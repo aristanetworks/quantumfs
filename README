@@ -1,0 +1,6 @@
+QuantumFS is a distributed, branchable filesystem built on FUSE and heterogeneous
+object stores. QuantumFS is a core component of Qubit.
+
+For more information on Qubit, please see AID2967 and AID2985.
+For more information on Quantumfs, please see AID3015.
+
