@@ -8,4 +8,5 @@ package main
 const (
 	exitOk           = iota
 	exitBadCacheSize = iota
+	exitMountFail    = iota
 )
