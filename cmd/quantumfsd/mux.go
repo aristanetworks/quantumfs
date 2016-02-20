@@ -6,8 +6,10 @@
 package main
 
 import "fmt"
+import "math"
 import "sync"
 
+import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
@@ -200,9 +202,17 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (code fuse.Status) {
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) (code fuse.Status) {
-	fmt.Println("Unhandled request StatFs")
-	return fuse.ENOSYS
+func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Status {
+	out.Blocks = 2684354560 // 10TB
+	out.Bfree = out.Blocks / 2
+	out.Bavail = out.Bfree
+	out.Files = 0
+	out.Ffree = math.MaxUint64
+	out.Bsize = 4096
+	out.NameLen = quantumfs.MaxFilenameLength
+	out.Frsize = 0
+
+	return fuse.OK
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
