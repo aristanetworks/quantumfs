@@ -10,13 +10,14 @@ import "flag"
 
 import "github.com/pivotal-golang/bytefmt"
 
-var config = struct {
+type QuantumFsConfig struct {
 	cachePath string
 	cacheSize uint64
 	mountPath string
-}{}
+}
 
 var cacheSizeString string
+var config QuantumFsConfig
 
 func init() {
 	const (

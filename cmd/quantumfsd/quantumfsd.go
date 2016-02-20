@@ -8,7 +8,6 @@ import "os"
 import "arista.com/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
-import "github.com/hanwen/go-fuse/fuse/nodefs"
 
 func main() {
 	processArgs()
@@ -21,9 +20,8 @@ func main() {
 		Name:          "quantumfs",
 	}
 
-	filesystem := NewQuantumfs()
-	connector := nodefs.NewFileSystemConnector(filesystem, nil)
-	server, err := fuse.NewServer(connector.RawFS(), config.mountPath,
+	quantumfs := NewQuantumFs(config)
+	server, err := fuse.NewServer(quantumfs, config.mountPath,
 		&mountOptions)
 	if err != nil {
 		os.Exit(exitMountFail)
