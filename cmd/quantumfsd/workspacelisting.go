@@ -5,7 +5,6 @@
 // directory hierarchy.
 package main
 
-import "fmt"
 import "time"
 
 import "github.com/hanwen/go-fuse/fuse"
@@ -41,8 +40,6 @@ func (nsl *NamespaceList) GetAttr(out *fuse.AttrOut) (result fuse.Status) {
 	out.Attr.Owner.Uid = 0
 	out.Attr.Owner.Gid = 0
 	out.Attr.Blksize = 4096
-
-	fmt.Println(out)
 
 	return fuse.OK
 }

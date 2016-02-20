@@ -54,7 +54,6 @@ func (qfs *QuantumFs) Forget(nodeid, nlookup uint64) {
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) (result fuse.Status) {
-	fmt.Println(input)
 	inode := qfs.inode(input.NodeId)
 	if inode == nil {
 		return fuse.ENOENT
