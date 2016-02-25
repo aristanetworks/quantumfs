@@ -43,7 +43,7 @@ func namespaceListFillAttr(attr *fuse.Attr, inodeNum uint64) {
 	attr.Ctime = 1
 	attr.Ctimensec = 1
 	attr.Mode = 0555 | fuse.S_IFDIR
-	attr.Nlink = 1024
+	attr.Nlink = 2 + uint32(globalQfs.config.workspaceDB.NumNamespaces())
 	attr.Owner.Uid = 0
 	attr.Owner.Gid = 0
 	attr.Blksize = 4096

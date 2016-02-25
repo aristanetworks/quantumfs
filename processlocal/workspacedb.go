@@ -20,6 +20,14 @@ type WorkspaceDB struct {
 	cache      map[string]map[string]uint64
 }
 
+func (wsdb *WorkspaceDB) NumNamespaces() int {
+	wsdb.cacheMutex.Lock()
+	num := len(wsdb.cache)
+	wsdb.cacheMutex.Unlock()
+
+	return num
+}
+
 func (wsdb *WorkspaceDB) NamespaceList() []string {
 	wsdb.cacheMutex.Lock()
 	namespaces := make([]string, 0, len(wsdb.cache))

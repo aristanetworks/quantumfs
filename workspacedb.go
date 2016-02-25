@@ -14,6 +14,10 @@ package quantumfs
 // must respond without blocking from a local cache if possible, perfectly accurate
 // data is not required.
 type WorkspaceDB interface {
+
+	// These methods need to be instant, but not necessarily completely up to
+	// date
+	NumNamespaces() int
 	NamespaceList() []string
 	WorkspaceList(namespace string) []string
 }
