@@ -20,7 +20,7 @@ func main() {
 		Name:          "quantumfs",
 	}
 
-	quantumfs := NewQuantumFs(config)
+	quantumfs := getInstance(config)
 	server, err := fuse.NewServer(quantumfs, config.mountPath,
 		&mountOptions)
 	if err != nil {

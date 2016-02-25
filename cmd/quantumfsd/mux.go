@@ -12,38 +12,60 @@ import "sync"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
-	qfs := &QuantumFs{
-		RawFileSystem: fuse.NewDefaultRawFileSystem(),
-		config:        config,
-		inodes:        make(map[uint64]Inode),
-	}
+var globalQfs *QuantumFs
 
-	qfs.inodes[fuse.FUSE_ROOT_ID] = NewNamespaceList()
-	return qfs
+func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
+	if globalQfs == nil {
+		qfs := &QuantumFs{
+			RawFileSystem: fuse.NewDefaultRawFileSystem(),
+			config:        config,
+			inodes:        make(map[uint64]Inode),
+			fileHandles:   make(map[uint64]FileHandle),
+		}
+
+		qfs.inodes[fuse.FUSE_ROOT_ID] = NewNamespaceList()
+		globalQfs = qfs
+	}
+	return globalQfs
 }
 
 type QuantumFs struct {
 	fuse.RawFileSystem
 	config QuantumFsConfig
 
-	inodeMutex sync.Mutex // TODO: Perhaps an RWMutex instead?
-	inodes     map[uint64]Inode
+	mapMutex    sync.Mutex // TODO: Perhaps an RWMutex instead?
+	inodes      map[uint64]Inode
+	fileHandles map[uint64]FileHandle
 }
 
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(id uint64) Inode {
-	qfs.inodeMutex.Lock()
+	qfs.mapMutex.Lock()
 	inode := qfs.inodes[id]
-	qfs.inodeMutex.Unlock()
+	qfs.mapMutex.Unlock()
 	return inode
 }
 
 // Set an inode in a thread safe way
 func (qfs *QuantumFs) setInode(id uint64, inode Inode) {
-	qfs.inodeMutex.Lock()
+	qfs.mapMutex.Lock()
 	qfs.inodes[id] = inode
-	qfs.inodeMutex.Unlock()
+	qfs.mapMutex.Unlock()
+}
+
+// Get a file handle in a thread safe way
+func (qfs *QuantumFs) fileHandle(id uint64) FileHandle {
+	qfs.mapMutex.Lock()
+	fileHandle := qfs.fileHandles[id]
+	qfs.mapMutex.Unlock()
+	return fileHandle
+}
+
+// Set a file handle in a thread safe way
+func (qfs *QuantumFs) setFileHandle(id uint64, fileHandle FileHandle) {
+	qfs.mapMutex.Lock()
+	qfs.fileHandles[id] = fileHandle
+	qfs.mapMutex.Unlock()
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.EntryOut) (status fuse.Status) {
@@ -178,9 +200,13 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (code fuse.Status) {
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) (status fuse.Status) {
-	fmt.Println("Unhandled request OpenDir")
-	return fuse.ENOSYS
+func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
+	inode := qfs.inode(input.NodeId)
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.OpenDir(input.Flags, input.Mode, out)
 }
 
 func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
@@ -189,8 +215,11 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.S
 }
 
 func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
-	fmt.Println("Unhandled request ReadDirPlus")
-	return fuse.ENOSYS
+	fileHandle := qfs.fileHandle(input.Fh)
+	if fileHandle == nil {
+		return fuse.ENOENT
+	}
+	return fileHandle.ReadDirPlus(input, out)
 }
 
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
