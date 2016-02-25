@@ -61,7 +61,7 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 func newNamespaceSnapshot() *namespaceSnapshot {
 	ns := namespaceSnapshot{
 		FileHandleCommon: FileHandleCommon{
-			id:       fuse.FUSE_ROOT_ID,
+			id:       globalQfs.newFileHandleId(),
 			inodeNum: fuse.FUSE_ROOT_ID,
 		},
 	}

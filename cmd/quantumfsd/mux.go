@@ -8,6 +8,7 @@ package main
 import "fmt"
 import "math"
 import "sync"
+import "sync/atomic"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -21,6 +22,8 @@ func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
 			config:        config,
 			inodes:        make(map[uint64]Inode),
 			fileHandles:   make(map[uint64]FileHandle),
+			inodeNum:      fuse.FUSE_ROOT_ID + 1,
+			fileHandleNum: fuse.FUSE_ROOT_ID + 1,
 		}
 
 		qfs.inodes[fuse.FUSE_ROOT_ID] = NewNamespaceList()
@@ -31,7 +34,9 @@ func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
 
 type QuantumFs struct {
 	fuse.RawFileSystem
-	config QuantumFsConfig
+	config        QuantumFsConfig
+	inodeNum      uint64
+	fileHandleNum uint64
 
 	mapMutex    sync.Mutex // TODO: Perhaps an RWMutex instead?
 	inodes      map[uint64]Inode
@@ -66,6 +71,16 @@ func (qfs *QuantumFs) setFileHandle(id uint64, fileHandle FileHandle) {
 	qfs.mapMutex.Lock()
 	qfs.fileHandles[id] = fileHandle
 	qfs.mapMutex.Unlock()
+}
+
+// Retrieve a unique inode number
+func (qfs *QuantumFs) newInodeId() uint64 {
+	return atomic.AddUint64(&qfs.inodeNum, 1)
+}
+
+// Retrieve a unique filehandle number
+func (qfs *QuantumFs) newFileHandleId() uint64 {
+	return atomic.AddUint64(&qfs.fileHandleNum, 1)
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.EntryOut) (status fuse.Status) {
