@@ -53,8 +53,8 @@ func namespaceListFillAttr(attr *fuse.Attr, inodeNum uint64) {
 	attr.Blksize = 4096
 }
 
-func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status) {
-	// Update out internal namespace listing
+// Update the internal namespaces list with the most recent available listing
+func (nsl *NamespaceList) updateNamespaceList() {
 	namespaces := globalQfs.config.workspaceDB.NamespaceList()
 	touched := make(map[string]bool)
 
@@ -72,6 +72,10 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 			delete(nsl.namespaces, name)
 		}
 	}
+}
+
+func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status) {
+	nsl.updateNamespaceList()
 
 	// Now take a snapshot of that mapping for the NamespaceSnapshot
 	children := make([]nameInodeIdTuple, 0, len(nsl.namespaces))
