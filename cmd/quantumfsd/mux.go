@@ -22,8 +22,8 @@ func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
 			config:        config,
 			inodes:        make(map[uint64]Inode),
 			fileHandles:   make(map[uint64]FileHandle),
-			inodeNum:      fuse.FUSE_ROOT_ID + 1,
-			fileHandleNum: fuse.FUSE_ROOT_ID + 1,
+			inodeNum:      fuse.FUSE_ROOT_ID,
+			fileHandleNum: fuse.FUSE_ROOT_ID,
 		}
 
 		qfs.inodes[fuse.FUSE_ROOT_ID] = NewNamespaceList()
@@ -51,10 +51,14 @@ func (qfs *QuantumFs) inode(id uint64) Inode {
 	return inode
 }
 
-// Set an inode in a thread safe way
+// Set an inode in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setInode(id uint64, inode Inode) {
 	qfs.mapMutex.Lock()
-	qfs.inodes[id] = inode
+	if inode != nil {
+		qfs.inodes[id] = inode
+	} else {
+		delete(qfs.inodes, id)
+	}
 	qfs.mapMutex.Unlock()
 }
 
@@ -66,10 +70,14 @@ func (qfs *QuantumFs) fileHandle(id uint64) FileHandle {
 	return fileHandle
 }
 
-// Set a file handle in a thread safe way
+// Set a file handle in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setFileHandle(id uint64, fileHandle FileHandle) {
 	qfs.mapMutex.Lock()
-	qfs.fileHandles[id] = fileHandle
+	if fileHandle != nil {
+		qfs.fileHandles[id] = fileHandle
+	} else {
+		delete(qfs.fileHandles, id)
+	}
 	qfs.mapMutex.Unlock()
 }
 
@@ -238,7 +246,7 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fu
 }
 
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
-	fmt.Println("Unhandled request ReleaseDir")
+	qfs.setFileHandle(input.Fh, nil)
 }
 
 func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (code fuse.Status) {
