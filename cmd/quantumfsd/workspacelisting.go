@@ -13,12 +13,16 @@ import "github.com/hanwen/go-fuse/fuse"
 func NewNamespaceList() *NamespaceList {
 	nsl := NamespaceList{
 		InodeCommon: InodeCommon{id: fuse.FUSE_ROOT_ID},
+		namespaces:  make(map[string]uint64),
 	}
 	return &nsl
 }
 
 type NamespaceList struct {
 	InodeCommon
+
+	// Map from child name to Inode ID
+	namespaces map[string]uint64
 }
 
 func (nsl *NamespaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
@@ -50,7 +54,32 @@ func namespaceListFillAttr(attr *fuse.Attr, inodeNum uint64) {
 }
 
 func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status) {
-	ns := newNamespaceSnapshot()
+	// Update out internal namespace listing
+	namespaces := globalQfs.config.workspaceDB.NamespaceList()
+	touched := make(map[string]bool)
+
+	// First add any new entries
+	for _, name := range namespaces {
+		if _, exists := nsl.namespaces[name]; !exists {
+			nsl.namespaces[name] = globalQfs.newInodeId()
+		}
+		touched[name] = true
+	}
+
+	// Then delete entries which no longer exist
+	for name, _ := range nsl.namespaces {
+		if _, exists := touched[name]; !exists {
+			delete(nsl.namespaces, name)
+		}
+	}
+
+	// Now take a snapshot of that mapping for the NamespaceSnapshot
+	children := make([]nameInodeIdTuple, 0, len(nsl.namespaces))
+	for name, inode := range nsl.namespaces {
+		children = append(children, nameInodeIdTuple{name: name, inodeId: inode})
+	}
+
+	ns := newNamespaceSnapshot(children)
 	globalQfs.setFileHandle(ns.FileHandleCommon.id, ns)
 	out.Fh = ns.FileHandleCommon.id
 	out.OpenFlags = 0
@@ -58,22 +87,26 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 	return fuse.OK
 }
 
-func newNamespaceSnapshot() *namespaceSnapshot {
+type nameInodeIdTuple struct {
+	name    string
+	inodeId uint64
+}
+
+func newNamespaceSnapshot(children []nameInodeIdTuple) *namespaceSnapshot {
 	ns := namespaceSnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:       globalQfs.newFileHandleId(),
 			inodeNum: fuse.FUSE_ROOT_ID,
 		},
+		namespaces: children,
 	}
-	// Now get the real list of namespaces
-	ns.namespaces = globalQfs.config.workspaceDB.NamespaceList()
 
 	return &ns
 }
 
 type namespaceSnapshot struct {
 	FileHandleCommon
-	namespaces []string
+	namespaces []nameInodeIdTuple
 }
 
 func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
@@ -118,14 +151,13 @@ func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 
 	toRemove := 0
 	for _, namespace := range ns.namespaces {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: namespace}
+		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: namespace.name}
 		details, _ := out.AddDirLookupEntry(entry)
 		if details == nil {
 			break
 		}
 
-		details.NodeId = offset
-		offset++
+		details.NodeId = namespace.inodeId
 		details.Generation = 1
 		details.EntryValid = config.cacheTimeSeconds
 		details.EntryValidNsec = config.cacheTimeNsecs
