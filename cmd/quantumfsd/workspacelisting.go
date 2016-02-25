@@ -65,49 +65,96 @@ func newNamespaceSnapshot() *namespaceSnapshot {
 			inodeNum: fuse.FUSE_ROOT_ID,
 		},
 	}
+	// Now get the real list of namespaces
+	ns.namespaces = globalQfs.config.workspaceDB.NamespaceList()
 
 	return &ns
 }
 
 type namespaceSnapshot struct {
 	FileHandleCommon
+	namespaces []string
 }
 
 func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
 	fmt.Println("ReadDirPlus", input, out)
-	if input.Offset != 0 {
-		return fuse.OK
-	}
+	offset := input.Offset
 
 	// Add .
-	entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: "."}
-	details, _ := out.AddDirLookupEntry(entry)
-	if details == nil {
-		return fuse.OK
-	}
+	if offset == 0 {
+		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: "."}
+		details, _ := out.AddDirLookupEntry(entry)
+		if details == nil {
+			return fuse.OK
+		}
 
-	details.NodeId = ns.FileHandleCommon.inodeNum
-	details.Generation = 1
-	details.EntryValid = config.cacheTimeSeconds
-	details.EntryValidNsec = config.cacheTimeNsecs
-	details.AttrValid = config.cacheTimeSeconds
-	details.AttrValidNsec = config.cacheTimeNsecs
-	namespaceListFillAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
+		details.NodeId = ns.FileHandleCommon.inodeNum
+		details.Generation = 1
+		details.EntryValid = config.cacheTimeSeconds
+		details.EntryValidNsec = config.cacheTimeNsecs
+		details.AttrValid = config.cacheTimeSeconds
+		details.AttrValidNsec = config.cacheTimeNsecs
+		namespaceListFillAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
+	}
+	offset++
 
 	// Add .., even though this will be overwritten
-	entry = fuse.DirEntry{Mode: fuse.S_IFDIR, Name: ".."}
-	details, _ = out.AddDirLookupEntry(entry)
-	if details == nil {
-		return fuse.OK
+	if offset == 1 {
+		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: ".."}
+		details, _ := out.AddDirLookupEntry(entry)
+		if details == nil {
+			return fuse.OK
+		}
+
+		details.NodeId = ns.FileHandleCommon.inodeNum
+		details.Generation = 1
+		details.EntryValid = config.cacheTimeSeconds
+		details.EntryValidNsec = config.cacheTimeNsecs
+		details.AttrValid = config.cacheTimeSeconds
+		details.AttrValidNsec = config.cacheTimeNsecs
+		namespaceListFillAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
+	}
+	offset++
+
+	toRemove := 0
+	for _, namespace := range ns.namespaces {
+		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: namespace}
+		details, _ := out.AddDirLookupEntry(entry)
+		if details == nil {
+			break
+		}
+
+		details.NodeId = offset
+		offset++
+		details.Generation = 1
+		details.EntryValid = config.cacheTimeSeconds
+		details.EntryValidNsec = config.cacheTimeNsecs
+		details.AttrValid = config.cacheTimeSeconds
+		details.AttrValidNsec = config.cacheTimeNsecs
+
+		details.Attr.Ino = offset - 1
+		details.Attr.Size = 4096
+		details.Attr.Blocks = 1
+
+		now := time.Now()
+		details.Attr.Atime = uint64(now.Unix())
+		details.Attr.Atimensec = uint32(now.Nanosecond())
+		details.Attr.Mtime = uint64(now.Unix())
+		details.Attr.Mtimensec = uint32(now.Nanosecond())
+
+		details.Attr.Ctime = 1
+		details.Attr.Ctimensec = 1
+		details.Attr.Mode = 0555 | fuse.S_IFDIR
+
+		details.Attr.Nlink = 8
+		details.Attr.Owner.Uid = 0
+		details.Attr.Owner.Gid = 0
+		details.Attr.Blksize = 4096
+
+		toRemove++
 	}
 
-	details.NodeId = ns.FileHandleCommon.inodeNum
-	details.Generation = 1
-	details.EntryValid = config.cacheTimeSeconds
-	details.EntryValidNsec = config.cacheTimeNsecs
-	details.AttrValid = config.cacheTimeSeconds
-	details.AttrValidNsec = config.cacheTimeNsecs
-	namespaceListFillAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
+	ns.namespaces = ns.namespaces[toRemove:]
 
 	return fuse.OK
 }

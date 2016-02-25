@@ -8,6 +8,9 @@ package main
 import "os"
 import "flag"
 
+import "arista.com/quantumfs"
+import "arista.com/quantumfs/processlocal"
+
 import "github.com/pivotal-golang/bytefmt"
 
 type QuantumFsConfig struct {
@@ -18,6 +21,8 @@ type QuantumFsConfig struct {
 	// How long the kernel is allowed to cache values
 	cacheTimeSeconds uint64
 	cacheTimeNsecs   uint32
+
+	workspaceDB quantumfs.WorkspaceDB
 }
 
 var cacheSizeString string
@@ -59,5 +64,7 @@ func processArgs() {
 		config.cacheSize = cacheSize
 	}
 	config.cacheTimeNsecs = (uint32)(cacheTimeNsecs)
+
+	config.workspaceDB = processlocal.NewWorkspaceDB()
 
 }
