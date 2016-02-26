@@ -60,7 +60,7 @@ func (wsdb *WorkspaceDB) WorkspaceList(namespace string) []string {
 	wsdb.cacheMutex.Lock()
 	workspaces := make([]string, 0, len(wsdb.cache[namespace]))
 
-	for name, _ := range wsdb.cache {
+	for name, _ := range wsdb.cache[namespace] {
 		workspaces = append(workspaces, name)
 	}
 
