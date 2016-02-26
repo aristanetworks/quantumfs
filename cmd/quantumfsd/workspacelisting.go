@@ -38,13 +38,16 @@ func fillRootAttr(attr *fuse.Attr, inodeNum uint64) {
 		uint32(globalQfs.config.workspaceDB.NumNamespaces()))
 }
 
+type listingAttrFill func(attr *fuse.Attr, inodeNum uint64, name string)
+
 func fillNamespaceAttr(attr *fuse.Attr, inodeNum uint64, namespace string) {
 	fillAttr(attr, inodeNum,
 		uint32(globalQfs.config.workspaceDB.NumWorkspaces(namespace)))
 }
 
-func fillWorkspaceAttr(attr *fuse.Attr, inodeNum uint64, namespace string, workspace string) {
+func fillWorkspaceAttr(attr *fuse.Attr, inodeNum uint64, workspace string) {
 	fillAttr(attr, inodeNum, 8)
+	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
 func fillAttr(attr *fuse.Attr, inodeNum uint64, numChildren uint32) {
@@ -111,7 +114,7 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 	updateChildren(config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces)
 
-	ds := newDirectorySnapshot(children, nsl.InodeCommon.id)
+	ds := newDirectorySnapshot(children, nsl.InodeCommon.id, fillNamespaceAttr)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
@@ -120,7 +123,7 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 }
 
 func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
-	if !globalQfs.config.workspaceDB.NamespaceExists(name) {
+	if !config.workspaceDB.NamespaceExists(name) {
 		return fuse.ENOENT
 	}
 
@@ -138,13 +141,15 @@ type nameInodeIdTuple struct {
 	inodeId uint64
 }
 
-func newDirectorySnapshot(children []nameInodeIdTuple, inodeNum uint64) *directorySnapshot {
+func newDirectorySnapshot(children []nameInodeIdTuple, inodeNum uint64,
+	fillFn listingAttrFill) *directorySnapshot {
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:       globalQfs.newFileHandleId(),
 			inodeNum: inodeNum,
 		},
 		children: children,
+		fillFn:   fillFn,
 	}
 
 	return &ds
@@ -153,6 +158,7 @@ func newDirectorySnapshot(children []nameInodeIdTuple, inodeNum uint64) *directo
 type directorySnapshot struct {
 	FileHandleCommon
 	children []nameInodeIdTuple
+	fillFn   listingAttrFill
 }
 
 func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
@@ -197,7 +203,7 @@ func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 
 		details.NodeId = child.inodeId
 		fillEntryOutCacheData(details)
-		fillNamespaceAttr(&details.Attr, details.NodeId, child.name)
+		ds.fillFn(&details.Attr, details.NodeId, child.name)
 
 		processed++
 	}
@@ -237,7 +243,7 @@ func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 		&wsl.workspaces, newWorkspaceRoot)
 	children := snapshotChildren(&wsl.workspaces)
 
-	ds := newDirectorySnapshot(children, wsl.InodeCommon.id)
+	ds := newDirectorySnapshot(children, wsl.InodeCommon.id, fillWorkspaceAttr)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
@@ -246,8 +252,17 @@ func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 }
 
 func (wsl *WorkspaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
-	fmt.Println("Unhandled WorkspaceList Lookup")
-	return fuse.ENOSYS
+	if !config.workspaceDB.WorkspaceExists(wsl.name, name) {
+		return fuse.ENOENT
+	}
+
+	updateChildren(config.workspaceDB.WorkspaceList(wsl.name), &wsl.workspaces, newWorkspaceRoot)
+
+	out.NodeId = wsl.workspaces[name]
+	fillEntryOutCacheData(out)
+	fillWorkspaceAttr(&out.Attr, out.NodeId, name)
+
+	return fuse.OK
 }
 
 func newWorkspaceRoot(name string, inodeNum uint64) Inode {
