@@ -177,7 +177,7 @@ func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 	}
 	offset++
 
-	toRemove := 0
+	processed := 0
 	for _, namespace := range ns.namespaces {
 		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: namespace.name}
 		details, _ := out.AddDirLookupEntry(entry)
@@ -189,10 +189,10 @@ func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 		fillEntryOutCacheData(details)
 		fillNamespaceAttr(&details.Attr, details.NodeId, namespace.name)
 
-		toRemove++
+		processed++
 	}
 
-	ns.namespaces = ns.namespaces[toRemove:]
+	ns.namespaces = ns.namespaces[processed:]
 
 	return fuse.OK
 }
