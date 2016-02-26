@@ -11,6 +11,7 @@ import "github.com/hanwen/go-fuse/fuse"
 type Inode interface {
 	GetAttr(out *fuse.AttrOut) (result fuse.Status)
 	OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status)
+	Lookup(name string, out *fuse.EntryOut) fuse.Status
 }
 
 type InodeCommon struct {

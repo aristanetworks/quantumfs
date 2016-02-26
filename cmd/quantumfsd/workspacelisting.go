@@ -29,11 +29,21 @@ func (nsl *NamespaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = config.cacheTimeSeconds
 	out.AttrValidNsec = config.cacheTimeNsecs
 
-	namespaceListFillAttr(&out.Attr, nsl.InodeCommon.id)
+	fillRootAttr(&out.Attr, nsl.InodeCommon.id)
 	return fuse.OK
 }
 
-func namespaceListFillAttr(attr *fuse.Attr, inodeNum uint64) {
+func fillRootAttr(attr *fuse.Attr, inodeNum uint64) {
+	fillAttr(attr, inodeNum,
+		uint32(globalQfs.config.workspaceDB.NumNamespaces()))
+}
+
+func fillNamespaceAttr(attr *fuse.Attr, inodeNum uint64, namespace string) {
+	fillAttr(attr, inodeNum,
+		uint32(globalQfs.config.workspaceDB.NumWorkspaces(namespace)))
+}
+
+func fillAttr(attr *fuse.Attr, inodeNum uint64, numChildren uint32) {
 	attr.Ino = inodeNum
 	attr.Size = 4096
 	attr.Blocks = 1
@@ -47,10 +57,18 @@ func namespaceListFillAttr(attr *fuse.Attr, inodeNum uint64) {
 	attr.Ctime = 1
 	attr.Ctimensec = 1
 	attr.Mode = 0555 | fuse.S_IFDIR
-	attr.Nlink = 2 + uint32(globalQfs.config.workspaceDB.NumNamespaces())
+	attr.Nlink = 2 + numChildren
 	attr.Owner.Uid = 0
 	attr.Owner.Gid = 0
 	attr.Blksize = 4096
+}
+
+func fillEntryOutCacheData(out *fuse.EntryOut) {
+	out.Generation = 1
+	out.EntryValid = config.cacheTimeSeconds
+	out.EntryValidNsec = config.cacheTimeNsecs
+	out.AttrValid = config.cacheTimeSeconds
+	out.AttrValidNsec = config.cacheTimeNsecs
 }
 
 // Update the internal namespaces list with the most recent available listing
@@ -91,6 +109,20 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+	if !globalQfs.config.workspaceDB.NamespaceExists(name) {
+		return fuse.ENOENT
+	}
+
+	nsl.updateNamespaceList()
+
+	out.NodeId = nsl.namespaces[name]
+	fillEntryOutCacheData(out)
+	fillNamespaceAttr(&out.Attr, out.NodeId, name)
+
+	return fuse.OK
+}
+
 type nameInodeIdTuple struct {
 	name    string
 	inodeId uint64
@@ -126,12 +158,8 @@ func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 		}
 
 		details.NodeId = ns.FileHandleCommon.inodeNum
-		details.Generation = 1
-		details.EntryValid = config.cacheTimeSeconds
-		details.EntryValidNsec = config.cacheTimeNsecs
-		details.AttrValid = config.cacheTimeSeconds
-		details.AttrValidNsec = config.cacheTimeNsecs
-		namespaceListFillAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
+		fillEntryOutCacheData(details)
+		fillRootAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
 	}
 	offset++
 
@@ -144,12 +172,8 @@ func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 		}
 
 		details.NodeId = ns.FileHandleCommon.inodeNum
-		details.Generation = 1
-		details.EntryValid = config.cacheTimeSeconds
-		details.EntryValidNsec = config.cacheTimeNsecs
-		details.AttrValid = config.cacheTimeSeconds
-		details.AttrValidNsec = config.cacheTimeNsecs
-		namespaceListFillAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
+		fillEntryOutCacheData(details)
+		fillRootAttr(&details.Attr, ns.FileHandleCommon.inodeNum)
 	}
 	offset++
 
@@ -162,30 +186,8 @@ func (ns *namespaceSnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 		}
 
 		details.NodeId = namespace.inodeId
-		details.Generation = 1
-		details.EntryValid = config.cacheTimeSeconds
-		details.EntryValidNsec = config.cacheTimeNsecs
-		details.AttrValid = config.cacheTimeSeconds
-		details.AttrValidNsec = config.cacheTimeNsecs
-
-		details.Attr.Ino = offset - 1
-		details.Attr.Size = 4096
-		details.Attr.Blocks = 1
-
-		now := time.Now()
-		details.Attr.Atime = uint64(now.Unix())
-		details.Attr.Atimensec = uint32(now.Nanosecond())
-		details.Attr.Mtime = uint64(now.Unix())
-		details.Attr.Mtimensec = uint32(now.Nanosecond())
-
-		details.Attr.Ctime = 1
-		details.Attr.Ctimensec = 1
-		details.Attr.Mode = 0555 | fuse.S_IFDIR
-
-		details.Attr.Nlink = 8
-		details.Attr.Owner.Uid = 0
-		details.Attr.Owner.Gid = 0
-		details.Attr.Blksize = 4096
+		fillEntryOutCacheData(details)
+		fillNamespaceAttr(&details.Attr, details.NodeId, namespace.name)
 
 		toRemove++
 	}

@@ -91,9 +91,13 @@ func (qfs *QuantumFs) newFileHandleId() uint64 {
 	return atomic.AddUint64(&qfs.fileHandleNum, 1)
 }
 
-func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.EntryOut) (status fuse.Status) {
-	fmt.Println("Unhandled request Lookup")
-	return fuse.ENOSYS
+func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.EntryOut) fuse.Status {
+	inode := qfs.inode(header.NodeId)
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Lookup(name, out)
 }
 
 func (qfs *QuantumFs) Forget(nodeid, nlookup uint64) {

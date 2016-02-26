@@ -19,5 +19,10 @@ type WorkspaceDB interface {
 	// date
 	NumNamespaces() int
 	NamespaceList() []string
+	NumWorkspaces(namespace string) int
 	WorkspaceList(namespace string) []string
+
+	// These methods need to be up to date
+	NamespaceExists(namespace string) bool
+	WorkspaceExists(namespace string, workspace string) bool
 }
