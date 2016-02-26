@@ -100,8 +100,9 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.Entry
 	return inode.Lookup(name, out)
 }
 
-func (qfs *QuantumFs) Forget(nodeid, nlookup uint64) {
-	fmt.Println("Unhandled request Forget")
+func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
+	fmt.Println("Forgetting inode", nodeID, "Looked up ", nlookup, "Times")
+	qfs.setInode(nodeID, nil)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) (result fuse.Status) {
