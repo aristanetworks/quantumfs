@@ -94,6 +94,7 @@ func (qfs *QuantumFs) newFileHandleId() uint64 {
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.EntryOut) fuse.Status {
 	inode := qfs.inode(header.NodeId)
 	if inode == nil {
+		fmt.Println("Lookup failed", name)
 		return fuse.ENOENT
 	}
 
@@ -159,9 +160,9 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte, code fuse.Sta
 	return nil, fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) Access(input *fuse.AccessIn) (code fuse.Status) {
+func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
 	fmt.Println("Unhandled request Access")
-	return fuse.ENOSYS
+	return fuse.OK
 }
 
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (sz int, code fuse.Status) {
@@ -231,6 +232,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (code fuse.Status) {
 func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
 	inode := qfs.inode(input.NodeId)
 	if inode == nil {
+		fmt.Println("OpenDir failed", input)
 		return fuse.ENOENT
 	}
 
@@ -245,6 +247,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.S
 func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
 	fileHandle := qfs.fileHandle(input.Fh)
 	if fileHandle == nil {
+		fmt.Println("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
 	}
 	return fileHandle.ReadDirPlus(input, out)
