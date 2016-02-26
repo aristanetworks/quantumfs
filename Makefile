@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd
+COMMANDS=quantumfsd qfs
 
 .PHONY: all $(COMMANDS)
 .NOTPARALLEL:
