@@ -212,7 +212,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult, fus
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
-	fmt.Println("Unhandled request Release")
+	qfs.setFileHandle(input.Fh, nil)
 }
 
 func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32, code fuse.Status) {
