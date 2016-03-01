@@ -22,11 +22,12 @@ func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
 			config:        config,
 			inodes:        make(map[uint64]Inode),
 			fileHandles:   make(map[uint64]FileHandle),
-			inodeNum:      fuse.FUSE_ROOT_ID,
-			fileHandleNum: fuse.FUSE_ROOT_ID,
+			inodeNum:      inodeIdReservedEnd,
+			fileHandleNum: inodeIdReservedEnd,
 		}
 
-		qfs.inodes[fuse.FUSE_ROOT_ID] = NewNamespaceList()
+		qfs.inodes[inodeIdRoot] = NewNamespaceList()
+		qfs.inodes[inodeIdApi] = NewApiInode()
 		globalQfs = qfs
 	}
 	return globalQfs

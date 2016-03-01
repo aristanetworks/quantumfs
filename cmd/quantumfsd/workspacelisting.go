@@ -12,7 +12,7 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewNamespaceList() Inode {
 	nsl := NamespaceList{
-		InodeCommon: InodeCommon{id: fuse.FUSE_ROOT_ID},
+		InodeCommon: InodeCommon{id: inodeIdRoot},
 		namespaces:  make(map[string]uint64),
 	}
 	return &nsl
@@ -113,6 +113,7 @@ func snapshotChildren(children *map[string]uint64) []nameInodeIdTuple {
 func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status) {
 	updateChildren(config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces)
+	children = append(children, nameInodeIdTuple{name: apiPath, inodeId: inodeIdApi})
 
 	ds := newDirectorySnapshot(children, nsl.InodeCommon.id, fillNamespaceAttr)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
@@ -123,6 +124,13 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 }
 
 func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+	if name == apiPath {
+		out.NodeId = inodeIdApi
+		fillEntryOutCacheData(out)
+		fillApiAttr(&out.Attr)
+		return fuse.OK
+	}
+
 	if !config.workspaceDB.NamespaceExists(name) {
 		return fuse.ENOENT
 	}
@@ -195,7 +203,13 @@ func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 
 	processed := 0
 	for _, child := range ds.children {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: child.name}
+		var mode uint32
+		if child.name == apiPath {
+			mode = fuse.S_IFREG
+		} else {
+			mode = fuse.S_IFDIR
+		}
+		entry := fuse.DirEntry{Mode: mode, Name: child.name}
 		details, _ := out.AddDirLookupEntry(entry)
 		if details == nil {
 			break
@@ -203,7 +217,11 @@ func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 
 		details.NodeId = child.inodeId
 		fillEntryOutCacheData(details)
-		ds.fillFn(&details.Attr, details.NodeId, child.name)
+		if child.name == apiPath {
+			fillApiAttr(&details.Attr)
+		} else {
+			ds.fillFn(&details.Attr, details.NodeId, child.name)
+		}
 
 		processed++
 	}
