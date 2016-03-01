@@ -110,7 +110,11 @@ func snapshotChildren(children *map[string]uint64) []nameInodeIdTuple {
 	return out
 }
 
-func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status) {
+func (nsl *NamespaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+	return nsl.OpenDir(flags, mode, out)
+}
+
+func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren(config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces)
 	children = append(children, nameInodeIdTuple{name: apiPath, inodeId: inodeIdApi})
@@ -256,6 +260,10 @@ func (nsd *WorkspaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
+func (wsl *WorkspaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+	return wsl.OpenDir(flags, mode, out)
+}
+
 func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren(config.workspaceDB.WorkspaceList(wsl.name),
 		&wsl.workspaces, newWorkspaceRoot)
@@ -295,6 +303,10 @@ type WorkspaceRoot struct {
 
 func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
+}
+
+func (wsr *WorkspaceRoot) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+	return wsr.OpenDir(flags, mode, out)
 }
 
 func (wsr *WorkspaceRoot) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {

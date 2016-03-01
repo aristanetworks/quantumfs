@@ -9,8 +9,9 @@ import "github.com/hanwen/go-fuse/fuse"
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
-	GetAttr(out *fuse.AttrOut) (result fuse.Status)
-	OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) (result fuse.Status)
+	GetAttr(out *fuse.AttrOut) fuse.Status
+	Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
+	OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
 	Lookup(name string, out *fuse.EntryOut) fuse.Status
 }
 

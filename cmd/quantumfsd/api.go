@@ -5,6 +5,7 @@ package main
 
 // This file contains all the interaction with the quantumfs API file.
 
+import "fmt"
 import "time"
 
 import "github.com/hanwen/go-fuse/fuse"
@@ -49,6 +50,11 @@ func (api *ApiInode) GetAttr(out *fuse.AttrOut) fuse.Status {
 
 func (api *ApiInode) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	return fuse.ENOTDIR
+}
+
+func (api *ApiInode) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+	fmt.Println("Open called on Api")
+	return fuse.ENOSYS
 }
 
 func (api *ApiInode) Lookup(name string, out *fuse.EntryOut) fuse.Status {

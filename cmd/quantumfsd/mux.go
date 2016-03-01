@@ -196,9 +196,14 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string, out *fuse.Create
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) (status fuse.Status) {
-	fmt.Println("Unhandled request Open")
-	return fuse.ENOSYS
+func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
+	inode := qfs.inode(input.NodeId)
+	if inode == nil {
+		fmt.Println("Open failed", input)
+		return fuse.ENOENT
+	}
+
+	return inode.Open(input.Flags, input.Mode, out)
 }
 
 func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult, fuse.Status) {
