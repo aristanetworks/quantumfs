@@ -10,9 +10,9 @@ import "github.com/hanwen/go-fuse/fuse"
 // changes.
 type Inode interface {
 	GetAttr(out *fuse.AttrOut) fuse.Status
+	Lookup(name string, out *fuse.EntryOut) fuse.Status
 	Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
 	OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
-	Lookup(name string, out *fuse.EntryOut) fuse.Status
 }
 
 type InodeCommon struct {
@@ -24,6 +24,7 @@ type InodeCommon struct {
 // the tree.
 type FileHandle interface {
 	ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status
+	Read(offset uint64, size uint32, buf []byte) (fuse.ReadResult, fuse.Status)
 }
 
 type FileHandleCommon struct {

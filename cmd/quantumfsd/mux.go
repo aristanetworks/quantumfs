@@ -207,8 +207,13 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
 }
 
 func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult, fuse.Status) {
-	fmt.Println("Unhandled request Read")
-	return nil, fuse.ENOSYS
+	fmt.Println("Read:", input)
+	fileHandle := qfs.fileHandle(input.Fh)
+	if fileHandle == nil {
+		fmt.Println("Read failed", fileHandle)
+		return nil, fuse.ENOENT
+	}
+	return fileHandle.Read(input.Offset, input.Size, buf)
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {

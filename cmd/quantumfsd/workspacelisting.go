@@ -235,6 +235,11 @@ func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 	return fuse.OK
 }
 
+func (ds *directorySnapshot) Read(offset uint64, size uint32, buf []byte) (fuse.ReadResult, fuse.Status) {
+	fmt.Println("Invalid read on directorySnapshot")
+	return nil, fuse.ENOSYS
+}
+
 func newWorkspaceList(name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
 		InodeCommon: InodeCommon{id: inodeNum},

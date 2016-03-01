@@ -53,10 +53,38 @@ func (api *ApiInode) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.
 }
 
 func (api *ApiInode) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	fmt.Println("Open called on Api")
-	return fuse.ENOSYS
+	out.OpenFlags = fuse.FOPEN_NONSEEKABLE
+	handle := newApiHandle()
+	globalQfs.setFileHandle(handle.FileHandleCommon.id, handle)
+	out.Fh = handle.FileHandleCommon.id
+	return fuse.OK
 }
 
 func (api *ApiInode) Lookup(name string, out *fuse.EntryOut) fuse.Status {
 	return fuse.ENOSYS
+}
+
+func newApiHandle() *ApiHandle {
+	api := ApiHandle{
+		FileHandleCommon: FileHandleCommon{
+			id:       globalQfs.newFileHandleId(),
+			inodeNum: inodeIdApi,
+		},
+	}
+	return &api
+}
+
+// ApiHandle represents the user's interactions with quantumfs and is not necessarily
+// synchronized with other api handles.
+type ApiHandle struct {
+	FileHandleCommon
+}
+
+func (api *ApiHandle) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
+	fmt.Println("Invalid ReadDirPlus against ApiHandle")
+	return fuse.ENOSYS
+}
+
+func (api *ApiHandle) Read(offset uint64, size uint32, buf []byte) (fuse.ReadResult, fuse.Status) {
+	return nil, fuse.OK
 }
