@@ -240,6 +240,11 @@ func (ds *directorySnapshot) Read(offset uint64, size uint32, buf []byte) (fuse.
 	return nil, fuse.ENOSYS
 }
 
+func (ds *directorySnapshot) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
+	fmt.Println("Invalid write on directorySnapshot")
+	return 0, fuse.ENOSYS
+}
+
 func newWorkspaceList(name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
 		InodeCommon: InodeCommon{id: inodeNum},

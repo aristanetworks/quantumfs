@@ -117,7 +117,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) (result 
 }
 
 func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn, out *fuse.AttrOut) (code fuse.Status) {
-	fmt.Println("Unhandled request SetAttr")
+	fmt.Println("Unhandled request SetAttr", input)
 	return fuse.ENOSYS
 }
 
@@ -220,9 +220,14 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	qfs.setFileHandle(input.Fh, nil)
 }
 
-func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32, code fuse.Status) {
-	fmt.Println("Unhandled request Write")
-	return 0, fuse.ENOSYS
+func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Status) {
+	fmt.Println("Unhandled request Write", input)
+	fileHandle := qfs.fileHandle(input.Fh)
+	if fileHandle == nil {
+		fmt.Println("Write failed", fileHandle)
+		return 0, fuse.ENOENT
+	}
+	return fileHandle.Write(input.Offset, input.Size, input.Flags, data)
 }
 
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {

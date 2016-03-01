@@ -88,3 +88,7 @@ func (api *ApiHandle) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fu
 func (api *ApiHandle) Read(offset uint64, size uint32, buf []byte) (fuse.ReadResult, fuse.Status) {
 	return nil, fuse.OK
 }
+
+func (api *ApiHandle) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
+	return 0, fuse.ENOSYS
+}
