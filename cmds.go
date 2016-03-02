@@ -47,7 +47,7 @@ func NewApi() *Api {
 		continue
 	}
 
-	fd, err := os.OpenFile(path, os.O_RDWR, 0)
+	fd, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0)
 	api.fd = fd
 	if err != nil {
 		panic(err)
