@@ -55,7 +55,8 @@ func branch() {
 	dst := flag.Arg(2)
 
 	fmt.Printf("Branching workspace \"%s\" into \"%s\"\n", src, dst)
-	err := quantumfs.Branch(src, dst)
+	api := quantumfs.NewApi()
+	err := api.Branch(src, dst)
 
 	if err != nil {
 		fmt.Println(err)

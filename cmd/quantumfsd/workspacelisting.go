@@ -8,11 +8,12 @@ package main
 import "fmt"
 import "time"
 
+import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewNamespaceList() Inode {
 	nsl := NamespaceList{
-		InodeCommon: InodeCommon{id: inodeIdRoot},
+		InodeCommon: InodeCommon{id: quantumfs.InodeIdRoot},
 		namespaces:  make(map[string]uint64),
 	}
 	return &nsl
@@ -117,7 +118,7 @@ func (nsl *NamespaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fus
 func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren(config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces)
-	children = append(children, nameInodeIdTuple{name: apiPath, inodeId: inodeIdApi})
+	children = append(children, nameInodeIdTuple{name: quantumfs.ApiPath, inodeId: quantumfs.InodeIdApi})
 
 	ds := newDirectorySnapshot(children, nsl.InodeCommon.id, fillNamespaceAttr)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
@@ -128,8 +129,8 @@ func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 }
 
 func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
-	if name == apiPath {
-		out.NodeId = inodeIdApi
+	if name == quantumfs.ApiPath {
+		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(out)
 		fillApiAttr(&out.Attr)
 		return fuse.OK
@@ -208,7 +209,7 @@ func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 	processed := 0
 	for _, child := range ds.children {
 		var mode uint32
-		if child.name == apiPath {
+		if child.name == quantumfs.ApiPath {
 			mode = fuse.S_IFREG
 		} else {
 			mode = fuse.S_IFDIR
@@ -221,7 +222,7 @@ func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryL
 
 		details.NodeId = child.inodeId
 		fillEntryOutCacheData(details)
-		if child.name == apiPath {
+		if child.name == quantumfs.ApiPath {
 			fillApiAttr(&details.Attr)
 		} else {
 			ds.fillFn(&details.Attr, details.NodeId, child.name)

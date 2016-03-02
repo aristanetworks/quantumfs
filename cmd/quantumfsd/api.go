@@ -8,11 +8,12 @@ package main
 import "fmt"
 import "time"
 
+import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewApiInode() Inode {
 	api := ApiInode{
-		InodeCommon: InodeCommon{id: inodeIdApi},
+		InodeCommon: InodeCommon{id: quantumfs.InodeIdApi},
 	}
 	return &api
 }
@@ -22,7 +23,7 @@ type ApiInode struct {
 }
 
 func fillApiAttr(attr *fuse.Attr) {
-	attr.Ino = inodeIdApi
+	attr.Ino = quantumfs.InodeIdApi
 	attr.Size = 0
 	attr.Blocks = 0
 
@@ -68,7 +69,7 @@ func newApiHandle() *ApiHandle {
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
 			id:       globalQfs.newFileHandleId(),
-			inodeNum: inodeIdApi,
+			inodeNum: quantumfs.InodeIdApi,
 		},
 	}
 	return &api
