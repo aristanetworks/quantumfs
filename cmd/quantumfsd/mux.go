@@ -7,6 +7,7 @@ package main
 
 import "fmt"
 import "math"
+import "syscall"
 import "sync"
 import "sync/atomic"
 
@@ -213,7 +214,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult, fus
 		fmt.Println("Read failed", fileHandle)
 		return nil, fuse.ENOENT
 	}
-	return fileHandle.Read(input.Offset, input.Size, buf)
+	return fileHandle.Read(input.Offset, input.Size, buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {

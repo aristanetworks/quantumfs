@@ -24,7 +24,7 @@ type InodeCommon struct {
 // the tree.
 type FileHandle interface {
 	ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status
-	Read(offset uint64, size uint32, buf []byte) (fuse.ReadResult, fuse.Status)
+	Read(offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status)
 	Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status)
 }
 
