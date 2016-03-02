@@ -13,12 +13,9 @@ func NewWorkspaceDB() quantumfs.WorkspaceDB {
 		cache: make(map[string]map[string]uint64),
 	}
 
-	wsdb.cache["travisb"] = make(map[string]uint64)
-	wsdb.cache["abuild"] = make(map[string]uint64)
-	wsdb.cache["travisb"]["workspace1"] = 1
-	wsdb.cache["travisb"]["workspace2"] = 2
-	wsdb.cache["abuild"]["project1@1234"] = 3
-	wsdb.cache["abuild"]["project1@5678"] = 4
+	// Create the null workspace
+	wsdb.cache[quantumfs.NullNamespaceName] = make(map[string]uint64)
+	wsdb.cache[quantumfs.NullNamespaceName][quantumfs.NullWorkspaceName] = 1
 	return wsdb
 }
 
