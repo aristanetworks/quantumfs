@@ -5,6 +5,7 @@ package main
 
 // This file contains all the interaction with the quantumfs API file.
 
+import "encoding/json"
 import "fmt"
 import "time"
 
@@ -24,8 +25,8 @@ type ApiInode struct {
 
 func fillApiAttr(attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
-	attr.Size = 0
-	attr.Blocks = 0
+	attr.Size = 1024
+	attr.Blocks = 1
 
 	now := time.Now()
 	attr.Atime = uint64(now.Unix())
@@ -54,7 +55,7 @@ func (api *ApiInode) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.
 }
 
 func (api *ApiInode) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	out.OpenFlags = fuse.FOPEN_NONSEEKABLE
+	out.OpenFlags = 0
 	handle := newApiHandle()
 	globalQfs.setFileHandle(handle.FileHandleCommon.id, handle)
 	out.Fh = handle.FileHandleCommon.id
@@ -71,6 +72,7 @@ func newApiHandle() *ApiHandle {
 			id:       globalQfs.newFileHandleId(),
 			inodeNum: quantumfs.InodeIdApi,
 		},
+		responses: make(chan fuse.ReadResult, 10),
 	}
 	return &api
 }
@@ -79,6 +81,7 @@ func newApiHandle() *ApiHandle {
 // synchronized with other api handles.
 type ApiHandle struct {
 	FileHandleCommon
+	responses chan fuse.ReadResult
 }
 
 func (api *ApiHandle) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
@@ -86,10 +89,68 @@ func (api *ApiHandle) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fu
 	return fuse.ENOSYS
 }
 
-func (api *ApiHandle) Read(offset uint64, size uint32, buf []byte) (fuse.ReadResult, fuse.Status) {
-	return nil, fuse.OK
+func (api *ApiHandle) Read(offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
+	fmt.Println("Received read request on Api")
+	var blocking chan struct{}
+	if !nonblocking {
+		blocking = make(chan struct{})
+	}
+
+	select {
+	case response := <-api.responses:
+		fmt.Println("Returning", response)
+		return response, fuse.OK
+	case <-blocking:
+		// This is a nonblocking socket, so return that nothing is ready
+		fmt.Println("Nonblocking socket, return nothing")
+		return nil, fuse.OK
+	}
+}
+
+func makeErrorResponse(code uint32, message string) []byte {
+	response := quantumfs.ErrorResponse{
+		CommandCommon: quantumfs.CommandCommon{CommandId: quantumfs.CmdError},
+		ErrorCode:     code,
+		Message:       message,
+	}
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		panic("Failed to marshall API error response")
+	}
+	return bytes
+}
+
+func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
+	bytes := makeErrorResponse(code, message)
+	api.responses <- fuse.ReadResultData(bytes)
 }
 
 func (api *ApiHandle) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
-	return 0, fuse.ENOSYS
+	fmt.Println("Writing at", offset, size)
+	var cmd quantumfs.CommandCommon
+	err := json.Unmarshal(buf, &cmd)
+
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+	}
+
+	switch cmd.CommandId {
+	default:
+		message := fmt.Sprintf("Unknown command number %d", cmd.CommandId)
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
+
+	case quantumfs.CmdError:
+		message := fmt.Sprintf("Invalid message %d to send to quantumfsd", cmd.CommandId)
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
+
+	case quantumfs.CmdBranchRequest:
+		fmt.Println("Received branch request")
+		api.branchWorkspace(buf)
+
+	}
+	return size, fuse.OK
+}
+
+func (api *ApiHandle) branchWorkspace(buf []byte) {
+	api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
 }
