@@ -87,9 +87,10 @@ const (
 
 // The various error codes
 const (
-	ErrorOK           = iota // Command Successful
-	ErrorBadJson      = iota // Failed to parse command
-	ErrorBadCommandId = iota // Unknown command ID
+	ErrorOK            = iota // Command Successful
+	ErrorBadJson       = iota // Failed to parse command
+	ErrorBadCommandId  = iota // Unknown command ID
+	ErrorCommandFailed = iota // The Command failed, check the error for more info
 )
 
 type ErrorResponse struct {

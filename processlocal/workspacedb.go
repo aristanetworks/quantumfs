@@ -3,6 +3,7 @@
 
 package processlocal
 
+import "fmt"
 import "sync"
 
 import "arista.com/quantumfs"
@@ -77,13 +78,41 @@ func (wsdb *WorkspaceDB) NamespaceExists(namespace string) bool {
 	return exists
 }
 
-func (wsdb *WorkspaceDB) WorkspaceExists(namespace string, workspace string) bool {
-	wsdb.cacheMutex.Lock()
+// Non-lock grabbing variant of WorkspaceExists
+func (wsdb *WorkspaceDB) workspaceExists(namespace string, workspace string) bool {
 	_, exists := wsdb.cache[namespace]
 	if exists {
 		_, exists = wsdb.cache[namespace][workspace]
 	}
+
+	return exists
+}
+
+func (wsdb *WorkspaceDB) WorkspaceExists(namespace string, workspace string) bool {
+	wsdb.cacheMutex.Lock()
+	exists := wsdb.workspaceExists(namespace, workspace)
 	wsdb.cacheMutex.Unlock()
 
 	return exists
+}
+
+func (wsdb *WorkspaceDB) BranchWorkspace(srcNamespace string, srcWorkspace string,
+	dstNamespace string, dstWorkspace string) error {
+
+	wsdb.cacheMutex.Lock()
+	defer wsdb.cacheMutex.Unlock()
+
+	if !wsdb.workspaceExists(srcNamespace, srcWorkspace) {
+		return fmt.Errorf("Source Workspace doesn't exist")
+	}
+
+	if _, exists := wsdb.cache[dstNamespace]; !exists {
+		wsdb.cache[dstNamespace] = make(map[string]uint64)
+	} else if _, exists := wsdb.cache[dstNamespace][dstWorkspace]; exists {
+		return fmt.Errorf("Destination Workspace already exists")
+	}
+
+	wsdb.cache[dstNamespace][dstWorkspace] = wsdb.cache[srcNamespace][srcWorkspace]
+
+	return nil
 }

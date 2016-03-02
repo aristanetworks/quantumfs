@@ -7,6 +7,7 @@ package main
 
 import "encoding/json"
 import "fmt"
+import "strings"
 import "time"
 
 import "arista.com/quantumfs"
@@ -126,7 +127,6 @@ func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 }
 
 func (api *ApiHandle) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
-	fmt.Println("Writing at", offset, size)
 	var cmd quantumfs.CommandCommon
 	err := json.Unmarshal(buf, &cmd)
 
@@ -152,5 +152,19 @@ func (api *ApiHandle) Write(offset uint64, size uint32, flags uint32, buf []byte
 }
 
 func (api *ApiHandle) branchWorkspace(buf []byte) {
+	var cmd quantumfs.BranchRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	src := strings.Split(cmd.Src, "/")
+	dst := strings.Split(cmd.Dst, "/")
+
+	if err := config.workspaceDB.BranchWorkspace(src[0], src[1], dst[0], dst[1]); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return
+	}
+
 	api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
 }
