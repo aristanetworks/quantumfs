@@ -16,11 +16,23 @@ import "syscall"
 func NewApi() *Api {
 	api := Api{}
 
-	path := ApiPath
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	directories := strings.Split(cwd, "/")
+	path := ""
+
 	for {
+		path = strings.Join(directories, "/") + "/" + ApiPath
 		stat, err := os.Lstat(path)
 		if err != nil {
-			path = "../" + path
+			if len(directories) == 1 {
+				// We didn't find anything and hit the root, give up
+				panic("Couldn't find api file")
+			}
+			directories = directories[:len(directories)-1]
 			continue
 		}
 		if !stat.IsDir() && stat.Size() == 0 {
@@ -32,6 +44,7 @@ func NewApi() *Api {
 				break
 			}
 		}
+		continue
 	}
 
 	fd, err := os.OpenFile(path, os.O_RDWR, 0)
