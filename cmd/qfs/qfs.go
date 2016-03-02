@@ -59,7 +59,7 @@ func branch() {
 	err := api.Branch(src, dst)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
 }
