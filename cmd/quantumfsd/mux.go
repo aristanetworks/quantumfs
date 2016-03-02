@@ -221,7 +221,6 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 }
 
 func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Status) {
-	fmt.Println("Unhandled request Write", input)
 	fileHandle := qfs.fileHandle(input.Fh)
 	if fileHandle == nil {
 		fmt.Println("Write failed", fileHandle)
