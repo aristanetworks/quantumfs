@@ -25,6 +25,7 @@ type WorkspaceDB interface {
 	// These methods need to be up to date
 	NamespaceExists(namespace string) bool
 	WorkspaceExists(namespace string, workspace string) bool
+	Workspace(namespace string, workspace string) ObjectKey
 
 	// These methods need to be atomic, but may retry internally
 	BranchWorkspace(srcNamespace string, srcWorkspace string,

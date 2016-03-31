@@ -46,11 +46,6 @@ func fillNamespaceAttr(attr *fuse.Attr, inodeNum uint64, namespace string) {
 		uint32(globalQfs.config.workspaceDB.NumWorkspaces(namespace)))
 }
 
-func fillWorkspaceAttr(attr *fuse.Attr, inodeNum uint64, workspace string) {
-	fillAttr(attr, inodeNum, 8)
-	attr.Mode = 0777 | fuse.S_IFDIR
-}
-
 func fillAttr(attr *fuse.Attr, inodeNum uint64, numChildren uint32) {
 	attr.Ino = inodeNum
 	attr.Size = 4096
@@ -80,7 +75,9 @@ func fillEntryOutCacheData(out *fuse.EntryOut) {
 }
 
 // Update the internal namespaces list with the most recent available listing
-func updateChildren(names []string, inodeMap *map[string]uint64, newInode func(name string, inodeId uint64) Inode) {
+func updateChildren(parentName string, names []string, inodeMap *map[string]uint64,
+	newInode func(parentName string, name string, inodeId uint64) Inode) {
+
 	touched := make(map[string]bool)
 
 	// First add any new entries
@@ -88,7 +85,7 @@ func updateChildren(names []string, inodeMap *map[string]uint64, newInode func(n
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := globalQfs.newInodeId()
 			(*inodeMap)[name] = inodeId
-			globalQfs.setInode(inodeId, newInode(name, inodeId))
+			globalQfs.setInode(inodeId, newInode(parentName, name, inodeId))
 		}
 		touched[name] = true
 	}
@@ -116,7 +113,7 @@ func (nsl *NamespaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fus
 }
 
 func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	updateChildren(config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
+	updateChildren("/", config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces)
 	children = append(children, nameInodeIdTuple{name: quantumfs.ApiPath, inodeId: quantumfs.InodeIdApi})
 
@@ -140,7 +137,8 @@ func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
 		return fuse.ENOENT
 	}
 
-	updateChildren(config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
+	updateChildren("/", config.workspaceDB.NamespaceList(), &nsl.namespaces,
+		newWorkspaceList)
 
 	out.NodeId = nsl.namespaces[name]
 	fillEntryOutCacheData(out)
@@ -246,18 +244,18 @@ func (ds *directorySnapshot) Write(offset uint64, size uint32, flags uint32, buf
 	return 0, fuse.ENOSYS
 }
 
-func newWorkspaceList(name string, inodeNum uint64) Inode {
+func newWorkspaceList(parentName string, name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
-		InodeCommon: InodeCommon{id: inodeNum},
-		name:        name,
-		workspaces:  make(map[string]uint64),
+		InodeCommon:   InodeCommon{id: inodeNum},
+		namespaceName: name,
+		workspaces:    make(map[string]uint64),
 	}
 	return &nsd
 }
 
 type WorkspaceList struct {
 	InodeCommon
-	name string
+	namespaceName string
 
 	// Map from child name to Inode ID
 	workspaces map[string]uint64
@@ -276,11 +274,12 @@ func (wsl *WorkspaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fus
 }
 
 func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	updateChildren(config.workspaceDB.WorkspaceList(wsl.name),
-		&wsl.workspaces, newWorkspaceRoot)
+	updateChildren(wsl.namespaceName,
+		config.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
+		newWorkspaceRoot)
 	children := snapshotChildren(&wsl.workspaces)
 
-	ds := newDirectorySnapshot(children, wsl.InodeCommon.id, fillWorkspaceAttr)
+	ds := newDirectorySnapshot(children, wsl.InodeCommon.id, fillWorkspaceAttrFake)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
@@ -289,41 +288,17 @@ func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) 
 }
 
 func (wsl *WorkspaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
-	if !config.workspaceDB.WorkspaceExists(wsl.name, name) {
+	if !config.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
 		return fuse.ENOENT
 	}
 
-	updateChildren(config.workspaceDB.WorkspaceList(wsl.name), &wsl.workspaces, newWorkspaceRoot)
+	updateChildren(wsl.namespaceName,
+		config.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
+		newWorkspaceRoot)
 
 	out.NodeId = wsl.workspaces[name]
 	fillEntryOutCacheData(out)
-	fillWorkspaceAttr(&out.Attr, out.NodeId, name)
+	fillWorkspaceAttrFake(&out.Attr, out.NodeId, name)
 
 	return fuse.OK
-}
-
-func newWorkspaceRoot(name string, inodeNum uint64) Inode {
-	return &WorkspaceRoot{
-		InodeCommon: InodeCommon{id: inodeNum},
-	}
-}
-
-type WorkspaceRoot struct {
-	InodeCommon
-}
-
-func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
-	return fuse.ENOSYS
-}
-
-func (wsr *WorkspaceRoot) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	return wsr.OpenDir(flags, mode, out)
-}
-
-func (wsr *WorkspaceRoot) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	return fuse.ENOSYS
-}
-
-func (wsr *WorkspaceRoot) Lookup(name string, out *fuse.EntryOut) fuse.Status {
-	return fuse.ENOSYS
 }

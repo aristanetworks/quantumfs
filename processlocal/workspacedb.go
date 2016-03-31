@@ -10,19 +10,20 @@ import "arista.com/quantumfs"
 
 func NewWorkspaceDB() quantumfs.WorkspaceDB {
 	wsdb := &WorkspaceDB{
-		cache: make(map[string]map[string]uint64),
+		cache: make(map[string]map[string]quantumfs.ObjectKey),
 	}
 
 	// Create the null workspace
-	wsdb.cache[quantumfs.NullNamespaceName] = make(map[string]uint64)
-	wsdb.cache[quantumfs.NullNamespaceName][quantumfs.NullWorkspaceName] = 1
+	wsdb.cache[quantumfs.NullNamespaceName] = make(map[string]quantumfs.ObjectKey)
+	wsdb.cache[quantumfs.NullNamespaceName][quantumfs.NullWorkspaceName] =
+		quantumfs.EmptyWorkspaceKey
 	return wsdb
 }
 
 // WorkspaceDB is a process local quantumfs.WorkspaceDB
 type WorkspaceDB struct {
 	cacheMutex sync.Mutex
-	cache      map[string]map[string]uint64
+	cache      map[string]map[string]quantumfs.ObjectKey
 }
 
 func (wsdb *WorkspaceDB) NumNamespaces() int {
@@ -75,19 +76,21 @@ func (wsdb *WorkspaceDB) NamespaceExists(namespace string) bool {
 	return exists
 }
 
-// Non-lock grabbing variant of WorkspaceExists
-func (wsdb *WorkspaceDB) workspaceExists(namespace string, workspace string) bool {
-	_, exists := wsdb.cache[namespace]
+// Non-lock grabbing variant of workspace
+func (wsdb *WorkspaceDB) workspace(namespace string, workspace string) (
+	quantumfs.ObjectKey, bool) {
+	var rootid quantumfs.ObjectKey
+	workspacelist, exists := wsdb.cache[namespace]
 	if exists {
-		_, exists = wsdb.cache[namespace][workspace]
+		rootid, exists = workspacelist[workspace]
 	}
 
-	return exists
+	return rootid, exists
 }
 
 func (wsdb *WorkspaceDB) WorkspaceExists(namespace string, workspace string) bool {
 	wsdb.cacheMutex.Lock()
-	exists := wsdb.workspaceExists(namespace, workspace)
+	_, exists := wsdb.workspace(namespace, workspace)
 	wsdb.cacheMutex.Unlock()
 
 	return exists
@@ -99,12 +102,12 @@ func (wsdb *WorkspaceDB) BranchWorkspace(srcNamespace string, srcWorkspace strin
 	wsdb.cacheMutex.Lock()
 	defer wsdb.cacheMutex.Unlock()
 
-	if !wsdb.workspaceExists(srcNamespace, srcWorkspace) {
+	if _, exists := wsdb.workspace(srcNamespace, srcWorkspace); !exists {
 		return fmt.Errorf("Source Workspace doesn't exist")
 	}
 
 	if _, exists := wsdb.cache[dstNamespace]; !exists {
-		wsdb.cache[dstNamespace] = make(map[string]uint64)
+		wsdb.cache[dstNamespace] = make(map[string]quantumfs.ObjectKey)
 	} else if _, exists := wsdb.cache[dstNamespace][dstWorkspace]; exists {
 		return fmt.Errorf("Destination Workspace already exists")
 	}
@@ -112,4 +115,12 @@ func (wsdb *WorkspaceDB) BranchWorkspace(srcNamespace string, srcWorkspace strin
 	wsdb.cache[dstNamespace][dstWorkspace] = wsdb.cache[srcNamespace][srcWorkspace]
 
 	return nil
+}
+
+func (wsdb *WorkspaceDB) Workspace(namespace string, workspace string) quantumfs.ObjectKey {
+	wsdb.cacheMutex.Lock()
+	rootid, _ := wsdb.workspace(namespace, workspace)
+	wsdb.cacheMutex.Unlock()
+
+	return rootid
 }

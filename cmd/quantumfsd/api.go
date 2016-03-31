@@ -64,6 +64,7 @@ func (api *ApiInode) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Sta
 }
 
 func (api *ApiInode) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+	fmt.Println("Invalid Lookup on ApiInode")
 	return fuse.ENOSYS
 }
 
