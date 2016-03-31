@@ -1,0 +1,4 @@
+[remote "review"]
+        url = ssh://gerrit:29418/quantumfs
+        push = HEAD:refs/for/master
+        receivepack = git receive-pack --reviewer quantumfs-dev
