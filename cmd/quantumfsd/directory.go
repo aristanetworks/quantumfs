@@ -43,8 +43,8 @@ type directoryContents struct {
 	attr     fuse.Attr
 }
 
-func newDirectorySnapshot2(children []directoryContents, inodeNum uint64) *directorySnapshot2 {
-	ds := directorySnapshot2{
+func newDirectorySnapshot(children []directoryContents, inodeNum uint64) *directorySnapshot {
+	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:       globalQfs.newFileHandleId(),
 			inodeNum: inodeNum,
@@ -55,12 +55,12 @@ func newDirectorySnapshot2(children []directoryContents, inodeNum uint64) *direc
 	return &ds
 }
 
-type directorySnapshot2 struct {
+type directorySnapshot struct {
 	FileHandleCommon
 	children []directoryContents
 }
 
-func (ds *directorySnapshot2) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
+func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
 	fmt.Println("ReadDirPlus directorySnapshot2", input, out)
 	offset := input.Offset
 
@@ -115,12 +115,12 @@ func (ds *directorySnapshot2) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntry
 	return fuse.OK
 }
 
-func (ds *directorySnapshot2) Read(offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
-	fmt.Println("Invalid read on directorySnapshot2")
+func (ds *directorySnapshot) Read(offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
+	fmt.Println("Invalid read on directorySnapshot")
 	return nil, fuse.ENOSYS
 }
 
-func (ds *directorySnapshot2) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
-	fmt.Println("Invalid write on directorySnapshot2")
+func (ds *directorySnapshot) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
+	fmt.Println("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }

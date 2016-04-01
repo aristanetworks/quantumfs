@@ -128,7 +128,7 @@ func (nsl *NamespaceList) OpenDir(context fuse.Context, flags uint32, mode uint3
 	fillApiAttr(&api.attr)
 	children = append(children, api)
 
-	ds := newDirectorySnapshot2(children, nsl.InodeCommon.id)
+	ds := newDirectorySnapshot(children, nsl.InodeCommon.id)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
@@ -193,7 +193,7 @@ func (wsl *WorkspaceList) OpenDir(context fuse.Context, flags uint32, mode uint3
 		newWorkspaceRoot)
 	children := snapshotChildren(&wsl.workspaces, fillWorkspaceAttrFake)
 
-	ds := newDirectorySnapshot2(children, wsl.InodeCommon.id)
+	ds := newDirectorySnapshot(children, wsl.InodeCommon.id)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0

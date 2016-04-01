@@ -112,7 +112,7 @@ func (wsr *WorkspaceRoot) OpenDir(context fuse.Context, flags uint32, mode uint3
 		children = append(children, entryInfo)
 	}
 
-	ds := newDirectorySnapshot2(children, wsr.InodeCommon.id)
+	ds := newDirectorySnapshot(children, wsr.InodeCommon.id)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
