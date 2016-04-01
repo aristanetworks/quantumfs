@@ -252,7 +252,7 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status
 		return fuse.ENOENT
 	}
 
-	return inode.OpenDir(input.Flags, input.Mode, out)
+	return inode.OpenDir(input.InHeader.Context, input.Flags, input.Mode, out)
 }
 
 func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
@@ -284,7 +284,7 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Sta
 	out.Bavail = out.Bfree
 	out.Files = 0
 	out.Ffree = math.MaxUint64
-	out.Bsize = 4096
+	out.Bsize = qfsBlockSize
 	out.NameLen = quantumfs.MaxFilenameLength
 	out.Frsize = 0
 

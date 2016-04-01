@@ -109,10 +109,10 @@ func snapshotChildren(children *map[string]uint64) []nameInodeIdTuple {
 }
 
 func (nsl *NamespaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	return nsl.OpenDir(flags, mode, out)
+	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (nsl *NamespaceList) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren("/", config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces)
 	children = append(children, nameInodeIdTuple{name: quantumfs.ApiPath, inodeId: quantumfs.InodeIdApi})
@@ -270,10 +270,10 @@ func (nsd *WorkspaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
 }
 
 func (wsl *WorkspaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	return wsl.OpenDir(flags, mode, out)
+	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsl *WorkspaceList) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren(wsl.namespaceName,
 		config.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
 		newWorkspaceRoot)
