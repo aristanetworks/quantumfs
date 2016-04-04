@@ -9,9 +9,9 @@ import "fmt"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-// WorkspaceRoot acts similarly to a workspace directory except only a single object
-// ID is used instead of one for each layer and that ID is directly requested from
-// the WorkspaceDB instead of passed in from the parent.
+// WorkspaceRoot acts similarly to a directory except only a single object ID is used
+// instead of one for each layer and that ID is directly requested from the
+// WorkspaceDB instead of passed in from the parent.
 type WorkspaceRoot struct {
 	InodeCommon
 	rootId    quantumfs.ObjectKey
