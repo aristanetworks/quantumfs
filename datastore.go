@@ -185,6 +185,22 @@ func createEmptyDirectory() ObjectKey {
 	return emptyDirKey
 }
 
+var EmptyBlockKey ObjectKey
+
+func createEmptyBlock() ObjectKey {
+	var emptyBlock struct{}
+
+	bytes, err := json.Marshal(emptyBlock)
+	if err != nil {
+		panic("Failed to marshal empty block")
+	}
+
+	hash := sha1.Sum(bytes)
+	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
+	constStore.store[emptyBlockKey] = bytes
+	return emptyBlockKey
+}
+
 type WorkspaceRoot struct {
 	BaseLayer  ObjectKey
 	VCSLayer   ObjectKey
@@ -263,7 +279,9 @@ func (store *ConstDataStore) Exists(key ObjectKey) bool {
 
 func init() {
 	emptyDirKey := createEmptyDirectory()
+	emptyBlockKey := createEmptyBlock()
 	emptyWorkspaceKey := createEmptyWorkspace(emptyDirKey)
 	EmptyDirKey = emptyDirKey
+	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
 }
