@@ -158,8 +158,6 @@ func (wsr *WorkspaceRoot) Lookup(context fuse.Context, name string, out *fuse.En
 }
 
 func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
-	fmt.Println("Unhandled Create call in WorkspaceRoot")
-
 	if _, exists := wsr.children[name]; exists {
 		return fuse.Status(syscall.EEXIST)
 	}

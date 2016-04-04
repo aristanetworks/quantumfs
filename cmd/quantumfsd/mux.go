@@ -193,7 +193,6 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) (code fuse
 }
 
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) (code fuse.Status) {
-	fmt.Println("Unhandled request Create for", input.InHeader.NodeId)
 	inode := qfs.inode(input.NodeId)
 	if inode == nil {
 		fmt.Println("Create failed", input)
