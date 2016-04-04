@@ -5,6 +5,7 @@
 package quantumfs
 
 import "fmt"
+import "time"
 
 import "crypto/sha1"
 import "encoding/json"
@@ -116,6 +117,23 @@ func SystemUid(uid UID, userId uint32) uint32 {
 	}
 }
 
+// Convert system UID to object UID
+//
+// userId is the UID of the current user
+func ObjectUid(uid uint32, userId uint32) UID {
+	if uid == userId {
+		return UIDUser
+	}
+
+	switch uid {
+	case 0:
+		return UIDRoot
+	default:
+		fmt.Println("Unknown UID", uid)
+		return UIDUser
+	}
+}
+
 // One of the UID* values
 type UID uint8
 
@@ -139,6 +157,23 @@ func SystemGid(gid GID, userId uint32) uint32 {
 	}
 }
 
+// Convert system GID to object GID
+//
+// userId is the GID of the current user
+func ObjectGid(gid uint32, userId uint32) GID {
+	if gid == userId {
+		return GIDUser
+	}
+
+	switch gid {
+	case 0:
+		return GIDRoot
+	default:
+		fmt.Println("Unknown GID", gid)
+		return GIDUser
+	}
+}
+
 // One of the GID* values
 type GID uint8
 
@@ -151,6 +186,13 @@ func (t *Time) Seconds() uint64 {
 
 func (t *Time) Nanoseconds() uint32 {
 	return uint32(*t % 1000000)
+}
+
+func NewTime(instant time.Time) Time {
+	t := instant.Unix() * 1000000
+	t += int64(instant.Nanosecond() / 1000)
+
+	return Time(t)
 }
 
 type DirectoryRecord struct {

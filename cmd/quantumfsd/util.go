@@ -23,6 +23,17 @@ func BytesToString(data []byte) string {
 	return string(data[:len])
 }
 
+// Convert the given null terminated string into a [256]byte array
+func StringToBytes(data string) [256]byte {
+	var out [256]byte
+	in := []byte(data)
+	for i := range in {
+		out[i] = in[i]
+	}
+
+	return out
+}
+
 // Given an integer, return the number of blocks of the given size necessary to
 // contain it.
 func BlocksRoundUp(len uint64, blockSize uint64) uint64 {

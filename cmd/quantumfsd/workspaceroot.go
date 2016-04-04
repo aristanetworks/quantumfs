@@ -5,6 +5,8 @@ package main
 
 import "encoding/json"
 import "fmt"
+import "syscall"
+import "time"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -157,5 +159,48 @@ func (wsr *WorkspaceRoot) Lookup(context fuse.Context, name string, out *fuse.En
 
 func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
 	fmt.Println("Unhandled Create call in WorkspaceRoot")
-	return fuse.ENOSYS
+
+	if _, exists := wsr.children[name]; exists {
+		return fuse.Status(syscall.EEXIST)
+	}
+
+	var permissions uint32
+	permissions = input.Mode & 0x7
+	permissions |= (input.Mode >> 3) & 0x7
+	permissions |= (input.Mode >> 6) & 0x7
+	permissions &= ^input.Umask
+
+	now := time.Now()
+	uid := input.InHeader.Context.Owner.Uid
+	gid := input.InHeader.Context.Owner.Gid
+
+	entry := quantumfs.DirectoryRecord{
+		Filename:           StringToBytes(name),
+		ID:                 quantumfs.EmptyBlockKey,
+		Type:               quantumfs.ObjectTypeSmallFile,
+		Permissions:        uint8(permissions),
+		Owner:              quantumfs.ObjectUid(uid, uid),
+		Group:              quantumfs.ObjectGid(gid, gid),
+		Size:               0,
+		ExtendedAttributes: quantumfs.EmptyBlockKey,
+		CreationTime:       quantumfs.NewTime(now),
+		ModificationTime:   quantumfs.NewTime(now),
+	}
+
+	inodeNum := globalQfs.newInodeId()
+	wsr.children[name] = inodeNum
+	wsr.baseLayer.NumEntries++
+	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, entry)
+	wsr.childrenRecords[inodeNum] = &wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
+
+	fillEntryOutCacheData(&out.EntryOut)
+	fillAttrWithDirectoryRecord(&out.EntryOut.Attr, inodeNum, input.InHeader.Context.Owner,
+		&entry)
+
+	fileHandleNum := globalQfs.newFileHandleId()
+
+	out.OpenOut.OpenFlags = 0
+	out.OpenOut.Fh = fileHandleNum
+
+	return fuse.OK
 }
