@@ -68,6 +68,10 @@ func (api *ApiInode) Lookup(context fuse.Context, name string, out *fuse.EntryOu
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.ENOTDIR
+}
+
 func newApiHandle() *ApiHandle {
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{

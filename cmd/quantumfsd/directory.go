@@ -37,6 +37,10 @@ func (dir *Directory) OpenDir(context fuse.Context, flags uint32, mode uint32, o
 	return fuse.ENOSYS
 }
 
+func (dir *Directory) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.ENOSYS
+}
+
 type directoryContents struct {
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc

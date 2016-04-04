@@ -154,3 +154,8 @@ func (wsr *WorkspaceRoot) Lookup(context fuse.Context, name string, out *fuse.En
 
 	return fuse.OK
 }
+
+func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	fmt.Println("Unhandled Create call in WorkspaceRoot")
+	return fuse.ENOSYS
+}

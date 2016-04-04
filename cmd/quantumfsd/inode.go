@@ -13,6 +13,7 @@ type Inode interface {
 	Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status
 	Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
 	OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
+	Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status
 }
 
 type InodeCommon struct {

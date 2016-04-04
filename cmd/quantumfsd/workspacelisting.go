@@ -158,6 +158,10 @@ func (nsl *NamespaceList) Lookup(context fuse.Context, name string, out *fuse.En
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.EACCES
+}
+
 func newWorkspaceList(parentName string, name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
@@ -215,4 +219,8 @@ func (wsl *WorkspaceList) Lookup(context fuse.Context, name string, out *fuse.En
 	fillWorkspaceAttrFake(&out.Attr, out.NodeId, name)
 
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.EACCES
 }
