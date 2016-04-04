@@ -102,6 +102,20 @@ const (
 	UIDUser = iota // The currently accessing user
 )
 
+// Convert object UID to system UID.
+//
+// userId is the UID of the current user
+func SystemUid(uid UID, userId uint32) uint32 {
+	switch uid {
+	case UIDRoot:
+		return 0
+	case UIDUser:
+		return userId
+	default:
+		return 0
+	}
+}
+
 // One of the UID* values
 type UID uint8
 
@@ -111,11 +125,33 @@ const (
 	GIDUser = iota // The currently accessing user
 )
 
+// Convert object GID to system GID.
+//
+// userId is the GID of the current user
+func SystemGid(gid GID, userId uint32) uint32 {
+	switch gid {
+	case GIDRoot:
+		return 0
+	case GIDUser:
+		return userId
+	default:
+		return 0
+	}
+}
+
 // One of the GID* values
 type GID uint8
 
 // Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
+
+func (t *Time) Seconds() uint64 {
+	return uint64(*t / 1000000)
+}
+
+func (t *Time) Nanoseconds() uint32 {
+	return uint32(*t % 1000000)
+}
 
 type DirectoryRecord struct {
 	Filename           [MaxFilenameLength]byte

@@ -51,7 +51,7 @@ func (api *ApiInode) GetAttr(out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (api *ApiInode) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (api *ApiInode) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	return fuse.ENOTDIR
 }
 

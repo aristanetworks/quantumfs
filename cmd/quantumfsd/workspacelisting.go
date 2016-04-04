@@ -5,7 +5,6 @@
 // directory hierarchy.
 package main
 
-import "fmt"
 import "time"
 
 import "arista.com/quantumfs"
@@ -99,25 +98,37 @@ func updateChildren(parentName string, names []string, inodeMap *map[string]uint
 	}
 }
 
-func snapshotChildren(children *map[string]uint64) []nameInodeIdTuple {
-	out := make([]nameInodeIdTuple, 0, len(*children))
+func snapshotChildren(children *map[string]uint64, fillAttr listingAttrFill) []directoryContents {
+	out := make([]directoryContents, 0, len(*children))
 	for name, inode := range *children {
-		out = append(out, nameInodeIdTuple{name: name, inodeId: inode})
+		child := directoryContents{
+			filename: name,
+			fuseType: fuse.S_IFDIR,
+		}
+		fillAttr(&child.attr, inode, name)
+
+		out = append(out, child)
 	}
 
 	return out
 }
 
 func (nsl *NamespaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	return nsl.OpenDir(flags, mode, out)
+	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (nsl *NamespaceList) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren("/", config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
-	children := snapshotChildren(&nsl.namespaces)
-	children = append(children, nameInodeIdTuple{name: quantumfs.ApiPath, inodeId: quantumfs.InodeIdApi})
+	children := snapshotChildren(&nsl.namespaces, fillNamespaceAttr)
 
-	ds := newDirectorySnapshot(children, nsl.InodeCommon.id, fillNamespaceAttr)
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
+	}
+	fillApiAttr(&api.attr)
+	children = append(children, api)
+
+	ds := newDirectorySnapshot(children, nsl.InodeCommon.id)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
@@ -147,103 +158,6 @@ func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
 	return fuse.OK
 }
 
-type nameInodeIdTuple struct {
-	name    string
-	inodeId uint64
-}
-
-func newDirectorySnapshot(children []nameInodeIdTuple, inodeNum uint64,
-	fillFn listingAttrFill) *directorySnapshot {
-	ds := directorySnapshot{
-		FileHandleCommon: FileHandleCommon{
-			id:       globalQfs.newFileHandleId(),
-			inodeNum: inodeNum,
-		},
-		children: children,
-		fillFn:   fillFn,
-	}
-
-	return &ds
-}
-
-type directorySnapshot struct {
-	FileHandleCommon
-	children []nameInodeIdTuple
-	fillFn   listingAttrFill
-}
-
-func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
-	fmt.Println("ReadDirPlus", input, out)
-	offset := input.Offset
-
-	// Add .
-	if offset == 0 {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: "."}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			return fuse.OK
-		}
-
-		details.NodeId = ds.FileHandleCommon.inodeNum
-		fillEntryOutCacheData(details)
-		fillRootAttr(&details.Attr, ds.FileHandleCommon.inodeNum)
-	}
-	offset++
-
-	// Add .., even though this will be overwritten
-	if offset == 1 {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: ".."}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			return fuse.OK
-		}
-
-		details.NodeId = ds.FileHandleCommon.inodeNum
-		fillEntryOutCacheData(details)
-		fillRootAttr(&details.Attr, ds.FileHandleCommon.inodeNum)
-	}
-	offset++
-
-	processed := 0
-	for _, child := range ds.children {
-		var mode uint32
-		if child.name == quantumfs.ApiPath {
-			mode = fuse.S_IFREG
-		} else {
-			mode = fuse.S_IFDIR
-		}
-		entry := fuse.DirEntry{Mode: mode, Name: child.name}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			break
-		}
-
-		details.NodeId = child.inodeId
-		fillEntryOutCacheData(details)
-		if child.name == quantumfs.ApiPath {
-			fillApiAttr(&details.Attr)
-		} else {
-			ds.fillFn(&details.Attr, details.NodeId, child.name)
-		}
-
-		processed++
-	}
-
-	ds.children = ds.children[processed:]
-
-	return fuse.OK
-}
-
-func (ds *directorySnapshot) Read(offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
-	fmt.Println("Invalid read on directorySnapshot")
-	return nil, fuse.ENOSYS
-}
-
-func (ds *directorySnapshot) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
-	fmt.Println("Invalid write on directorySnapshot")
-	return 0, fuse.ENOSYS
-}
-
 func newWorkspaceList(parentName string, name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
@@ -270,16 +184,16 @@ func (nsd *WorkspaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
 }
 
 func (wsl *WorkspaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	return wsl.OpenDir(flags, mode, out)
+	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) OpenDir(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsl *WorkspaceList) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren(wsl.namespaceName,
 		config.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
 		newWorkspaceRoot)
-	children := snapshotChildren(&wsl.workspaces)
+	children := snapshotChildren(&wsl.workspaces, fillWorkspaceAttrFake)
 
-	ds := newDirectorySnapshot(children, wsl.InodeCommon.id, fillWorkspaceAttrFake)
+	ds := newDirectorySnapshot(children, wsl.InodeCommon.id)
 	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
