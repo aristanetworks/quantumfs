@@ -25,7 +25,7 @@ func (dir *Directory) GetAttr(out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+func (dir *Directory) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	return fuse.ENOSYS
 }
 

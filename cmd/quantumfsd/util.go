@@ -25,7 +25,7 @@ func BytesToString(data []byte) string {
 
 // Given an integer, return the number of blocks of the given size necessary to
 // contain it.
-func BlocksRoundUp(len int, blockSize int) int {
+func BlocksRoundUp(len uint64, blockSize uint64) uint64 {
 	blocks := len / blockSize
 	if len%blockSize != 0 {
 		blocks++

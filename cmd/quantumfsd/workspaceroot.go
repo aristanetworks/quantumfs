@@ -17,6 +17,9 @@ type WorkspaceRoot struct {
 	rootId    quantumfs.ObjectKey
 	baseLayer quantumfs.DirectoryEntry
 	children  map[string]uint64
+
+	// Indexed by inode number
+	childrenRecords map[uint64]*quantumfs.DirectoryRecord
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -44,16 +47,20 @@ func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
 	}
 
 	children := make(map[string]uint64, baseLayer.NumEntries)
-	for _, entry := range baseLayer.Entries {
+	childrenRecords := make(map[uint64]*quantumfs.DirectoryRecord, baseLayer.NumEntries)
+	for i, entry := range baseLayer.Entries {
 		inodeId := globalQfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
+		childrenRecords[inodeId] = &baseLayer.Entries[i]
 		globalQfs.setInode(inodeId, newDirectory(entry.ID, inodeId))
 	}
 
 	return &WorkspaceRoot{
-		InodeCommon: InodeCommon{id: inodeNum},
-		rootId:      rootId,
-		baseLayer:   baseLayer,
+		InodeCommon:     InodeCommon{id: inodeNum},
+		rootId:          rootId,
+		baseLayer:       baseLayer,
+		children:        children,
+		childrenRecords: childrenRecords,
 	}
 }
 
@@ -75,39 +82,54 @@ func (wsr *WorkspaceRoot) Open(flags uint32, mode uint32, out *fuse.OpenOut) fus
 	return fuse.ENOSYS
 }
 
+func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Owner, entry *quantumfs.DirectoryRecord) {
+
+	attr.Ino = inodeNum
+
+	fileType := objectTypeToFileType(entry.Type)
+	switch fileType {
+	case fuse.S_IFDIR:
+		attr.Size = qfsBlockSize
+		attr.Blocks = 1
+	default:
+		fmt.Println("Unhandled filetype in fillAttrWithDirectoryRecord",
+			fileType)
+		fallthrough
+	case fuse.S_IFREG:
+		attr.Size = entry.Size
+		attr.Blocks = BlocksRoundUp(entry.Size, qfsBlockSize)
+	}
+
+	attr.Atime = entry.ModificationTime.Seconds()
+	attr.Mtime = entry.ModificationTime.Seconds()
+	attr.Ctime = entry.CreationTime.Seconds()
+	attr.Atimensec = entry.ModificationTime.Nanoseconds()
+	attr.Mtimensec = entry.ModificationTime.Nanoseconds()
+	attr.Ctimensec = entry.CreationTime.Nanoseconds()
+
+	var permissions uint32
+	permissions |= uint32(entry.Permissions)
+	permissions |= uint32(entry.Permissions << 3)
+	permissions |= uint32(entry.Permissions << 6)
+	permissions |= fileType
+
+	attr.Mode = permissions
+	attr.Nlink = uint32(entry.Size)
+	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner, owner.Uid)
+	attr.Owner.Gid = quantumfs.SystemGid(entry.Group, owner.Gid)
+	attr.Blksize = qfsBlockSize
+}
+
 func (wsr *WorkspaceRoot) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	children := make([]directoryContents, 0, wsr.baseLayer.NumEntries)
 	for _, entry := range wsr.baseLayer.Entries {
 		filename := BytesToString(entry.Filename[:])
 
-		var permissions uint32
-		permissions |= uint32(entry.Permissions)
-		permissions |= uint32(entry.Permissions << 3)
-		permissions |= uint32(entry.Permissions << 6)
-		permissions |= objectTypeToFileType(entry.Type)
-
 		entryInfo := directoryContents{
 			filename: filename,
 			fuseType: objectTypeToFileType(entry.Type),
-			attr: fuse.Attr{
-				Ino:       wsr.children[filename],
-				Size:      qfsBlockSize,
-				Blocks:    1,
-				Atime:     entry.ModificationTime.Seconds(),
-				Mtime:     entry.ModificationTime.Seconds(),
-				Ctime:     entry.CreationTime.Seconds(),
-				Atimensec: entry.ModificationTime.Nanoseconds(),
-				Mtimensec: entry.ModificationTime.Nanoseconds(),
-				Ctimensec: entry.CreationTime.Nanoseconds(),
-				Mode:      permissions,
-				Nlink:     uint32(entry.Size),
-				Owner: fuse.Owner{
-					Uid: quantumfs.SystemUid(entry.Owner, context.Owner.Uid),
-					Gid: quantumfs.SystemGid(entry.Group, context.Owner.Gid),
-				},
-				Blksize: qfsBlockSize,
-			},
 		}
+		fillAttrWithDirectoryRecord(&entryInfo.attr, wsr.children[filename], context.Owner, &entry)
 
 		children = append(children, entryInfo)
 	}
@@ -120,7 +142,15 @@ func (wsr *WorkspaceRoot) OpenDir(context fuse.Context, flags uint32, mode uint3
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) Lookup(name string, out *fuse.EntryOut) fuse.Status {
-	fmt.Println("Unhandled Lookup in WorkspaceRoot")
-	return fuse.ENOSYS
+func (wsr *WorkspaceRoot) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+	inodeNum, exists := wsr.children[name]
+	if !exists {
+		return fuse.ENOENT
+	}
+
+	out.NodeId = inodeNum
+	fillEntryOutCacheData(out)
+	fillAttrWithDirectoryRecord(&out.Attr, out.NodeId, context.Owner, wsr.childrenRecords[inodeNum])
+
+	return fuse.OK
 }
