@@ -190,12 +190,16 @@ func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.Cr
 	wsr.baseLayer.NumEntries++
 	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, entry)
 	wsr.childrenRecords[inodeNum] = &wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
+	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey)
+	globalQfs.setInode(inodeNum, file)
 
 	fillEntryOutCacheData(&out.EntryOut)
 	fillAttrWithDirectoryRecord(&out.EntryOut.Attr, inodeNum, input.InHeader.Context.Owner,
 		&entry)
 
 	fileHandleNum := globalQfs.newFileHandleId()
+	fileDescriptor := newFileDescriptor(file, inodeNum, fileHandleNum)
+	globalQfs.setFileHandle(fileHandleNum, fileDescriptor)
 
 	out.OpenOut.OpenFlags = 0
 	out.OpenOut.Fh = fileHandleNum
