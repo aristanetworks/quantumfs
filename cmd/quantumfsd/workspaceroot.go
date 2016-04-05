@@ -111,8 +111,8 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 
 	var permissions uint32
 	permissions |= uint32(entry.Permissions)
-	permissions |= uint32(entry.Permissions << 3)
-	permissions |= uint32(entry.Permissions << 6)
+	permissions |= uint32(entry.Permissions) << 3
+	permissions |= uint32(entry.Permissions) << 6
 	permissions |= fileType
 
 	attr.Mode = permissions
