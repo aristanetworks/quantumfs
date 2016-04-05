@@ -163,10 +163,10 @@ func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.Cr
 	}
 
 	var permissions uint32
-	permissions = input.Mode & 0x7
-	permissions |= (input.Mode >> 3) & 0x7
-	permissions |= (input.Mode >> 6) & 0x7
-	permissions &= ^input.Umask
+	mode := input.Mode & ^input.Umask
+	permissions = mode & 0x7
+	permissions |= (mode >> 3) & 0x7
+	permissions |= (mode >> 6) & 0x7
 
 	now := time.Now()
 	uid := input.InHeader.Context.Owner.Uid
