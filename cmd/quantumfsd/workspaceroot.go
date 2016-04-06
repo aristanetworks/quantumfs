@@ -3,6 +3,7 @@
 
 package main
 
+import "crypto/sha1"
 import "encoding/json"
 import "fmt"
 import "syscall"
@@ -16,12 +17,16 @@ import "github.com/hanwen/go-fuse/fuse"
 // WorkspaceDB instead of passed in from the parent.
 type WorkspaceRoot struct {
 	InodeCommon
+	namespace string
+	workspace string
 	rootId    quantumfs.ObjectKey
 	baseLayer quantumfs.DirectoryEntry
 	children  map[string]uint64
 
 	// Indexed by inode number
 	childrenRecords map[uint64]*quantumfs.DirectoryRecord
+
+	dirty bool // True if the contents of this subtree has changed since last sync
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -42,6 +47,9 @@ func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
 	}
 
 	object = DataStore.Get(workspaceRoot.BaseLayer)
+	if object == nil {
+		panic("No baseLayer object")
+	}
 
 	var baseLayer quantumfs.DirectoryEntry
 	if err := json.Unmarshal(object.Get(), &baseLayer); err != nil {
@@ -59,6 +67,8 @@ func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
 
 	return &WorkspaceRoot{
 		InodeCommon:     InodeCommon{id: inodeNum},
+		namespace:       parentName,
+		workspace:       name,
 		rootId:          rootId,
 		baseLayer:       baseLayer,
 		children:        children,
@@ -71,6 +81,61 @@ func (wsr *WorkspaceRoot) addChild(name string, inodeNum uint64, child quantumfs
 	wsr.baseLayer.NumEntries++
 	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, child)
 	wsr.childrenRecords[inodeNum] = &wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
+	wsr.dirty = true
+
+	wsr.advanceRootId()
+}
+
+// If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
+func (wsr *WorkspaceRoot) advanceRootId() {
+	if !wsr.dirty {
+		return
+	}
+
+	// Upload the base layer object
+	bytes, err := json.Marshal(wsr.baseLayer)
+	if err != nil {
+		panic("Failed to marshal baselayer")
+	}
+
+	hash := sha1.Sum(bytes)
+	newBaseLayerId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
+
+	var buffer quantumfs.Buffer
+	buffer.Set(bytes)
+	if err := config.durableStore.Set(newBaseLayerId, &buffer); err != nil {
+		panic("Failed to upload new baseLayer object")
+	}
+
+	// Upload the workspaceroot object
+	var workspaceRoot quantumfs.WorkspaceRoot
+	workspaceRoot.BaseLayer = newBaseLayerId
+
+	bytes, err = json.Marshal(workspaceRoot)
+	if err != nil {
+		panic("Failed to marshal workspace root")
+	}
+
+	hash = sha1.Sum(bytes)
+	newRootId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
+	buffer.Set(bytes)
+	if err := config.durableStore.Set(newRootId, &buffer); err != nil {
+		panic("Failed to upload new workspace root")
+	}
+
+	// Update workspace rootId
+	if newRootId != wsr.rootId {
+		rootId, err := config.workspaceDB.AdvanceWorkspace(wsr.namespace,
+			wsr.workspace, wsr.rootId, newRootId)
+
+		if err != nil {
+			panic("Unexpected workspace rootID update failure")
+		}
+
+		wsr.rootId = rootId
+	}
+
+	wsr.dirty = false
 }
 
 func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
