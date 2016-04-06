@@ -30,4 +30,45 @@ type WorkspaceDB interface {
 	// These methods need to be atomic, but may retry internally
 	BranchWorkspace(srcNamespace string, srcWorkspace string,
 		dstNamespace string, dstWorkspace string) error
+
+	// AdvanceWorkspace changes the workspace rootID. If the current rootID
+	// doesn't match what the client considers the current rootID then no changes
+	// are made and the current rootID is returned such that the client can merge
+	// the changes and retry.
+	//
+	// The return value is the new rootID.
+	//
+	// Possible errors are:
+	// WSDB_WORKSPACE_NOT_FOUND: The named workspace didn't exist
+	// WSDB_OUT_OF_DATE: The workspace rootID was changed remotely so the local
+	//                   instance is out of date.
+	AdvanceWorkspace(namespace string, workspace string, currentRootId ObjectKey,
+		newRootId ObjectKey) (ObjectKey, error)
+}
+
+func NewWorkspaceDbErr(code int) error {
+	return &WorkspaceDbErr{code: code}
+}
+
+type WorkspaceDbErr struct {
+	code int
+}
+
+const (
+	WSDB_OK                  = iota // Success
+	WSDB_WORKSPACE_NOT_FOUND = iota // The workspace didn't exist
+	WSDB_OUT_OF_DATE         = iota // The operation was based off out of date information
+)
+
+func (err *WorkspaceDbErr) Error() string {
+	switch err.code {
+	default:
+		return "Unknown wsdb error"
+	case WSDB_OK:
+		return "No error"
+	case WSDB_WORKSPACE_NOT_FOUND:
+		return "Workspace not found"
+	case WSDB_OUT_OF_DATE:
+		return "Workspace changed remotely"
+	}
 }
