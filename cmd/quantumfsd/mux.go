@@ -100,7 +100,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string, out *fuse.Entry
 		return fuse.ENOENT
 	}
 
-	return inode.Lookup(name, out)
+	return inode.Lookup(header.Context, name, out)
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
@@ -193,8 +193,13 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) (code fuse
 }
 
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) (code fuse.Status) {
-	fmt.Println("Unhandled request Create")
-	return fuse.ENOSYS
+	inode := qfs.inode(input.NodeId)
+	if inode == nil {
+		fmt.Println("Create failed", input)
+		return fuse.EACCES // TODO Confirm this is correct
+	}
+
+	return inode.Create(input, name, out)
 }
 
 func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {

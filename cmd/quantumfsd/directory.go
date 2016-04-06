@@ -25,7 +25,7 @@ func (dir *Directory) GetAttr(out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+func (dir *Directory) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
@@ -34,6 +34,10 @@ func (dir *Directory) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.St
 }
 
 func (dir *Directory) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+	return fuse.ENOSYS
+}
+
+func (dir *Directory) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
@@ -61,7 +65,7 @@ type directorySnapshot struct {
 }
 
 func (ds *directorySnapshot) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
-	fmt.Println("ReadDirPlus directorySnapshot2", input, out)
+	fmt.Println("ReadDirPlus directorySnapshot", input, out)
 	offset := input.Offset
 
 	// Add .

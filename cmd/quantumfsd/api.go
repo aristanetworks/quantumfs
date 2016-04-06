@@ -63,9 +63,13 @@ func (api *ApiInode) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Sta
 	return fuse.OK
 }
 
-func (api *ApiInode) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+func (api *ApiInode) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	fmt.Println("Invalid Lookup on ApiInode")
 	return fuse.ENOSYS
+}
+
+func (api *ApiInode) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.ENOTDIR
 }
 
 func newApiHandle() *ApiHandle {

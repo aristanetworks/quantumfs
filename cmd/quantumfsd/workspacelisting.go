@@ -136,7 +136,7 @@ func (nsl *NamespaceList) OpenDir(context fuse.Context, flags uint32, mode uint3
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+func (nsl *NamespaceList) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(out)
@@ -156,6 +156,10 @@ func (nsl *NamespaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
 	fillNamespaceAttr(&out.Attr, out.NodeId, name)
 
 	return fuse.OK
+}
+
+func (nsl *NamespaceList) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.EACCES
 }
 
 func newWorkspaceList(parentName string, name string, inodeNum uint64) Inode {
@@ -201,7 +205,7 @@ func (wsl *WorkspaceList) OpenDir(context fuse.Context, flags uint32, mode uint3
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
+func (wsl *WorkspaceList) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	if !config.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
 		return fuse.ENOENT
 	}
@@ -215,4 +219,8 @@ func (wsl *WorkspaceList) Lookup(name string, out *fuse.EntryOut) fuse.Status {
 	fillWorkspaceAttrFake(&out.Attr, out.NodeId, name)
 
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+	return fuse.EACCES
 }

@@ -22,7 +22,8 @@ type QuantumFsConfig struct {
 	cacheTimeSeconds uint64
 	cacheTimeNsecs   uint32
 
-	workspaceDB quantumfs.WorkspaceDB
+	workspaceDB  quantumfs.WorkspaceDB
+	durableStore quantumfs.DataStore
 }
 
 var cacheSizeString string
@@ -66,5 +67,6 @@ func processArgs() {
 	config.cacheTimeNsecs = (uint32)(cacheTimeNsecs)
 
 	config.workspaceDB = processlocal.NewWorkspaceDB()
+	config.durableStore = processlocal.NewDataStore()
 
 }

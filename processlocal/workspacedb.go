@@ -124,3 +124,26 @@ func (wsdb *WorkspaceDB) Workspace(namespace string, workspace string) quantumfs
 
 	return rootid
 }
+
+func (wsdb *WorkspaceDB) AdvanceWorkspace(namespace string, workspace string,
+	currentRootId quantumfs.ObjectKey, newRootId quantumfs.ObjectKey) (
+	quantumfs.ObjectKey, error) {
+
+	wsdb.cacheMutex.Lock()
+	rootId, exists := wsdb.workspace(namespace, workspace)
+	if !exists {
+		wsdb.cacheMutex.Unlock()
+		return rootId, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_NOT_FOUND)
+	}
+
+	if currentRootId != rootId {
+		wsdb.cacheMutex.Unlock()
+		return rootId, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE)
+	}
+
+	wsdb.cache[namespace][workspace] = newRootId
+
+	wsdb.cacheMutex.Unlock()
+
+	return newRootId, nil
+}
