@@ -66,6 +66,13 @@ func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
 	}
 }
 
+func (wsr *WorkspaceRoot) addChild(name string, inodeNum uint64, child quantumfs.DirectoryRecord) {
+	wsr.children[name] = inodeNum
+	wsr.baseLayer.NumEntries++
+	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, child)
+	wsr.childrenRecords[inodeNum] = &wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
+}
+
 func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = config.cacheTimeSeconds
 	out.AttrValidNsec = config.cacheTimeNsecs
@@ -186,10 +193,7 @@ func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.Cr
 	}
 
 	inodeNum := globalQfs.newInodeId()
-	wsr.children[name] = inodeNum
-	wsr.baseLayer.NumEntries++
-	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, entry)
-	wsr.childrenRecords[inodeNum] = &wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
+	wsr.addChild(name, inodeNum, entry)
 	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey)
 	globalQfs.setInode(inodeNum, file)
 
