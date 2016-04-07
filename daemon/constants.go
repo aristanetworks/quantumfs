@@ -2,7 +2,7 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // Various constants used throughout quantumfsd
-package main
+package daemon
 
 import "fmt"
 

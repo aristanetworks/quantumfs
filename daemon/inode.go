@@ -2,7 +2,7 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // The basic Inode and FileHandle structures
-package main
+package daemon
 
 import "github.com/hanwen/go-fuse/fuse"
 

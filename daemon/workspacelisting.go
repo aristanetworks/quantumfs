@@ -3,7 +3,7 @@
 
 // The code which handles listing available workspaces as the first two levels of the
 // directory hierarchy.
-package main
+package daemon
 
 import "time"
 

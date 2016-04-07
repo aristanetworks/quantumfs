@@ -3,7 +3,7 @@
 
 // Central configuration object and handling
 
-package main
+package daemon
 
 import "os"
 import "flag"

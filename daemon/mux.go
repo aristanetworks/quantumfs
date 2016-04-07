@@ -3,7 +3,7 @@
 
 // go-fuse creates a goroutine for every request. The code here simply takes these
 // requests and forwards them to the correct Inode.
-package main
+package daemon
 
 import "fmt"
 import "math"
