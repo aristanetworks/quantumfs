@@ -95,3 +95,8 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.server = server
 	go server.Serve()
 }
+
+// Make the given path relative to the mount root
+func (th *testHelper) relPath(path string) string {
+	return th.mountPath + "/" + path
+}
