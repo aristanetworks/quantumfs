@@ -14,4 +14,4 @@ $(COMMANDS):
 	go build arista.com/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST):
-	go test arista.com/quantumfs/$@
+	go test arista.com/quantumfs/$@ 2>&1
