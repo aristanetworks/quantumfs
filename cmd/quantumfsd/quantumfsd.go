@@ -2,7 +2,7 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // quantumfsd is the central daemon of the filesystem
-package daemon
+package main
 
 import "os"
 import "arista.com/quantumfs"
