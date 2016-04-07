@@ -1,9 +1,10 @@
 COMMANDS=quantumfsd qfs
+PKGS_TO_TEST=daemon
 
-.PHONY: all $(COMMANDS)
+.PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 .NOTPARALLEL:
 
-all: $(COMMANDS)
+all: $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -11,3 +12,6 @@ clean:
 $(COMMANDS):
 	go get arista.com/quantumfs/cmd/$@
 	go build arista.com/quantumfs/cmd/$@
+
+$(PKGS_TO_TEST):
+	go test arista.com/quantumfs/$@
