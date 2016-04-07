@@ -7,6 +7,7 @@ package daemon
 
 import "io/ioutil"
 import "os"
+import "runtime"
 import "testing"
 
 import "arista.com/quantumfs"
@@ -17,7 +18,13 @@ import "github.com/hanwen/go-fuse/fuse"
 // startTest is a helper which configures the testing environment
 func startTest(t *testing.T) testHelper {
 	t.Parallel()
-	return testHelper{t: t}
+
+	testPc, _, _, _ := runtime.Caller(1)
+	testName := runtime.FuncForPC(testPc).Name()
+	return testHelper{
+		t:        t,
+		testName: testName,
+	}
 }
 
 // endTest cleans up the testing environment after the test has finished
@@ -38,6 +45,7 @@ func (th *testHelper) endTest() {
 // This helper is more of a namespacing mechanism than a coherent object
 type testHelper struct {
 	t         *testing.T
+	testName  string
 	qfs       *QuantumFs
 	mountPath string
 	server    *fuse.Server
@@ -75,7 +83,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		MaxBackground: 1024,
 		MaxWrite:      quantumfs.MaxBlockSize,
 		FsName:        "cluster",
-		Name:          config.MountPath,
+		Name:          th.testName,
 	}
 
 	quantumfs := NewQuantumFs(config)
