@@ -22,7 +22,7 @@ func (store *dataStore) Get(key quantumfs.ObjectKey) *quantumfs.Buffer {
 		return &buffer
 	}
 
-	err = config.durableStore.Get(key, &buffer)
+	err = config.DurableStore.Get(key, &buffer)
 	if err == nil {
 		return &buffer
 	}
@@ -31,5 +31,5 @@ func (store *dataStore) Get(key quantumfs.ObjectKey) *quantumfs.Buffer {
 }
 
 func (store *dataStore) Set(key quantumfs.ObjectKey, buffer *quantumfs.Buffer) error {
-	return config.durableStore.Set(key, buffer)
+	return config.DurableStore.Set(key, buffer)
 }

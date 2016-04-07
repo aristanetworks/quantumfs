@@ -45,8 +45,8 @@ func fillApiAttr(attr *fuse.Attr) {
 }
 
 func (api *ApiInode) GetAttr(out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+	out.AttrValid = config.CacheTimeSeconds
+	out.AttrValidNsec = config.CacheTimeNsecs
 	fillApiAttr(&out.Attr)
 	return fuse.OK
 }
@@ -166,7 +166,7 @@ func (api *ApiHandle) branchWorkspace(buf []byte) {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
-	if err := config.workspaceDB.BranchWorkspace(src[0], src[1], dst[0], dst[1]); err != nil {
+	if err := config.WorkspaceDB.BranchWorkspace(src[0], src[1], dst[0], dst[1]); err != nil {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
 		return
 	}

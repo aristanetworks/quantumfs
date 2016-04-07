@@ -26,8 +26,8 @@ type NamespaceList struct {
 }
 
 func (nsl *NamespaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+	out.AttrValid = config.CacheTimeSeconds
+	out.AttrValidNsec = config.CacheTimeNsecs
 
 	fillRootAttr(&out.Attr, nsl.InodeCommon.id)
 	return fuse.OK
@@ -35,14 +35,14 @@ func (nsl *NamespaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
 
 func fillRootAttr(attr *fuse.Attr, inodeNum uint64) {
 	fillAttr(attr, inodeNum,
-		uint32(globalQfs.config.workspaceDB.NumNamespaces()))
+		uint32(globalQfs.config.WorkspaceDB.NumNamespaces()))
 }
 
 type listingAttrFill func(attr *fuse.Attr, inodeNum uint64, name string)
 
 func fillNamespaceAttr(attr *fuse.Attr, inodeNum uint64, namespace string) {
 	fillAttr(attr, inodeNum,
-		uint32(globalQfs.config.workspaceDB.NumWorkspaces(namespace)))
+		uint32(globalQfs.config.WorkspaceDB.NumWorkspaces(namespace)))
 }
 
 func fillAttr(attr *fuse.Attr, inodeNum uint64, numChildren uint32) {
@@ -67,10 +67,10 @@ func fillAttr(attr *fuse.Attr, inodeNum uint64, numChildren uint32) {
 
 func fillEntryOutCacheData(out *fuse.EntryOut) {
 	out.Generation = 1
-	out.EntryValid = config.cacheTimeSeconds
-	out.EntryValidNsec = config.cacheTimeNsecs
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+	out.EntryValid = config.CacheTimeSeconds
+	out.EntryValidNsec = config.CacheTimeNsecs
+	out.AttrValid = config.CacheTimeSeconds
+	out.AttrValidNsec = config.CacheTimeNsecs
 }
 
 // Update the internal namespaces list with the most recent available listing
@@ -118,7 +118,7 @@ func (nsl *NamespaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fus
 }
 
 func (nsl *NamespaceList) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	updateChildren("/", config.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
+	updateChildren("/", config.WorkspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
 	children := snapshotChildren(&nsl.namespaces, fillNamespaceAttr)
 
 	api := directoryContents{
@@ -144,11 +144,11 @@ func (nsl *NamespaceList) Lookup(context fuse.Context, name string, out *fuse.En
 		return fuse.OK
 	}
 
-	if !config.workspaceDB.NamespaceExists(name) {
+	if !config.WorkspaceDB.NamespaceExists(name) {
 		return fuse.ENOENT
 	}
 
-	updateChildren("/", config.workspaceDB.NamespaceList(), &nsl.namespaces,
+	updateChildren("/", config.WorkspaceDB.NamespaceList(), &nsl.namespaces,
 		newWorkspaceList)
 
 	out.NodeId = nsl.namespaces[name]
@@ -180,8 +180,8 @@ type WorkspaceList struct {
 }
 
 func (nsd *WorkspaceList) GetAttr(out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+	out.AttrValid = config.CacheTimeSeconds
+	out.AttrValidNsec = config.CacheTimeNsecs
 
 	fillRootAttr(&out.Attr, nsd.InodeCommon.id)
 	return fuse.OK
@@ -193,7 +193,7 @@ func (wsl *WorkspaceList) Open(flags uint32, mode uint32, out *fuse.OpenOut) fus
 
 func (wsl *WorkspaceList) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	updateChildren(wsl.namespaceName,
-		config.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
+		config.WorkspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
 		newWorkspaceRoot)
 	children := snapshotChildren(&wsl.workspaces, fillWorkspaceAttrFake)
 
@@ -206,12 +206,12 @@ func (wsl *WorkspaceList) OpenDir(context fuse.Context, flags uint32, mode uint3
 }
 
 func (wsl *WorkspaceList) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
-	if !config.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
+	if !config.WorkspaceDB.WorkspaceExists(wsl.namespaceName, name) {
 		return fuse.ENOENT
 	}
 
 	updateChildren(wsl.namespaceName,
-		config.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
+		config.WorkspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
 		newWorkspaceRoot)
 
 	out.NodeId = wsl.workspaces[name]

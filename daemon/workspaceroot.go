@@ -38,7 +38,7 @@ func fillWorkspaceAttrFake(attr *fuse.Attr, inodeNum uint64, workspace string) {
 }
 
 func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
-	rootId := config.workspaceDB.Workspace(parentName, name)
+	rootId := config.WorkspaceDB.Workspace(parentName, name)
 
 	object := DataStore.Get(rootId)
 	var workspaceRoot quantumfs.WorkspaceRoot
@@ -103,7 +103,7 @@ func (wsr *WorkspaceRoot) advanceRootId() {
 
 	var buffer quantumfs.Buffer
 	buffer.Set(bytes)
-	if err := config.durableStore.Set(newBaseLayerId, &buffer); err != nil {
+	if err := config.DurableStore.Set(newBaseLayerId, &buffer); err != nil {
 		panic("Failed to upload new baseLayer object")
 	}
 
@@ -119,13 +119,13 @@ func (wsr *WorkspaceRoot) advanceRootId() {
 	hash = sha1.Sum(bytes)
 	newRootId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
 	buffer.Set(bytes)
-	if err := config.durableStore.Set(newRootId, &buffer); err != nil {
+	if err := config.DurableStore.Set(newRootId, &buffer); err != nil {
 		panic("Failed to upload new workspace root")
 	}
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
-		rootId, err := config.workspaceDB.AdvanceWorkspace(wsr.namespace,
+		rootId, err := config.WorkspaceDB.AdvanceWorkspace(wsr.namespace,
 			wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
@@ -139,8 +139,8 @@ func (wsr *WorkspaceRoot) advanceRootId() {
 }
 
 func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+	out.AttrValid = config.CacheTimeSeconds
+	out.AttrValidNsec = config.CacheTimeNsecs
 	var childDirectories uint32
 	for _, entry := range wsr.baseLayer.Entries {
 		if entry.Type == quantumfs.ObjectTypeDirectoryEntry {

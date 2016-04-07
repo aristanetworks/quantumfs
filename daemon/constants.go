@@ -9,13 +9,6 @@ import "fmt"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-// Various exist reasons, will be returned to the shell as an exit code
-const (
-	exitOk           = iota
-	exitBadCacheSize = iota
-	exitMountFail    = iota
-)
-
 // Mapping between datastore object types and the FUSE filetype
 // Returns 0 if there is no valid FUSE filetype
 func objectTypeToFileType(objectType quantumfs.ObjectType) uint32 {

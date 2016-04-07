@@ -14,13 +14,14 @@ import "sync/atomic"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
+var config QuantumFsConfig
 var globalQfs *QuantumFs
 
-func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
+func NewQuantumFs(conf QuantumFsConfig) fuse.RawFileSystem {
 	if globalQfs == nil {
 		qfs := &QuantumFs{
 			RawFileSystem: fuse.NewDefaultRawFileSystem(),
-			config:        config,
+			config:        conf,
 			inodes:        make(map[uint64]Inode),
 			fileHandles:   make(map[uint64]FileHandle),
 			inodeNum:      quantumfs.InodeIdReservedEnd,
@@ -30,6 +31,7 @@ func getInstance(config QuantumFsConfig) fuse.RawFileSystem {
 		qfs.inodes[quantumfs.InodeIdRoot] = NewNamespaceList()
 		qfs.inodes[quantumfs.InodeIdApi] = NewApiInode()
 		globalQfs = qfs
+		config = conf
 	}
 	return globalQfs
 }
