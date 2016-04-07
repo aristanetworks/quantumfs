@@ -100,3 +100,12 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 func (th *testHelper) relPath(path string) string {
 	return th.mountPath + "/" + path
 }
+
+// assert the condition is true. If it is not true then fail the test with the given
+// message
+func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
+	if !condition {
+		th.endTest()
+		th.t.Fatalf(format, args...)
+	}
+}
