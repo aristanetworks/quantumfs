@@ -4,10 +4,67 @@
 // quantumfsd is the central daemon of the filesystem
 package main
 
+import "flag"
 import "os"
+
 import "arista.com/quantumfs"
+import "arista.com/quantumfs/daemon"
+import "arista.com/quantumfs/processlocal"
 
 import "github.com/hanwen/go-fuse/fuse"
+import "github.com/pivotal-golang/bytefmt"
+
+// Various exist reasons, will be returned to the shell as an exit code
+const (
+	exitOk           = iota
+	exitBadCacheSize = iota
+	exitMountFail    = iota
+)
+
+var cacheSizeString string
+var cacheTimeNsecs uint
+var config daemon.QuantumFsConfig
+
+func init() {
+	const (
+		defaultCachePath        = "/dev/shmem"
+		defaultCacheSize        = "8G"
+		defaultMountPath        = "/mnt/quantumfs"
+		defaultCacheTimeSeconds = 1
+		defaultCacheTimeNsecs   = 0
+	)
+
+	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
+		"Default location of the internal cache. Should be on a ramfs or "+
+			"tmpfs filsystem")
+	flag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
+		"Size of the local cache, e.g. 8G or 512M")
+	flag.StringVar(&config.MountPath, "mountpath", defaultMountPath,
+		"Path to mount quantumfs at")
+	flag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds", defaultCacheTimeSeconds,
+		"Number of seconds the kernel will cache response data")
+	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
+		"Number of nanoseconds the kernel will cache response data")
+}
+
+// Process the command arguments. Will show the command usage if no arguments are
+// given since the mount point is mandatory.
+//
+// Exit if processing failed
+func processArgs() {
+	flag.Parse()
+
+	if cacheSize, err := bytefmt.ToBytes(cacheSizeString); err != nil {
+		os.Exit(exitBadCacheSize)
+	} else {
+		config.CacheSize = cacheSize
+	}
+	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
+
+	config.WorkspaceDB = processlocal.NewWorkspaceDB()
+	config.DurableStore = processlocal.NewDataStore()
+
+}
 
 func main() {
 	processArgs()
@@ -20,8 +77,8 @@ func main() {
 		Name:          "quantumfs",
 	}
 
-	quantumfs := getInstance(config)
-	server, err := fuse.NewServer(quantumfs, config.mountPath,
+	quantumfs := daemon.NewQuantumFs(config)
+	server, err := fuse.NewServer(quantumfs, config.MountPath,
 		&mountOptions)
 	if err != nil {
 		os.Exit(exitMountFail)

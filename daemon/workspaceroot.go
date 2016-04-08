@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package main
+package daemon
 
 import "crypto/sha1"
 import "encoding/json"
@@ -32,21 +32,21 @@ type WorkspaceRoot struct {
 // Fetching the number of child directories for all the workspaces within a namespace
 // is relatively expensive and not terribly useful. Instead fake it and assume a
 // normal number here.
-func fillWorkspaceAttrFake(attr *fuse.Attr, inodeNum uint64, workspace string) {
+func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum uint64, workspace string) {
 	fillAttr(attr, inodeNum, 27)
 	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
-func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
-	rootId := config.workspaceDB.Workspace(parentName, name)
+func newWorkspaceRoot(c *ctx, parentName string, name string, inodeNum uint64) Inode {
+	rootId := c.workspaceDB.Workspace(parentName, name)
 
-	object := DataStore.Get(rootId)
+	object := DataStore.Get(c, rootId)
 	var workspaceRoot quantumfs.WorkspaceRoot
 	if err := json.Unmarshal(object.Get(), &workspaceRoot); err != nil {
 		panic("Couldn't decode WorkspaceRoot Object")
 	}
 
-	object = DataStore.Get(workspaceRoot.BaseLayer)
+	object = DataStore.Get(c, workspaceRoot.BaseLayer)
 	if object == nil {
 		panic("No baseLayer object")
 	}
@@ -59,10 +59,10 @@ func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
 	children := make(map[string]uint64, baseLayer.NumEntries)
 	childrenRecords := make(map[uint64]*quantumfs.DirectoryRecord, baseLayer.NumEntries)
 	for i, entry := range baseLayer.Entries {
-		inodeId := globalQfs.newInodeId()
+		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-		globalQfs.setInode(inodeId, newDirectory(entry.ID, inodeId))
+		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId))
 	}
 
 	return &WorkspaceRoot{
@@ -76,18 +76,18 @@ func newWorkspaceRoot(parentName string, name string, inodeNum uint64) Inode {
 	}
 }
 
-func (wsr *WorkspaceRoot) addChild(name string, inodeNum uint64, child quantumfs.DirectoryRecord) {
+func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64, child quantumfs.DirectoryRecord) {
 	wsr.children[name] = inodeNum
 	wsr.baseLayer.NumEntries++
 	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, child)
 	wsr.childrenRecords[inodeNum] = &wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
 	wsr.dirty = true
 
-	wsr.advanceRootId()
+	wsr.advanceRootId(c)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
-func (wsr *WorkspaceRoot) advanceRootId() {
+func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	if !wsr.dirty {
 		return
 	}
@@ -103,7 +103,7 @@ func (wsr *WorkspaceRoot) advanceRootId() {
 
 	var buffer quantumfs.Buffer
 	buffer.Set(bytes)
-	if err := config.durableStore.Set(newBaseLayerId, &buffer); err != nil {
+	if err := c.durableStore.Set(newBaseLayerId, &buffer); err != nil {
 		panic("Failed to upload new baseLayer object")
 	}
 
@@ -119,13 +119,13 @@ func (wsr *WorkspaceRoot) advanceRootId() {
 	hash = sha1.Sum(bytes)
 	newRootId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
 	buffer.Set(bytes)
-	if err := config.durableStore.Set(newRootId, &buffer); err != nil {
+	if err := c.durableStore.Set(newRootId, &buffer); err != nil {
 		panic("Failed to upload new workspace root")
 	}
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
-		rootId, err := config.workspaceDB.AdvanceWorkspace(wsr.namespace,
+		rootId, err := c.workspaceDB.AdvanceWorkspace(wsr.namespace,
 			wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
@@ -138,9 +138,9 @@ func (wsr *WorkspaceRoot) advanceRootId() {
 	wsr.dirty = false
 }
 
-func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
 	var childDirectories uint32
 	for _, entry := range wsr.baseLayer.Entries {
 		if entry.Type == quantumfs.ObjectTypeDirectoryEntry {
@@ -152,7 +152,7 @@ func (wsr *WorkspaceRoot) GetAttr(out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsr *WorkspaceRoot) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
@@ -165,6 +165,7 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = 1
+		attr.Nlink = uint32(entry.Size)
 	default:
 		fmt.Println("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -172,6 +173,7 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 	case fuse.S_IFREG:
 		attr.Size = entry.Size
 		attr.Blocks = BlocksRoundUp(entry.Size, qfsBlockSize)
+		attr.Nlink = 1
 	}
 
 	attr.Atime = entry.ModificationTime.Seconds()
@@ -188,13 +190,12 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 	permissions |= fileType
 
 	attr.Mode = permissions
-	attr.Nlink = uint32(entry.Size)
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner, owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group, owner.Gid)
 	attr.Blksize = qfsBlockSize
 }
 
-func (wsr *WorkspaceRoot) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	children := make([]directoryContents, 0, wsr.baseLayer.NumEntries)
 	for _, entry := range wsr.baseLayer.Entries {
 		filename := BytesToString(entry.Filename[:])
@@ -208,28 +209,28 @@ func (wsr *WorkspaceRoot) OpenDir(context fuse.Context, flags uint32, mode uint3
 		children = append(children, entryInfo)
 	}
 
-	ds := newDirectorySnapshot(children, wsr.InodeCommon.id)
-	globalQfs.setFileHandle(ds.FileHandleCommon.id, ds)
+	ds := newDirectorySnapshot(c, children, wsr.InodeCommon.id)
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = ds.FileHandleCommon.id
 	out.OpenFlags = 0
 
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	inodeNum, exists := wsr.children[name]
 	if !exists {
 		return fuse.ENOENT
 	}
 
 	out.NodeId = inodeNum
-	fillEntryOutCacheData(out)
+	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(&out.Attr, out.NodeId, context.Owner, wsr.childrenRecords[inodeNum])
 
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
 	if _, exists := wsr.children[name]; exists {
 		return fuse.Status(syscall.EEXIST)
 	}
@@ -257,18 +258,18 @@ func (wsr *WorkspaceRoot) Create(input *fuse.CreateIn, name string, out *fuse.Cr
 		ModificationTime:   quantumfs.NewTime(now),
 	}
 
-	inodeNum := globalQfs.newInodeId()
-	wsr.addChild(name, inodeNum, entry)
+	inodeNum := c.qfs.newInodeId()
+	wsr.addChild(c, name, inodeNum, entry)
 	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey)
-	globalQfs.setInode(inodeNum, file)
+	c.qfs.setInode(c, inodeNum, file)
 
-	fillEntryOutCacheData(&out.EntryOut)
+	fillEntryOutCacheData(c, &out.EntryOut)
 	fillAttrWithDirectoryRecord(&out.EntryOut.Attr, inodeNum, input.InHeader.Context.Owner,
 		&entry)
 
-	fileHandleNum := globalQfs.newFileHandleId()
+	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(file, inodeNum, fileHandleNum)
-	globalQfs.setFileHandle(fileHandleNum, fileDescriptor)
+	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	out.OpenOut.OpenFlags = 0
 	out.OpenOut.Fh = fileHandleNum

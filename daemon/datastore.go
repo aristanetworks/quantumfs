@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package main
+package daemon
 
 import "arista.com/quantumfs"
 
@@ -15,14 +15,14 @@ func newDataStore() *dataStore {
 type dataStore struct {
 }
 
-func (store *dataStore) Get(key quantumfs.ObjectKey) *quantumfs.Buffer {
+func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
 	buffer := quantumfs.Buffer{}
 	err := quantumfs.ConstantStore.Get(key, &buffer)
 	if err == nil {
 		return &buffer
 	}
 
-	err = config.durableStore.Get(key, &buffer)
+	err = c.durableStore.Get(key, &buffer)
 	if err == nil {
 		return &buffer
 	}
@@ -30,6 +30,6 @@ func (store *dataStore) Get(key quantumfs.ObjectKey) *quantumfs.Buffer {
 	return nil
 }
 
-func (store *dataStore) Set(key quantumfs.ObjectKey, buffer *quantumfs.Buffer) error {
-	return config.durableStore.Set(key, buffer)
+func (store *dataStore) Set(c *ctx, key quantumfs.ObjectKey, buffer *quantumfs.Buffer) error {
+	return c.durableStore.Set(key, buffer)
 }

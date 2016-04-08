@@ -15,8 +15,6 @@ import "syscall"
 // interpretting the results.
 
 func NewApi() *Api {
-	api := Api{}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -47,6 +45,11 @@ func NewApi() *Api {
 		}
 	}
 
+	return NewApiWithPath(path)
+}
+func NewApiWithPath(path string) *Api {
+	api := Api{}
+
 	fd, err := os.OpenFile(path, os.O_RDWR, 0)
 	api.fd = fd
 	if err != nil {
@@ -58,6 +61,10 @@ func NewApi() *Api {
 
 type Api struct {
 	fd *os.File
+}
+
+func (api *Api) Close() {
+	api.fd.Close()
 }
 
 func writeAll(fd *os.File, data []byte) error {

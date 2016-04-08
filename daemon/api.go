@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package main
+package daemon
 
 // This file contains all the interaction with the quantumfs API file.
 
@@ -44,38 +44,38 @@ func fillApiAttr(attr *fuse.Attr) {
 	attr.Blksize = 4096
 }
 
-func (api *ApiInode) GetAttr(out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = config.cacheTimeSeconds
-	out.AttrValidNsec = config.cacheTimeNsecs
+func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
 	fillApiAttr(&out.Attr)
 	return fuse.OK
 }
 
-func (api *ApiInode) OpenDir(context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (api *ApiInode) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	return fuse.ENOTDIR
 }
 
-func (api *ApiInode) Open(flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
 	out.OpenFlags = 0
-	handle := newApiHandle()
-	globalQfs.setFileHandle(handle.FileHandleCommon.id, handle)
+	handle := newApiHandle(c)
+	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = handle.FileHandleCommon.id
 	return fuse.OK
 }
 
-func (api *ApiInode) Lookup(context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+func (api *ApiInode) Lookup(c *ctx, context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
 	fmt.Println("Invalid Lookup on ApiInode")
 	return fuse.ENOSYS
 }
 
-func (api *ApiInode) Create(input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
 	return fuse.ENOTDIR
 }
 
-func newApiHandle() *ApiHandle {
+func newApiHandle(c *ctx) *ApiHandle {
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
-			id:       globalQfs.newFileHandleId(),
+			id:       c.qfs.newFileHandleId(),
 			inodeNum: quantumfs.InodeIdApi,
 		},
 		responses: make(chan fuse.ReadResult, 10),
@@ -90,12 +90,12 @@ type ApiHandle struct {
 	responses chan fuse.ReadResult
 }
 
-func (api *ApiHandle) ReadDirPlus(input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
+func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
 	fmt.Println("Invalid ReadDirPlus against ApiHandle")
 	return fuse.ENOSYS
 }
 
-func (api *ApiHandle) Read(offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
+func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
 	fmt.Println("Received read request on Api")
 	var blocking chan struct{}
 	if !nonblocking {
@@ -131,7 +131,7 @@ func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 	api.responses <- fuse.ReadResultData(bytes)
 }
 
-func (api *ApiHandle) Write(offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
+func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
 	var cmd quantumfs.CommandCommon
 	err := json.Unmarshal(buf, &cmd)
 
@@ -150,13 +150,13 @@ func (api *ApiHandle) Write(offset uint64, size uint32, flags uint32, buf []byte
 
 	case quantumfs.CmdBranchRequest:
 		fmt.Println("Received branch request")
-		api.branchWorkspace(buf)
+		api.branchWorkspace(c, buf)
 
 	}
 	return size, fuse.OK
 }
 
-func (api *ApiHandle) branchWorkspace(buf []byte) {
+func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	var cmd quantumfs.BranchRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
@@ -166,7 +166,7 @@ func (api *ApiHandle) branchWorkspace(buf []byte) {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
-	if err := config.workspaceDB.BranchWorkspace(src[0], src[1], dst[0], dst[1]); err != nil {
+	if err := c.workspaceDB.BranchWorkspace(src[0], src[1], dst[0], dst[1]); err != nil {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
 		return
 	}

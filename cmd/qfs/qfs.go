@@ -11,7 +11,7 @@ import "os"
 
 import "arista.com/quantumfs"
 
-// Various exist reasons, will be returned to the shell as an exit code
+// Various exit reasons, will be returned to the shell as an exit code
 const (
 	exitOk      = iota
 	exitBadCmd  = iota
