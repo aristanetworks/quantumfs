@@ -3,6 +3,8 @@
 
 package daemon
 
+// Test the basic namespace listing functionality
+
 import "io/ioutil"
 import "syscall"
 import "testing"
