@@ -29,6 +29,10 @@ func startTest(t *testing.T) testHelper {
 
 // endTest cleans up the testing environment after the test has finished
 func (th *testHelper) endTest() {
+	if th.api != nil {
+		th.api.Close()
+	}
+
 	if th.server != nil {
 		if err := th.server.Unmount(); err != nil {
 			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
@@ -49,6 +53,7 @@ type testHelper struct {
 	qfs       *QuantumFs
 	mountPath string
 	server    *fuse.Server
+	api       *quantumfs.Api
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
@@ -94,6 +99,15 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 
 	th.server = server
 	go server.Serve()
+}
+
+func (th *testHelper) getApi() *quantumfs.Api {
+	if th.api != nil {
+		return th.api
+	}
+
+	th.api = quantumfs.NewApiWithPath(th.relPath(quantumfs.ApiPath))
+	return th.api
 }
 
 // Make the given path relative to the mount root
