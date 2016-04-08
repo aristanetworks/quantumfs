@@ -63,6 +63,10 @@ type Api struct {
 	fd *os.File
 }
 
+func (api *Api) Close() {
+	api.fd.Close()
+}
+
 func writeAll(fd *os.File, data []byte) error {
 	for {
 		size, err := fd.Write(data)
