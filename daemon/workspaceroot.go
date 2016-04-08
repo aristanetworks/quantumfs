@@ -165,6 +165,7 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = 1
+		attr.Nlink = uint32(entry.Size)
 	default:
 		fmt.Println("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -172,6 +173,7 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 	case fuse.S_IFREG:
 		attr.Size = entry.Size
 		attr.Blocks = BlocksRoundUp(entry.Size, qfsBlockSize)
+		attr.Nlink = 1
 	}
 
 	attr.Atime = entry.ModificationTime.Seconds()
@@ -188,7 +190,6 @@ func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64, owner fuse.Ow
 	permissions |= fileType
 
 	attr.Mode = permissions
-	attr.Nlink = uint32(entry.Size)
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner, owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group, owner.Gid)
 	attr.Blksize = qfsBlockSize
