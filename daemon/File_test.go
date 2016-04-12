@@ -16,13 +16,11 @@ func TestFileCreation_test(t *testing.T) {
 
 	workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
 	testFilename := workspace + "/" + "test"
-	_, err := syscall.Creat(test.relPath(testFilename), 0124)
-	// Disabled because the open side isn't implemented correctly yet
-	//test.assert(err == nil, "Error creating file: %v", err)
+	fd, err := syscall.Creat(test.relPath(testFilename), 0124)
+	test.assert(err == nil, "Error creating file: %v", err)
 
-	// Disabled because you can't close a file you didn't open
-	//err = syscall.Close(fd)
-	//test.assert(err == nil, "Error closing fd: %v", err)
+	err = syscall.Close(fd)
+	test.assert(err == nil, "Error closing fd: %v", err)
 
 	var stat syscall.Stat_t
 	err = syscall.Stat(test.relPath(testFilename), &stat)
