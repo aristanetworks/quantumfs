@@ -79,7 +79,7 @@ type DirectoryEntry struct {
 
 // The various types the next referenced object could be
 const (
-	ObjectTypeBuildArtifact     = iota
+	ObjectTypeBuildProduct      = iota
 	ObjectTypeDirectoryEntry    = iota
 	ObjectTypeExtendedAttribute = iota
 	ObjectTypeHardlink          = iota

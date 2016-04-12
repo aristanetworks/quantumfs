@@ -19,7 +19,7 @@ func objectTypeToFileType(objectType quantumfs.ObjectType) uint32 {
 		quantumfs.ObjectTypeVeryLargeFile,
 		quantumfs.ObjectTypeHardlink,
 		quantumfs.ObjectTypeVCSFile,
-		quantumfs.ObjectTypeBuildArtifact: // Do we need recursive evaluation?
+		quantumfs.ObjectTypeBuildProduct: // Do we need recursive evaluation?
 		return fuse.S_IFREG
 
 	case quantumfs.ObjectTypeDirectoryEntry:
