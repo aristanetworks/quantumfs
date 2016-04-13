@@ -1,0 +1,82 @@
+The coding style used in quantumfs is defined by these simple rules:
+
+1. Use go fmt
+2. Tabs are eight spaces
+3. The maximum line length is 85 characters
+4. When wrapping indent with one tab. If the following code would be at the same
+   level insert a blank line.
+
+These simple rules can be challenging to implement and appease go fmt at the same
+time. Here are examples of mutually acceptable formatting in some of these
+challenging cases. For the purposes of discussion all the examples below will assume
+a maximum line length of 60.
+
+Long Function Signature
+=======================
+
+If you have a long function signature, you must wrap after a comma. Because indenting
+one level will put the continuation of the signature at the same level as the code,
+insert a blank line after the wrapped function signature. ie.
+
+  0         1         2         3         4         5         *         7         8
+  01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+> func (fi *File) OpenDir(c *ctx, context fuse.Context, flags uint32) fuse.Status {
+>       var foo int
+
+would be wrapped
+
+  0         1         2         3         4         5         *         7         8
+  01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+> func (fi *File) OpenDir(c *ctx, context fuse.Context,
+>         flags uint32) fuse.Status {
+> 
+>         var foo int
+
+Note the blank line following the function signature.
+
+Unfortunately go fmt demands wrapping a functions signature after a comma. Wrapping
+between the argument list and the return list is not allowed. Thus you must wrap the
+last argument as well:
+
+  0         1         2         3         4         5         *         7         8
+  01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+> func (fi *File) OpenDir(c *ctx, context fuse.Context) fuse.Status {
+>       var foo int
+
+Needs to be wrapped like so:
+
+  0         1         2         3         4         5         *         7         8
+  01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+> func (fi *File) OpenDir(c *ctx,
+>       context fuse.Context) fuse.Status {
+> 
+>       var foo int
+
+
+If-Statements
+=============
+
+Wrapping long if-statements is also somewhat challenging due to the automatic
+semicolon insertion rule, especially if the idiomatic "if err := somecall(); err !=
+nil {" style is used. Although ugly options appear to be restricted to using the less
+idomatic form:
+
+> err := somecall()
+> if err != nil {
+
+or wrapping the line in the argument list for somecall(). For the same reasons as
+with long functions signatures a blank line is necessary. ie:
+
+  0         1         2         3         4         5         *         7         8
+  01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+>        if err := c.workspaceDB.BranchWorkspace(src, dst); err != nil {
+>                api = 6
+
+must be wrapped like:
+
+  0         1         2         3         4         5         *         7         8
+  01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+>        if err := c.workspaceDB.BranchWorkspace(src,
+>                dst); err != nil {
+> 
+>                api = 6
