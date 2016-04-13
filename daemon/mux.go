@@ -124,52 +124,52 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) fuse.Sta
 }
 
 func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
-	out *fuse.AttrOut) (code fuse.Status) {
+	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Unhandled request SetAttr", input)
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
-	out *fuse.EntryOut) (code fuse.Status) {
+	out *fuse.EntryOut) fuse.Status {
 
 	fmt.Println("Unhandled request Mknod")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
-	out *fuse.EntryOut) (code fuse.Status) {
+	out *fuse.EntryOut) fuse.Status {
 
 	fmt.Println("Unhandled request Mkdir")
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) (code fuse.Status) {
+func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {
 	fmt.Println("Unhandled request Unlink")
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) (code fuse.Status) {
+func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) fuse.Status {
 	fmt.Println("Unhandled request Rmdir")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
-	newName string) (code fuse.Status) {
+	newName string) fuse.Status {
 
 	fmt.Println("Unhandled request Rename")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
-	out *fuse.EntryOut) (code fuse.Status) {
+	out *fuse.EntryOut) fuse.Status {
 
 	fmt.Println("Unhandled request Link")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
-	linkName string, out *fuse.EntryOut) (code fuse.Status) {
+	linkName string, out *fuse.EntryOut) fuse.Status {
 
 	fmt.Println("Unhandled request Symlink")
 	return fuse.ENOSYS
@@ -221,7 +221,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) fuse.Statu
 }
 
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
-	out *fuse.CreateOut) (code fuse.Status) {
+	out *fuse.CreateOut) fuse.Status {
 
 	inode := qfs.inode(&qfs.c, input.NodeId)
 	if inode == nil {
@@ -274,12 +274,12 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (code fuse.Status) {
+func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) fuse.Status {
 	fmt.Println("Unhandled request Fsync")
 	return fuse.ENOSYS
 }
 
-func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (code fuse.Status) {
+func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) fuse.Status {
 	fmt.Println("Unhandled request Fallocate")
 	return fuse.ENOSYS
 }
@@ -317,7 +317,7 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	qfs.setFileHandle(&qfs.c, input.Fh, nil)
 }
 
-func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (code fuse.Status) {
+func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) fuse.Status {
 	fmt.Println("Unhandled request FsyncDir")
 	return fuse.ENOSYS
 }
