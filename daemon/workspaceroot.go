@@ -276,3 +276,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string, out 
 
 	return fuse.OK
 }
+
+func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid SetAttr on WorkspaceRoot")
+	return fuse.ENOSYS
+}

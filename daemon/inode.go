@@ -14,6 +14,7 @@ type Inode interface {
 	Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
 	OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status
 	Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status
+	SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
 }
 
 type InodeCommon struct {

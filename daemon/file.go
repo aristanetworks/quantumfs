@@ -45,6 +45,11 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.Crea
 	return fuse.ENOTDIR
 }
 
+func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid SetAttr on File")
+	return fuse.ENOSYS
+}
+
 func newFileDescriptor(file *File, inodeNum uint64, fileHandleId uint64) FileHandle {
 	return &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{

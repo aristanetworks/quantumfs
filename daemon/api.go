@@ -72,6 +72,11 @@ func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse
 	return fuse.ENOTDIR
 }
 
+func (api *ApiInode) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid SetAttr on ApiInode")
+	return fuse.ENOSYS
+}
+
 func newApiHandle(c *ctx) *ApiHandle {
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
