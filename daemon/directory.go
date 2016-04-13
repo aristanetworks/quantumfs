@@ -46,6 +46,11 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) f
 	return fuse.ENOSYS
 }
 
+func (dir *Directory) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on Directory")
+	return fuse.ENOSYS
+}
+
 type directoryContents struct {
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc

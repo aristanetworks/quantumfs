@@ -77,6 +77,11 @@ func (api *ApiInode) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fu
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on ApiInode")
+	return fuse.ENOSYS
+}
+
 func newApiHandle(c *ctx) *ApiHandle {
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{

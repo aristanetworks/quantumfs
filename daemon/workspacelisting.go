@@ -168,6 +168,11 @@ func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOu
 	return fuse.ENOSYS
 }
 
+func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func newWorkspaceList(c *ctx, parentName string, name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
@@ -233,5 +238,10 @@ func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string, out 
 
 func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 	fmt.Println("Invalid SetAttr on WorkspaceList")
+	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS
 }

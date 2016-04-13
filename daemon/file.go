@@ -50,6 +50,11 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.St
 	return fuse.ENOSYS
 }
 
+func (fi *File) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on File")
+	return fuse.ENOSYS
+}
+
 func newFileDescriptor(file *File, inodeNum uint64, fileHandleId uint64) FileHandle {
 	return &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{

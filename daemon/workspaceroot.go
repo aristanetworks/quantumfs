@@ -281,3 +281,8 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOu
 	fmt.Println("Invalid SetAttr on WorkspaceRoot")
 	return fuse.ENOSYS
 }
+
+func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on WorkspaceRoot")
+	return fuse.ENOSYS
+}
