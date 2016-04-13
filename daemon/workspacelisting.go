@@ -74,6 +74,11 @@ func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 }
 
+func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
+}
+
 // Update the internal namespaces list with the most recent available listing
 func updateChildren(c *ctx, parentName string, names []string, inodeMap *map[string]uint64,
 	newInode func(c *ctx, parentName string, name string, inodeId uint64) Inode) {

@@ -230,16 +230,20 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string, out 
 	return fuse.OK
 }
 
+func modeToPermissions(mode uint32, umask uint32) uint8 {
+	var permissions uint32
+	mode = mode & ^umask
+	permissions = mode & 0x7
+	permissions |= (mode >> 3) & 0x7
+	permissions |= (mode >> 6) & 0x7
+
+	return uint8(permissions)
+}
+
 func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
 	if _, exists := wsr.children[name]; exists {
 		return fuse.Status(syscall.EEXIST)
 	}
-
-	var permissions uint32
-	mode := input.Mode & ^input.Umask
-	permissions = mode & 0x7
-	permissions |= (mode >> 3) & 0x7
-	permissions |= (mode >> 6) & 0x7
 
 	now := time.Now()
 	uid := input.InHeader.Context.Owner.Uid
@@ -249,7 +253,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string, out 
 		Filename:           StringToBytes(name),
 		ID:                 quantumfs.EmptyBlockKey,
 		Type:               quantumfs.ObjectTypeSmallFile,
-		Permissions:        uint8(permissions),
+		Permissions:        modeToPermissions(input.Mode, input.Umask),
 		Owner:              quantumfs.ObjectUid(uid, uid),
 		Group:              quantumfs.ObjectGid(gid, gid),
 		Size:               0,
@@ -283,26 +287,57 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOu
 }
 
 func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-	_, exists := wsr.childrenRecords[inodeNum]
+	entry, exists := wsr.childrenRecords[inodeNum]
 	if !exists {
 		return fuse.ENOENT
 	}
 
 	valid := uint(attr.SetAttrInCommon.Valid)
-	if BitFlagsSet(valid, fuse.FATTR_MODE|
-		fuse.FATTR_UID|
-		fuse.FATTR_GID|
-		fuse.FATTR_SIZE|
-		fuse.FATTR_ATIME|
-		fuse.FATTR_MTIME|
-		fuse.FATTR_FH|
-		fuse.FATTR_ATIME_NOW|
-		fuse.FATTR_MTIME_NOW|
-		fuse.FATTR_LOCKOWNER|
-		fuse.FATTR_CTIME) {
+	if BitFlagsSet(valid, fuse.FATTR_FH|
+		fuse.FATTR_LOCKOWNER) {
 		fmt.Println("Unsupported attribute(s) to set", valid)
 		return fuse.ENOSYS
 	}
+
+	if BitFlagsSet(valid, fuse.FATTR_MODE) {
+		entry.Permissions = modeToPermissions(attr.Mode, 0)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_UID) {
+		entry.Owner = quantumfs.ObjectUid(attr.Owner.Uid,
+			attr.InHeader.Context.Owner.Uid)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_GID) {
+		entry.Group = quantumfs.ObjectGid(attr.Owner.Gid,
+			attr.InHeader.Context.Owner.Gid)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
+		entry.Size = attr.Size
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
+		// atime is ignored and not stored
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_MTIME) {
+		entry.ModificationTime = quantumfs.NewTimeSeconds(attr.Mtime,
+			attr.Mtimensec)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
+		entry.ModificationTime = quantumfs.NewTime(time.Now())
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_CTIME) {
+		entry.CreationTime = quantumfs.NewTimeSeconds(attr.Ctime,
+			attr.Ctimensec)
+	}
+
+	fillAttrOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(&out.Attr, inodeNum,
+		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
 
 	return fuse.OK
 }
