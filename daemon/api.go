@@ -51,11 +51,15 @@ func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (api *ApiInode) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (api *ApiInode) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
 	return fuse.ENOTDIR
 }
 
-func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
 	out.OpenFlags = 0
 	handle := newApiHandle(c)
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
@@ -63,12 +67,16 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) 
 	return fuse.OK
 }
 
-func (api *ApiInode) Lookup(c *ctx, context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+func (api *ApiInode) Lookup(c *ctx, context fuse.Context, name string,
+	out *fuse.EntryOut) fuse.Status {
+
 	fmt.Println("Invalid Lookup on ApiInode")
 	return fuse.ENOSYS
 }
 
-func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string,
+	out *fuse.CreateOut) fuse.Status {
+
 	return fuse.ENOTDIR
 }
 
@@ -90,12 +98,16 @@ type ApiHandle struct {
 	responses chan fuse.ReadResult
 }
 
-func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
+func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
+	out *fuse.DirEntryList) fuse.Status {
+
 	fmt.Println("Invalid ReadDirPlus against ApiHandle")
 	return fuse.ENOSYS
 }
 
-func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
+func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
+	nonblocking bool) (fuse.ReadResult, fuse.Status) {
+
 	fmt.Println("Received read request on Api")
 	var blocking chan struct{}
 	if !nonblocking {
@@ -115,9 +127,11 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte, nonbl
 
 func makeErrorResponse(code uint32, message string) []byte {
 	response := quantumfs.ErrorResponse{
-		CommandCommon: quantumfs.CommandCommon{CommandId: quantumfs.CmdError},
-		ErrorCode:     code,
-		Message:       message,
+		CommandCommon: quantumfs.CommandCommon{
+			CommandId: quantumfs.CmdError,
+		},
+		ErrorCode: code,
+		Message:   message,
 	}
 	bytes, err := json.Marshal(response)
 	if err != nil {
@@ -131,7 +145,9 @@ func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 	api.responses <- fuse.ReadResultData(bytes)
 }
 
-func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
+func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
+	buf []byte) (uint32, fuse.Status) {
+
 	var cmd quantumfs.CommandCommon
 	err := json.Unmarshal(buf, &cmd)
 
@@ -145,7 +161,8 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32, bu
 		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
 
 	case quantumfs.CmdError:
-		message := fmt.Sprintf("Invalid message %d to send to quantumfsd", cmd.CommandId)
+		message := fmt.Sprintf("Invalid message %d to send to quantumfsd",
+			cmd.CommandId)
 		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
 
 	case quantumfs.CmdBranchRequest:
@@ -166,7 +183,9 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
-	if err := c.workspaceDB.BranchWorkspace(src[0], src[1], dst[0], dst[1]); err != nil {
+	if err := c.workspaceDB.BranchWorkspace(src[0], src[1], dst[0],
+		dst[1]); err != nil {
+
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
 		return
 	}

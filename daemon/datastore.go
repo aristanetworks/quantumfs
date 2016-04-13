@@ -30,6 +30,8 @@ func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
 	return nil
 }
 
-func (store *dataStore) Set(c *ctx, key quantumfs.ObjectKey, buffer *quantumfs.Buffer) error {
+func (store *dataStore) Set(c *ctx, key quantumfs.ObjectKey,
+	buffer *quantumfs.Buffer) error {
+
 	return c.durableStore.Set(key, buffer)
 }

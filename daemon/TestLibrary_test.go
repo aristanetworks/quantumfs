@@ -41,7 +41,8 @@ func (th *testHelper) endTest() {
 
 	if th.mountPath != "" {
 		if err := os.RemoveAll(th.mountPath); err != nil {
-			th.t.Fatalf("Failed to cleanup temporary mount point: %v", err)
+			th.t.Fatalf("Failed to cleanup temporary mount point: %v",
+				err)
 		}
 	}
 }

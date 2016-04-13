@@ -74,8 +74,9 @@ func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
 }
 
 // Update the internal namespaces list with the most recent available listing
-func updateChildren(c *ctx, parentName string, names []string, inodeMap *map[string]uint64,
-	newInode func(c *ctx, parentName string, name string, inodeId uint64) Inode) {
+func updateChildren(c *ctx, parentName string, names []string,
+	inodeMap *map[string]uint64, newInode func(c *ctx, parentName string,
+		name string, inodeId uint64) Inode) {
 
 	touched := make(map[string]bool)
 
@@ -84,7 +85,8 @@ func updateChildren(c *ctx, parentName string, names []string, inodeMap *map[str
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
-			c.qfs.setInode(c, inodeId, newInode(c, parentName, name, inodeId))
+			c.qfs.setInode(c, inodeId, newInode(c, parentName, name,
+				inodeId))
 		}
 		touched[name] = true
 	}
@@ -98,7 +100,9 @@ func updateChildren(c *ctx, parentName string, names []string, inodeMap *map[str
 	}
 }
 
-func snapshotChildren(c *ctx, children *map[string]uint64, fillAttr listingAttrFill) []directoryContents {
+func snapshotChildren(c *ctx, children *map[string]uint64,
+	fillAttr listingAttrFill) []directoryContents {
+
 	out := make([]directoryContents, 0, len(*children))
 	for name, inode := range *children {
 		child := directoryContents{
@@ -113,12 +117,17 @@ func snapshotChildren(c *ctx, children *map[string]uint64, fillAttr listingAttrF
 	return out
 }
 
-func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces, newWorkspaceList)
+func (nsl *NamespaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
+	mode uint32, out *fuse.OpenOut) fuse.Status {
+
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
+		newWorkspaceList)
 	children := snapshotChildren(c, &nsl.namespaces, fillNamespaceAttr)
 
 	api := directoryContents{
@@ -136,7 +145,9 @@ func (nsl *NamespaceList) OpenDir(c *ctx, context fuse.Context, flags uint32, mo
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) Lookup(c *ctx, context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+func (nsl *NamespaceList) Lookup(c *ctx, context fuse.Context, name string,
+	out *fuse.EntryOut) fuse.Status {
+
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
@@ -158,11 +169,15 @@ func (nsl *NamespaceList) Lookup(c *ctx, context fuse.Context, name string, out 
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
+	out *fuse.CreateOut) fuse.Status {
+
 	return fuse.EACCES
 }
 
-func newWorkspaceList(c *ctx, parentName string, name string, inodeNum uint64) Inode {
+func newWorkspaceList(c *ctx, parentName string, name string,
+	inodeNum uint64) Inode {
+
 	nsd := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
 		namespaceName: name,
@@ -187,11 +202,15 @@ func (nsd *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsl *WorkspaceList) Open(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsl *WorkspaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
+	mode uint32, out *fuse.OpenOut) fuse.Status {
+
 	updateChildren(c, wsl.namespaceName,
 		c.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
 		newWorkspaceRoot)
@@ -205,7 +224,9 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, context fuse.Context, flags uint32, mo
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) Lookup(c *ctx, context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+func (wsl *WorkspaceList) Lookup(c *ctx, context fuse.Context, name string,
+	out *fuse.EntryOut) fuse.Status {
+
 	if !c.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
 		return fuse.ENOENT
 	}
@@ -221,6 +242,8 @@ func (wsl *WorkspaceList) Lookup(c *ctx, context fuse.Context, name string, out 
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,
+	out *fuse.CreateOut) fuse.Status {
+
 	return fuse.EACCES
 }

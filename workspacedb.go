@@ -57,7 +57,9 @@ type WorkspaceDbErr struct {
 const (
 	WSDB_OK                  = iota // Success
 	WSDB_WORKSPACE_NOT_FOUND = iota // The workspace didn't exist
-	WSDB_OUT_OF_DATE         = iota // The operation was based off out of date information
+
+	// The operation was based off out of date information
+	WSDB_OUT_OF_DATE = iota
 )
 
 func (err *WorkspaceDbErr) Error() string {

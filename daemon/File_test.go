@@ -34,8 +34,8 @@ func TestFileCreation_test(t *testing.T) {
 	expectedPermissions |= syscall.S_IFREG
 	expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO
 	test.assert(stat.Mode == expectedPermissions,
-		"File permissions incorrect. Expected %x got %x", expectedPermissions,
-		stat.Mode)
+		"File permissions incorrect. Expected %x got %x",
+		expectedPermissions, stat.Mode)
 
 	test.endTest()
 }
