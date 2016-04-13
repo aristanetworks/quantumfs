@@ -260,7 +260,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string, out 
 
 	inodeNum := c.qfs.newInodeId()
 	wsr.addChild(c, name, inodeNum, entry)
-	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey)
+	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey, wsr)
 	c.qfs.setInode(c, inodeNum, file)
 
 	fillEntryOutCacheData(c, &out.EntryOut)
@@ -283,6 +283,26 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOu
 }
 
 func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-	fmt.Println("Invalid setChildAttr on WorkspaceRoot")
-	return fuse.ENOSYS
+	_, exists := wsr.childrenRecords[inodeNum]
+	if !exists {
+		return fuse.ENOENT
+	}
+
+	valid := uint(attr.SetAttrInCommon.Valid)
+	if BitFlagsSet(valid, fuse.FATTR_MODE|
+		fuse.FATTR_UID|
+		fuse.FATTR_GID|
+		fuse.FATTR_SIZE|
+		fuse.FATTR_ATIME|
+		fuse.FATTR_MTIME|
+		fuse.FATTR_FH|
+		fuse.FATTR_ATIME_NOW|
+		fuse.FATTR_MTIME_NOW|
+		fuse.FATTR_LOCKOWNER|
+		fuse.FATTR_CTIME) {
+		fmt.Println("Unsupported attribute(s) to set", valid)
+		return fuse.ENOSYS
+	}
+
+	return fuse.OK
 }
