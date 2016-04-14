@@ -5,6 +5,7 @@
 // directory hierarchy.
 package daemon
 
+import "fmt"
 import "time"
 
 import "arista.com/quantumfs"
@@ -69,6 +70,11 @@ func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
 	out.Generation = 1
 	out.EntryValid = c.config.CacheTimeSeconds
 	out.EntryValidNsec = c.config.CacheTimeNsecs
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
+}
+
+func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 }
@@ -162,6 +168,16 @@ func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string, out 
 	return fuse.EACCES
 }
 
+func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid SetAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
+func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func newWorkspaceList(c *ctx, parentName string, name string, inodeNum uint64) Inode {
 	nsd := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
@@ -223,4 +239,14 @@ func (wsl *WorkspaceList) Lookup(c *ctx, context fuse.Context, name string, out 
 
 func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
 	return fuse.EACCES
+}
+
+func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid SetAttr on WorkspaceList")
+	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	fmt.Println("Invalid setChildAttr on WorkspaceList")
+	return fuse.ENOSYS
 }
