@@ -22,6 +22,8 @@ type Inode interface {
 	Create(c *ctx, input *fuse.CreateIn, name string,
 		out *fuse.CreateOut) fuse.Status
 
+	SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status
