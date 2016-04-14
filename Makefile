@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs
+COMMANDS=quantumfsd qfs contentcheck
 PKGS_TO_TEST=daemon
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)

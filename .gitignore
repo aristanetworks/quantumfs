@@ -1,4 +1,5 @@
 /quantumfsd
 /qfs
+/contentcheck
 .*.swp
 .swp
