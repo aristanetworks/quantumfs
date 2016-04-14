@@ -195,6 +195,13 @@ func NewTime(instant time.Time) Time {
 	return Time(t)
 }
 
+func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
+	t := seconds * 1000000
+	t += uint64(nanoseconds / 1000)
+
+	return Time(t)
+}
+
 type DirectoryRecord struct {
 	Filename           [MaxFilenameLength]byte
 	ID                 ObjectKey

@@ -123,11 +123,13 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) fuse.Sta
 	return inode.GetAttr(qfs.c.req(input.Unique), out)
 }
 
-func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	inode := qfs.inode(&qfs.c, input.NodeId)
+	if inode == nil {
+		return fuse.ENOENT
+	}
 
-	fmt.Println("Unhandled request SetAttr", input)
-	return fuse.ENOSYS
+	return inode.SetAttr(qfs.c.req(input.Unique), input, out)
 }
 
 func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
