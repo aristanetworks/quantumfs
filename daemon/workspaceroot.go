@@ -26,7 +26,7 @@ type WorkspaceRoot struct {
 	// Indexed by inode number
 	childrenRecords map[uint64]*quantumfs.DirectoryRecord
 
-	dirty bool // True if the contents of this subtree has changed since last sync
+	dirty bool // True if the contents of subtree has changed since last sync
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
