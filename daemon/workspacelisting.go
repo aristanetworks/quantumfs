@@ -268,12 +268,16 @@ func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 	return fuse.EACCES
 }
 
-func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
 	fmt.Println("Invalid SetAttr on WorkspaceList")
 	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
 	fmt.Println("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS
 }

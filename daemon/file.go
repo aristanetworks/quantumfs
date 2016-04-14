@@ -57,11 +57,15 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 	return fuse.ENOTDIR
 }
 
-func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
 
-func (fi *File) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (fi *File) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
 	fmt.Println("Invalid setChildAttr on File")
 	return fuse.ENOSYS
 }
