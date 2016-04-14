@@ -23,5 +23,5 @@ codechecks: contentcheck
 newreview: all codechecks
 	rbt post
 
-updatewreview: all codechecks
+updatereview: all codechecks
 	rbt post -u
