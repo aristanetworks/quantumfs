@@ -20,5 +20,8 @@ codechecks: contentcheck
 	./contentcheck
 
 # A utility command to produce a review after running all the necessary checks
-review: all codechecks
+newreview: all codechecks
 	rbt post
+
+updatewreview: all codechecks
+	rbt post -u
