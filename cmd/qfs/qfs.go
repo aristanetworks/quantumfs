@@ -26,7 +26,8 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Println("Available commands:")
 		fmt.Println("  branch <workspaceO> <workspaceN>")
-		fmt.Println("         - create a new workspaceN which is a copy of workspaceO")
+		fmt.Println("         - create a new workspaceN which is a copy of" +
+			" workspaceO")
 		fmt.Println("           as of this point in time")
 		os.Exit(exitBadCmd)
 	}

@@ -14,7 +14,8 @@ func NewWorkspaceDB() quantumfs.WorkspaceDB {
 	}
 
 	// Create the null workspace
-	wsdb.cache[quantumfs.NullNamespaceName] = make(map[string]quantumfs.ObjectKey)
+	wsdb.cache[quantumfs.NullNamespaceName] =
+		make(map[string]quantumfs.ObjectKey)
 	wsdb.cache[quantumfs.NullNamespaceName][quantumfs.NullWorkspaceName] =
 		quantumfs.EmptyWorkspaceKey
 	return wsdb
@@ -112,12 +113,15 @@ func (wsdb *WorkspaceDB) BranchWorkspace(srcNamespace string, srcWorkspace strin
 		return fmt.Errorf("Destination Workspace already exists")
 	}
 
-	wsdb.cache[dstNamespace][dstWorkspace] = wsdb.cache[srcNamespace][srcWorkspace]
+	wsdb.cache[dstNamespace][dstWorkspace] =
+		wsdb.cache[srcNamespace][srcWorkspace]
 
 	return nil
 }
 
-func (wsdb *WorkspaceDB) Workspace(namespace string, workspace string) quantumfs.ObjectKey {
+func (wsdb *WorkspaceDB) Workspace(namespace string,
+	workspace string) quantumfs.ObjectKey {
+
 	wsdb.cacheMutex.Lock()
 	rootid, _ := wsdb.workspace(namespace, workspace)
 	wsdb.cacheMutex.Unlock()
@@ -133,12 +137,14 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(namespace string, workspace string,
 	rootId, exists := wsdb.workspace(namespace, workspace)
 	if !exists {
 		wsdb.cacheMutex.Unlock()
-		return rootId, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_NOT_FOUND)
+		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_NOT_FOUND)
+		return rootId, e
 	}
 
 	if currentRootId != rootId {
 		wsdb.cacheMutex.Unlock()
-		return rootId, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE)
+		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE)
+		return rootId, e
 	}
 
 	wsdb.cache[namespace][workspace] = newRootId

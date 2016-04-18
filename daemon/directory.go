@@ -25,28 +25,40 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) Lookup(c *ctx, context fuse.Context, name string, out *fuse.EntryOut) fuse.Status {
+func (dir *Directory) Lookup(c *ctx, context fuse.Context, name string,
+	out *fuse.EntryOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) Open(c *ctx, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32, out *fuse.OpenOut) fuse.Status {
+func (dir *Directory) OpenDir(c *ctx, context fuse.Context, flags uint32,
+	mode uint32, out *fuse.OpenOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string, out *fuse.CreateOut) fuse.Status {
+func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
+	out *fuse.CreateOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
 	fmt.Println("Invalid SetAttr on Directory")
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (dir *Directory) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
 	fmt.Println("Invalid setChildAttr on Directory")
 	return fuse.ENOSYS
 }
@@ -57,7 +69,9 @@ type directoryContents struct {
 	attr     fuse.Attr
 }
 
-func newDirectorySnapshot(c *ctx, children []directoryContents, inodeNum uint64) *directorySnapshot {
+func newDirectorySnapshot(c *ctx, children []directoryContents,
+	inodeNum uint64) *directorySnapshot {
+
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:       c.qfs.newFileHandleId(),
@@ -74,7 +88,9 @@ type directorySnapshot struct {
 	children []directoryContents
 }
 
-func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
+func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
+	out *fuse.DirEntryList) fuse.Status {
+
 	fmt.Println("ReadDirPlus directorySnapshot", input, out)
 	offset := input.Offset
 
@@ -129,12 +145,16 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn, out *fuse.D
 	return fuse.OK
 }
 
-func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte, nonblocking bool) (fuse.ReadResult, fuse.Status) {
+func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte,
+	nonblocking bool) (fuse.ReadResult, fuse.Status) {
+
 	fmt.Println("Invalid read on directorySnapshot")
 	return nil, fuse.ENOSYS
 }
 
-func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (uint32, fuse.Status) {
+func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
+	buf []byte) (uint32, fuse.Status) {
+
 	fmt.Println("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }

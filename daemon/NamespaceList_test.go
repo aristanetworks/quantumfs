@@ -23,7 +23,8 @@ func TestNamespaceListing_test(t *testing.T) {
 
 	entries, err := ioutil.ReadDir(test.relPath(""))
 	test.assert(err == nil, "Couldn't read root listing")
-	test.assert(len(entries) == 2, "Incorrect number of entries in empty root: %d", len(entries))
+	test.assert(len(entries) == 2,
+		"Incorrect number of entries in empty root: %d", len(entries))
 
 	test.endTest()
 }
@@ -34,7 +35,8 @@ func TestWorkspaceListing_test(t *testing.T) {
 
 	entries, err := ioutil.ReadDir(test.relPath(quantumfs.NullNamespaceName))
 	test.assert(err == nil, "Couldn't read namespace listing")
-	test.assert(len(entries) == 1, "Incorrect number of entries in null namespace: %d", len(entries))
+	test.assert(len(entries) == 1,
+		"Incorrect number of entries in null namespace: %d", len(entries))
 
 	test.endTest()
 }
@@ -46,7 +48,8 @@ func TestNullWorkspaceListing_test(t *testing.T) {
 	path := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
 	entries, err := ioutil.ReadDir(test.relPath(path))
 	test.assert(err == nil, "Couldn't read workspace listing")
-	test.assert(len(entries) == 0, "Incorrect number of entries in null workspace: %d", len(entries))
+	test.assert(len(entries) == 0,
+		"Incorrect number of entries in null workspace: %d", len(entries))
 
 	test.endTest()
 }

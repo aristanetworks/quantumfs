@@ -41,7 +41,8 @@ func init() {
 		"Size of the local cache, e.g. 8G or 512M")
 	flag.StringVar(&config.MountPath, "mountpath", defaultMountPath,
 		"Path to mount quantumfs at")
-	flag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds", defaultCacheTimeSeconds,
+	flag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
+		defaultCacheTimeSeconds,
 		"Number of seconds the kernel will cache response data")
 	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
