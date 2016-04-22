@@ -26,7 +26,7 @@ type WorkspaceRoot struct {
 	// Indexed by inode number
 	childrenRecords map[uint64]*quantumfs.DirectoryRecord
 
-	dirty bool // True if the contents of subtree has changed since last sync
+	dirty_ bool // True if the contents of subtree has changed since last sync
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -89,14 +89,18 @@ func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64,
 	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, child)
 	wsr.childrenRecords[inodeNum] =
 		&wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
-	wsr.dirty = true
+	wsr.dirty(c)
+}
 
+// Mark this workspace dirty and update the workspace DB
+func (wsr *WorkspaceRoot) dirty(c *ctx) {
+	wsr.dirty_ = true
 	wsr.advanceRootId(c)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
-	if !wsr.dirty {
+	if !wsr.dirty_ {
 		return
 	}
 
@@ -143,7 +147,7 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		wsr.rootId = rootId
 	}
 
-	wsr.dirty = false
+	wsr.dirty_ = false
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -362,6 +366,8 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAt
 	fillAttrOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(&out.Attr, inodeNum,
 		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
+
+	wsr.dirty(c)
 
 	return fuse.OK
 }
