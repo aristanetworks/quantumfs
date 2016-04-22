@@ -264,6 +264,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 		return fuse.Status(syscall.EEXIST)
 	}
 
+	c.vlog("Creating workspace")
+
 	now := time.Now()
 	uid := input.InHeader.Context.Owner.Uid
 	gid := input.InHeader.Context.Owner.Gid

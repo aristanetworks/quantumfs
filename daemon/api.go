@@ -76,7 +76,7 @@ func (api *ApiInode) Lookup(c *ctx, context fuse.Context, name string,
 
 func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
-
+	c.vlog("creating file %s", name)
 	return fuse.ENOTDIR
 }
 
@@ -161,6 +161,7 @@ func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 
 func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
+	c.vlog("writing to file")
 
 	var cmd quantumfs.CommandCommon
 	err := json.Unmarshal(buf, &cmd)
@@ -184,6 +185,8 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.branchWorkspace(c, buf)
 
 	}
+
+	c.vlog("done writing to file")
 	return size, fuse.OK
 }
 
