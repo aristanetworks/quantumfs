@@ -27,6 +27,9 @@ type Inode interface {
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status
+
+	// Mark this Inode dirty
+	dirty(c *ctx)
 }
 
 type InodeCommon struct {

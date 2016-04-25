@@ -42,6 +42,8 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum uint64,
 func newWorkspaceRoot(c *ctx, parentName string, name string,
 	inodeNum uint64) Inode {
 
+	var wsr WorkspaceRoot
+
 	rootId := c.workspaceDB.Workspace(parentName, name)
 
 	object := DataStore.Get(c, rootId)
@@ -67,18 +69,17 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId))
+		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId, &wsr))
 	}
 
-	return &WorkspaceRoot{
-		InodeCommon:     InodeCommon{id: inodeNum},
-		namespace:       parentName,
-		workspace:       name,
-		rootId:          rootId,
-		baseLayer:       baseLayer,
-		children:        children,
-		childrenRecords: childrenRecords,
-	}
+	wsr.InodeCommon = InodeCommon{id: inodeNum}
+	wsr.namespace = parentName
+	wsr.workspace = name
+	wsr.rootId = rootId
+	wsr.baseLayer = baseLayer
+	wsr.children = children
+	wsr.childrenRecords = childrenRecords
+	return &wsr
 }
 
 func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64,

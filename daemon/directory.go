@@ -12,13 +12,19 @@ import "github.com/hanwen/go-fuse/fuse"
 type Directory struct {
 	InodeCommon
 	baseLayerId quantumfs.ObjectKey
+	parent      Inode
 }
 
-func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum uint64) Inode {
+func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum uint64, parent Inode) Inode {
 	return &Directory{
 		InodeCommon: InodeCommon{id: inodeNum},
 		baseLayerId: baseLayerId,
+		parent:      parent,
 	}
+}
+
+func (dir *Directory) dirty(c *ctx) {
+	dir.parent.dirty(c)
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
