@@ -41,8 +41,8 @@ func (th *testHelper) endTest() {
 		}
 	}
 
-	if th.mountPath != "" {
-		if err := os.RemoveAll(th.mountPath); err != nil {
+	if th.tempDir != "" {
+		if err := os.RemoveAll(th.tempDir); err != nil {
 			th.t.Fatalf("Failed to cleanup temporary mount point: %v",
 				err)
 		}
@@ -51,21 +51,24 @@ func (th *testHelper) endTest() {
 
 // This helper is more of a namespacing mechanism than a coherent object
 type testHelper struct {
-	t         *testing.T
-	testName  string
-	qfs       *QuantumFs
-	mountPath string
-	server    *fuse.Server
-	api       *quantumfs.Api
+	t        *testing.T
+	testName string
+	qfs      *QuantumFs
+	tempDir  string
+	server   *fuse.Server
+	api      *quantumfs.Api
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
-	mountPath, err := ioutil.TempDir("", "quantumfsTest")
+	tempDir, err := ioutil.TempDir("", "quantumfsTest")
 	if err != nil {
 		th.t.Fatalf("Unable to create temporary mount point: %v", err)
 	}
 
-	th.mountPath = mountPath
+	th.tempDir = tempDir
+	mountPath := tempDir + "/mnt"
+
+	os.Mkdir(mountPath, 0777)
 	th.t.Log("Using mountpath", mountPath)
 
 	config := QuantumFsConfig{
@@ -115,7 +118,7 @@ func (th *testHelper) getApi() *quantumfs.Api {
 
 // Make the given path relative to the mount root
 func (th *testHelper) relPath(path string) string {
-	return th.mountPath + "/" + path
+	return th.tempDir + "/mnt/" + path
 }
 
 // Retrieve a list of FileDescriptor from an Inode
