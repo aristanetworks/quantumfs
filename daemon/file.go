@@ -92,6 +92,10 @@ type FileDescriptor struct {
 	file *File
 }
 
+func (fd *FileDescriptor) dirty(c *ctx) {
+	fd.file.dirty(c)
+}
+
 func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
@@ -108,6 +112,8 @@ func (fd *FileDescriptor) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
+
+	fd.dirty(c)
 
 	fmt.Println("Received write request on FileDescriptor")
 	return 0, fuse.ENOSYS
