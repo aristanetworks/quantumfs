@@ -143,7 +143,7 @@ func Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 
 	// todo: send to shared memory
 	t := time.Now()
-	
+
 	if getLogLevel(idx, level) {
 		fmt.Printf(t.Format(time.StampNano) + " " + idx.String() + " " +
 			strconv.FormatUint(reqId, 10) + ": " + format + "\n",
