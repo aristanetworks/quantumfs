@@ -9,6 +9,7 @@ import "time"
 
 import "crypto/sha1"
 import "encoding/json"
+import "arista.com/quantumfs/qlog"
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = 1 * 1024 * 1024
@@ -120,7 +121,7 @@ func SystemUid(uid UID, userId uint32) uint32 {
 // Convert system UID to object UID
 //
 // userId is the UID of the current user
-func ObjectUid(uid uint32, userId uint32) UID {
+func ObjectUid(requestId uint64, uid uint32, userId uint32) UID {
 	if uid == userId {
 		return UIDUser
 	}
@@ -129,7 +130,7 @@ func ObjectUid(uid uint32, userId uint32) UID {
 	case 0:
 		return UIDRoot
 	default:
-		fmt.Println("Unknown UID", uid)
+		qlog.Log(qlog.LogDatastore, requestId, 0, "Unknown UID %d", uid)
 		return UIDUser
 	}
 }
@@ -160,7 +161,7 @@ func SystemGid(gid GID, userId uint32) uint32 {
 // Convert system GID to object GID
 //
 // userId is the GID of the current user
-func ObjectGid(gid uint32, userId uint32) GID {
+func ObjectGid(requestId uint64, gid uint32, userId uint32) GID {
 	if gid == userId {
 		return GIDUser
 	}
@@ -169,7 +170,7 @@ func ObjectGid(gid uint32, userId uint32) GID {
 	case 0:
 		return GIDRoot
 	default:
-		fmt.Println("Unknown GID", gid)
+		qlog.Log(qlog.LogDatastore, requestId, 0, "Unknown GID", gid)
 		return GIDUser
 	}
 }

@@ -5,13 +5,13 @@
 // requests and forwards them to the correct Inode.
 package daemon
 
-import "fmt"
 import "math"
 import "syscall"
 import "sync"
 import "sync/atomic"
 
 import "arista.com/quantumfs"
+import "arista.com/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
@@ -100,16 +100,18 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	inode := qfs.inode(&qfs.c, header.NodeId)
+	c := qfs.c.req(header.Unique)
 	if inode == nil {
-		fmt.Println("Lookup failed", name)
+		c.elog("Lookup failed", name)
 		return fuse.ENOENT
 	}
 
-	return inode.Lookup(qfs.c.req(header.Unique), header.Context, name, out)
+	return inode.Lookup(c, header.Context, name, out)
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
-	fmt.Println("Forgetting inode", nodeID, "Looked up ", nlookup, "Times")
+	qlog.Log(qlog.LogDaemon, qlog.MaxReqId, 2,
+		"Forgetting inode %d Looked up %d Times", nodeID, nlookup)
 	qfs.setInode(&qfs.c, nodeID, nil)
 }
 
@@ -135,90 +137,107 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Sta
 func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	fmt.Println("Unhandled request Mknod")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Mknod")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	fmt.Println("Unhandled request Mkdir")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Mkdir")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {
-	fmt.Println("Unhandled request Unlink")
+
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request Unlink")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) fuse.Status {
-	fmt.Println("Unhandled request Rmdir")
+
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request Rmdir")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	newName string) fuse.Status {
 
-	fmt.Println("Unhandled request Rename")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Rename")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	out *fuse.EntryOut) fuse.Status {
 
-	fmt.Println("Unhandled request Link")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Link")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	linkName string, out *fuse.EntryOut) fuse.Status {
 
-	fmt.Println("Unhandled request Symlink")
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request Symlink")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 	code fuse.Status) {
 
-	fmt.Println("Unhandled request Readlink")
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request Readlink")
 	return nil, fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
-	fmt.Println("Unhandled request Access")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Access")
 	return fuse.OK
 }
 
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (sz int,
 	code fuse.Status) {
 
-	fmt.Println("Unhandled request GetXAttrSize")
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request GetXAttrSize")
 	return 0, fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
 	code fuse.Status) {
 
-	fmt.Println("Unhandled request GetXAttrData")
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request GetXAttrData")
 	return nil, fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 	code fuse.Status) {
 
-	fmt.Println("Unhandled request ListXAttr")
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request ListXAttr")
 	return nil, fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	data []byte) fuse.Status {
 
-	fmt.Println("Unhandled request SetXAttr")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request SetXAttr")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) fuse.Status {
-	fmt.Println("Unhandled request RemoveXAttr")
+
+	c := qfs.c.req(header.Unique)
+	c.elog("Unhandled request RemoveXAttr")
 	return fuse.ENOSYS
 }
 
@@ -226,34 +245,37 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
 	inode := qfs.inode(&qfs.c, input.NodeId)
+	c := qfs.c.req(input.Unique)
 	if inode == nil {
-		fmt.Println("Create failed", input)
+		c.elog("Create failed", input)
 		return fuse.EACCES // TODO Confirm this is correct
 	}
 
-	return inode.Create(qfs.c.req(input.Unique), input, name, out)
+	return inode.Create(c, input, name, out)
 }
 
 func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
 	inode := qfs.inode(&qfs.c, input.NodeId)
+	c := qfs.c.req(input.Unique)
 	if inode == nil {
-		fmt.Println("Open failed", input)
+		c.elog("Open failed", input)
 		return fuse.ENOENT
 	}
 
-	return inode.Open(qfs.c.req(input.Unique), input.Flags, input.Mode, out)
+	return inode.Open(c, input.Flags, input.Mode, out)
 }
 
 func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 	fuse.Status) {
 
-	fmt.Println("Read:", input)
+	c := qfs.c.req(input.Unique)
+	c.elog("Read:", input)
 	fileHandle := qfs.fileHandle(&qfs.c, input.Fh)
 	if fileHandle == nil {
-		fmt.Println("Read failed", fileHandle)
+		c.elog("Read failed", fileHandle)
 		return nil, fuse.ENOENT
 	}
-	return fileHandle.Read(qfs.c.req(input.Unique), input.Offset, input.Size,
+	return fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
 
@@ -263,44 +285,52 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 
 func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Status) {
 	fileHandle := qfs.fileHandle(&qfs.c, input.Fh)
+	c := qfs.c.req(input.Unique)
 	if fileHandle == nil {
-		fmt.Println("Write failed", fileHandle)
+		c.elog("Write failed", fileHandle)
 		return 0, fuse.ENOENT
 	}
-	return fileHandle.Write(qfs.c.req(input.Unique), input.Offset, input.Size,
+	return fileHandle.Write(c, input.Offset, input.Size,
 		input.Flags, data)
 }
 
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {
-	fmt.Println("Unhandled request Flush")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Flush")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) fuse.Status {
-	fmt.Println("Unhandled request Fsync")
+
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Fsync")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) fuse.Status {
-	fmt.Println("Unhandled request Fallocate")
+
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request Fallocate")
 	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
 	inode := qfs.inode(&qfs.c, input.NodeId)
+	c := qfs.c.req(input.Unique)
 	if inode == nil {
-		fmt.Println("OpenDir failed", input)
+		c.elog("OpenDir failed", input)
 		return fuse.ENOENT
 	}
 
-	return inode.OpenDir(qfs.c.req(input.Unique), input.InHeader.Context,
+	return inode.OpenDir(c, input.InHeader.Context,
 		input.Flags, input.Mode, out)
 }
 
 func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fmt.Println("Unhandled request ReadDir")
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request ReadDir")
 	return fuse.ENOSYS
 }
 
@@ -308,11 +338,12 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
 	fileHandle := qfs.fileHandle(&qfs.c, input.Fh)
+	c := qfs.c.req(input.Unique)
 	if fileHandle == nil {
-		fmt.Println("ReadDirPlus failed", fileHandle)
+		c.elog("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
 	}
-	return fileHandle.ReadDirPlus(qfs.c.req(input.Unique), input, out)
+	return fileHandle.ReadDirPlus(c, input, out)
 }
 
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
@@ -320,7 +351,9 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 }
 
 func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) fuse.Status {
-	fmt.Println("Unhandled request FsyncDir")
+
+	c := qfs.c.req(input.Unique)
+	c.elog("Unhandled request FsyncDir")
 	return fuse.ENOSYS
 }
 
@@ -338,5 +371,5 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Sta
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
-	fmt.Println("Unhandled request Init")
+	qlog.Log(qlog.LogDaemon, qlog.MaxReqId, 0, "Unhandled request Init")
 }

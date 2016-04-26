@@ -11,6 +11,8 @@ import "unsafe"
 import "strconv"
 import "strings"
 import "os"
+import "time"
+import "math"
 
 type LogSubsystem uint8
 const (
@@ -20,6 +22,8 @@ const (
 	LogWorkspacedb
 	logSubsystemmax = LogWorkspacedb
 )
+
+const MaxReqId uint64 = math.MaxUint64
 
 func (enum LogSubsystem) String() string {
 	switch enum {
@@ -49,28 +53,14 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
 
-// this is the logging system level store. Increase size as the number of
+// This is the logging system level store. Increase size as the number of
 // LogSubsystems increases past your capacity
 var logLevels uint16
 var maxLogLevels uint8
 var logEnvTag = "TRACE"
 
-func generateWriter(fileOut string) func(string, ...interface{}) (int, error) {
-
-	fd, e := os.OpenFile(fileOut, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	if e != nil {
-		fmt.Printf("Unable to open file for logging: %s, %e", fileOut, e)
-		return nil
-	}
-
-	return func(format string, args ...interface{}) (int, error) {
-		num, e := fd.WriteString(fmt.Sprintf(format, args...))
-		return num, e
-	}
-}
-
 // Get whether, given the subsystem, the given level is active for logs
-func GetLogLevel(idx LogSubsystem, level uint8) bool {
+func getLogLevel(idx LogSubsystem, level uint8) bool {
 	var mask uint16 = (1 << ((uint8(idx) * maxLogLevels) + level))
 	return (logLevels & mask) != 0
 }
@@ -148,3 +138,15 @@ func init() {
 	loadLevels()
 }
 
+func Log(idx LogSubsystem, reqId uint64, level uint8, format string,
+	args ...interface{}) {
+
+	// todo: send to shared memory
+	t := time.Now()
+	
+	if getLogLevel(idx, level) {
+		fmt.Printf(t.Format(time.StampNano) + " " + idx.String() + " " +
+			strconv.FormatUint(reqId, 10) + ": " + format + "\n",
+			args...)
+	}
+}

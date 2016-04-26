@@ -5,7 +5,6 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
-import "fmt"
 import "syscall"
 import "time"
 
@@ -166,19 +165,19 @@ func (wsr *WorkspaceRoot) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum uint64,
+func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum uint64,
 	owner fuse.Owner, entry *quantumfs.DirectoryRecord) {
 
 	attr.Ino = inodeNum
 
-	fileType := objectTypeToFileType(entry.Type)
+	fileType := objectTypeToFileType(c, entry.Type)
 	switch fileType {
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = 1
 		attr.Nlink = uint32(entry.Size)
 	default:
-		fmt.Println("Unhandled filetype in fillAttrWithDirectoryRecord",
+		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
 		fallthrough
 	case fuse.S_IFREG:
@@ -215,9 +214,9 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
 
 		entryInfo := directoryContents{
 			filename: filename,
-			fuseType: objectTypeToFileType(entry.Type),
+			fuseType: objectTypeToFileType(c, entry.Type),
 		}
-		fillAttrWithDirectoryRecord(&entryInfo.attr, wsr.children[filename],
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr, wsr.children[filename],
 			context.Owner, &entry)
 
 		children = append(children, entryInfo)
@@ -241,7 +240,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string,
 
 	out.NodeId = inodeNum
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(&out.Attr, out.NodeId, context.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, out.NodeId, context.Owner,
 		wsr.childrenRecords[inodeNum])
 
 	return fuse.OK
@@ -275,8 +274,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 		ID:                 quantumfs.EmptyBlockKey,
 		Type:               quantumfs.ObjectTypeSmallFile,
 		Permissions:        modeToPermissions(input.Mode, input.Umask),
-		Owner:              quantumfs.ObjectUid(uid, uid),
-		Group:              quantumfs.ObjectGid(gid, gid),
+		Owner:              quantumfs.ObjectUid(c.requestId, uid, uid),
+		Group:              quantumfs.ObjectGid(c.requestId, gid, gid),
 		Size:               0,
 		ExtendedAttributes: quantumfs.EmptyBlockKey,
 		CreationTime:       quantumfs.NewTime(now),
@@ -290,7 +289,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 	c.qfs.setInode(c, inodeNum, file)
 
 	fillEntryOutCacheData(c, &out.EntryOut)
-	fillAttrWithDirectoryRecord(&out.EntryOut.Attr, inodeNum,
+	fillAttrWithDirectoryRecord(c, &out.EntryOut.Attr, inodeNum,
 		input.InHeader.Context.Owner, &entry)
 
 	fileHandleNum := c.qfs.newFileHandleId()

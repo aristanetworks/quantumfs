@@ -3,8 +3,6 @@
 
 package daemon
 
-import "fmt"
-
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -91,7 +89,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fmt.Println("ReadDirPlus directorySnapshot", input, out)
+	c.vlog("ReadDirPlus directorySnapshot", input, out)
 	offset := input.Offset
 
 	// Add .
@@ -148,13 +146,13 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fmt.Println("Invalid read on directorySnapshot")
+	c.elog("Invalid read on directorySnapshot")
 	return nil, fuse.ENOSYS
 }
 
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	fmt.Println("Invalid write on directorySnapshot")
+	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
