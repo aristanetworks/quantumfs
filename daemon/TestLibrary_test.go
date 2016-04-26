@@ -98,6 +98,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	}
 
 	quantumfs := NewQuantumFs(config)
+	th.qfs = quantumfs.(*QuantumFs)
 	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
 	if err != nil {
 		th.t.Fatalf("Failed to create quantumfs instance: %v", err)
@@ -129,7 +130,9 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 
 	for _, file := range th.qfs.fileHandles {
 		fh, ok := file.(*FileDescriptor)
-		th.assert(ok, "Found non-FileHandleCommon in fileHandles: %v", file)
+		if !ok {
+			continue
+		}
 
 		if fh.inodeNum == inodeNum {
 			handles = append(handles, fh)
