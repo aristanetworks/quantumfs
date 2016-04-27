@@ -30,6 +30,9 @@ type Inode interface {
 
 	// Mark this Inode dirty
 	dirty(c *ctx)
+
+	// Mark this Inode dirty because a child is dirty
+	dirtyChild(c *ctx, child Inode)
 }
 
 type InodeCommon struct {

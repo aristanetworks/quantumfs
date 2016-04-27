@@ -29,6 +29,9 @@ type NamespaceList struct {
 func (nsl *NamespaceList) dirty(c *ctx) {
 }
 
+func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
+}
+
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -218,6 +221,9 @@ type WorkspaceList struct {
 }
 
 func (wsl *WorkspaceList) dirty(c *ctx) {
+}
+
+func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
 }
 
 func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {

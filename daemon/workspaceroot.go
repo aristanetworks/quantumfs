@@ -26,7 +26,8 @@ type WorkspaceRoot struct {
 	// Indexed by inode number
 	childrenRecords map[uint64]*quantumfs.DirectoryRecord
 
-	dirty_ bool // True if the contents of subtree has changed since last sync
+	dirty_         bool    // True if the contents of subtree has changed since last sync
+	dirtyChildren_ []Inode // list of children which are currently dirty
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -79,6 +80,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.baseLayer = baseLayer
 	wsr.children = children
 	wsr.childrenRecords = childrenRecords
+	wsr.dirtyChildren_ = make([]Inode, 0)
 	return &wsr
 }
 
@@ -97,6 +99,13 @@ func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64,
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	wsr.dirty_ = true
 	wsr.advanceRootId(c)
+}
+
+// Record that a specific child is dirty and when syncing heirarchically, sync them
+// as well.
+func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
+	wsr.dirtyChildren_ = append(wsr.dirtyChildren_, child)
+	wsr.dirty(c)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb

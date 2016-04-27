@@ -24,7 +24,11 @@ func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum uint64, parent Inode
 }
 
 func (dir *Directory) dirty(c *ctx) {
-	dir.parent.dirty(c)
+	dir.parent.dirtyChild(c, dir)
+}
+
+func (dir *Directory) dirtyChild(c *ctx, child Inode) {
+	dir.dirty(c)
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {

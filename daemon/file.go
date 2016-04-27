@@ -33,7 +33,11 @@ type File struct {
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
 	fi.dirty_ = true
-	fi.parent.dirty(c)
+	fi.parent.dirtyChild(c, fi)
+}
+
+func (fi *File) dirtyChild(c *ctx, child Inode) {
+	fi.dirty(c)
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {

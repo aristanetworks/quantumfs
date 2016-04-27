@@ -47,6 +47,9 @@ func fillApiAttr(attr *fuse.Attr) {
 func (api *ApiInode) dirty(c *ctx) {
 }
 
+func (api *ApiInode) dirtyChild(c *ctx, child Inode) {
+}
+
 func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
