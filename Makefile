@@ -1,5 +1,5 @@
 COMMANDS=quantumfsd qfs contentcheck
-PKGS_TO_TEST=daemon
+PKGS_TO_TEST=daemon qlog
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST) review codechecks
 .NOTPARALLEL:

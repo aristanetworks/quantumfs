@@ -17,10 +17,9 @@ import "math"
 type LogSubsystem uint8
 const (
 	LogDaemon LogSubsystem = iota
-	LogProcessLocal
 	LogDatastore
 	LogWorkspacedb
-	logSubsystemmax = LogWorkspacedb
+	logSubsystemMax = LogWorkspacedb
 )
 
 const MaxReqId uint64 = math.MaxUint64
@@ -29,8 +28,6 @@ func (enum LogSubsystem) String() string {
 	switch enum {
 	case LogDaemon:
 		return "Daemon"
-	case LogProcessLocal:
-		return "ProcessLocal"
 	case LogDatastore:
 		return "Datastore"
 	case LogWorkspacedb:
@@ -40,14 +37,12 @@ func (enum LogSubsystem) String() string {
 }
 
 func getSubsystem(sys string) (LogSubsystem, error) {
-	switch (sys) {
-	case "Daemon":
+	switch (strings.ToLower(sys)) {
+	case "daemon":
 		return LogDaemon, nil
-	case "ProcessLocal":
-		return LogProcessLocal, nil
-	case "Datastore":
+	case "datastore":
 		return LogDatastore, nil
-	case "WorkspaceDb":
+	case "workspacedb":
 		return LogWorkspacedb, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
@@ -58,6 +53,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 var logLevels uint16
 var maxLogLevels uint8
 var logEnvTag = "TRACE"
+var write func(format string, args ...interface{}) (int, error)
 
 // Get whether, given the subsystem, the given level is active for logs
 func getLogLevel(idx LogSubsystem, level uint8) bool {
@@ -65,18 +61,18 @@ func getLogLevel(idx LogSubsystem, level uint8) bool {
 	return (logLevels & mask) != 0
 }
 
-func setLogLevelBitmask(sys LogSubsystem, level uint8, enable bool) {
+func setLogLevelBitmask(sys LogSubsystem, level uint8) {
 	idx := uint8(sys)
 	logLevels &= ^(((1 << maxLogLevels)-1) << (idx * maxLogLevels))
-	logLevels |= uint16(level << (idx * maxLogLevels))
+	logLevels |= uint16(level) << uint16(idx * maxLogLevels)
 }
 
 // Load desired log levels from the environment variable
-func loadLevels() {
+func loadLevels(levels string) {
 	// reset all levels
-	logLevels = 0;
-
-	levels := os.Getenv(logEnvTag)	
+	for i := 0; i <= int(logSubsystemMax); i++ {
+		setLogLevelBitmask(LogSubsystem(i), 1)
+	}
 
 	bases := strings.Split(levels, ",")
 
@@ -107,10 +103,10 @@ func loadLevels() {
 
 		// if it's cummulative, turn it into a cummulative mask
 		if cummulative {
-			if level > int(maxLogLevels) {
-				level = int(maxLogLevels)
+			if level >= int(maxLogLevels) {
+				level = int(maxLogLevels - 1)
 			}
-			level = (1 << uint8(level)) - 1
+			level = (1 << uint8(level + 1)) - 1
 		}
 
 		var idx LogSubsystem
@@ -119,23 +115,23 @@ func loadLevels() {
 			continue;
 		}
 
-		setLogLevelBitmask(idx, uint8(level), true)
+		setLogLevelBitmask(idx, uint8(level))
 	}
 }
 
 func init() {
 	logLevels = 0
 	maxLogLevels = 4
+        write = fmt.Printf
 
 	// check that our logLevel container is large enough for our subsystems
-	if (uint8(logSubsystemmax) * maxLogLevels) >
+	if (uint8(logSubsystemMax) * maxLogLevels) >
 		uint8(unsafe.Sizeof(logLevels)) * 8 {
 
 		panic("Log level structure not large enough for given subsystems")
 	}
 
-
-	loadLevels()
+	loadLevels(os.Getenv(logEnvTag))
 }
 
 func Log(idx LogSubsystem, reqId uint64, level uint8, format string,
@@ -145,7 +141,7 @@ func Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	t := time.Now()
 
 	if getLogLevel(idx, level) {
-		fmt.Printf(t.Format(time.StampNano) + " " + idx.String() + " " +
+		write(t.Format(time.StampNano) + " " + idx.String() + " " +
 			strconv.FormatUint(reqId, 10) + ": " + format + "\n",
 			args...)
 	}
