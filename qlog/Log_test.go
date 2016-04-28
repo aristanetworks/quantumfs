@@ -27,7 +27,7 @@ func TestLogSet_test(t *testing.T) {
 	if !strings.Contains(logs, "TestToken2") {
 		t.Fatal("Different subsystem erroneously affected by log setting")
 	}
-	
+
 	loadLevels("")
 	logs = ""
 	for i := 1; i < int(maxLogLevels); i++ {
