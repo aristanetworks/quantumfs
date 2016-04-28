@@ -15,15 +15,15 @@ func TestLogSet_test(t *testing.T) {
 	write = testutils.IoPipe(&logs)
 
 	loadLevels("Daemon|2")
-	Log(LogDaemon, MaxReqId, 1, "TestToken1")
+	Log(LogDaemon, DummyReqId, 1, "TestToken1")
 	if !strings.Contains(logs, "TestToken1") {
 		t.Fatal("Enabled log doesn't show up")
 	}
-	Log(LogDaemon, MaxReqId, 0, "TestToken0")
+	Log(LogDaemon, DummyReqId, 0, "TestToken0")
 	if strings.Contains(logs, "TestToken0") {
 		t.Fatal("Log level 0 not disabled by mask")
 	}
-	Log(LogWorkspacedb, MaxReqId, 0, "TestToken2")
+	Log(LogWorkspacedb, DummyReqId, 0, "TestToken2")
 	if !strings.Contains(logs, "TestToken2") {
 		t.Fatal("Different subsystem erroneously affected by log setting")
 	}
@@ -31,12 +31,12 @@ func TestLogSet_test(t *testing.T) {
 	loadLevels("")
 	logs = ""
 	for i := 1; i < int(maxLogLevels); i++ {
-		Log(LogDaemon, MaxReqId, uint8(i), "TestToken")
+		Log(LogDaemon, DummyReqId, uint8(i), "TestToken")
 		if strings.Contains(logs, "TestToken") {
 			t.Fatal("Disabled log appeared")
 		}
 	}
-	Log(LogDaemon, MaxReqId, 0, "TestToken")
+	Log(LogDaemon, DummyReqId, 0, "TestToken")
 	if !strings.Contains(logs, "TestToken") {
 		t.Fatal("Default log level not working")
 	}
@@ -44,7 +44,7 @@ func TestLogSet_test(t *testing.T) {
 	// Test variable arguments
 	a := 12345
 	b := 98765
-	Log(LogDaemon, MaxReqId, 0, "Testing args %d %d", a, b)
+	Log(LogDaemon, DummyReqId, 0, "Testing args %d %d", a, b)
 	if !strings.Contains(logs, "12345") ||
 		!strings.Contains(logs, "98765") {
 		t.Fatal("Variable insertion in logs not working.")

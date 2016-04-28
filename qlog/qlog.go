@@ -22,7 +22,7 @@ const (
 	logSubsystemMax = LogWorkspacedb
 )
 
-const MaxReqId uint64 = math.MaxUint64
+const DummyReqId uint64 = math.MaxUint64
 
 func (enum LogSubsystem) String() string {
 	switch enum {

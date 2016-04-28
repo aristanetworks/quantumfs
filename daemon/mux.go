@@ -110,8 +110,8 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
-	qlog.Log(qlog.LogDaemon, qlog.MaxReqId, 2,
-		"Forgetting inode %d Looked up %d Times", nodeID, nlookup)
+	c := qfs.c.req(qlog.DummyReqId)
+	c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
 	qfs.setInode(&qfs.c, nodeID, nil)
 }
 
@@ -371,5 +371,6 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Sta
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
-	qlog.Log(qlog.LogDaemon, qlog.MaxReqId, 0, "Unhandled request Init")
+	c := qfs.c.req(qlog.DummyReqId)
+	c.elog("Unhandled request Init")
 }
