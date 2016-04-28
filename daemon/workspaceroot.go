@@ -116,10 +116,8 @@ func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
 // wsr can update its new key.
 func (wsr *WorkspaceRoot) updateRecords(c *ctx) {
 	for _, child := range wsr.dirtyChildren_ {
-		if child.isDirty() {
-			newKey := child.sync(c)
-			wsr.childrenRecords[child.inodeNum()].ID = newKey
-		}
+		newKey := child.sync(c)
+		wsr.childrenRecords[child.inodeNum()].ID = newKey
 	}
 	wsr.dirtyChildren_ = make([]Inode, 0)
 }
