@@ -26,6 +26,7 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 			config:       &config,
 			workspaceDB:  config.WorkspaceDB,
 			durableStore: config.DurableStore,
+                        requestId:    qlog.DummyReqId,
 		},
 	}
 
@@ -110,8 +111,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
-	c := qfs.c.req(qlog.DummyReqId)
-	c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
+	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
 	qfs.setInode(&qfs.c, nodeID, nil)
 }
 
@@ -371,6 +371,5 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Sta
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
-	c := qfs.c.req(qlog.DummyReqId)
-	c.elog("Unhandled request Init")
+	qfs.c.elog("Unhandled request Init")
 }
