@@ -305,7 +305,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on WorkspaceRoot")
+	c.elog("Invalid SetAttr on WorkspaceRoot")
 	return fuse.ENOSYS
 }
 
@@ -320,7 +320,7 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAt
 	valid := uint(attr.SetAttrInCommon.Valid)
 	if BitFlagsSet(valid, fuse.FATTR_FH|
 		fuse.FATTR_LOCKOWNER) {
-		fmt.Println("Unsupported attribute(s) to set", valid)
+		c.elog("Unsupported attribute(s) to set", valid)
 		return fuse.ENOSYS
 	}
 
@@ -329,12 +329,12 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAt
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.Owner = quantumfs.ObjectUid(attr.Owner.Uid,
+		entry.Owner = quantumfs.ObjectUid(c.requestId, attr.Owner.Uid,
 			attr.InHeader.Context.Owner.Uid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.Group = quantumfs.ObjectGid(attr.Owner.Gid,
+		entry.Group = quantumfs.ObjectGid(c.requestId, attr.Owner.Gid,
 			attr.InHeader.Context.Owner.Gid)
 	}
 
@@ -361,7 +361,7 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAt
 	}
 
 	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(&out.Attr, inodeNum,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
 		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
 
 	return fuse.OK

@@ -64,7 +64,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (fi *File) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on File")
+	c.elog("Invalid setChildAttr on File")
 	return fuse.ENOSYS
 }
 

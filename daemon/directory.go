@@ -50,14 +50,14 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on Directory")
+	c.elog("Invalid SetAttr on Directory")
 	return fuse.ENOSYS
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on Directory")
+	c.elog("Invalid setChildAttr on Directory")
 	return fuse.ENOSYS
 }
 
