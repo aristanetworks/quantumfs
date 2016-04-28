@@ -37,10 +37,6 @@ func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func (nsl *NamespaceList) inodeNum() uint64 {
-	return nsl.InodeCommon.id
-}
-
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
