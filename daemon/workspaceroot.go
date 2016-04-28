@@ -108,11 +108,34 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
 	wsr.dirty(c)
 }
 
+func (wsr *WorkspaceRoot) isDirty() bool {
+	return wsr.dirty_
+}
+
+func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
+	wsr.advanceRootId(c)
+	return wsr.rootId
+}
+
+// Walk the list of children which are dirty and have them recompute their new key
+// wsr can update its new key.
+func (wsr *WorkspaceRoot) updateRecords(c *ctx) {
+	for _, child := range wsr.dirtyChildren_ {
+		if child.isDirty() {
+			newKey := child.sync(c)
+			wsr.childrenRecords[child.inodeNum()].ID = newKey
+		}
+	}
+	wsr.dirtyChildren_ = make([]Inode, 0)
+}
+
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	if !wsr.dirty_ {
 		return
 	}
+
+	wsr.updateRecords(c)
 
 	// Upload the base layer object
 	bytes, err := json.Marshal(wsr.baseLayer)

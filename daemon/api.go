@@ -50,6 +50,19 @@ func (api *ApiInode) dirty(c *ctx) {
 func (api *ApiInode) dirtyChild(c *ctx, child Inode) {
 }
 
+func (api *ApiInode) isDirty() bool {
+	return false
+}
+
+func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
+	fmt.Println("Invalid sync call for API")
+	return quantumfs.EmptyBlockKey
+}
+
+func (api *ApiInode) inodeNum() uint64 {
+	return quantumfs.InodeIdApi
+}
+
 func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs

@@ -31,6 +31,13 @@ func (dir *Directory) dirtyChild(c *ctx, child Inode) {
 	dir.dirty(c)
 }
 
+func (dir *Directory) isDirty() bool {
+	return false
+}
+func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
+	return dir.baseLayerId
+}
+
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }

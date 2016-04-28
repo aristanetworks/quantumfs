@@ -40,6 +40,15 @@ func (fi *File) dirtyChild(c *ctx, child Inode) {
 	fi.dirty(c)
 }
 
+func (fi *File) isDirty() bool {
+	return fi.dirty_
+}
+
+func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
+	fi.dirty_ = false
+	return fi.key
+}
+
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
