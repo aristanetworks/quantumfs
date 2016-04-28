@@ -47,9 +47,6 @@ func fillApiAttr(attr *fuse.Attr) {
 func (api *ApiInode) dirty(c *ctx) {
 }
 
-func (api *ApiInode) dirtyChild(c *ctx, child Inode) {
-}
-
 func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
 	fmt.Println("Invalid sync call for API")
 	return quantumfs.EmptyBlockKey

@@ -35,10 +35,6 @@ func (fi *File) dirty(c *ctx) {
 	fi.parent.dirtyChild(c, fi)
 }
 
-func (fi *File) dirtyChild(c *ctx, child Inode) {
-	fi.dirty(c)
-}
-
 func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
 	fi.dirty_ = false
 	return fi.key

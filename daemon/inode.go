@@ -54,6 +54,10 @@ func (inode *InodeCommon) isDirty() bool {
 	return inode.dirty_
 }
 
+func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
+	panic("Unsupported dirtyChild() call on leaf Inode")
+}
+
 // FileHandle represents a specific path at a specific point in time, even as the
 // tree changes underneath it. This is used to provide consistent snapshot views into
 // the tree.
