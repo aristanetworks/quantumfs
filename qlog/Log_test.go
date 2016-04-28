@@ -53,20 +53,20 @@ func TestLogSet_test(t *testing.T) {
 
 func TestLoadLevels_test(t *testing.T) {
 	loadLevels("Daemon/*")
-	if logLevels != 287 {
+	if logLevels != 0x11F {
 		t.Fatal("Wildcard log levels incorrectly set", logLevels)
 	}
 
 	// test out of order, combo setting, and general bitmask
 	loadLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
-	if logLevels != 4003 {
+	if logLevels != 0xFA3 {
 		t.Fatal("Out of order, combo setting, or general bitmask broken",
 			logLevels)
 	}
 
 	// test misspelling ignores misspelt entry. Ensure case insensitivity
 	loadLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
-	if logLevels != 3857 {
+	if logLevels != 0xF11 {
 		t.Fatal("Case insensitivity broken / mis-spelling not ignored",
 			logLevels)
 	}
