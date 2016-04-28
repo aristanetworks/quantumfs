@@ -14,7 +14,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func NewNamespaceList() Inode {
 	nsl := NamespaceList{
 		InodeCommon: InodeCommon{id: quantumfs.InodeIdRoot},
-		namespaces:  make(map[string]uint64),
+		namespaces:  make(map[string]InodeId),
 	}
 	return &nsl
 }
@@ -23,7 +23,7 @@ type NamespaceList struct {
 	InodeCommon
 
 	// Map from child name to Inode ID
-	namespaces map[string]uint64
+	namespaces map[string]InodeId
 }
 
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -34,20 +34,20 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum uint64) {
+func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	fillAttr(attr, inodeNum,
 		uint32(c.workspaceDB.NumNamespaces()))
 }
 
-type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum uint64, name string)
+type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId, name string)
 
-func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum uint64, namespace string) {
+func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId, namespace string) {
 	fillAttr(attr, inodeNum,
 		uint32(c.workspaceDB.NumWorkspaces(namespace)))
 }
 
-func fillAttr(attr *fuse.Attr, inodeNum uint64, numChildren uint32) {
-	attr.Ino = inodeNum
+func fillAttr(attr *fuse.Attr, inodeNum InodeId, numChildren uint32) {
+	attr.Ino = uint64(inodeNum)
 	attr.Size = 4096
 	attr.Blocks = 1
 
@@ -81,8 +81,8 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 
 // Update the internal namespaces list with the most recent available listing
 func updateChildren(c *ctx, parentName string, names []string,
-	inodeMap *map[string]uint64, newInode func(c *ctx, parentName string,
-		name string, inodeId uint64) Inode) {
+	inodeMap *map[string]InodeId, newInode func(c *ctx, parentName string,
+		name string, inodeId InodeId) Inode) {
 
 	touched := make(map[string]bool)
 
@@ -106,7 +106,7 @@ func updateChildren(c *ctx, parentName string, names []string,
 	}
 }
 
-func snapshotChildren(c *ctx, children *map[string]uint64,
+func snapshotChildren(c *ctx, children *map[string]InodeId,
 	fillAttr listingAttrFill) []directoryContents {
 
 	out := make([]directoryContents, 0, len(*children))
@@ -145,7 +145,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
 
 	ds := newDirectorySnapshot(c, children, nsl.InodeCommon.id)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
-	out.Fh = ds.FileHandleCommon.id
+	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
 
 	return fuse.OK
@@ -168,9 +168,10 @@ func (nsl *NamespaceList) Lookup(c *ctx, context fuse.Context, name string,
 	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
 		newWorkspaceList)
 
-	out.NodeId = nsl.namespaces[name]
+	inodeNum := nsl.namespaces[name]
+	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillNamespaceAttr(c, &out.Attr, out.NodeId, name)
+	fillNamespaceAttr(c, &out.Attr, inodeNum, name)
 
 	return fuse.OK
 }
@@ -188,7 +189,7 @@ func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on NamespaceList")
@@ -196,12 +197,12 @@ func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAt
 }
 
 func newWorkspaceList(c *ctx, parentName string, name string,
-	inodeNum uint64) Inode {
+	inodeNum InodeId) Inode {
 
 	nsd := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
 		namespaceName: name,
-		workspaces:    make(map[string]uint64),
+		workspaces:    make(map[string]InodeId),
 	}
 	return &nsd
 }
@@ -211,7 +212,7 @@ type WorkspaceList struct {
 	namespaceName string
 
 	// Map from child name to Inode ID
-	workspaces map[string]uint64
+	workspaces map[string]InodeId
 }
 
 func (nsd *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -238,7 +239,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
 
 	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
-	out.Fh = ds.FileHandleCommon.id
+	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
 
 	return fuse.OK
@@ -255,9 +256,10 @@ func (wsl *WorkspaceList) Lookup(c *ctx, context fuse.Context, name string,
 		c.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
 		newWorkspaceRoot)
 
-	out.NodeId = wsl.workspaces[name]
+	inodeNum := wsl.workspaces[name]
+	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillWorkspaceAttrFake(c, &out.Attr, out.NodeId, name)
+	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, name)
 
 	return fuse.OK
 }
@@ -275,7 +277,7 @@ func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on WorkspaceList")

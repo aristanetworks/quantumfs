@@ -10,7 +10,7 @@ import "fmt"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func newFile(inodeNum uint64, fileType quantumfs.ObjectType, key quantumfs.ObjectKey,
+func newFile(inodeNum InodeId, fileType quantumfs.ObjectType, key quantumfs.ObjectKey,
 	parent Inode) *File {
 
 	file := File{
@@ -63,14 +63,14 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
 
-func (fi *File) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on File")
 	return fuse.ENOSYS
 }
 
-func newFileDescriptor(file *File, inodeNum uint64, fileHandleId uint64) FileHandle {
+func newFileDescriptor(file *File, inodeNum InodeId, fileHandleId FileHandleId) FileHandle {
 	return &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
 			id:       fileHandleId,

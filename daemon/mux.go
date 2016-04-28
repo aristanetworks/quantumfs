@@ -18,8 +18,8 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 	qfs := &QuantumFs{
 		RawFileSystem: fuse.NewDefaultRawFileSystem(),
 		config:        config,
-		inodes:        make(map[uint64]Inode),
-		fileHandles:   make(map[uint64]FileHandle),
+		inodes:        make(map[InodeId]Inode),
+		fileHandles:   make(map[FileHandleId]FileHandle),
 		inodeNum:      quantumfs.InodeIdReservedEnd,
 		fileHandleNum: quantumfs.InodeIdReservedEnd,
 		c: ctx{
@@ -44,12 +44,12 @@ type QuantumFs struct {
 	c             ctx
 
 	mapMutex    sync.Mutex // TODO: Perhaps an RWMutex instead?
-	inodes      map[uint64]Inode
-	fileHandles map[uint64]FileHandle
+	inodes      map[InodeId]Inode
+	fileHandles map[FileHandleId]FileHandle
 }
 
 // Get an inode in a thread safe way
-func (qfs *QuantumFs) inode(c *ctx, id uint64) Inode {
+func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	qfs.mapMutex.Lock()
 	inode := qfs.inodes[id]
 	qfs.mapMutex.Unlock()
@@ -57,7 +57,7 @@ func (qfs *QuantumFs) inode(c *ctx, id uint64) Inode {
 }
 
 // Set an inode in a thread safe way, set to nil to delete
-func (qfs *QuantumFs) setInode(c *ctx, id uint64, inode Inode) {
+func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	qfs.mapMutex.Lock()
 	if inode != nil {
 		qfs.inodes[id] = inode
@@ -68,7 +68,7 @@ func (qfs *QuantumFs) setInode(c *ctx, id uint64, inode Inode) {
 }
 
 // Get a file handle in a thread safe way
-func (qfs *QuantumFs) fileHandle(c *ctx, id uint64) FileHandle {
+func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 	qfs.mapMutex.Lock()
 	fileHandle := qfs.fileHandles[id]
 	qfs.mapMutex.Unlock()
@@ -76,7 +76,7 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id uint64) FileHandle {
 }
 
 // Set a file handle in a thread safe way, set to nil to delete
-func (qfs *QuantumFs) setFileHandle(c *ctx, id uint64, fileHandle FileHandle) {
+func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	qfs.mapMutex.Lock()
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
@@ -87,19 +87,19 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id uint64, fileHandle FileHandle) {
 }
 
 // Retrieve a unique inode number
-func (qfs *QuantumFs) newInodeId() uint64 {
-	return atomic.AddUint64(&qfs.inodeNum, 1)
+func (qfs *QuantumFs) newInodeId() InodeId {
+	return InodeId(atomic.AddUint64(&qfs.inodeNum, 1))
 }
 
 // Retrieve a unique filehandle number
-func (qfs *QuantumFs) newFileHandleId() uint64 {
-	return atomic.AddUint64(&qfs.fileHandleNum, 1)
+func (qfs *QuantumFs) newFileHandleId() FileHandleId {
+	return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	inode := qfs.inode(&qfs.c, header.NodeId)
+	inode := qfs.inode(&qfs.c, InodeId(header.NodeId))
 	if inode == nil {
 		fmt.Println("Lookup failed", name)
 		return fuse.ENOENT
@@ -110,12 +110,12 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	fmt.Println("Forgetting inode", nodeID, "Looked up ", nlookup, "Times")
-	qfs.setInode(&qfs.c, nodeID, nil)
+	qfs.setInode(&qfs.c, InodeId(nodeID), nil)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	inode := qfs.inode(&qfs.c, input.NodeId)
+	inode := qfs.inode(&qfs.c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
@@ -124,7 +124,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) fuse.Sta
 }
 
 func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-	inode := qfs.inode(&qfs.c, input.NodeId)
+	inode := qfs.inode(&qfs.c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
@@ -225,7 +225,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) fuse.Statu
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
-	inode := qfs.inode(&qfs.c, input.NodeId)
+	inode := qfs.inode(&qfs.c, InodeId(input.NodeId))
 	if inode == nil {
 		fmt.Println("Create failed", input)
 		return fuse.EACCES // TODO Confirm this is correct
@@ -235,7 +235,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 }
 
 func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
-	inode := qfs.inode(&qfs.c, input.NodeId)
+	inode := qfs.inode(&qfs.c, InodeId(input.NodeId))
 	if inode == nil {
 		fmt.Println("Open failed", input)
 		return fuse.ENOENT
@@ -248,7 +248,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 	fuse.Status) {
 
 	fmt.Println("Read:", input)
-	fileHandle := qfs.fileHandle(&qfs.c, input.Fh)
+	fileHandle := qfs.fileHandle(&qfs.c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		fmt.Println("Read failed", fileHandle)
 		return nil, fuse.ENOENT
@@ -258,11 +258,11 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
-	qfs.setFileHandle(&qfs.c, input.Fh, nil)
+	qfs.setFileHandle(&qfs.c, FileHandleId(input.Fh), nil)
 }
 
 func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Status) {
-	fileHandle := qfs.fileHandle(&qfs.c, input.Fh)
+	fileHandle := qfs.fileHandle(&qfs.c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		fmt.Println("Write failed", fileHandle)
 		return 0, fuse.ENOENT
@@ -287,7 +287,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) fuse.Status {
 }
 
 func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
-	inode := qfs.inode(&qfs.c, input.NodeId)
+	inode := qfs.inode(&qfs.c, InodeId(input.NodeId))
 	if inode == nil {
 		fmt.Println("OpenDir failed", input)
 		return fuse.ENOENT
@@ -307,7 +307,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fileHandle := qfs.fileHandle(&qfs.c, input.Fh)
+	fileHandle := qfs.fileHandle(&qfs.c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		fmt.Println("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
@@ -316,7 +316,7 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 }
 
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
-	qfs.setFileHandle(&qfs.c, input.Fh, nil)
+	qfs.setFileHandle(&qfs.c, FileHandleId(input.Fh), nil)
 }
 
 func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) fuse.Status {

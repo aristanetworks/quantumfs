@@ -6,6 +6,8 @@ package daemon
 
 import "github.com/hanwen/go-fuse/fuse"
 
+type InodeId uint64
+
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -25,12 +27,12 @@ type Inode interface {
 	SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status
 }
 
 type InodeCommon struct {
-	id uint64
+	id InodeId
 }
 
 // FileHandle represents a specific path at a specific point in time, even as the
@@ -45,7 +47,9 @@ type FileHandle interface {
 		uint32, fuse.Status)
 }
 
+type FileHandleId uint64
+
 type FileHandleCommon struct {
-	id       uint64
-	inodeNum uint64
+	id       FileHandleId
+	inodeNum InodeId
 }

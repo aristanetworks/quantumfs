@@ -14,7 +14,7 @@ type Directory struct {
 	baseLayerId quantumfs.ObjectKey
 }
 
-func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum uint64) Inode {
+func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum InodeId) Inode {
 	return &Directory{
 		InodeCommon: InodeCommon{id: inodeNum},
 		baseLayerId: baseLayerId,
@@ -56,7 +56,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on Directory")
@@ -70,7 +70,7 @@ type directoryContents struct {
 }
 
 func newDirectorySnapshot(c *ctx, children []directoryContents,
-	inodeNum uint64) *directorySnapshot {
+	inodeNum InodeId) *directorySnapshot {
 
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
@@ -102,7 +102,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 			return fuse.OK
 		}
 
-		details.NodeId = ds.FileHandleCommon.inodeNum
+		details.NodeId = uint64(ds.FileHandleCommon.inodeNum)
 		fillEntryOutCacheData(c, details)
 		fillRootAttr(c, &details.Attr, ds.FileHandleCommon.inodeNum)
 	}
@@ -116,7 +116,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 			return fuse.OK
 		}
 
-		details.NodeId = ds.FileHandleCommon.inodeNum
+		details.NodeId = uint64(ds.FileHandleCommon.inodeNum)
 		fillEntryOutCacheData(c, details)
 		fillRootAttr(c, &details.Attr, ds.FileHandleCommon.inodeNum)
 	}

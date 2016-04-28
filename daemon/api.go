@@ -63,7 +63,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out.OpenFlags = 0
 	handle := newApiHandle(c)
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
-	out.Fh = handle.FileHandleCommon.id
+	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
 }
 
@@ -87,7 +87,7 @@ func (api *ApiInode) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (api *ApiInode) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on ApiInode")
