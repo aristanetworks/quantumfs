@@ -15,7 +15,9 @@ type Directory struct {
 	parent      Inode
 }
 
-func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum uint64, parent Inode) Inode {
+func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum uint64,
+	parent Inode) Inode {
+
 	return &Directory{
 		InodeCommon: InodeCommon{id: inodeNum},
 		baseLayerId: baseLayerId,
