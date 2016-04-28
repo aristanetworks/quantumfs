@@ -32,10 +32,6 @@ func (nsl *NamespaceList) dirty(c *ctx) {
 func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
 }
 
-func (nsl *NamespaceList) isDirty() bool {
-	return false
-}
-
 func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
 	fmt.Println("Invalid sync for namespace")
 	return quantumfs.EmptyBlockKey
@@ -237,10 +233,6 @@ func (wsl *WorkspaceList) dirty(c *ctx) {
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
-}
-
-func (wsl *WorkspaceList) isDirty() bool {
-	return false
 }
 
 func (wsl *WorkspaceList) sync(c *ctx) quantumfs.ObjectKey {

@@ -42,11 +42,16 @@ type Inode interface {
 }
 
 type InodeCommon struct {
-	id uint64
+	id     uint64
+	dirty_ bool // True if this Inode or any children are dirty
 }
 
 func (inode *InodeCommon) inodeNum() uint64 {
 	return inode.id
+}
+
+func (inode *InodeCommon) isDirty() bool {
+	return inode.dirty_
 }
 
 // FileHandle represents a specific path at a specific point in time, even as the

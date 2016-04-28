@@ -50,10 +50,6 @@ func (api *ApiInode) dirty(c *ctx) {
 func (api *ApiInode) dirtyChild(c *ctx, child Inode) {
 }
 
-func (api *ApiInode) isDirty() bool {
-	return false
-}
-
 func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
 	fmt.Println("Invalid sync call for API")
 	return quantumfs.EmptyBlockKey

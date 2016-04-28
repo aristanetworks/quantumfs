@@ -26,7 +26,6 @@ type WorkspaceRoot struct {
 	// Indexed by inode number
 	childrenRecords map[uint64]*quantumfs.DirectoryRecord
 
-	dirty_         bool    // True if the contents of subtree has changed since last sync
 	dirtyChildren_ []Inode // list of children which are currently dirty
 }
 
@@ -106,10 +105,6 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
 	wsr.dirtyChildren_ = append(wsr.dirtyChildren_, child)
 	wsr.dirty(c)
-}
-
-func (wsr *WorkspaceRoot) isDirty() bool {
-	return wsr.dirty_
 }
 
 func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {

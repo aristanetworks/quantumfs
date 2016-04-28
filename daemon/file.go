@@ -27,7 +27,6 @@ type File struct {
 	fileType quantumfs.ObjectType
 	key      quantumfs.ObjectKey
 	parent   Inode
-	dirty_   bool // True if the contents of the file have changed
 }
 
 // Mark this file dirty and notify your paent
@@ -38,10 +37,6 @@ func (fi *File) dirty(c *ctx) {
 
 func (fi *File) dirtyChild(c *ctx, child Inode) {
 	fi.dirty(c)
-}
-
-func (fi *File) isDirty() bool {
-	return fi.dirty_
 }
 
 func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
