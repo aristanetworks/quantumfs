@@ -5,8 +5,6 @@ package daemon
 
 // This file holds the File type, which represents regular files
 
-import "fmt"
-
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -77,7 +75,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (fi *File) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on File")
+	c.elog("Invalid setChildAttr on File")
 	return fuse.ENOSYS
 }
 
@@ -103,14 +101,14 @@ func (fd *FileDescriptor) dirty(c *ctx) {
 func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fmt.Println("Invalid ReadDirPlus against FileDescriptor")
+	c.elog("Invalid ReadDirPlus against FileDescriptor")
 	return fuse.ENOSYS
 }
 
 func (fd *FileDescriptor) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fmt.Println("Received read request on FileDescriptor")
+	c.elog("Received read request on FileDescriptor")
 	return nil, fuse.ENOSYS
 }
 
@@ -119,6 +117,6 @@ func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32
 
 	fd.dirty(c)
 
-	fmt.Println("Received write request on FileDescriptor")
+	c.elog("Received write request on FileDescriptor")
 	return 0, fuse.ENOSYS
 }

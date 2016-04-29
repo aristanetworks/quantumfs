@@ -4,14 +4,12 @@
 // Various constants used throughout quantumfsd
 package daemon
 
-import "fmt"
-
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 // Mapping between datastore object types and the FUSE filetype
 // Returns 0 if there is no valid FUSE filetype
-func objectTypeToFileType(objectType quantumfs.ObjectType) uint32 {
+func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 	switch objectType {
 	case quantumfs.ObjectTypeSmallFile,
 		quantumfs.ObjectTypeMediumFile,
@@ -33,7 +31,7 @@ func objectTypeToFileType(objectType quantumfs.ObjectType) uint32 {
 		return 0
 
 	default:
-		fmt.Println("Unknown object type to map to fuse:", objectType)
+		c.elog("Unknown object type to map to fuse: %d", objectType)
 		return 0
 	}
 }

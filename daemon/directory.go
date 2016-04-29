@@ -3,8 +3,6 @@
 
 package daemon
 
-import "fmt"
-
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -68,14 +66,14 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on Directory")
+	c.elog("Invalid SetAttr on Directory")
 	return fuse.ENOSYS
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on Directory")
+	c.elog("Invalid setChildAttr on Directory")
 	return fuse.ENOSYS
 }
 
@@ -107,7 +105,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fmt.Println("ReadDirPlus directorySnapshot", input, out)
+	c.vlog("ReadDirPlus directorySnapshot", input, out)
 	offset := input.Offset
 
 	// Add .
@@ -164,13 +162,13 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fmt.Println("Invalid read on directorySnapshot")
+	c.elog("Invalid read on directorySnapshot")
 	return nil, fuse.ENOSYS
 }
 
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	fmt.Println("Invalid write on directorySnapshot")
+	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
