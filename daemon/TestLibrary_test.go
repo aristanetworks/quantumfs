@@ -5,9 +5,11 @@ package daemon
 
 // Test library
 
+import "fmt"
 import "io/ioutil"
 import "os"
 import "runtime"
+import "sync/atomic"
 import "testing"
 
 import "arista.com/quantumfs"
@@ -96,6 +98,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	}
 
 	quantumfs := NewQuantumFs(config)
+	th.qfs = quantumfs.(*QuantumFs)
 	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
 	if err != nil {
 		th.t.Fatalf("Failed to create quantumfs instance: %v", err)
@@ -117,6 +120,45 @@ func (th *testHelper) getApi() *quantumfs.Api {
 // Make the given path relative to the mount root
 func (th *testHelper) relPath(path string) string {
 	return th.tempDir + "/mnt/" + path
+}
+
+// Retrieve a list of FileDescriptor from an Inode
+func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
+	handles := make([]*FileDescriptor, 0)
+
+	th.qfs.mapMutex.Lock()
+
+	for _, file := range th.qfs.fileHandles {
+		fh, ok := file.(*FileDescriptor)
+		if !ok {
+			continue
+		}
+
+		if fh.inodeNum == inodeNum {
+			handles = append(handles, fh)
+		}
+	}
+
+	th.qfs.mapMutex.Unlock()
+
+	return handles
+}
+
+// Retrieve the rootId of the given workspace
+func (th *testHelper) workspaceRootId(namespace string,
+	workspace string) quantumfs.ObjectKey {
+
+	return th.qfs.c.workspaceDB.Workspace(namespace, workspace)
+}
+
+// Global test request ID incremented for all the running tests
+var requestId = uint64(1000000000)
+
+// Produce a request specific ctx variable to use for quantumfs internal calls
+func (th *testHelper) newCtx() *ctx {
+	reqId := atomic.AddUint64(&requestId, 1)
+	fmt.Println("Allocating request %d to test %s", reqId, th.testName)
+	return th.qfs.c.req(reqId)
 }
 
 // assert the condition is true. If it is not true then fail the test with the given

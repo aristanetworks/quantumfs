@@ -4,6 +4,7 @@
 // The basic Inode and FileHandle structures
 package daemon
 
+import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 // Inode represents a specific path in the tree which updates as the tree itself
@@ -27,10 +28,34 @@ type Inode interface {
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status
+
+	dirty(c *ctx) // Mark this Inode dirty
+	// Mark this Inode dirty because a child is dirty
+	dirtyChild(c *ctx, child Inode)
+	isDirty() bool // Is this Inode dirty?
+
+	// Compute a new object key, possibly schedule the sync the object data
+	// itself to the datastore
+	sync(c *ctx) quantumfs.ObjectKey
+
+	inodeNum() uint64
 }
 
 type InodeCommon struct {
-	id uint64
+	id     uint64
+	dirty_ bool // True if this Inode or any children are dirty
+}
+
+func (inode *InodeCommon) inodeNum() uint64 {
+	return inode.id
+}
+
+func (inode *InodeCommon) isDirty() bool {
+	return inode.dirty_
+}
+
+func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
+	panic("Unsupported dirtyChild() call on leaf Inode")
 }
 
 // FileHandle represents a specific path at a specific point in time, even as the

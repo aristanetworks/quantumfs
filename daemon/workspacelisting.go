@@ -26,6 +26,16 @@ type NamespaceList struct {
 	namespaces map[string]uint64
 }
 
+func (nsl *NamespaceList) dirty(c *ctx) {
+}
+
+func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
+}
+
+func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
+}
+
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -214,11 +224,21 @@ type WorkspaceList struct {
 	workspaces map[string]uint64
 }
 
-func (nsd *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+func (wsl *WorkspaceList) dirty(c *ctx) {
+}
+
+func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
+}
+
+func (wsl *WorkspaceList) sync(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
+}
+
+func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
-	fillRootAttr(c, &out.Attr, nsd.InodeCommon.id)
+	fillRootAttr(c, &out.Attr, wsl.InodeCommon.id)
 	return fuse.OK
 }
 

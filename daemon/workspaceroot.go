@@ -25,7 +25,7 @@ type WorkspaceRoot struct {
 	// Indexed by inode number
 	childrenRecords map[uint64]*quantumfs.DirectoryRecord
 
-	dirty bool // True if the contents of subtree has changed since last sync
+	dirtyChildren_ []Inode // list of children which are currently dirty
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -40,6 +40,8 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum uint64,
 
 func newWorkspaceRoot(c *ctx, parentName string, name string,
 	inodeNum uint64) Inode {
+
+	var wsr WorkspaceRoot
 
 	rootId := c.workspaceDB.Workspace(parentName, name)
 
@@ -66,18 +68,18 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId))
+		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId, &wsr))
 	}
 
-	return &WorkspaceRoot{
-		InodeCommon:     InodeCommon{id: inodeNum},
-		namespace:       parentName,
-		workspace:       name,
-		rootId:          rootId,
-		baseLayer:       baseLayer,
-		children:        children,
-		childrenRecords: childrenRecords,
-	}
+	wsr.InodeCommon = InodeCommon{id: inodeNum}
+	wsr.namespace = parentName
+	wsr.workspace = name
+	wsr.rootId = rootId
+	wsr.baseLayer = baseLayer
+	wsr.children = children
+	wsr.childrenRecords = childrenRecords
+	wsr.dirtyChildren_ = make([]Inode, 0)
+	return &wsr
 }
 
 func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64,
@@ -88,16 +90,44 @@ func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64,
 	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, child)
 	wsr.childrenRecords[inodeNum] =
 		&wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
-	wsr.dirty = true
+	wsr.dirty(c)
+}
 
+// Mark this workspace dirty and update the workspace DB
+func (wsr *WorkspaceRoot) dirty(c *ctx) {
+	wsr.dirty_ = true
 	wsr.advanceRootId(c)
+}
+
+// Record that a specific child is dirty and when syncing heirarchically, sync them
+// as well.
+func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
+	wsr.dirtyChildren_ = append(wsr.dirtyChildren_, child)
+	wsr.dirty(c)
+}
+
+func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
+	wsr.advanceRootId(c)
+	return wsr.rootId
+}
+
+// Walk the list of children which are dirty and have them recompute their new key
+// wsr can update its new key.
+func (wsr *WorkspaceRoot) updateRecords(c *ctx) {
+	for _, child := range wsr.dirtyChildren_ {
+		newKey := child.sync(c)
+		wsr.childrenRecords[child.inodeNum()].ID = newKey
+	}
+	wsr.dirtyChildren_ = make([]Inode, 0)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
-	if !wsr.dirty {
+	if !wsr.dirty_ {
 		return
 	}
+
+	wsr.updateRecords(c)
 
 	// Upload the base layer object
 	bytes, err := json.Marshal(wsr.baseLayer)
@@ -142,7 +172,7 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		wsr.rootId = rootId
 	}
 
-	wsr.dirty = false
+	wsr.dirty_ = false
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -363,6 +393,8 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAt
 	fillAttrOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
 		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
+
+	wsr.dirty(c)
 
 	return fuse.OK
 }

@@ -44,6 +44,13 @@ func fillApiAttr(attr *fuse.Attr) {
 	attr.Blksize = 4096
 }
 
+func (api *ApiInode) dirty(c *ctx) {
+}
+
+func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
+}
+
 func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
