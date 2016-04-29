@@ -3,8 +3,6 @@
 
 package daemon
 
-import "fmt"
-
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -12,13 +10,28 @@ import "github.com/hanwen/go-fuse/fuse"
 type Directory struct {
 	InodeCommon
 	baseLayerId quantumfs.ObjectKey
+	parent      Inode
 }
 
-func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum InodeId) Inode {
+func newDirectory(baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode {
 	return &Directory{
 		InodeCommon: InodeCommon{id: inodeNum},
 		baseLayerId: baseLayerId,
+		parent:      parent,
 	}
+}
+
+func (dir *Directory) dirty(c *ctx) {
+	dir.parent.dirtyChild(c, dir)
+}
+
+func (dir *Directory) dirtyChild(c *ctx, child Inode) {
+	dir.dirty(c)
+}
+
+func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
+	return dir.baseLayerId
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -52,14 +65,14 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on Directory")
+	c.elog("Invalid SetAttr on Directory")
 	return fuse.ENOSYS
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on Directory")
+	c.elog("Invalid setChildAttr on Directory")
 	return fuse.ENOSYS
 }
 
@@ -91,7 +104,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fmt.Println("ReadDirPlus directorySnapshot", input, out)
+	c.vlog("ReadDirPlus directorySnapshot", input, out)
 	offset := input.Offset
 
 	// Add .
@@ -148,13 +161,13 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fmt.Println("Invalid read on directorySnapshot")
+	c.elog("Invalid read on directorySnapshot")
 	return nil, fuse.ENOSYS
 }
 
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	fmt.Println("Invalid write on directorySnapshot")
+	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }

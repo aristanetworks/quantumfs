@@ -44,6 +44,13 @@ func fillApiAttr(attr *fuse.Attr) {
 	attr.Blksize = 4096
 }
 
+func (api *ApiInode) dirty(c *ctx) {
+}
+
+func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
+}
+
 func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -70,13 +77,13 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 func (api *ApiInode) Lookup(c *ctx, context fuse.Context, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	fmt.Println("Invalid Lookup on ApiInode")
+	c.elog("Invalid Lookup on ApiInode")
 	return fuse.ENOSYS
 }
 
 func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
-
+	c.vlog("creating file %s", name)
 	return fuse.ENOTDIR
 }
 
@@ -115,14 +122,14 @@ type ApiHandle struct {
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	fmt.Println("Invalid ReadDirPlus against ApiHandle")
+	c.elog("Invalid ReadDirPlus against ApiHandle")
 	return fuse.ENOSYS
 }
 
 func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fmt.Println("Received read request on Api")
+	c.vlog("Received read request on Api")
 	var blocking chan struct{}
 	if !nonblocking {
 		blocking = make(chan struct{})
@@ -130,11 +137,11 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	select {
 	case response := <-api.responses:
-		fmt.Println("Returning", response)
+		c.vlog("Returning", response)
 		return response, fuse.OK
 	case <-blocking:
 		// This is a nonblocking socket, so return that nothing is ready
-		fmt.Println("Nonblocking socket, return nothing")
+		c.vlog("Nonblocking socket, return nothing")
 		return nil, fuse.OK
 	}
 }
@@ -161,6 +168,7 @@ func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 
 func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
+	c.vlog("writing to file")
 
 	var cmd quantumfs.CommandCommon
 	err := json.Unmarshal(buf, &cmd)
@@ -180,10 +188,12 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
 
 	case quantumfs.CmdBranchRequest:
-		fmt.Println("Received branch request")
+		c.vlog("Received branch request")
 		api.branchWorkspace(c, buf)
 
 	}
+
+	c.vlog("done writing to file")
 	return size, fuse.OK
 }
 

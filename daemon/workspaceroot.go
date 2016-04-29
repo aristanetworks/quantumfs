@@ -5,7 +5,6 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
-import "fmt"
 import "syscall"
 import "time"
 
@@ -26,7 +25,7 @@ type WorkspaceRoot struct {
 	// Indexed by inode number
 	childrenRecords map[InodeId]*quantumfs.DirectoryRecord
 
-	dirty bool // True if the contents of subtree has changed since last sync
+	dirtyChildren_ []Inode // list of children which are currently dirty
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -41,6 +40,8 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 func newWorkspaceRoot(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
+
+	var wsr WorkspaceRoot
 
 	rootId := c.workspaceDB.Workspace(parentName, name)
 
@@ -67,18 +68,18 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId))
+		c.qfs.setInode(c, inodeId, newDirectory(entry.ID, inodeId, &wsr))
 	}
 
-	return &WorkspaceRoot{
-		InodeCommon:     InodeCommon{id: inodeNum},
-		namespace:       parentName,
-		workspace:       name,
-		rootId:          rootId,
-		baseLayer:       baseLayer,
-		children:        children,
-		childrenRecords: childrenRecords,
-	}
+	wsr.InodeCommon = InodeCommon{id: inodeNum}
+	wsr.namespace = parentName
+	wsr.workspace = name
+	wsr.rootId = rootId
+	wsr.baseLayer = baseLayer
+	wsr.children = children
+	wsr.childrenRecords = childrenRecords
+	wsr.dirtyChildren_ = make([]Inode, 0)
+	return &wsr
 }
 
 func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum InodeId,
@@ -89,16 +90,44 @@ func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum InodeId,
 	wsr.baseLayer.Entries = append(wsr.baseLayer.Entries, child)
 	wsr.childrenRecords[inodeNum] =
 		&wsr.baseLayer.Entries[wsr.baseLayer.NumEntries-1]
-	wsr.dirty = true
+	wsr.dirty(c)
+}
 
+// Mark this workspace dirty and update the workspace DB
+func (wsr *WorkspaceRoot) dirty(c *ctx) {
+	wsr.dirty_ = true
 	wsr.advanceRootId(c)
+}
+
+// Record that a specific child is dirty and when syncing heirarchically, sync them
+// as well.
+func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
+	wsr.dirtyChildren_ = append(wsr.dirtyChildren_, child)
+	wsr.dirty(c)
+}
+
+func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
+	wsr.advanceRootId(c)
+	return wsr.rootId
+}
+
+// Walk the list of children which are dirty and have them recompute their new key
+// wsr can update its new key.
+func (wsr *WorkspaceRoot) updateRecords(c *ctx) {
+	for _, child := range wsr.dirtyChildren_ {
+		newKey := child.sync(c)
+		wsr.childrenRecords[child.inodeNum()].ID = newKey
+	}
+	wsr.dirtyChildren_ = make([]Inode, 0)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
-	if !wsr.dirty {
+	if !wsr.dirty_ {
 		return
 	}
+
+	wsr.updateRecords(c)
 
 	// Upload the base layer object
 	bytes, err := json.Marshal(wsr.baseLayer)
@@ -143,7 +172,7 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		wsr.rootId = rootId
 	}
 
-	wsr.dirty = false
+	wsr.dirty_ = false
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -166,19 +195,19 @@ func (wsr *WorkspaceRoot) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func fillAttrWithDirectoryRecord(attr *fuse.Attr, inodeNum InodeId,
+func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry *quantumfs.DirectoryRecord) {
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := objectTypeToFileType(entry.Type)
+	fileType := objectTypeToFileType(c, entry.Type)
 	switch fileType {
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = 1
 		attr.Nlink = uint32(entry.Size)
 	default:
-		fmt.Println("Unhandled filetype in fillAttrWithDirectoryRecord",
+		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
 		fallthrough
 	case fuse.S_IFREG:
@@ -215,9 +244,9 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
 
 		entryInfo := directoryContents{
 			filename: filename,
-			fuseType: objectTypeToFileType(entry.Type),
+			fuseType: objectTypeToFileType(c, entry.Type),
 		}
-		fillAttrWithDirectoryRecord(&entryInfo.attr, wsr.children[filename],
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr, wsr.children[filename],
 			context.Owner, &entry)
 
 		children = append(children, entryInfo)
@@ -241,7 +270,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string,
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(&out.Attr, inodeNum, context.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, context.Owner,
 		wsr.childrenRecords[inodeNum])
 
 	return fuse.OK
@@ -264,6 +293,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 		return fuse.Status(syscall.EEXIST)
 	}
 
+	c.vlog("Creating workspace")
+
 	now := time.Now()
 	uid := input.InHeader.Context.Owner.Uid
 	gid := input.InHeader.Context.Owner.Gid
@@ -273,8 +304,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 		ID:                 quantumfs.EmptyBlockKey,
 		Type:               quantumfs.ObjectTypeSmallFile,
 		Permissions:        modeToPermissions(input.Mode, input.Umask),
-		Owner:              quantumfs.ObjectUid(uid, uid),
-		Group:              quantumfs.ObjectGid(gid, gid),
+		Owner:              quantumfs.ObjectUid(c.requestId, uid, uid),
+		Group:              quantumfs.ObjectGid(c.requestId, gid, gid),
 		Size:               0,
 		ExtendedAttributes: quantumfs.EmptyBlockKey,
 		CreationTime:       quantumfs.NewTime(now),
@@ -288,7 +319,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 	c.qfs.setInode(c, inodeNum, file)
 
 	fillEntryOutCacheData(c, &out.EntryOut)
-	fillAttrWithDirectoryRecord(&out.EntryOut.Attr, inodeNum,
+	fillAttrWithDirectoryRecord(c, &out.EntryOut.Attr, inodeNum,
 		input.InHeader.Context.Owner, &entry)
 
 	fileHandleNum := c.qfs.newFileHandleId()
@@ -304,7 +335,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on WorkspaceRoot")
+	c.elog("Invalid SetAttr on WorkspaceRoot")
 	return fuse.ENOSYS
 }
 
@@ -319,7 +350,7 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetA
 	valid := uint(attr.SetAttrInCommon.Valid)
 	if BitFlagsSet(valid, fuse.FATTR_FH|
 		fuse.FATTR_LOCKOWNER) {
-		fmt.Println("Unsupported attribute(s) to set", valid)
+		c.elog("Unsupported attribute(s) to set", valid)
 		return fuse.ENOSYS
 	}
 
@@ -328,12 +359,12 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetA
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.Owner = quantumfs.ObjectUid(attr.Owner.Uid,
+		entry.Owner = quantumfs.ObjectUid(c.requestId, attr.Owner.Uid,
 			attr.InHeader.Context.Owner.Uid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.Group = quantumfs.ObjectGid(attr.Owner.Gid,
+		entry.Group = quantumfs.ObjectGid(c.requestId, attr.Owner.Gid,
 			attr.InHeader.Context.Owner.Gid)
 	}
 
@@ -360,8 +391,10 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetA
 	}
 
 	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(&out.Attr, inodeNum,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
 		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
+
+	wsr.dirty(c)
 
 	return fuse.OK
 }
