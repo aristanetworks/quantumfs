@@ -199,8 +199,8 @@ func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on NamespaceList")
 	return fuse.ENOSYS
@@ -297,8 +297,8 @@ func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS

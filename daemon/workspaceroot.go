@@ -246,8 +246,8 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
 			filename: filename,
 			fuseType: objectTypeToFileType(c, entry.Type),
 		}
-		fillAttrWithDirectoryRecord(c, &entryInfo.attr, wsr.children[filename],
-			context.Owner, &entry)
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+			wsr.children[filename], context.Owner, &entry)
 
 		children = append(children, entryInfo)
 	}
@@ -339,8 +339,8 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	entry, exists := wsr.childrenRecords[inodeNum]
 	if !exists {

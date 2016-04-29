@@ -8,8 +8,8 @@ package daemon
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func newFile(inodeNum InodeId, fileType quantumfs.ObjectType, key quantumfs.ObjectKey,
-	parent Inode) *File {
+func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
+	key quantumfs.ObjectKey, parent Inode) *File {
 
 	file := File{
 		InodeCommon: InodeCommon{id: inodeNum},
@@ -79,7 +79,9 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func newFileDescriptor(file *File, inodeNum InodeId, fileHandleId FileHandleId) FileHandle {
+func newFileDescriptor(file *File, inodeNum InodeId,
+	fileHandleId FileHandleId) FileHandle {
+
 	return &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
 			id:       fileHandleId,
