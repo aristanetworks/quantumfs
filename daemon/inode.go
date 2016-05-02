@@ -7,6 +7,8 @@ package daemon
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
+type InodeId uint64
+
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -26,7 +28,7 @@ type Inode interface {
 	SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
+	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status
 
 	dirty(c *ctx) // Mark this Inode dirty
@@ -38,15 +40,15 @@ type Inode interface {
 	// itself to the datastore
 	sync(c *ctx) quantumfs.ObjectKey
 
-	inodeNum() uint64
+	inodeNum() InodeId
 }
 
 type InodeCommon struct {
-	id     uint64
+	id     InodeId
 	dirty_ bool // True if this Inode or any children are dirty
 }
 
-func (inode *InodeCommon) inodeNum() uint64 {
+func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
 }
 
@@ -70,7 +72,9 @@ type FileHandle interface {
 		uint32, fuse.Status)
 }
 
+type FileHandleId uint64
+
 type FileHandleCommon struct {
-	id       uint64
-	inodeNum uint64
+	id       FileHandleId
+	inodeNum InodeId
 }

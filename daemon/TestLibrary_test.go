@@ -134,7 +134,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 			continue
 		}
 
-		if fh.inodeNum == inodeNum {
+		if fh.inodeNum == InodeId(inodeNum) {
 			handles = append(handles, fh)
 		}
 	}

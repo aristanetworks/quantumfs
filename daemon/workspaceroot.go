@@ -20,10 +20,10 @@ type WorkspaceRoot struct {
 	workspace string
 	rootId    quantumfs.ObjectKey
 	baseLayer quantumfs.DirectoryEntry
-	children  map[string]uint64
+	children  map[string]InodeId
 
 	// Indexed by inode number
-	childrenRecords map[uint64]*quantumfs.DirectoryRecord
+	childrenRecords map[InodeId]*quantumfs.DirectoryRecord
 
 	dirtyChildren_ []Inode // list of children which are currently dirty
 }
@@ -31,7 +31,7 @@ type WorkspaceRoot struct {
 // Fetching the number of child directories for all the workspaces within a namespace
 // is relatively expensive and not terribly useful. Instead fake it and assume a
 // normal number here.
-func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum uint64,
+func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	workspace string) {
 
 	fillAttr(attr, inodeNum, 27)
@@ -39,7 +39,7 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum uint64,
 }
 
 func newWorkspaceRoot(c *ctx, parentName string, name string,
-	inodeNum uint64) Inode {
+	inodeNum InodeId) Inode {
 
 	var wsr WorkspaceRoot
 
@@ -61,8 +61,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		panic("Couldn't decode base layer object")
 	}
 
-	children := make(map[string]uint64, baseLayer.NumEntries)
-	childrenRecords := make(map[uint64]*quantumfs.DirectoryRecord,
+	children := make(map[string]InodeId, baseLayer.NumEntries)
+	childrenRecords := make(map[InodeId]*quantumfs.DirectoryRecord,
 		baseLayer.NumEntries)
 	for i, entry := range baseLayer.Entries {
 		inodeId := c.qfs.newInodeId()
@@ -82,7 +82,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	return &wsr
 }
 
-func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum uint64,
+func (wsr *WorkspaceRoot) addChild(c *ctx, name string, inodeNum InodeId,
 	child quantumfs.DirectoryRecord) {
 
 	wsr.children[name] = inodeNum
@@ -195,10 +195,10 @@ func (wsr *WorkspaceRoot) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum uint64,
+func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry *quantumfs.DirectoryRecord) {
 
-	attr.Ino = inodeNum
+	attr.Ino = uint64(inodeNum)
 
 	fileType := objectTypeToFileType(c, entry.Type)
 	switch fileType {
@@ -246,15 +246,15 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
 			filename: filename,
 			fuseType: objectTypeToFileType(c, entry.Type),
 		}
-		fillAttrWithDirectoryRecord(c, &entryInfo.attr, wsr.children[filename],
-			context.Owner, &entry)
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+			wsr.children[filename], context.Owner, &entry)
 
 		children = append(children, entryInfo)
 	}
 
 	ds := newDirectorySnapshot(c, children, wsr.InodeCommon.id)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
-	out.Fh = ds.FileHandleCommon.id
+	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
 
 	return fuse.OK
@@ -268,9 +268,9 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string,
 		return fuse.ENOENT
 	}
 
-	out.NodeId = inodeNum
+	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, out.NodeId, context.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, context.Owner,
 		wsr.childrenRecords[inodeNum])
 
 	return fuse.OK
@@ -327,7 +327,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	out.OpenOut.OpenFlags = 0
-	out.OpenOut.Fh = fileHandleNum
+	out.OpenOut.Fh = uint64(fileHandleNum)
 
 	return fuse.OK
 }
@@ -339,8 +339,8 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum uint64, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	entry, exists := wsr.childrenRecords[inodeNum]
 	if !exists {
