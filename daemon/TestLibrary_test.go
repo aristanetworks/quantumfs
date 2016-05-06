@@ -175,3 +175,33 @@ func (th *testHelper) assert(condition bool, format string, args ...interface{})
 		th.t.Fatalf(format, args...)
 	}
 }
+
+type crashOnWrite struct {
+	FileHandle
+}
+
+func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint32,
+	buf []byte) (uint32, fuse.Status) {
+
+	panic("Intentional crash")
+}
+
+// If a quantumfs test fails then it may leave the filesystem mount hanging around in
+// a blocked state. testHelper needs to forcefully abort and umount these to keep the
+// system functional. Test this forceful unmounting here.
+func TestHungFilesystemAbort_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		api := test.getApi()
+
+		// Introduce a panicing error into quantumfs
+		for k, v := range test.qfs.fileHandles {
+			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
+		}
+
+		// panic Quantumfs
+		api.Branch("_null/null", "test/crash")
+
+		panic("failed test")
+	})
+}
