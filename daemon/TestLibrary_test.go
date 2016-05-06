@@ -17,16 +17,22 @@ import "arista.com/quantumfs/processlocal"
 
 import "github.com/hanwen/go-fuse/fuse"
 
+type quantumFsTest func(test *testHelper)
+
 // startTest is a helper which configures the testing environment
-func startTest(t *testing.T) testHelper {
+func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
 
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
-	return testHelper{
+	th := &testHelper{
 		t:        t,
 		testName: testName,
 	}
+
+	defer th.endTest()
+
+	test(th)
 }
 
 // endTest cleans up the testing environment after the test has finished
