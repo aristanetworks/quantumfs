@@ -5,10 +5,13 @@ package daemon
 
 // Test library
 
+import "bufio"
 import "fmt"
 import "io/ioutil"
 import "os"
 import "runtime"
+import "strings"
+import "strconv"
 import "sync/atomic"
 import "testing"
 
@@ -16,6 +19,8 @@ import "arista.com/quantumfs"
 import "arista.com/quantumfs/processlocal"
 
 import "github.com/hanwen/go-fuse/fuse"
+
+const fusectlPath = "/sys/fs/fuse/"
 
 type quantumFsTest func(test *testHelper)
 
@@ -35,13 +40,38 @@ func runTest(t *testing.T, test quantumFsTest) {
 	test(th)
 }
 
+func abortFuse(th *testHelper) {
+	// Forcefully abort the filesystem so it can be unmounted
+	th.t.Logf("Aborting FUSE connection %d", th.fuseConnection)
+	path := fmt.Sprintf("%s/connections/%d/abort", fusectlPath,
+		th.fuseConnection)
+	abort, err := os.OpenFile(path, os.O_WRONLY, 0)
+	if err != nil {
+		// We cannot abort so we won't terminate. We are
+		// truly wedged.
+		panic("Failed to abort FUSE connection (open)")
+	}
+
+	if _, err := abort.Write([]byte("1")); err != nil {
+		panic("Failed to abort FUSE connection (write)")
+	}
+
+	abort.Close()
+}
+
 // endTest cleans up the testing environment after the test has finished
 func (th *testHelper) endTest() {
+	exception := recover()
+
 	if th.api != nil {
 		th.api.Close()
 	}
 
 	if th.server != nil {
+		if exception != nil && th.fuseConnection != 0 {
+			abortFuse(th)
+		}
+
 		if err := th.server.Unmount(); err != nil {
 			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
 		}
@@ -53,16 +83,21 @@ func (th *testHelper) endTest() {
 				err)
 		}
 	}
+
+	if exception != nil {
+		th.t.Fatalf("Test failed with exception: %v", exception)
+	}
 }
 
 // This helper is more of a namespacing mechanism than a coherent object
 type testHelper struct {
-	t        *testing.T
-	testName string
-	qfs      *QuantumFs
-	tempDir  string
-	server   *fuse.Server
-	api      *quantumfs.Api
+	t              *testing.T
+	testName       string
+	qfs            *QuantumFs
+	tempDir        string
+	server         *fuse.Server
+	fuseConnection int
+	api            *quantumfs.Api
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
@@ -94,6 +129,53 @@ func (th *testHelper) startDefaultQuantumFs() {
 	th.startQuantumFs(config)
 }
 
+// Return the fuse connection id for the filesystem mounted at the given path
+func fuseConnection(mountPath string) int {
+	file, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		panic("Failed opening mountinfo")
+	}
+	defer file.Close()
+
+	mountinfo := bufio.NewReader(file)
+
+	for {
+		bline, _, err := mountinfo.ReadLine()
+		if err != nil {
+			panic("Failed to find mount")
+		}
+
+		line := string(bline)
+
+		if strings.Contains(line, mountPath) {
+			fields := strings.SplitN(line, " ", 5)
+			dev := strings.Split(fields[2], ":")[1]
+			devInt, err := strconv.Atoi(dev)
+			if err != nil {
+				panic("Failed to convert dev to integer")
+			}
+			return devInt
+		}
+	}
+	panic("Mount not found")
+}
+
+// If the filesystem panics, abort it and unmount it to prevent the test binary from
+// hanging.
+func serveSafely(th *testHelper) {
+	defer func(th *testHelper) {
+		exception := recover()
+		if exception != nil {
+			if th.fuseConnection != 0 {
+				abortFuse(th)
+			}
+			th.t.Fatalf("FUSE panic'd: %v", exception)
+		}
+	}(th)
+
+	th.server.Serve()
+}
+
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
@@ -110,8 +192,10 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		th.t.Fatalf("Failed to create quantumfs instance: %v", err)
 	}
 
+	th.fuseConnection = fuseConnection(config.MountPath)
+
 	th.server = server
-	go server.Serve()
+	go serveSafely(th)
 }
 
 func (th *testHelper) getApi() *quantumfs.Api {
