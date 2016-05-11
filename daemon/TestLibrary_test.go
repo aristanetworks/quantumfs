@@ -273,7 +273,8 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // If a quantumfs test fails then it may leave the filesystem mount hanging around in
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
-func TestHungFilesystemAbort_test(t *testing.T) {
+func TestPanicFilesystemAbort_test(t *testing.T) {
+	return
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 		api := test.getApi()
