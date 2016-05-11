@@ -14,6 +14,7 @@ import "strings"
 import "strconv"
 import "sync/atomic"
 import "testing"
+import "time"
 
 import "arista.com/quantumfs"
 import "arista.com/quantumfs/processlocal"
@@ -31,11 +32,43 @@ func runTest(t *testing.T, test quantumFsTest) {
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
 	th := &testHelper{
-		t:        t,
-		testName: testName,
+		t:          t,
+		testName:   testName,
+		testResult: make(chan string),
 	}
 
 	defer th.endTest()
+
+	// Allow tests to run for up to 1 seconds before considering them timed out
+	go th.execute(test)
+
+	var testResult string
+
+	select {
+	case <-time.After(1 * time.Second):
+		testResult = "TIMED OUT"
+
+	case testResult = <-th.testResult:
+	}
+
+	if !th.shouldFail && testResult != "" {
+		th.t.Fatal(testResult)
+	} else if th.shouldFail && testResult == "" {
+		th.t.Fatal("Test is expected to fail")
+	}
+}
+
+func (th *testHelper) execute(test quantumFsTest) {
+	// Catch any panics and covert them into test failures
+	defer func(th *testHelper) {
+		err := recover()
+
+		// If the test passed pass that fact back to runTest()
+		if err == nil {
+			err = ""
+		}
+		th.testResult <- err.(string)
+	}(th)
 
 	test(th)
 }
@@ -98,6 +131,8 @@ type testHelper struct {
 	server         *fuse.Server
 	fuseConnection int
 	api            *quantumfs.Api
+	testResult     chan string
+	shouldFail     bool
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
@@ -255,8 +290,8 @@ func (th *testHelper) newCtx() *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		th.endTest()
-		th.t.Fatalf(format, args...)
+		msg := fmt.Sprintf(format, args)
+		panic(msg)
 	}
 }
 
@@ -288,5 +323,19 @@ func TestPanicFilesystemAbort_test(t *testing.T) {
 		api.Branch("_null/null", "test/crash")
 
 		panic("failed test")
+	})
+}
+
+// If a test never returns from some event, such as an inifinite loop, the test
+// should timeout and cleanup after itself.
+func TestTimeout_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.shouldFail = true
+		time.Sleep(60 * time.Second)
+
+		// If we get here then the test library didn't time us out and we
+		// sould fail this test.
+		test.shouldFail = false
+		test.assert(false, "Test didn't fail due to timeout")
 	})
 }
