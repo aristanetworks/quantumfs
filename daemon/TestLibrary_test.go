@@ -330,6 +330,8 @@ func TestPanicFilesystemAbort_test(t *testing.T) {
 // should timeout and cleanup after itself.
 func TestTimeout_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
 		test.shouldFail = true
 		time.Sleep(60 * time.Second)
 
