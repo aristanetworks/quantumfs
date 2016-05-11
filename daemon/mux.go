@@ -23,10 +23,13 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 		inodeNum:      quantumfs.InodeIdReservedEnd,
 		fileHandleNum: quantumfs.InodeIdReservedEnd,
 		c: ctx{
+			Ctx: quantumfs.Ctx{
+				Qlog:      qlog.NewQlog(),
+				RequestId: qlog.DummyReqId,
+			},
 			config:       &config,
 			workspaceDB:  config.WorkspaceDB,
 			durableStore: config.DurableStore,
-			requestId:    qlog.DummyReqId,
 		},
 	}
 
