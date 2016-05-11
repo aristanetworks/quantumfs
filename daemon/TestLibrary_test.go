@@ -309,7 +309,6 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort_test(t *testing.T) {
-	return
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 		api := test.getApi()
