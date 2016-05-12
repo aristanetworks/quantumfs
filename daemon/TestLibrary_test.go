@@ -5,37 +5,106 @@ package daemon
 
 // Test library
 
+import "bufio"
 import "fmt"
 import "io/ioutil"
 import "os"
 import "runtime"
+import "strings"
+import "strconv"
 import "sync/atomic"
 import "testing"
+import "time"
 
 import "arista.com/quantumfs"
 import "arista.com/quantumfs/processlocal"
 
 import "github.com/hanwen/go-fuse/fuse"
 
+const fusectlPath = "/sys/fs/fuse/"
+
+type quantumFsTest func(test *testHelper)
+
 // startTest is a helper which configures the testing environment
-func startTest(t *testing.T) testHelper {
+func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
 
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
-	return testHelper{
-		t:        t,
-		testName: testName,
+	th := &testHelper{
+		t:          t,
+		testName:   testName,
+		testResult: make(chan string),
 	}
+
+	defer th.endTest()
+
+	// Allow tests to run for up to 1 seconds before considering them timed out
+	go th.execute(test)
+
+	var testResult string
+
+	select {
+	case <-time.After(1 * time.Second):
+		testResult = "TIMED OUT"
+
+	case testResult = <-th.testResult:
+	}
+
+	if !th.shouldFail && testResult != "" {
+		th.t.Fatal(testResult)
+	} else if th.shouldFail && testResult == "" {
+		th.t.Fatal("Test is expected to fail")
+	}
+}
+
+func (th *testHelper) execute(test quantumFsTest) {
+	// Catch any panics and covert them into test failures
+	defer func(th *testHelper) {
+		err := recover()
+
+		// If the test passed pass that fact back to runTest()
+		if err == nil {
+			err = ""
+		}
+		th.testResult <- err.(string)
+	}(th)
+
+	test(th)
+}
+
+func abortFuse(th *testHelper) {
+	// Forcefully abort the filesystem so it can be unmounted
+	th.t.Logf("Aborting FUSE connection %d", th.fuseConnection)
+	path := fmt.Sprintf("%s/connections/%d/abort", fusectlPath,
+		th.fuseConnection)
+	abort, err := os.OpenFile(path, os.O_WRONLY, 0)
+	if err != nil {
+		// We cannot abort so we won't terminate. We are
+		// truly wedged.
+		panic("Failed to abort FUSE connection (open)")
+	}
+
+	if _, err := abort.Write([]byte("1")); err != nil {
+		panic("Failed to abort FUSE connection (write)")
+	}
+
+	abort.Close()
 }
 
 // endTest cleans up the testing environment after the test has finished
 func (th *testHelper) endTest() {
+	exception := recover()
+
 	if th.api != nil {
 		th.api.Close()
 	}
 
 	if th.server != nil {
+		if exception != nil && th.fuseConnection != 0 {
+			abortFuse(th)
+		}
+
 		if err := th.server.Unmount(); err != nil {
 			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
 		}
@@ -47,16 +116,23 @@ func (th *testHelper) endTest() {
 				err)
 		}
 	}
+
+	if exception != nil {
+		th.t.Fatalf("Test failed with exception: %v", exception)
+	}
 }
 
 // This helper is more of a namespacing mechanism than a coherent object
 type testHelper struct {
-	t        *testing.T
-	testName string
-	qfs      *QuantumFs
-	tempDir  string
-	server   *fuse.Server
-	api      *quantumfs.Api
+	t              *testing.T
+	testName       string
+	qfs            *QuantumFs
+	tempDir        string
+	server         *fuse.Server
+	fuseConnection int
+	api            *quantumfs.Api
+	testResult     chan string
+	shouldFail     bool
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
@@ -88,6 +164,53 @@ func (th *testHelper) startDefaultQuantumFs() {
 	th.startQuantumFs(config)
 }
 
+// Return the fuse connection id for the filesystem mounted at the given path
+func fuseConnection(mountPath string) int {
+	file, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		panic("Failed opening mountinfo")
+	}
+	defer file.Close()
+
+	mountinfo := bufio.NewReader(file)
+
+	for {
+		bline, _, err := mountinfo.ReadLine()
+		if err != nil {
+			panic("Failed to find mount")
+		}
+
+		line := string(bline)
+
+		if strings.Contains(line, mountPath) {
+			fields := strings.SplitN(line, " ", 5)
+			dev := strings.Split(fields[2], ":")[1]
+			devInt, err := strconv.Atoi(dev)
+			if err != nil {
+				panic("Failed to convert dev to integer")
+			}
+			return devInt
+		}
+	}
+	panic("Mount not found")
+}
+
+// If the filesystem panics, abort it and unmount it to prevent the test binary from
+// hanging.
+func serveSafely(th *testHelper) {
+	defer func(th *testHelper) {
+		exception := recover()
+		if exception != nil {
+			if th.fuseConnection != 0 {
+				abortFuse(th)
+			}
+			th.t.Fatalf("FUSE panic'd: %v", exception)
+		}
+	}(th)
+
+	th.server.Serve()
+}
+
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
@@ -104,8 +227,10 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		th.t.Fatalf("Failed to create quantumfs instance: %v", err)
 	}
 
+	th.fuseConnection = fuseConnection(config.MountPath)
+
 	th.server = server
-	go server.Serve()
+	go serveSafely(th)
 }
 
 func (th *testHelper) getApi() *quantumfs.Api {
@@ -165,7 +290,54 @@ func (th *testHelper) newCtx() *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		th.endTest()
-		th.t.Fatalf(format, args...)
+		msg := fmt.Sprintf(format, args)
+		panic(msg)
 	}
+}
+
+type crashOnWrite struct {
+	FileHandle
+}
+
+func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint32,
+	buf []byte) (uint32, fuse.Status) {
+
+	panic("Intentional crash")
+}
+
+// If a quantumfs test fails then it may leave the filesystem mount hanging around in
+// a blocked state. testHelper needs to forcefully abort and umount these to keep the
+// system functional. Test this forceful unmounting here.
+func TestPanicFilesystemAbort_test(t *testing.T) {
+	return
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		api := test.getApi()
+
+		// Introduce a panicing error into quantumfs
+		for k, v := range test.qfs.fileHandles {
+			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
+		}
+
+		// panic Quantumfs
+		api.Branch("_null/null", "test/crash")
+
+		panic("failed test")
+	})
+}
+
+// If a test never returns from some event, such as an inifinite loop, the test
+// should timeout and cleanup after itself.
+func TestTimeout_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		test.shouldFail = true
+		time.Sleep(60 * time.Second)
+
+		// If we get here then the test library didn't time us out and we
+		// sould fail this test.
+		test.shouldFail = false
+		test.assert(false, "Test didn't fail due to timeout")
+	})
 }

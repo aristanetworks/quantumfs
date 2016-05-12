@@ -5,7 +5,6 @@ package testutils
 
 import "fmt"
 
-
 func IoPipe(output *string) func(format string, args ...interface{}) (int, error) {
 	return func(format string, args ...interface{}) (int, error) {
 		newline := fmt.Sprintf(format, args...)
