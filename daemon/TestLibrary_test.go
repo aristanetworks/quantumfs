@@ -131,7 +131,6 @@ func (th *testHelper) logscan() {
 	errors := make([]string, 0, 10)
 
 	for _, line := range th.testOutput {
-		fmt.Printf("Checking line: %s", line)
 		if strings.Contains(line, "PANIC") {
 			errors = append(errors, line)
 		}
