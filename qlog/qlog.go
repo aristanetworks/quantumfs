@@ -34,6 +34,8 @@ func (enum LogSubsystem) String() string {
 		return "Datastore"
 	case LogWorkspacedb:
 		return "WorkspaceDb"
+	case LogTest:
+		return "Test"
 	}
 	return ""
 }
@@ -46,6 +48,8 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 		return LogDatastore, nil
 	case "workspacedb":
 		return LogWorkspacedb, nil
+	case "test":
+		return LogTest, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }

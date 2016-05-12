@@ -56,21 +56,22 @@ func TestLoadLevels_test(t *testing.T) {
 	qlog := NewQlog()
 
 	qlog.loadLevels("Daemon/*")
-	if qlog.logLevels != 0x11F {
-		t.Fatal("Wildcard log levels incorrectly set", qlog.logLevels)
+	if qlog.logLevels != 0x111F {
+		t.Fatalf("Wildcard log levels incorrectly set: %x != %x", 0x111f,
+			qlog.logLevels)
 	}
 
 	// test out of order, combo setting, and general bitmask
 	qlog.loadLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
-	if qlog.logLevels != 0xFA3 {
-		t.Fatal("Out of order, combo setting, or general bitmask broken",
+	if qlog.logLevels != 0x1FA3 {
+		t.Fatalf("Out of order, combo setting, or general bitmask broken %x",
 			qlog.logLevels)
 	}
 
 	// test misspelling ignores misspelt entry. Ensure case insensitivity
 	qlog.loadLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
-	if qlog.logLevels != 0xF11 {
-		t.Fatal("Case insensitivity broken / mis-spelling not ignored",
+	if qlog.logLevels != 0x1F11 {
+		t.Fatalf("Case insensitivity broken / mis-spelling not ignored %x",
 			qlog.logLevels)
 	}
 }
