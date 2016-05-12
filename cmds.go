@@ -153,7 +153,5 @@ func (api *Api) Branch(src string, dst string) error {
 		return err
 	}
 
-	fmt.Println(response)
-
 	return nil
 }
