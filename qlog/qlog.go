@@ -20,7 +20,8 @@ const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
 	LogWorkspacedb
-	logSubsystemMax = LogWorkspacedb
+	LogTest
+	logSubsystemMax = LogTest
 )
 
 const DummyReqId uint64 = math.MaxUint64

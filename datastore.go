@@ -130,7 +130,7 @@ func ObjectUid(c Ctx, uid uint32, userId uint32) UID {
 	case 0:
 		return UIDRoot
 	default:
-		c.elog(qlog.LogDatastore, "Unknown UID %d", uid)
+		c.Elog(qlog.LogDatastore, "Unknown UID %d", uid)
 		return UIDUser
 	}
 }
@@ -170,7 +170,7 @@ func ObjectGid(c Ctx, gid uint32, userId uint32) GID {
 	case 0:
 		return GIDRoot
 	default:
-		c.elog(qlog.LogDatastore, "Unknown GID", gid)
+		c.Elog(qlog.LogDatastore, "Unknown GID", gid)
 		return GIDUser
 	}
 }

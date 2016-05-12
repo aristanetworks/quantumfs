@@ -19,6 +19,7 @@ import "time"
 
 import "arista.com/quantumfs"
 import "arista.com/quantumfs/processlocal"
+import "arista.com/quantumfs/qlog"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -172,7 +173,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 	mountPath := tempDir + "/mnt"
 
 	os.Mkdir(mountPath, 0777)
-	th.t.Log("Using mountpath", mountPath)
+	th.t.Logf("[%s] Using mountpath %s", th.testName, mountPath)
 
 	config := QuantumFsConfig{
 		CachePath:        "",
@@ -327,8 +328,10 @@ var requestId = uint64(1000000000)
 // Produce a request specific ctx variable to use for quantumfs internal calls
 func (th *testHelper) newCtx() *ctx {
 	reqId := atomic.AddUint64(&requestId, 1)
-	fmt.Println("Allocating request %d to test %s", reqId, th.testName)
-	return th.qfs.c.req(reqId)
+	c := th.qfs.c.req(reqId)
+	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
+		th.testName)
+	return c
 }
 
 // assert the condition is true. If it is not true then fail the test with the given
