@@ -27,6 +27,9 @@ type Inode interface {
 
 	SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
 
+	Mkdir(c *ctx, name string, mode uint32, mask uint32,
+		out *fuse.EntryOut) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status

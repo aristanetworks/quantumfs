@@ -146,8 +146,12 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	c := qfs.c.req(input.Unique)
-	c.elog("Unhandled request Mkdir")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Mkdir(c, name, input.Mode, input.Umask, out)
 }
 
 func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {

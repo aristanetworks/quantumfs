@@ -339,6 +339,12 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
+func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, mode uint32, mask uint32,
+	out *fuse.EntryOut) fuse.Status {
+
+	return fuse.ENOTDIR
+}
+
 func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
