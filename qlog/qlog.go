@@ -15,6 +15,7 @@ import "time"
 import "math"
 
 type LogSubsystem uint8
+
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
@@ -37,7 +38,7 @@ func (enum LogSubsystem) String() string {
 }
 
 func getSubsystem(sys string) (LogSubsystem, error) {
-	switch (strings.ToLower(sys)) {
+	switch strings.ToLower(sys) {
 	case "daemon":
 		return LogDaemon, nil
 	case "datastore":
@@ -63,8 +64,8 @@ func getLogLevel(idx LogSubsystem, level uint8) bool {
 
 func setLogLevelBitmask(sys LogSubsystem, level uint8) {
 	idx := uint8(sys)
-	logLevels &= ^(((1 << maxLogLevels)-1) << (idx * maxLogLevels))
-	logLevels |= uint16(level) << uint16(idx * maxLogLevels)
+	logLevels &= ^(((1 << maxLogLevels) - 1) << (idx * maxLogLevels))
+	logLevels |= uint16(level) << uint16(idx*maxLogLevels)
 }
 
 // Load desired log levels from the environment variable
@@ -106,13 +107,13 @@ func loadLevels(levels string) {
 			if level >= int(maxLogLevels) {
 				level = int(maxLogLevels - 1)
 			}
-			level = (1 << uint8(level + 1)) - 1
+			level = (1 << uint8(level+1)) - 1
 		}
 
 		var idx LogSubsystem
 		idx, e = getSubsystem(tokens[0])
 		if e != nil {
-			continue;
+			continue
 		}
 
 		setLogLevelBitmask(idx, uint8(level))
@@ -122,11 +123,11 @@ func loadLevels(levels string) {
 func init() {
 	logLevels = 0
 	maxLogLevels = 4
-        write = fmt.Printf
+	write = fmt.Printf
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >
-		uint8(unsafe.Sizeof(logLevels)) * 8 {
+		uint8(unsafe.Sizeof(logLevels))*8 {
 
 		panic("Log level structure not large enough for given subsystems")
 	}
@@ -141,8 +142,8 @@ func Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	t := time.Now()
 
 	if getLogLevel(idx, level) {
-		write(t.Format(time.StampNano) + " " + idx.String() + " " +
-			strconv.FormatUint(reqId, 10) + ": " + format + "\n",
+		write(t.Format(time.StampNano)+" "+idx.String()+" "+
+			strconv.FormatUint(reqId, 10)+": "+format+"\n",
 			args...)
 	}
 }
