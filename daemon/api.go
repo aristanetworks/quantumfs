@@ -64,7 +64,7 @@ func (api *ApiInode) OpenDir(c *ctx, context fuse.Context, flags uint32, mode ui
 	return fuse.ENOTDIR
 }
 
-func (api *ApiInode) Mkdir(c *ctx, name string, mode uint32, mask uint32,
+func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOTDIR

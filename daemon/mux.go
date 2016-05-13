@@ -151,7 +151,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 		return fuse.ENOENT
 	}
 
-	return inode.Mkdir(c, name, input.Mode, input.Umask, out)
+	return inode.Mkdir(c, name, input, out)
 }
 
 func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {

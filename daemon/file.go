@@ -72,7 +72,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
 
-func (fi *File) Mkdir(c *ctx, name string, mode uint32, mask uint32,
+func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOTDIR

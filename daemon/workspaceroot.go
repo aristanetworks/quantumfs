@@ -339,7 +339,7 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, mode uint32, mask uint32,
+func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOTDIR

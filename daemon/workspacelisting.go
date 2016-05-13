@@ -199,7 +199,7 @@ func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) Mkdir(c *ctx, name string, mode uint32, mask uint32,
+func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
@@ -303,7 +303,7 @@ func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) Mkdir(c *ctx, name string, mode uint32, mask uint32,
+func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
