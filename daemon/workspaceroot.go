@@ -212,7 +212,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = 1
-		attr.Nlink = uint32(entry.Size)
+		attr.Nlink = uint32(entry.Size) + 2
 	default:
 		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
