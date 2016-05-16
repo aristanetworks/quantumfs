@@ -35,6 +35,13 @@ func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
 	return dir.baseLayerId
 }
 
+func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on Directory")
+	return fuse.ENOSYS
+}
+
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }

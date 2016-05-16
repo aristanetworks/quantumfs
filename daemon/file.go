@@ -38,6 +38,13 @@ func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
 	return fi.key
 }
 
+func (fi *File) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on File")
+	return fuse.ENOSYS
+}
+
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }

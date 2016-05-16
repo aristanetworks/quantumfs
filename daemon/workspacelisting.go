@@ -36,6 +36,13 @@ func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
+func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -239,6 +246,13 @@ func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
 
 func (wsl *WorkspaceList) sync(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
+}
+
+func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on WorkspaceList")
+	return fuse.ENOSYS
 }
 
 func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {

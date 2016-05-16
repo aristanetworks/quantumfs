@@ -202,8 +202,12 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 
 func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
 	c := qfs.c.req(input.Unique)
-	c.elog("Unhandled request Access")
-	return fuse.OK
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Access(c, input.Mask, input.Uid, input.Gid)
 }
 
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (sz int,

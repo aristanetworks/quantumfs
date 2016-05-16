@@ -175,6 +175,13 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	wsr.dirty_ = false
 }
 
+func (wsr *WorkspaceRoot) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on WorkspaceRoot")
+	return fuse.ENOSYS
+}
+
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs

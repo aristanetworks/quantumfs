@@ -51,6 +51,21 @@ func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
+func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	switch mask {
+	case fuse.F_OK,
+		fuse.W_OK,
+		fuse.R_OK:
+		return fuse.OK
+	case fuse.X_OK:
+		return fuse.EACCES
+	default:
+		return fuse.EINVAL
+	}
+}
+
 func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
