@@ -342,7 +342,37 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	return fuse.ENOTDIR
+	if _, exists := wsr.children[name]; exists {
+		return fuse.Status(syscall.EEXIST)
+	}
+
+	now := time.Now()
+	uid := input.InHeader.Context.Owner.Uid
+	gid := input.InHeader.Context.Owner.Gid
+
+	entry := quantumfs.DirectoryRecord{
+		Filename:           StringToBytes(name),
+		ID:                 quantumfs.EmptyDirKey,
+		Type:               quantumfs.ObjectTypeDirectoryEntry,
+		Permissions:        modeToPermissions(input.Mode, input.Umask),
+		Owner:              quantumfs.ObjectUid(c.requestId, uid, uid),
+		Group:              quantumfs.ObjectGid(c.requestId, gid, gid),
+		Size:               0,
+		ExtendedAttributes: quantumfs.EmptyBlockKey,
+		CreationTime:       quantumfs.NewTime(now),
+		ModificationTime:   quantumfs.NewTime(now),
+	}
+
+	inodeNum := c.qfs.newInodeId()
+	wsr.addChild(c, name, inodeNum, entry)
+	dir := newDirectory(quantumfs.EmptyDirKey, inodeNum, wsr)
+	c.qfs.setInode(c, inodeNum, dir)
+
+	fillEntryOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
+		input.InHeader.Context.Owner, &entry)
+
+	return fuse.OK
 }
 
 func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
