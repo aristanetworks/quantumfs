@@ -17,7 +17,7 @@ func TestFileCreation_test(t *testing.T) {
 		workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
-		test.assert(err != nil, "Error creating file: %v", err)
+		test.assert(err == nil, "Error creating file: %v", err)
 
 		err = syscall.Close(fd)
 		test.assert(err != nil, "Error closing fd: %v", err)
@@ -45,7 +45,7 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 		workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
-		test.assert(err != nil, "Error creating file: %v", err)
+		test.assert(err == nil, "Error creating file: %v", err)
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ind test file: %v", err)
