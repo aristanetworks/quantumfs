@@ -20,7 +20,7 @@ func TestFileCreation_test(t *testing.T) {
 		test.assert(err == nil, "Error creating file: %v", err)
 
 		err = syscall.Close(fd)
-		test.assert(err != nil, "Error closing fd: %v", err)
+		test.assert(err == nil, "Error closing fd: %v", err)
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
