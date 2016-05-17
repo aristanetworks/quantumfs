@@ -77,6 +77,11 @@ func (th *testHelper) execute(test quantumFsTest) {
 }
 
 func abortFuse(th *testHelper) {
+	if th.fuseConnection == 0 {
+		// Nothing to abort
+		return
+	}
+
 	// Forcefully abort the filesystem so it can be unmounted
 	th.t.Logf("Aborting FUSE connection %d", th.fuseConnection)
 	path := fmt.Sprintf("%s/connections/%d/abort", fusectlPath,
@@ -104,12 +109,18 @@ func (th *testHelper) endTest() {
 	}
 
 	if th.server != nil {
-		if exception != nil && th.fuseConnection != 0 {
+		if exception != nil {
 			abortFuse(th)
 		}
 
 		if err := th.server.Unmount(); err != nil {
 			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
+			abortFuse(th)
+
+			if err := th.server.Unmount(); err != nil {
+				th.t.Fatalf("Failed to unmount quantumfs instance "+
+					"after aborting: %v", err)
+			}
 		}
 	}
 
