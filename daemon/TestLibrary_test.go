@@ -12,12 +12,14 @@ import "os"
 import "runtime"
 import "strings"
 import "strconv"
+import "sync"
 import "sync/atomic"
 import "testing"
 import "time"
 
 import "arista.com/quantumfs"
 import "arista.com/quantumfs/processlocal"
+import "arista.com/quantumfs/qlog"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -35,6 +37,7 @@ func runTest(t *testing.T, test quantumFsTest) {
 		t:          t,
 		testName:   testName,
 		testResult: make(chan string),
+		testOutput: make([]string, 0, 1000),
 	}
 
 	defer th.endTest()
@@ -120,19 +123,44 @@ func (th *testHelper) endTest() {
 	if exception != nil {
 		th.t.Fatalf("Test failed with exception: %v", exception)
 	}
+
+	th.logscan()
+}
+
+// Check the test output for errors
+func (th *testHelper) logscan() {
+	errors := make([]string, 0, 10)
+
+	for _, line := range th.testOutput {
+		if strings.Contains(line, "PANIC") {
+			errors = append(errors, line)
+		}
+	}
+
+	if !th.shouldFailLogscan && len(errors) != 0 {
+		for _, err := range errors {
+			th.t.Logf("FATAL message logged: %s", err)
+		}
+		th.t.Fatal("Test FAILED due to FATAL messages")
+	} else if th.shouldFailLogscan && len(errors) == 0 {
+		th.t.Fatal("Test FAILED due to missing FATAL messages")
+	}
 }
 
 // This helper is more of a namespacing mechanism than a coherent object
 type testHelper struct {
-	t              *testing.T
-	testName       string
-	qfs            *QuantumFs
-	tempDir        string
-	server         *fuse.Server
-	fuseConnection int
-	api            *quantumfs.Api
-	testResult     chan string
-	shouldFail     bool
+	mutex             sync.Mutex // Protects a mishmash of the members
+	t                 *testing.T
+	testName          string
+	qfs               *QuantumFs
+	tempDir           string
+	server            *fuse.Server
+	fuseConnection    int
+	api               *quantumfs.Api
+	testResult        chan string
+	testOutput        []string
+	shouldFail        bool
+	shouldFailLogscan bool
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
@@ -145,7 +173,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 	mountPath := tempDir + "/mnt"
 
 	os.Mkdir(mountPath, 0777)
-	th.t.Log("Using mountpath", mountPath)
+	th.t.Logf("[%s] Using mountpath %s", th.testName, mountPath)
 
 	config := QuantumFsConfig{
 		CachePath:        "",
@@ -222,6 +250,12 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 
 	quantumfs := NewQuantumFs(config)
 	th.qfs = quantumfs.(*QuantumFs)
+
+	writer := func(format string, args ...interface{}) (int, error) {
+		return th.log(format, args...)
+	}
+	th.qfs.c.Qlog.SetWriter(writer)
+
 	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
 	if err != nil {
 		th.t.Fatalf("Failed to create quantumfs instance: %v", err)
@@ -231,6 +265,18 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 
 	th.server = server
 	go serveSafely(th)
+}
+
+func (th *testHelper) log(format string, args ...interface{}) (int, error) {
+	output := fmt.Sprintf("["+th.testName+"] "+format, args...)
+
+	th.mutex.Lock()
+	th.testOutput = append(th.testOutput, output)
+	th.mutex.Unlock()
+
+	th.t.Log(output)
+
+	return len(output), nil
 }
 
 func (th *testHelper) getApi() *quantumfs.Api {
@@ -282,8 +328,10 @@ var requestId = uint64(1000000000)
 // Produce a request specific ctx variable to use for quantumfs internal calls
 func (th *testHelper) newCtx() *ctx {
 	reqId := atomic.AddUint64(&requestId, 1)
-	fmt.Println("Allocating request %d to test %s", reqId, th.testName)
-	return th.qfs.c.req(reqId)
+	c := th.qfs.c.req(reqId)
+	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
+		th.testName)
+	return c
 }
 
 // assert the condition is true. If it is not true then fail the test with the given
@@ -309,8 +357,9 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort_test(t *testing.T) {
-	return
 	runTest(t, func(test *testHelper) {
+		test.shouldFailLogscan = true
+
 		test.startDefaultQuantumFs()
 		api := test.getApi()
 
@@ -321,8 +370,6 @@ func TestPanicFilesystemAbort_test(t *testing.T) {
 
 		// panic Quantumfs
 		api.Branch("_null/null", "test/crash")
-
-		panic("failed test")
 	})
 }
 
