@@ -114,13 +114,13 @@ func (th *testHelper) endTest() {
 		}
 
 		if err := th.server.Unmount(); err != nil {
-			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
 			abortFuse(th)
 
 			if err := th.server.Unmount(); err != nil {
 				th.t.Fatalf("Failed to unmount quantumfs instance "+
 					"after aborting: %v", err)
 			}
+			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
 		}
 	}
 
