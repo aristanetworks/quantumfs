@@ -17,7 +17,7 @@ func TestDirectoryCreation_test(t *testing.T) {
 		workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "test"
 		err := syscall.Mkdir(test.relPath(testFilename), 0124)
-		test.assert(err != nil, "Error creating directories: %v", err)
+		test.assert(err == nil, "Error creating directories: %v", err)
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
