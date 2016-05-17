@@ -121,7 +121,7 @@ func SystemUid(uid UID, userId uint32) uint32 {
 // Convert system UID to object UID
 //
 // userId is the UID of the current user
-func ObjectUid(requestId uint64, uid uint32, userId uint32) UID {
+func ObjectUid(c Ctx, uid uint32, userId uint32) UID {
 	if uid == userId {
 		return UIDUser
 	}
@@ -130,7 +130,7 @@ func ObjectUid(requestId uint64, uid uint32, userId uint32) UID {
 	case 0:
 		return UIDRoot
 	default:
-		qlog.Log(qlog.LogDatastore, requestId, 0, "Unknown UID %d", uid)
+		c.Elog(qlog.LogDatastore, "Unknown UID %d", uid)
 		return UIDUser
 	}
 }
@@ -161,7 +161,7 @@ func SystemGid(gid GID, userId uint32) uint32 {
 // Convert system GID to object GID
 //
 // userId is the GID of the current user
-func ObjectGid(requestId uint64, gid uint32, userId uint32) GID {
+func ObjectGid(c Ctx, gid uint32, userId uint32) GID {
 	if gid == userId {
 		return GIDUser
 	}
@@ -170,7 +170,7 @@ func ObjectGid(requestId uint64, gid uint32, userId uint32) GID {
 	case 0:
 		return GIDRoot
 	default:
-		qlog.Log(qlog.LogDatastore, requestId, 0, "Unknown GID", gid)
+		c.Elog(qlog.LogDatastore, "Unknown GID", gid)
 		return GIDUser
 	}
 }

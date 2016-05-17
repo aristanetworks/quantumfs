@@ -10,33 +10,34 @@ import "strings"
 import "arista.com/quantumfs/testutils"
 
 func TestLogSet_test(t *testing.T) {
+	qlog := NewQlog()
 	// let's redirect the log writer in qfs
 	var logs string
-	write = testutils.IoPipe(&logs)
+	qlog.SetWriter(testutils.IoPipe(&logs))
 
-	loadLevels("Daemon|2")
-	Log(LogDaemon, DummyReqId, 1, "TestToken1")
+	qlog.loadLevels("Daemon|2")
+	qlog.Log(LogDaemon, DummyReqId, 1, "TestToken1")
 	if !strings.Contains(logs, "TestToken1") {
 		t.Fatal("Enabled log doesn't show up")
 	}
-	Log(LogDaemon, DummyReqId, 0, "TestToken0")
+	qlog.Log(LogDaemon, DummyReqId, 0, "TestToken0")
 	if strings.Contains(logs, "TestToken0") {
 		t.Fatal("Log level 0 not disabled by mask")
 	}
-	Log(LogWorkspacedb, DummyReqId, 0, "TestToken2")
+	qlog.Log(LogWorkspacedb, DummyReqId, 0, "TestToken2")
 	if !strings.Contains(logs, "TestToken2") {
 		t.Fatal("Different subsystem erroneously affected by log setting")
 	}
 
-	loadLevels("")
+	qlog.loadLevels("")
 	logs = ""
 	for i := 1; i < int(maxLogLevels); i++ {
-		Log(LogDaemon, DummyReqId, uint8(i), "TestToken")
+		qlog.Log(LogDaemon, DummyReqId, uint8(i), "TestToken")
 		if strings.Contains(logs, "TestToken") {
 			t.Fatal("Disabled log appeared")
 		}
 	}
-	Log(LogDaemon, DummyReqId, 0, "TestToken")
+	qlog.Log(LogDaemon, DummyReqId, 0, "TestToken")
 	if !strings.Contains(logs, "TestToken") {
 		t.Fatal("Default log level not working")
 	}
@@ -44,7 +45,7 @@ func TestLogSet_test(t *testing.T) {
 	// Test variable arguments
 	a := 12345
 	b := 98765
-	Log(LogDaemon, DummyReqId, 0, "Testing args %d %d", a, b)
+	qlog.Log(LogDaemon, DummyReqId, 0, "Testing args %d %d", a, b)
 	if !strings.Contains(logs, "12345") ||
 		!strings.Contains(logs, "98765") {
 		t.Fatal("Variable insertion in logs not working.")
@@ -52,22 +53,25 @@ func TestLogSet_test(t *testing.T) {
 }
 
 func TestLoadLevels_test(t *testing.T) {
-	loadLevels("Daemon/*")
-	if logLevels != 0x11F {
-		t.Fatal("Wildcard log levels incorrectly set", logLevels)
+	qlog := NewQlog()
+
+	qlog.loadLevels("Daemon/*")
+	if qlog.logLevels != 0x111F {
+		t.Fatalf("Wildcard log levels incorrectly set: %x != %x", 0x111f,
+			qlog.logLevels)
 	}
 
 	// test out of order, combo setting, and general bitmask
-	loadLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
-	if logLevels != 0xFA3 {
-		t.Fatal("Out of order, combo setting, or general bitmask broken",
-			logLevels)
+	qlog.loadLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
+	if qlog.logLevels != 0x1FA3 {
+		t.Fatalf("Out of order, combo setting, or general bitmask broken %x",
+			qlog.logLevels)
 	}
 
 	// test misspelling ignores misspelt entry. Ensure case insensitivity
-	loadLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
-	if logLevels != 0xF11 {
-		t.Fatal("Case insensitivity broken / mis-spelling not ignored",
-			logLevels)
+	qlog.loadLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
+	if qlog.logLevels != 0x1F11 {
+		t.Fatalf("Case insensitivity broken / mis-spelling not ignored %x",
+			qlog.logLevels)
 	}
 }

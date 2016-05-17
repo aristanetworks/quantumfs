@@ -20,7 +20,8 @@ const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
 	LogWorkspacedb
-	logSubsystemMax = LogWorkspacedb
+	LogTest
+	logSubsystemMax = LogTest
 )
 
 const DummyReqId uint64 = math.MaxUint64
@@ -33,6 +34,8 @@ func (enum LogSubsystem) String() string {
 		return "Datastore"
 	case LogWorkspacedb:
 		return "WorkspaceDb"
+	case LogTest:
+		return "Test"
 	}
 	return ""
 }
@@ -45,34 +48,32 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 		return LogDatastore, nil
 	case "workspacedb":
 		return LogWorkspacedb, nil
+	case "test":
+		return LogTest, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
 
-// This is the logging system level store. Increase size as the number of
-// LogSubsystems increases past your capacity
-var logLevels uint16
-var maxLogLevels uint8
-var logEnvTag = "TRACE"
-var write func(format string, args ...interface{}) (int, error)
+const logEnvTag = "TRACE"
+const maxLogLevels = 4
 
 // Get whether, given the subsystem, the given level is active for logs
-func getLogLevel(idx LogSubsystem, level uint8) bool {
+func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {
 	var mask uint16 = (1 << ((uint8(idx) * maxLogLevels) + level))
-	return (logLevels & mask) != 0
+	return (q.logLevels & mask) != 0
 }
 
-func setLogLevelBitmask(sys LogSubsystem, level uint8) {
+func (q *Qlog) setLogLevelBitmask(sys LogSubsystem, level uint8) {
 	idx := uint8(sys)
-	logLevels &= ^(((1 << maxLogLevels) - 1) << (idx * maxLogLevels))
-	logLevels |= uint16(level) << uint16(idx*maxLogLevels)
+	q.logLevels &= ^(((1 << maxLogLevels) - 1) << (idx * maxLogLevels))
+	q.logLevels |= uint16(level) << uint16(idx*maxLogLevels)
 }
 
 // Load desired log levels from the environment variable
-func loadLevels(levels string) {
+func (q *Qlog) loadLevels(levels string) {
 	// reset all levels
 	for i := 0; i <= int(logSubsystemMax); i++ {
-		setLogLevelBitmask(LogSubsystem(i), 1)
+		q.setLogLevelBitmask(LogSubsystem(i), 1)
 	}
 
 	bases := strings.Split(levels, ",")
@@ -116,33 +117,47 @@ func loadLevels(levels string) {
 			continue
 		}
 
-		setLogLevelBitmask(idx, uint8(level))
+		q.setLogLevelBitmask(idx, uint8(level))
 	}
 }
 
-func init() {
-	logLevels = 0
-	maxLogLevels = 4
-	write = fmt.Printf
+type Qlog struct {
+	// This is the logging system level store. Increase size as the number of
+	// LogSubsystems increases past your capacity
+	logLevels uint16
+	write     func(format string, args ...interface{}) (int, error)
+}
+
+func NewQlog() *Qlog {
+	q := Qlog{
+		logLevels: 0,
+		write:     fmt.Printf,
+	}
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >
-		uint8(unsafe.Sizeof(logLevels))*8 {
+		uint8(unsafe.Sizeof(q.logLevels))*8 {
 
 		panic("Log level structure not large enough for given subsystems")
 	}
 
-	loadLevels(os.Getenv(logEnvTag))
+	q.loadLevels(os.Getenv(logEnvTag))
+
+	return &q
 }
 
-func Log(idx LogSubsystem, reqId uint64, level uint8, format string,
+func (q *Qlog) SetWriter(w func(format string, args ...interface{}) (int, error)) {
+	q.write = w
+}
+
+func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
 	// todo: send to shared memory
 	t := time.Now()
 
-	if getLogLevel(idx, level) {
-		write(t.Format(time.StampNano)+" "+idx.String()+" "+
+	if q.getLogLevel(idx, level) {
+		q.write(t.Format(time.StampNano)+" "+idx.String()+" "+
 			strconv.FormatUint(reqId, 10)+": "+format+"\n",
 			args...)
 	}
