@@ -377,6 +377,7 @@ func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	c.qfs.setInode(c, inodeNum, dir)
 
 	fillEntryOutCacheData(c, out)
+	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
 		input.InHeader.Context.Owner, &entry)
 
