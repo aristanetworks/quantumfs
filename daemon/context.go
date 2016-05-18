@@ -24,11 +24,14 @@ type ctx struct {
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
 	requestCtx := &ctx{
+		Ctx: quantumfs.Ctx{
+			Qlog:		c.Qlog,
+			RequestId:	header.Unique,
+		},
 		qfs:          c.qfs,
 		config:       c.config,
 		workspaceDB:  c.workspaceDB,
 		durableStore: c.durableStore,
-		requestId:    header.Unique,
                 fuseCtx:      header.Context,
 	}
 	return requestCtx

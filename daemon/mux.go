@@ -332,7 +332,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
@@ -428,7 +428,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) fuse.Status {
 }
 
 func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(input)
 	defer logRequestPanic(c)
 
 	out.Blocks = 2684354560 // 10TB
