@@ -304,8 +304,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 		ID:                 quantumfs.EmptyBlockKey,
 		Type:               quantumfs.ObjectTypeSmallFile,
 		Permissions:        modeToPermissions(input.Mode, input.Umask),
-		Owner:              quantumfs.ObjectUid(c.requestId, uid, uid),
-		Group:              quantumfs.ObjectGid(c.requestId, gid, gid),
+		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
+		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
 		Size:               0,
 		ExtendedAttributes: quantumfs.EmptyBlockKey,
 		CreationTime:       quantumfs.NewTime(now),
@@ -362,12 +362,12 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.Owner = quantumfs.ObjectUid(c.requestId, attr.Owner.Uid,
+		entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
 			c.fuseCtx.Owner.Uid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.Group = quantumfs.ObjectGid(c.requestId, attr.Owner.Gid,
+		entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
 			c.fuseCtx.Owner.Gid)
 	}
 

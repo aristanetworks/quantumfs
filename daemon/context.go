@@ -14,11 +14,11 @@ import "github.com/hanwen/go-fuse/fuse"
 // If Go ever gets goroutine local storage it may be cleaner to move these contents
 // to using that instead of threading it everywhere.
 type ctx struct {
+	quantumfs.Ctx
 	qfs          *QuantumFs
 	config       *QuantumFsConfig
 	workspaceDB  quantumfs.WorkspaceDB
 	durableStore quantumfs.DataStore
-	requestId    uint64
 	fuseCtx      fuse.Context
 }
 
@@ -37,28 +37,31 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 //only to be used for some testing - not all functions will work with this
 func (c *ctx) dummyReq(request uint64) *ctx {
 	requestCtx := &ctx{
+		Ctx: quantumfs.Ctx{
+			Qlog:      c.Qlog,
+			RequestId: c.RequestId,
+		},
 		qfs:          c.qfs,
 		config:       c.config,
 		workspaceDB:  c.workspaceDB,
 		durableStore: c.durableStore,
-		requestId:    request,
 	}
 	return requestCtx
 }
 
 // local daemon package specific log wrappers
 func (c ctx) elog(format string, args ...interface{}) {
-	qlog.Log(qlog.LogDaemon, c.requestId, 0, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 0, format, args...)
 }
 
 func (c ctx) wlog(format string, args ...interface{}) {
-	qlog.Log(qlog.LogDaemon, c.requestId, 1, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 1, format, args...)
 }
 
 func (c ctx) dlog(format string, args ...interface{}) {
-	qlog.Log(qlog.LogDaemon, c.requestId, 2, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 2, format, args...)
 }
 
 func (c ctx) vlog(format string, args ...interface{}) {
-	qlog.Log(qlog.LogDaemon, c.requestId, 3, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 3, format, args...)
 }
