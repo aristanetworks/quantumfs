@@ -326,6 +326,7 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 	c.qfs.setInode(c, inodeNum, file)
 
 	fillEntryOutCacheData(c, &out.EntryOut)
+	out.EntryOut.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.EntryOut.Attr, inodeNum,
 		input.InHeader.Context.Owner, &entry)
 

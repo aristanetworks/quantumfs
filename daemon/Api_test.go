@@ -5,6 +5,7 @@ package daemon
 
 // Test the various Api calls
 
+import "os"
 import "syscall"
 import "testing"
 
@@ -30,7 +31,7 @@ func TestWorkspaceBranching_test(t *testing.T) {
 
 		// Then create a file
 		testFilename := dst + "/" + "test"
-		_, err = syscall.Creat(test.relPath(testFilename), 0124)
+		_, err = os.Create(test.relPath(testFilename))
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
