@@ -17,6 +17,7 @@ func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
 		key:         key,
 		parent:      parent,
 	}
+	file.self = &file
 	return &file
 }
 
@@ -110,7 +111,7 @@ type FileDescriptor struct {
 }
 
 func (fd *FileDescriptor) dirty(c *ctx) {
-	fd.file.dirty(c)
+	fd.file.self.dirty(c)
 }
 
 func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,

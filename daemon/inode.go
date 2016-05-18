@@ -4,6 +4,9 @@
 // The basic Inode and FileHandle structures
 package daemon
 
+import "fmt"
+import "reflect"
+
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -50,6 +53,7 @@ type Inode interface {
 }
 
 type InodeCommon struct {
+	self   Inode // Leaf subclass instance
 	id     InodeId
 	dirty_ bool // True if this Inode or any children are dirty
 }
@@ -63,7 +67,10 @@ func (inode *InodeCommon) isDirty() bool {
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
-	panic("Unsupported dirtyChild() call on leaf Inode")
+	inodeType := reflect.TypeOf(inode)
+	msg := fmt.Sprintf("Unsupported dirtyChild() call on leaf Inode: %v %v",
+		inodeType, inode)
+	panic(msg)
 }
 
 // FileHandle represents a specific path at a specific point in time, even as the

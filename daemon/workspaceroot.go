@@ -43,6 +43,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	}
 
 	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil)
+	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId

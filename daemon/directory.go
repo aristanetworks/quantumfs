@@ -48,7 +48,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		c.qfs.setInode(c, inodeId, newDirectory(c, entry.ID, inodeId, dir))
 	}
 
-	dir.InodeCommon = InodeCommon{id: inodeNum}
+	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.baseLayer = baseLayer
 	dir.children = children
 	dir.childrenRecords = childrenRecords
@@ -73,7 +73,7 @@ func (dir *Directory) addChild(c *ctx, name string, inodeNum InodeId,
 	dir.baseLayer.Entries = append(dir.baseLayer.Entries, child)
 	dir.childrenRecords[inodeNum] =
 		&dir.baseLayer.Entries[dir.baseLayer.NumEntries-1]
-	dir.dirty(c)
+	dir.self.dirty(c)
 }
 
 func (dir *Directory) dirty(c *ctx) {
@@ -84,7 +84,7 @@ func (dir *Directory) dirty(c *ctx) {
 // as well.
 func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
 	wsr.dirtyChildren_ = append(wsr.dirtyChildren_, child)
-	wsr.dirty(c)
+	wsr.self.dirty(c)
 }
 
 func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
@@ -231,7 +231,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
 		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
 
-	dir.dirty(c)
+	dir.self.dirty(c)
 
 	return fuse.OK
 }
@@ -333,7 +333,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	inodeNum := c.qfs.newInodeId()
 	dir.addChild(c, name, inodeNum, entry)
 	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile,
-		quantumfs.EmptyBlockKey, dir)
+		quantumfs.EmptyBlockKey, dir.self)
 	c.qfs.setInode(c, inodeNum, file)
 
 	fillEntryOutCacheData(c, &out.EntryOut)
