@@ -7,6 +7,8 @@ package daemon
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
+import "encoding/json"
+import "crypto/sha1"
 
 func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
 	key quantumfs.ObjectKey, parent Inode) *File {
@@ -39,10 +41,11 @@ func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	return fuse.ENOSYS
+
+	return fi.parent.getChildAttr(c, fi.InodeCommon.id, out)
 }
 
-func (fi *File) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32,
+func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	return fuse.ENOTDIR
@@ -51,10 +54,17 @@ func (fi *File) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32,
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	return fuse.ENOSYS
+	fileHandleNum := c.qfs.newFileHandleId()
+	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum)
+	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+
+	out.OpenFlags = 0
+	out.Fh = uint64(fileHandleNum)
+
+	return fuse.OK
 }
 
-func (fi *File) Lookup(c *ctx, context fuse.Context, name string,
+func (fi *File) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOSYS
@@ -77,6 +87,13 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 
 	c.elog("Invalid setChildAttr on File")
 	return fuse.ENOSYS
+}
+
+func (fi *File) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
+
+	c.elog("Invalid getChildAttr on File")
+	return fuse.ENOTDIR;
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
@@ -110,15 +127,76 @@ func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (fd *FileDescriptor) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	c.elog("Received read request on FileDescriptor")
-	return nil, fuse.ENOSYS
+	if fd.file.key == quantumfs.EmptyBlockKey {
+		return fuse.ReadResultData(nil), fuse.OK
+	}
+
+	data := DataStore.Get(c, fd.file.key)
+	var buffer []byte
+	if err := json.Unmarshal(data.Get(), &buffer); err != nil {
+		return nil, fuse.EIO
+	}
+
+	end := offset + uint64(len(buf))
+	if (end > uint64(len(buffer))) {
+		end = uint64(len(buffer))
+	}
+
+	copied := copy(buf, buffer[offset:end])
+
+	return fuse.ReadResultData(buf[0:copied]), fuse.OK
 }
 
 func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	fd.dirty(c)
+	var buffer []byte
 
-	c.elog("Received write request on FileDescriptor")
-	return 0, fuse.ENOSYS
+	if fd.file.key != quantumfs.EmptyBlockKey {
+		data := DataStore.Get(c, fd.file.key)
+		if data != nil {
+			if err := json.Unmarshal(data.Get(), &buffer); err != nil {
+				return 0, fuse.EIO
+			}
+		}
+	}
+
+	if offset > uint64(len(buffer)) {
+		offset = uint64(len(buffer))
+	}
+	if size > uint32(len(buf)) {
+		size = uint32(len(buf))
+	}
+
+	var finalBuffer []byte
+	// append our write data to the first split of the existing data
+	finalBuffer = append(buffer[0:offset], buf[0:size]...)
+	// record how much was actually appended (in case len(buf) < size)
+	copied := uint32(len(finalBuffer)) - uint32(offset)
+	// then add on the rest of the existing data afterwards
+	finalBuffer = append(finalBuffer, buffer[offset:len(buffer)]...)
+
+	if copied > 0 {
+		jsonData, err := json.Marshal(finalBuffer)
+		if err != nil {
+			return 0, fuse.EIO
+		}
+
+		hash := sha1.Sum(finalBuffer)
+		newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
+
+		err = DataStore.Set(c, newFileKey, quantumfs.NewBuffer(jsonData))
+		if err != nil {
+			return 0, fuse.EIO
+		}
+
+		fd.file.key = newFileKey
+		var attr fuse.SetAttrIn
+		attr.Valid = fuse.FATTR_SIZE
+		attr.Size = uint64(len(finalBuffer))
+		fd.file.parent.setChildAttr(c, fd.file.id, &attr, nil)
+		fd.dirty(c)
+	}
+
+	return copied, fuse.OK
 }

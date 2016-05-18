@@ -139,7 +139,7 @@ func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func (nsl *NamespaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
+func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
 	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
@@ -161,7 +161,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) Lookup(c *ctx, context fuse.Context, name string,
+func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	if name == quantumfs.ApiPath {
@@ -203,6 +203,11 @@ func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
+func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
@@ -249,7 +254,7 @@ func (wsl *WorkspaceList) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func (wsl *WorkspaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
+func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
 	updateChildren(c, wsl.namespaceName,
@@ -265,7 +270,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, context fuse.Context, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) Lookup(c *ctx, context fuse.Context, name string,
+func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	if !c.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
@@ -301,5 +306,10 @@ func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on WorkspaceList")
+	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }

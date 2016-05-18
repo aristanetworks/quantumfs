@@ -58,7 +58,7 @@ func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (api *ApiInode) OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32,
+func (api *ApiInode) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	return fuse.ENOTDIR
@@ -74,7 +74,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.OK
 }
 
-func (api *ApiInode) Lookup(c *ctx, context fuse.Context, name string,
+func (api *ApiInode) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	c.elog("Invalid Lookup on ApiInode")
@@ -98,6 +98,12 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn
 	out *fuse.AttrOut) fuse.Status {
 
 	fmt.Println("Invalid setChildAttr on ApiInode")
+	return fuse.ENOSYS
+}
+
+func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
+	
 	return fuse.ENOSYS
 }
 

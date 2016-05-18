@@ -291,6 +291,12 @@ func (buf *Buffer) Get() []byte {
 	return buf.data
 }
 
+func NewBuffer(in []byte) *Buffer {
+	return &Buffer{
+		data: in,
+	}
+}
+
 type DataStore interface {
 	Get(key ObjectKey, buffer *Buffer) error
 	Set(key ObjectKey, buffer *Buffer) error

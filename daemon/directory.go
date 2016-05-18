@@ -39,7 +39,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) Lookup(c *ctx, context fuse.Context, name string,
+func (dir *Directory) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOSYS
@@ -51,7 +51,7 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) OpenDir(c *ctx, context fuse.Context, flags uint32,
+func (dir *Directory) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
 	return fuse.ENOSYS
@@ -74,6 +74,12 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrI
 	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on Directory")
+	return fuse.ENOSYS
+}
+
+func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
+
 	return fuse.ENOSYS
 }
 
