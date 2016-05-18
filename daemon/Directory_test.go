@@ -14,7 +14,8 @@ func TestDirectoryCreation_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "test"
 		err := syscall.Mkdir(test.relPath(testFilename), 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
@@ -28,7 +29,8 @@ func TestDirectoryCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFDIR
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
+			syscall.S_IRWXO
 		test.assert(stat.Mode == expectedPermissions,
 			"Directory permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
