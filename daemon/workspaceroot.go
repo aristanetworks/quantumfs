@@ -66,6 +66,7 @@ func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	// Upload the workspaceroot object
 	var workspaceRoot quantumfs.WorkspaceRoot
+	wsr.Directory.sync(c)
 	workspaceRoot.BaseLayer = wsr.baseLayerId
 
 	bytes, err := json.Marshal(workspaceRoot)
