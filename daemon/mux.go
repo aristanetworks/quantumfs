@@ -169,8 +169,12 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
-	c.elog("Unhandled request Mkdir")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Mkdir(c, name, input, out)
 }
 
 func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {
@@ -235,8 +239,12 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
-	c.elog("Unhandled request Access")
-	return fuse.OK
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Access(c, input.Mask, input.Uid, input.Gid)
 }
 
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (sz int,

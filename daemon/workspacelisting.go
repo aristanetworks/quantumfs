@@ -36,6 +36,13 @@ func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
+func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -199,6 +206,12 @@ func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
+func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	return fuse.EPERM
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -238,6 +251,13 @@ func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
 
 func (wsl *WorkspaceList) sync(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
+}
+
+func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on WorkspaceList")
+	return fuse.ENOSYS
 }
 
 func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -300,6 +320,12 @@ func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	fmt.Println("Invalid SetAttr on WorkspaceList")
 	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	return fuse.EPERM
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
