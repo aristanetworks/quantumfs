@@ -14,7 +14,8 @@ func TestFileCreation_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -30,7 +31,8 @@ func TestFileCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
+			syscall.S_IRWXO
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -42,7 +44,8 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		// Create a file and determine its inode numbers
-		workspace := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -54,15 +57,16 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 
 		// Find the matching FileHandle
 		descriptors := test.fileDescriptorFromInodeNum(stat.Ino)
-		test.assert(len(descriptors) == 1, "Incorrect number of fds found 1 != %d",
-			len(descriptors))
+		test.assert(len(descriptors) == 1,
+			"Incorrect number of fds found 1 != %d", len(descriptors))
 		fileDescriptor := descriptors[0]
 		file := fileDescriptor.file
 
-		// Save the workspace rootId, change the File key, simulating changing the
-		// data, then mark the matching FileDescriptor dirty. This should trigger a
-		// refresh up the hierarchy and, because we currently do not support delayed
-		// syncing, change the workspace rootId and mark the fileDescriptor clean.
+		// Save the workspace rootId, change the File key, simulating
+		// changing the data, then mark the matching FileDescriptor dirty.
+		// This should trigger a refresh up the hierarchy and, because we
+		// currently do not support delayed syncing, change the workspace
+		// rootId and mark the fileDescriptor clean.
 		oldRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
 			quantumfs.NullWorkspaceName)
 
