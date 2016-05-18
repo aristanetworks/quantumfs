@@ -10,6 +10,7 @@ import "fmt"
 import "io/ioutil"
 import "os"
 import "runtime"
+import "runtime/debug"
 import "strings"
 import "strconv"
 import "sync"
@@ -65,12 +66,22 @@ func (th *testHelper) execute(test quantumFsTest) {
 	// Catch any panics and covert them into test failures
 	defer func(th *testHelper) {
 		err := recover()
+		trace := ""
 
 		// If the test passed pass that fact back to runTest()
 		if err == nil {
 			err = ""
+		} else {
+			// Capture the stack trace of the failure
+			trace = BytesToString(debug.Stack())
 		}
-		th.testResult <- err.(string)
+
+		result := err.(string)
+		if trace != "" {
+			result += "\nStack Trace: " + trace
+		}
+
+		th.testResult <- result
 	}(th)
 
 	test(th)
