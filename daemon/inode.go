@@ -12,7 +12,10 @@ type InodeId uint64
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
+	Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status
+
 	GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status
+
 	Lookup(c *ctx, context fuse.Context, name string,
 		out *fuse.EntryOut) fuse.Status
 
@@ -26,6 +29,9 @@ type Inode interface {
 		out *fuse.CreateOut) fuse.Status
 
 	SetAttr(c *ctx, attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
+
+	Mkdir(c *ctx, name string, input *fuse.MkdirIn,
+		out *fuse.EntryOut) fuse.Status
 
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,

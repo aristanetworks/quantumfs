@@ -38,6 +38,13 @@ func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
 	return fi.key
 }
 
+func (fi *File) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on File")
+	return fuse.ENOSYS
+}
+
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.ENOSYS
 }
@@ -70,6 +77,12 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
+}
+
+func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	return fuse.ENOTDIR
 }
 
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,

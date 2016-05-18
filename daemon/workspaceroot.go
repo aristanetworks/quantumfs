@@ -175,6 +175,13 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	wsr.dirty_ = false
 }
 
+func (wsr *WorkspaceRoot) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	c.elog("Unsupported Access on WorkspaceRoot")
+	return fuse.ENOSYS
+}
+
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -205,7 +212,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = 1
-		attr.Nlink = uint32(entry.Size)
+		attr.Nlink = uint32(entry.Size) + 2
 	default:
 		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -338,6 +345,43 @@ func (wsr *WorkspaceRoot) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	c.elog("Invalid SetAttr on WorkspaceRoot")
 	return fuse.ENOSYS
+}
+
+func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	if _, exists := wsr.children[name]; exists {
+		return fuse.Status(syscall.EEXIST)
+	}
+
+	now := time.Now()
+	uid := input.InHeader.Context.Owner.Uid
+	gid := input.InHeader.Context.Owner.Gid
+
+	entry := quantumfs.DirectoryRecord{
+		Filename:           StringToBytes(name),
+		ID:                 quantumfs.EmptyDirKey,
+		Type:               quantumfs.ObjectTypeDirectoryEntry,
+		Permissions:        modeToPermissions(input.Mode, input.Umask),
+		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
+		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
+		Size:               0,
+		ExtendedAttributes: quantumfs.EmptyBlockKey,
+		CreationTime:       quantumfs.NewTime(now),
+		ModificationTime:   quantumfs.NewTime(now),
+	}
+
+	inodeNum := c.qfs.newInodeId()
+	wsr.addChild(c, name, inodeNum, entry)
+	dir := newDirectory(quantumfs.EmptyDirKey, inodeNum, wsr)
+	c.qfs.setInode(c, inodeNum, dir)
+
+	fillEntryOutCacheData(c, out)
+	out.NodeId = uint64(inodeNum)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
+		input.InHeader.Context.Owner, &entry)
+
+	return fuse.OK
 }
 
 func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
