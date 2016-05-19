@@ -78,6 +78,7 @@ func (dir *Directory) addChild(c *ctx, name string, inodeNum InodeId,
 }
 
 func (dir *Directory) dirty(c *ctx) {
+	dir.dirty_ = true
 	dir.parent.dirtyChild(c, dir)
 }
 
