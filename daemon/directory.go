@@ -49,6 +49,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	}
 
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
+	dir.parent = parent
 	dir.baseLayer = baseLayer
 	dir.children = children
 	dir.childrenRecords = childrenRecords
@@ -82,9 +83,9 @@ func (dir *Directory) dirty(c *ctx) {
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
 // as well.
-func (wsr *WorkspaceRoot) dirtyChild(c *ctx, child Inode) {
-	wsr.dirtyChildren_ = append(wsr.dirtyChildren_, child)
-	wsr.self.dirty(c)
+func (dir *Directory) dirtyChild(c *ctx, child Inode) {
+	dir.dirtyChildren_ = append(dir.dirtyChildren_, child)
+	dir.self.dirty(c)
 }
 
 func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
@@ -384,7 +385,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	inodeNum := c.qfs.newInodeId()
 	dir.addChild(c, name, inodeNum, entry)
-	newDir := newDirectory(c, quantumfs.EmptyDirKey, inodeNum, dir)
+	newDir := newDirectory(c, quantumfs.EmptyDirKey, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, newDir)
 
 	fillEntryOutCacheData(c, out)
