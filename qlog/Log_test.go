@@ -15,7 +15,7 @@ func TestLogSet_test(t *testing.T) {
 	var logs string
 	qlog.SetWriter(testutils.IoPipe(&logs))
 
-	qlog.loadLevels("Daemon|2")
+	qlog.SetLogLevels("Daemon|2")
 	qlog.Log(LogDaemon, DummyReqId, 1, "TestToken1")
 	if !strings.Contains(logs, "TestToken1") {
 		t.Fatal("Enabled log doesn't show up")
@@ -29,7 +29,7 @@ func TestLogSet_test(t *testing.T) {
 		t.Fatal("Different subsystem erroneously affected by log setting")
 	}
 
-	qlog.loadLevels("")
+	qlog.SetLogLevels("")
 	logs = ""
 	for i := 1; i < int(maxLogLevels); i++ {
 		qlog.Log(LogDaemon, DummyReqId, uint8(i), "TestToken")
@@ -55,21 +55,21 @@ func TestLogSet_test(t *testing.T) {
 func TestLoadLevels_test(t *testing.T) {
 	qlog := NewQlog()
 
-	qlog.loadLevels("Daemon/*")
+	qlog.SetLogLevels("Daemon/*")
 	if qlog.logLevels != 0x111F {
 		t.Fatalf("Wildcard log levels incorrectly set: %x != %x", 0x111f,
 			qlog.logLevels)
 	}
 
 	// test out of order, combo setting, and general bitmask
-	qlog.loadLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
+	qlog.SetLogLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
 	if qlog.logLevels != 0x1FA3 {
 		t.Fatalf("Out of order, combo setting, or general bitmask broken %x",
 			qlog.logLevels)
 	}
 
 	// test misspelling ignores misspelt entry. Ensure case insensitivity
-	qlog.loadLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
+	qlog.SetLogLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
 	if qlog.logLevels != 0x1F11 {
 		t.Fatalf("Case insensitivity broken / mis-spelling not ignored %x",
 			qlog.logLevels)
