@@ -7,6 +7,8 @@ package daemon
 
 import "syscall"
 import "testing"
+import "os"
+import "bytes"
 
 import "arista.com/quantumfs"
 
@@ -36,6 +38,66 @@ func TestFileCreation_test(t *testing.T) {
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
+	})
+}
+
+func FileReadWrite_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		testText := []byte("This is test data 1234567890 !@#$%^&*()")
+		//write the test data in two goes
+		textSplit := len(testText) / 2
+
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
+		testFilename := workspace + "/" + "testrw"
+		file, err := os.Create(test.relPath(testFilename))
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		//ensure the Create() handle works
+		written := 0
+		for written < textSplit {
+			var writeIt int
+			writeIt, err = file.Write(testText[written:textSplit])
+			written += writeIt
+			test.assert(err == nil, "Error writing to fd: %v", err)
+		}
+
+		err = file.Close()
+		test.assert(err == nil, "Error closing fd: %v", err)
+
+		//now open the file again to trigger Open()
+		file, err = os.Open(test.relPath(testFilename))
+		test.assert(err == nil, "Error opening fd: %v", err)
+
+		//ensure the Open() handle works
+		for written < len(testText) {
+			var writeIt int
+			writeIt, err = file.Write(testText[written:])
+			written += writeIt
+			test.assert(err == nil, "Error writing to fd: %v", err)
+		}
+
+		err = file.Close()
+		test.assert(err == nil, "Error closing fd: %v", err)
+
+		file, err = os.Open(test.relPath(testFilename))
+		test.assert(err == nil, "Error opening fd: %v", err)
+
+		read := 0
+		var readBuf [100]byte
+		for read < len(testText) {
+			var readIt int
+			readIt, err = file.Read(readBuf[read:])
+			read +=readIt
+			test.assert(err == nil, "Error reading from fd: %v", err)
+		}
+		test.assert(bytes.Equal(testText, readBuf[0:read]),
+			"File data not preserved")
+
+		err = file.Close()
+		test.assert(err == nil, "Error closing fd: %v", err)
 	})
 }
 
