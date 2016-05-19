@@ -124,7 +124,7 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn
 
 func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.AttrOut) fuse.Status {
-	
+
 	return fuse.ENOSYS
 }
 
