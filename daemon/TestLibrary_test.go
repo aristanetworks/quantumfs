@@ -10,7 +10,6 @@ import "fmt"
 import "io/ioutil"
 import "os"
 import "runtime"
-import "runtime/debug"
 import "strings"
 import "strconv"
 import "sync"
@@ -352,8 +351,7 @@ func (th *testHelper) newCtx() *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		msg := fmt.Sprintf("%s-------\n", debug.Stack())
-		msg += fmt.Sprintf(format, args)
+		msg := fmt.Sprintf(format, args)
 		panic(msg)
 	}
 }
