@@ -37,22 +37,6 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 	return requestCtx
 }
 
-//only to be used for some testing - not all functions will work with this
-func (c *ctx) dummyReq(request uint64) *ctx {
-	requestCtx := &ctx{
-		Ctx: quantumfs.Ctx{
-			Qlog:      c.Qlog,
-			RequestId: c.RequestId,
-		},
-		qfs:          c.qfs,
-		config:       c.config,
-		workspaceDB:  c.workspaceDB,
-		durableStore: c.durableStore,
-		fuseCtx:      nil,
-	}
-	return requestCtx
-}
-
 // local daemon package specific log wrappers
 func (c ctx) elog(format string, args ...interface{}) {
 	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 0, format, args...)

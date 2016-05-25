@@ -144,7 +144,8 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	}
 
 	if offset > uint64(len(finalData.Get())) {
-		offset = uint64(len(finalData.Get()))
+		c.elog("Writing past the end of file is not supported yet")
+		return 0, fuse.EIO
 	}
 	if size > uint32(len(buf)) {
 		size = uint32(len(buf))
@@ -153,7 +154,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	copied := finalData.Write(buf[:size], uint32(offset))
 	if copied > 0 {
 		hash := sha1.Sum(finalData.Get())
-		newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
+		newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData, hash)
 
 		err := DataStore.Set(c, newFileKey,
 			quantumfs.NewBuffer(finalData.Get()))

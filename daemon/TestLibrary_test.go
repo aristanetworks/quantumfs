@@ -347,6 +347,22 @@ func (th *testHelper) newCtx() *ctx {
 	return c
 }
 
+//only to be used for some testing - not all functions will work with this
+func (c *ctx) dummyReq(request uint64) *ctx {
+	requestCtx := &ctx{
+		Ctx: quantumfs.Ctx{
+			Qlog:      c.Qlog,
+			RequestId: c.RequestId,
+		},
+		qfs:          c.qfs,
+		config:       c.config,
+		workspaceDB:  c.workspaceDB,
+		durableStore: c.durableStore,
+		fuseCtx:      nil,
+	}
+	return requestCtx
+}
+
 // assert the condition is true. If it is not true then fail the test with the given
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {

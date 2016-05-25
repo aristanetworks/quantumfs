@@ -10,7 +10,6 @@ import "testing"
 import "os"
 import "bytes"
 import "io"
-import "fmt"
 
 import "arista.com/quantumfs"
 
@@ -82,8 +81,8 @@ func TestFileReadWrite_test(t *testing.T) {
 				"Error reading from fd: %v", err)
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
-			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
-				fullReadBuf[:readLen], testText[:written]))
+			"Read and written bytes do not match, %s vs %s",
+				fullReadBuf[:readLen], testText[:written])
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
@@ -124,8 +123,8 @@ func TestFileReadWrite_test(t *testing.T) {
 				"Error reading from fd: %v", err)
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
-			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
-				fullReadBuf[:readLen], testText[:written]))
+			"Read and written bytes do not match, %s vs %s",
+				fullReadBuf[:readLen], testText[:written])
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
@@ -143,8 +142,8 @@ func TestFileReadWrite_test(t *testing.T) {
 				"Error reading from fd: %v", err)
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
-			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
-				fullReadBuf[:readLen], testText[:written]))
+			"Read and written bytes do not match, %s vs %s",
+				fullReadBuf[:readLen], testText[:written])
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)

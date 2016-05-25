@@ -5,7 +5,6 @@
 // directory hierarchy.
 package daemon
 
-import "fmt"
 import "time"
 
 import "arista.com/quantumfs"
@@ -202,7 +201,7 @@ func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on NamespaceList")
+	c.elog("Invalid SetAttr on NamespaceList")
 	return fuse.ENOSYS
 }
 
@@ -215,14 +214,14 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on NamespaceList")
+	c.elog("Invalid setChildAttr on NamespaceList")
 	return fuse.ENOSYS
 }
 
 func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid getChildAttr on NamespaceList")
+	c.elog("Invalid getChildAttr on NamespaceList")
 	return fuse.ENOSYS
 }
 
@@ -320,7 +319,7 @@ func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on WorkspaceList")
+	c.elog("Invalid SetAttr on WorkspaceList")
 	return fuse.ENOSYS
 }
 
@@ -333,13 +332,13 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on WorkspaceList")
+	c.elog("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS
 }
 
 func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid getChildAttr on WorkspaceList")
+	c.elog("Invalid getChildAttr on WorkspaceList")
 	return fuse.ENOSYS
 }

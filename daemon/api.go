@@ -111,21 +111,21 @@ func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string,
 func (api *ApiInode) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid SetAttr on ApiInode")
+	c.elog("Invalid SetAttr on ApiInode")
 	return fuse.ENOSYS
 }
 
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid setChildAttr on ApiInode")
+	c.elog("Invalid setChildAttr on ApiInode")
 	return fuse.ENOSYS
 }
 
 func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.AttrOut) fuse.Status {
 
-	fmt.Println("Invalid getChildAttr on ApiInode")
+	c.elog("Invalid getChildAttr on ApiInode")
 	return fuse.ENOSYS
 }
 
