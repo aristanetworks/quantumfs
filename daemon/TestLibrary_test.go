@@ -74,11 +74,12 @@ func (th *testHelper) execute(test quantumFsTest) {
 		} else {
 			// Capture the stack trace of the failure
 			trace = BytesToString(debug.Stack())
+			trace = strings.SplitN(trace, "\n", 8)[7]
 		}
 
 		result := err.(string)
 		if trace != "" {
-			result += "\nStack Trace: " + trace
+			result += "\nStack Trace:\n" + trace
 		}
 
 		th.testResult <- result
@@ -364,10 +365,7 @@ func (th *testHelper) newCtx() *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		//print out the program stack so we know where this happened
-		msg := fmt.Sprintf("%s\n---------------------------------------\n",
-			debug.Stack())
-		msg += fmt.Sprintf(format, args)
+		msg := fmt.Sprintf(format, args)
 		panic(msg)
 	}
 }
