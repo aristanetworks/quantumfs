@@ -32,7 +32,8 @@ func TestWorkspaceBranching_test(t *testing.T) {
 
 		// Then create a file
 		testFilename := dst + "/" + "test"
-		_, err = os.Create(test.relPath(testFilename))
+		fd, _ := os.Create(test.relPath(testFilename))
+		fd.Close()
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)

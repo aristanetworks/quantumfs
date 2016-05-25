@@ -123,7 +123,8 @@ func (th *testHelper) endTest() {
 				th.t.Fatalf("Failed to unmount quantumfs instance "+
 					"after aborting: %v", err)
 			}
-			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
+			th.t.Fatalf("Failed to unmount quantumfs instance, are you"+
+				" leaking a file descriptor?: %v", err)
 		}
 	}
 
