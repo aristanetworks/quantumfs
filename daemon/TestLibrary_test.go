@@ -133,7 +133,8 @@ func (th *testHelper) endTest() {
 				th.t.Fatalf("Failed to unmount quantumfs instance "+
 					"after aborting: %v", err)
 			}
-			th.t.Fatalf("Failed to unmount quantumfs instance: %v", err)
+			th.t.Fatalf("Failed to unmount quantumfs instance, are you"+
+				" leaking a file descriptor?: %v", err)
 		}
 	}
 
@@ -363,7 +364,10 @@ func (th *testHelper) newCtx() *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		msg := fmt.Sprintf(format, args)
+		//print out the program stack so we know where this happened
+		msg := fmt.Sprintf("%s\n---------------------------------------\n",
+			debug.Stack())
+		msg += fmt.Sprintf(format, args)
 		panic(msg)
 	}
 }
