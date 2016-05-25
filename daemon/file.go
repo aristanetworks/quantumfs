@@ -104,7 +104,7 @@ func (fi *File) getChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid getChildAttr on File")
-	return fuse.ENOTDIR;
+	return fuse.ENOTDIR
 }
 
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
@@ -118,7 +118,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	buffer := data.Get()
 
 	end := offset + uint64(len(buf))
-	if (end > uint64(len(buffer))) {
+	if end > uint64(len(buffer)) {
 		end = uint64(len(buffer))
 	}
 

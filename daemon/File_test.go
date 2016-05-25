@@ -83,7 +83,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
 			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
-			fullReadBuf[:readLen], testText[:written]))
+				fullReadBuf[:readLen], testText[:written]))
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
@@ -103,7 +103,7 @@ func TestFileReadWrite_test(t *testing.T) {
 			var writeIt int
 			//test the offset code path by writing a small bit at a time
 			writeTo := len(testText)
-			if writeTo > written + 4 {
+			if writeTo > written+4 {
 				writeTo = written + 4
 			}
 
@@ -125,7 +125,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
 			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
-			fullReadBuf[:readLen], testText[:written]))
+				fullReadBuf[:readLen], testText[:written]))
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
@@ -144,7 +144,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
 			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
-			fullReadBuf[:readLen], testText[:written]))
+				fullReadBuf[:readLen], testText[:written]))
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)

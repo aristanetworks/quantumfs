@@ -113,7 +113,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	c := qfs.c.req(header)
-        defer logRequestPanic(c)
+	defer logRequestPanic(c)
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		c.elog("Lookup failed", name)
