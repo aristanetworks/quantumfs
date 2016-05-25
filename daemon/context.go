@@ -19,7 +19,7 @@ type ctx struct {
 	config       *QuantumFsConfig
 	workspaceDB  quantumfs.WorkspaceDB
 	durableStore quantumfs.DataStore
-	fuseCtx      fuse.Context
+	fuseCtx      *fuse.Context
 }
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
@@ -32,7 +32,7 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 		config:       c.config,
 		workspaceDB:  c.workspaceDB,
 		durableStore: c.durableStore,
-                fuseCtx:      header.Context,
+                fuseCtx:      &header.Context,
 	}
 	return requestCtx
 }
@@ -48,6 +48,7 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 		config:       c.config,
 		workspaceDB:  c.workspaceDB,
 		durableStore: c.durableStore,
+		fuseCtx:      nil,
 	}
 	return requestCtx
 }

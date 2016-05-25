@@ -7,7 +7,6 @@ package daemon
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
-import "encoding/json"
 import "crypto/sha1"
 
 func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
@@ -71,8 +70,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.OK
 }
 
-func (fi *File) Lookup(c *ctx, name string,
-	out *fuse.EntryOut) fuse.Status {
+func (fi *File) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOSYS
 }
@@ -109,6 +107,72 @@ func (fi *File) getChildAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENOTDIR;
 }
 
+func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
+	nonblocking bool) (fuse.ReadResult, fuse.Status) {
+
+	if fi.key == quantumfs.EmptyBlockKey {
+		return fuse.ReadResultData(nil), fuse.OK
+	}
+
+	data := DataStore.Get(c, fi.key)
+	buffer := data.Get()
+
+	end := offset + uint64(len(buf))
+	if (end > uint64(len(buffer))) {
+		end = uint64(len(buffer))
+	}
+
+	copied := copy(buf, buffer[offset:end])
+
+	return fuse.ReadResultData(buf[0:copied]), fuse.OK
+}
+
+func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
+	buf []byte) (uint32, fuse.Status) {
+
+	var finalData *quantumfs.Buffer
+
+	if fi.key != quantumfs.EmptyBlockKey {
+		data := DataStore.Get(c, fi.key)
+		if data == nil {
+			c.elog("Data for key missing from datastore")
+			return 0, fuse.EIO
+		}
+		finalData = quantumfs.NewBuffer(data.Get())
+	} else {
+		finalData = quantumfs.NewBuffer([]byte{})
+	}
+
+	if offset > uint64(len(finalData.Get())) {
+		offset = uint64(len(finalData.Get()))
+	}
+	if size > uint32(len(buf)) {
+		size = uint32(len(buf))
+	}
+
+	copied := finalData.Write(buf[:size], uint32(offset))
+	if copied > 0 {
+		hash := sha1.Sum(finalData.Get())
+		newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
+
+		err := DataStore.Set(c, newFileKey,
+			quantumfs.NewBuffer(finalData.Get()))
+		if err != nil {
+			c.elog("Unable to write data to the datastore")
+			return 0, fuse.EIO
+		}
+
+		fi.key = newFileKey
+		var attr fuse.SetAttrIn
+		attr.Valid = fuse.FATTR_SIZE
+		attr.Size = uint64(len(finalData.Get()))
+		fi.parent.setChildAttr(c, fi.id, &attr, nil)
+		fi.dirty(c)
+	}
+
+	return copied, fuse.OK
+}
+
 func newFileDescriptor(file *File, inodeNum InodeId,
 	fileHandleId FileHandleId) FileHandle {
 
@@ -140,76 +204,11 @@ func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (fd *FileDescriptor) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	if fd.file.key == quantumfs.EmptyBlockKey {
-		return fuse.ReadResultData(nil), fuse.OK
-	}
-
-	data := DataStore.Get(c, fd.file.key)
-	var buffer []byte
-	if err := json.Unmarshal(data.Get(), &buffer); err != nil {
-		return nil, fuse.EIO
-	}
-
-	end := offset + uint64(len(buf))
-	if (end > uint64(len(buffer))) {
-		end = uint64(len(buffer))
-	}
-
-	copied := copy(buf, buffer[offset:end])
-
-	return fuse.ReadResultData(buf[0:copied]), fuse.OK
+	return fd.file.Read(c, offset, size, buf, nonblocking)
 }
 
 func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	var buffer []byte
-
-	if fd.file.key != quantumfs.EmptyBlockKey {
-		data := DataStore.Get(c, fd.file.key)
-		if data != nil {
-			if err := json.Unmarshal(data.Get(), &buffer); err != nil {
-				return 0, fuse.EIO
-			}
-		}
-	}
-
-	if offset > uint64(len(buffer)) {
-		offset = uint64(len(buffer))
-	}
-	if size > uint32(len(buf)) {
-		size = uint32(len(buf))
-	}
-
-	var finalBuffer []byte
-	// append our write data to the first split of the existing data
-	finalBuffer = append(buffer[0:offset], buf[0:size]...)
-	// record how much was actually appended (in case len(buf) < size)
-	copied := uint32(len(finalBuffer)) - uint32(offset)
-	// then add on the rest of the existing data afterwards
-	finalBuffer = append(finalBuffer, buffer[offset:len(buffer)]...)
-
-	if copied > 0 {
-		jsonData, err := json.Marshal(finalBuffer)
-		if err != nil {
-			return 0, fuse.EIO
-		}
-
-		hash := sha1.Sum(finalBuffer)
-		newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
-		err = DataStore.Set(c, newFileKey, quantumfs.NewBuffer(jsonData))
-		if err != nil {
-			return 0, fuse.EIO
-		}
-
-		fd.file.key = newFileKey
-		var attr fuse.SetAttrIn
-		attr.Valid = fuse.FATTR_SIZE
-		attr.Size = uint64(len(finalBuffer))
-		fd.file.parent.setChildAttr(c, fd.file.id, &attr, nil)
-		fd.dirty(c)
-	}
-
-	return copied, fuse.OK
+	return fd.file.Write(c, offset, size, flags, buf)
 }

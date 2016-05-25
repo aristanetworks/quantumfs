@@ -242,8 +242,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Blksize = qfsBlockSize
 }
 
-func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32,
-	mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
 
 	children := make([]directoryContents, 0, wsr.baseLayer.NumEntries)
 	for _, entry := range wsr.baseLayer.Entries {

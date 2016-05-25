@@ -9,6 +9,8 @@ import "syscall"
 import "testing"
 import "os"
 import "bytes"
+import "io"
+import "fmt"
 
 import "arista.com/quantumfs"
 
@@ -41,11 +43,12 @@ func TestFileCreation_test(t *testing.T) {
 	})
 }
 
-func FileReadWrite_test(t *testing.T) {
+func TestFileReadWrite_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		testText := []byte("This is test data 1234567890 !@#$%^&*()")
+		//length of test Text should be 37, and not a multiple of readBuf len
+		testText := []byte("This is test data 1234567890 !@#^&*()")
 		//write the test data in two goes
 		textSplit := len(testText) / 2
 
@@ -53,7 +56,8 @@ func FileReadWrite_test(t *testing.T) {
 			quantumfs.NullWorkspaceName
 		testFilename := workspace + "/" + "testrw"
 		file, err := os.Create(test.relPath(testFilename))
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.assert(file != nil && err == nil,
+			"Error creating file: %v", err)
 
 		//ensure the Create() handle works
 		written := 0
@@ -61,40 +65,86 @@ func FileReadWrite_test(t *testing.T) {
 			var writeIt int
 			writeIt, err = file.Write(testText[written:textSplit])
 			written += writeIt
-			test.assert(err == nil, "Error writing to fd: %v", err)
+			test.assert(err == nil, "Error writing to new fd: %v", err)
 		}
+
+		readLen := 0
+		//intentionally make the read buffer small so we do multiple reads
+		fullReadBuf := make([]byte, 100)
+		readBuf := make([]byte, 4)
+		for readLen < written {
+			var readIt int
+			//note, this also tests read offsets
+			readIt, err = file.ReadAt(readBuf, int64(readLen))
+			copy(fullReadBuf[readLen:], readBuf[:readIt])
+			readLen += readIt
+			test.assert(err == nil || err == io.EOF,
+				"Error reading from fd: %v", err)
+		}
+		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
+			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
+			fullReadBuf[:readLen], testText[:written]))
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
 
 		//now open the file again to trigger Open()
-		file, err = os.Open(test.relPath(testFilename))
+		file, err = os.OpenFile(test.relPath(testFilename),
+			os.O_RDWR, 0777)
 		test.assert(err == nil, "Error opening fd: %v", err)
+
+		//test overwriting past the end of the file with an offset by
+		//rewinding back the textSplit
+		textSplit -= 2
+		written -= 2
 
 		//ensure the Open() handle works
 		for written < len(testText) {
 			var writeIt int
-			writeIt, err = file.Write(testText[written:])
+			//test the offset code path by writing a small bit at a time
+			writeTo := len(testText)
+			if writeTo > written + 4 {
+				writeTo = written + 4
+			}
+
+			writeIt, err = file.WriteAt(testText[written:writeTo],
+				int64(written))
 			written += writeIt
-			test.assert(err == nil, "Error writing to fd: %v", err)
+			test.assert(err == nil, "Error writing existing fd: %v", err)
 		}
+
+		readLen = 0
+		for readLen < written {
+			var readIt int
+			//note, this also tests read offsets
+			readIt, err = file.ReadAt(readBuf, int64(readLen))
+			copy(fullReadBuf[readLen:], readBuf[:readIt])
+			readLen += readIt
+			test.assert(err == nil || err == io.EOF,
+				"Error reading from fd: %v", err)
+		}
+		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
+			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
+			fullReadBuf[:readLen], testText[:written]))
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
 
-		file, err = os.Open(test.relPath(testFilename))
+		file, err = os.OpenFile(test.relPath(testFilename), os.O_RDWR, 0777)
 		test.assert(err == nil, "Error opening fd: %v", err)
 
-		read := 0
-		var readBuf [100]byte
-		for read < len(testText) {
+		readLen = 0
+		for readLen < len(testText) {
 			var readIt int
-			readIt, err = file.Read(readBuf[read:])
-			read +=readIt
-			test.assert(err == nil, "Error reading from fd: %v", err)
+			readIt, err = file.Read(readBuf)
+			copy(fullReadBuf[readLen:], readBuf[:readIt])
+			readLen += readIt
+			test.assert(err != io.EOF || err == nil,
+				"Error reading from fd: %v", err)
 		}
-		test.assert(bytes.Equal(testText, readBuf[0:read]),
-			"File data not preserved")
+		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
+			fmt.Sprintf("Read and written bytes do not match, %s vs %s",
+			fullReadBuf[:readLen], testText[:written]))
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)

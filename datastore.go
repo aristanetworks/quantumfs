@@ -287,6 +287,26 @@ func (buf *Buffer) Set(in []byte) {
 	buf.data = in
 }
 
+func (buf *Buffer) Write(in []byte, offset uint32) uint32 {
+	var finalBuffer []byte
+	// append our write data to the first split of the existing data
+	finalBuffer = append(buf.data[:offset], in...)
+
+	// record how much was actually appended (in case len(in) < size)
+	copied := uint32(len(finalBuffer)) - uint32(offset)
+
+	// then add on the rest of the existing data afterwards, excluding the amount
+	// that we just wrote (to overwrite instead of insert)
+	remainingStart := offset + copied
+	if int(remainingStart) < len(buf.data) {
+		finalBuffer = append(finalBuffer, buf.data[remainingStart:]...)
+	}
+
+	buf.data = finalBuffer
+
+	return copied
+}
+
 func (buf *Buffer) Get() []byte {
 	return buf.data
 }
