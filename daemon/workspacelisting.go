@@ -15,6 +15,7 @@ func NewNamespaceList() Inode {
 		InodeCommon: InodeCommon{id: quantumfs.InodeIdRoot},
 		namespaces:  make(map[string]InodeId),
 	}
+	nsl.self = &nsl
 	return &nsl
 }
 
@@ -233,6 +234,7 @@ func newWorkspaceList(c *ctx, parentName string, name string,
 		namespaceName: name,
 		workspaces:    make(map[string]InodeId),
 	}
+	nsd.self = &nsd
 	return &nsd
 }
 

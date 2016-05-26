@@ -19,8 +19,11 @@ func BitFlagsSet(field uint, flags uint) bool {
 
 // Convert the given null terminated byte array into a string
 func BytesToString(data []byte) string {
-	len := bytes.IndexByte(data, 0)
-	return string(data[:len])
+	length := bytes.IndexByte(data, 0)
+	if length == -1 {
+		length = len(data)
+	}
+	return string(data[:length])
 }
 
 // Convert the given null terminated string into a [256]byte array

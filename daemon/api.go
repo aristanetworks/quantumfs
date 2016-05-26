@@ -17,6 +17,7 @@ func NewApiInode() Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{id: quantumfs.InodeIdApi},
 	}
+	api.self = &api
 	return &api
 }
 
