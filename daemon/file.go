@@ -115,14 +115,14 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 
 	data := DataStore.Get(c, fi.key)
-	buffer := data.Get()
+	curData := data.Get()
 
 	end := offset + uint64(len(buf))
-	if end > uint64(len(buffer)) {
-		end = uint64(len(buffer))
+	if end > uint64(len(curData)) {
+		end = uint64(len(curData))
 	}
 
-	copied := copy(buf, buffer[offset:end])
+	copied := copy(buf, curData[offset:end])
 
 	return fuse.ReadResultData(buf[0:copied]), fuse.OK
 }
