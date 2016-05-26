@@ -355,10 +355,26 @@ var requestId = uint64(1000000000)
 // Produce a request specific ctx variable to use for quantumfs internal calls
 func (th *testHelper) newCtx() *ctx {
 	reqId := atomic.AddUint64(&requestId, 1)
-	c := th.qfs.c.req(reqId)
+	c := th.qfs.c.dummyReq(reqId)
 	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
 		th.testName)
 	return c
+}
+
+//only to be used for some testing - not all functions will work with this
+func (c *ctx) dummyReq(request uint64) *ctx {
+	requestCtx := &ctx{
+		Ctx: quantumfs.Ctx{
+			Qlog:      c.Qlog,
+			RequestId: c.RequestId,
+		},
+		qfs:          c.qfs,
+		config:       c.config,
+		workspaceDB:  c.workspaceDB,
+		durableStore: c.durableStore,
+		fuseCtx:      nil,
+	}
+	return requestCtx
 }
 
 // assert the condition is true. If it is not true then fail the test with the given

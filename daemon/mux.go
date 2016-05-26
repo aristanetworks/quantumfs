@@ -116,16 +116,15 @@ func logRequestPanic(c *ctx) {
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		c.elog("Lookup failed", name)
 		return fuse.ENOENT
 	}
 
-	return inode.Lookup(c, header.Context, name, out)
+	return inode.Lookup(c, name, out)
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
@@ -135,7 +134,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -147,7 +146,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn, out *fuse.AttrOut) fuse.Sta
 }
 
 func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -161,7 +160,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Sta
 func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Mknod")
@@ -171,7 +170,7 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -184,7 +183,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 
 func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Unlink")
@@ -193,7 +192,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {
 
 func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) fuse.Status {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Rmdir")
@@ -203,7 +202,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) fuse.Status {
 func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	newName string) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Rename")
@@ -213,7 +212,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Link")
@@ -223,7 +222,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	linkName string, out *fuse.EntryOut) fuse.Status {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Symlink")
@@ -233,7 +232,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 	code fuse.Status) {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Readlink")
@@ -241,7 +240,7 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 }
 
 func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -255,7 +254,7 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (sz int,
 	code fuse.Status) {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request GetXAttrSize")
@@ -265,7 +264,7 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (sz int,
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
 	code fuse.Status) {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request GetXAttrData")
@@ -275,7 +274,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 	code fuse.Status) {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request ListXAttr")
@@ -285,7 +284,7 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	data []byte) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request SetXAttr")
@@ -294,7 +293,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 
 func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) fuse.Status {
 
-	c := qfs.c.req(header.Unique)
+	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request RemoveXAttr")
@@ -304,7 +303,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader, attr string) fuse.Statu
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -317,7 +316,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 }
 
 func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -332,10 +331,9 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
 func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 	fuse.Status) {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
-	c.elog("Read:", input)
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("Read failed", fileHandle)
@@ -346,19 +344,19 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
 }
 
 func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Status) {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
-		c.elog("Write failed", fileHandle)
+		c.elog("Write failed")
 		return 0, fuse.ENOENT
 	}
 	return fileHandle.Write(c, input.Offset, input.Size,
@@ -366,7 +364,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Stat
 }
 
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Flush")
@@ -375,7 +373,7 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {
 
 func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Fsync")
@@ -384,7 +382,7 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) fuse.Status {
 
 func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request Fallocate")
@@ -392,7 +390,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) fuse.Status {
 }
 
 func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
@@ -401,14 +399,13 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn, out *fuse.OpenOut) fuse.Status
 		return fuse.ENOENT
 	}
 
-	return inode.OpenDir(c, input.InHeader.Context,
-		input.Flags, input.Mode, out)
+	return inode.OpenDir(c, input.Flags, input.Mode, out)
 }
 
 func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request ReadDir")
@@ -418,7 +415,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
@@ -435,7 +432,7 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 
 func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) fuse.Status {
 
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 
 	c.elog("Unhandled request FsyncDir")
@@ -443,7 +440,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) fuse.Status {
 }
 
 func (qfs *QuantumFs) StatFs(input *fuse.InHeader, out *fuse.StatfsOut) fuse.Status {
-	c := qfs.c.req(input.Unique)
+	c := qfs.c.req(input)
 	defer logRequestPanic(c)
 
 	out.Blocks = 2684354560 // 10TB

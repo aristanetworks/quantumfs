@@ -5,6 +5,7 @@ package daemon
 
 import "arista.com/quantumfs"
 import "arista.com/quantumfs/qlog"
+import "github.com/hanwen/go-fuse/fuse"
 
 // The ctx type needs to be threaded through all the objects and calls of the
 // system. It provides access to the configuration, the quantumfs mux and request
@@ -18,18 +19,20 @@ type ctx struct {
 	config       *QuantumFsConfig
 	workspaceDB  quantumfs.WorkspaceDB
 	durableStore quantumfs.DataStore
+	fuseCtx      *fuse.Context
 }
 
-func (c *ctx) req(request uint64) *ctx {
+func (c *ctx) req(header *fuse.InHeader) *ctx {
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
 			Qlog:      c.Qlog,
-			RequestId: c.RequestId,
+			RequestId: header.Unique,
 		},
 		qfs:          c.qfs,
 		config:       c.config,
 		workspaceDB:  c.workspaceDB,
 		durableStore: c.durableStore,
+		fuseCtx:      &header.Context,
 	}
 	return requestCtx
 }
