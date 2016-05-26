@@ -209,12 +209,12 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
 		entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-			attr.InHeader.Context.Owner.Uid)
+			c.fuseCtx.Owner.Uid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_GID) {
 		entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-			attr.InHeader.Context.Owner.Gid)
+			c.fuseCtx.Owner.Gid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
@@ -239,9 +239,11 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			attr.Ctimensec)
 	}
 
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
-		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
+	if out != nil {
+		fillAttrOutCacheData(c, out)
+		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+			entry)
+	}
 
 	dir.self.dirty(c)
 
@@ -269,8 +271,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (dir *Directory) Lookup(c *ctx, context fuse.Context, name string,
-	out *fuse.EntryOut) fuse.Status {
+func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 
 	inodeNum, exists := dir.children[name]
 	if !exists {
@@ -279,7 +280,7 @@ func (dir *Directory) Lookup(c *ctx, context fuse.Context, name string,
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, context.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		dir.childrenRecords[inodeNum])
 
 	return fuse.OK
@@ -291,8 +292,8 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-func (dir *Directory) OpenDir(c *ctx, context fuse.Context, flags uint32,
-	mode uint32, out *fuse.OpenOut) fuse.Status {
+func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
 
 	children := make([]directoryContents, 0, len(dir.childrenRecords))
 	for _, entry := range dir.childrenRecords {
@@ -303,7 +304,7 @@ func (dir *Directory) OpenDir(c *ctx, context fuse.Context, flags uint32,
 			fuseType: objectTypeToFileType(c, entry.Type),
 		}
 		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-			dir.children[filename], context.Owner, entry)
+			dir.children[filename], c.fuseCtx.Owner, entry)
 
 		children = append(children, entryInfo)
 	}
@@ -326,8 +327,8 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	c.vlog("Creating file: '%s'", name)
 
 	now := time.Now()
-	uid := input.InHeader.Context.Owner.Uid
-	gid := input.InHeader.Context.Owner.Gid
+	uid := c.fuseCtx.Owner.Uid
+	gid := c.fuseCtx.Owner.Gid
 
 	entry := quantumfs.DirectoryRecord{
 		Filename:           StringToBytes(name),
@@ -351,11 +352,13 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	fillEntryOutCacheData(c, &out.EntryOut)
 	out.EntryOut.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.EntryOut.Attr, inodeNum,
-		input.InHeader.Context.Owner, &entry)
+		c.fuseCtx.Owner, &entry)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(file, inodeNum, fileHandleNum)
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+
+	c.vlog("New file inode %d, fileHandle %d", inodeNum, fileHandleNum)
 
 	out.OpenOut.OpenFlags = 0
 	out.OpenOut.Fh = uint64(fileHandleNum)
@@ -378,8 +381,8 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	}
 
 	now := time.Now()
-	uid := input.InHeader.Context.Owner.Uid
-	gid := input.InHeader.Context.Owner.Gid
+	uid := c.fuseCtx.Owner.Uid
+	gid := c.fuseCtx.Owner.Gid
 
 	entry := quantumfs.DirectoryRecord{
 		Filename:           StringToBytes(name),
@@ -401,8 +404,18 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
-		input.InHeader.Context.Owner, &entry)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, &entry)
+
+	return fuse.OK
+}
+
+func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
+
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+		dir.childrenRecords[inodeNum])
 
 	return fuse.OK
 }
