@@ -397,6 +397,11 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.OK
 }
 
+func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
+
+	return fuse.ENOTDIR
+}
+
 type directoryContents struct {
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc

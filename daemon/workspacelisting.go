@@ -213,6 +213,11 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
+func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
+
+	return fuse.ENOTDIR
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -323,6 +328,11 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
+}
+
+func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
+
+	return fuse.ENOTDIR
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,

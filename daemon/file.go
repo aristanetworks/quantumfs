@@ -86,6 +86,11 @@ func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
+func (fi *File) Unlink(c *ctx, name string) fuse.Status {
+
+	return fuse.ENOTDIR
+}
+
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 

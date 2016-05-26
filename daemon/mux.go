@@ -187,8 +187,12 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader, name string) fuse.Status {
 	c := qfs.c.req(header.Unique)
 	defer logRequestPanic(c)
 
-	c.elog("Unhandled request Unlink")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Unlink(c, name)
 }
 
 func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) fuse.Status {
