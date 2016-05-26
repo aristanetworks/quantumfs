@@ -201,3 +201,24 @@ func TestDirectoryFileDeletion_test(t *testing.T) {
 		test.assert(err != nil, "Error test file not deleted: %v", err)
 	})
 }
+
+func TestDirectoryUnlinkDirectory_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
+		testDir := workspace + "/" + "test"
+		err := os.Mkdir(test.relPath(testDir), 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		err = syscall.Unlink(test.relPath(testDir))
+		test.assert(err != nil, "Expected error unlinking directory")
+		test.assert(err.Error() == "is a directory",
+			"Error not 'is a directory': %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(testDir), &stat)
+		test.assert(err == nil, "Error test directory was deleted")
+	})
+}
