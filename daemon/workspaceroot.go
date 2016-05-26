@@ -242,8 +242,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Blksize = qfsBlockSize
 }
 
-func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
-	mode uint32, out *fuse.OpenOut) fuse.Status {
+func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
 
 	children := make([]directoryContents, 0, wsr.baseLayer.NumEntries)
 	for _, entry := range wsr.baseLayer.Entries {
@@ -254,7 +254,7 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
 			fuseType: objectTypeToFileType(c, entry.Type),
 		}
 		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-			wsr.children[filename], context.Owner, &entry)
+			wsr.children[filename], c.fuseCtx.Owner, &entry)
 
 		children = append(children, entryInfo)
 	}
@@ -267,7 +267,7 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, context fuse.Context, flags uint32,
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string,
+func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	inodeNum, exists := wsr.children[name]
@@ -277,7 +277,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, context fuse.Context, name string,
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, context.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		wsr.childrenRecords[inodeNum])
 
 	return fuse.OK
@@ -303,8 +303,8 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 	c.vlog("Creating workspace")
 
 	now := time.Now()
-	uid := input.InHeader.Context.Owner.Uid
-	gid := input.InHeader.Context.Owner.Gid
+	uid := c.fuseCtx.Owner.Uid
+	gid := c.fuseCtx.Owner.Gid
 
 	entry := quantumfs.DirectoryRecord{
 		Filename:           StringToBytes(name),
@@ -325,14 +325,17 @@ func (wsr *WorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
 		quantumfs.EmptyBlockKey, wsr)
 	c.qfs.setInode(c, inodeNum, file)
 
+	out.EntryOut.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, &out.EntryOut)
 	out.EntryOut.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.EntryOut.Attr, inodeNum,
-		input.InHeader.Context.Owner, &entry)
+		c.fuseCtx.Owner, &entry)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(file, inodeNum, fileHandleNum)
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+
+	c.vlog("New file inode %d, fileHandle %d", inodeNum, fileHandleNum)
 
 	out.OpenOut.OpenFlags = 0
 	out.OpenOut.Fh = uint64(fileHandleNum)
@@ -405,12 +408,12 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
 		entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-			attr.InHeader.Context.Owner.Uid)
+			c.fuseCtx.Owner.Uid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_GID) {
 		entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-			attr.InHeader.Context.Owner.Gid)
+			c.fuseCtx.Owner.Gid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
@@ -435,11 +438,24 @@ func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
 			attr.Ctimensec)
 	}
 
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
-		attr.SetAttrInCommon.InHeader.Context.Owner, entry)
+	if out != nil {
+		fillAttrOutCacheData(c, out)
+		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
+			c.fuseCtx.Owner, entry)
+	}
 
 	wsr.dirty(c)
+
+	return fuse.OK
+}
+
+func (wsr *WorkspaceRoot) getChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.AttrOut) fuse.Status {
+
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+		wsr.childrenRecords[inodeNum])
 
 	return fuse.OK
 }

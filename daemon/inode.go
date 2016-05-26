@@ -16,13 +16,13 @@ type Inode interface {
 
 	GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status
 
-	Lookup(c *ctx, context fuse.Context, name string,
+	Lookup(c *ctx, name string,
 		out *fuse.EntryOut) fuse.Status
 
 	Open(c *ctx, flags uint32, mode uint32,
 		out *fuse.OpenOut) fuse.Status
 
-	OpenDir(c *ctx, context fuse.Context, flags uint32, mode uint32,
+	OpenDir(c *ctx, flags uint32, mode uint32,
 		out *fuse.OpenOut) fuse.Status
 
 	Create(c *ctx, input *fuse.CreateIn, name string,
@@ -36,6 +36,8 @@ type Inode interface {
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status
+
+	getChildAttr(c *ctx, inodeNum InodeId, out *fuse.AttrOut) fuse.Status
 
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty
