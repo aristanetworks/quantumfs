@@ -78,6 +78,13 @@ type DirectoryEntry struct {
 	Entries    []DirectoryRecord
 }
 
+func NewDirectoryEntry(capacity int) *DirectoryEntry {
+	var dirEntry DirectoryEntry
+	dirEntry.Entries = make([]DirectoryRecord, 0, capacity)
+
+	return &dirEntry
+}
+
 // The various types the next referenced object could be
 const (
 	ObjectTypeBuildProduct      = iota
