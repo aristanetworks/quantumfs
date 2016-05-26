@@ -272,7 +272,6 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-
 	inodeNum, exists := dir.children[name]
 	if !exists {
 		return fuse.ENOENT
