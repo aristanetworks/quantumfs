@@ -87,7 +87,6 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
-
 	return fuse.ENOTDIR
 }
 
