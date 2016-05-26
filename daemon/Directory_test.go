@@ -180,3 +180,24 @@ func TestDirectoryUpdate_test(t *testing.T) {
 		test.assert(err == nil, "Workspace copy doesn't match")
 	})
 }
+
+func TestDirectoryFileDeletion_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
+		testFilename := workspace + "/" + "test"
+		fd, err := os.Create(test.relPath(testFilename))
+		test.assert(err == nil, "Error creating file: %v", err)
+		err = fd.Close()
+		test.assert(err == nil, "Error closing fd: %v", err)
+
+		err = syscall.Unlink(test.relPath(testFilename))
+		test.assert(err == nil, "Error unlinking file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(testFilename), &stat)
+		test.assert(err != nil, "Error test file not deleted: %v", err)
+	})
+}
