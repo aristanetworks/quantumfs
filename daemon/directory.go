@@ -72,6 +72,12 @@ func (dir *Directory) addChild(c *ctx, name string, inodeNum InodeId,
 	dir.self.dirty(c)
 }
 
+func (dir *Directory) delChild(c *ctx, name string) {
+	delete(dir.childrenRecords, dir.children[name])
+	delete(dir.children, name)
+	dir.self.dirty(c)
+}
+
 func (dir *Directory) dirty(c *ctx) {
 	dir.dirty_ = true
 	dir.parent.dirtyChild(c, dir)
@@ -402,8 +408,13 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
+	if _, exists := dir.children[name]; !exists {
+		return fuse.ENOENT
+	}
 
-	return fuse.ENOTDIR
+	dir.delChild(c, name)
+
+	return fuse.OK
 }
 
 type directoryContents struct {
