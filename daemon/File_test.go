@@ -82,7 +82,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
 			"Read and written bytes do not match, %s vs %s",
-				fullReadBuf[:readLen], testText[:written])
+			fullReadBuf[:readLen], testText[:written])
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
@@ -124,7 +124,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
 			"Read and written bytes do not match, %s vs %s",
-				fullReadBuf[:readLen], testText[:written])
+			fullReadBuf[:readLen], testText[:written])
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
@@ -143,7 +143,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		}
 		test.assert(bytes.Equal(fullReadBuf[:readLen], testText[:written]),
 			"Read and written bytes do not match, %s vs %s",
-				fullReadBuf[:readLen], testText[:written])
+			fullReadBuf[:readLen], testText[:written])
 
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
