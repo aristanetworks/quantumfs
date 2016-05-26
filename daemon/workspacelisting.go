@@ -213,7 +213,6 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
-
 	return fuse.ENOTDIR
 }
 
@@ -337,7 +336,6 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
-
 	return fuse.ENOTDIR
 }
 
