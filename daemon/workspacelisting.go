@@ -228,13 +228,13 @@ func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
-	nsd := WorkspaceList{
+	wsl := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
 		namespaceName: name,
 		workspaces:    make(map[string]InodeId),
 	}
-	nsd.self = &nsd
-	return &nsd
+	wsl.self = &wsl
+	return &wsl
 }
 
 type WorkspaceList struct {
