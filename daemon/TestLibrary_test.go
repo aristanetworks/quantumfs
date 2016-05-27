@@ -8,6 +8,7 @@ package daemon
 import "bufio"
 import "fmt"
 import "io/ioutil"
+import "math/rand"
 import "os"
 import "runtime"
 import "runtime/debug"
@@ -318,6 +319,45 @@ func (th *testHelper) getApi() *quantumfs.Api {
 // Make the given path relative to the mount root
 func (th *testHelper) relPath(path string) string {
 	return th.tempDir + "/mnt/" + path
+}
+
+// Return a random namespace/workspace name of given length
+func randomNamespaceName(size int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-."
+
+	result := ""
+	for i := 0; i < size; i++ {
+		result += string(chars[rand.Intn(len(chars))])
+	}
+
+	return result
+}
+
+func TestRandomNamespaceName_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		name1 := randomNamespaceName(8)
+		name2 := randomNamespaceName(8)
+		name3 := randomNamespaceName(10)
+
+		test.assert(len(name1) == 8, "name1 wrong length: %d", len(name1))
+		test.assert(name1 != name2, "name1 == name2: '%s'", name1)
+		test.assert(len(name3) == 10, "name3 wrong length: %d", len(name1))
+	})
+}
+
+// Create a new workspace to test within
+//
+// Returns the relative path of the workspace
+func (th *testHelper) newWorkspace() string {
+	api := th.getApi()
+
+	src := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
+
+	err := api.Branch(src, dst)
+	th.assert(err == nil, "Failed to branch workspace: %v", err)
+
+	return dst
 }
 
 // Retrieve a list of FileDescriptor from an Inode
