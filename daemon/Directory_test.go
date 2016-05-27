@@ -148,3 +148,77 @@ func TestRecursiveDirectoryFileDescriptorDirtying_test(t *testing.T) {
 		syscall.Close(fd)
 	})
 }
+
+// If we modify a Directory we do not ever reload the data from the datastore. In
+// order to confirm the data has been written correctly we need to branch the
+// workspace after modifying the directory and confirm the newly loaded directory
+// contains the changes in the update.
+func TestDirectoryUpdate_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		api := test.getApi()
+
+		src := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
+		dst := "dirupdate/test"
+
+		// First create a file
+		testFilename := src + "/" + "test"
+		fd, err := os.Create(test.relPath(testFilename))
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		// Then branch the workspace
+		err = api.Branch(src, dst)
+		test.assert(err == nil, "Failed to branch workspace: %v", err)
+
+		// Ensure the new workspace has the correct file
+		testFilename = dst + "/" + "test"
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(testFilename), &stat)
+		test.assert(err == nil, "Workspace copy doesn't match")
+	})
+}
+
+func TestDirectoryFileDeletion_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
+		testFilename := workspace + "/" + "test"
+		fd, err := os.Create(test.relPath(testFilename))
+		test.assert(err == nil, "Error creating file: %v", err)
+		err = fd.Close()
+		test.assert(err == nil, "Error closing fd: %v", err)
+
+		err = syscall.Unlink(test.relPath(testFilename))
+		test.assert(err == nil, "Error unlinking file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(testFilename), &stat)
+		test.assert(err != nil, "Error test file not deleted: %v", err)
+	})
+}
+
+func TestDirectoryUnlinkDirectory_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := quantumfs.NullNamespaceName + "/" +
+			quantumfs.NullWorkspaceName
+		testDir := workspace + "/" + "test"
+		err := os.Mkdir(test.relPath(testDir), 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		err = syscall.Unlink(test.relPath(testDir))
+		test.assert(err != nil, "Expected error unlinking directory")
+		test.assert(err.Error() == "is a directory",
+			"Error not 'is a directory': %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(testDir), &stat)
+		test.assert(err == nil, "Error test directory was deleted")
+	})
+}

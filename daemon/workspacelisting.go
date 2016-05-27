@@ -212,6 +212,11 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
+func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on NamespaceList")
+	return fuse.ENOTDIR
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -229,13 +234,13 @@ func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId,
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
-	nsd := WorkspaceList{
+	wsl := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
 		namespaceName: name,
 		workspaces:    make(map[string]InodeId),
 	}
-	nsd.self = &nsd
-	return &nsd
+	wsl.self = &wsl
+	return &wsl
 }
 
 type WorkspaceList struct {
@@ -329,6 +334,11 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
+}
+
+func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on WorkspaceList")
+	return fuse.ENOTDIR
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,

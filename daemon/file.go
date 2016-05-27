@@ -48,7 +48,6 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-
 	return fi.parent.getChildAttr(c, fi.InodeCommon.id, out)
 }
 
@@ -72,7 +71,6 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 }
 
 func (fi *File) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-
 	return fuse.ENOSYS
 }
 
@@ -91,6 +89,11 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	return fuse.ENOTDIR
+}
+
+func (fi *File) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on File")
 	return fuse.ENOTDIR
 }
 
