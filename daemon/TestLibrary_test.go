@@ -323,7 +323,8 @@ func (th *testHelper) relPath(path string) string {
 
 // Return a random namespace/workspace name of given length
 func randomNamespaceName(size int) string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-."
+	const chars = "abcdefghijklmnopqrstuvwxyz" + "0123456789-." +
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 	result := ""
 	for i := 0; i < size; i++ {
