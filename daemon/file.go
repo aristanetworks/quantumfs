@@ -93,6 +93,7 @@ func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (fi *File) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on File")
 	return fuse.ENOTDIR
 }
 
