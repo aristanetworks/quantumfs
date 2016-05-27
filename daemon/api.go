@@ -91,6 +91,11 @@ func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
 	return fuse.ENOTDIR
 }
 
+func (api *ApiInode) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on ApiInode")
+	return fuse.ENOTDIR
+}
+
 func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 

@@ -38,6 +38,8 @@ type Inode interface {
 
 	Unlink(c *ctx, name string) fuse.Status
 
+	Rmdir(c *ctx, name string) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status

@@ -64,17 +64,31 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	return &dir
 }
 
+func (dir *Directory) updateSize(c *ctx) {
+	var attr fuse.SetAttrIn
+	attr.Valid = fuse.FATTR_SIZE
+	attr.Size = uint64(len(dir.childrenRecords))
+
+	// If we do not have a parent, then the parent is a workspacelist and we have
+	// nothing to update.
+	if dir.parent != nil {
+		dir.parent.setChildAttr(c, dir.id, &attr, nil)
+	}
+}
+
 func (dir *Directory) addChild(c *ctx, name string, inodeNum InodeId,
 	child *quantumfs.DirectoryRecord) {
 
 	dir.children[name] = inodeNum
 	dir.childrenRecords[inodeNum] = child
+	dir.updateSize(c)
 	dir.self.dirty(c)
 }
 
 func (dir *Directory) delChild(c *ctx, name string) {
 	delete(dir.childrenRecords, dir.children[name])
 	delete(dir.children, name)
+	dir.updateSize(c)
 	dir.self.dirty(c)
 }
 
@@ -428,6 +442,26 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
 	if type_ == fuse.S_IFDIR {
 		return fuse.Status(syscall.EISDIR)
+	}
+
+	dir.delChild(c, name)
+
+	return fuse.OK
+}
+
+func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
+	if _, exists := dir.children[name]; !exists {
+		return fuse.ENOENT
+	}
+
+	inode := dir.children[name]
+	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+	if type_ != fuse.S_IFDIR {
+		return fuse.ENOTDIR
+	}
+
+	if dir.childrenRecords[inode].Size != 0 {
+		return fuse.Status(syscall.ENOTEMPTY)
 	}
 
 	dir.delChild(c, name)
