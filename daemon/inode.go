@@ -34,10 +34,7 @@ type Inode interface {
 		out *fuse.EntryOut) fuse.Status
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-		out *fuse.AttrOut) fuse.Status
-
-	getChildAttr(c *ctx, inodeNum InodeId, out *fuse.AttrOut) fuse.Status
+	getDirectoryRecord(c *ctx, inodeNum InodeId) quantumfs.DirectoryRecord
 
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty

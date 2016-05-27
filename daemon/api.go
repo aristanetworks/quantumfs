@@ -85,6 +85,13 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
+func (wsr *ApiInode) getDirectoryRecord(c *ctx,
+	inodeNum InodeId) quantumfs.DirectoryRecord {
+
+	c.elog("Api doesn't support record fetch")
+	return errors.New("Unsupported record fetch")
+}
+
 func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
@@ -112,20 +119,6 @@ func (api *ApiInode) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid SetAttr on ApiInode")
-	return fuse.ENOSYS
-}
-
-func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid setChildAttr on ApiInode")
-	return fuse.ENOSYS
-}
-
-func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid getChildAttr on ApiInode")
 	return fuse.ENOSYS
 }
 

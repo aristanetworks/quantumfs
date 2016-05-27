@@ -211,20 +211,6 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid setChildAttr on NamespaceList")
-	return fuse.ENOSYS
-}
-
-func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid getChildAttr on NamespaceList")
-	return fuse.ENOSYS
-}
-
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -327,18 +313,4 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
-}
-
-func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid setChildAttr on WorkspaceList")
-	return fuse.ENOSYS
-}
-
-func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid getChildAttr on WorkspaceList")
-	return fuse.ENOSYS
 }

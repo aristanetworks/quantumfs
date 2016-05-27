@@ -387,75 +387,9 @@ func (wsr *WorkspaceRoot) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+func (wsr *WorkspaceRoot) getDirectoryRecord(c *ctx,
+	inodeNum InodeId) quantumfs.DirectoryRecord {
 
-	entry, exists := wsr.childrenRecords[inodeNum]
-	if !exists {
-		return fuse.ENOENT
-	}
-
-	valid := uint(attr.SetAttrInCommon.Valid)
-	if BitFlagsSet(valid, fuse.FATTR_FH|
-		fuse.FATTR_LOCKOWNER) {
-		c.elog("Unsupported attribute(s) to set", valid)
-		return fuse.ENOSYS
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MODE) {
-		entry.Permissions = modeToPermissions(attr.Mode, 0)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-			c.fuseCtx.Owner.Uid)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-			c.fuseCtx.Owner.Gid)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
-		entry.Size = attr.Size
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
-		// atime is ignored and not stored
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-		entry.ModificationTime = quantumfs.NewTimeSeconds(attr.Mtime,
-			attr.Mtimensec)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-		entry.ModificationTime = quantumfs.NewTime(time.Now())
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_CTIME) {
-		entry.CreationTime = quantumfs.NewTimeSeconds(attr.Ctime,
-			attr.Ctimensec)
-	}
-
-	if out != nil {
-		fillAttrOutCacheData(c, out)
-		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
-			c.fuseCtx.Owner, entry)
-	}
-
-	wsr.dirty(c)
-
-	return fuse.OK
-}
-
-func (wsr *WorkspaceRoot) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
-
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-		wsr.childrenRecords[inodeNum])
-
-	return fuse.OK
+	c.elog("Directory doesn't support record fetch yet")
+	return errors.New("Unsupported record fetch")
 }

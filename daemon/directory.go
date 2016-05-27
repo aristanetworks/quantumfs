@@ -82,18 +82,11 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
-func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (dir *Directory) getDirectoryRecord(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	c.elog("Invalid setChildAttr on Directory")
-	return fuse.ENOSYS
-}
-
-func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid getChildAttr on Directory")
-	return fuse.ENOSYS
+	c.elog("Directory doesn't support record fetch yet")
+	return errors.New("Unsupported record fetch")
 }
 
 type directoryContents struct {
