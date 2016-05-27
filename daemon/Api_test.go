@@ -9,8 +9,6 @@ import "os"
 import "syscall"
 import "testing"
 
-import "arista.com/quantumfs"
-
 func TestWorkspaceBranching_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
@@ -18,8 +16,7 @@ func TestWorkspaceBranching_test(t *testing.T) {
 		api := test.getApi()
 
 		// First branch the null workspace
-		src := quantumfs.NullNamespaceName + "/" +
-			quantumfs.NullWorkspaceName
+		src := test.nullWorkspace()
 		dst := "apitest/a"
 		err := api.Branch(src, dst)
 		test.assert(err == nil, "Failed to branch workspace: %v", err)

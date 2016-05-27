@@ -345,13 +345,17 @@ func TestRandomNamespaceName_test(t *testing.T) {
 	})
 }
 
+func (th *testHelper) nullWorkspace() string {
+	return quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+}
+
 // Create a new workspace to test within
 //
 // Returns the relative path of the workspace
 func (th *testHelper) newWorkspace() string {
 	api := th.getApi()
 
-	src := quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+	src := th.nullWorkspace()
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
 
 	err := api.Branch(src, dst)
