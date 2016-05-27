@@ -244,7 +244,25 @@ func TestDirectoryRmdirNotEmpty_test(t *testing.T) {
 		fd.Close()
 
 		err = syscall.Rmdir(test.relPath(testDir))
-		test.log("%v", err)
 		test.assert(err != nil, "Expected error when deleting directory")
+		test.assert(err.Error() == "directory not empty",
+			"Expected error 'directory not empty': %v", err)
+	})
+}
+
+func TestDirectoryRmdirFile_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		testFile := workspace + "/test"
+		fd, err := os.Create(test.relPath(testFile))
+		test.assert(err == nil, "Error creating file: %v", err)
+		fd.Close()
+
+		err = syscall.Rmdir(test.relPath(testFile))
+		test.assert(err != nil, "Expected error when deleting directory")
+		test.assert(err.Error() == "not a directory",
+			"Expected error 'not a directory': %v", err)
 	})
 }
