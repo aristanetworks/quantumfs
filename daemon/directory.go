@@ -436,8 +436,23 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 }
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on Directory")
-	return fuse.ENOTDIR
+	if _, exists := dir.children[name]; !exists {
+		return fuse.ENOENT
+	}
+
+	inode := dir.children[name]
+	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+	if type_ != fuse.S_IFDIR {
+		return fuse.ENOTDIR
+	}
+
+	if dir.childrenRecords[inode].Size != 0 {
+		return fuse.Status(syscall.ENOTEMPTY)
+	}
+
+	dir.delChild(c, name)
+
+	return fuse.OK
 }
 
 type directoryContents struct {
