@@ -216,6 +216,11 @@ func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
 	return fuse.ENOTDIR
 }
 
+func (nsl *NamespaceList) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on NamespaceList")
+	return fuse.ENOTDIR
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -336,6 +341,11 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
+	return fuse.ENOTDIR
+}
+
+func (wsl *WorkspaceList) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on WorkspaceList")
 	return fuse.ENOTDIR
 }
 

@@ -96,6 +96,11 @@ func (fi *File) Unlink(c *ctx, name string) fuse.Status {
 	return fuse.ENOTDIR
 }
 
+func (fi *File) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on File")
+	return fuse.ENOTDIR
+}
+
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 

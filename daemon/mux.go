@@ -199,8 +199,12 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader, name string) fuse.Status {
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 
-	c.elog("Unhandled request Rmdir")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Rmdir(c, name)
 }
 
 func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,

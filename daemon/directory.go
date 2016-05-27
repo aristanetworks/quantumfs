@@ -435,6 +435,11 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	return fuse.OK
 }
 
+func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on Directory")
+	return fuse.ENOTDIR
+}
+
 type directoryContents struct {
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc
