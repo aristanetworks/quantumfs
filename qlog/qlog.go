@@ -70,7 +70,7 @@ func (q *Qlog) setLogLevelBitmask(sys LogSubsystem, level uint8) {
 }
 
 // Load desired log levels from the environment variable
-func (q *Qlog) loadLevels(levels string) {
+func (q *Qlog) SetLogLevels(levels string) {
 	// reset all levels
 	for i := 0; i <= int(logSubsystemMax); i++ {
 		q.setLogLevelBitmask(LogSubsystem(i), 1)
@@ -141,7 +141,7 @@ func NewQlog() *Qlog {
 		panic("Log level structure not large enough for given subsystems")
 	}
 
-	q.loadLevels(os.Getenv(logEnvTag))
+	q.SetLogLevels(os.Getenv(logEnvTag))
 
 	return &q
 }

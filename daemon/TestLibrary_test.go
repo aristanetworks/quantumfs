@@ -66,12 +66,23 @@ func (th *testHelper) execute(test quantumFsTest) {
 	// Catch any panics and covert them into test failures
 	defer func(th *testHelper) {
 		err := recover()
+		trace := ""
 
 		// If the test passed pass that fact back to runTest()
 		if err == nil {
 			err = ""
+		} else {
+			// Capture the stack trace of the failure
+			trace = BytesToString(debug.Stack())
+			trace = strings.SplitN(trace, "\n", 8)[7]
 		}
-		th.testResult <- err.(string)
+
+		result := err.(string)
+		if trace != "" {
+			result += "\nStack Trace:\n" + trace
+		}
+
+		th.testResult <- result
 	}(th)
 
 	test(th)
@@ -270,6 +281,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		return th.log(format, args...)
 	}
 	th.qfs.c.Qlog.SetWriter(writer)
+	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacesdb/*,test/*")
 
 	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
 	if err != nil {
@@ -369,10 +381,7 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		//print out the program stack so we know where this happened
-		msg := fmt.Sprintf("%s\n---------------------------------------\n",
-			debug.Stack())
-		msg += fmt.Sprintf(format, args)
+		msg := fmt.Sprintf(format, args)
 		panic(msg)
 	}
 }

@@ -6,6 +6,7 @@
 package daemon
 
 import "math"
+import "runtime/debug"
 import "syscall"
 import "sync"
 import "sync/atomic"
@@ -106,7 +107,10 @@ func logRequestPanic(c *ctx) {
 		return
 	}
 
-	c.elog("PANIC serving request %u: %v", exception)
+	stackTrace := debug.Stack()
+
+	c.elog("PANIC serving request %u: '%v' Stacktrace: %v", exception,
+		BytesToString(stackTrace))
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
