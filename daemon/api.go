@@ -87,6 +87,7 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on ApiInode")
 	return fuse.ENOTDIR
 }
 
