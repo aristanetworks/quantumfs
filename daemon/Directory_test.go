@@ -230,6 +230,28 @@ func TestDirectoryRmdirEmpty_test(t *testing.T) {
 	})
 }
 
+func TestDirectoryRmdirNewlyEmpty_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(test.relPath(testDir), 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		testFile := testDir + "/file"
+		fd, err := os.Create(test.relPath(testFile))
+		test.assert(err == nil, "Error creating file: %v", err)
+		fd.Close()
+
+		err = syscall.Unlink(test.relPath(testFile))
+		test.assert(err == nil, "Error unlinking file: %v", err)
+
+		err = syscall.Rmdir(test.relPath(testDir))
+		test.assert(err == nil, "Error deleting directory: %v", err)
+	})
+}
+
 func TestDirectoryRmdirNotEmpty_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
