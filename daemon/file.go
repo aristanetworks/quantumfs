@@ -6,6 +6,7 @@ package daemon
 // This file holds the File type, which represents regular files
 
 import "arista.com/quantumfs"
+import "errors"
 import "github.com/hanwen/go-fuse/fuse"
 import "crypto/sha1"
 
@@ -51,8 +52,14 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
+	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", fi.id)
+		return fuse.ENOSYS
+	}
+
 	fillAttrWithDirectoryRecord(c, &out.Attr, fi.InodeCommon.id, c.fuseCtx.Owner,
-		wsr.childrenRecords[inodeNum])
+		&record)
 
 	return fuse.OK
 }
@@ -90,68 +97,27 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	inodeNum := fi.InodeCommmon.id
-	entry, exists := wsr.childrenRecords[inodeNum]
-	if !exists {
-		return fuse.ENOENT
-	}
-
-	valid := uint(attr.SetAttrInCommon.Valid)
-	if BitFlagsSet(valid, fuse.FATTR_FH|
-		fuse.FATTR_LOCKOWNER) {
-		c.elog("Unsupported attribute(s) to set", valid)
-		return fuse.ENOSYS
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MODE) {
-		entry.Permissions = modeToPermissions(attr.Mode, 0)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-			c.fuseCtx.Owner.Uid)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-			c.fuseCtx.Owner.Gid)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
-		entry.Size = attr.Size
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
-		// atime is ignored and not stored
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-		entry.ModificationTime = quantumfs.NewTimeSeconds(attr.Mtime,
-			attr.Mtimensec)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-		entry.ModificationTime = quantumfs.NewTime(time.Now())
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_CTIME) {
-		entry.CreationTime = quantumfs.NewTimeSeconds(attr.Ctime,
-			attr.Ctimensec)
-	}
-
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
-		c.fuseCtx.Owner, entry)
-
-	wsr.dirty(c)
-
-	return fuse.OK
+	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.ENOTDIR
+}
+
+func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
+
+	c.elog("Invalid setChildAttr on File")
+	return fuse.ENOSYS
+}
+
+func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
+	error) {
+
+	c.elog("Unsupported record fetch on file")
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
@@ -214,9 +180,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = uint64(len(finalData.Get()))
-		fillAttrOutCacheData(c, out)
-		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-			entry)
+		fi.parent.setChildAttr(c, fi.id, &attr, nil)
 		fi.dirty(c)
 	}
 

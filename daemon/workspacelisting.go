@@ -5,6 +5,7 @@
 // directory hierarchy.
 package daemon
 
+import "errors"
 import "time"
 
 import "arista.com/quantumfs"
@@ -212,6 +213,19 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
+func (nsl *NamespaceList) getChildRecord(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+}
+
+func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+
+	c.elog("Invalid setChildAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -315,4 +329,18 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
+}
+
+func (wsl *WorkspaceList) getChildRecord(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+
+	c.elog("Unsupported record fetch on worklist")
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+}
+
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+
+	c.elog("Invalid setChildAttr on WorkspaceList")
+	return fuse.ENOSYS
 }

@@ -5,6 +5,7 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
+import "errors"
 import "syscall"
 import "time"
 
@@ -398,11 +399,14 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.OK
 }
 
-func (dir *Directory) getDirectoryRecord(c *ctx,
+func (dir *Directory) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	c.elog("Directory doesn't support record fetch yet")
-	return errors.New("Unsupported record fetch")
+	if val, ok := dir.childrenRecords[inodeNum]; ok {
+		return *val, nil
+	}
+
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
 type directoryContents struct {
