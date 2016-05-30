@@ -452,9 +452,11 @@ func TestPanicFilesystemAbort_test(t *testing.T) {
 		api := test.getApi()
 
 		// Introduce a panicing error into quantumfs
+		test.qfs.mapMutex.Lock()
 		for k, v := range test.qfs.fileHandles {
 			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
 		}
+		test.qfs.mapMutex.Unlock()
 
 		// panic Quantumfs
 		api.Branch("_null/null", "test/crash")
