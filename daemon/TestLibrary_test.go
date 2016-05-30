@@ -228,31 +228,35 @@ func (th *testHelper) startDefaultQuantumFs() {
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func fuseConnection(mountPath string) int {
-	file, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		panic("Failed opening mountinfo")
-	}
-	defer file.Close()
-
-	mountinfo := bufio.NewReader(file)
-
-	for {
-		bline, _, err := mountinfo.ReadLine()
+	for i := 0; i < 100; i++ {
+		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
-			panic("Failed to find mount")
+			panic("Failed opening mountinfo")
 		}
+		defer file.Close()
 
-		line := string(bline)
+		mountinfo := bufio.NewReader(file)
 
-		if strings.Contains(line, mountPath) {
-			fields := strings.SplitN(line, " ", 5)
-			dev := strings.Split(fields[2], ":")[1]
-			devInt, err := strconv.Atoi(dev)
+		for {
+			bline, _, err := mountinfo.ReadLine()
 			if err != nil {
-				panic("Failed to convert dev to integer")
+				panic("Failed to find mount")
 			}
-			return devInt
+
+			line := string(bline)
+
+			if strings.Contains(line, mountPath) {
+				fields := strings.SplitN(line, " ", 5)
+				dev := strings.Split(fields[2], ":")[1]
+				devInt, err := strconv.Atoi(dev)
+				if err != nil {
+					panic("Failed to convert dev to integer")
+				}
+				return devInt
+			}
 		}
+
+		time.Sleep(50 * time.Millisecond)
 	}
 	panic("Mount not found")
 }
