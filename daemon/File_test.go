@@ -17,8 +17,7 @@ func TestFileCreation_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := quantumfs.NullNamespaceName + "/" +
-			quantumfs.NullWorkspaceName
+		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -51,8 +50,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		//write the test data in two goes
 		textSplit := len(testText) / 2
 
-		workspace := quantumfs.NullNamespaceName + "/" +
-			quantumfs.NullWorkspaceName
+		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "testrw"
 		file, err := os.Create(test.relPath(testFilename))
 		test.assert(file != nil && err == nil,
@@ -214,8 +212,7 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		// Create a file and determine its inode numbers
-		workspace := quantumfs.NullNamespaceName + "/" +
-			quantumfs.NullWorkspaceName
+		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
 		test.assert(err == nil, "Error creating file: %v", err)

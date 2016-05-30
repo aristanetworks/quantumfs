@@ -17,7 +17,6 @@ type Directory struct {
 	InodeCommon
 	parent      Inode
 	baseLayerId quantumfs.ObjectKey
-	baseLayer   quantumfs.DirectoryEntry
 	children    map[string]InodeId
 
 	// Indexed by inode number
@@ -51,7 +50,6 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.parent = parent
-	dir.baseLayer = baseLayer
 	dir.children = children
 	dir.childrenRecords = childrenRecords
 	dir.dirtyChildren_ = make([]Inode, 0)
@@ -67,14 +65,31 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	return &dir
 }
 
+func (dir *Directory) updateSize(c *ctx) {
+	var attr fuse.SetAttrIn
+	attr.Valid = fuse.FATTR_SIZE
+	attr.Size = uint64(len(dir.childrenRecords))
+
+	// If we do not have a parent, then the parent is a workspacelist and we have
+	// nothing to update.
+	if dir.parent != nil {
+		dir.parent.setChildAttr(c, dir.id, &attr, nil)
+	}
+}
+
 func (dir *Directory) addChild(c *ctx, name string, inodeNum InodeId,
-	child quantumfs.DirectoryRecord) {
+	child *quantumfs.DirectoryRecord) {
 
 	dir.children[name] = inodeNum
-	dir.baseLayer.NumEntries++
-	dir.baseLayer.Entries = append(dir.baseLayer.Entries, child)
-	dir.childrenRecords[inodeNum] =
-		&dir.baseLayer.Entries[dir.baseLayer.NumEntries-1]
+	dir.childrenRecords[inodeNum] = child
+	dir.updateSize(c)
+	dir.self.dirty(c)
+}
+
+func (dir *Directory) delChild(c *ctx, name string) {
+	delete(dir.childrenRecords, dir.children[name])
+	delete(dir.children, name)
+	dir.updateSize(c)
 	dir.self.dirty(c)
 }
 
@@ -97,8 +112,17 @@ func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
 
 	dir.updateRecords(c)
 
+	// Compile the internal records into a block which can be placed in the
+	// datastore.
+	baseLayer := quantumfs.NewDirectoryEntry(len(dir.childrenRecords))
+	baseLayer.NumEntries = uint32(len(dir.childrenRecords))
+
+	for _, entry := range dir.childrenRecords {
+		baseLayer.Entries = append(baseLayer.Entries, *entry)
+	}
+
 	// Upload the base layer object
-	bytes, err := json.Marshal(dir.baseLayer)
+	bytes, err := json.Marshal(baseLayer)
 	if err != nil {
 		panic("Failed to marshal baselayer")
 	}
@@ -252,7 +276,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 	var childDirectories uint32
-	for _, entry := range dir.baseLayer.Entries {
+	for _, entry := range dir.childrenRecords {
 		if entry.Type == quantumfs.ObjectTypeDirectoryEntry {
 			childDirectories++
 		}
@@ -285,8 +309,8 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	children := make([]directoryContents, 0, dir.baseLayer.NumEntries)
-	for _, entry := range dir.baseLayer.Entries {
+	children := make([]directoryContents, 0, len(dir.childrenRecords))
+	for _, entry := range dir.childrenRecords {
 		filename := BytesToString(entry.Filename[:])
 
 		entryInfo := directoryContents{
@@ -294,7 +318,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 			fuseType: objectTypeToFileType(c, entry.Type),
 		}
 		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-			dir.children[filename], c.fuseCtx.Owner, &entry)
+			dir.children[filename], c.fuseCtx.Owner, entry)
 
 		children = append(children, entryInfo)
 	}
@@ -334,7 +358,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	}
 
 	inodeNum := c.qfs.newInodeId()
-	dir.addChild(c, name, inodeNum, entry)
+	dir.addChild(c, name, inodeNum, &entry)
 	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile,
 		quantumfs.EmptyBlockKey, dir.self)
 	c.qfs.setInode(c, inodeNum, file)
@@ -388,7 +412,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	}
 
 	inodeNum := c.qfs.newInodeId()
-	dir.addChild(c, name, inodeNum, entry)
+	dir.addChild(c, name, inodeNum, &entry)
 	newDir := newDirectory(c, quantumfs.EmptyDirKey, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, newDir)
 
@@ -407,6 +431,42 @@ func (dir *Directory) getChildRecord(c *ctx,
 	}
 
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+}
+
+func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
+	if _, exists := dir.children[name]; !exists {
+		return fuse.ENOENT
+	}
+
+	inode := dir.children[name]
+	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+	if type_ == fuse.S_IFDIR {
+		return fuse.Status(syscall.EISDIR)
+	}
+
+	dir.delChild(c, name)
+
+	return fuse.OK
+}
+
+func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
+	if _, exists := dir.children[name]; !exists {
+		return fuse.ENOENT
+	}
+
+	inode := dir.children[name]
+	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+	if type_ != fuse.S_IFDIR {
+		return fuse.ENOTDIR
+	}
+
+	if dir.childrenRecords[inode].Size != 0 {
+		return fuse.Status(syscall.ENOTEMPTY)
+	}
+
+	dir.delChild(c, name)
+
+	return fuse.OK
 }
 
 type directoryContents struct {

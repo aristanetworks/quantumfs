@@ -54,7 +54,6 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
@@ -114,7 +113,6 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 }
 
 func (fi *File) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-
 	return fuse.ENOSYS
 }
 
@@ -133,6 +131,16 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	return fuse.ENOTDIR
+}
+
+func (fi *File) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on File")
+	return fuse.ENOTDIR
+}
+
+func (fi *File) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on File")
 	return fuse.ENOTDIR
 }
 

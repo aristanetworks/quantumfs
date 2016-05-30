@@ -46,8 +46,7 @@ func TestNullWorkspaceListing_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		path := quantumfs.NullNamespaceName + "/" +
-			quantumfs.NullWorkspaceName
+		path := test.nullWorkspace()
 		entries, err := ioutil.ReadDir(test.relPath(path))
 		test.assert(err == nil, "Couldn't read workspace listing")
 		test.assert(len(entries) == 0,

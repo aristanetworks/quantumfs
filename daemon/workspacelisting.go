@@ -219,6 +219,22 @@ func (nsl *NamespaceList) getChildRecord(c *ctx,
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
+func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on NamespaceList")
+	return fuse.ENOTDIR
+}
+
+func (nsl *NamespaceList) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on NamespaceList")
+	return fuse.ENOTDIR
+}
+
+func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -229,13 +245,13 @@ func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
-	nsd := WorkspaceList{
+	wsl := WorkspaceList{
 		InodeCommon:   InodeCommon{id: inodeNum},
 		namespaceName: name,
 		workspaces:    make(map[string]InodeId),
 	}
-	nsd.self = &nsd
-	return &nsd
+	wsl.self = &wsl
+	return &wsl
 }
 
 type WorkspaceList struct {
@@ -333,6 +349,23 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 func (wsl *WorkspaceList) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+
+	c.elog("Unsupported record fetch on worklist")
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+}
+
+func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Unlink on WorkspaceList")
+	return fuse.ENOTDIR
+}
+
+func (wsl *WorkspaceList) Rmdir(c *ctx, name string) fuse.Status {
+	c.elog("Invalid Rmdir on WorkspaceList")
+	return fuse.ENOTDIR
+}
+
+func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Unsupported record fetch on worklist")
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
