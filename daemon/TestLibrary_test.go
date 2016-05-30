@@ -78,7 +78,16 @@ func (th *testHelper) execute(test quantumFsTest) {
 			trace = strings.SplitN(trace, "\n", 8)[7]
 		}
 
-		result := err.(string)
+		var result string
+		switch err.(type) {
+		default:
+			result = fmt.Sprintf("Unknown panic type: %v", err)
+		case string:
+			result = err.(string)
+		case error:
+			result = err.(error).Error()
+		}
+
 		if trace != "" {
 			result += "\nStack Trace:\n" + trace
 		}
