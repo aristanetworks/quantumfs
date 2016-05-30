@@ -128,10 +128,15 @@ type Qlog struct {
 	write     func(format string, args ...interface{}) (int, error)
 }
 
+func printToStdout(format string, args ...interface{}) (int, error) {
+	format += "\n"
+	return fmt.Printf(format, args...)
+}
+
 func NewQlog() *Qlog {
 	q := Qlog{
 		logLevels: 0,
-		write:     fmt.Printf,
+		write:     printToStdout,
 	}
 
 	// check that our logLevel container is large enough for our subsystems
@@ -158,7 +163,6 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 
 	if q.getLogLevel(idx, level) {
 		q.write(t.Format(time.StampNano)+" "+idx.String()+" "+
-			strconv.FormatUint(reqId, 10)+": "+format+"\n",
-			args...)
+			strconv.FormatUint(reqId, 10)+": "+format, args...)
 	}
 }
