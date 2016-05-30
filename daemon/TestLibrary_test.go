@@ -35,6 +35,8 @@ func runTest(t *testing.T, test quantumFsTest) {
 
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
+	lastSlash := strings.LastIndex(testName, "/")
+	testName = testName[lastSlash+1:]
 	th := &testHelper{
 		t:          t,
 		testName:   testName,
