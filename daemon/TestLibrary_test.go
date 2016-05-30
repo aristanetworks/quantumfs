@@ -6,6 +6,7 @@ package daemon
 // Test library
 
 import "bufio"
+import "flag"
 import "fmt"
 import "io/ioutil"
 import "math/rand"
@@ -202,16 +203,11 @@ type testHelper struct {
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
-	tempDir, err := ioutil.TempDir("", "quantumfsTest")
-	if err != nil {
-		th.t.Fatalf("Unable to create temporary mount point: %v", err)
-	}
+	th.tempDir = testRunDir + "/" + th.testName
+	mountPath := th.tempDir + "/mnt"
 
-	th.tempDir = tempDir
-	mountPath := tempDir + "/mnt"
-
-	os.Mkdir(mountPath, 0777)
-	th.t.Logf("[%s] Using mountpath %s", th.testName, mountPath)
+	os.MkdirAll(mountPath, 0777)
+	th.log("Using mountpath %s", mountPath)
 
 	config := QuantumFsConfig{
 		CachePath:        "",
@@ -407,6 +403,30 @@ func (th *testHelper) workspaceRootId(namespace string,
 
 // Global test request ID incremented for all the running tests
 var requestId = uint64(1000000000)
+
+// Temporary directory for this test run
+var testRunDir string
+
+func init() {
+	var err error
+	for i := 0; i < 10; i++ {
+		testRunDir, err = ioutil.TempDir("", "quantumfsTest")
+		if err != nil {
+			continue
+		}
+		return
+	}
+	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	result := m.Run()
+
+	os.RemoveAll(testRunDir)
+	os.Exit(result)
+}
 
 // Produce a request specific ctx variable to use for quantumfs internal calls
 func (th *testHelper) newCtx() *ctx {
