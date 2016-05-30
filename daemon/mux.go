@@ -82,6 +82,9 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 
 // Set a file handle in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
+	c.vlog("QuantumFs::setFileHandle Enter")
+	c.vlog("QuantumFs::setFileHandle Exit")
+
 	qfs.mapMutex.Lock()
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
