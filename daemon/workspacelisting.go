@@ -232,12 +232,6 @@ func (nsl *NamespaceList) Rmdir(c *ctx, name string) fuse.Status {
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
-}
-
-func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-
 	c.elog("Invalid setChildAttr on NamespaceList")
 	return fuse.ENOSYS
 }
@@ -362,13 +356,6 @@ func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
 func (wsl *WorkspaceList) Rmdir(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Rmdir on WorkspaceList")
 	return fuse.ENOTDIR
-}
-
-func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Unsupported record fetch on worklist")
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
