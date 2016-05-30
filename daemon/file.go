@@ -9,6 +9,11 @@ import "arista.com/quantumfs"
 import "errors"
 import "github.com/hanwen/go-fuse/fuse"
 import "crypto/sha1"
+import "syscall"
+
+const execBit = 0x1
+const writeBit = 0x2
+const readBit = 0x4
 
 func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
 	key quantumfs.ObjectKey, parent Inode) *File {
@@ -70,8 +75,33 @@ func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOTDIR
 }
 
+func (fi *File) openPermission(c *ctx, flags uint32) bool {
+	record, error := fi.parent.getChildRecord(c, fi.id)
+	if error != nil {
+		return false
+	}
+
+	c.vlog("Open permission check. Have %d, flags %d", record.Permissions, flags)
+	//this only works because we don't have owner/group/other specific perms
+	switch flags & syscall.O_ACCMODE {
+	case syscall.O_RDONLY:
+		return (record.Permissions & readBit) != 0
+	case syscall.O_WRONLY:
+		return (record.Permissions & writeBit) != 0
+	case syscall.O_RDWR:
+		var bitmask uint8 = readBit + writeBit
+		return (record.Permissions & bitmask) == bitmask
+	}
+
+	return false
+}
+
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
+
+	if !fi.openPermission(c, flags) {
+		return fuse.EPERM
+	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum)
