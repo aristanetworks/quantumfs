@@ -57,7 +57,7 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
-		return fuse.ENOSYS
+		return fuse.EIO
 	}
 
 	fillAttrOutCacheData(c, out)
