@@ -430,7 +430,8 @@ func (dir *Directory) getChildRecord(c *ctx,
 		return *val, nil
 	}
 
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return quantumfs.DirectoryRecord{},
+		errors.New("Inode given is not a child of this directory")
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {

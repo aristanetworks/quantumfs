@@ -54,14 +54,13 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
 	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
 		return fuse.ENOSYS
 	}
 
+	fillAttrOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, fi.InodeCommon.id, c.fuseCtx.Owner,
 		&record)
 
@@ -80,7 +79,7 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 		return false
 	}
 
-	c.vlog("Open permission check. Have %d, flags %d", record.Permissions, flags)
+	c.vlog("Open permission check. Have %x, flags %x", record.Permissions, flags)
 	//this only works because we don't have owner/group/other specific perms
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
@@ -88,7 +87,7 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 	case syscall.O_WRONLY:
 		return (record.Permissions & writeBit) != 0
 	case syscall.O_RDWR:
-		var bitmask uint8 = readBit + writeBit
+		var bitmask uint8 = readBit | writeBit
 		return (record.Permissions & bitmask) == bitmask
 	}
 

@@ -216,7 +216,9 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (nsl *NamespaceList) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	c.elog("Unsupported record fetch on NamespaceList")
+	return quantumfs.DirectoryRecord{},
+		errors.New("Unsupported record fetch on NamespaceList")
 }
 
 func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
@@ -344,8 +346,9 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (wsl *WorkspaceList) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	c.elog("Unsupported record fetch on worklist")
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	c.elog("Unsupported record fetch on WorkspaceList")
+	return quantumfs.DirectoryRecord{},
+		errors.New("Unsupported record fetch on WorkspaceList")
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
