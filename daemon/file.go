@@ -6,8 +6,14 @@ package daemon
 // This file holds the File type, which represents regular files
 
 import "arista.com/quantumfs"
+import "errors"
 import "github.com/hanwen/go-fuse/fuse"
 import "crypto/sha1"
+import "syscall"
+
+const execBit = 0x1
+const writeBit = 0x2
+const readBit = 0x4
 
 func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
 	key quantumfs.ObjectKey, parent Inode) *File {
@@ -48,7 +54,17 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	return fi.parent.getChildAttr(c, fi.InodeCommon.id, out)
+	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", fi.id)
+		return fuse.EIO
+	}
+
+	fillAttrOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, fi.InodeCommon.id, c.fuseCtx.Owner,
+		&record)
+
+	return fuse.OK
 }
 
 func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
@@ -57,8 +73,34 @@ func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOTDIR
 }
 
+func (fi *File) openPermission(c *ctx, flags uint32) bool {
+	record, error := fi.parent.getChildRecord(c, fi.id)
+	if error != nil {
+		return false
+	}
+
+	c.vlog("Open permission check. Have %x, flags %x", record.Permissions, flags)
+	//this only works because we don't have owner/group/other specific perms.
+	//we need to confirm whether we can treat the root user/group specially.
+	switch flags & syscall.O_ACCMODE {
+	case syscall.O_RDONLY:
+		return (record.Permissions & readBit) != 0
+	case syscall.O_WRONLY:
+		return (record.Permissions & writeBit) != 0
+	case syscall.O_RDWR:
+		var bitmask uint8 = readBit | writeBit
+		return (record.Permissions & bitmask) == bitmask
+	}
+
+	return false
+}
+
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
+
+	if !fi.openPermission(c, flags) {
+		return fuse.EPERM
+	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum)
@@ -109,11 +151,11 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	return fuse.ENOSYS
 }
 
-func (fi *File) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
+func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
+	error) {
 
-	c.elog("Invalid getChildAttr on File")
-	return fuse.ENOTDIR
+	c.elog("Unsupported record fetch on file")
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
