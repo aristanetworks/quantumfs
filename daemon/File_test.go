@@ -238,36 +238,38 @@ func TestFileSizeChanges_test(t *testing.T) {
 		test.assert(err == nil && string(output) == testText[:4],
 			"Truncated file contents not what's expected")
 
-		cmd = exec.Command("truncate", "--size", "50",
+		cmd = exec.Command("truncate", "--size", "8",
 			test.relPath(testFilename))
 		output, err = cmd.CombinedOutput()
 		test.assert(err == nil && len(output) == 0,
 			"Unable to extend file size with SetAttr")
 
-		cmd = exec.Command("cat", test.relPath(testFilename))
+		cmd = exec.Command("cat", "-vT", test.relPath(testFilename))
 		output, err = cmd.CombinedOutput()
-		test.assert(err == nil && string(output) == testText[:4],
+		test.assert(err == nil &&
+			string(output) == testText[:4] + "^@^@^@^@",
 			"Extended file isn't filled with a hole: '%s'",
 			string(output))
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == 50,
+		test.assert(stat.Size == 8,
 			"File size didn't match expected: %d", stat.Size)
 
 		err = printToFile(test.relPath(testFilename), testText)
 		test.assert(err == nil, "Error writing to new fd: %v", err)
 
-		cmd = exec.Command("cat", test.relPath(testFilename))
+		cmd = exec.Command("cat", "-vT",  test.relPath(testFilename))
 		output, err = cmd.CombinedOutput()
-		test.assert(err == nil && string(output) == testText[:4]+testText,
+		test.assert(err == nil &&
+			string(output) == testText[:4]+"^@^@^@^@"+testText,
 			"Append to file with a hole is incorrect: '%s'",
 			string(output))
 
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == int64(50+len(testText)),
+		test.assert(stat.Size == int64(8+len(testText)),
 			"File size change not preserve with file append: %d",
 			stat.Size)
 	})

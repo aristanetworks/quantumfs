@@ -40,7 +40,10 @@ func enforceSize(buffer []byte, size int) []byte {
 		return buffer[:size]
 	}
 
-	//if the size requested is larger than the buffer, we don't change the buffer
+	for len(buffer) < size {
+		buffer = append(buffer, 0)
+	}
+
 	return buffer
 }
 
@@ -144,13 +147,11 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) &&
 		record.Size > attr.Size {
 
-		curBuffer := fi.fetchData(c)
+		curBuffer := fi.fetchData(c, attr.Size)
 		if curBuffer == nil {
 			c.elog("Unable to fetch existing data for file")
 			return fuse.EIO
 		}
-
-		curBuffer.Set(enforceSize(curBuffer.Get(), int(attr.Size)))
 
 		err = fi.pushData(c, curBuffer)
 		if err != nil {
@@ -192,17 +193,24 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
-func (fi *File) fetchData(c *ctx) *quantumfs.Buffer {
+func (fi *File) fetchData(c *ctx, targetSize uint64) *quantumfs.Buffer {
+	var rtn *quantumfs.Buffer
+
 	if fi.key != quantumfs.EmptyBlockKey {
 		data := DataStore.Get(c, fi.key)
 		if data == nil {
 			c.elog("Data for key missing from datastore")
 			return nil
 		}
-		return quantumfs.NewBuffer(data.Get())
+		rtn = quantumfs.NewBuffer(data.Get())
+	} else {
+		rtn = quantumfs.NewBuffer([]byte{})
 	}
 
-	return quantumfs.NewBuffer([]byte{})
+	// Before we return the buffer, make sure it's the size it needs to be
+	rtn.Set(enforceSize(rtn.Get(), int(targetSize)))
+
+	return rtn
 }
 
 func (fi *File) pushData(c *ctx, buffer *quantumfs.Buffer) error {
@@ -230,14 +238,13 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return fuse.ReadResultData(nil), fuse.EIO
 	}
 
-	curBuffer := fi.fetchData(c)
+	curBuffer := fi.fetchData(c, record.Size)
 	if curBuffer == nil {
 		c.elog("Unable to fetch existing data for file")
 		return fuse.ReadResultData(nil), fuse.EIO
 	}
 
-	curData := enforceSize(curBuffer.Get(), int(record.Size))
-
+	curData := curBuffer.Get()
 	end := offset + uint64(len(buf))
 	if end > uint64(len(curData)) {
 		end = uint64(len(curData))
@@ -258,13 +265,11 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		return 0, fuse.EIO
 	}
 
-	finalData := fi.fetchData(c)
+	finalData := fi.fetchData(c, record.Size)
 	if finalData == nil {
 		c.elog("Unable to fetch existing data for file")
 		return 0, fuse.EIO
 	}
-
-	finalData.Set(enforceSize(finalData.Get(), int(record.Size)))
 
 	if offset > uint64(len(finalData.Get())) {
 		offset = uint64(len(finalData.Get()))
@@ -283,8 +288,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
-		// Don't overwrite the size, increment it only to preserve holes
-		attr.Size = record.Size + uint64(copied)
+		attr.Size = uint64(len(finalData.Get()))
 		fi.parent.setChildAttr(c, fi.id, &attr, nil)
 		fi.dirty(c)
 	}
