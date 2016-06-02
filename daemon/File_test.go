@@ -7,10 +7,10 @@ package daemon
 
 import "bytes"
 import "io"
+import "io/ioutil"
 import "syscall"
 import "testing"
 import "os"
-import "os/exec"
 
 import "arista.com/quantumfs"
 
@@ -222,54 +222,55 @@ func TestFileSizeChanges_test(t *testing.T) {
 		err := printToFile(test.relPath(testFilename), testText)
 		test.assert(err == nil, "Error writing to new fd: %v", err)
 
-		cmd := exec.Command("cat", test.relPath(testFilename))
-		output, err := cmd.CombinedOutput()
+		var output []byte
+		output, err = ioutil.ReadFile(test.relPath(testFilename))
 		test.assert(err == nil && string(output) == testText,
 			"Couldn't read back from file")
 
-		cmd = exec.Command("truncate", "--size", "4",
-			test.relPath(testFilename))
-		output, err = cmd.CombinedOutput()
-		test.assert(err == nil && len(output) == 0,
-			"Problem truncating file")
+		err = os.Truncate(test.relPath(testFilename), 4)
+		test.assert(err == nil, "Problem truncating file")
 
-		cmd = exec.Command("cat", test.relPath(testFilename))
-		output, err = cmd.CombinedOutput()
+		output, err = ioutil.ReadFile(test.relPath(testFilename))
 		test.assert(err == nil && string(output) == testText[:4],
 			"Truncated file contents not what's expected")
 
-		cmd = exec.Command("truncate", "--size", "8",
-			test.relPath(testFilename))
-		output, err = cmd.CombinedOutput()
-		test.assert(err == nil && len(output) == 0,
-			"Unable to extend file size with SetAttr")
+		err = os.Truncate(test.relPath(testFilename), 8)
+		test.assert(err == nil, "Unable to extend file size with SetAttr")
 
-		cmd = exec.Command("cat", "-vT", test.relPath(testFilename))
-		output, err = cmd.CombinedOutput()
+		output, err = ioutil.ReadFile(test.relPath(testFilename))
 		test.assert(err == nil &&
-			string(output) == testText[:4]+"^@^@^@^@",
+			string(output) == testText[:4]+"\x00\x00\x00\x00",
+			"Extended file isn't filled with a hole: '%s'",
+			string(output))
+
+		// Shrink it again to ensure double truncates work
+		err = os.Truncate(test.relPath(testFilename), 6)
+		test.assert(err == nil, "Problem truncating file")
+
+		output, err = ioutil.ReadFile(test.relPath(testFilename))
+		test.assert(err == nil &&
+			string(output) == testText[:4] + "\x00\x00",
 			"Extended file isn't filled with a hole: '%s'",
 			string(output))
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == 8,
+		test.assert(stat.Size == 6,
 			"File size didn't match expected: %d", stat.Size)
 
 		err = printToFile(test.relPath(testFilename), testText)
 		test.assert(err == nil, "Error writing to new fd: %v", err)
 
-		cmd = exec.Command("cat", "-vT", test.relPath(testFilename))
-		output, err = cmd.CombinedOutput()
+		output, err = ioutil.ReadFile(test.relPath(testFilename))
 		test.assert(err == nil &&
-			string(output) == testText[:4]+"^@^@^@^@"+testText,
+			string(output) == testText[:4]+"\x00\x00"+testText,
 			"Append to file with a hole is incorrect: '%s'",
 			string(output))
 
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == int64(8+len(testText)),
+		test.assert(stat.Size == int64(6+len(testText)),
 			"File size change not preserve with file append: %d",
 			stat.Size)
 	})

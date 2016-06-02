@@ -35,18 +35,6 @@ type File struct {
 	parent   Inode
 }
 
-func enforceSize(buffer []byte, size int) []byte {
-	if len(buffer) > size {
-		return buffer[:size]
-	}
-
-	for len(buffer) < size {
-		buffer = append(buffer, 0)
-	}
-
-	return buffer
-}
-
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
 	fi.dirty_ = true
@@ -143,11 +131,13 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return fuse.EIO
 	}
 
-	// If we're truncating the attr.Size, truncate the data BEFORE we mod attr
+	// If we're extending the file, then clip the datastore garbage tail data.
+	// Discrepancy between attr.Size and datastore value length is handled in
+	// Read and Write functions, as well as below
 	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) &&
-		record.Size > attr.Size {
+		record.Size < attr.Size {
 
-		curBuffer := fi.fetchData(c, attr.Size)
+		curBuffer := fi.fetchData(c, record.Size)
 		if curBuffer == nil {
 			c.elog("Unable to fetch existing data for file")
 			return fuse.EIO
@@ -193,6 +183,19 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
+func resize(buffer []byte, size int) []byte {
+	if len(buffer) > size {
+		return buffer[:size]
+	}
+
+	for len(buffer) < size {
+		newLength := make([]byte, size - len(buffer))
+		buffer = append(buffer, newLength...)
+	}
+
+	return buffer
+}
+
 func (fi *File) fetchData(c *ctx, targetSize uint64) *quantumfs.Buffer {
 	var rtn *quantumfs.Buffer
 
@@ -208,7 +211,7 @@ func (fi *File) fetchData(c *ctx, targetSize uint64) *quantumfs.Buffer {
 	}
 
 	// Before we return the buffer, make sure it's the size it needs to be
-	rtn.Set(enforceSize(rtn.Get(), int(targetSize)))
+	rtn.Set(resize(rtn.Get(), int(targetSize)))
 
 	return rtn
 }
@@ -272,7 +275,8 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	}
 
 	if offset > uint64(len(finalData.Get())) {
-		offset = uint64(len(finalData.Get()))
+		c.elog("Writing past the end of file is not supported yet")
+		return 0, fuse.EIO
 	}
 	if size > uint32(len(buf)) {
 		size = uint32(len(buf))
