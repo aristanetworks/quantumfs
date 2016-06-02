@@ -249,7 +249,7 @@ func TestFileSizeChanges_test(t *testing.T) {
 
 		output, err = ioutil.ReadFile(test.relPath(testFilename))
 		test.assert(err == nil &&
-			string(output) == testText[:4] + "\x00\x00",
+			string(output) == testText[:4]+"\x00\x00",
 			"Extended file isn't filled with a hole: '%s'",
 			string(output))
 

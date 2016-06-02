@@ -189,7 +189,7 @@ func resize(buffer []byte, size int) []byte {
 	}
 
 	for len(buffer) < size {
-		newLength := make([]byte, size - len(buffer))
+		newLength := make([]byte, size-len(buffer))
 		buffer = append(buffer, newLength...)
 	}
 
