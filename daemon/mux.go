@@ -250,8 +250,12 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	c.vlog("QuantumFs::Symlink Enter")
 	defer c.vlog("QuantumFs::Symlink Exit")
 
-	c.elog("Unhandled request Symlink")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Symlink(c, pointedTo, linkName, out)
 }
 
 func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,

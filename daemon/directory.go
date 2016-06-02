@@ -470,6 +470,13 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	return fuse.OK
 }
 
+func (dir *Directory) Symlink(c *ctx, pointedTo string, linkName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Symlink on Directory")
+	return fuse.ENOTDIR
+}
+
 type directoryContents struct {
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc

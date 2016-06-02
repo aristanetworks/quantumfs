@@ -40,6 +40,9 @@ type Inode interface {
 
 	Rmdir(c *ctx, name string) fuse.Status
 
+	Symlink(c *ctx, pointedTo string, linkName string,
+		out *fuse.EntryOut) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut) fuse.Status

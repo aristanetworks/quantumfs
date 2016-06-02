@@ -228,7 +228,14 @@ func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
 
 func (nsl *NamespaceList) Rmdir(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Rmdir on NamespaceList")
-	return fuse.ENOTDIR
+	return fuse.EACCES
+}
+
+func (nsl *NamespaceList) Symlink(c *ctx, pointedTo string, linkName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Symlink on NamespaceList")
+	return fuse.EACCES
 }
 
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
@@ -358,7 +365,14 @@ func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
 
 func (wsl *WorkspaceList) Rmdir(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Rmdir on WorkspaceList")
-	return fuse.ENOTDIR
+	return fuse.EACCES
+}
+
+func (wsl *WorkspaceList) Symlink(c *ctx, pointedTo string, linkName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Symlink on WorkspaceList")
+	return fuse.EACCES
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,

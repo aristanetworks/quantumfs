@@ -144,6 +144,13 @@ func (fi *File) Rmdir(c *ctx, name string) fuse.Status {
 	return fuse.ENOTDIR
 }
 
+func (fi *File) Symlink(c *ctx, pointedTo string, linkName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Symlink on File")
+	return fuse.ENOTDIR
+}
+
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
