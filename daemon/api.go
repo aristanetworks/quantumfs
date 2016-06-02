@@ -6,6 +6,7 @@ package daemon
 // This file contains all the interaction with the quantumfs API file.
 
 import "encoding/json"
+import "errors"
 import "fmt"
 import "strings"
 import "time"
@@ -86,6 +87,13 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
+func (wsr *ApiInode) getChildRecord(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+
+	c.elog("Api doesn't support record fetch")
+	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+}
+
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Unlink on ApiInode")
 	return fuse.ENOTDIR
@@ -130,13 +138,6 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn
 	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on ApiInode")
-	return fuse.ENOSYS
-}
-
-func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
-
-	c.elog("Invalid getChildAttr on ApiInode")
 	return fuse.ENOSYS
 }
 

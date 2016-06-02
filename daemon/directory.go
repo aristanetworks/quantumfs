@@ -5,6 +5,7 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
+import "errors"
 import "syscall"
 import "time"
 
@@ -422,15 +423,15 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.OK
 }
 
-func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId,
-	out *fuse.AttrOut) fuse.Status {
+func (dir *Directory) getChildRecord(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-		dir.childrenRecords[inodeNum])
+	if val, ok := dir.childrenRecords[inodeNum]; ok {
+		return *val, nil
+	}
 
-	return fuse.OK
+	return quantumfs.DirectoryRecord{},
+		errors.New("Inode given is not a child of this directory")
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
