@@ -239,8 +239,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	c.vlog("QuantumFs::Link Enter")
 	defer c.vlog("QuantumFs::Link Exit")
 
-	c.elog("Unhandled request Link")
-	return fuse.ENOSYS
+	return fuse.EPERM
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
@@ -391,7 +390,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Release Enter")
+	c.vlog("QuantumFs::Release Enter Fh: ", input.Fh)
 	defer c.vlog("QuantumFs::Release Exit")
 
 	qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
@@ -415,7 +414,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Stat
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Flush Enter")
+	c.vlog("QuantumFs::Flush Enter Fh: ", input.Fh)
 	defer c.vlog("QuantumFs::Flush Exit")
 
 	c.elog("Unhandled request Flush")

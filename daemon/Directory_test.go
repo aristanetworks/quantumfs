@@ -207,8 +207,7 @@ func TestDirectoryUnlinkDirectory_test(t *testing.T) {
 
 		err = syscall.Unlink(test.relPath(testDir))
 		test.assert(err != nil, "Expected error unlinking directory")
-		test.assert(err.Error() == "is a directory",
-			"Error not 'is a directory': %v", err)
+		test.assert(err == syscall.EISDIR, "Error not EISDIR: %v", err)
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(test.relPath(testDir), &stat)
@@ -267,8 +266,8 @@ func TestDirectoryRmdirNotEmpty_test(t *testing.T) {
 
 		err = syscall.Rmdir(test.relPath(testDir))
 		test.assert(err != nil, "Expected error when deleting directory")
-		test.assert(err.Error() == "directory not empty",
-			"Expected error 'directory not empty': %v", err)
+		test.assert(err == syscall.ENOTEMPTY,
+			"Expected error ENOTEMPTY: %v", err)
 	})
 }
 
@@ -284,7 +283,7 @@ func TestDirectoryRmdirFile_test(t *testing.T) {
 
 		err = syscall.Rmdir(test.relPath(testFile))
 		test.assert(err != nil, "Expected error when deleting directory")
-		test.assert(err.Error() == "not a directory",
-			"Expected error 'not a directory': %v", err)
+		test.assert(err == syscall.ENOTDIR,
+			"Expected error ENOTDIR: %v", err)
 	})
 }
