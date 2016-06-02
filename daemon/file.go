@@ -201,7 +201,7 @@ func (fi *File) fetchData(c *ctx) *quantumfs.Buffer {
 		}
 		return quantumfs.NewBuffer(data.Get())
 	}
-	
+
 	return quantumfs.NewBuffer([]byte{})
 }
 

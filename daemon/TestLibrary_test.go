@@ -479,7 +479,7 @@ func TestTimeout_test(t *testing.T) {
 }
 
 func printToFile(filename string, data string) error {
-	file, err := os.OpenFile(filename, os.O_CREATE | os.O_APPEND | os.O_RDWR,
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR,
 		0777)
 	if file == nil || err != nil {
 		return errors.New("Unable to open file for RDRW")

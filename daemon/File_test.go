@@ -261,13 +261,13 @@ func TestFileSizeChanges_test(t *testing.T) {
 
 		cmd = exec.Command("cat", test.relPath(testFilename))
 		output, err = cmd.CombinedOutput()
-		test.assert(err == nil && string(output) == testText[:4] + testText,
+		test.assert(err == nil && string(output) == testText[:4]+testText,
 			"Append to file with a hole is incorrect: '%s'",
 			string(output))
 
 		err = syscall.Stat(test.relPath(testFilename), &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == int64(50 + len(testText)),
+		test.assert(stat.Size == int64(50+len(testText)),
 			"File size change not preserve with file append: %d",
 			stat.Size)
 	})
