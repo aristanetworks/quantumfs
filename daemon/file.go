@@ -35,6 +35,15 @@ type File struct {
 	parent   Inode
 }
 
+func enforceSize(buffer []byte, size int) []byte {
+	if len(buffer) > size {
+		return buffer[:size]
+	}
+
+	//if the size requested is larger than the buffer, we don't change the buffer
+	return buffer
+}
+
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
 	fi.dirty_ = true
@@ -125,6 +134,31 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", fi.id)
+		return fuse.EIO
+	}
+
+	// If we're truncating the attr.Size, truncate the data BEFORE we mod attr
+	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) &&
+		record.Size > attr.Size {
+
+		curBuffer := fi.fetchData(c)
+		if curBuffer == nil {
+			c.elog("Unable to fetch existing data for file")
+			return fuse.EIO
+		}
+
+		curBuffer.Set(enforceSize(curBuffer.Get(), int(attr.Size)))
+
+		err = fi.pushData(c, curBuffer)
+		if err != nil {
+			c.elog("Unable to truncate file data: %v", err)
+			return fuse.EIO
+		}
+	}
+
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
 
@@ -158,15 +192,51 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
+func (fi *File) fetchData(c *ctx) *quantumfs.Buffer {
+	if fi.key != quantumfs.EmptyBlockKey {
+		data := DataStore.Get(c, fi.key)
+		if data == nil {
+			c.elog("Data for key missing from datastore")
+			return nil
+		}
+		return quantumfs.NewBuffer(data.Get())
+	}
+	
+	return quantumfs.NewBuffer([]byte{})
+}
+
+func (fi *File) pushData(c *ctx, buffer *quantumfs.Buffer) error {
+	hash := sha1.Sum(buffer.Get())
+	newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData, hash)
+
+	err := DataStore.Set(c, newFileKey,
+		quantumfs.NewBuffer(buffer.Get()))
+	if err != nil {
+		c.elog("Unable to write data to the datastore")
+		return errors.New("Unable to write to the datastore")
+	}
+
+	fi.key = newFileKey
+	return nil
+}
+
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	if fi.key == quantumfs.EmptyBlockKey {
-		return fuse.ReadResultData(nil), fuse.OK
+	// Get the record for this file so we can enforce its attributes on the data
+	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", fi.id)
+		return fuse.ReadResultData(nil), fuse.EIO
 	}
 
-	data := DataStore.Get(c, fi.key)
-	curData := data.Get()
+	curBuffer := fi.fetchData(c)
+	if curBuffer == nil {
+		c.elog("Unable to fetch existing data for file")
+		return fuse.ReadResultData(nil), fuse.EIO
+	}
+
+	curData := enforceSize(curBuffer.Get(), int(record.Size))
 
 	end := offset + uint64(len(buf))
 	if end > uint64(len(curData)) {
@@ -181,22 +251,23 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	var finalData *quantumfs.Buffer
-
-	if fi.key != quantumfs.EmptyBlockKey {
-		data := DataStore.Get(c, fi.key)
-		if data == nil {
-			c.elog("Data for key missing from datastore")
-			return 0, fuse.EIO
-		}
-		finalData = quantumfs.NewBuffer(data.Get())
-	} else {
-		finalData = quantumfs.NewBuffer([]byte{})
+	// Get the record for this file so we can enforce its attributes on the data
+	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", fi.id)
+		return 0, fuse.EIO
 	}
 
-	if offset > uint64(len(finalData.Get())) {
-		c.elog("Writing past the end of file is not supported yet")
+	finalData := fi.fetchData(c)
+	if finalData == nil {
+		c.elog("Unable to fetch existing data for file")
 		return 0, fuse.EIO
+	}
+
+	finalData.Set(enforceSize(finalData.Get(), int(record.Size)))
+
+	if offset > uint64(len(finalData.Get())) {
+		offset = uint64(len(finalData.Get()))
 	}
 	if size > uint32(len(buf)) {
 		size = uint32(len(buf))
@@ -204,20 +275,16 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	copied := finalData.Write(buf[:size], uint32(offset))
 	if copied > 0 {
-		hash := sha1.Sum(finalData.Get())
-		newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData, hash)
-
-		err := DataStore.Set(c, newFileKey,
-			quantumfs.NewBuffer(finalData.Get()))
+		err = fi.pushData(c, finalData)
 		if err != nil {
-			c.elog("Unable to write data to the datastore")
+			c.elog("Write failed")
 			return 0, fuse.EIO
 		}
 
-		fi.key = newFileKey
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
-		attr.Size = uint64(len(finalData.Get()))
+		// Don't overwrite the size, increment it only to preserve holes
+		attr.Size = record.Size + uint64(copied)
 		fi.parent.setChildAttr(c, fi.id, &attr, nil)
 		fi.dirty(c)
 	}

@@ -212,11 +212,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	}
 
 	valid := uint(attr.SetAttrInCommon.Valid)
-	if BitFlagsSet(valid, fuse.FATTR_FH|
-		fuse.FATTR_LOCKOWNER) {
-		c.elog("Unsupported attribute(s) to set", valid)
-		return fuse.ENOSYS
-	}
+	// We don't support file locks yet, but when we do we need FATTR_LOCKOWNER
 
 	if BitFlagsSet(valid, fuse.FATTR_MODE) {
 		entry.Permissions = modeToPermissions(attr.Mode, 0)
