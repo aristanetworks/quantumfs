@@ -25,3 +25,14 @@ func TestHardlink(t *testing.T) {
 		test.assert(err == syscall.EPERM, "Expected EPERM error: %v", err)
 	})
 }
+
+func TestSymlinkCreate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		link := workspace + "/symlink"
+		err := syscall.Symlink("/usr/bin/arch", test.relPath(link))
+		test.assert(err == nil, "Error creating symlink: %v", err)
+	})
+}
