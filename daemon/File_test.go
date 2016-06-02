@@ -247,7 +247,7 @@ func TestFileSizeChanges_test(t *testing.T) {
 		cmd = exec.Command("cat", "-vT", test.relPath(testFilename))
 		output, err = cmd.CombinedOutput()
 		test.assert(err == nil &&
-			string(output) == testText[:4] + "^@^@^@^@",
+			string(output) == testText[:4]+"^@^@^@^@",
 			"Extended file isn't filled with a hole: '%s'",
 			string(output))
 
@@ -260,7 +260,7 @@ func TestFileSizeChanges_test(t *testing.T) {
 		err = printToFile(test.relPath(testFilename), testText)
 		test.assert(err == nil, "Error writing to new fd: %v", err)
 
-		cmd = exec.Command("cat", "-vT",  test.relPath(testFilename))
+		cmd = exec.Command("cat", "-vT", test.relPath(testFilename))
 		output, err = cmd.CombinedOutput()
 		test.assert(err == nil &&
 			string(output) == testText[:4]+"^@^@^@^@"+testText,
