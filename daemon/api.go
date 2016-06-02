@@ -142,6 +142,9 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn
 }
 
 func newApiHandle(c *ctx) *ApiHandle {
+	c.vlog("newApiHandle Enter")
+	defer c.vlog("newApiHandle Exit")
+
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
 			id:       c.qfs.newFileHandleId(),

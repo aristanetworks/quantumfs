@@ -7,6 +7,7 @@ package daemon
 
 import "bufio"
 import "errors"
+import "flag"
 import "fmt"
 import "io/ioutil"
 import "math/rand"
@@ -36,6 +37,8 @@ func runTest(t *testing.T, test quantumFsTest) {
 
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
+	lastSlash := strings.LastIndex(testName, "/")
+	testName = testName[lastSlash+1:]
 	th := &testHelper{
 		t:          t,
 		testName:   testName,
@@ -79,7 +82,16 @@ func (th *testHelper) execute(test quantumFsTest) {
 			trace = strings.SplitN(trace, "\n", 8)[7]
 		}
 
-		result := err.(string)
+		var result string
+		switch err.(type) {
+		default:
+			result = fmt.Sprintf("Unknown panic type: %v", err)
+		case string:
+			result = err.(string)
+		case error:
+			result = err.(error).Error()
+		}
+
 		if trace != "" {
 			result += "\nStack Trace:\n" + trace
 		}
@@ -192,16 +204,11 @@ type testHelper struct {
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
-	tempDir, err := ioutil.TempDir("", "quantumfsTest")
-	if err != nil {
-		th.t.Fatalf("Unable to create temporary mount point: %v", err)
-	}
+	th.tempDir = testRunDir + "/" + th.testName
+	mountPath := th.tempDir + "/mnt"
 
-	th.tempDir = tempDir
-	mountPath := tempDir + "/mnt"
-
-	os.Mkdir(mountPath, 0777)
-	th.t.Logf("[%s] Using mountpath %s", th.testName, mountPath)
+	os.MkdirAll(mountPath, 0777)
+	th.log("Using mountpath %s", mountPath)
 
 	config := QuantumFsConfig{
 		CachePath:        "",
@@ -222,31 +229,35 @@ func (th *testHelper) startDefaultQuantumFs() {
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func fuseConnection(mountPath string) int {
-	file, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		panic("Failed opening mountinfo")
-	}
-	defer file.Close()
-
-	mountinfo := bufio.NewReader(file)
-
-	for {
-		bline, _, err := mountinfo.ReadLine()
+	for i := 0; i < 100; i++ {
+		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
-			panic("Failed to find mount")
+			panic("Failed opening mountinfo")
 		}
+		defer file.Close()
 
-		line := string(bline)
+		mountinfo := bufio.NewReader(file)
 
-		if strings.Contains(line, mountPath) {
-			fields := strings.SplitN(line, " ", 5)
-			dev := strings.Split(fields[2], ":")[1]
-			devInt, err := strconv.Atoi(dev)
+		for {
+			bline, _, err := mountinfo.ReadLine()
 			if err != nil {
-				panic("Failed to convert dev to integer")
+				panic("Failed to find mount")
 			}
-			return devInt
+
+			line := string(bline)
+
+			if strings.Contains(line, mountPath) {
+				fields := strings.SplitN(line, " ", 5)
+				dev := strings.Split(fields[2], ":")[1]
+				devInt, err := strconv.Atoi(dev)
+				if err != nil {
+					panic("Failed to convert dev to integer")
+				}
+				return devInt
+			}
 		}
+
+		time.Sleep(50 * time.Millisecond)
 	}
 	panic("Mount not found")
 }
@@ -398,6 +409,30 @@ func (th *testHelper) workspaceRootId(namespace string,
 // Global test request ID incremented for all the running tests
 var requestId = uint64(1000000000)
 
+// Temporary directory for this test run
+var testRunDir string
+
+func init() {
+	var err error
+	for i := 0; i < 10; i++ {
+		testRunDir, err = ioutil.TempDir("", "quantumfsTest")
+		if err != nil {
+			continue
+		}
+		return
+	}
+	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	result := m.Run()
+
+	os.RemoveAll(testRunDir)
+	os.Exit(result)
+}
+
 // Produce a request specific ctx variable to use for quantumfs internal calls
 func (th *testHelper) newCtx() *ctx {
 	reqId := atomic.AddUint64(&requestId, 1)
@@ -453,9 +488,11 @@ func TestPanicFilesystemAbort_test(t *testing.T) {
 		api := test.getApi()
 
 		// Introduce a panicing error into quantumfs
+		test.qfs.mapMutex.Lock()
 		for k, v := range test.qfs.fileHandles {
 			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
 		}
+		test.qfs.mapMutex.Unlock()
 
 		// panic Quantumfs
 		api.Branch("_null/null", "test/crash")
