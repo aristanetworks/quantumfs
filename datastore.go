@@ -318,6 +318,14 @@ func (buf *Buffer) Get() []byte {
 	return buf.data
 }
 
+func (buf *Buffer) ContentHash() [ObjectKeyLength - 1]byte {
+	return sha1.Sum(buf.data)
+}
+
+func (buf *Buffer) Key(keyType KeyType) ObjectKey {
+	return NewObjectKey(keyType, buf.ContentHash())
+}
+
 func NewBuffer(in []byte) *Buffer {
 	return &Buffer{
 		data: in,

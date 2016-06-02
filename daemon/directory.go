@@ -345,7 +345,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	gid := c.fuseCtx.Owner.Gid
 
 	entry := quantumfs.DirectoryRecord{
-		Filename:           StringToBytes(name),
+		Filename:           StringToBytes256(name),
 		ID:                 quantumfs.EmptyBlockKey,
 		Type:               quantumfs.ObjectTypeSmallFile,
 		Permissions:        modeToPermissions(input.Mode, input.Umask),
@@ -399,7 +399,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	gid := c.fuseCtx.Owner.Gid
 
 	entry := quantumfs.DirectoryRecord{
-		Filename:           StringToBytes(name),
+		Filename:           StringToBytes256(name),
 		ID:                 quantumfs.EmptyDirKey,
 		Type:               quantumfs.ObjectTypeDirectoryEntry,
 		Permissions:        modeToPermissions(input.Mode, input.Umask),
@@ -470,11 +470,48 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	return fuse.OK
 }
 
-func (dir *Directory) Symlink(c *ctx, pointedTo string, linkName string,
+func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on Directory")
-	return fuse.ENOTDIR
+	if _, exists := dir.children[name]; exists {
+		return fuse.Status(syscall.EEXIST)
+	}
+
+	now := time.Now()
+	uid := c.fuseCtx.Owner.Uid
+	gid := c.fuseCtx.Owner.Gid
+
+	buf := quantumfs.NewBuffer([]byte(pointedTo))
+	key := buf.Key(quantumfs.KeyTypeData)
+
+	if err := DataStore.Set(c, key, buf); err != nil {
+		c.elog("Failed to upload block: %v", err)
+		return fuse.EIO
+	}
+
+	entry := quantumfs.DirectoryRecord{
+		Filename:           StringToBytes256(name),
+		ID:                 key,
+		Type:               quantumfs.ObjectTypeSymlink,
+		Permissions:        modeToPermissions(0777, 0000),
+		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
+		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
+		Size:               uint64(len(pointedTo)),
+		ExtendedAttributes: quantumfs.EmptyBlockKey,
+		CreationTime:       quantumfs.NewTime(now),
+		ModificationTime:   quantumfs.NewTime(now),
+	}
+
+	inodeNum := c.qfs.newInodeId()
+	dir.addChild(c, name, inodeNum, &entry)
+	symlink := newSymlink(c, inodeNum, key, dir.self)
+	c.qfs.setInode(c, inodeNum, symlink)
+
+	fillEntryOutCacheData(c, out)
+	out.NodeId = uint64(inodeNum)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, &entry)
+
+	return fuse.OK
 }
 
 type directoryContents struct {

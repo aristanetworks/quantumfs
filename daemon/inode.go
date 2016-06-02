@@ -40,7 +40,7 @@ type Inode interface {
 
 	Rmdir(c *ctx, name string) fuse.Status
 
-	Symlink(c *ctx, pointedTo string, linkName string,
+	Symlink(c *ctx, pointedTo string, name string,
 		out *fuse.EntryOut) fuse.Status
 
 	// Methods called by children
