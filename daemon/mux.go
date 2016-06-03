@@ -266,8 +266,12 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 	c.vlog("QuantumFs::Readlink Enter")
 	defer c.vlog("QuantumFs::Readlink Exit")
 
-	c.elog("Unhandled request Readlink")
-	return nil, fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return nil, fuse.ENOENT
+	}
+
+	return inode.Readlink(c)
 }
 
 func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {

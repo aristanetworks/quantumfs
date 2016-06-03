@@ -238,6 +238,11 @@ func (nsl *NamespaceList) Symlink(c *ctx, pointedTo string, linkName string,
 	return fuse.EACCES
 }
 
+func (nsl *NamespaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
+	c.elog("Invalid Readlink on NamespaceList")
+	return nil, fuse.EINVAL
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -373,6 +378,11 @@ func (wsl *WorkspaceList) Symlink(c *ctx, pointedTo string, linkName string,
 
 	c.elog("Invalid Symlink on WorkspaceList")
 	return fuse.EACCES
+}
+
+func (wsl *WorkspaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
+	c.elog("Invalid Readlink on WorkspaceList")
+	return nil, fuse.EINVAL
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,

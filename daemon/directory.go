@@ -516,6 +516,11 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 	return fuse.OK
 }
 
+func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
+	c.elog("Invalid Readlink on Directory")
+	return nil, fuse.EINVAL
+}
+
 type directoryContents struct {
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc

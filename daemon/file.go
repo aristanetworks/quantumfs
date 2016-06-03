@@ -151,6 +151,11 @@ func (fi *File) Symlink(c *ctx, pointedTo string, linkName string,
 	return fuse.ENOTDIR
 }
 
+func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
+	c.elog("Invalid Readlink on File")
+	return nil, fuse.EINVAL
+}
+
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 

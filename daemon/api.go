@@ -141,6 +141,11 @@ func (api *ApiInode) Symlink(c *ctx, pointedTo string, linkName string,
 	return fuse.ENOTDIR
 }
 
+func (api *ApiInode) Readlink(c *ctx) ([]byte, fuse.Status) {
+	c.elog("Invalid Readlink on ApiInode")
+	return nil, fuse.EINVAL
+}
+
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
