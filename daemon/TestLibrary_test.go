@@ -376,6 +376,21 @@ func (th *testHelper) newWorkspace() string {
 	return dst
 }
 
+// Branch existing workspace into new random name
+//
+// Returns the relative path of the new workspace.
+func (th *testHelper) branchWorkspace(src string) string {
+	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
+
+	api := th.getApi()
+	err := api.Branch(src, dst)
+
+	th.assert(err == nil, "Failed to branch workspace: %s -> %s: %v", src, dst,
+		err)
+
+	return dst
+}
+
 // Retrieve a list of FileDescriptor from an Inode
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
