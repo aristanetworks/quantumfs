@@ -53,3 +53,23 @@ func TestReadlink(t *testing.T) {
 			orig, path)
 	})
 }
+
+func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		link := workspace + "/symlink"
+		orig := "/usr/bin/arch"
+		err := syscall.Symlink(orig, test.relPath(link))
+		test.assert(err == nil, "Error creating symlink: %v", err)
+
+		workspace = test.branchWorkspace(workspace)
+		link = workspace + "/symlink"
+
+		path, err := os.Readlink(test.relPath(link))
+		test.assert(err == nil, "Error reading symlink: %v", err)
+		test.assert(path == orig, "Path does not match '%s' != '%s'",
+			orig, path)
+	})
+}
