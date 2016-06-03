@@ -103,8 +103,12 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 }
 
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on Symlink")
-	return nil, fuse.EINVAL
+	data := DataStore.Get(c, link.key)
+	if data == nil {
+		return nil, fuse.EIO
+	}
+
+	return data.Get(), fuse.OK
 }
 
 func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
