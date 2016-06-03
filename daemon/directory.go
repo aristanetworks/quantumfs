@@ -28,6 +28,8 @@ type Directory struct {
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	inodeNum InodeId, parent Inode) {
 
+	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
+
 	object := DataStore.Get(c, baseLayerId)
 	if object == nil {
 		panic("No baseLayer object")
@@ -35,6 +37,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	var baseLayer quantumfs.DirectoryEntry
 	if err := json.Unmarshal(object.Get(), &baseLayer); err != nil {
+		c.elog("Invalid base layer object: %v %v", err, string(object.Get()))
 		panic("Couldn't decode base layer object")
 	}
 
@@ -506,8 +509,10 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	inodeNum := c.qfs.newInodeId()
 	dir.addChild(c, name, inodeNum, &entry)
-	symlink := newSymlink(c, inodeNum, key, dir.self)
+	symlink := newSymlink(c, key, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, symlink)
+
+	c.vlog("Created new symlink with key: %s", key)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
