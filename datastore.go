@@ -9,6 +9,7 @@ import "time"
 
 import "crypto/sha1"
 import "encoding/json"
+import "encoding/hex"
 import "arista.com/quantumfs/qlog"
 
 // Maximum size of a block which can be stored in a datastore
@@ -71,6 +72,12 @@ type ObjectKey struct {
 // Extract the type of the object. Returns a KeyType*
 func (key *ObjectKey) Type() byte {
 	return key.Key[0]
+}
+
+func (key ObjectKey) String() string {
+	hex := hex.EncodeToString(key.Key[:])
+
+	return "Key: " + hex
 }
 
 type DirectoryEntry struct {
