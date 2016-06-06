@@ -12,7 +12,8 @@ import "time"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId, parent Inode) Inode
+type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode
 
 // This file contains the normal directory Inode type for a workspace
 type Directory struct {

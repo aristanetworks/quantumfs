@@ -15,7 +15,8 @@ const execBit = 0x1
 const writeBit = 0x2
 const readBit = 0x4
 
-func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId, parent Inode) Inode {
+func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode {
 
 	return newFile(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent)
 }
