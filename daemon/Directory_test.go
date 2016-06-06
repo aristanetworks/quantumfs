@@ -17,11 +17,11 @@ func TestDirectoryCreation_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
-		err := syscall.Mkdir(test.relPath(testFilename), 0124)
+		err := syscall.Mkdir(testFilename, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
 
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test dir: %v", err)
 		test.assert(stat.Size == qfsBlockSize, "Incorrect Size: %d",
 			stat.Size)
@@ -43,11 +43,11 @@ func TestRecursiveDirectoryCreation_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		dirName := workspace + "/test/a/b"
-		err := os.MkdirAll(test.relPath(dirName), 0124)
+		err := os.MkdirAll(dirName, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
 
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(dirName), &stat)
+		err = syscall.Stat(dirName, &stat)
 		test.assert(err == nil, "Error stat'ing test dir: %v", err)
 		test.assert(stat.Size == qfsBlockSize, "Incorrect Size: %d",
 			stat.Size)
@@ -71,17 +71,17 @@ func TestRecursiveDirectoryFileCreation_test(t *testing.T) {
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
 
-		err := os.MkdirAll(test.relPath(dirName), 0124)
+		err := os.MkdirAll(dirName, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
 
-		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
+		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
 
 		err = syscall.Close(fd)
 		test.assert(err == nil, "Error closing fd: %v", err)
 
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
 		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
@@ -105,13 +105,13 @@ func TestRecursiveDirectoryFileDescriptorDirtying_test(t *testing.T) {
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/" + "test"
 
-		err := os.MkdirAll(test.relPath(dirName), 0124)
+		err := os.MkdirAll(dirName, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
 
-		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
+		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ind test file: %v", err)
 		test.assert(stat.Ino >= quantumfs.InodeIdReservedEnd,
 			"File had reserved inode number %d", stat.Ino)
@@ -155,12 +155,12 @@ func TestDirectoryUpdate_test(t *testing.T) {
 
 		api := test.getApi()
 
-		src := test.nullWorkspace()
+		src := test.nullWorkspaceRel()
 		dst := "dirupdate/test"
 
 		// First create a file
-		testFilename := src + "/" + "test"
-		fd, err := os.Create(test.relPath(testFilename))
+		testFilename := test.absPath(src + "/" + "test")
+		fd, err := os.Create(testFilename)
 		fd.Close()
 		test.assert(err == nil, "Error creating test file: %v", err)
 
@@ -169,9 +169,9 @@ func TestDirectoryUpdate_test(t *testing.T) {
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
 
 		// Ensure the new workspace has the correct file
-		testFilename = dst + "/" + "test"
+		testFilename = test.absPath(dst + "/" + "test")
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Workspace copy doesn't match")
 	})
 }
@@ -182,16 +182,16 @@ func TestDirectoryFileDeletion_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
-		fd, err := os.Create(test.relPath(testFilename))
+		fd, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
 		err = fd.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
 
-		err = syscall.Unlink(test.relPath(testFilename))
+		err = syscall.Unlink(testFilename)
 		test.assert(err == nil, "Error unlinking file: %v", err)
 
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err != nil, "Error test file not deleted: %v", err)
 	})
 }
@@ -202,15 +202,15 @@ func TestDirectoryUnlinkDirectory_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		testDir := workspace + "/" + "test"
-		err := os.Mkdir(test.relPath(testDir), 0124)
+		err := os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
 
-		err = syscall.Unlink(test.relPath(testDir))
+		err = syscall.Unlink(testDir)
 		test.assert(err != nil, "Expected error unlinking directory")
 		test.assert(err == syscall.EISDIR, "Error not EISDIR: %v", err)
 
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testDir), &stat)
+		err = syscall.Stat(testDir, &stat)
 		test.assert(err == nil, "Error test directory was deleted")
 	})
 }
@@ -221,10 +221,10 @@ func TestDirectoryRmdirEmpty_test(t *testing.T) {
 
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
-		err := os.Mkdir(test.relPath(testDir), 0124)
+		err := os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
 
-		err = syscall.Rmdir(test.relPath(testDir))
+		err = syscall.Rmdir(testDir)
 		test.assert(err == nil, "Error deleting directory: %v", err)
 	})
 }
@@ -235,18 +235,18 @@ func TestDirectoryRmdirNewlyEmpty_test(t *testing.T) {
 
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
-		err := os.Mkdir(test.relPath(testDir), 0124)
+		err := os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
 
 		testFile := testDir + "/file"
-		fd, err := os.Create(test.relPath(testFile))
+		fd, err := os.Create(testFile)
 		test.assert(err == nil, "Error creating file: %v", err)
 		fd.Close()
 
-		err = syscall.Unlink(test.relPath(testFile))
+		err = syscall.Unlink(testFile)
 		test.assert(err == nil, "Error unlinking file: %v", err)
 
-		err = syscall.Rmdir(test.relPath(testDir))
+		err = syscall.Rmdir(testDir)
 		test.assert(err == nil, "Error deleting directory: %v", err)
 	})
 }
@@ -257,14 +257,14 @@ func TestDirectoryRmdirNotEmpty_test(t *testing.T) {
 
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
-		err := os.Mkdir(test.relPath(testDir), 0124)
+		err := os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
 		testFile := testDir + "/file"
-		fd, err := os.Create(test.relPath(testFile))
+		fd, err := os.Create(testFile)
 		test.assert(err == nil, "Error creating file: %v", err)
 		fd.Close()
 
-		err = syscall.Rmdir(test.relPath(testDir))
+		err = syscall.Rmdir(testDir)
 		test.assert(err != nil, "Expected error when deleting directory")
 		test.assert(err == syscall.ENOTEMPTY,
 			"Expected error ENOTEMPTY: %v", err)
@@ -277,11 +277,11 @@ func TestDirectoryRmdirFile_test(t *testing.T) {
 
 		workspace := test.newWorkspace()
 		testFile := workspace + "/test"
-		fd, err := os.Create(test.relPath(testFile))
+		fd, err := os.Create(testFile)
 		test.assert(err == nil, "Error creating file: %v", err)
 		fd.Close()
 
-		err = syscall.Rmdir(test.relPath(testFile))
+		err = syscall.Rmdir(testFile)
 		test.assert(err != nil, "Expected error when deleting directory")
 		test.assert(err == syscall.ENOTDIR,
 			"Expected error ENOTDIR: %v", err)

@@ -16,12 +16,12 @@ func TestNamespaceListing_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		var stat syscall.Stat_t
-		err := syscall.Stat(test.relPath(quantumfs.ApiPath), &stat)
+		err := syscall.Stat(test.absPath(quantumfs.ApiPath), &stat)
 		test.assert(err == nil, "Error getting api stat data: %v", err)
 		test.assert(stat.Ino == quantumfs.InodeIdApi,
 			"api file has incorrect inode number %d", stat.Ino)
 
-		entries, err := ioutil.ReadDir(test.relPath(""))
+		entries, err := ioutil.ReadDir(test.absPath(""))
 		test.assert(err == nil, "Couldn't read root listing")
 		test.assert(len(entries) == 2,
 			"Incorrect number of entries in empty root: %d",
@@ -34,7 +34,7 @@ func TestWorkspaceListing_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		entries, err :=
-			ioutil.ReadDir(test.relPath(quantumfs.NullNamespaceName))
+			ioutil.ReadDir(test.absPath(quantumfs.NullNamespaceName))
 		test.assert(err == nil, "Couldn't read namespace listing")
 		test.assert(len(entries) == 1,
 			"Incorrect number of entries in null namespace: %d",
@@ -47,7 +47,7 @@ func TestNullWorkspaceListing_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		path := test.nullWorkspace()
-		entries, err := ioutil.ReadDir(test.relPath(path))
+		entries, err := ioutil.ReadDir(path)
 		test.assert(err == nil, "Couldn't read workspace listing")
 		test.assert(len(entries) == 0,
 			"Incorrect number of entries in null workspace: %d",
