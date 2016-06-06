@@ -292,8 +292,6 @@ func TestDirectoryRmdirFile_test(t *testing.T) {
 // Confirm that when we reload a directory from the datastore that the classes it
 // instantiates matches the type of the entry in the directory.
 func TestDirectoryChildTypes(t *testing.T) {
-	t.Skip("Test disabled due to new file not being found")
-
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -316,7 +314,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 		workspace = test.newWorkspace()
 		testFile = workspace + "/testdir/testfile"
 
-		data, err := ioutil.ReadFile(testFile)
+		data, err := ioutil.ReadFile(test.relPath(testFile))
 		test.assert(err == nil, "Error reading file in new workspace: %v",
 			err)
 		test.assert(string(data) == fileContents,
