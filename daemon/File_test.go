@@ -10,6 +10,7 @@ import "testing"
 import "os"
 import "bytes"
 import "io"
+import "io/ioutil"
 
 import "arista.com/quantumfs"
 
@@ -148,6 +149,28 @@ func TestFileReadWrite_test(t *testing.T) {
 	})
 }
 
+func TestWriteThenRead(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFile := workspace + "/testfile"
+
+		fd, err := os.Create(test.relPath(testFile))
+		test.assert(err == nil, "Error creating file: %v", err)
+		test.log("Created file %s", testFile)
+
+		fileContents := "testdata"
+		_, err = fd.Write([]byte(fileContents))
+		test.assert(err == nil, "Error writing to file: %v", err)
+		fd.Close()
+
+		data, err := ioutil.ReadFile(testFile)
+		test.assert(err == nil, "Error reading file workspace: %v", err)
+		test.assert(string(data) == fileContents,
+			"File contents differ in from source: %v", string(data))
+	})
+}
 func TestFileDescriptorPermissions_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
