@@ -5,6 +5,7 @@ package daemon
 
 // Test the various operations on directories, such as creation and traversing
 
+import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
@@ -285,5 +286,39 @@ func TestDirectoryRmdirFile_test(t *testing.T) {
 		test.assert(err != nil, "Expected error when deleting directory")
 		test.assert(err == syscall.ENOTDIR,
 			"Expected error ENOTDIR: %v", err)
+	})
+}
+
+// Confirm that when we reload a directory from the datastore that the classes it
+// instantiates matches the type of the entry in the directory.
+func TestDirectoryChildTypes(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testDir := workspace + "/testdir"
+		testFile := testDir + "/testfile"
+
+		err := os.Mkdir(test.relPath(testDir), 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		fd, err := os.Create(test.relPath(testFile))
+		test.assert(err == nil, "Error creating file: %v", err)
+		test.log("Created file %s", testFile)
+
+		fileContents := "testdata"
+		_, err = fd.Write([]byte(fileContents))
+		test.assert(err == nil, "Error writing to file: %v", err)
+		fd.Close()
+
+		workspace = test.newWorkspace()
+		testFile = workspace + "/testdir/testfile"
+
+		data, err := ioutil.ReadFile(test.relPath(testFile))
+		test.assert(err == nil, "Error reading file in new workspace: %v",
+			err)
+		test.assert(string(data) == fileContents,
+			"File contents differ in branched workspace: %v",
+			string(data))
 	})
 }
