@@ -12,6 +12,9 @@ import "time"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
+type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode
+
 // This file contains the normal directory Inode type for a workspace
 type Directory struct {
 	InodeCommon
@@ -48,7 +51,16 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-		c.qfs.setInode(c, inodeId, newDirectory(c, entry.ID, inodeId, dir))
+
+		var constructor InodeConstructor
+		switch entry.Type {
+		case quantumfs.ObjectTypeDirectoryEntry:
+			constructor = newDirectory
+		case quantumfs.ObjectTypeSmallFile:
+			constructor = newSmallFile
+		}
+
+		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, inodeId, dir))
 	}
 
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
@@ -364,8 +376,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	inodeNum := c.qfs.newInodeId()
 	dir.addChild(c, name, inodeNum, &entry)
-	file := newFile(inodeNum, quantumfs.ObjectTypeSmallFile,
-		quantumfs.EmptyBlockKey, dir.self)
+	file := newSmallFile(c, quantumfs.EmptyBlockKey, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, file)
 
 	fillEntryOutCacheData(c, &out.EntryOut)
@@ -374,7 +385,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 		c.fuseCtx.Owner, &entry)
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(file, inodeNum, fileHandleNum)
+	fileDescriptor := newFileDescriptor(file.(*File), inodeNum, fileHandleNum)
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog("New file inode %d, fileHandle %d", inodeNum, fileHandleNum)

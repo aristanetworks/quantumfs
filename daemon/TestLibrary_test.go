@@ -323,13 +323,18 @@ func (th *testHelper) getApi() *quantumfs.Api {
 		return th.api
 	}
 
-	th.api = quantumfs.NewApiWithPath(th.relPath(quantumfs.ApiPath))
+	th.api = quantumfs.NewApiWithPath(th.absPath(quantumfs.ApiPath))
 	return th.api
+}
+
+// Make the given path absolute to the mount root
+func (th *testHelper) absPath(path string) string {
+	return th.tempDir + "/mnt/" + path
 }
 
 // Make the given path relative to the mount root
 func (th *testHelper) relPath(path string) string {
-	return th.tempDir + "/mnt/" + path
+	return strings.TrimPrefix(path, th.tempDir+"/mnt/")
 }
 
 // Return a random namespace/workspace name of given length
@@ -357,8 +362,12 @@ func TestRandomNamespaceName_test(t *testing.T) {
 	})
 }
 
-func (th *testHelper) nullWorkspace() string {
+func (th *testHelper) nullWorkspaceRel() string {
 	return quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+}
+
+func (th *testHelper) nullWorkspace() string {
+	return th.absPath(th.nullWorkspaceRel())
 }
 
 // Create a new workspace to test within
@@ -367,19 +376,20 @@ func (th *testHelper) nullWorkspace() string {
 func (th *testHelper) newWorkspace() string {
 	api := th.getApi()
 
-	src := th.nullWorkspace()
+	src := th.nullWorkspaceRel()
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
 
 	err := api.Branch(src, dst)
 	th.assert(err == nil, "Failed to branch workspace: %v", err)
 
-	return dst
+	return th.absPath(dst)
 }
 
 // Branch existing workspace into new random name
 //
 // Returns the relative path of the new workspace.
-func (th *testHelper) branchWorkspace(src string) string {
+func (th *testHelper) branchWorkspace(original string) string {
+	src := th.relPath(original)
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
 
 	api := th.getApi()

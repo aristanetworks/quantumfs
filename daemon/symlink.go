@@ -11,7 +11,7 @@ import "arista.com/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-func newSymlink(c *ctx, inodeNum InodeId, key quantumfs.ObjectKey,
+func newSymlink(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 	parent Inode) *Symlink {
 
 	symlink := Symlink{

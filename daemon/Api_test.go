@@ -16,7 +16,7 @@ func TestWorkspaceBranching_test(t *testing.T) {
 		api := test.getApi()
 
 		// First branch the null workspace
-		src := test.nullWorkspace()
+		src := test.nullWorkspaceRel()
 		dst := "apitest/a"
 		err := api.Branch(src, dst)
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
@@ -28,16 +28,16 @@ func TestWorkspaceBranching_test(t *testing.T) {
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
 
 		// Then create a file
-		testFilename := dst + "/" + "test"
-		fd, _ := os.Create(test.relPath(testFilename))
+		testFilename := test.absPath(dst + "/" + "test")
+		fd, _ := os.Create(testFilename)
 		fd.Close()
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 
 		// Ensure the first branched workspace wasn't modified
-		testFilename = src + "/" + "test"
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		testFilename = test.absPath(src + "/" + "test")
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err != nil, "Original workspace was modified")
 	})
 }
