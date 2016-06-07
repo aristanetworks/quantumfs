@@ -352,14 +352,9 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	return fuse.OK
 }
 
-func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
-	out *fuse.CreateOut) fuse.Status {
-
-	if _, exists := dir.children[name]; exists {
-		return fuse.Status(syscall.EEXIST)
-	}
-
-	c.vlog("Creating file: '%s'", name)
+func (dir *Directory) create(c *ctx, name string, mode uint32, umask uint32,
+	constructor InodeConstructor, type_ quantumfs.ObjectType,
+	key quantumfs.ObjectKey, out *fuse.EntryOut) Inode {
 
 	now := time.Now()
 	uid := c.fuseCtx.Owner.Uid
@@ -367,9 +362,9 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	entry := quantumfs.DirectoryRecord{
 		Filename:           StringToBytes256(name),
-		ID:                 quantumfs.EmptyBlockKey,
-		Type:               quantumfs.ObjectTypeSmallFile,
-		Permissions:        modeToPermissions(input.Mode, input.Umask),
+		ID:                 key,
+		Type:               type_,
+		Permissions:        modeToPermissions(mode, umask),
 		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
 		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
 		Size:               0,
@@ -380,19 +375,34 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	inodeNum := c.qfs.newInodeId()
 	dir.addChild(c, name, inodeNum, &entry)
-	file := newSmallFile(c, quantumfs.EmptyBlockKey, inodeNum, dir.self)
-	c.qfs.setInode(c, inodeNum, file)
+	newEntity := constructor(c, key, inodeNum, dir.self)
+	c.qfs.setInode(c, inodeNum, newEntity)
 
-	fillEntryOutCacheData(c, &out.EntryOut)
-	out.EntryOut.NodeId = uint64(inodeNum)
-	fillAttrWithDirectoryRecord(c, &out.EntryOut.Attr, inodeNum,
-		c.fuseCtx.Owner, &entry)
+	fillEntryOutCacheData(c, out)
+	out.NodeId = uint64(inodeNum)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, &entry)
+
+	return newEntity
+}
+
+func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
+	out *fuse.CreateOut) fuse.Status {
+
+	if _, exists := dir.children[name]; exists {
+		return fuse.Status(syscall.EEXIST)
+	}
+
+	c.vlog("Creating file: '%s'", name)
+
+	file := dir.create(c, name, input.Mode, input.Umask, newSmallFile,
+		quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey,
+		&out.EntryOut)
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(file.(*File), inodeNum, fileHandleNum)
+	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(), fileHandleNum)
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
-	c.vlog("New file inode %d, fileHandle %d", inodeNum, fileHandleNum)
+	c.vlog("New file inode %d, fileHandle %d", file.inodeNum(), fileHandleNum)
 
 	out.OpenOut.OpenFlags = 0
 	out.OpenOut.Fh = uint64(fileHandleNum)
@@ -414,31 +424,8 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 		return fuse.Status(syscall.EEXIST)
 	}
 
-	now := time.Now()
-	uid := c.fuseCtx.Owner.Uid
-	gid := c.fuseCtx.Owner.Gid
-
-	entry := quantumfs.DirectoryRecord{
-		Filename:           StringToBytes256(name),
-		ID:                 quantumfs.EmptyDirKey,
-		Type:               quantumfs.ObjectTypeDirectoryEntry,
-		Permissions:        modeToPermissions(input.Mode, input.Umask),
-		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
-		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
-		Size:               0,
-		ExtendedAttributes: quantumfs.EmptyBlockKey,
-		CreationTime:       quantumfs.NewTime(now),
-		ModificationTime:   quantumfs.NewTime(now),
-	}
-
-	inodeNum := c.qfs.newInodeId()
-	dir.addChild(c, name, inodeNum, &entry)
-	newDir := newDirectory(c, quantumfs.EmptyDirKey, inodeNum, dir.self)
-	c.qfs.setInode(c, inodeNum, newDir)
-
-	fillEntryOutCacheData(c, out)
-	out.NodeId = uint64(inodeNum)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, &entry)
+	dir.create(c, name, input.Mode, input.Umask, newDirectory,
+		quantumfs.ObjectTypeDirectoryEntry, quantumfs.EmptyDirKey, out)
 
 	return fuse.OK
 }
@@ -497,10 +484,6 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 		return fuse.Status(syscall.EEXIST)
 	}
 
-	now := time.Now()
-	uid := c.fuseCtx.Owner.Uid
-	gid := c.fuseCtx.Owner.Gid
-
 	buf := quantumfs.NewBuffer([]byte(pointedTo))
 	key := buf.Key(quantumfs.KeyTypeData)
 
@@ -509,30 +492,10 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 		return fuse.EIO
 	}
 
-	entry := quantumfs.DirectoryRecord{
-		Filename:           StringToBytes256(name),
-		ID:                 key,
-		Type:               quantumfs.ObjectTypeSymlink,
-		Permissions:        modeToPermissions(0777, 0000),
-		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
-		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
-		Size:               uint64(len(pointedTo)),
-		ExtendedAttributes: quantumfs.EmptyBlockKey,
-		CreationTime:       quantumfs.NewTime(now),
-		ModificationTime:   quantumfs.NewTime(now),
-	}
-
-	inodeNum := c.qfs.newInodeId()
-	dir.addChild(c, name, inodeNum, &entry)
-	symlink := newSymlink(c, key, inodeNum, dir.self)
-	c.qfs.setInode(c, inodeNum, symlink)
+	dir.create(c, name, 0777, 0777, newSymlink, quantumfs.ObjectTypeSymlink,
+		key, out)
 
 	c.vlog("Created new symlink with key: %s", key)
-
-	fillEntryOutCacheData(c, out)
-	out.NodeId = uint64(inodeNum)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, &entry)
-
 	return fuse.OK
 }
 
