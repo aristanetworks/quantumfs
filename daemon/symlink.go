@@ -12,7 +12,7 @@ import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func newSymlink(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode) *Symlink {
+	parent Inode) Inode {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{id: inodeNum},

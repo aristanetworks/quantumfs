@@ -54,10 +54,14 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 		var constructor InodeConstructor
 		switch entry.Type {
+		default:
+			c.elog("Unknown InodeConstructor type: %d", entry.Type)
 		case quantumfs.ObjectTypeDirectoryEntry:
 			constructor = newDirectory
 		case quantumfs.ObjectTypeSmallFile:
 			constructor = newSmallFile
+		case quantumfs.ObjectTypeSymlink:
+			constructor = newSymlink
 		}
 
 		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, inodeId, dir))
