@@ -372,7 +372,7 @@ func (th *testHelper) nullWorkspace() string {
 
 // Create a new workspace to test within
 //
-// Returns the relative path of the workspace
+// Returns the absolute path of the workspace
 func (th *testHelper) newWorkspace() string {
 	api := th.getApi()
 
