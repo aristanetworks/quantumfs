@@ -166,13 +166,13 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	if q.getLogLevel(idx, level) {
 		var front string
 		if reqId != DummyReqId {
-			const frontFmt = "%s | %s %5d: "
+			const frontFmt = "%s | %12s %5d: "
 			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
 				idx, reqId)
 		} else {
-			const frontFmt = "%s | %s [MUX]: "
+			const frontFmt = "%s | %12s [MUX]: "
 			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
-				idx, reqId)
+				idx)
 		}
 		q.write(front+format, args...)
 	}
