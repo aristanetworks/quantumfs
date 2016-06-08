@@ -399,7 +399,8 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 		&out.EntryOut)
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(), fileHandleNum)
+	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(),
+		fileHandleNum)
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog("New file inode %d, fileHandle %d", file.inodeNum(), fileHandleNum)
