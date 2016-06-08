@@ -332,6 +332,11 @@ func (th *testHelper) absPath(path string) string {
 	return th.tempDir + "/mnt/" + path
 }
 
+// Make the given path relative to the mount root
+func (th *testHelper) relPath(path string) string {
+	return strings.TrimPrefix(path, th.tempDir+"/mnt/")
+}
+
 // Return a random namespace/workspace name of given length
 func randomNamespaceName(size int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz" + "0123456789-." +
@@ -367,7 +372,7 @@ func (th *testHelper) nullWorkspace() string {
 
 // Create a new workspace to test within
 //
-// Returns the relative path of the workspace
+// Returns the absolute path of the workspace
 func (th *testHelper) newWorkspace() string {
 	api := th.getApi()
 
@@ -378,6 +383,22 @@ func (th *testHelper) newWorkspace() string {
 	th.assert(err == nil, "Failed to branch workspace: %v", err)
 
 	return th.absPath(dst)
+}
+
+// Branch existing workspace into new random name
+//
+// Returns the relative path of the new workspace.
+func (th *testHelper) branchWorkspace(original string) string {
+	src := th.relPath(original)
+	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
+
+	api := th.getApi()
+	err := api.Branch(src, dst)
+
+	th.assert(err == nil, "Failed to branch workspace: %s -> %s: %v", src, dst,
+		err)
+
+	return dst
 }
 
 // Retrieve a list of FileDescriptor from an Inode
