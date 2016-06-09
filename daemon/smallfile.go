@@ -13,8 +13,28 @@ type SmallFile struct {
 	bytes uint32
 }
 
-func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
+func (fi *SmallFile) ReadBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
 	error) {
+
+	// Sanity checks
+	if offset >= uint64(quantumfs.MaxBlockSize) {
+		return 0, errors.New("Attempt to read past end of block")
+	}
+
+	// If we try to read too far, there's nothing to read here
+	if blockIdx > 0 {
+		return 0, nil
+	}
+
+	expectedSize := fi.bytes
+	data := fetchDataSized(c, fi.key, int(expectedSize))
+
+	copied := copy(buf, data.Get()[offset:])
+	return copied, nil
+}
+
+func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
+	buf []byte) (int, error) {
 
 	// Sanity checks
 	if blockIdx > 0 {
@@ -42,7 +62,6 @@ func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte)
 		//store the key
 		fi.bytes = uint32(len(data.Get()))
 		fi.key = *newFileKey
-		c.elog("TEST %s", data.Get())
 		return int(copied), nil
 	}
 

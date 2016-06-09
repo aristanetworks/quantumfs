@@ -131,19 +131,8 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %d", fi.id)
-		return fuse.EIO
-	}
-
-	// If we're truncating the file, then clip the datastore garbage tail data.
-	// Discrepancy between attr.Size and datastore value length is handled in
-	// Read and Write functions, as well as below
-	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) &&
-		record.Size > attr.Size {
-
-		err = fi.accessor.Truncate(c, uint32(attr.Size))
+	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		err := fi.accessor.Truncate(c, uint32(attr.Size))
 		if err != nil {
 			return fuse.EIO
 		}
@@ -256,6 +245,9 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 
 type BlockAccessor interface {
 
+	// Read data from the block via an index
+	ReadBlock(*ctx, int, uint64, []byte) (int, error)
+
 	// Write data to a block via an index
 	WriteBlock(*ctx, int, uint64, []byte) (int, error)
 
@@ -322,7 +314,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	if size == 0 {
 		c.vlog("Read with zero size or buf")
-		return 0, fuse.OK
+		return fuse.ReadResult(nil), fuse.OK
 	}
 
 	// Determine the block to start in
@@ -331,53 +323,25 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	offset = offset % fi.accessor.GetBlockLength()
 
 	// Read the first block a little specially (with offset)
-	read, err := fi.readBlock(c, startBlkIdx, offset,
-		buf[writeCount:])
+	read, err := fi.accessor.ReadBlock(c, startBlkIdx, offset, buf[readCount:])
 	if err != nil {
-		c.elog("Unable to write first data block")
-		return 0, fuse.EIO
+		c.elog("Unable to read first data block")
+		return fuse.ReadResult(nil), fuse.EIO
 	}
-	writeCount += written
+	readCount += read
 
-	// Loop through the blocks, writing them
+	// Loop through the blocks, reading them
 	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
-		written, err = fi.writeBlock(c, i, 0, buf[writeCount:])
+		read, err = fi.accessor.ReadBlock(c, i, 0, buf[readCount:])
 		if err != nil {
-			// We couldn't write more, but that's okay we've written some
+			// We couldn't read more, but that's okay we've read some
 			// already so just return early and report what we've done
 			break;
 		}
-		writeCount += written
+		readCount += read
 	}
 
-	// Update the direct entry
-	var bytes []byte
-	bytes, err = fi.accessor.Marshal()
-	if err != nil {
-		panic("Failed to marshal baselayer")
-	}
-	hash := sha1.Sum(bytes)
-	newBaseLayerId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
-	if err := c.durableStore.Set(newBaseLayerId, &buffer); err != nil {
-		panic("Failed to upload new baseLayer object")
-	}
-
-	// Update the size with what we were able to write	
-	var attr fuse.SetAttrIn
-	attr.Valid = fuse.FATTR_SIZE
-	attr.Size = uint64(fi.accessor.GetFileLength())
-	fi.parent.setChildAttr(c, fi.id, &attr, nil)
-	fi.dirty(c)
-
-	return uint32(writeCount), fuse.OK
-
-//remains of old function
-	copied := copy(buf, curData[offset:end])
-
-	return fuse.ReadResultData(buf[0:copied]), fuse.OK
+	return fuse.ReadResultData(buf[:readCount]), fuse.OK
 }
 
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,

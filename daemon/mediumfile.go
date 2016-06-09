@@ -25,18 +25,29 @@ func (fi *MediumFile) expandTo(length int) {
 	fi.blocks = append(fi.blocks, newLength...)
 }
 
-func (fi *MediumFile) ReadBlock(c *ctx, blockIdx int, offset uint64) ([]byte,
-	error) {
+func (fi *MediumFile) ReadBlock(c *ctx, blockIdx int, offset uint64,
+	buf []byte) (int, error) {
 
 	// Sanity checks
 	if offset >= uint64(fi.blockSize) {
-		return []byte{}, errors.New("Attempt to read past end of block")
+		return 0, errors.New("Attempt to read past end of block")
 	}
 
 	// If we read too far then there's nothing to return
 	if blockIdx >= len(fi.blocks) {
-		return []byte{}, nil
+		return 0, nil
 	}
+
+	expectedSize := fi.blockSize
+	if blockIdx == len(fi.blocks)-1 {
+		// This is the last block, so it may not be filled
+		expectedSize = fi.lastBlockBytes
+	}
+	// Grab the data
+	data := fetchDataSized(c, fi.blocks[blockIdx], int(expectedSize))
+
+	copied := copy(buf, data.Get()[offset:])
+	return copied, nil
 }
 
 func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -61,12 +72,6 @@ func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte
 	if data == nil {
 		c.elog("Unable to fetch data for block")
 		return 0, errors.New("Unable to fetch block data")
-	}
-
-	if offset > uint64(len(data.Get())) {
-		c.elog("Writing past the end of file is not supported yet")
-		return 0, errors.New("Writing past the end of file " +
-			"is not supported yet")
 	}
 
 	copied := data.Write(buf, uint32(offset))
@@ -118,20 +123,15 @@ func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint32) error {
 	newLengthBytes = newLengthBytes % quantumfs.MaxBlockSize
 
 	// If we're increasing the length, we can just update
-	if newEndBlkIdx >= len(fi.blocks) {
-		fi.expandTo(newEndBlkIdx+1)
+	if newEndBlkIdx >= uint32(len(fi.blocks)) {
+		fi.expandTo(int(newEndBlkIdx+1))
 		return nil
 	}
 
 	// Allow increasing just the last block
-	if newEndBlkIdx == len(fi.blocks)-1 && newLengthBytes > fi.lastBlockBytes {
+	if newEndBlkIdx == uint32(len(fi.blocks)-1) && newLengthBytes > fi.lastBlockBytes {
 		fi.lastBlockBytes = newLengthBytes
 		return nil
-	}
-
-	// Go through the blocks, emptying them out
-	for i := uint32(len(fi.blocks))-1; i > newEndBlkIdx; i-- {
-		fi.blocks[i] = quantumfs.EmptyBlockKey
 	}
 
 	// Truncate the new last block
