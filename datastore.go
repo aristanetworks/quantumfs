@@ -300,6 +300,23 @@ func (buf *Buffer) Set(in []byte) {
 }
 
 func (buf *Buffer) Write(in []byte, offset uint32) uint32 {
+	// Sanity check offset and length
+	maxWriteLen := MaxBlockSize - int(offset)
+	if maxWriteLen <= 0 {
+		return 0
+	}
+
+	if len(in) > maxWriteLen {
+		in = in[:maxWriteLen]
+	}
+
+	// Ensure that our data ends where we need it to. This allows us to write
+	// past the end of a block, but not past the block's max capacity
+	deltaLen := int(offset) - len(buf.data)
+	if deltaLen > 0 {
+		buf.data = append(buf.data, make([]byte, deltaLen)...)
+	}
+
 	var finalBuffer []byte
 	// append our write data to the first split of the existing data
 	finalBuffer = append(buf.data[:offset], in...)
