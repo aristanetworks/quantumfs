@@ -319,3 +319,82 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 		syscall.Close(fd)
 	})
 }
+
+// Test file metadata updates
+func TestFileAttrUpdate_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		api := test.getApi()
+
+		src := test.nullWorkspace()
+		dst := "testFile/test"
+
+		// First create a file
+		testFile := test.relPath(src + "/" + "test")
+		fd, err := os.Create(testFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		// Then apply a SetAttr only change
+		os.Truncate(testFile, 5)
+
+		// Then branch the workspace
+		err = api.Branch(src, dst)
+		test.assert(err == nil, "Failed to branch workspace: %v", err)
+
+		// Ensure the new workspace has the correct file attributes
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(dst + "/" + "test"), &stat)
+		test.assert(err == nil, "Workspace copy doesn't have file")
+		test.assert(stat.Size == 5, "Workspace copy attr Size not updated")
+
+		// Read the data and ensure it's what we expected
+		var output []byte
+		output, err = ioutil.ReadFile(test.relPath(dst + "/" + "test"))
+		test.assert(string(output) == "\x00\x00\x00\x00\x00",
+			"Workspace doesn't fully reflect attr Size change %v",
+			output)
+	})
+}
+
+func TestFileAttrWriteUpdate_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		api := test.getApi()
+
+		src := test.nullWorkspace()
+		dst := "testFile/test"
+
+		// First create a file
+		testFile := test.relPath(src + "/" + "test")
+		fd, err := os.Create(testFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		// Then apply a SetAttr only change
+		os.Truncate(testFile, 5)
+
+		// Add some extra data to it
+		testText := "ExtraData"
+		err = printToFile(testFile, testText)
+
+		// Then branch the workspace
+		err = api.Branch(src, dst)
+		test.assert(err == nil, "Failed to branch workspace: %v", err)
+
+		// Ensure the new workspace has the correct file attributes
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.relPath(dst + "/" + "test"), &stat)
+		test.assert(err == nil, "Workspace copy doesn't have file")
+		test.assert(stat.Size == int64(5+len(testText)),
+			"Workspace copy attr Size not updated")
+
+		// Read the data and ensure it's what we expected
+		var output []byte
+		output, err = ioutil.ReadFile(test.relPath(dst + "/" + "test"))
+		test.assert(string(output) == "\x00\x00\x00\x00\x00"+testText,
+			"Workspace doesn't fully reflect file contents")
+	})
+}
