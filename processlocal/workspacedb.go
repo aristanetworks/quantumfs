@@ -23,56 +23,56 @@ func NewWorkspaceDB() quantumfs.WorkspaceDB {
 
 // WorkspaceDB is a process local quantumfs.WorkspaceDB
 type WorkspaceDB struct {
-	cacheMutex sync.Mutex
+	cacheMutex sync.RWMutex
 	cache      map[string]map[string]quantumfs.ObjectKey
 }
 
 func (wsdb *WorkspaceDB) NumNamespaces() int {
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	num := len(wsdb.cache)
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return num
 }
 
 func (wsdb *WorkspaceDB) NamespaceList() []string {
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	namespaces := make([]string, 0, len(wsdb.cache))
 
 	for name, _ := range wsdb.cache {
 		namespaces = append(namespaces, name)
 	}
 
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return namespaces
 }
 
 func (wsdb *WorkspaceDB) NumWorkspaces(namespace string) int {
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	num := len(wsdb.cache[namespace])
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return num
 }
 
 func (wsdb *WorkspaceDB) WorkspaceList(namespace string) []string {
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	workspaces := make([]string, 0, len(wsdb.cache[namespace]))
 
 	for name, _ := range wsdb.cache[namespace] {
 		workspaces = append(workspaces, name)
 	}
 
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return workspaces
 }
 
 func (wsdb *WorkspaceDB) NamespaceExists(namespace string) bool {
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.cache[namespace]
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return exists
 }
@@ -90,9 +90,9 @@ func (wsdb *WorkspaceDB) workspace(namespace string, workspace string) (
 }
 
 func (wsdb *WorkspaceDB) WorkspaceExists(namespace string, workspace string) bool {
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.workspace(namespace, workspace)
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return exists
 }
@@ -122,9 +122,9 @@ func (wsdb *WorkspaceDB) BranchWorkspace(srcNamespace string, srcWorkspace strin
 func (wsdb *WorkspaceDB) Workspace(namespace string,
 	workspace string) quantumfs.ObjectKey {
 
-	wsdb.cacheMutex.Lock()
+	wsdb.cacheMutex.RLock()
 	rootid, _ := wsdb.workspace(namespace, workspace)
-	wsdb.cacheMutex.Unlock()
+	wsdb.cacheMutex.RUnlock()
 
 	return rootid
 }
