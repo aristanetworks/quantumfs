@@ -239,8 +239,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	c.vlog("QuantumFs::Link Enter")
 	defer c.vlog("QuantumFs::Link Exit")
 
-	c.elog("Unhandled request Link")
-	return fuse.ENOSYS
+	return fuse.EPERM
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
@@ -251,8 +250,12 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	c.vlog("QuantumFs::Symlink Enter")
 	defer c.vlog("QuantumFs::Symlink Exit")
 
-	c.elog("Unhandled request Symlink")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	return inode.Symlink(c, pointedTo, linkName, out)
 }
 
 func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
@@ -263,8 +266,12 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 	c.vlog("QuantumFs::Readlink Enter")
 	defer c.vlog("QuantumFs::Readlink Exit")
 
-	c.elog("Unhandled request Readlink")
-	return nil, fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return nil, fuse.ENOENT
+	}
+
+	return inode.Readlink(c)
 }
 
 func (qfs *QuantumFs) Access(input *fuse.AccessIn) fuse.Status {
@@ -391,7 +398,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (fuse.ReadResult,
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Release Enter")
+	c.vlog("QuantumFs::Release Enter Fh: %v", input.Fh)
 	defer c.vlog("QuantumFs::Release Exit")
 
 	qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
@@ -415,7 +422,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (uint32, fuse.Stat
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) fuse.Status {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Flush Enter")
+	c.vlog("QuantumFs::Flush Enter Fh: %v", input.Fh)
 	defer c.vlog("QuantumFs::Flush Exit")
 
 	c.elog("Unhandled request Flush")

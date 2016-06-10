@@ -20,14 +20,14 @@ func TestFileCreation_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
-		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
+		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
 
 		err = syscall.Close(fd)
 		test.assert(err == nil, "Error closing fd: %v", err)
 
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
 		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
@@ -53,7 +53,7 @@ func TestFileReadWrite_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "testrw"
-		file, err := os.Create(test.relPath(testFilename))
+		file, err := os.Create(testFilename)
 		test.assert(file != nil && err == nil,
 			"Error creating file: %v", err)
 
@@ -87,8 +87,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		test.assert(err == nil, "Error closing fd: %v", err)
 
 		//now open the file again to trigger Open()
-		file, err = os.OpenFile(test.relPath(testFilename),
-			os.O_RDWR, 0777)
+		file, err = os.OpenFile(testFilename, os.O_RDWR, 0777)
 		test.assert(err == nil, "Error opening fd: %v", err)
 
 		//test overwriting past the end of the file with an offset by
@@ -128,7 +127,7 @@ func TestFileReadWrite_test(t *testing.T) {
 		err = file.Close()
 		test.assert(err == nil, "Error closing fd: %v", err)
 
-		file, err = os.OpenFile(test.relPath(testFilename), os.O_RDWR, 0777)
+		file, err = os.OpenFile(testFilename, os.O_RDWR, 0777)
 		test.assert(err == nil, "Error opening fd: %v", err)
 
 		readLen = 0
@@ -155,20 +154,20 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
-		fd, err := syscall.Creat(test.relPath(testFilename), 0000)
+		fd, err := syscall.Creat(testFilename, 0000)
 		test.assert(err == nil, "Error creating file: %v", err)
 		syscall.Close(fd)
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions := modeToPermissions(stat.Mode, 0x777)
 		test.assert(permissions == 0x0,
 			"Creating with mode not preserved, %d vs 0000", permissions)
 
 		//test write only
-		err = syscall.Chmod(test.relPath(testFilename), 0222)
+		err = syscall.Chmod(testFilename, 0222)
 		test.assert(err == nil, "Error chmod-ing test file: %v", err)
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
 		test.assert(permissions == 0x2,
@@ -176,35 +175,35 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 
 		var file *os.File
 		//ensure we can't read the file, only write
-		file, err = os.Open(test.relPath(testFilename))
+		file, err = os.Open(testFilename)
 		test.assert(file == nil && err != nil,
 			"Able to open write-only file for read")
 		test.assert(os.IsPermission(err),
 			"Expected permission error not returned: %v", err)
 		file.Close()
 
-		file, err = os.OpenFile(test.relPath(testFilename), os.O_WRONLY, 0x2)
+		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
 		test.assert(file != nil && err == nil,
 			"Unable to open file only for writing with permissions")
 		file.Close()
 
 		//test read only
-		err = syscall.Chmod(test.relPath(testFilename), 0444)
+		err = syscall.Chmod(testFilename, 0444)
 		test.assert(err == nil, "Error chmod-ing test file: %v", err)
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
 		test.assert(permissions == 0x4,
 			"Chmodding not working, %d vs 0444", permissions)
 
-		file, err = os.OpenFile(test.relPath(testFilename), os.O_WRONLY, 0x2)
+		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
 		test.assert(file == nil && err != nil,
 			"Able to open read-only file for write")
 		test.assert(os.IsPermission(err),
 			"Expected permission error not returned: %v", err)
 		file.Close()
 
-		file, err = os.Open(test.relPath(testFilename))
+		file, err = os.Open(testFilename)
 		test.assert(file != nil && err == nil,
 			"Unable to open file only for reading with permissions")
 		file.Close()
@@ -283,10 +282,10 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 		// Create a file and determine its inode numbers
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
-		fd, err := syscall.Creat(test.relPath(testFilename), 0124)
+		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.relPath(testFilename), &stat)
+		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Ino >= quantumfs.InodeIdReservedEnd,
 			"File had reserved inode number %d", stat.Ino)
@@ -313,8 +312,7 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 			quantumfs.NullWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
-		test.assert(!file.dirty_, "FileDescriptor not cleaned after"+
-			"change")
+		test.assert(!file.dirty_, "FileDescriptor not cleaned after change")
 
 		syscall.Close(fd)
 	})

@@ -161,8 +161,19 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	// todo: send to shared memory
 	t := time.Now()
 
+	const timeFormat = "2006-01-02T15:04:05.000000000"
+
 	if q.getLogLevel(idx, level) {
-		q.write(t.Format(time.StampNano)+" "+idx.String()+" "+
-			strconv.FormatUint(reqId, 10)+": "+format, args...)
+		var front string
+		if reqId != DummyReqId {
+			const frontFmt = "%s | %12s %5d: "
+			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
+				idx, reqId)
+		} else {
+			const frontFmt = "%s | %12s [MUX]: "
+			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
+				idx)
+		}
+		q.write(front+format, args...)
 	}
 }

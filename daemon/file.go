@@ -15,7 +15,13 @@ const execBit = 0x1
 const writeBit = 0x2
 const readBit = 0x4
 
-func newFile(inodeNum InodeId, fileType quantumfs.ObjectType,
+func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode {
+
+	return newFile(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent)
+}
+
+func newFile(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode) *File {
 
 	file := File{
@@ -167,6 +173,18 @@ func (fi *File) Unlink(c *ctx, name string) fuse.Status {
 func (fi *File) Rmdir(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Rmdir on File")
 	return fuse.ENOTDIR
+}
+
+func (fi *File) Symlink(c *ctx, pointedTo string, linkName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Symlink on File")
+	return fuse.ENOTDIR
+}
+
+func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
+	c.elog("Invalid Readlink on File")
+	return nil, fuse.EINVAL
 }
 
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,

@@ -27,7 +27,7 @@ func BytesToString(data []byte) string {
 }
 
 // Convert the given null terminated string into a [256]byte array
-func StringToBytes(data string) [256]byte {
+func StringToBytes256(data string) [256]byte {
 	var out [256]byte
 	in := []byte(data)
 	for i := range in {
