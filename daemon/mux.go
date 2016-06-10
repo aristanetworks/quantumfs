@@ -48,16 +48,16 @@ type QuantumFs struct {
 	fileHandleNum uint64
 	c             ctx
 
-	mapMutex    sync.Mutex // TODO: Perhaps an RWMutex instead?
+	mapMutex    sync.RWMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
 }
 
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
-	qfs.mapMutex.Lock()
+	qfs.mapMutex.RLock()
 	inode := qfs.inodes[id]
-	qfs.mapMutex.Unlock()
+	qfs.mapMutex.RUnlock()
 	return inode
 }
 
@@ -74,9 +74,9 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
-	qfs.mapMutex.Lock()
+	qfs.mapMutex.RLock()
 	fileHandle := qfs.fileHandles[id]
-	qfs.mapMutex.Unlock()
+	qfs.mapMutex.RUnlock()
 	return fileHandle
 }
 
