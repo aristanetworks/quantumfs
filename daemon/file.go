@@ -8,7 +8,6 @@ package daemon
 import "arista.com/quantumfs"
 import "errors"
 import "github.com/hanwen/go-fuse/fuse"
-import "crypto/sha1"
 import "syscall"
 
 const execBit = 0x1
@@ -215,18 +214,12 @@ func resize(buffer []byte, size int) []byte {
 }
 
 func (fi *File) fetchData(c *ctx, targetSize uint64) *quantumfs.Buffer {
-	var rtn *quantumfs.Buffer
-
-	if fi.key != quantumfs.EmptyBlockKey {
-		data := DataStore.Get(c, fi.key)
-		if data == nil {
-			c.elog("Data for key missing from datastore")
-			return nil
-		}
-		rtn = quantumfs.NewBuffer(data.Get())
-	} else {
-		rtn = quantumfs.NewBuffer([]byte{})
+	data := DataStore.Get(c, fi.key)
+	if data == nil {
+		c.elog("Data for key missing from datastore")
+		return nil
 	}
+	rtn := quantumfs.NewBuffer(data.Get())
 
 	// Before we return the buffer, make sure it's the size it needs to be
 	rtn.Set(resize(rtn.Get(), int(targetSize)))
@@ -235,8 +228,7 @@ func (fi *File) fetchData(c *ctx, targetSize uint64) *quantumfs.Buffer {
 }
 
 func (fi *File) pushData(c *ctx, buffer *quantumfs.Buffer) error {
-	hash := sha1.Sum(buffer.Get())
-	newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData, hash)
+	newFileKey := buffer.Key(quantumfs.KeyTypeData)
 
 	err := DataStore.Set(c, newFileKey,
 		quantumfs.NewBuffer(buffer.Get()))
