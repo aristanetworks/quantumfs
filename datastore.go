@@ -257,12 +257,7 @@ func createEmptyDirectory() ObjectKey {
 var EmptyBlockKey ObjectKey
 
 func createEmptyBlock() ObjectKey {
-	var emptyBlock struct{}
-
-	bytes, err := json.Marshal(emptyBlock)
-	if err != nil {
-		panic("Failed to marshal empty block")
-	}
+	var bytes []byte
 
 	hash := sha1.Sum(bytes)
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
