@@ -192,7 +192,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	select {
 	case response := <-api.responses:
-		c.vlog("Returning", response)
+		c.vlog("API Response %s", response)
 		return response, fuse.OK
 	case <-blocking:
 		// This is a nonblocking socket, so return that nothing is ready
