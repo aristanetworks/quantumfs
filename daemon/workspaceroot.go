@@ -52,7 +52,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 // Mark this workspace dirty and update the workspace DB
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	wsr.dirty_ = true
+	wsr.setDirty(true)
 	wsr.advanceRootId(c)
 }
 

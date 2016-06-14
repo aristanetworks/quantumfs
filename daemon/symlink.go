@@ -126,11 +126,11 @@ func (link *Symlink) getChildRecord(c *ctx,
 }
 
 func (link *Symlink) dirty(c *ctx) {
-	link.dirty_ = true
+	link.setDirty(true)
 	link.parent.dirtyChild(c, link)
 }
 
 func (link *Symlink) sync(c *ctx) quantumfs.ObjectKey {
-	link.dirty_ = false
+	link.setDirty(false)
 	return link.key
 }

@@ -6,6 +6,8 @@ package daemon
 
 import "fmt"
 import "reflect"
+import "sync"
+import "sync/atomic"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -64,9 +66,13 @@ type Inode interface {
 }
 
 type InodeCommon struct {
-	self   Inode // Leaf subclass instance
-	id     InodeId
-	dirty_ bool // True if this Inode or any children are dirty
+	// These fields are constant once instantiated
+	self Inode // Leaf subclass instance
+	id   InodeId
+
+	// These fields are protected by the lock
+	lock   sync.RWMutex
+	dirty_ uint32 // 1 if this Inode or any children are dirty
 }
 
 func (inode *InodeCommon) inodeNum() InodeId {
@@ -74,7 +80,22 @@ func (inode *InodeCommon) inodeNum() InodeId {
 }
 
 func (inode *InodeCommon) isDirty() bool {
-	return inode.dirty_
+	if atomic.LoadUint32(&inode.dirty_) == 1 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (inode *InodeCommon) setDirty(dirty bool) {
+	var val uint32
+	if dirty {
+		val = 1
+	} else {
+		val = 0
+	}
+
+	atomic.StoreUint32(&inode.dirty_, val)
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
