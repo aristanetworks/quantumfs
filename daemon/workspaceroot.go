@@ -60,13 +60,18 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 }
 
 func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
-	wsr.Directory.sync(c)
+	c.vlog("WorkspaceRoot::sync Enter")
+	defer c.vlog("WorkspaceRoot::sync Exit")
+
 	wsr.advanceRootId(c)
 	return wsr.rootId
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
+	c.vlog("WorkspaceRoot::advanceRootId Enter")
+	defer c.vlog("WorkspaceRoot::advanceRootId Exit")
+
 	// Upload the workspaceroot object
 	var workspaceRoot quantumfs.WorkspaceRoot
 	wsr.Directory.sync(c)
