@@ -76,6 +76,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	dir.children = children
 	dir.childrenRecords = childrenRecords
 	dir.dirtyChildren_ = make([]Inode, 0)
+	dir.baseLayerId = baseLayerId
 }
 
 func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
