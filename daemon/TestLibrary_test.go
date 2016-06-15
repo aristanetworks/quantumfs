@@ -135,6 +135,7 @@ func (th *testHelper) endTest() {
 
 	if th.server != nil {
 		if exception != nil {
+			th.t.Logf("Failed with exception, forcefully unmounting")
 			abortFuse(th)
 		}
 
