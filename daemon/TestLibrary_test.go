@@ -427,7 +427,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 func (th *testHelper) workspaceRootId(namespace string,
 	workspace string) quantumfs.ObjectKey {
 
-	return th.qfs.c.workspaceDB.Workspace(namespace, workspace)
+	return th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx, namespace, workspace)
 }
 
 // Global test request ID incremented for all the running tests

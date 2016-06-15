@@ -34,7 +34,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	var wsr WorkspaceRoot
 
-	rootId := c.workspaceDB.Workspace(parentName, name)
+	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
 
 	object := DataStore.Get(c, rootId)
 	var workspaceRoot quantumfs.WorkspaceRoot
@@ -85,7 +85,7 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(wsr.namespace,
+		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.namespace,
 			wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {

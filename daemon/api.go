@@ -262,7 +262,7 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
-	if err := c.workspaceDB.BranchWorkspace(src[0], src[1], dst[0],
+	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], dst[0],
 		dst[1]); err != nil {
 
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())

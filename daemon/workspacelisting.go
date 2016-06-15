@@ -54,14 +54,14 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	fillAttr(attr, inodeNum,
-		uint32(c.workspaceDB.NumNamespaces()))
+		uint32(c.workspaceDB.NumNamespaces(&c.Ctx)))
 }
 
 type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId, name string)
 
 func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId, namespace string) {
 	fillAttr(attr, inodeNum,
-		uint32(c.workspaceDB.NumWorkspaces(namespace)))
+		uint32(c.workspaceDB.NumWorkspaces(&c.Ctx, namespace)))
 }
 
 func fillAttr(attr *fuse.Attr, inodeNum InodeId, numChildren uint32) {
@@ -150,7 +150,7 @@ func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32,
 func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
 		newWorkspaceList)
 	children := snapshotChildren(c, &nsl.namespaces, fillNamespaceAttr)
 
@@ -179,11 +179,11 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 		return fuse.OK
 	}
 
-	if !c.workspaceDB.NamespaceExists(name) {
+	if !c.workspaceDB.NamespaceExists(&c.Ctx, name) {
 		return fuse.ENOENT
 	}
 
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
 		newWorkspaceList)
 
 	inodeNum := nsl.namespaces[name]
@@ -305,8 +305,8 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
 	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
-		newWorkspaceRoot)
+		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+		&wsl.workspaces, newWorkspaceRoot)
 	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
 
 	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id)
@@ -320,13 +320,13 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	if !c.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
+	if !c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.namespaceName, name) {
 		return fuse.ENOENT
 	}
 
 	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
-		newWorkspaceRoot)
+		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+		&wsl.workspaces, newWorkspaceRoot)
 
 	inodeNum := wsl.workspaces[name]
 	out.NodeId = uint64(inodeNum)
