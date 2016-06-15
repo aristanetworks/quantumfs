@@ -139,7 +139,7 @@ func (dir *Directory) dirtyChild(c *ctx, child Inode) {
 func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory::sync Enter")
 	defer c.vlog("Directory::sync Exit")
-	if dir.isDirty() {
+	if !dir.isDirty() {
 		c.vlog("directory not dirty")
 		return dir.baseLayerId
 	}
