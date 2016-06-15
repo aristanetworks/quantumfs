@@ -32,6 +32,9 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 func newWorkspaceRoot(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
+	c.vlog("WorkspaceRoot::newWorkspaceRoot Enter")
+	defer c.vlog("WorkspaceRoot::newWorkspaceRoot Exit")
+
 	var wsr WorkspaceRoot
 
 	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
@@ -92,6 +95,7 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 			panic("Unexpected workspace rootID update failure")
 		}
 
+		c.dlog("Advanced rootId %v -> %v", wsr.rootId, rootId)
 		wsr.rootId = rootId
 	}
 }

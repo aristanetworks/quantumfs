@@ -81,6 +81,9 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent Inode) Inode {
 
+	c.vlog("Directory::newDirectory Enter")
+	defer c.vlog("Directory::newDirectory Exit")
+
 	var dir Directory
 
 	initDirectory(c, &dir, baseLayerId, inodeNum, parent)
@@ -133,7 +136,10 @@ func (dir *Directory) dirtyChild(c *ctx, child Inode) {
 }
 
 func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
+	c.vlog("Directory::sync Enter")
+	defer c.vlog("Directory::sync Exit")
 	if dir.isDirty() {
+		c.vlog("directory not dirty")
 		return dir.baseLayerId
 	}
 
@@ -166,6 +172,7 @@ func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
 		panic("Failed to upload new baseLayer object")
 	}
 
+	c.vlog("Directory key %v -> %v", dir.baseLayerId, newBaseLayerId)
 	dir.baseLayerId = newBaseLayerId
 
 	dir.setDirty(false)
@@ -384,6 +391,9 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	constructor InodeConstructor, type_ quantumfs.ObjectType,
 	key quantumfs.ObjectKey, out *fuse.EntryOut) Inode {
+
+	c.vlog("Directory::create_ Enter")
+	defer c.vlog("Directory::create_ Exit")
 
 	now := time.Now()
 	uid := c.fuseCtx.Owner.Uid
