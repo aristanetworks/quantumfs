@@ -293,7 +293,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		return th.log(format, args...)
 	}
 	th.qfs.c.Qlog.SetWriter(writer)
-	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacesdb/*,test/*")
+	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacedb/*,test/*")
 
 	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
 	if err != nil {
