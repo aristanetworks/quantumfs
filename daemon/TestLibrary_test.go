@@ -471,7 +471,7 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
 			Qlog:      c.Qlog,
-			RequestId: c.RequestId,
+			RequestId: request,
 		},
 		qfs:          c.qfs,
 		config:       c.config,
