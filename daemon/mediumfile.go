@@ -17,6 +17,25 @@ type MediumFile struct {
 	blocks		[]quantumfs.ObjectKey
 }
 
+func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
+	var rtn MediumFile
+	rtn.blockSize = quantumfs.MaxBlockSize
+
+	buffer := DataStore.Get(c, key)
+	if buffer == nil {
+		c.elog("Unable to fetch metadata for new medium file creation")
+		// Assume that the file is empty
+		rtn.lastBlockBytes = 0
+		return &rtn
+	}
+
+	if err := json.Unmarshal(buffer.Get(), &rtn); err != nil {
+		panic("Couldn't decode MediumFile object")
+	}
+
+	return &rtn
+}
+
 func (fi *MediumFile) expandTo(length int) {
 	newLength := make([]quantumfs.ObjectKey, length - len(fi.blocks))
 	for i := 0; i < len(newLength); i++ {
@@ -68,7 +87,7 @@ func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte
 	}
 
 	// Grab the data
-	data := fetchData(c, fi.blocks[blockIdx])
+	data := DataStore.Get(c, fi.blocks[blockIdx])
 	if data == nil {
 		c.elog("Unable to fetch data for block")
 		return 0, errors.New("Unable to fetch block data")
@@ -99,13 +118,21 @@ func (fi *MediumFile) GetBlockLength() uint64 {
 	return uint64(fi.blockSize)
 }
 
-func (fi *MediumFile) Marshal() ([]byte, error) {
+func (fi *MediumFile) WriteToStore(c *ctx) quantumfs.ObjectKey {
 	bytes, err := json.Marshal(fi)
 	if err != nil {
-		return []byte{}, errors.New("Unable to Marshal data")
+		panic("Unable to marshal file metadata")
 	}
 
-	return bytes, nil
+	var buffer quantumfs.Buffer
+	buffer.Set(bytes)
+
+	newFileKey := buffer.Key(quantumfs.KeyTypeMetadata)
+	if err := c.durableStore.Set(newFileKey, &buffer); err != nil {
+		panic("Failed to upload new medium file")
+	}
+
+	return newFileKey
 }
 
 func (fi *MediumFile) GetType() quantumfs.ObjectType {
@@ -118,19 +145,21 @@ func (fi *MediumFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAcces
 	return nil
 }
 
-func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint32) error {
+func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint64) error {
 	newEndBlkIdx := newLengthBytes / quantumfs.MaxBlockSize
 	newLengthBytes = newLengthBytes % quantumfs.MaxBlockSize
 
 	// If we're increasing the length, we can just update
-	if newEndBlkIdx >= uint32(len(fi.blocks)) {
+	if newEndBlkIdx >= uint64(len(fi.blocks)) {
 		fi.expandTo(int(newEndBlkIdx+1))
 		return nil
 	}
 
 	// Allow increasing just the last block
-	if newEndBlkIdx == uint32(len(fi.blocks)-1) && newLengthBytes > fi.lastBlockBytes {
-		fi.lastBlockBytes = newLengthBytes
+	if newEndBlkIdx == uint64(len(fi.blocks)-1) &&
+		newLengthBytes > uint64(fi.lastBlockBytes) {
+
+		fi.lastBlockBytes = uint32(newLengthBytes)
 		return nil
 	}
 
@@ -150,7 +179,7 @@ func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint32) error {
 	// Now that everything has succeeded and is in the datastore, update metadata
 	fi.blocks[newEndBlkIdx] = *newFileKey
 	fi.blocks = fi.blocks[:newEndBlkIdx+1]
-	fi.lastBlockBytes = newLengthBytes
+	fi.lastBlockBytes = uint32(newLengthBytes)
 
 	return nil
 }

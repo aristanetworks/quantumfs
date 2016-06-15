@@ -17,10 +17,16 @@ const readBit = 0x4
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 	parent Inode) Inode {
 
-	return newFile(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent)
+	return newFile_(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent)
 }
 
-func newFile(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
+func newMediumFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode {
+
+	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent)
+}
+
+func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode) *File {
 
 	file := File{
@@ -30,9 +36,18 @@ func newFile(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 		parent:      parent,
 	}
 	file.self = &file
-	file.accessor = &SmallFile{
-		key:	key,
-		bytes:	0,
+
+	if fileType == quantumfs.ObjectTypeSmallFile {
+		childRecord, err := parent.getChildRecord(c, inodeNum)
+		if err != nil {
+			panic("Couldn't get existing small file's record")
+		}
+		file.accessor = newSmallAccessor(c, childRecord.Size, key)
+	} else if fileType == quantumfs.ObjectTypeMediumFile {
+		file.accessor = newMediumAccessor(c, key)
+	} else {
+		c.elog("Unsupported file type %v", fileType)
+		panic("Couldn't create new file of unsupported type")
 	}
 
 	return &file
@@ -137,11 +152,14 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-		err := fi.accessor.Truncate(c, uint32(attr.Size))
+		err := fi.accessor.Truncate(c, uint64(attr.Size))
 		if err != nil {
 			return fuse.EIO
 		}
 	}
+
+	// Update the entry metadata
+	fi.key = fi.accessor.WriteToStore(c)
 
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
@@ -201,21 +219,14 @@ func resize(buffer []byte, size int) []byte {
 	return buffer
 }
 
-func fetchData(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
-	data := DataStore.Get(c, key)
-	if data == nil {
-		c.elog("Data for key missing from datastore")
-		return nil
-	}
-	rtn := quantumfs.NewBuffer(data.Get())
-
-	return rtn
-}
-
 func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
 	targetSize int) *quantumfs.Buffer { 
 
-	rtn := fetchData(c, key)
+	rtn := DataStore.Get(c, key)
+	if rtn == nil {
+		c.elog("Data for key missing from datastore")
+		return nil
+	}
 
 	// Before we return the buffer, make sure it's the size it needs to be
 	rtn.Set(resize(rtn.Get(), targetSize))
@@ -223,7 +234,9 @@ func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
 	return rtn
 }
 
-func (fi *File) pushData(c *ctx, buffer *quantumfs.Buffer) error {
+func pushData(c *ctx, buffer *quantumfs.Buffer) (*quantumfs.ObjectKey,
+	error) {
+
 	newFileKey := buffer.Key(quantumfs.KeyTypeData)
 
 	err := DataStore.Set(c, newFileKey,
@@ -272,11 +285,11 @@ type BlockAccessor interface {
 	// Convert contents into new accessor type
 	ConvertTo(*ctx, quantumfs.ObjectType) BlockAccessor
 
-	// Get the file's direct data in bytes (raw or metadata depending on type)
-	Marshal() ([]byte, error)
+	// Write file's metadata to the datastore and provide the key
+	WriteToStore(c *ctx) quantumfs.ObjectKey
 
 	// Truncate to lessen length *only*, error otherwise
-	Truncate(*ctx, uint32) error
+	Truncate(*ctx, uint64) error
 }
 
 // Given the number of blocks to write into the file, ensure that we are the
@@ -393,19 +406,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	}
 
 	// Update the direct entry
-	var bytes []byte
-	bytes, err = fi.accessor.Marshal()
-	if err != nil {
-		panic("Failed to marshal baselayer")
-	}
-	hash := sha1.Sum(bytes)
-	newBaseLayerId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
-	if err := c.durableStore.Set(newBaseLayerId, &buffer); err != nil {
-		panic("Failed to upload new baseLayer object")
-	}
+	fi.key = fi.accessor.WriteToStore(c)
 
 	// Update the size with what we were able to write	
 	var attr fuse.SetAttrIn

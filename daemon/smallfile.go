@@ -7,10 +7,19 @@ package daemon
 
 import "arista.com/quantumfs"
 import "errors"
+import "math"
 
 type SmallFile struct {
 	key quantumfs.ObjectKey
-	bytes uint32
+	bytes uint64
+}
+
+func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
+	var rtn SmallFile
+	rtn.key = key
+	rtn.bytes = size
+
+	return &rtn
 }
 
 func (fi *SmallFile) ReadBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -46,7 +55,7 @@ func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
 	}
 
 	// Grab the data
-	data := fetchData(c, fi.key)
+	data := DataStore.Get(c, fi.key)
 	if data == nil {
 		c.elog("Unable to fetch data for block")
 		return 0, errors.New("Unable to fetch block data")
@@ -60,7 +69,7 @@ func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
 			return 0, errors.New("Unable to write to block")
 		}
 		//store the key
-		fi.bytes = uint32(len(data.Get()))
+		fi.bytes = uint64(len(data.Get()))
 		fi.key = *newFileKey
 		return int(copied), nil
 	}
@@ -77,9 +86,9 @@ func (fi *SmallFile) GetBlockLength() uint64 {
 	return quantumfs.MaxBlockSize
 }
 
-func (fi *SmallFile) Marshal() ([]byte, error) {
+func (fi *SmallFile) WriteToStore(c *ctx) quantumfs.ObjectKey {
 	// No metadata to marshal for small files
-	return []byte{}, nil
+	return fi.key
 }
 
 func (fi *SmallFile) GetType() quantumfs.ObjectType {
@@ -90,9 +99,12 @@ func (fi *SmallFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccess
 	if newType == quantumfs.ObjectTypeMediumFile {
 		var rtn MediumFile
 		rtn.blockSize = quantumfs.MaxBlockSize
-		rtn.blocks = make([]quantumfs.ObjectKey, 1)
+
+		numBlocks := int(math.Ceil(float64(fi.bytes) /
+			float64(rtn.blockSize)))
+		rtn.blocks = make([]quantumfs.ObjectKey, numBlocks)
 		rtn.blocks[0] = fi.key
-		rtn.lastBlockBytes = fi.bytes
+		rtn.lastBlockBytes = uint32(fi.bytes % uint64(rtn.blockSize))
 
 		return &rtn
 	}
@@ -101,7 +113,7 @@ func (fi *SmallFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccess
 	return nil
 }
 
-func (fi *SmallFile) Truncate(c *ctx, newLengthBytes uint32) error {
+func (fi *SmallFile) Truncate(c *ctx, newLengthBytes uint64) error {
 
 	// If we're increasing the length, then we can just update
 	if newLengthBytes > fi.bytes {
