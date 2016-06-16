@@ -109,6 +109,19 @@ func (fi *SmallFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccess
 		return &rtn
 	}
 
+	if newType == quantumfs.ObjectTypeLargeFile {
+		var rtn LargeFile
+		rtn.blockSize = quantumfs.MaxBlockSize
+
+		numBlocks := int(math.Ceil(float64(fi.bytes) /
+			float64(rtn.blockSize)))
+		rtn.ExpandTo(numBlocks)
+		rtn.blocks[0] = fi.key
+		rtn.lastBlockBytes = uint32(fi.bytes % uint64(rtn.blockSize))
+
+		return &rtn
+	}
+
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }

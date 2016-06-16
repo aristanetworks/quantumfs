@@ -65,6 +65,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 			constructor = newSmallFile
 		case quantumfs.ObjectTypeMediumFile:
 			constructor = newMediumFile
+		case quantumfs.ObjectTypeLargeFile:
+			constructor = newLargeFile
 		case quantumfs.ObjectTypeSymlink:
 			constructor = newSymlink
 		}

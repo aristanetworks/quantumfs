@@ -129,7 +129,7 @@ func (fi *MediumFile) WriteToStore(c *ctx) quantumfs.ObjectKey {
 
 	newFileKey := buffer.Key(quantumfs.KeyTypeMetadata)
 	if err := c.durableStore.Set(newFileKey, &buffer); err != nil {
-		panic("Failed to upload new medium file")
+		panic("Failed to upload new file metadata")
 	}
 
 	return newFileKey

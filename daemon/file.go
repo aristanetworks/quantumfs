@@ -26,6 +26,12 @@ func newMediumFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent)
 }
 
+func newLargeFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode {
+
+	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent)
+}
+
 func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode) *File {
 
