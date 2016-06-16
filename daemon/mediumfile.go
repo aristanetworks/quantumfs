@@ -36,7 +36,7 @@ func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
 	return &rtn
 }
 
-func (fi *MediumFile) expandTo(length int) {
+func (fi *MediumFile) ExpandTo(length int) {
 	newLength := make([]quantumfs.ObjectKey, length - len(fi.blocks))
 	for i := 0; i < len(newLength); i++ {
 		newLength[i] = quantumfs.EmptyBlockKey
@@ -83,13 +83,13 @@ func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte
 
 	// Ensure we expand the file to fit the blockIdx
 	if blockIdx >= len(fi.blocks) {
-		fi.expandTo(blockIdx+1)
+		fi.ExpandTo(blockIdx+1)
 	}
 
 	// Grab the data
 	data := DataStore.Get(c, fi.blocks[blockIdx])
 	if data == nil {
-		c.elog("Unable to fetch data for block")
+		c.elog("Unable to fetch data for block %s", fi.blocks[blockIdx])
 		return 0, errors.New("Unable to fetch block data")
 	}
 
@@ -151,7 +151,7 @@ func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint64) error {
 
 	// If we're increasing the length, we can just update
 	if newEndBlkIdx >= uint64(len(fi.blocks)) {
-		fi.expandTo(int(newEndBlkIdx+1))
+		fi.ExpandTo(int(newEndBlkIdx+1))
 		return nil
 	}
 

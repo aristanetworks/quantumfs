@@ -292,11 +292,11 @@ type BlockAccessor interface {
 	Truncate(*ctx, uint64) error
 }
 
-// Given the number of blocks to write into the file, ensure that we are the
+// Given the block index to write into the file, ensure that we are the
 // correct file type
-func (fi *File) reconcileFileType(c *ctx, numBlocks int) error {
+func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 
-	neededType := calcTypeGivenBlocks(numBlocks)
+	neededType := calcTypeGivenBlocks(blockIdx+1)
 	if neededType > fi.accessor.GetType() {
 		newAccessor := fi.accessor.ConvertTo(c, neededType)
 		if newAccessor == nil {
@@ -319,7 +319,7 @@ func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int
 	var written int
 	written, err = fi.accessor.WriteBlock(c, blockIdx, offset, buf)
 	if err != nil {
-		return 0, errors.New("Couldn't write block")
+		return 0, err
 	}
 
 	return written, nil
@@ -389,8 +389,9 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	written, err := fi.writeBlock(c, startBlkIdx, offset,
 		buf[writeCount:])
 	if err != nil {
-		c.elog("Unable to write first data block")
+		c.elog("Unable to write first data block: %v", err)
 		return 0, fuse.EIO
+
 	}
 	writeCount += written
 

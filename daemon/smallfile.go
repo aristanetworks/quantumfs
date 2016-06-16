@@ -50,8 +50,8 @@ func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, errors.New("BlockIdx must be zero for small files")
 	}
 
-	if uint32(offset) + uint32(len(buf)) >= quantumfs.MaxBlockSize {
-		return 0, errors.New("Offset and write amount exceeds small file")
+	if uint32(offset) >= quantumfs.MaxBlockSize {
+		return 0, errors.New("Offset exceeds small file")
 	}
 
 	// Grab the data
@@ -102,7 +102,7 @@ func (fi *SmallFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccess
 
 		numBlocks := int(math.Ceil(float64(fi.bytes) /
 			float64(rtn.blockSize)))
-		rtn.blocks = make([]quantumfs.ObjectKey, numBlocks)
+		rtn.ExpandTo(numBlocks)
 		rtn.blocks[0] = fi.key
 		rtn.lastBlockBytes = uint32(fi.bytes % uint64(rtn.blockSize))
 
