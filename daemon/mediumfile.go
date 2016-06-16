@@ -69,8 +69,8 @@ func (fi *MediumFile) ReadBlock(c *ctx, blockIdx int, offset uint64,
 	return copied, nil
 }
 
-func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
-	error) {
+func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
+	buf []byte) (int, error) {
 
 	// Sanity checks
 	if blockIdx > quantumfs.MaxBlocksMediumFile {
