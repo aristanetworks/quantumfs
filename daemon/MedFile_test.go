@@ -39,7 +39,7 @@ func TestFileExpansion_test(t *testing.T) {
 
 		// Write the fibonacci sequence to the file continually past what
 		// a single block could hold.
-		data := genFibonacci(4*1024*1024)
+		data := genFibonacci(4 * 1024 * 1024)
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error writing 4MB fibonacci to new fd: %v",
 			err)
@@ -76,7 +76,7 @@ func TestFileExpansion_test(t *testing.T) {
 		test.assert(err == nil, "Error reading fib+hole back from file")
 		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
 			"Data readback mismatch")
-		delta := (5*1024*1024) - newLen
+		delta := (5 * 1024 * 1024) - newLen
 		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
 			"File hole not filled with zeros")
 	})
@@ -94,7 +94,7 @@ func TestMedFileAttr_test(t *testing.T) {
 		syscall.Close(fd)
 
 		// Then expand it via SetAttr to medium file size
-		newSize := int64(2*1024*1024)
+		newSize := int64(2 * 1024 * 1024)
 		os.Truncate(testFilename, newSize)
 
 		// Check that the size increase worked
@@ -108,7 +108,7 @@ func TestMedFileAttr_test(t *testing.T) {
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Error reading 4MB hole from file")
-		
+
 		for i := 0; i < len(output); i++ {
 			test.assert(output[i] == 0, "Data not zeroed in file, %s",
 				output[i])
@@ -119,7 +119,7 @@ func TestMedFileAttr_test(t *testing.T) {
 		var file *os.File
 		var count int
 		dataOffset := 1500000
-		file, err = os.OpenFile(testFilename, os.O_RDWR,  0777)
+		file, err = os.OpenFile(testFilename, os.O_RDWR, 0777)
 		test.assert(err == nil, "Unable to open file for rdwr: %v", err)
 		count, err = file.WriteAt(testString, int64(dataOffset))
 		test.assert(err == nil, "Unable to write at offset: %v", err)

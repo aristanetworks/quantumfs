@@ -10,7 +10,7 @@ import "errors"
 import "math"
 
 type SmallFile struct {
-	key quantumfs.ObjectKey
+	key   quantumfs.ObjectKey
 	bytes uint64
 }
 

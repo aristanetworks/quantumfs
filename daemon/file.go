@@ -220,7 +220,7 @@ func resize(buffer []byte, size int) []byte {
 }
 
 func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
-	targetSize int) *quantumfs.Buffer { 
+	targetSize int) *quantumfs.Buffer {
 
 	rtn := DataStore.Get(c, key)
 	if rtn == nil {
@@ -296,7 +296,7 @@ type BlockAccessor interface {
 // correct file type
 func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 
-	neededType := calcTypeGivenBlocks(blockIdx+1)
+	neededType := calcTypeGivenBlocks(blockIdx + 1)
 	if neededType > fi.accessor.GetType() {
 		newAccessor := fi.accessor.ConvertTo(c, neededType)
 		if newAccessor == nil {
@@ -358,7 +358,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		if err != nil {
 			// We couldn't read more, but that's okay we've read some
 			// already so just return early and report what we've done
-			break;
+			break
 		}
 		readCount += read
 	}
@@ -401,7 +401,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			// We couldn't write more, but that's okay we've written some
 			// already so just return early and report what we've done
-			break;
+			break
 		}
 		writeCount += written
 	}
@@ -409,7 +409,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	// Update the direct entry
 	fi.key = fi.accessor.WriteToStore(c)
 
-	// Update the size with what we were able to write	
+	// Update the size with what we were able to write
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.GetFileLength())

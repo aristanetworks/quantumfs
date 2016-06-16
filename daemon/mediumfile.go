@@ -12,9 +12,9 @@ import "errors"
 // These variables are always correct. Where the datastore value length disagrees,
 // this structure is correct.
 type MediumFile struct {
-	blockSize	uint32
-	lastBlockBytes	uint32
-	blocks		[]quantumfs.ObjectKey
+	blockSize      uint32
+	lastBlockBytes uint32
+	blocks         []quantumfs.ObjectKey
 }
 
 func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
@@ -37,7 +37,7 @@ func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
 }
 
 func (fi *MediumFile) ExpandTo(length int) {
-	newLength := make([]quantumfs.ObjectKey, length - len(fi.blocks))
+	newLength := make([]quantumfs.ObjectKey, length-len(fi.blocks))
 	for i := 0; i < len(newLength); i++ {
 		newLength[i] = quantumfs.EmptyBlockKey
 	}
@@ -83,7 +83,7 @@ func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64, buf []byte
 
 	// Ensure we expand the file to fit the blockIdx
 	if blockIdx >= len(fi.blocks) {
-		fi.ExpandTo(blockIdx+1)
+		fi.ExpandTo(blockIdx + 1)
 	}
 
 	// Grab the data
@@ -151,7 +151,7 @@ func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint64) error {
 
 	// If we're increasing the length, we can just update
 	if newEndBlkIdx >= uint64(len(fi.blocks)) {
-		fi.ExpandTo(int(newEndBlkIdx+1))
+		fi.ExpandTo(int(newEndBlkIdx + 1))
 		return nil
 	}
 
