@@ -36,7 +36,11 @@ func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
 	return &rtn
 }
 
-func (fi *MediumFile) ExpandTo(length int) {
+func (fi *MediumFile) expandTo(length int) {
+	if length > quantumfs.MaxBlocksMediumFile {
+		panic("Invalid new length set to expandTo for medium file")
+	}
+
 	newLength := make([]quantumfs.ObjectKey, length-len(fi.blocks))
 	for i := 0; i < len(newLength); i++ {
 		newLength[i] = quantumfs.EmptyBlockKey
@@ -44,7 +48,7 @@ func (fi *MediumFile) ExpandTo(length int) {
 	fi.blocks = append(fi.blocks, newLength...)
 }
 
-func (fi *MediumFile) ReadBlock(c *ctx, blockIdx int, offset uint64,
+func (fi *MediumFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	// Sanity checks
@@ -69,7 +73,7 @@ func (fi *MediumFile) ReadBlock(c *ctx, blockIdx int, offset uint64,
 	return copied, nil
 }
 
-func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
+func (fi *MediumFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	// Sanity checks
@@ -83,7 +87,7 @@ func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
 
 	// Ensure we expand the file to fit the blockIdx
 	if blockIdx >= len(fi.blocks) {
-		fi.ExpandTo(blockIdx + 1)
+		fi.expandTo(blockIdx + 1)
 	}
 
 	// Grab the data
@@ -109,16 +113,19 @@ func (fi *MediumFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
 	return 0, errors.New("writeBlock attempt with zero data")
 }
 
-func (fi *MediumFile) GetFileLength() uint64 {
+func (fi *MediumFile) fileLength() uint64 {
 	return (uint64(fi.blockSize) * uint64(len(fi.blocks)-1)) +
 		uint64(fi.lastBlockBytes)
 }
 
-func (fi *MediumFile) GetBlockLength() uint64 {
-	return uint64(fi.blockSize)
+func (fi *MediumFile) blockIdxInfo(absOffset uint64) (int, uint64) {
+	blkIdx := absOffset / uint64(fi.blockSize)
+	remainingOffset := absOffset % uint64(fi.blockSize)
+
+	return int(blkIdx), remainingOffset
 }
 
-func (fi *MediumFile) WriteToStore(c *ctx) quantumfs.ObjectKey {
+func (fi *MediumFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 	bytes, err := json.Marshal(fi)
 	if err != nil {
 		panic("Unable to marshal file metadata")
@@ -135,23 +142,26 @@ func (fi *MediumFile) WriteToStore(c *ctx) quantumfs.ObjectKey {
 	return newFileKey
 }
 
-func (fi *MediumFile) GetType() quantumfs.ObjectType {
+func (fi *MediumFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeMediumFile
 }
 
-func (fi *MediumFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccessor {
+func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	if newType <= quantumfs.ObjectTypeMediumFile {
+		return fi
+	}
 
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }
 
-func (fi *MediumFile) Truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *MediumFile) truncate(c *ctx, newLengthBytes uint64) error {
 	newEndBlkIdx := newLengthBytes / quantumfs.MaxBlockSize
 	newLengthBytes = newLengthBytes % quantumfs.MaxBlockSize
 
 	// If we're increasing the length, we can just update
 	if newEndBlkIdx >= uint64(len(fi.blocks)) {
-		fi.ExpandTo(int(newEndBlkIdx + 1))
+		fi.expandTo(int(newEndBlkIdx + 1))
 		return nil
 	}
 

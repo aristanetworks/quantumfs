@@ -22,7 +22,7 @@ func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
 	return &rtn
 }
 
-func (fi *SmallFile) ReadBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
+func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
 	error) {
 
 	// Sanity checks
@@ -42,7 +42,7 @@ func (fi *SmallFile) ReadBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 	return copied, nil
 }
 
-func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
+func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	// Sanity checks
@@ -78,32 +78,41 @@ func (fi *SmallFile) WriteBlock(c *ctx, blockIdx int, offset uint64,
 	return 0, errors.New("writeBlock attempt with zero data")
 }
 
-func (fi *SmallFile) GetFileLength() uint64 {
+func (fi *SmallFile) fileLength() uint64 {
 	return uint64(fi.bytes)
 }
 
-func (fi *SmallFile) GetBlockLength() uint64 {
-	return quantumfs.MaxBlockSize
+func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
+	blkIdx := absOffset / quantumfs.MaxBlockSize
+	remainingOffset := absOffset % quantumfs.MaxBlockSize
+
+	return int(blkIdx), remainingOffset
 }
 
-func (fi *SmallFile) WriteToStore(c *ctx) quantumfs.ObjectKey {
+func (fi *SmallFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 	// No metadata to marshal for small files
 	return fi.key
 }
 
-func (fi *SmallFile) GetType() quantumfs.ObjectType {
+func (fi *SmallFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeSmallFile
 }
 
-func (fi *SmallFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccessor {
+func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	if newType == quantumfs.ObjectTypeSmallFile {
+		return fi
+	}
+
 	if newType == quantumfs.ObjectTypeMediumFile {
 		var rtn MediumFile
 		rtn.blockSize = quantumfs.MaxBlockSize
 
 		numBlocks := int(math.Ceil(float64(fi.bytes) /
 			float64(rtn.blockSize)))
-		rtn.ExpandTo(numBlocks)
-		rtn.blocks[0] = fi.key
+		rtn.expandTo(numBlocks)
+		if numBlocks > 0 {
+			rtn.blocks[0] = fi.key
+		}
 		rtn.lastBlockBytes = uint32(fi.bytes % uint64(rtn.blockSize))
 
 		return &rtn
@@ -126,7 +135,7 @@ func (fi *SmallFile) ConvertTo(c *ctx, newType quantumfs.ObjectType) BlockAccess
 	return nil
 }
 
-func (fi *SmallFile) Truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
 
 	// If we're increasing the length, then we can just update
 	if newLengthBytes > fi.bytes {
