@@ -584,8 +584,8 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return fuse.EIO
 		}
 
-		dir.create_(c, name, 0777, 0777, newSymlink, quantumfs.ObjectTypeSymlink,
-			key, out)
+		dir.create_(c, name, 0777, 0777, newSymlink,
+			quantumfs.ObjectTypeSymlink, key, out)
 		return fuse.OK
 	}()
 

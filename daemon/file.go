@@ -230,7 +230,8 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		copied := finalData.Write(buf[:size], uint32(offset))
 		if copied > 0 {
 			hash := sha1.Sum(finalData.Get())
-			newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData, hash)
+			newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData,
+				hash)
 
 			err := DataStore.Set(c, newFileKey,
 				quantumfs.NewBuffer(finalData.Get()))

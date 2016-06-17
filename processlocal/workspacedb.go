@@ -120,8 +120,9 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 	wsdb.cache[dstNamespace][dstWorkspace] =
 		wsdb.cache[srcNamespace][srcWorkspace]
 
-	c.Dlog(qlog.LogWorkspaceDb, "Branched workspace '%s/%s' to '%s/%s' with key %v",
-		srcNamespace, srcWorkspace, dstNamespace, dstWorkspace,
+	c.Dlog(qlog.LogWorkspaceDb,
+		"Branched workspace '%s/%s' to '%s/%s' with key %v", srcNamespace,
+		srcWorkspace, dstNamespace, dstWorkspace,
 		wsdb.cache[dstNamespace][dstWorkspace])
 
 	return nil
