@@ -47,6 +47,9 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	children := make(map[string]InodeId, baseLayer.NumEntries)
 	childrenRecords := make(map[InodeId]*quantumfs.DirectoryRecord,
 		baseLayer.NumEntries)
+	// Link the array as we build it, since the constructor may need the record
+	dir.childrenRecords = childrenRecords
+
 	for i, entry := range baseLayer.Entries {
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
@@ -60,6 +63,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 			constructor = newDirectory
 		case quantumfs.ObjectTypeSmallFile:
 			constructor = newSmallFile
+		case quantumfs.ObjectTypeMediumFile:
+			constructor = newMediumFile
 		case quantumfs.ObjectTypeSymlink:
 			constructor = newSymlink
 		}
@@ -70,7 +75,6 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.parent = parent
 	dir.children = children
-	dir.childrenRecords = childrenRecords
 	dir.dirtyChildren_ = make([]Inode, 0)
 }
 
