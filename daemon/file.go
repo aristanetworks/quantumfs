@@ -284,7 +284,6 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	return nil
 }
 
-
 type blockAccessor interface {
 
 	// Read data from the block via an index
@@ -330,7 +329,7 @@ func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int
 type blockFn func(*ctx, int, uint64, []byte) (int, error)
 
 // Returns the number of bytes operated on, and any error code
-func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf[]byte,
+func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	fn blockFn) (uint64, error) {
 
 	count := uint64(0)
