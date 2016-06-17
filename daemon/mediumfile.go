@@ -146,15 +146,13 @@ func (fi *MediumFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeMediumFile
 }
 
-func (fi *MediumFile) convertTo(c *ctx,
-	newType quantumfs.ObjectType) (blockAccessor, error) {
-
+func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
 	if newType <= quantumfs.ObjectTypeMediumFile {
-		return nil, nil
+		return fi
 	}
 
 	c.elog("Unable to convert file accessor to type %d", newType)
-	return nil, errors.New("Unsupported new accessor type")
+	return nil
 }
 
 func (fi *MediumFile) truncate(c *ctx, newLengthBytes uint64) error {

@@ -273,14 +273,12 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 
 	neededType := calcTypeGivenBlocks(blockIdx + 1)
-	newAccessor, err := fi.accessor.convertTo(c, neededType)
-	if err != nil {
-		return err
+	newAccessor := fi.accessor.convertTo(c, neededType)
+	if newAccessor == nil {
+		return errors.New("Unable to process needed type for accessor")
 	}
 
-	if newAccessor != nil {
-		fi.accessor = newAccessor
-	}
+	fi.accessor = newAccessor
 	return nil
 }
 
@@ -299,7 +297,7 @@ type blockAccessor interface {
 	blockIdxInfo(uint64) (int, uint64)
 
 	// Convert contents into new accessor type, nil accessor if current is fine
-	convertTo(*ctx, quantumfs.ObjectType) (blockAccessor, error)
+	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
 
 	// Write file's metadata to the datastore and provide the key
 	writeToStore(c *ctx) quantumfs.ObjectKey

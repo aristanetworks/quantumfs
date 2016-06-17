@@ -98,11 +98,9 @@ func (fi *SmallFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeSmallFile
 }
 
-func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) (blockAccessor,
-	error) {
-
+func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
 	if newType == quantumfs.ObjectTypeSmallFile {
-		return nil, nil
+		return fi
 	}
 
 	if newType == quantumfs.ObjectTypeMediumFile {
@@ -111,19 +109,17 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) (blockAcces
 
 		numBlocks := int(math.Ceil(float64(fi.bytes) /
 			float64(rtn.blockSize)))
-		// Ensure we have a minimum number of blocks
-		if numBlocks == 0 {
-			numBlocks = 1
-		}
 		rtn.expandTo(numBlocks)
-		rtn.blocks[0] = fi.key
+		if numBlocks > 0 {
+			rtn.blocks[0] = fi.key
+		}
 		rtn.lastBlockBytes = uint32(fi.bytes % uint64(rtn.blockSize))
 
-		return &rtn, nil
+		return &rtn
 	}
 
 	c.elog("Unable to convert file accessor to type %d", newType)
-	return nil, errors.New("Unsupported new accessor type")
+	return nil
 }
 
 func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
