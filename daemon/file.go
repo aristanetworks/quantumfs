@@ -14,20 +14,16 @@ const execBit = 0x1
 const writeBit = 0x2
 const readBit = 0x4
 
-func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode) Inode {
 
-	childRecord, err := parent.getChildRecord(c, inodeNum)
-	if err != nil {
-		panic("Couldn't get existing small file's record")
-	}
-	accessor := newSmallAccessor(c, childRecord.Size, key)
+	accessor := newSmallAccessor(c, size, key)
 
 	return newFile_(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent,
 		accessor)
 }
 
-func newMediumFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode) Inode {
 
 	accessor := newMediumAccessor(c, key)

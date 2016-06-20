@@ -12,8 +12,8 @@ import "time"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode) Inode
+type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode) Inode
 
 // This file contains the normal directory Inode type for a workspace
 type Directory struct {
@@ -73,7 +73,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 			constructor = newSymlink
 		}
 
-		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, inodeId, dir))
+		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
+			inodeId, dir))
 	}
 
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
@@ -83,8 +84,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	dir.baseLayerId = baseLayerId
 }
 
-func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode) Inode {
+func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode) Inode {
 
 	c.vlog("Directory::newDirectory Enter")
 	defer c.vlog("Directory::newDirectory Exit")
@@ -416,7 +417,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	inodeNum := c.qfs.newInodeId()
 	dir.addChild_(c, name, inodeNum, &entry)
-	newEntity := constructor(c, key, inodeNum, dir.self)
+	newEntity := constructor(c, key, 0, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, newEntity)
 
 	fillEntryOutCacheData(c, out)
