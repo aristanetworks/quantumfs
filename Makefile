@@ -9,8 +9,13 @@ all: $(COMMANDS) $(PKGS_TO_TEST)
 clean:
 	rm -f $(COMMANDS)
 
+fetch:
+	for cmd in $(COMMANDS); do \
+		echo "Fetching $$cmd"; \
+		go get arista.com/quantumfs/cmd/$$cmd; \
+	done
+
 $(COMMANDS):
-	go get arista.com/quantumfs/cmd/$@
 	go build arista.com/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST):
