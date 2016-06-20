@@ -154,6 +154,9 @@ func (th *testHelper) endTest() {
 	}
 
 	if th.tempDir != "" {
+		th.waitToBeUnmounted()
+		time.Sleep(1 * time.Second)
+
 		if err := os.RemoveAll(th.tempDir); err != nil {
 			th.t.Fatalf("Failed to cleanup temporary mount point: %v",
 				err)
@@ -165,6 +168,23 @@ func (th *testHelper) endTest() {
 	}
 
 	th.logscan()
+}
+
+func (th *testHelper) waitToBeUnmounted() {
+	for i := 0; i < 100; i++ {
+		mounts, err := ioutil.ReadFile("/proc/self/mountinfo")
+		if err == nil {
+			mounts := BytesToString(mounts)
+			if !strings.Contains(mounts, th.tempDir) {
+				th.log("Waited %d times to unmount", i)
+				return
+			}
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	panic("Filesystem didn't unmount in time")
 }
 
 // Check the test output for errors
@@ -451,6 +471,23 @@ func init() {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+
+	// Disable Garbage Collection. Because the tests provide both the filesystem
+	// and the code accessing that filesystem the program is reentrant in ways
+	// opaque to the golang scheduler. Thus we can end up in a deadlock situation
+	// between two threads:
+	//
+	// ThreadFS is the filesystem, ThreadT is the test
+	//
+	//   ThreadFS                    ThreadT
+	//                               Start filesystem syscall
+	//   Start executing response
+	//   <GC Wait>                   <Queue GC wait after syscal return>
+	//                        DEADLOCK
+	//
+	// Because the filesystem request is blocked waiting on GC and the syscall
+	// will never return to allow GC to progress, the test program is deadlocked.
+	debug.SetGCPercent(-1)
 
 	result := m.Run()
 

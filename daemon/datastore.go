@@ -26,6 +26,7 @@ func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
 	if err == nil {
 		return &buffer
 	}
+	c.elog("Couldn't get from any store: %v. Key %s", err, key)
 
 	return nil
 }
