@@ -452,6 +452,23 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 
+	// Disable Garbage Collection. Because the tests provide both the filesystem
+	// and the code accessing that filesystem the program is reentrant in ways
+	// opaque to the golang scheduler. Thus we can end up in a deadlock situation
+	// between two threads:
+	//
+	// ThreadFS is the filesystem, ThreadT is the test
+	//
+	//   ThreadFS                    ThreadT
+	//                               Start filesystem syscall
+	//   Start executing response
+	//   <GC Wait>                   <Queue GC wait after syscal return>
+	//                        DEADLOCK
+	//
+	// Because the filesystem request is blocked waiting on GC and the syscall
+	// will never return to allow GC to progress, the test program is deadlocked.
+	debug.SetGCPercent(-1)
+
 	result := m.Run()
 
 	os.RemoveAll(testRunDir)
