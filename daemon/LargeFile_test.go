@@ -12,7 +12,6 @@ import "testing"
 import "syscall"
 
 func TestLargeFileExpansion_test(t *testing.T) {
-t.Skip("Temporarily Disabled")
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -33,7 +32,7 @@ t.Skip("Temporarily Disabled")
 		test.assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
 		if !bytes.Equal(data, output) {
-			for i := 0; i < len(data); i++ {
+			for i := 0; i < len(data); i += 1024 {
 				test.assert(data[i] == output[i],
 					"Data readback mismatch at idx %d, %s vs %s",
 					i, data[i], output[i])
@@ -65,7 +64,6 @@ t.Skip("Temporarily Disabled")
 }
 
 func TestLargeFileAttr_test(t *testing.T) {
-t.Skip("Temporarily disabled")
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -92,7 +90,7 @@ t.Skip("Temporarily disabled")
 		output, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Error reading 40MB hole from file")
 
-		for i := 0; i < len(output); i++ {
+		for i := 0; i < len(output); i += 1024 {
 			test.assert(output[i] == 0, "Data not zeroed in file, %s",
 				output[i])
 		}

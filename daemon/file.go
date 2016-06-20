@@ -159,7 +159,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-		endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
+		endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size - 1)
 
 		err := fi.reconcileFileType(c, endBlkIdx)
 		if err != nil {
@@ -352,7 +352,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 
 	// Determine the block to start in
 	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(offset)
-	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size))
+	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size) - 1)
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)

@@ -41,6 +41,13 @@ func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAcces
 		return fi
 	}
 
+	if newType == quantumfs.ObjectTypeLargeFile {
+		rtn := newLargeShell()
+		rtn.data = fi.data
+
+		return &rtn
+	}
+
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }

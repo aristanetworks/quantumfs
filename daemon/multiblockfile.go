@@ -117,7 +117,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		return int(copied), nil
 	}
 
-	c.elog("writeBlock attempt with zero data")
+	c.elog("writeBlock attempt with zero data, %d, %d", copied, len(buf))
 	return 0, errors.New("writeBlock attempt with zero data")
 }
 

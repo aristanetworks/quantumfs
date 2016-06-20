@@ -7,9 +7,16 @@ package daemon
 
 import "arista.com/quantumfs"
 
-// LargeFile is basically identical to mediumFile, except that it has a couple mods
 type LargeFile struct {
 	MultiBlockFile
+}
+
+// Shell constructor
+func newLargeShell() LargeFile {
+	var rtn LargeFile
+	rtn.maxBlocks = quantumfs.MaxBlocksLargeFile
+
+	return rtn
 }
 
 func newLargeAccessor(c *ctx, key quantumfs.ObjectKey) *LargeFile {
@@ -27,4 +34,13 @@ func newLargeAccessor(c *ctx, key quantumfs.ObjectKey) *LargeFile {
 
 func (fi *LargeFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeLargeFile
+}
+
+func (fi *LargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	if newType <= quantumfs.ObjectTypeLargeFile {
+		return fi
+	}
+
+	c.elog("Unable to convert file accessor to type %d", newType)
+	return nil
 }
