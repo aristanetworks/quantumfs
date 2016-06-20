@@ -2,7 +2,6 @@ COMMANDS=quantumfsd qfs
 PKGS_TO_TEST=daemon qlog
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
-.NOTPARALLEL:
 
 all: $(COMMANDS) $(PKGS_TO_TEST)
 
