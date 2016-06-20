@@ -70,8 +70,9 @@ type InodeCommon struct {
 	self Inode // Leaf subclass instance
 	id   InodeId
 
-	// These fields are protected by the lock
-	lock   sync.RWMutex
+	lock sync.RWMutex
+
+	// This field is accessed using atomic instructions
 	dirty_ uint32 // 1 if this Inode or any children are dirty
 }
 
