@@ -51,6 +51,9 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	children := make(map[string]InodeId, baseLayer.NumEntries)
 	childrenRecords := make(map[InodeId]*quantumfs.DirectoryRecord,
 		baseLayer.NumEntries)
+	// Link the array as we build it, since the constructor may need the record
+	dir.childrenRecords = childrenRecords
+
 	for i, entry := range baseLayer.Entries {
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
@@ -64,6 +67,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 			constructor = newDirectory
 		case quantumfs.ObjectTypeSmallFile:
 			constructor = newSmallFile
+		case quantumfs.ObjectTypeMediumFile:
+			constructor = newMediumFile
 		case quantumfs.ObjectTypeSymlink:
 			constructor = newSymlink
 		}
@@ -74,7 +79,6 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.parent = parent
 	dir.children = children
-	dir.childrenRecords = childrenRecords
 	dir.dirtyChildren_ = make([]Inode, 0)
 	dir.baseLayerId = baseLayerId
 }
@@ -256,11 +260,8 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		}
 
 		valid := uint(attr.SetAttrInCommon.Valid)
-		if BitFlagsSet(valid, fuse.FATTR_FH|
-			fuse.FATTR_LOCKOWNER) {
-			c.elog("Unsupported attribute(s) to set", valid)
-			return fuse.ENOSYS
-		}
+		// We don't support file locks yet, but when we do we need
+		// FATTR_LOCKOWNER
 
 		if BitFlagsSet(valid, fuse.FATTR_MODE) {
 			entry.Permissions = modeToPermissions(attr.Mode, 0)

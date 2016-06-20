@@ -6,6 +6,7 @@ package daemon
 // Test library
 
 import "bufio"
+import "errors"
 import "flag"
 import "fmt"
 import "io/ioutil"
@@ -487,7 +488,7 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 // message
 func (th *testHelper) assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		msg := fmt.Sprintf(format, args)
+		msg := fmt.Sprintf(format, args...)
 		panic(msg)
 	}
 }
@@ -538,4 +539,25 @@ func TestTimeout_test(t *testing.T) {
 		test.shouldFail = false
 		test.assert(false, "Test didn't fail due to timeout")
 	})
+}
+
+func printToFile(filename string, data string) error {
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR,
+		0777)
+	if file == nil || err != nil {
+		return errors.New("Unable to open file for RDRW")
+	}
+
+	written := 0
+	for written < len(data) {
+		var writeIt int
+		writeIt, err = file.Write([]byte(data[written:]))
+		written += writeIt
+		if err != nil {
+			return errors.New("Unable to write all data")
+		}
+	}
+	file.Close()
+
+	return nil
 }

@@ -15,6 +15,11 @@ import "arista.com/quantumfs/qlog"
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = 1 * 1024 * 1024
 
+// Maximum number of blocks for each file type (determined by the encoding, which is
+// JSON currently, but will change. These should be updated then)
+const MaxBlocksMediumFile = 32
+const MaxBlocksLargeFile = 49000
+
 // Maximum length of a filename
 const MaxFilenameLength = 256
 
@@ -252,12 +257,7 @@ func createEmptyDirectory() ObjectKey {
 var EmptyBlockKey ObjectKey
 
 func createEmptyBlock() ObjectKey {
-	var emptyBlock struct{}
-
-	bytes, err := json.Marshal(emptyBlock)
-	if err != nil {
-		panic("Failed to marshal empty block")
-	}
+	var bytes []byte
 
 	hash := sha1.Sum(bytes)
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
@@ -302,6 +302,23 @@ func (buf *Buffer) Set(in []byte) {
 }
 
 func (buf *Buffer) Write(in []byte, offset uint32) uint32 {
+	// Sanity check offset and length
+	maxWriteLen := MaxBlockSize - int(offset)
+	if maxWriteLen <= 0 {
+		return 0
+	}
+
+	if len(in) > maxWriteLen {
+		in = in[:maxWriteLen]
+	}
+
+	// Ensure that our data ends where we need it to. This allows us to write
+	// past the end of a block, but not past the block's max capacity
+	deltaLen := int(offset) - len(buf.data)
+	if deltaLen > 0 {
+		buf.data = append(buf.data, make([]byte, deltaLen)...)
+	}
+
 	var finalBuffer []byte
 	// append our write data to the first split of the existing data
 	finalBuffer = append(buf.data[:offset], in...)

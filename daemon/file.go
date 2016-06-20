@@ -8,7 +8,6 @@ package daemon
 import "arista.com/quantumfs"
 import "errors"
 import "github.com/hanwen/go-fuse/fuse"
-import "crypto/sha1"
 import "syscall"
 
 const execBit = 0x1
@@ -18,19 +17,37 @@ const readBit = 0x4
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 	parent Inode) Inode {
 
-	return newFile(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent)
+	childRecord, err := parent.getChildRecord(c, inodeNum)
+	if err != nil {
+		panic("Couldn't get existing small file's record")
+	}
+	accessor := newSmallAccessor(c, childRecord.Size, key)
+
+	return newFile_(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent,
+		accessor)
 }
 
-func newFile(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
-	key quantumfs.ObjectKey, parent Inode) *File {
+func newMediumFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode) Inode {
+
+	accessor := newMediumAccessor(c, key)
+
+	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent,
+		accessor)
+}
+
+func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
+	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
 		InodeCommon: InodeCommon{id: inodeNum},
 		fileType:    fileType,
 		key:         key,
 		parent:      parent,
+		accessor:    accessor,
 	}
 	file.self = &file
+
 	return &file
 }
 
@@ -39,6 +56,7 @@ type File struct {
 	fileType quantumfs.ObjectType
 	key      quantumfs.ObjectKey
 	parent   Inode
+	accessor blockAccessor
 }
 
 // Mark this file dirty and notify your paent
@@ -131,6 +149,24 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
+
+		err := fi.reconcileFileType(c, endBlkIdx)
+		if err != nil {
+			c.elog("Could not reconcile file type with new end blockIdx")
+			return fuse.EIO
+		}
+
+		err = fi.accessor.truncate(c, uint64(attr.Size))
+		if err != nil {
+			return fuse.EIO
+		}
+	}
+
+	// Update the entry metadata
+	fi.key = fi.accessor.writeToStore(c)
+
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
 
@@ -176,84 +212,195 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
+func resize(buffer []byte, size int) []byte {
+	if len(buffer) > size {
+		return buffer[:size]
+	}
+
+	for len(buffer) < size {
+		newLength := make([]byte, size-len(buffer))
+		buffer = append(buffer, newLength...)
+	}
+
+	return buffer
+}
+
+func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
+	targetSize int) *quantumfs.Buffer {
+
+	rtn := DataStore.Get(c, key)
+	if rtn == nil {
+		c.elog("Data for key missing from datastore")
+		return nil
+	}
+
+	// Before we return the buffer, make sure it's the size it needs to be
+	rtn.Set(resize(rtn.Get(), targetSize))
+
+	return rtn
+}
+
+func pushData(c *ctx, buffer *quantumfs.Buffer) (*quantumfs.ObjectKey,
+	error) {
+
+	newFileKey := buffer.Key(quantumfs.KeyTypeData)
+
+	err := DataStore.Set(c, newFileKey,
+		quantumfs.NewBuffer(buffer.Get()))
+	if err != nil {
+		c.elog("Unable to write data to the datastore")
+		return nil, errors.New("Unable to write to the datastore")
+	}
+
+	return &newFileKey, nil
+}
+
+func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
+	switch {
+	case numBlocks <= 1:
+		return quantumfs.ObjectTypeSmallFile
+	case numBlocks <= quantumfs.MaxBlocksMediumFile:
+		return quantumfs.ObjectTypeMediumFile
+	case numBlocks <= quantumfs.MaxBlocksLargeFile:
+		return quantumfs.ObjectTypeLargeFile
+	default:
+		return quantumfs.ObjectTypeVeryLargeFile
+	}
+}
+
+// Given the block index to write into the file, ensure that we are the
+// correct file type
+func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
+
+	neededType := calcTypeGivenBlocks(blockIdx + 1)
+	newAccessor := fi.accessor.convertTo(c, neededType)
+	if newAccessor == nil {
+		return errors.New("Unable to process needed type for accessor")
+	}
+
+	fi.accessor = newAccessor
+	return nil
+}
+
+type blockAccessor interface {
+
+	// Read data from the block via an index
+	readBlock(*ctx, int, uint64, []byte) (int, error)
+
+	// Write data to a block via an index
+	writeBlock(*ctx, int, uint64, []byte) (int, error)
+
+	// Get the file's length in bytes
+	fileLength() uint64
+
+	// Extract block and remaining offset from absolute offset
+	blockIdxInfo(uint64) (int, uint64)
+
+	// Convert contents into new accessor type, nil accessor if current is fine
+	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
+
+	// Write file's metadata to the datastore and provide the key
+	writeToStore(c *ctx) quantumfs.ObjectKey
+
+	// Truncate to lessen length *only*, error otherwise
+	truncate(*ctx, uint64) error
+}
+
+func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
+	error) {
+
+	err := fi.reconcileFileType(c, blockIdx)
+	if err != nil {
+		c.elog("Could not reconcile file type with new blockIdx")
+		return 0, err
+	}
+
+	var written int
+	written, err = fi.accessor.writeBlock(c, blockIdx, offset, buf)
+	if err != nil {
+		return 0, err
+	}
+
+	return written, nil
+}
+
+type blockFn func(*ctx, int, uint64, []byte) (int, error)
+
+// Returns the number of bytes operated on, and any error code
+func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
+	fn blockFn) (uint64, error) {
+
+	count := uint64(0)
+
+	// Ensure size and buf are consistent
+	buf = buf[:size]
+	size = uint32(len(buf))
+
+	if size == 0 {
+		c.vlog("block operation with zero size or buf")
+		return 0, nil
+	}
+
+	// Determine the block to start in
+	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(offset)
+	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size))
+	offset = newOffset
+
+	// Handle the first block a little specially (with offset)
+	iterCount, err := fn(c, startBlkIdx, offset, buf[count:])
+	if err != nil {
+		c.elog("Unable to operate on first data block")
+		return 0, errors.New("Unable to operate on first data block")
+	}
+	count += uint64(iterCount)
+
+	// Loop through the blocks, operating on them
+	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
+		iterCount, err = fn(c, i, 0, buf[count:])
+		if err != nil {
+			// We couldn't do more, but that's okay we've done some
+			// already so just return early and report what we've done
+			break
+		}
+		count += uint64(iterCount)
+	}
+
+	return count, nil
+}
+
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fi.lock.RLock()
-	defer fi.lock.RUnlock()
+	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
+		fi.accessor.readBlock)
 
-	if fi.key == quantumfs.EmptyBlockKey {
-		return fuse.ReadResultData(nil), fuse.OK
+	if err != nil {
+		return fuse.ReadResult(nil), fuse.EIO
 	}
 
-	data := DataStore.Get(c, fi.key)
-	curData := data.Get()
-
-	end := offset + uint64(len(buf))
-	if end > uint64(len(curData)) {
-		end = uint64(len(curData))
-	}
-
-	copied := copy(buf, curData[offset:end])
-
-	return fuse.ReadResultData(buf[0:copied]), fuse.OK
+	return fuse.ReadResultData(buf[:readCount]), fuse.OK
 }
 
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	copied, result := func() (uint32, fuse.Status) {
-		fi.lock.Lock()
-		defer fi.lock.Unlock()
+	writeCount, err := fi.operateOnBlocks(c, offset, size, buf, fi.writeBlock)
 
-		var finalData *quantumfs.Buffer
-
-		if fi.key != quantumfs.EmptyBlockKey {
-			data := DataStore.Get(c, fi.key)
-			if data == nil {
-				c.elog("Data for key missing from datastore")
-				return 0, fuse.EIO
-			}
-			finalData = quantumfs.NewBuffer(data.Get())
-		} else {
-			finalData = quantumfs.NewBuffer([]byte{})
-		}
-
-		if offset > uint64(len(finalData.Get())) {
-			c.elog("Writing past the end of file is not supported yet")
-			return 0, fuse.EIO
-		}
-		if size > uint32(len(buf)) {
-			size = uint32(len(buf))
-		}
-
-		copied := finalData.Write(buf[:size], uint32(offset))
-		if copied > 0 {
-			hash := sha1.Sum(finalData.Get())
-			newFileKey := quantumfs.NewObjectKey(quantumfs.KeyTypeData,
-				hash)
-
-			err := DataStore.Set(c, newFileKey,
-				quantumfs.NewBuffer(finalData.Get()))
-			if err != nil {
-				c.elog("Unable to write data to the datastore")
-				return 0, fuse.EIO
-			}
-
-			fi.key = newFileKey
-			var attr fuse.SetAttrIn
-			attr.Valid = fuse.FATTR_SIZE
-			attr.Size = uint64(len(finalData.Get()))
-			fi.parent.setChildAttr(c, fi.id, &attr, nil)
-		}
-		return copied, fuse.OK
-	}()
-
-	if result == fuse.OK {
-		fi.dirty(c)
+	if err != nil {
+		return 0, fuse.EIO
 	}
 
-	return copied, result
+	// Update the direct entry
+	fi.key = fi.accessor.writeToStore(c)
+
+	// Update the size with what we were able to write
+	var attr fuse.SetAttrIn
+	attr.Valid = fuse.FATTR_SIZE
+	attr.Size = uint64(fi.accessor.fileLength())
+	fi.parent.setChildAttr(c, fi.id, &attr, nil)
+	fi.dirty(c)
+
+	return uint32(writeCount), fuse.OK
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
