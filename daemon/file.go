@@ -154,7 +154,8 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 			err := fi.reconcileFileType(c, endBlkIdx)
 			if err != nil {
-				c.elog("Could not reconcile file type with new end blockIdx")
+				c.elog("Could not reconcile file type with new end" +
+					" blockIdx")
 				return fuse.EIO
 			}
 
