@@ -149,23 +149,34 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-		endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
+	result := func() fuse.Status {
+		fi.lock.Lock()
+		defer fi.lock.Unlock()
 
-		err := fi.reconcileFileType(c, endBlkIdx)
-		if err != nil {
-			c.elog("Could not reconcile file type with new end blockIdx")
-			return fuse.EIO
+		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
+
+			err := fi.reconcileFileType(c, endBlkIdx)
+			if err != nil {
+				c.elog("Could not reconcile file type with new end blockIdx")
+				return fuse.EIO
+			}
+
+			err = fi.accessor.truncate(c, uint64(attr.Size))
+			if err != nil {
+				return fuse.EIO
+			}
 		}
 
-		err = fi.accessor.truncate(c, uint64(attr.Size))
-		if err != nil {
-			return fuse.EIO
-		}
+		// Update the entry metadata
+		fi.key = fi.accessor.writeToStore(c)
+
+		return fuse.OK
+	}()
+
+	if result != fuse.OK {
+		return result
 	}
-
-	// Update the entry metadata
-	fi.key = fi.accessor.writeToStore(c)
 
 	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
 }
@@ -371,6 +382,9 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
+	fi.lock.RLock()
+	defer fi.lock.RUnlock()
+
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
 		fi.accessor.readBlock)
 
@@ -384,14 +398,22 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	writeCount, err := fi.operateOnBlocks(c, offset, size, buf, fi.writeBlock)
+	writeCount, result := func() (uint32, fuse.Status) {
+		writeCount, err := fi.operateOnBlocks(c, offset, size, buf,
+			fi.writeBlock)
 
-	if err != nil {
-		return 0, fuse.EIO
+		if err != nil {
+			return 0, fuse.EIO
+		}
+
+		// Update the direct entry
+		fi.key = fi.accessor.writeToStore(c)
+		return uint32(writeCount), fuse.OK
+	}()
+
+	if result != fuse.OK {
+		return writeCount, result
 	}
-
-	// Update the direct entry
-	fi.key = fi.accessor.writeToStore(c)
 
 	// Update the size with what we were able to write
 	var attr fuse.SetAttrIn
@@ -400,7 +422,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	fi.parent.setChildAttr(c, fi.id, &attr, nil)
 	fi.dirty(c)
 
-	return uint32(writeCount), fuse.OK
+	return writeCount, fuse.OK
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
