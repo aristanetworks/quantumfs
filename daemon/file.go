@@ -396,6 +396,9 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
 	writeCount, result := func() (uint32, fuse.Status) {
+		fi.lock.Lock()
+		defer fi.lock.Unlock()
+
 		writeCount, err := fi.operateOnBlocks(c, offset, size, buf,
 			fi.writeBlock)
 
