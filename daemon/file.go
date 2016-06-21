@@ -146,8 +146,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	result := func() fuse.Status {
-		fi.lock.Lock()
-		defer fi.lock.Unlock()
+		defer fi.Lock().Unlock()
 
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
@@ -379,8 +378,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fi.lock.RLock()
-	defer fi.lock.RUnlock()
+	defer fi.RLock().RUnlock()
 
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
 		fi.accessor.readBlock)
@@ -396,8 +394,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
 	writeCount, result := func() (uint32, fuse.Status) {
-		fi.lock.Lock()
-		defer fi.lock.Unlock()
+		defer fi.Lock().Unlock()
 
 		writeCount, err := fi.operateOnBlocks(c, offset, size, buf,
 			fi.writeBlock)

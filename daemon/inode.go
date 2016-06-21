@@ -105,6 +105,15 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 		inodeType, inode)
 	panic(msg)
 }
+func (inode *InodeCommon) Lock() *sync.RWMutex {
+	inode.lock.Lock()
+	return &inode.lock
+}
+
+func (inode *InodeCommon) RLock() *sync.RWMutex {
+	inode.lock.RLock()
+	return &inode.lock
+}
 
 // FileHandle represents a specific path at a specific point in time, even as the
 // tree changes underneath it. This is used to provide consistent snapshot views into

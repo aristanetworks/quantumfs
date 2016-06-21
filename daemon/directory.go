@@ -134,8 +134,7 @@ func (dir *Directory) dirty(c *ctx) {
 // as well.
 func (dir *Directory) dirtyChild(c *ctx, child Inode) {
 	func() {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 		dir.dirtyChildren_ = append(dir.dirtyChildren_, child)
 	}()
 	dir.self.dirty(c)
@@ -149,8 +148,7 @@ func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
 		return dir.baseLayerId
 	}
 
-	dir.lock.Lock()
-	defer dir.lock.Unlock()
+	defer dir.Lock().Unlock()
 
 	dir.updateRecords_(c)
 
@@ -252,8 +250,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	result := func() fuse.Status {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 
 		entry, exists := dir.childrenRecords[inodeNum]
 		if !exists {
@@ -324,8 +321,7 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	dir.lock.RLock()
-	defer dir.lock.RUnlock()
+	defer dir.RLock().RUnlock()
 
 	var childDirectories uint32
 	out.AttrValid = c.config.CacheTimeSeconds
@@ -341,8 +337,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-	dir.lock.RLock()
-	defer dir.lock.RUnlock()
+	defer dir.RLock().RUnlock()
 
 	inodeNum, exists := dir.children[name]
 	if !exists {
@@ -366,8 +361,7 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	dir.lock.RLock()
-	defer dir.lock.RUnlock()
+	defer dir.RLock().RUnlock()
 
 	children := make([]directoryContents, 0, len(dir.childrenRecords))
 	for _, entry := range dir.childrenRecords {
@@ -432,8 +426,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	var file Inode
 	result := func() fuse.Status {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 
 		if _, exists := dir.children[name]; exists {
 			return fuse.Status(syscall.EEXIST)
@@ -477,8 +470,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	result := func() fuse.Status {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 
 		if _, exists := dir.children[name]; exists {
 			return fuse.Status(syscall.EEXIST)
@@ -500,8 +492,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (dir *Directory) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	dir.lock.RLock()
-	defer dir.lock.RUnlock()
+	defer dir.RLock().RUnlock()
 
 	if val, ok := dir.childrenRecords[inodeNum]; ok {
 		return *val, nil
@@ -513,8 +504,7 @@ func (dir *Directory) getChildRecord(c *ctx,
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	result := func() fuse.Status {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 
 		if _, exists := dir.children[name]; !exists {
 			return fuse.ENOENT
@@ -539,8 +529,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	result := func() fuse.Status {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 		if _, exists := dir.children[name]; !exists {
 			return fuse.ENOENT
 		}
@@ -571,8 +560,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	var key quantumfs.ObjectKey
 	result := func() fuse.Status {
-		dir.lock.Lock()
-		defer dir.lock.Unlock()
+		defer dir.Lock().Unlock()
 
 		if _, exists := dir.children[name]; exists {
 			return fuse.Status(syscall.EEXIST)
