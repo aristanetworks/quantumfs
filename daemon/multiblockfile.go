@@ -112,8 +112,11 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 			c.elog("Write failed")
 			return 0, errors.New("Unable to write to block")
 		}
-		//store the key
+		//store the key and update the metadata
 		fi.data.blocks[blockIdx] = *newFileKey
+		if blockIdx == len(fi.data.blocks)-1 {
+			fi.data.lastBlockBytes = uint32(len(data.Get()))
+		}
 		return int(copied), nil
 	}
 
@@ -151,25 +154,32 @@ func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 }
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
-	newEndBlkIdx := newLengthBytes / quantumfs.MaxBlockSize
-	newLengthBytes = newLengthBytes % quantumfs.MaxBlockSize
+	newEndBlkIdx := (newLengthBytes-1) / uint64(fi.data.blockSize)
+	newNumBlocks := newEndBlkIdx + 1
+	lastBlockLen := newLengthBytes - (newEndBlkIdx * uint64(fi.data.blockSize))
 
-	// If we're increasing the length, we can just update
-	if newEndBlkIdx >= uint64(len(fi.data.blocks)) {
-		fi.expandTo(int(newEndBlkIdx + 1))
-		return nil
+	// Handle the special zero length case
+	if newLengthBytes == 0 {
+		newEndBlkIdx = 0
+		newNumBlocks = 0
+		lastBlockLen = 0
+	}
+
+	// If we're increasing the length, we need to update the block num
+	if newNumBlocks > uint64(len(fi.data.blocks)) {
+		fi.expandTo(int(newNumBlocks))
 	}
 
 	// Allow increasing just the last block
-	if newEndBlkIdx == uint64(len(fi.data.blocks)-1) &&
-		newLengthBytes > uint64(fi.data.lastBlockBytes) {
+	if newNumBlocks == uint64(len(fi.data.blocks)) &&
+		lastBlockLen > uint64(fi.data.lastBlockBytes) {
 
-		fi.data.lastBlockBytes = uint32(newLengthBytes)
+		fi.data.lastBlockBytes = uint32(lastBlockLen)
 		return nil
 	}
 
 	// Truncate the new last block
-	data := fetchDataSized(c, fi.data.blocks[newEndBlkIdx], int(newLengthBytes))
+	data := fetchDataSized(c, fi.data.blocks[newEndBlkIdx], int(lastBlockLen))
 	if data == nil {
 		c.elog("Unable to fetch existing data for block")
 		return errors.New("Unable to fetch existing data")
@@ -183,8 +193,8 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 
 	// Now that everything has succeeded and is in the datastore, update metadata
 	fi.data.blocks[newEndBlkIdx] = *newFileKey
-	fi.data.blocks = fi.data.blocks[:newEndBlkIdx+1]
-	fi.data.lastBlockBytes = uint32(newLengthBytes)
+	fi.data.blocks = fi.data.blocks[:newNumBlocks]
+	fi.data.lastBlockBytes = uint32(lastBlockLen)
 
 	return nil
 }

@@ -25,10 +25,16 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		test.assert(err == nil, "Error writing 40MB fibonacci to new fd: %v",
 			err)
 
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Unable to stat file: %v", err)
+		test.assert(stat.Size == int64(len(data)), "File size incorrect, %d",
+			stat.Size)
+
 		// Read it back
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 40MB fibonacci back from file")
+		test.assert(err == nil, "Error reading 40MB fibonacci from file")
 		test.assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
 		if !bytes.Equal(data, output) {
@@ -51,13 +57,13 @@ func TestLargeFileExpansion_test(t *testing.T) {
 			"Post-truncation mismatch")
 
 		// Let's re-expand it using SetAttr
-		os.Truncate(testFilename, 40*1024*1024)
+		os.Truncate(testFilename, int64(len(data)))
 
 		output, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Error reading fib+hole back from file")
 		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
 			"Data readback mismatch")
-		delta := (40 * 1024 * 1024) - newLen
+		delta := len(data) - newLen
 		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
 			"File hole not filled with zeros")
 	})
