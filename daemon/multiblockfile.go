@@ -18,8 +18,8 @@ type MultiBlockContainer struct {
 }
 
 type MultiBlockFile struct {
-	data		MultiBlockContainer
-	maxBlocks	int
+	data      MultiBlockContainer
+	maxBlocks int
 }
 
 func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
@@ -154,7 +154,7 @@ func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 }
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
-	newEndBlkIdx := (newLengthBytes-1) / uint64(fi.data.blockSize)
+	newEndBlkIdx := (newLengthBytes - 1) / uint64(fi.data.blockSize)
 	newNumBlocks := newEndBlkIdx + 1
 	lastBlockLen := newLengthBytes - (newEndBlkIdx * uint64(fi.data.blockSize))
 
