@@ -6,6 +6,7 @@
 package daemon
 
 import "errors"
+import "sync"
 import "time"
 
 import "arista.com/quantumfs"
@@ -17,6 +18,8 @@ func NewNamespaceList() Inode {
 		namespaces:  make(map[string]InodeId),
 	}
 	nsl.self = &nsl
+	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock
+	assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
 	return &nsl
 }
 
@@ -25,6 +28,8 @@ type NamespaceList struct {
 
 	// Map from child name to Inode ID
 	namespaces map[string]InodeId
+
+	realTreeLock sync.RWMutex
 }
 
 func (nsl *NamespaceList) dirty(c *ctx) {
@@ -161,7 +166,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	fillApiAttr(&api.attr)
 	children = append(children, api)
 
-	ds := newDirectorySnapshot(c, children, nsl.InodeCommon.id)
+	ds := newDirectorySnapshot(c, children, nsl.InodeCommon.id, nsl.treeLock())
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
@@ -259,6 +264,8 @@ func newWorkspaceList(c *ctx, parentName string, name string,
 		workspaces:    make(map[string]InodeId),
 	}
 	wsl.self = &wsl
+	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
+	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl
 }
 
@@ -268,6 +275,8 @@ type WorkspaceList struct {
 
 	// Map from child name to Inode ID
 	workspaces map[string]InodeId
+
+	realTreeLock sync.RWMutex
 }
 
 func (wsl *WorkspaceList) dirty(c *ctx) {
@@ -309,7 +318,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 		&wsl.workspaces, newWorkspaceRoot)
 	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
 
-	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id)
+	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id, wsl.treeLock())
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0

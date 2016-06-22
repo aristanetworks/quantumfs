@@ -129,6 +129,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Lookup(c, name, out)
 }
 
@@ -153,6 +154,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.GetAttr(c, out)
 }
 
@@ -171,6 +173,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.SetAttr(c, input, out)
 }
 
@@ -203,6 +206,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Mkdir(c, name, input, out)
 }
 
@@ -221,6 +225,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Unlink(c, name)
 }
 
@@ -239,6 +244,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Rmdir(c, name)
 }
 
@@ -284,6 +290,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Symlink(c, pointedTo, linkName, out)
 }
 
@@ -303,6 +310,7 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 		return nil, fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Readlink(c)
 }
 
@@ -319,6 +327,7 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Access(c, input.Mask, input.Uid, input.Gid)
 }
 
@@ -411,6 +420,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 		return fuse.EACCES // TODO Confirm this is correct
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Create(c, input, name, out)
 }
 
@@ -430,6 +440,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.Open(c, input.Flags, input.Mode, out)
 }
 
@@ -449,6 +460,8 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 		c.elog("Read failed", fileHandle)
 		return nil, fuse.ENOENT
 	}
+
+	defer fileHandle.RLockTree().RUnlock()
 	return fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
@@ -478,6 +491,8 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 		c.elog("Write failed")
 		return 0, fuse.ENOENT
 	}
+
+	defer fileHandle.RLockTree().RUnlock()
 	return fileHandle.Write(c, input.Offset, input.Size,
 		input.Flags, data)
 }
@@ -533,6 +548,7 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 		return fuse.ENOENT
 	}
 
+	defer inode.RLockTree().RUnlock()
 	return inode.OpenDir(c, input.Flags, input.Mode, out)
 }
 
@@ -565,6 +581,8 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 		c.elog("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
 	}
+
+	defer fileHandle.RLockTree().RUnlock()
 	return fileHandle.ReadDirPlus(c, input, out)
 }
 

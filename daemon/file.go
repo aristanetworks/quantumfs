@@ -5,10 +5,13 @@ package daemon
 
 // This file holds the File type, which represents regular files
 
-import "arista.com/quantumfs"
 import "errors"
-import "github.com/hanwen/go-fuse/fuse"
+import "sync"
 import "syscall"
+
+import "arista.com/quantumfs"
+
+import "github.com/hanwen/go-fuse/fuse"
 
 const execBit = 0x1
 const writeBit = 0x2
@@ -46,6 +49,8 @@ func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 		accessor: accessor,
 	}
 	file.self = &file
+
+	assert(file.treeLock() != nil, "File treeLock nil at init")
 
 	return &file
 }
@@ -126,7 +131,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum)
+	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	out.OpenFlags = 0
@@ -426,15 +431,19 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId) FileHandle {
+	fileHandleId FileHandleId, treeLock *sync.RWMutex) FileHandle {
 
-	return &FileDescriptor{
+	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
-			id:       fileHandleId,
-			inodeNum: inodeNum,
+			id:        fileHandleId,
+			inodeNum:  inodeNum,
+			treeLock_: treeLock,
 		},
 		file: file,
 	}
+
+	assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	return fd
 }
 
 type FileDescriptor struct {

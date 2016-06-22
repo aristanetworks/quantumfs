@@ -56,6 +56,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
+	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	return &wsr
 }
 

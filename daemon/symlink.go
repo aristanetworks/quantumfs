@@ -23,6 +23,7 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 		parent: parent,
 	}
 	symlink.self = &symlink
+	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 	return &symlink
 }
 

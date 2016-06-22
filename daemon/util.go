@@ -47,3 +47,10 @@ func BlocksRoundUp(len uint64, blockSize uint64) uint64 {
 
 	return blocks
 }
+
+// Panic with the given message if the condition isn't true.
+func assert(condition bool, msg string) {
+	if !condition {
+		panic(msg)
+	}
+}
