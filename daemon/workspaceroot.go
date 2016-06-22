@@ -5,6 +5,7 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
+import "sync"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -17,6 +18,10 @@ type WorkspaceRoot struct {
 	namespace string
 	workspace string
 	rootId    quantumfs.ObjectKey
+
+	// The RWMutex which backs the treeLock for all the inodes in this workspace
+	// tree.
+	realTreeLock sync.RWMutex
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -45,11 +50,13 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		panic("Couldn't decode WorkspaceRoot Object")
 	}
 
-	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil)
+	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil,
+		&wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
+	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	return &wsr
 }
 
@@ -59,14 +66,6 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	wsr.advanceRootId(c)
 }
 
-func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
-	c.vlog("WorkspaceRoot::sync Enter")
-	defer c.vlog("WorkspaceRoot::sync Exit")
-
-	wsr.advanceRootId(c)
-	return wsr.rootId
-}
-
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	c.vlog("WorkspaceRoot::advanceRootId Enter")
@@ -74,7 +73,7 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 
 	// Upload the workspaceroot object
 	var workspaceRoot quantumfs.WorkspaceRoot
-	wsr.Directory.sync(c)
+	wsr.Directory.sync_DOWN(c)
 	workspaceRoot.BaseLayer = wsr.baseLayerId
 
 	bytes, err := json.Marshal(workspaceRoot)

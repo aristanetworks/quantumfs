@@ -9,16 +9,21 @@ import "encoding/json"
 import "errors"
 import "fmt"
 import "strings"
+import "sync"
 import "time"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewApiInode() Inode {
+func NewApiInode(treeLock *sync.RWMutex) Inode {
 	api := ApiInode{
-		InodeCommon: InodeCommon{id: quantumfs.InodeIdApi},
+		InodeCommon: InodeCommon{
+			id:        quantumfs.InodeIdApi,
+			treeLock_: treeLock,
+		},
 	}
 	api.self = &api
+	assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
 
@@ -47,10 +52,6 @@ func fillApiAttr(attr *fuse.Attr) {
 }
 
 func (api *ApiInode) dirty(c *ctx) {
-}
-
-func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,
@@ -108,7 +109,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	out.OpenFlags = 0
-	handle := newApiHandle(c)
+	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
@@ -153,17 +154,19 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn
 	return fuse.ENOSYS
 }
 
-func newApiHandle(c *ctx) *ApiHandle {
+func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 	c.vlog("newApiHandle Enter")
 	defer c.vlog("newApiHandle Exit")
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
-			id:       c.qfs.newFileHandleId(),
-			inodeNum: quantumfs.InodeIdApi,
+			id:        c.qfs.newFileHandleId(),
+			inodeNum:  quantumfs.InodeIdApi,
+			treeLock_: treeLock,
 		},
 		responses: make(chan fuse.ReadResult, 10),
 	}
+	assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
 	return &api
 }
 

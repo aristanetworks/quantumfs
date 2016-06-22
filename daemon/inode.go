@@ -60,9 +60,13 @@ type Inode interface {
 
 	// Compute a new object key, possibly schedule the sync the object data
 	// itself to the datastore
-	sync(c *ctx) quantumfs.ObjectKey
+	sync_DOWN(c *ctx) quantumfs.ObjectKey
 
 	inodeNum() InodeId
+
+	treeLock() *sync.RWMutex
+	LockTree() *sync.RWMutex
+	RLockTree() *sync.RWMutex
 }
 
 type InodeCommon struct {
@@ -71,6 +75,12 @@ type InodeCommon struct {
 	id   InodeId
 
 	lock sync.RWMutex
+
+	// The treeLock is used to lock the entire workspace tree when certain
+	// tree-wide operations are being performed. Primarily this is done with all
+	// requests which call downward (parent to child) in the tree. This is done
+	// to ensure that all Inode locks are only acquired child to parent.
+	treeLock_ *sync.RWMutex
 
 	// This field is accessed using atomic instructions
 	dirty_ uint32 // 1 if this Inode or any children are dirty
@@ -106,6 +116,30 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 	panic(msg)
 }
 
+func (inode *InodeCommon) treeLock() *sync.RWMutex {
+	return inode.treeLock_
+}
+
+func (inode *InodeCommon) LockTree() *sync.RWMutex {
+	inode.treeLock_.Lock()
+	return inode.treeLock_
+}
+
+func (inode *InodeCommon) RLockTree() *sync.RWMutex {
+	inode.treeLock_.RLock()
+	return inode.treeLock_
+}
+
+func (inode *InodeCommon) Lock() *sync.RWMutex {
+	inode.lock.Lock()
+	return &inode.lock
+}
+
+func (inode *InodeCommon) RLock() *sync.RWMutex {
+	inode.lock.RLock()
+	return &inode.lock
+}
+
 // FileHandle represents a specific path at a specific point in time, even as the
 // tree changes underneath it. This is used to provide consistent snapshot views into
 // the tree.
@@ -116,11 +150,30 @@ type FileHandle interface {
 
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
+
+	treeLock() *sync.RWMutex
+	LockTree() *sync.RWMutex
+	RLockTree() *sync.RWMutex
 }
 
 type FileHandleId uint64
 
 type FileHandleCommon struct {
-	id       FileHandleId
-	inodeNum InodeId
+	id        FileHandleId
+	inodeNum  InodeId
+	treeLock_ *sync.RWMutex
+}
+
+func (file *FileHandleCommon) treeLock() *sync.RWMutex {
+	return file.treeLock_
+}
+
+func (file *FileHandleCommon) LockTree() *sync.RWMutex {
+	file.treeLock_.Lock()
+	return file.treeLock_
+}
+
+func (file *FileHandleCommon) RLockTree() *sync.RWMutex {
+	file.treeLock_.RLock()
+	return file.treeLock_
 }

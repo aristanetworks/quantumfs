@@ -5,10 +5,13 @@ package daemon
 
 // This file holds the File type, which represents regular files
 
-import "arista.com/quantumfs"
 import "errors"
-import "github.com/hanwen/go-fuse/fuse"
+import "sync"
 import "syscall"
+
+import "arista.com/quantumfs"
+
+import "github.com/hanwen/go-fuse/fuse"
 
 const execBit = 0x1
 const writeBit = 0x2
@@ -36,13 +39,18 @@ func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
-		InodeCommon: InodeCommon{id: inodeNum},
-		fileType:    fileType,
-		key:         key,
-		parent:      parent,
-		accessor:    accessor,
+		InodeCommon: InodeCommon{
+			id:        inodeNum,
+			treeLock_: parent.treeLock(),
+		},
+		fileType: fileType,
+		key:      key,
+		parent:   parent,
+		accessor: accessor,
 	}
 	file.self = &file
+
+	assert(file.treeLock() != nil, "File treeLock nil at init")
 
 	return &file
 }
@@ -59,11 +67,6 @@ type File struct {
 func (fi *File) dirty(c *ctx) {
 	fi.setDirty(true)
 	fi.parent.dirtyChild(c, fi)
-}
-
-func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
-	fi.setDirty(false)
-	return fi.key
 }
 
 func (fi *File) Access(c *ctx, mask uint32, uid uint32,
@@ -123,7 +126,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum)
+	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	out.OpenFlags = 0
@@ -146,8 +149,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	result := func() fuse.Status {
-		fi.lock.Lock()
-		defer fi.lock.Unlock()
+		defer fi.Lock().Unlock()
 
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
@@ -379,8 +381,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	fi.lock.RLock()
-	defer fi.lock.RUnlock()
+	defer fi.RLock().RUnlock()
 
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
 		fi.accessor.readBlock)
@@ -396,6 +397,8 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
 	writeCount, result := func() (uint32, fuse.Status) {
+		defer fi.Lock().Unlock()
+
 		writeCount, err := fi.operateOnBlocks(c, offset, size, buf,
 			fi.writeBlock)
 
@@ -423,15 +426,19 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId) FileHandle {
+	fileHandleId FileHandleId, treeLock *sync.RWMutex) FileHandle {
 
-	return &FileDescriptor{
+	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
-			id:       fileHandleId,
-			inodeNum: inodeNum,
+			id:        fileHandleId,
+			inodeNum:  inodeNum,
+			treeLock_: treeLock,
 		},
 		file: file,
 	}
+
+	assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	return fd
 }
 
 type FileDescriptor struct {
