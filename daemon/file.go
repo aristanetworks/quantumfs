@@ -36,11 +36,14 @@ func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
-		InodeCommon: InodeCommon{id: inodeNum},
-		fileType:    fileType,
-		key:         key,
-		parent:      parent,
-		accessor:    accessor,
+		InodeCommon: InodeCommon{
+			id:        inodeNum,
+			treeLock_: parent.treeLock(),
+		},
+		fileType: fileType,
+		key:      key,
+		parent:   parent,
+		accessor: accessor,
 	}
 	file.self = &file
 

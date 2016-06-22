@@ -63,6 +63,8 @@ type Inode interface {
 	sync(c *ctx) quantumfs.ObjectKey
 
 	inodeNum() InodeId
+
+	treeLock() *sync.RWMutex
 }
 
 type InodeCommon struct {
@@ -71,6 +73,12 @@ type InodeCommon struct {
 	id   InodeId
 
 	lock sync.RWMutex
+
+	// The treeLock is used to lock the entire workspace tree when certain
+	// tree-wide operations are being performed. Primarily this is done with all
+	// requests which call downward (parent to child) in the tree. This is done
+	// to ensure that all Inode locks are only acquired child to parent.
+	treeLock_ *sync.RWMutex
 
 	// This field is accessed using atomic instructions
 	dirty_ uint32 // 1 if this Inode or any children are dirty
@@ -105,6 +113,11 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 		inodeType, inode)
 	panic(msg)
 }
+
+func (inode *InodeCommon) treeLock() *sync.RWMutex {
+	return inode.treeLock_
+}
+
 func (inode *InodeCommon) Lock() *sync.RWMutex {
 	inode.lock.Lock()
 	return &inode.lock

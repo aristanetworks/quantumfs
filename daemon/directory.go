@@ -7,6 +7,7 @@ import "crypto/sha1"
 import "encoding/json"
 import "errors"
 import "syscall"
+import "sync"
 import "time"
 
 import "arista.com/quantumfs"
@@ -33,7 +34,7 @@ type Directory struct {
 }
 
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
-	inodeNum InodeId, parent Inode) {
+	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
 
 	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
 
@@ -79,6 +80,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.parent = parent
+	dir.treeLock_ = treeLock
 	dir.children = children
 	dir.dirtyChildren_ = make([]Inode, 0)
 	dir.baseLayerId = baseLayerId
@@ -92,7 +94,7 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
 
 	var dir Directory
 
-	initDirectory(c, &dir, baseLayerId, inodeNum, parent)
+	initDirectory(c, &dir, baseLayerId, inodeNum, parent, parent.treeLock())
 
 	return &dir
 }

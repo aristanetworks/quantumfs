@@ -15,9 +15,12 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode) Inode {
 
 	symlink := Symlink{
-		InodeCommon: InodeCommon{id: inodeNum},
-		key:         key,
-		parent:      parent,
+		InodeCommon: InodeCommon{
+			id:        inodeNum,
+			treeLock_: parent.treeLock(),
+		},
+		key:    key,
+		parent: parent,
 	}
 	symlink.self = &symlink
 	return &symlink

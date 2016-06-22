@@ -5,6 +5,7 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
+import "sync"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -17,6 +18,10 @@ type WorkspaceRoot struct {
 	namespace string
 	workspace string
 	rootId    quantumfs.ObjectKey
+
+	// The RWMutex which backs the treeLock for all the inodes in this workspace
+	// tree.
+	realTreeLock sync.RWMutex
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -45,7 +50,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		panic("Couldn't decode WorkspaceRoot Object")
 	}
 
-	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil)
+	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil,
+		&wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
