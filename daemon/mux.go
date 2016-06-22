@@ -36,8 +36,9 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 
 	qfs.c.qfs = qfs
 
-	qfs.inodes[quantumfs.InodeIdRoot] = NewNamespaceList()
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode()
+	namespaceList := NewNamespaceList()
+	qfs.inodes[quantumfs.InodeIdRoot] = namespaceList
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock())
 	return qfs
 }
 

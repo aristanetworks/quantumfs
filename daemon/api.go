@@ -15,11 +15,15 @@ import "time"
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewApiInode() Inode {
+func NewApiInode(treeLock *sync.RWMutex) Inode {
 	api := ApiInode{
-		InodeCommon: InodeCommon{id: quantumfs.InodeIdApi},
+		InodeCommon: InodeCommon{
+			id:        quantumfs.InodeIdApi,
+			treeLock_: treeLock,
+		},
 	}
 	api.self = &api
+	assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
 
