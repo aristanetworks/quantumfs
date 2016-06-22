@@ -60,7 +60,7 @@ type Inode interface {
 
 	// Compute a new object key, possibly schedule the sync the object data
 	// itself to the datastore
-	sync(c *ctx) quantumfs.ObjectKey
+	sync_DOWN(c *ctx) quantumfs.ObjectKey
 
 	inodeNum() InodeId
 

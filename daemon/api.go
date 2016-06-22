@@ -54,10 +54,6 @@ func fillApiAttr(attr *fuse.Attr) {
 func (api *ApiInode) dirty(c *ctx) {
 }
 
-func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
-}
-
 func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 

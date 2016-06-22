@@ -133,8 +133,3 @@ func (link *Symlink) dirty(c *ctx) {
 	link.setDirty(true)
 	link.parent.dirtyChild(c, link)
 }
-
-func (link *Symlink) sync(c *ctx) quantumfs.ObjectKey {
-	link.setDirty(false)
-	return link.key
-}

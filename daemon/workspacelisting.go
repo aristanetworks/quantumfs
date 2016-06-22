@@ -38,10 +38,6 @@ func (nsl *NamespaceList) dirty(c *ctx) {
 func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
 }
 
-func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
-}
-
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
@@ -283,10 +279,6 @@ func (wsl *WorkspaceList) dirty(c *ctx) {
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
-}
-
-func (wsl *WorkspaceList) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,

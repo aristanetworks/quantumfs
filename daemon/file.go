@@ -69,11 +69,6 @@ func (fi *File) dirty(c *ctx) {
 	fi.parent.dirtyChild(c, fi)
 }
 
-func (fi *File) sync(c *ctx) quantumfs.ObjectKey {
-	fi.setDirty(false)
-	return fi.key
-}
-
 func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
