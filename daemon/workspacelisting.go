@@ -6,6 +6,7 @@
 package daemon
 
 import "errors"
+import "sync"
 import "time"
 
 import "arista.com/quantumfs"
@@ -17,6 +18,8 @@ func NewNamespaceList() Inode {
 		namespaces:  make(map[string]InodeId),
 	}
 	nsl.self = &nsl
+	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock
+	assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
 	return &nsl
 }
 
@@ -25,16 +28,14 @@ type NamespaceList struct {
 
 	// Map from child name to Inode ID
 	namespaces map[string]InodeId
+
+	realTreeLock sync.RWMutex
 }
 
 func (nsl *NamespaceList) dirty(c *ctx) {
 }
 
 func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
-}
-
-func (nsl *NamespaceList) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -54,14 +55,14 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	fillAttr(attr, inodeNum,
-		uint32(c.workspaceDB.NumNamespaces()))
+		uint32(c.workspaceDB.NumNamespaces(&c.Ctx)))
 }
 
 type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId, name string)
 
 func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId, namespace string) {
 	fillAttr(attr, inodeNum,
-		uint32(c.workspaceDB.NumWorkspaces(namespace)))
+		uint32(c.workspaceDB.NumWorkspaces(&c.Ctx, namespace)))
 }
 
 func fillAttr(attr *fuse.Attr, inodeNum InodeId, numChildren uint32) {
@@ -150,7 +151,7 @@ func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32,
 func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
 		newWorkspaceList)
 	children := snapshotChildren(c, &nsl.namespaces, fillNamespaceAttr)
 
@@ -161,7 +162,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	fillApiAttr(&api.attr)
 	children = append(children, api)
 
-	ds := newDirectorySnapshot(c, children, nsl.InodeCommon.id)
+	ds := newDirectorySnapshot(c, children, nsl.InodeCommon.id, nsl.treeLock())
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
@@ -179,11 +180,11 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 		return fuse.OK
 	}
 
-	if !c.workspaceDB.NamespaceExists(name) {
+	if !c.workspaceDB.NamespaceExists(&c.Ctx, name) {
 		return fuse.ENOENT
 	}
 
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(), &nsl.namespaces,
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
 		newWorkspaceList)
 
 	inodeNum := nsl.namespaces[name]
@@ -259,6 +260,8 @@ func newWorkspaceList(c *ctx, parentName string, name string,
 		workspaces:    make(map[string]InodeId),
 	}
 	wsl.self = &wsl
+	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
+	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl
 }
 
@@ -268,16 +271,14 @@ type WorkspaceList struct {
 
 	// Map from child name to Inode ID
 	workspaces map[string]InodeId
+
+	realTreeLock sync.RWMutex
 }
 
 func (wsl *WorkspaceList) dirty(c *ctx) {
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
-}
-
-func (wsl *WorkspaceList) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -305,11 +306,11 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
 	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
-		newWorkspaceRoot)
+		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+		&wsl.workspaces, newWorkspaceRoot)
 	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
 
-	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id)
+	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id, wsl.treeLock())
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
@@ -320,13 +321,13 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	if !c.workspaceDB.WorkspaceExists(wsl.namespaceName, name) {
+	if !c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.namespaceName, name) {
 		return fuse.ENOENT
 	}
 
 	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(wsl.namespaceName), &wsl.workspaces,
-		newWorkspaceRoot)
+		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+		&wsl.workspaces, newWorkspaceRoot)
 
 	inodeNum := wsl.workspaces[name]
 	out.NodeId = uint64(inodeNum)

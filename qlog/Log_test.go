@@ -24,7 +24,7 @@ func TestLogSet_test(t *testing.T) {
 	if strings.Contains(logs, "TestToken0") {
 		t.Fatal("Log level 0 not disabled by mask")
 	}
-	qlog.Log(LogWorkspacedb, DummyReqId, 0, "TestToken2")
+	qlog.Log(LogWorkspaceDb, DummyReqId, 0, "TestToken2")
 	if !strings.Contains(logs, "TestToken2") {
 		t.Fatal("Different subsystem erroneously affected by log setting")
 	}

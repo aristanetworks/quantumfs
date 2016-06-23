@@ -3,22 +3,26 @@
 
 package daemon
 
-import "crypto/sha1"
 import "encoding/json"
 import "errors"
 import "syscall"
+import "sync"
 import "time"
 
 import "arista.com/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode) Inode
+type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode) Inode
 
 // This file contains the normal directory Inode type for a workspace
 type Directory struct {
 	InodeCommon
-	parent      Inode
+
+	// These fields are constant after instantiation
+	parent Inode
+
+	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
 	children    map[string]InodeId
 
@@ -29,7 +33,7 @@ type Directory struct {
 }
 
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
-	inodeNum InodeId, parent Inode) {
+	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
 
 	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
 
@@ -47,8 +51,16 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	children := make(map[string]InodeId, baseLayer.NumEntries)
 	childrenRecords := make(map[InodeId]*quantumfs.DirectoryRecord,
 		baseLayer.NumEntries)
-	// Link the array as we build it, since the constructor may need the record
+
+	// Set directory data before processing the children incase the children
+	// access the parent.
+	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
+	dir.parent = parent
+	dir.treeLock_ = treeLock
+	dir.children = children
 	dir.childrenRecords = childrenRecords
+	dir.dirtyChildren_ = make([]Inode, 0)
+	dir.baseLayerId = baseLayerId
 
 	for i, entry := range baseLayer.Entries {
 		inodeId := c.qfs.newInodeId()
@@ -69,111 +81,67 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 			constructor = newSymlink
 		}
 
-		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, inodeId, dir))
+		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
+			inodeId, dir))
 	}
 
-	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
-	dir.parent = parent
-	dir.children = children
-	dir.dirtyChildren_ = make([]Inode, 0)
+	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
-func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode) Inode {
+func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode) Inode {
+
+	c.vlog("Directory::newDirectory Enter")
+	defer c.vlog("Directory::newDirectory Exit")
 
 	var dir Directory
 
-	initDirectory(c, &dir, baseLayerId, inodeNum, parent)
+	initDirectory(c, &dir, baseLayerId, inodeNum, parent, parent.treeLock())
 
 	return &dir
 }
 
-func (dir *Directory) updateSize(c *ctx) {
-	var attr fuse.SetAttrIn
-	attr.Valid = fuse.FATTR_SIZE
-	attr.Size = uint64(len(dir.childrenRecords))
-
+// Needs inode lock for read
+func (dir *Directory) updateSize_(c *ctx) {
 	// If we do not have a parent, then the parent is a workspacelist and we have
 	// nothing to update.
 	if dir.parent != nil {
+		var attr fuse.SetAttrIn
+		attr.Valid = fuse.FATTR_SIZE
+		attr.Size = uint64(len(dir.childrenRecords))
 		dir.parent.setChildAttr(c, dir.id, &attr, nil)
 	}
 }
 
-func (dir *Directory) addChild(c *ctx, name string, inodeNum InodeId,
+// Needs inode lock for write
+func (dir *Directory) addChild_(c *ctx, name string, inodeNum InodeId,
 	child *quantumfs.DirectoryRecord) {
 
 	dir.children[name] = inodeNum
 	dir.childrenRecords[inodeNum] = child
-	dir.updateSize(c)
-	dir.self.dirty(c)
+	dir.updateSize_(c)
 }
 
-func (dir *Directory) delChild(c *ctx, name string) {
+// Needs inode lock for write
+func (dir *Directory) delChild_(c *ctx, name string) {
 	delete(dir.childrenRecords, dir.children[name])
 	delete(dir.children, name)
-	dir.updateSize(c)
-	dir.self.dirty(c)
+	dir.updateSize_(c)
 }
 
 func (dir *Directory) dirty(c *ctx) {
-	dir.dirty_ = true
+	dir.setDirty(true)
 	dir.parent.dirtyChild(c, dir)
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
 // as well.
 func (dir *Directory) dirtyChild(c *ctx, child Inode) {
-	dir.dirtyChildren_ = append(dir.dirtyChildren_, child)
+	func() {
+		defer dir.Lock().Unlock()
+		dir.dirtyChildren_ = append(dir.dirtyChildren_, child)
+	}()
 	dir.self.dirty(c)
-}
-
-func (dir *Directory) sync(c *ctx) quantumfs.ObjectKey {
-	if !dir.dirty_ {
-		return dir.baseLayerId
-	}
-
-	dir.updateRecords(c)
-
-	// Compile the internal records into a block which can be placed in the
-	// datastore.
-	baseLayer := quantumfs.NewDirectoryEntry(len(dir.childrenRecords))
-	baseLayer.NumEntries = uint32(len(dir.childrenRecords))
-
-	for _, entry := range dir.childrenRecords {
-		baseLayer.Entries = append(baseLayer.Entries, *entry)
-	}
-
-	// Upload the base layer object
-	bytes, err := json.Marshal(baseLayer)
-	if err != nil {
-		panic("Failed to marshal baselayer")
-	}
-
-	hash := sha1.Sum(bytes)
-	newBaseLayerId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
-	if err := c.durableStore.Set(newBaseLayerId, &buffer); err != nil {
-		panic("Failed to upload new baseLayer object")
-	}
-
-	dir.baseLayerId = newBaseLayerId
-
-	dir.dirty_ = false
-
-	return dir.baseLayerId
-}
-
-// Walk the list of children which are dirty and have them recompute their new key
-// wsr can update its new key.
-func (dir *Directory) updateRecords(c *ctx) {
-	for _, child := range dir.dirtyChildren_ {
-		newKey := child.sync(c)
-		dir.childrenRecords[child.inodeNum()].ID = newKey
-	}
-	dir.dirtyChildren_ = make([]Inode, 0)
 }
 
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
@@ -231,59 +199,68 @@ func modeToPermissions(mode uint32, umask uint32) uint8 {
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	entry, exists := dir.childrenRecords[inodeNum]
-	if !exists {
-		return fuse.ENOENT
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		entry, exists := dir.childrenRecords[inodeNum]
+		if !exists {
+			return fuse.ENOENT
+		}
+
+		valid := uint(attr.SetAttrInCommon.Valid)
+		// We don't support file locks yet, but when we do we need
+		// FATTR_LOCKOWNER
+
+		if BitFlagsSet(valid, fuse.FATTR_MODE) {
+			entry.Permissions = modeToPermissions(attr.Mode, 0)
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_UID) {
+			entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
+				c.fuseCtx.Owner.Uid)
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_GID) {
+			entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
+				c.fuseCtx.Owner.Gid)
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_SIZE) {
+			entry.Size = attr.Size
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
+			// atime is ignored and not stored
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
+			entry.ModificationTime = quantumfs.NewTimeSeconds(attr.Mtime,
+				attr.Mtimensec)
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
+			entry.ModificationTime = quantumfs.NewTime(time.Now())
+		}
+
+		if BitFlagsSet(valid, fuse.FATTR_CTIME) {
+			entry.CreationTime = quantumfs.NewTimeSeconds(attr.Ctime,
+				attr.Ctimensec)
+		}
+
+		if out != nil {
+			fillAttrOutCacheData(c, out)
+			fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
+				c.fuseCtx.Owner, entry)
+		}
+
+		return fuse.OK
+	}()
+
+	if result == fuse.OK {
+		dir.self.dirty(c)
 	}
 
-	valid := uint(attr.SetAttrInCommon.Valid)
-	// We don't support file locks yet, but when we do we need FATTR_LOCKOWNER
-
-	if BitFlagsSet(valid, fuse.FATTR_MODE) {
-		entry.Permissions = modeToPermissions(attr.Mode, 0)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-			c.fuseCtx.Owner.Uid)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-			c.fuseCtx.Owner.Gid)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
-		entry.Size = attr.Size
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
-		// atime is ignored and not stored
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-		entry.ModificationTime = quantumfs.NewTimeSeconds(attr.Mtime,
-			attr.Mtimensec)
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-		entry.ModificationTime = quantumfs.NewTime(time.Now())
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_CTIME) {
-		entry.CreationTime = quantumfs.NewTimeSeconds(attr.Ctime,
-			attr.Ctimensec)
-	}
-
-	if out != nil {
-		fillAttrOutCacheData(c, out)
-		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-			entry)
-	}
-
-	dir.self.dirty(c)
-
-	return fuse.OK
+	return result
 }
 
 func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
@@ -294,9 +271,11 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer dir.RLock().RUnlock()
+
+	var childDirectories uint32
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
-	var childDirectories uint32
 	for _, entry := range dir.childrenRecords {
 		if entry.Type == quantumfs.ObjectTypeDirectoryEntry {
 			childDirectories++
@@ -308,6 +287,8 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
+	defer dir.RLock().RUnlock()
+
 	inodeNum, exists := dir.children[name]
 	if !exists {
 		return fuse.ENOENT
@@ -330,6 +311,8 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	defer dir.RLock().RUnlock()
+
 	children := make([]directoryContents, 0, len(dir.childrenRecords))
 	for _, entry := range dir.childrenRecords {
 		filename := BytesToString(entry.Filename[:])
@@ -344,7 +327,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 		children = append(children, entryInfo)
 	}
 
-	ds := newDirectorySnapshot(c, children, dir.InodeCommon.id)
+	ds := newDirectorySnapshot(c, children, dir.InodeCommon.id, dir.treeLock())
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
@@ -352,9 +335,12 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	return fuse.OK
 }
 
-func (dir *Directory) create(c *ctx, name string, mode uint32, umask uint32,
+func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	constructor InodeConstructor, type_ quantumfs.ObjectType,
 	key quantumfs.ObjectKey, out *fuse.EntryOut) Inode {
+
+	c.vlog("Directory::create_ Enter")
+	defer c.vlog("Directory::create_ Exit")
 
 	now := time.Now()
 	uid := c.fuseCtx.Owner.Uid
@@ -374,8 +360,8 @@ func (dir *Directory) create(c *ctx, name string, mode uint32, umask uint32,
 	}
 
 	inodeNum := c.qfs.newInodeId()
-	dir.addChild(c, name, inodeNum, &entry)
-	newEntity := constructor(c, key, inodeNum, dir.self)
+	dir.addChild_(c, name, inodeNum, &entry)
+	newEntity := constructor(c, key, 0, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, newEntity)
 
 	fillEntryOutCacheData(c, out)
@@ -388,19 +374,31 @@ func (dir *Directory) create(c *ctx, name string, mode uint32, umask uint32,
 func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
-	if _, exists := dir.children[name]; exists {
-		return fuse.Status(syscall.EEXIST)
+	var file Inode
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		if _, exists := dir.children[name]; exists {
+			return fuse.Status(syscall.EEXIST)
+		}
+
+		c.vlog("Creating file: '%s'", name)
+
+		file = dir.create_(c, name, input.Mode, input.Umask, newSmallFile,
+			quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey,
+			&out.EntryOut)
+		return fuse.OK
+	}()
+
+	if result != fuse.OK {
+		return result
 	}
 
-	c.vlog("Creating file: '%s'", name)
-
-	file := dir.create(c, name, input.Mode, input.Umask, newSmallFile,
-		quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey,
-		&out.EntryOut)
+	dir.self.dirty(c)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(),
-		fileHandleNum)
+		fileHandleNum, file.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog("New file inode %d, fileHandle %d", file.inodeNum(), fileHandleNum)
@@ -421,18 +419,30 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	if _, exists := dir.children[name]; exists {
-		return fuse.Status(syscall.EEXIST)
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		if _, exists := dir.children[name]; exists {
+			return fuse.Status(syscall.EEXIST)
+		}
+
+		dir.create_(c, name, input.Mode, input.Umask, newDirectory,
+			quantumfs.ObjectTypeDirectoryEntry, quantumfs.EmptyDirKey,
+			out)
+		return fuse.OK
+	}()
+
+	if result == fuse.OK {
+		dir.self.dirty(c)
 	}
 
-	dir.create(c, name, input.Mode, input.Umask, newDirectory,
-		quantumfs.ObjectTypeDirectoryEntry, quantumfs.EmptyDirKey, out)
-
-	return fuse.OK
+	return result
 }
 
 func (dir *Directory) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+
+	defer dir.RLock().RUnlock()
 
 	if val, ok := dir.childrenRecords[inodeNum]; ok {
 		return *val, nil
@@ -443,61 +453,88 @@ func (dir *Directory) getChildRecord(c *ctx,
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
-	if _, exists := dir.children[name]; !exists {
-		return fuse.ENOENT
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		if _, exists := dir.children[name]; !exists {
+			return fuse.ENOENT
+		}
+
+		inode := dir.children[name]
+		type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+		if type_ == fuse.S_IFDIR {
+			return fuse.Status(syscall.EISDIR)
+		}
+
+		dir.delChild_(c, name)
+		return fuse.OK
+	}()
+
+	if result == fuse.OK {
+		dir.self.dirty(c)
 	}
 
-	inode := dir.children[name]
-	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
-	if type_ == fuse.S_IFDIR {
-		return fuse.Status(syscall.EISDIR)
-	}
-
-	dir.delChild(c, name)
-
-	return fuse.OK
+	return result
 }
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
-	if _, exists := dir.children[name]; !exists {
-		return fuse.ENOENT
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+		if _, exists := dir.children[name]; !exists {
+			return fuse.ENOENT
+		}
+
+		inode := dir.children[name]
+		type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+		if type_ != fuse.S_IFDIR {
+			return fuse.ENOTDIR
+		}
+
+		if dir.childrenRecords[inode].Size != 0 {
+			return fuse.Status(syscall.ENOTEMPTY)
+		}
+
+		dir.delChild_(c, name)
+		return fuse.OK
+	}()
+
+	if result == fuse.OK {
+		dir.self.dirty(c)
 	}
 
-	inode := dir.children[name]
-	type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
-	if type_ != fuse.S_IFDIR {
-		return fuse.ENOTDIR
-	}
-
-	if dir.childrenRecords[inode].Size != 0 {
-		return fuse.Status(syscall.ENOTEMPTY)
-	}
-
-	dir.delChild(c, name)
-
-	return fuse.OK
+	return result
 }
 
 func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	if _, exists := dir.children[name]; exists {
-		return fuse.Status(syscall.EEXIST)
+	var key quantumfs.ObjectKey
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		if _, exists := dir.children[name]; exists {
+			return fuse.Status(syscall.EEXIST)
+		}
+
+		buf := quantumfs.NewBuffer([]byte(pointedTo))
+		key = buf.Key(quantumfs.KeyTypeData)
+
+		if err := DataStore.Set(c, key, buf); err != nil {
+			c.elog("Failed to upload block: %v", err)
+			return fuse.EIO
+		}
+
+		dir.create_(c, name, 0777, 0777, newSymlink,
+			quantumfs.ObjectTypeSymlink, key, out)
+		return fuse.OK
+	}()
+
+	if result == fuse.OK {
+		dir.self.dirty(c)
+		c.vlog("Created new symlink with key: %s", key)
 	}
 
-	buf := quantumfs.NewBuffer([]byte(pointedTo))
-	key := buf.Key(quantumfs.KeyTypeData)
-
-	if err := DataStore.Set(c, key, buf); err != nil {
-		c.elog("Failed to upload block: %v", err)
-		return fuse.EIO
-	}
-
-	dir.create(c, name, 0777, 0777, newSymlink, quantumfs.ObjectTypeSymlink,
-		key, out)
-
-	c.vlog("Created new symlink with key: %s", key)
-	return fuse.OK
+	return result
 }
 
 func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
@@ -506,21 +543,25 @@ func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
 }
 
 type directoryContents struct {
+	// All immutable after creation
 	filename string
 	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc
 	attr     fuse.Attr
 }
 
 func newDirectorySnapshot(c *ctx, children []directoryContents,
-	inodeNum InodeId) *directorySnapshot {
+	inodeNum InodeId, treeLock *sync.RWMutex) *directorySnapshot {
 
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
-			id:       c.qfs.newFileHandleId(),
-			inodeNum: inodeNum,
+			id:        c.qfs.newFileHandleId(),
+			inodeNum:  inodeNum,
+			treeLock_: treeLock,
 		},
 		children: children,
 	}
+
+	assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
 
 	return &ds
 }

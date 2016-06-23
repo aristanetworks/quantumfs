@@ -1,3 +1,6 @@
+Coding Style
+############
+
 The coding style used in quantumfs is defined by these simple rules:
 
 1. Use go fmt
@@ -80,3 +83,87 @@ must be wrapped like:
 >                dst); err != nil {
 > 
 >                api = 6
+
+Naming Conventions
+##################
+
+Test filenames
+==============
+
+Test filenames start with a capital letter and end with "_test".
+
+Function Names
+==============
+
+Function names follow the golang style. An important extension of this is that
+functions which expect a particular lock to already be held by the caller will have
+an underscore ("_") appended to the function name. There must also be a comment for
+the function describing the minimum lock(s) which must be held.
+
+Locking and Critical Sections
+#############################
+
+Consider the following code:
+
+> func (obj *Obj) a() {
+>       obj.doSomethingExpensive1()
+>
+>       obj.lock.Lock()
+>       obj.doSomethingImportant()
+>       obj.lock.Unlock()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+On the face of it this code seems simple, safe and efficient; both the expensive
+operations are done without the lock held and the lock is released after the minimal
+critical code is executed. Unfortunately this code is not panic safe and should
+doSomethingImportant() panic, perhaps because of a coding error or other unavoidable
+error, then obj.lock will never be unlocked. The next time this code comes around it
+will deadlock.
+
+In order to make this code safe we need to defer the Unlock() to ensure that, should
+a panic happen while we are holding the lock that it is released. Employing this
+advice literally we would end up with code as such:
+
+> func (obj *Obj) a() {
+>       obj.doSomethingExpensive1()
+>
+>       obj.lock.Lock()
+>       defer obj.lock.Unlock()
+>       obj.doSomethingImportant()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+Unfortunately while this code is now safe from panics and will not leak the lock, it
+also holds the lock during an expensive operation, doSomethingExpensive2(). This is
+because, in the case without panics, deferred functions are only called at function
+exit. Therefore all critical sections need to be their own separate function to
+ensure the locks are always released and cover a minimal amount of execution. The
+final and correct style for a critical section would thus be:
+
+> func (obj *Obj) a() {
+>       obj.doSomethingExpensive1()
+>
+>       func() {
+>               obj.lock.Lock()
+>               defer obj.lock.Unlock()
+>               obj.doSomethingImportant()
+>       }()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+For convenience InodeCommon has a helper method which allows locking of the form:
+
+> func (file *File a() {
+>       file.doSomethingExpensive1()
+>
+>       func() {
+>               defer file.Lock().Unlock()
+>               file.doSomethingImportant()
+>       }()
+>
+>       file.doSomethingExpensive2()
+> }

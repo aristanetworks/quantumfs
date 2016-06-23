@@ -136,6 +136,7 @@ func (th *testHelper) endTest() {
 
 	if th.server != nil {
 		if exception != nil {
+			th.t.Logf("Failed with exception, forcefully unmounting")
 			abortFuse(th)
 		}
 
@@ -314,7 +315,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		return th.log(format, args...)
 	}
 	th.qfs.c.Qlog.SetWriter(writer)
-	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacesdb/*,test/*")
+	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacedb/*,test/*")
 
 	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
 	if err != nil {
@@ -448,7 +449,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 func (th *testHelper) workspaceRootId(namespace string,
 	workspace string) quantumfs.ObjectKey {
 
-	return th.qfs.c.workspaceDB.Workspace(namespace, workspace)
+	return th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx, namespace, workspace)
 }
 
 // Global test request ID incremented for all the running tests
@@ -509,7 +510,7 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
 			Qlog:      c.Qlog,
-			RequestId: c.RequestId,
+			RequestId: request,
 		},
 		qfs:          c.qfs,
 		config:       c.config,
