@@ -12,7 +12,7 @@ import "strings"
 import "sync"
 import "time"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewApiInode(treeLock *sync.RWMutex) Inode {

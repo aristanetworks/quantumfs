@@ -6,7 +6,7 @@ package processlocal
 import "fmt"
 import "sync"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func NewDataStore() quantumfs.DataStore {
 	store := &DataStore{

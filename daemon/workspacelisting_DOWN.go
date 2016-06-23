@@ -5,7 +5,7 @@ package daemon
 
 // This is the _DOWN counterpart to workspacelisting.go
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func (wsl *WorkspaceList) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey

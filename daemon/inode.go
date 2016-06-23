@@ -9,7 +9,7 @@ import "reflect"
 import "sync"
 import "sync/atomic"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 type InodeId uint64

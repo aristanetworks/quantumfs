@@ -9,7 +9,7 @@ import "syscall"
 import "sync"
 import "time"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, size uint64,

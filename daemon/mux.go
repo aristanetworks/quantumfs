@@ -11,8 +11,8 @@ import "syscall"
 import "sync"
 import "sync/atomic"
 
-import "arista.com/quantumfs"
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {

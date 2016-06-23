@@ -21,9 +21,9 @@ import "sync/atomic"
 import "testing"
 import "time"
 
-import "arista.com/quantumfs"
-import "arista.com/quantumfs/processlocal"
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/processlocal"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 import "github.com/hanwen/go-fuse/fuse"
 

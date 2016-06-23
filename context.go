@@ -3,7 +3,7 @@
 
 package quantumfs
 
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 // Generic request context object
 type Ctx struct {

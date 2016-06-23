@@ -7,7 +7,7 @@ package qlog
 
 import "testing"
 import "strings"
-import "arista.com/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestLogSet_test(t *testing.T) {
 	qlog := NewQlog()

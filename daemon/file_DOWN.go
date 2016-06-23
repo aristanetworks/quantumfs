@@ -5,7 +5,7 @@ package daemon
 
 // This is the _DOWN counterpart to file.go
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func (fi *File) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	fi.setDirty(false)

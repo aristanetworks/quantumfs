@@ -10,7 +10,7 @@ import "time"
 import "crypto/sha1"
 import "encoding/json"
 import "encoding/hex"
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = 1 * 1024 * 1024

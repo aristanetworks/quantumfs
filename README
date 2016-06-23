@@ -9,12 +9,12 @@ Dev Environment Setup
 ---------------------
 
 1) ensure your GOPATH environment variable is correctly pointed such that this
-README's folder path is $GOPATH/src/arista.com/quantumfs/README
+README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 
-2) clone the github go-fuse bindings into a github folder located as such:
+2) clone the dependent libraries:
 
-	cd $GOPATH
-	git clone https://github.com/hanwen/go-fuse ./src/github.com/hanwen/go-fuse
+	cd $GOPATH/src/github.com/aristanetworks
+        make fetch
 
 3) ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
 

@@ -5,7 +5,7 @@ package daemon
 
 // This is the _DOWN counterpart to symlink.go
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func (link *Symlink) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	link.setDirty(false)
