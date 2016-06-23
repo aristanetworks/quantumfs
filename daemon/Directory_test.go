@@ -135,6 +135,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying_test(t *testing.T) {
 		file.key.Key[1]++
 		fileDescriptor.dirty(test.newCtx())
 
+		test.syncAllWorkspaces()
 		newRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
 			quantumfs.NullWorkspaceName)
 
