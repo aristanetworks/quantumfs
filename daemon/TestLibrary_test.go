@@ -6,9 +6,11 @@ package daemon
 // Test library
 
 import "bufio"
+import "bytes"
 import "errors"
 import "flag"
 import "fmt"
+import "io"
 import "io/ioutil"
 import "math/rand"
 import "os"
@@ -583,6 +585,7 @@ func printToFile(filename string, data string) error {
 	if file == nil || err != nil {
 		return errors.New("Unable to open file for RDRW")
 	}
+	defer file.Close()
 
 	written := 0
 	for written < len(data) {
@@ -593,7 +596,49 @@ func printToFile(filename string, data string) error {
 			return errors.New("Unable to write all data")
 		}
 	}
-	file.Close()
 
 	return nil
+}
+
+func checkSparse(test *testHelper, fileA string, fileB string, offset int, len int) {
+	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
+	test.assert(err == nil, "Unable to open fileA for RDONLY")
+	defer fdA.Close()
+
+	fdB, err := os.OpenFile(fileB, os.O_RDONLY, 0777)
+	test.assert(err == nil, "Unable to open fileB for RDONLY")
+	defer fdB.Close()
+
+	rtnA := make([]byte, len)
+	rtnB := make([]byte, len)
+	idx := int64(0)
+	for {
+		var readA int
+		for readA < len {
+			var readIt int
+			readIt, err = fdA.ReadAt(rtnA[readA:], idx+int64(readA))
+
+			if err == io.EOF {
+				return
+			}
+			test.assert(err == nil, "Error while reading from fileA")
+			readA += readIt
+		}
+		
+		var readB int
+		for readB < len {
+			var readIt int
+			readIt, err = fdB.ReadAt(rtnB[readB:], idx+int64(readB))
+
+			if err == io.EOF {
+				return
+			}
+			test.assert(err == nil, "Error while reading from fileB")
+			readB += readIt
+		}
+
+		test.assert(bytes.Equal(rtnA, rtnB), "data mismatch, %v vs %v",
+			rtnA, rtnB)
+		idx += int64(offset)
+	}
 }

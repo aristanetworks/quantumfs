@@ -46,8 +46,8 @@ type Inode interface {
 	Readlink(c *ctx) ([]byte, fuse.Status)
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-		out *fuse.AttrOut) fuse.Status
+	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
+		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
 
 	getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord, error)
 

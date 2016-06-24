@@ -15,8 +15,8 @@ func TestLargeFileExpansion_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
-		testFilename := workspace + "/test"
+		workspace := test.nullWorkspaceRel()
+		testFilename := test.absPath(workspace + "/test")
 
 		// Write the fibonacci sequence to the file continually past what
 		// a medium file could hold.
@@ -73,6 +73,8 @@ func TestLargeFileAttr_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
+		api := test.getApi()
+
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
@@ -114,5 +116,19 @@ func TestLargeFileAttr_test(t *testing.T) {
 			"Unable to write data all at once")
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
+		
+		output, err = ioutil.ReadFile(testFilename)
+		test.assert(err == nil, "Failed to read large file with sparse data")
+		test.assert(bytes.Equal(output[dataOffset:dataOffset +
+			len(testString)], testString),
+			"Offset write failed in sparse file")
+
+		// Branch the workspace
+		dst := "largeattrsparse/test"
+		err = api.Branch(test.relPath(workspace), dst)
+		test.assert(err == nil, "Unable to branch")
+
+		checkSparse(test, test.absPath(dst + "/test"), testFilename, 250000,
+			10)
 	})
 }

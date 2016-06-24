@@ -105,32 +105,32 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 
 	if newType == quantumfs.ObjectTypeMediumFile {
 		rtn := newMediumShell()
-		rtn.data.blockSize = quantumfs.MaxBlockSize
+		rtn.data.BlockSize = quantumfs.MaxBlockSize
 
 		numBlocks := int(math.Ceil(float64(fi.bytes) /
-			float64(rtn.data.blockSize)))
+			float64(rtn.data.BlockSize)))
 		rtn.expandTo(numBlocks)
 		if numBlocks > 0 {
-			rtn.data.blocks[0] = fi.key
+			rtn.data.Blocks[0] = fi.key
 		}
-		rtn.data.lastBlockBytes = uint32(fi.bytes %
-			uint64(rtn.data.blockSize))
+		rtn.data.LastBlockBytes = uint32(fi.bytes %
+			uint64(rtn.data.BlockSize))
 
 		return &rtn
 	}
 
 	if newType == quantumfs.ObjectTypeLargeFile {
 		rtn := newLargeShell()
-		rtn.data.blockSize = quantumfs.MaxBlockSize
+		rtn.data.BlockSize = quantumfs.MaxBlockSize
 
 		numBlocks := int(math.Ceil(float64(fi.bytes) /
-			float64(rtn.data.blockSize)))
+			float64(rtn.data.BlockSize)))
 		rtn.expandTo(numBlocks)
 		if numBlocks > 0 {
-			rtn.data.blocks[0] = fi.key
+			rtn.data.Blocks[0] = fi.key
 		}
-		rtn.data.lastBlockBytes = uint32(fi.bytes %
-			uint64(rtn.data.blockSize))
+		rtn.data.LastBlockBytes = uint32(fi.bytes %
+			uint64(rtn.data.BlockSize))
 
 		return &rtn
 	}
