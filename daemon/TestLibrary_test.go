@@ -624,7 +624,7 @@ func checkSparse(test *testHelper, fileA string, fileB string, offset int, len i
 			test.assert(err == nil, "Error while reading from fileA")
 			readA += readIt
 		}
-		
+
 		var readB int
 		for readB < len {
 			var readIt int

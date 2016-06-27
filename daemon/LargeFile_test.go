@@ -116,10 +116,10 @@ func TestLargeFileAttr_test(t *testing.T) {
 			"Unable to write data all at once")
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
-		
+
 		output, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Failed to read large file with sparse data")
-		test.assert(bytes.Equal(output[dataOffset:dataOffset +
+		test.assert(bytes.Equal(output[dataOffset:dataOffset+
 			len(testString)], testString),
 			"Offset write failed in sparse file")
 
@@ -128,7 +128,7 @@ func TestLargeFileAttr_test(t *testing.T) {
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
-		checkSparse(test, test.absPath(dst + "/test"), testFilename, 250000,
+		checkSparse(test, test.absPath(dst+"/test"), testFilename, 250000,
 			10)
 	})
 }
