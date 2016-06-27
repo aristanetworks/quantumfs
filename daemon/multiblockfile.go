@@ -31,9 +31,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 	buffer := DataStore.Get(c, key)
 	if buffer == nil {
 		c.elog("Unable to fetch metadata for new file creation")
-		// Assume that the file is empty
-		rtn.data.LastBlockBytes = 0
-		return &rtn
+		panic("Unable to fetch metadata for new file creation")
 	}
 
 	if err := json.Unmarshal(buffer.Get(), &rtn.data); err != nil {
