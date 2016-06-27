@@ -34,6 +34,8 @@ func TestFileExpansion_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
+		api := test.getApi()
+
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
@@ -70,21 +72,32 @@ func TestFileExpansion_test(t *testing.T) {
 			"Post-truncation mismatch")
 
 		// Let's re-expand it using SetAttr
-		os.Truncate(testFilename, 5*1024*1024)
+		const truncLen = 5 * 1024 * 1024
+		os.Truncate(testFilename, truncLen)
 
 		output, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Error reading fib+hole back from file")
 		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
 			"Data readback mismatch")
-		delta := (5 * 1024 * 1024) - newLen
+		delta := truncLen - newLen
 		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
 			"File hole not filled with zeros")
+
+		// Branch the workspace
+		dst := "largeattrsparse/test"
+		err = api.Branch(test.relPath(workspace), dst)
+		test.assert(err == nil, "Unable to branch")
+
+		checkSparse(test, test.absPath(dst+"/test"), testFilename, 25000,
+			10)
 	})
 }
 
 func TestMedFileAttr_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
+
+		api := test.getApi()
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
@@ -127,5 +140,13 @@ func TestMedFileAttr_test(t *testing.T) {
 			"Unable to write data all at once")
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
+
+		// Branch the workspace
+		dst := "medattrsparse/test"
+		err = api.Branch(test.relPath(workspace), dst)
+		test.assert(err == nil, "Unable to branch")
+
+		checkSparse(test, test.absPath(dst+"/test"), testFilename, 25000,
+			10)
 	})
 }

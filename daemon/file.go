@@ -23,8 +23,7 @@ func newSmallFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 	}
 	accessor := newSmallAccessor(c, childRecord.Size, key)
 
-	return newFile_(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent,
-		accessor)
+	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
 func newMediumFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
@@ -32,25 +31,22 @@ func newMediumFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent,
-		accessor)
+	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
 func newLargeFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
 	parent Inode) Inode {
 
-	accessor := newMediumAccessor(c, key)
+	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent,
-		accessor)
+	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
-func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
+func newFile_(c *ctx, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
 		InodeCommon: InodeCommon{id: inodeNum},
-		fileType:    fileType,
 		key:         key,
 		parent:      parent,
 		accessor:    accessor,
@@ -62,7 +58,6 @@ func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	fileType quantumfs.ObjectType
 	key      quantumfs.ObjectKey
 	parent   Inode
 	accessor blockAccessor
@@ -171,12 +166,13 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		if err != nil {
 			return fuse.EIO
 		}
+
+		// Update the entry metadata
+		fi.key = fi.accessor.writeToStore(c)
+		fi.dirty(c)
 	}
 
-	// Update the entry metadata
-	fi.key = fi.accessor.writeToStore(c)
-
-	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
+	return fi.parent.setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -207,8 +203,8 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on File")
 	return fuse.ENOSYS
@@ -287,7 +283,11 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 		return errors.New("Unable to process needed type for accessor")
 	}
 
-	fi.accessor = newAccessor
+	if fi.accessor != newAccessor {
+		fi.accessor = newAccessor
+		var attr fuse.SetAttrIn
+		fi.parent.setChildAttr(c, fi.id, &neededType, &attr, nil)
+	}
 	return nil
 }
 
@@ -406,7 +406,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent.setChildAttr(c, fi.id, &attr, nil)
+	fi.parent.setChildAttr(c, fi.id, nil, &attr, nil)
 	fi.dirty(c)
 
 	return uint32(writeCount), fuse.OK

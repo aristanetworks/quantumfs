@@ -15,14 +15,14 @@ func TestLargeFileExpansion_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
-		testFilename := workspace + "/test"
+		workspace := test.nullWorkspaceRel()
+		testFilename := test.absPath(workspace + "/test")
 
 		// Write the fibonacci sequence to the file continually past what
 		// a medium file could hold.
-		data := genFibonacci(40 * 1024 * 1024)
+		data := genFibonacci(34 * 1024 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing 40MB fibonacci to new fd: %v",
+		test.assert(err == nil, "Error writing 34MB fibonacci to new fd: %v",
 			err)
 
 		var stat syscall.Stat_t
@@ -34,7 +34,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		// Read it back
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 40MB fibonacci from file")
+		test.assert(err == nil, "Error reading 34MB fibonacci from file")
 		test.assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
 		if !bytes.Equal(data, output) {
@@ -73,6 +73,8 @@ func TestLargeFileAttr_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
+		api := test.getApi()
+
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
@@ -81,7 +83,7 @@ func TestLargeFileAttr_test(t *testing.T) {
 		syscall.Close(fd)
 
 		// Then expand it via SetAttr to large file size
-		newSize := int64(40 * 1024 * 1024)
+		newSize := int64(34 * 1024 * 1024)
 		os.Truncate(testFilename, newSize)
 
 		// Check that the size increase worked
@@ -91,10 +93,10 @@ func TestLargeFileAttr_test(t *testing.T) {
 		test.assert(stat.Size == newSize, "File size incorrect, %d",
 			stat.Size)
 
-		// Read what should be 40MB of zeros
+		// Read what should be 34MB of zeros
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 40MB hole from file")
+		test.assert(err == nil, "Error reading 34MB hole from file")
 
 		for i := 0; i < len(output); i += 1024 {
 			test.assert(output[i] == 0, "Data not zeroed in file, %s",
@@ -114,5 +116,19 @@ func TestLargeFileAttr_test(t *testing.T) {
 			"Unable to write data all at once")
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
+
+		output, err = ioutil.ReadFile(testFilename)
+		test.assert(err == nil, "Failed to read large file with sparse data")
+		test.assert(bytes.Equal(output[dataOffset:dataOffset+
+			len(testString)], testString),
+			"Offset write failed in sparse file")
+
+		// Branch the workspace
+		dst := "largeattrsparse/test"
+		err = api.Branch(test.relPath(workspace), dst)
+		test.assert(err == nil, "Unable to branch")
+
+		checkSparse(test, test.absPath(dst+"/test"), testFilename, 250000,
+			10)
 	})
 }

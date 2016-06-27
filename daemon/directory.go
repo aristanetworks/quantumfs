@@ -54,7 +54,6 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-
 		var constructor InodeConstructor
 		switch entry.Type {
 		default:
@@ -98,7 +97,7 @@ func (dir *Directory) updateSize(c *ctx) {
 	// If we do not have a parent, then the parent is a workspacelist and we have
 	// nothing to update.
 	if dir.parent != nil {
-		dir.parent.setChildAttr(c, dir.id, &attr, nil)
+		dir.parent.setChildAttr(c, dir.id, nil, &attr, nil)
 	}
 }
 
@@ -231,11 +230,17 @@ func modeToPermissions(mode uint32, umask uint32) uint8 {
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
 
 	entry, exists := dir.childrenRecords[inodeNum]
 	if !exists {
 		return fuse.ENOENT
+	}
+
+	// Update the type if needed
+	if newType != nil {
+		entry.Type = *newType
 	}
 
 	valid := uint(attr.SetAttrInCommon.Valid)
