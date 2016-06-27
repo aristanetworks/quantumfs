@@ -8,7 +8,7 @@ package daemon
 import "crypto/sha1"
 import "encoding/json"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory::sync Enter")

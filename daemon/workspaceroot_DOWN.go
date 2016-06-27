@@ -5,7 +5,7 @@ package daemon
 
 // This is the _DOWN counterpart to workspaceroot.go
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func (wsr *WorkspaceRoot) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	c.vlog("WorkspaceRoot::sync Enter")

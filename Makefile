@@ -11,11 +11,11 @@ clean:
 fetch:
 	for cmd in $(COMMANDS); do \
 		echo "Fetching $$cmd"; \
-		go get arista.com/quantumfs/cmd/$$cmd; \
+		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
 
 $(COMMANDS):
-	go build arista.com/quantumfs/cmd/$@
+	go build github.com/aristanetworks/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST):
-	go test arista.com/quantumfs/$@
+	go test github.com/aristanetworks/quantumfs/$@

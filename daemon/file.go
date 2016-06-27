@@ -9,7 +9,7 @@ import "errors"
 import "sync"
 import "syscall"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 

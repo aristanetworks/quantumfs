@@ -6,8 +6,8 @@ package processlocal
 import "fmt"
 import "sync"
 
-import "arista.com/quantumfs"
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 func NewWorkspaceDB() quantumfs.WorkspaceDB {
 	wsdb := &WorkspaceDB{

@@ -12,7 +12,7 @@ import "syscall"
 import "testing"
 import "os"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func TestFileCreation_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {

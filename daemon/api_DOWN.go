@@ -5,7 +5,7 @@ package daemon
 
 // _DOWN counterpart to api.go
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func (api *ApiInode) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey

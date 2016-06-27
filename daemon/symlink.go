@@ -7,7 +7,7 @@ package daemon
 
 import "errors"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 

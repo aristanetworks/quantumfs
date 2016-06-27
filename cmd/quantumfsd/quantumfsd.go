@@ -7,9 +7,9 @@ package main
 import "flag"
 import "os"
 
-import "arista.com/quantumfs"
-import "arista.com/quantumfs/daemon"
-import "arista.com/quantumfs/processlocal"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/daemon"
+import "github.com/aristanetworks/quantumfs/processlocal"
 
 import "github.com/hanwen/go-fuse/fuse"
 import "github.com/pivotal-golang/bytefmt"

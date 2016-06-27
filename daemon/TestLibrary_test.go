@@ -21,9 +21,9 @@ import "sync/atomic"
 import "testing"
 import "time"
 
-import "arista.com/quantumfs"
-import "arista.com/quantumfs/processlocal"
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/processlocal"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -250,10 +250,10 @@ func (th *testHelper) startDefaultQuantumFs() {
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func fuseConnection(mountPath string) int {
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
-			panic("Failed opening mountinfo")
+			panic(fmt.Sprintf("Failed opening mountinfo: %v", err))
 		}
 		defer file.Close()
 
@@ -262,7 +262,7 @@ func fuseConnection(mountPath string) int {
 		for {
 			bline, _, err := mountinfo.ReadLine()
 			if err != nil {
-				panic("Failed to find mount")
+				continue
 			}
 
 			line := string(bline)

@@ -7,7 +7,7 @@ import "crypto/sha1"
 import "encoding/json"
 import "sync"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 // WorkspaceRoot acts similarly to a directory except only a single object ID is used
