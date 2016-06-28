@@ -6,7 +6,7 @@ package processlocal
 import "fmt"
 import "sync"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func NewDataStore() quantumfs.DataStore {
 	store := &DataStore{
@@ -17,7 +17,7 @@ func NewDataStore() quantumfs.DataStore {
 }
 
 type DataStore struct {
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	data  map[quantumfs.ObjectKey][]byte
 }
 
@@ -25,13 +25,13 @@ func (store *DataStore) Get(key quantumfs.ObjectKey,
 	buffer *quantumfs.Buffer) error {
 
 	var err error
-	store.mutex.Lock()
+	store.mutex.RLock()
 	if data, exists := store.data[key]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
 		buffer.Set(data)
 	}
-	store.mutex.Unlock()
+	store.mutex.RUnlock()
 	return err
 }
 
@@ -50,9 +50,9 @@ func (store *DataStore) Set(key quantumfs.ObjectKey,
 }
 
 func (store *DataStore) Exists(key quantumfs.ObjectKey) bool {
-	store.mutex.Lock()
+	store.mutex.RLock()
 	_, exists := store.data[key]
-	store.mutex.Unlock()
+	store.mutex.RUnlock()
 
 	return exists
 }

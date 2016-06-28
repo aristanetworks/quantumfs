@@ -7,19 +7,23 @@ package daemon
 
 import "errors"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-func newSymlink(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode) Inode {
 
 	symlink := Symlink{
-		InodeCommon: InodeCommon{id: inodeNum},
-		key:         key,
-		parent:      parent,
+		InodeCommon: InodeCommon{
+			id:        inodeNum,
+			treeLock_: parent.treeLock(),
+		},
+		key:    key,
+		parent: parent,
 	}
 	symlink.self = &symlink
+	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 	return &symlink
 }
 
@@ -127,11 +131,6 @@ func (link *Symlink) getChildRecord(c *ctx,
 }
 
 func (link *Symlink) dirty(c *ctx) {
-	link.dirty_ = true
+	link.setDirty(true)
 	link.parent.dirtyChild(c, link)
-}
-
-func (link *Symlink) sync(c *ctx) quantumfs.ObjectKey {
-	link.dirty_ = false
-	return link.key
 }

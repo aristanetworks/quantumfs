@@ -88,7 +88,7 @@ func TestFileExpansion_test(t *testing.T) {
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
-		checkSparse(test, test.absPath(dst+"/test"), testFilename, 25000,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename, 25000,
 			10)
 	})
 }
@@ -146,7 +146,7 @@ func TestMedFileAttr_test(t *testing.T) {
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
-		checkSparse(test, test.absPath(dst+"/test"), testFilename, 25000,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename, 25000,
 			10)
 	})
 }

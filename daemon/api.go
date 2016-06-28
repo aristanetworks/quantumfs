@@ -9,16 +9,21 @@ import "encoding/json"
 import "errors"
 import "fmt"
 import "strings"
+import "sync"
 import "time"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewApiInode() Inode {
+func NewApiInode(treeLock *sync.RWMutex) Inode {
 	api := ApiInode{
-		InodeCommon: InodeCommon{id: quantumfs.InodeIdApi},
+		InodeCommon: InodeCommon{
+			id:        quantumfs.InodeIdApi,
+			treeLock_: treeLock,
+		},
 	}
 	api.self = &api
+	assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
 
@@ -47,10 +52,6 @@ func fillApiAttr(attr *fuse.Attr) {
 }
 
 func (api *ApiInode) dirty(c *ctx) {
-}
-
-func (api *ApiInode) sync(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,
@@ -108,7 +109,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	out.OpenFlags = 0
-	handle := newApiHandle(c)
+	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
@@ -154,17 +155,19 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENOSYS
 }
 
-func newApiHandle(c *ctx) *ApiHandle {
+func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 	c.vlog("newApiHandle Enter")
 	defer c.vlog("newApiHandle Exit")
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
-			id:       c.qfs.newFileHandleId(),
-			inodeNum: quantumfs.InodeIdApi,
+			id:        c.qfs.newFileHandleId(),
+			inodeNum:  quantumfs.InodeIdApi,
+			treeLock_: treeLock,
 		},
 		responses: make(chan fuse.ReadResult, 10),
 	}
+	assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
 	return &api
 }
 
@@ -193,7 +196,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	select {
 	case response := <-api.responses:
-		c.vlog("Returning", response)
+		c.vlog("API Response %s", response)
 		return response, fuse.OK
 	case <-blocking:
 		// This is a nonblocking socket, so return that nothing is ready
@@ -263,7 +266,7 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
-	if err := c.workspaceDB.BranchWorkspace(src[0], src[1], dst[0],
+	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], dst[0],
 		dst[1]); err != nil {
 
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())

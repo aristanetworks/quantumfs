@@ -5,8 +5,9 @@ package daemon
 
 import "crypto/sha1"
 import "encoding/json"
+import "sync"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 // WorkspaceRoot acts similarly to a directory except only a single object ID is used
@@ -17,6 +18,10 @@ type WorkspaceRoot struct {
 	namespace string
 	workspace string
 	rootId    quantumfs.ObjectKey
+
+	// The RWMutex which backs the treeLock for all the inodes in this workspace
+	// tree.
+	realTreeLock sync.RWMutex
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -32,9 +37,12 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 func newWorkspaceRoot(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
+	c.vlog("WorkspaceRoot::newWorkspaceRoot Enter")
+	defer c.vlog("WorkspaceRoot::newWorkspaceRoot Exit")
+
 	var wsr WorkspaceRoot
 
-	rootId := c.workspaceDB.Workspace(parentName, name)
+	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
 
 	object := DataStore.Get(c, rootId)
 	var workspaceRoot quantumfs.WorkspaceRoot
@@ -42,31 +50,30 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		panic("Couldn't decode WorkspaceRoot Object")
 	}
 
-	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil)
+	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil,
+		&wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
+	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	return &wsr
 }
 
 // Mark this workspace dirty and update the workspace DB
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	wsr.dirty_ = true
+	wsr.setDirty(true)
 	wsr.advanceRootId(c)
-}
-
-func (wsr *WorkspaceRoot) sync(c *ctx) quantumfs.ObjectKey {
-	wsr.Directory.sync(c)
-	wsr.advanceRootId(c)
-	return wsr.rootId
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
 func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
+	c.vlog("WorkspaceRoot::advanceRootId Enter")
+	defer c.vlog("WorkspaceRoot::advanceRootId Exit")
+
 	// Upload the workspaceroot object
 	var workspaceRoot quantumfs.WorkspaceRoot
-	wsr.Directory.sync(c)
+	wsr.Directory.sync_DOWN(c)
 	workspaceRoot.BaseLayer = wsr.baseLayerId
 
 	bytes, err := json.Marshal(workspaceRoot)
@@ -85,13 +92,14 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(wsr.namespace,
+		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.namespace,
 			wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
 			panic("Unexpected workspace rootID update failure")
 		}
 
+		c.dlog("Advanced rootId %v -> %v", wsr.rootId, rootId)
 		wsr.rootId = rootId
 	}
 }

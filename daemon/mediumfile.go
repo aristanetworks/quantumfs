@@ -5,7 +5,7 @@ package daemon
 
 // This contains medium file types and methods
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 type MediumFile struct {
 	MultiBlockFile

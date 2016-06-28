@@ -9,7 +9,7 @@ import "flag"
 import "fmt"
 import "os"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (

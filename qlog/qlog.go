@@ -19,7 +19,7 @@ type LogSubsystem uint8
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
-	LogWorkspacedb
+	LogWorkspaceDb
 	LogTest
 	logSubsystemMax = LogTest
 )
@@ -32,7 +32,7 @@ func (enum LogSubsystem) String() string {
 		return "Daemon"
 	case LogDatastore:
 		return "Datastore"
-	case LogWorkspacedb:
+	case LogWorkspaceDb:
 		return "WorkspaceDb"
 	case LogTest:
 		return "Test"
@@ -47,7 +47,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 	case "datastore":
 		return LogDatastore, nil
 	case "workspacedb":
-		return LogWorkspacedb, nil
+		return LogWorkspaceDb, nil
 	case "test":
 		return LogTest, nil
 	}
