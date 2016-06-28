@@ -15,6 +15,7 @@ type MediumFile struct {
 func newMediumShell() MediumFile {
 	var rtn MediumFile
 	rtn.maxBlocks = quantumfs.MaxBlocksMediumFile
+	rtn.data.BlockSize = quantumfs.MaxBlockSize
 
 	return rtn
 }
