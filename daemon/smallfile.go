@@ -5,7 +5,7 @@ package daemon
 
 // This contains small file types and methods
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "errors"
 import "math"
 

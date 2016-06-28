@@ -3,7 +3,7 @@
 
 package daemon
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 // This file contains all the interaction with the datastore.
 var DataStore = newDataStore()

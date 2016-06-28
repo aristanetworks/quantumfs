@@ -5,7 +5,7 @@
 
 package daemon
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 type QuantumFsConfig struct {
 	CachePath string

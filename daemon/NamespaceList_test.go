@@ -9,7 +9,7 @@ import "io/ioutil"
 import "syscall"
 import "testing"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func TestNamespaceListing_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {

@@ -3,8 +3,8 @@
 
 package daemon
 
-import "arista.com/quantumfs"
-import "arista.com/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
 // The ctx type needs to be threaded through all the objects and calls of the

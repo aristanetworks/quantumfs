@@ -12,7 +12,7 @@ import "syscall"
 import "testing"
 import "os"
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 func TestFileCreation_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -312,7 +312,8 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 			quantumfs.NullWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
-		test.assert(!file.dirty_, "FileDescriptor not cleaned after change")
+		test.assert(!file.isDirty(),
+			"FileDescriptor not cleaned after change")
 
 		syscall.Close(fd)
 	})
