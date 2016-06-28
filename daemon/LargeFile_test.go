@@ -3,57 +3,42 @@
 
 package daemon
 
-// Test the small/medium file transitions and medium file operations
+// Test the small/medium/large file transitions and large file operations
 
 import "bytes"
 import "io/ioutil"
 import "os"
 import "testing"
-import "strconv"
 import "syscall"
 
-func genFibonacci(maxLen int) []byte {
-	rtn := make([]byte, maxLen)
-	copy(rtn, "11")
-	end := 2
-	lastFib := 1
-	lastLastFib := 1
-
-	for len(rtn) < maxLen {
-		fibNum := lastFib + lastLastFib
-		lastLastFib = lastFib
-		lastFib = fibNum
-
-		copy(rtn[end:], strconv.Itoa(fibNum))
-	}
-
-	return rtn[:maxLen]
-}
-
-func TestFileExpansion_test(t *testing.T) {
+func TestLargeFileExpansion_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
-
-		api := test.getApi()
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
 		// Write the fibonacci sequence to the file continually past what
-		// a single block could hold.
-		data := genFibonacci(4 * 1024 * 1024)
+		// a medium file could hold.
+		data := genFibonacci(34 * 1024 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing 4MB fibonacci to new fd: %v",
+		test.assert(err == nil, "Error writing 34MB fibonacci to new fd: %v",
 			err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Unable to stat file: %v", err)
+		test.assert(stat.Size == int64(len(data)), "File size incorrect, %d",
+			stat.Size)
 
 		// Read it back
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 4MB fibonacci back from file")
+		test.assert(err == nil, "Error reading 34MB fibonacci from file")
 		test.assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
 		if !bytes.Equal(data, output) {
-			for i := 0; i < len(data); i++ {
+			for i := 0; i < len(data); i += 1024 {
 				test.assert(data[i] == output[i],
 					"Data readback mismatch at idx %d, %s vs %s",
 					i, data[i], output[i])
@@ -64,36 +49,32 @@ func TestFileExpansion_test(t *testing.T) {
 		newLen := 2500000
 		os.Truncate(testFilename, int64(newLen))
 
-		// Ensure that the data remaining is what we expect
-		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 2.5MB fibonacci from file")
-		test.assert(len(output) == newLen, "Truncated length incorrect")
-		test.assert(bytes.Equal(data[:newLen], output),
-			"Post-truncation mismatch")
+		// Ensure that the data ends where we expect
+		offset := 2432132
+		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
+		test.assert(fdErr == nil, "Unable to open file for RDONLY")
+		// Try to read more than should exist
+		endOfFile := test.readTo(fd, offset, len(data)-offset)
+		err = fd.Close()
+		test.assert(err == nil, "Unable to close file")
+		test.assert(len(endOfFile) == newLen-offset, "Truncation incorrect")
+		test.assert(bytes.Equal(data[offset:offset+len(endOfFile)],
+			endOfFile), "Post-truncation mismatch")
 
 		// Let's re-expand it using SetAttr
-		const truncLen = 5 * 1024 * 1024
-		os.Truncate(testFilename, truncLen)
+		os.Truncate(testFilename, int64(len(data)))
 
-		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading fib+hole back from file")
-		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
-			"Data readback mismatch")
-		delta := truncLen - newLen
-		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
-			"File hole not filled with zeros")
-
-		// Branch the workspace
-		dst := "largeattrsparse/test"
-		err = api.Branch(test.relPath(workspace), dst)
-		test.assert(err == nil, "Unable to branch")
-
-		test.checkSparse(test.absPath(dst+"/test"), testFilename, 25000,
-			10)
+		fd, fdErr = os.OpenFile(testFilename, os.O_RDONLY, 0777)
+		test.assert(fdErr == nil, "Unable to open for for RDONLY")
+		endOfFile = test.readTo(fd, offset, len(data)-offset)
+		err = fd.Close()
+		test.assert(err == nil, "Unable to close file")
+		copy(output[offset:], endOfFile)
+		test.assert(bytes.Equal(data, output), "Data and file mismatch")
 	})
 }
 
-func TestMedFileAttr_test(t *testing.T) {
+func TestLargeFileAttr_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -106,8 +87,8 @@ func TestMedFileAttr_test(t *testing.T) {
 		fd, _ := syscall.Creat(testFilename, 0124)
 		syscall.Close(fd)
 
-		// Then expand it via SetAttr to medium file size
-		newSize := int64(2 * 1024 * 1024)
+		// Then expand it via SetAttr to large file size
+		newSize := int64(34 * 1024 * 1024)
 		os.Truncate(testFilename, newSize)
 
 		// Check that the size increase worked
@@ -117,12 +98,12 @@ func TestMedFileAttr_test(t *testing.T) {
 		test.assert(stat.Size == newSize, "File size incorrect, %d",
 			stat.Size)
 
-		// Read what should be 2MB of zeros
+		// Read what should be 34MB of zeros
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 4MB hole from file")
+		test.assert(err == nil, "Error reading 34MB hole from file")
 
-		for i := 0; i < len(output); i++ {
+		for i := 0; i < len(output); i += 1024 {
 			test.assert(output[i] == 0, "Data not zeroed in file, %s",
 				output[i])
 		}
@@ -131,7 +112,7 @@ func TestMedFileAttr_test(t *testing.T) {
 		testString := []byte("testData")
 		var file *os.File
 		var count int
-		dataOffset := 1500000
+		dataOffset := 4500000
 		file, err = os.OpenFile(testFilename, os.O_RDWR, 0777)
 		test.assert(err == nil, "Unable to open file for rdwr: %v", err)
 		count, err = file.WriteAt(testString, int64(dataOffset))
@@ -141,12 +122,18 @@ func TestMedFileAttr_test(t *testing.T) {
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
 
+		output, err = ioutil.ReadFile(testFilename)
+		test.assert(err == nil, "Failed to read large file with sparse data")
+		test.assert(bytes.Equal(output[dataOffset:dataOffset+
+			len(testString)], testString),
+			"Offset write failed in sparse file")
+
 		// Branch the workspace
-		dst := "medattrsparse/test"
+		dst := "largeattrsparse/test"
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
-		test.checkSparse(test.absPath(dst+"/test"), testFilename, 25000,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename, 250000,
 			10)
 	})
 }

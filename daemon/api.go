@@ -147,7 +147,8 @@ func (api *ApiInode) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on ApiInode")
