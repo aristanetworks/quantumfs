@@ -631,8 +631,7 @@ func checkSparse(test *testHelper, fileA string, fileB string, offset int, len i
 	for {
 		var readA int
 		for readA < len {
-			var readIt int
-			readIt, err = fdA.ReadAt(rtnA[readA:], idx+int64(readA))
+			readIt, err := fdA.ReadAt(rtnA[readA:], idx+int64(readA))
 
 			if err == io.EOF {
 				return
@@ -643,8 +642,7 @@ func checkSparse(test *testHelper, fileA string, fileB string, offset int, len i
 
 		var readB int
 		for readB < len {
-			var readIt int
-			readIt, err = fdB.ReadAt(rtnB[readB:], idx+int64(readB))
+			readIt, err := fdB.ReadAt(rtnB[readB:], idx+int64(readB))
 
 			if err == io.EOF {
 				return
