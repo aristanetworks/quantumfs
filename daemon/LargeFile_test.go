@@ -54,7 +54,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
 		// Try to read more than should exist
-		endOfFile := readTo(test, fd, offset, len(data)-offset)
+		endOfFile := test.readTo(fd, offset, len(data)-offset)
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
 		test.assert(len(endOfFile) == newLen-offset, "Truncation incorrect")
@@ -66,7 +66,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 
 		fd, fdErr = os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open for for RDONLY")
-		endOfFile = readTo(test, fd, offset, len(data)-offset)
+		endOfFile = test.readTo(fd, offset, len(data)-offset)
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
 		copy(output[offset:], endOfFile)
@@ -133,7 +133,7 @@ func TestLargeFileAttr_test(t *testing.T) {
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
-		checkSparse(test, test.absPath(dst+"/test"), testFilename, 250000,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename, 250000,
 			10)
 	})
 }
