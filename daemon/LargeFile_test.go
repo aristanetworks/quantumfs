@@ -15,8 +15,8 @@ func TestLargeFileExpansion_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspaceRel()
-		testFilename := test.absPath(workspace + "/test")
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
 
 		// Write the fibonacci sequence to the file continually past what
 		// a medium file could hold.
@@ -49,23 +49,28 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		newLen := 2500000
 		os.Truncate(testFilename, int64(newLen))
 
-		// Ensure that the data remaining is what we expect
-		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 2.5MB fibonacci from file")
-		test.assert(len(output) == newLen, "Truncated length incorrect")
-		test.assert(bytes.Equal(data[:newLen], output),
-			"Post-truncation mismatch")
+		// Ensure that the data ends where we expect
+		offset := 2432132
+		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
+		test.assert(fdErr == nil, "Unable to open file for RDONLY")
+		// Try to read more than should exist
+		endOfFile := readTo(test, fd, offset, len(data)-offset)
+		err = fd.Close()
+		test.assert(err == nil, "Unable to close file")
+		test.assert(len(endOfFile) == newLen-offset, "Truncation incorrect")
+		test.assert(bytes.Equal(data[offset:offset+len(endOfFile)],
+			endOfFile), "Post-truncation mismatch")
 
 		// Let's re-expand it using SetAttr
 		os.Truncate(testFilename, int64(len(data)))
 
-		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading fib+hole back from file")
-		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
-			"Data readback mismatch")
-		delta := len(data) - newLen
-		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
-			"File hole not filled with zeros")
+		fd, fdErr = os.OpenFile(testFilename, os.O_RDONLY, 0777)
+		test.assert(fdErr == nil, "Unable to open for for RDONLY")
+		endOfFile = readTo(test, fd, offset, len(data)-offset)
+		err = fd.Close()
+		test.assert(err == nil, "Unable to close file")
+		copy(output[offset:], endOfFile)
+		test.assert(bytes.Equal(data, output), "Data and file mismatch")
 	})
 }
 

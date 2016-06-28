@@ -600,6 +600,22 @@ func printToFile(filename string, data string) error {
 	return nil
 }
 
+func readTo(test *testHelper, file *os.File, offset int, num int) []byte {
+	rtn := make([]byte, num)
+
+	for totalCount := 0; totalCount < num; {
+		readIt, err := file.ReadAt(rtn[totalCount:],
+			int64(offset+totalCount))
+		if err == io.EOF {
+			return rtn[:totalCount + readIt]
+		}
+		test.assert(err == nil, "Unable to read from file")
+		totalCount += readIt
+	}
+
+	return rtn
+}
+
 func checkSparse(test *testHelper, fileA string, fileB string, offset int, len int) {
 	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
 	test.assert(err == nil, "Unable to open fileA for RDONLY")
