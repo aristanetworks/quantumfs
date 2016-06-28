@@ -616,7 +616,9 @@ func (test *testHelper) readTo(file *os.File, offset int, num int) []byte {
 	return rtn
 }
 
-func (test *testHelper) checkSparse(fileA string, fileB string, offset int, len int) {
+func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
+	len int) {
+
 	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
 	test.assert(err == nil, "Unable to open fileA for RDONLY")
 	defer fdA.Close()
