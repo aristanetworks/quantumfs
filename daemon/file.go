@@ -33,7 +33,7 @@ func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeI
 	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
-func newLargeFile(c *ctx, key quantumfs.ObjectKey, inodeNum InodeId,
+func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode) Inode {
 
 	accessor := newLargeAccessor(c, key)
@@ -181,7 +181,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
+	return fi.parent.setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,

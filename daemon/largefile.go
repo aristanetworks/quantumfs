@@ -5,7 +5,7 @@ package daemon
 
 // This contains large file types and methods
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 
 type LargeFile struct {
 	MultiBlockFile

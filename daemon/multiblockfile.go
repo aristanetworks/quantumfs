@@ -5,7 +5,7 @@ package daemon
 
 // This contains the generic multi-block file types and methods
 
-import "arista.com/quantumfs"
+import "github.com/aristanetworks/quantumfs"
 import "encoding/json"
 import "errors"
 
