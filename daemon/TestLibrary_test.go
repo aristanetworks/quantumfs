@@ -607,7 +607,7 @@ func readTo(test *testHelper, file *os.File, offset int, num int) []byte {
 		readIt, err := file.ReadAt(rtn[totalCount:],
 			int64(offset+totalCount))
 		if err == io.EOF {
-			return rtn[:totalCount + readIt]
+			return rtn[:totalCount+readIt]
 		}
 		test.assert(err == nil, "Unable to read from file")
 		totalCount += readIt
