@@ -298,7 +298,7 @@ type Buffer interface {
 	Get() []byte
 	Set(data []byte, keyType KeyType)
 	ContentHash() [ObjectKeyLength - 1]byte
-	Key(c *Ctx) ObjectKey
+	Key(c *Ctx) (ObjectKey, error)
 }
 
 type DataStore interface {

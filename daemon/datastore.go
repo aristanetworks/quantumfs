@@ -39,7 +39,11 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 
-	return store.durableStore.Set(buffer.Key(c), buffer)
+	key, err := buffer.Key(c)
+	if err != nil {
+		return err
+	}
+	return store.durableStore.Set(key, buffer)
 }
 
 // buffer is the central data-handling type of quantumfsd
@@ -112,13 +116,13 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 	return sha1.Sum(buf.data)
 }
 
-func (buf *buffer) Key(c *quantumfs.Ctx) quantumfs.ObjectKey {
+func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 	if !buf.dirty {
-		return buf.key
+		return buf.key, nil
 	}
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
-	buf.dataStore.Set(c, buf)
-	return buf.key
+	err := buf.dataStore.Set(c, buf)
+	return buf.key, err
 }

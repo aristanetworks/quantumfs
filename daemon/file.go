@@ -255,14 +255,14 @@ func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
 }
 
 func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
-	err := c.dataStore.Set(&c.Ctx, buffer)
+	key, err := buffer.Key(&c.Ctx)
 	if err != nil {
 		c.elog("Unable to write data to the datastore")
 		return quantumfs.ObjectKey{},
 			errors.New("Unable to write to the datastore")
 	}
 
-	return buffer.Key(&c.Ctx), nil
+	return key, nil
 }
 
 func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {

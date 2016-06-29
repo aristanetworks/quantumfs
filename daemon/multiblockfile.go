@@ -140,12 +140,12 @@ func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 	}
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-
-	if err := c.dataStore.Set(&c.Ctx, buf); err != nil {
+	key, err := buf.Key(&c.Ctx)
+	if err != nil {
 		panic("Failed to upload new file metadata")
 	}
 
-	return buf.Key(&c.Ctx)
+	return key
 }
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {

@@ -37,11 +37,11 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	}
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	if err := c.dataStore.Set(&c.Ctx, buf); err != nil {
+	newBaseLayerId, err := buf.Key(&c.Ctx)
+	if err != nil {
 		panic("Failed to upload new baseLayer object")
 	}
 
-	newBaseLayerId := buf.Key(&c.Ctx)
 	c.vlog("Directory key %v -> %v", dir.baseLayerId, newBaseLayerId)
 	dir.baseLayerId = newBaseLayerId
 
