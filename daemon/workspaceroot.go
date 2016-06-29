@@ -43,7 +43,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
 
-	object := c.dataStore.Get(c, rootId)
+	object := c.dataStore.Get(&c.Ctx, rootId)
 	var workspaceRoot quantumfs.WorkspaceRoot
 	if err := json.Unmarshal(object.Get(), &workspaceRoot); err != nil {
 		panic("Couldn't decode WorkspaceRoot Object")
@@ -81,13 +81,13 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		panic("Failed to marshal workspace root")
 	}
 
-	buf := newBuffer(bytes, quantumfs.KeyTypeMetadata)
-	if err := c.dataStore.Set(c, buf); err != nil {
+	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
+	if err := c.dataStore.Set(&c.Ctx, buf); err != nil {
 		panic("Failed to upload new workspace root")
 	}
 
 	// Update workspace rootId
-	newRootId := buf.Key()
+	newRootId := buf.Key(&c.Ctx)
 	if newRootId != wsr.rootId {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.namespace,
 			wsr.workspace, wsr.rootId, newRootId)

@@ -55,7 +55,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	}
 
 	// Grab the data
-	data := c.dataStore.Get(c, fi.key)
+	data := c.dataStore.Get(&c.Ctx, fi.key)
 	if data == nil {
 		c.elog("Unable to fetch data for block")
 		return 0, errors.New("Unable to fetch block data")

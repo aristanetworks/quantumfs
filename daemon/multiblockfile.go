@@ -28,7 +28,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 	var rtn MultiBlockFile
 	rtn.maxBlocks = maxBlocks
 
-	buffer := c.dataStore.Get(c, key)
+	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		c.elog("Unable to fetch metadata for new file creation")
 		panic("Unable to fetch metadata for new file creation")
@@ -96,7 +96,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	}
 
 	// Grab the data
-	data := c.dataStore.Get(c, fi.data.Blocks[blockIdx])
+	data := c.dataStore.Get(&c.Ctx, fi.data.Blocks[blockIdx])
 	if data == nil {
 		c.elog("Unable to fetch data for block %s", fi.data.Blocks[blockIdx])
 		return 0, errors.New("Unable to fetch block data")
@@ -139,13 +139,13 @@ func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 		panic("Unable to marshal file metadata")
 	}
 
-	buf := newBuffer(bytes, quantumfs.KeyTypeMetadata)
+	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 
-	if err := c.dataStore.Set(c, buf); err != nil {
+	if err := c.dataStore.Set(&c.Ctx, buf); err != nil {
 		panic("Failed to upload new file metadata")
 	}
 
-	return buf.Key()
+	return buf.Key(&c.Ctx)
 }
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {

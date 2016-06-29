@@ -6,6 +6,7 @@ package daemon
 import "crypto/sha1"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 func newDataStore(durableStore quantumfs.DataStore) *dataStore {
 	return &dataStore{
@@ -17,7 +18,9 @@ type dataStore struct {
 	durableStore quantumfs.DataStore
 }
 
-func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) quantumfs.Buffer {
+func (store *dataStore) Get(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey) quantumfs.Buffer {
+
 	var buf buffer
 
 	err := quantumfs.ConstantStore.Get(key, &buf)
@@ -29,30 +32,32 @@ func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) quantumfs.Buffer {
 	if err == nil {
 		return &buf
 	}
-	c.elog("Couldn't get from any store: %v. Key %s", err, key)
+	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %v. Key %s", err, key)
 
 	return nil
 }
 
-func (store *dataStore) Set(c *ctx, buffer quantumfs.Buffer) error {
+func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 
-	return store.durableStore.Set(buffer.Key(), buffer)
+	return store.durableStore.Set(buffer.Key(c), buffer)
 }
 
 // buffer is the central data-handling type of quantumfsd
-func newBuffer(in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
+func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	return &buffer{
-		data:    in,
-		dirty:   false,
-		keyType: keyType,
+		data:      in,
+		dirty:     false,
+		keyType:   keyType,
+		dataStore: c.dataStore,
 	}
 }
 
 type buffer struct {
-	data    []byte
-	dirty   bool
-	keyType quantumfs.KeyType
-	key     quantumfs.ObjectKey
+	data      []byte
+	dirty     bool
+	keyType   quantumfs.KeyType
+	key       quantumfs.ObjectKey
+	dataStore *dataStore
 }
 
 func (buf *buffer) Write(in []byte, offset uint32) uint32 {
@@ -87,6 +92,7 @@ func (buf *buffer) Write(in []byte, offset uint32) uint32 {
 		finalBuffer = append(finalBuffer, buf.data[remainingStart:]...)
 	}
 
+	buf.dirty = true
 	buf.data = finalBuffer
 
 	return copied
@@ -106,11 +112,13 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 	return sha1.Sum(buf.data)
 }
 
-func (buf *buffer) Key() quantumfs.ObjectKey {
+func (buf *buffer) Key(c *quantumfs.Ctx) quantumfs.ObjectKey {
 	if !buf.dirty {
 		return buf.key
 	}
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
+	buf.dirty = false
+	buf.dataStore.Set(c, buf)
 	return buf.key
 }
