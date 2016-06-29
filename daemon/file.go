@@ -240,7 +240,7 @@ func resize(buffer []byte, size int) []byte {
 }
 
 func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
-	targetSize int) *quantumfs.Buffer {
+	targetSize int) quantumfs.Buffer {
 
 	orig := c.dataStore.Get(c, key)
 	if orig == nil {
@@ -249,12 +249,12 @@ func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
 	}
 
 	// Before we return the buffer, make sure it's the size it needs to be
-	rtn := quantumfs.NewBuffer(resize(orig.Get(), targetSize), key.Type())
+	rtn := newBuffer(resize(orig.Get(), targetSize), key.Type())
 
-	return &rtn
+	return rtn
 }
 
-func pushData(c *ctx, buffer *quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
 	err := c.dataStore.Set(c, buffer)
 	if err != nil {
 		c.elog("Unable to write data to the datastore")

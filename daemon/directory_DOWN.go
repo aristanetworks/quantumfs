@@ -36,12 +36,12 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 		panic("Failed to marshal baselayer")
 	}
 
-	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
-	newBaseLayerId := buffer.Key()
-	if err := c.dataStore.Set(c, &buffer); err != nil {
+	buf := newBuffer(bytes, quantumfs.KeyTypeMetadata)
+	if err := c.dataStore.Set(c, buf); err != nil {
 		panic("Failed to upload new baseLayer object")
 	}
 
+	newBaseLayerId := buf.Key()
 	c.vlog("Directory key %v -> %v", dir.baseLayerId, newBaseLayerId)
 	dir.baseLayerId = newBaseLayerId
 

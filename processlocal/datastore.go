@@ -21,22 +21,21 @@ type DataStore struct {
 	data  map[quantumfs.ObjectKey][]byte
 }
 
-func (store *DataStore) Get(key quantumfs.ObjectKey) (quantumfs.Buffer, error) {
-
+func (store *DataStore) Get(key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 	var err error
-	var buf quantumfs.Buffer
+
 	store.mutex.RLock()
 	defer store.mutex.RUnlock()
 	if data, exists := store.data[key]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
-		buf = quantumfs.NewBuffer(data, key.Type())
+		buf.Set(data, key.Type())
 	}
-	return buf, err
+	return err
 }
 
 func (store *DataStore) Set(key quantumfs.ObjectKey,
-	buffer *quantumfs.Buffer) error {
+	buffer quantumfs.Buffer) error {
 
 	if len(buffer.Get()) > quantumfs.MaxBlockSize {
 		panic("Attempted to store overlarge block")

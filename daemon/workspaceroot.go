@@ -81,13 +81,13 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		panic("Failed to marshal workspace root")
 	}
 
-	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
-	newRootId := buffer.Key()
-	if err := c.dataStore.Set(c, &buffer); err != nil {
+	buf := newBuffer(bytes, quantumfs.KeyTypeMetadata)
+	if err := c.dataStore.Set(c, buf); err != nil {
 		panic("Failed to upload new workspace root")
 	}
 
 	// Update workspace rootId
+	newRootId := buf.Key()
 	if newRootId != wsr.rootId {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.namespace,
 			wsr.workspace, wsr.rootId, newRootId)

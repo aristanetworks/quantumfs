@@ -139,13 +139,13 @@ func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 		panic("Unable to marshal file metadata")
 	}
 
-	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
+	buf := newBuffer(bytes, quantumfs.KeyTypeMetadata)
 
-	if err := c.dataStore.Set(c, &buffer); err != nil {
+	if err := c.dataStore.Set(c, buf); err != nil {
 		panic("Failed to upload new file metadata")
 	}
 
-	return buffer.Key()
+	return buf.Key()
 }
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {

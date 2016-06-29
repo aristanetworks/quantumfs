@@ -523,11 +523,10 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return fuse.Status(syscall.EEXIST)
 		}
 
-		buf := quantumfs.NewBuffer([]byte(pointedTo),
-			quantumfs.ObjectTypeSymlink)
+		buf := newBuffer([]byte(pointedTo), quantumfs.ObjectTypeSymlink)
 		key = buf.Key()
 
-		if err := c.dataStore.Set(c, &buf); err != nil {
+		if err := c.dataStore.Set(c, buf); err != nil {
 			c.elog("Failed to upload block: %v", err)
 			return fuse.EIO
 		}
