@@ -15,11 +15,11 @@ import "github.com/hanwen/go-fuse/fuse"
 // to using that instead of threading it everywhere.
 type ctx struct {
 	quantumfs.Ctx
-	qfs          *QuantumFs
-	config       *QuantumFsConfig
-	workspaceDB  quantumfs.WorkspaceDB
-	durableStore quantumfs.DataStore
-	fuseCtx      *fuse.Context
+	qfs         *QuantumFs
+	config      *QuantumFsConfig
+	workspaceDB quantumfs.WorkspaceDB
+	dataStore   *dataStore
+	fuseCtx     *fuse.Context
 }
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
@@ -28,11 +28,11 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 			Qlog:      c.Qlog,
 			RequestId: header.Unique,
 		},
-		qfs:          c.qfs,
-		config:       c.config,
-		workspaceDB:  c.workspaceDB,
-		durableStore: c.durableStore,
-		fuseCtx:      &header.Context,
+		qfs:         c.qfs,
+		config:      c.config,
+		workspaceDB: c.workspaceDB,
+		dataStore:   c.dataStore,
+		fuseCtx:     &header.Context,
 	}
 	return requestCtx
 }

@@ -522,11 +522,11 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 			Qlog:      c.Qlog,
 			RequestId: request,
 		},
-		qfs:          c.qfs,
-		config:       c.config,
-		workspaceDB:  c.workspaceDB,
-		durableStore: c.durableStore,
-		fuseCtx:      nil,
+		qfs:         c.qfs,
+		config:      c.config,
+		workspaceDB: c.workspaceDB,
+		dataStore:   c.dataStore,
+		fuseCtx:     nil,
 	}
 	return requestCtx
 }

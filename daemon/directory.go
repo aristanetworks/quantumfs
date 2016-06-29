@@ -37,7 +37,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
 
-	object := DataStore.Get(c, baseLayerId)
+	object := c.dataStore.Get(c, baseLayerId)
 	if object == nil {
 		panic("No baseLayer object")
 	}
@@ -527,7 +527,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			quantumfs.ObjectTypeSymlink)
 		key = buf.Key()
 
-		if err := DataStore.Set(c, &buf); err != nil {
+		if err := c.dataStore.Set(c, &buf); err != nil {
 			c.elog("Failed to upload block: %v", err)
 			return fuse.EIO
 		}

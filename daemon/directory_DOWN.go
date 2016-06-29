@@ -5,7 +5,6 @@ package daemon
 
 // This is _DOWN counterpart to directory.go
 
-import "crypto/sha1"
 import "encoding/json"
 
 import "github.com/aristanetworks/quantumfs"
@@ -37,11 +36,9 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 		panic("Failed to marshal baselayer")
 	}
 
-	hash := sha1.Sum(bytes)
-	newBaseLayerId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
 	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
-	if err := c.durableStore.Set(newBaseLayerId, &buffer); err != nil {
+	newBaseLayerId := buffer.Key()
+	if err := c.dataStore.Set(c, &buffer); err != nil {
 		panic("Failed to upload new baseLayer object")
 	}
 

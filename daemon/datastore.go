@@ -5,14 +5,14 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
-// This file contains all the interaction with the datastore.
-var DataStore = newDataStore()
-
-func newDataStore() *dataStore {
-	return &dataStore{}
+func newDataStore(durableStore quantumfs.DataStore) *dataStore {
+	return &dataStore{
+		durableStore: durableStore,
+	}
 }
 
 type dataStore struct {
+	durableStore quantumfs.DataStore
 }
 
 func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
@@ -21,7 +21,7 @@ func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
 		return &buf
 	}
 
-	buf, err = c.durableStore.Get(key)
+	buf, err = store.durableStore.Get(key)
 	if err == nil {
 		return &buf
 	}
@@ -32,5 +32,5 @@ func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
 
 func (store *dataStore) Set(c *ctx, buffer *quantumfs.Buffer) error {
 
-	return c.durableStore.Set(buffer.Key(), buffer)
+	return store.durableStore.Set(buffer.Key(), buffer)
 }
