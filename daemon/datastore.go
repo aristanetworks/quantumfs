@@ -40,6 +40,14 @@ func (store *dataStore) Set(c *ctx, buffer quantumfs.Buffer) error {
 }
 
 // buffer is the central data-handling type of quantumfsd
+func newBuffer(in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
+	return &buffer{
+		data:    in,
+		dirty:   false,
+		keyType: keyType,
+	}
+}
+
 type buffer struct {
 	data    []byte
 	dirty   bool
@@ -105,12 +113,4 @@ func (buf *buffer) Key() quantumfs.ObjectKey {
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	return buf.key
-}
-
-func newBuffer(in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	return &buffer{
-		data:    in,
-		dirty:   true,
-		keyType: keyType,
-	}
 }
