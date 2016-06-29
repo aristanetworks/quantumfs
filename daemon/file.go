@@ -22,8 +22,7 @@ func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, quantumfs.ObjectTypeSmallFile, inodeNum, key, parent,
-		accessor)
+	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
 func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
@@ -31,11 +30,18 @@ func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeI
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, quantumfs.ObjectTypeMediumFile, inodeNum, key, parent,
-		accessor)
+	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
-func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
+func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
+	parent Inode) Inode {
+
+	accessor := newLargeAccessor(c, key)
+
+	return newFile_(c, inodeNum, key, parent, accessor)
+}
+
+func newFile_(c *ctx, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
@@ -43,7 +49,6 @@ func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		fileType: fileType,
 		key:      key,
 		parent:   parent,
 		accessor: accessor,
@@ -57,7 +62,6 @@ func newFile_(c *ctx, fileType quantumfs.ObjectType, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	fileType quantumfs.ObjectType
 	key      quantumfs.ObjectKey
 	parent   Inode
 	accessor blockAccessor
@@ -152,7 +156,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		defer fi.Lock().Unlock()
 
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size)
+			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size - 1)
 
 			err := fi.reconcileFileType(c, endBlkIdx)
 			if err != nil {
@@ -165,10 +169,10 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			if err != nil {
 				return fuse.EIO
 			}
-		}
 
-		// Update the entry metadata
-		fi.key = fi.accessor.writeToStore(c)
+			// Update the entry metadata
+			fi.key = fi.accessor.writeToStore(c)
+		}
 
 		return fuse.OK
 	}()
@@ -177,7 +181,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent.setChildAttr(c, fi.InodeCommon.id, attr, out)
+	return fi.parent.setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -208,8 +212,8 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
+	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on File")
 	return fuse.ENOSYS
@@ -288,7 +292,11 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 		return errors.New("Unable to process needed type for accessor")
 	}
 
-	fi.accessor = newAccessor
+	if fi.accessor != newAccessor {
+		fi.accessor = newAccessor
+		var attr fuse.SetAttrIn
+		fi.parent.setChildAttr(c, fi.id, &neededType, &attr, nil)
+	}
 	return nil
 }
 
@@ -353,7 +361,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 
 	// Determine the block to start in
 	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(offset)
-	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size))
+	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size) - 1)
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
@@ -419,7 +427,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent.setChildAttr(c, fi.id, &attr, nil)
+	fi.parent.setChildAttr(c, fi.id, nil, &attr, nil)
 	fi.dirty(c)
 
 	return writeCount, fuse.OK

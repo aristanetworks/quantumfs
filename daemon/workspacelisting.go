@@ -245,7 +245,8 @@ func (nsl *NamespaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
 }
 
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on NamespaceList")
 	return fuse.ENOSYS
@@ -387,7 +388,8 @@ func (wsl *WorkspaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS

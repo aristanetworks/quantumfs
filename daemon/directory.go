@@ -66,7 +66,6 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		inodeId := c.qfs.newInodeId()
 		children[BytesToString(entry.Filename[:])] = inodeId
 		childrenRecords[inodeId] = &baseLayer.Entries[i]
-
 		var constructor InodeConstructor
 		switch entry.Type {
 		default:
@@ -77,6 +76,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 			constructor = newSmallFile
 		case quantumfs.ObjectTypeMediumFile:
 			constructor = newMediumFile
+		case quantumfs.ObjectTypeLargeFile:
+			constructor = newLargeFile
 		case quantumfs.ObjectTypeSymlink:
 			constructor = newSymlink
 		}
@@ -109,7 +110,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = uint64(len(dir.childrenRecords))
-		dir.parent.setChildAttr(c, dir.id, &attr, nil)
+		dir.parent.setChildAttr(c, dir.id, nil, &attr, nil)
 	}
 }
 
@@ -197,7 +198,8 @@ func modeToPermissions(mode uint32, umask uint32) uint8 {
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut) fuse.Status {
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -205,6 +207,11 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		entry, exists := dir.childrenRecords[inodeNum]
 		if !exists {
 			return fuse.ENOENT
+		}
+
+		// Update the type if needed
+		if newType != nil {
+			entry.Type = *newType
 		}
 
 		valid := uint(attr.SetAttrInCommon.Valid)
