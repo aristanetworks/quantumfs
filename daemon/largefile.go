@@ -44,3 +44,6 @@ func (fi *LargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }
+
+func (fi *LargeFile) setFile(file *File) {
+}

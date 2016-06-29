@@ -54,6 +54,7 @@ func newFile_(c *ctx, inodeNum InodeId,
 		accessor: accessor,
 	}
 	file.self = &file
+	accessor.setFile(&file)
 
 	assert(file.treeLock() != nil, "File treeLock nil at init")
 
@@ -317,7 +318,10 @@ type blockAccessor interface {
 	writeToStore(c *ctx) quantumfs.ObjectKey
 
 	// Truncate to lessen length *only*, error otherwise
-	truncate(*ctx, uint64) error
+	truncate(c *ctx, newLength uint64) error
+
+	// Set the File parent of the blockAccessor
+	setFile(file *File)
 }
 
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
