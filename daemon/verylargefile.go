@@ -5,9 +5,7 @@ package daemon
 
 // This contains very large file types and methods
 
-import "arista.com/quantumfs"
-import "errors"
-import "math"
+import "github.com/aristanetworks/quantumfs"
 
 type VeryLargeFile struct {
 	parts		[]LargeFile
@@ -32,7 +30,7 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, nil
 	}
 
-	return parts[partIdx].readBlock(c, blockIdxRem, offset, buf)
+	return fi.parts[partIdx].readBlock(c, blockIdxRem, offset, buf)
 }
 
 func (fi *VeryLargeFile) expandTo(lengthParts int) {
@@ -40,7 +38,7 @@ func (fi *VeryLargeFile) expandTo(lengthParts int) {
 		panic("Invalid new length set to expandTo for file accessor")
 	}
 
-	newLength := make([]quantumfs.ObjectKey, lengthParts-len(fi.parts))
+	newLength := make([]LargeFile, lengthParts-len(fi.parts))
 	for i := 0; i < len(newLength); i++ {
 		newLength[i] = newLargeShell() 
 	}
@@ -54,7 +52,7 @@ func (fi *VeryLargeFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile
 
 	// Ensure we have a part to write to
-	for len(parts) <= partIdx {
+	for len(fi.parts) <= partIdx {
 		fi.expandTo(partIdx + 1)
 	}
 
@@ -66,11 +64,12 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 
 	// Count everything except the last block as being full
 	for i := 0; i < len(fi.parts) - 1; i++ {
-		length += fi.parts[i].data.blockSize * quantumfs.MaxBlocksLargeFile
+		length += uint64(fi.parts[i].data.BlockSize *
+			quantumfs.MaxBlocksLargeFile)
 	}
 
 	// And add what's in the last block
-	length += fi.parts[len(fi.parts) - 1]
+	length += fi.parts[len(fi.parts) - 1].fileLength()
 
 	return length
 }
@@ -79,8 +78,8 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// Variable multiblock data block sizes makes this function harder
 
 	for i := 0; i < len(fi.parts); i++ {
-		maxLengthBlock := fi.parts[i].data.blockSize *
-			quantumfs.MaxBlocksLargeFile
+		maxLengthBlock := uint64(fi.parts[i].data.BlockSize *
+			quantumfs.MaxBlocksLargeFile)
 
 		// If this block extends past the remaining offset, then this
 		// is the block we're looking for
@@ -94,7 +93,8 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// If we're reached here, we've gone through all of the existing blocks.
 	// New blocks will be quantumfs.MaxBlockSize, so use that info to calculate
 	// our return values
-	maxLengthBlock := quantumfs.MaxBlockSize * quantumfs.MaxBlocksLargeFile
+	maxLengthBlock := uint64(quantumfs.MaxBlockSize *
+		quantumfs.MaxBlocksLargeFile)
 	i := len(fi.parts)
 	for {
 		if maxLengthBlock > absOffset {
@@ -102,8 +102,6 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 		}
 		absOffset -= maxLengthBlock
 	}
-
-	return int(blkIdx), remainingOffset
 }
 
 func (fi *VeryLargeFile) writeToStore(c *ctx) quantumfs.ObjectKey {
@@ -122,26 +120,15 @@ func (fi *VeryLargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAc
 
 func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
 
-	// If we're increasing the length, then we can just update
-	if newLengthBytes > fi.bytes {
-		fi.bytes = newLengthBytes
-		return nil
+	// If we're expanding the length, handle that first
+	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(newLengthBytes)
+	newNumBlocks := lastBlockIdx + 1
+
+	if newNumBlocks > len(fi.parts) {
+		fi.expandTo(newNumBlocks)
+	} else {
+		fi.parts = fi.parts[:newNumBlocks]
 	}
 
-	data := fetchDataSized(c, fi.key, int(newLengthBytes))
-	if data == nil {
-		c.elog("Unable to fetch existing data for block")
-		return errors.New("Unable to fetch existing data")
-	}
-
-	newFileKey, err := pushData(c, data)
-	if err != nil {
-		c.elog("Block data write failed")
-		return errors.New("Unable to write to block")
-	}
-
-	// Now that everything has succeeded and is in the datastore, update metadata
-	fi.key = *newFileKey
-	fi.bytes = newLengthBytes
-	return nil
+	return fi.parts[lastBlockIdx].truncate(c, lastBlockRem)
 }
