@@ -22,6 +22,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
 	var buf buffer
+	initBuffer(&buf, store, key)
 
 	err := quantumfs.ConstantStore.Get(key, &buf)
 	if err == nil {
@@ -38,7 +39,6 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 }
 
 func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
-
 	key, err := buffer.Key(c)
 	if err != nil {
 		return err
@@ -54,6 +54,13 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 		keyType:   keyType,
 		dataStore: c.dataStore,
 	}
+}
+
+func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
+	buf.dirty = false
+	buf.dataStore = dataStore
+	buf.keyType = key.Type()
+	buf.key = key
 }
 
 type buffer struct {
