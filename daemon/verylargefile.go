@@ -6,16 +6,44 @@ package daemon
 // This contains very large file types and methods
 
 import "github.com/aristanetworks/quantumfs"
+import "encoding/json"
 
 type VeryLargeFile struct {
 	parts		[]LargeFile
+}
+
+type veryLargeStore struct {
+	Keys		[]quantumfs.ObjectKey
 }
 
 const MaxParts = 48000
 
 func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 	var rtn VeryLargeFile
-//TODO: Fill with new constructor
+
+	buffer := DataStore.Get(c, key)
+	if buffer == nil {
+		c.elog("Unable to fetch metadata for new vl file creation")
+		panic("Unable to fetch metadata for new vl file creation")
+	}
+
+	var store veryLargeStore
+	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
+		panic("Couldn't decode veryLargeStore object")
+	}
+
+	for i := 0; i < len(store.Keys); i++ {
+		rtn.parts = append(rtn.parts, *newLargeAccessor(c, store.Keys[i]))
+	}
+
+	return &rtn
+}
+
+func newVeryLargeShell(file *LargeFile) *VeryLargeFile {
+	var rtn VeryLargeFile
+	rtn.parts = make([]LargeFile, 1)
+	rtn.parts[0] = *file
+
 	return &rtn
 }
 
@@ -105,8 +133,28 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 }
 
 func (fi *VeryLargeFile) writeToStore(c *ctx) quantumfs.ObjectKey {
-//TODO: Add marshalling and saving
-	return quantumfs.EmptyBlockKey
+	var store veryLargeStore
+
+	for i := 0; i < len(fi.parts); i++ {
+		newKey := fi.parts[i].writeToStore(c)
+
+		store.Keys = append(store.Keys, newKey)
+	}
+
+	bytes, err := json.Marshal(store)
+	if err != nil {
+		panic("Unable to marshal very large file keys")
+	}
+
+	var buffer quantumfs.Buffer
+	buffer.Set(bytes)
+
+	newFileKey := buffer.Key(quantumfs.KeyTypeMetadata)
+	if err := c.durableStore.Set(newFileKey, &buffer); err != nil {
+		panic("Failed to upload new very large file keys")
+	}
+
+	return newFileKey
 }
 
 func (fi *VeryLargeFile) getType() quantumfs.ObjectType {
@@ -114,6 +162,10 @@ func (fi *VeryLargeFile) getType() quantumfs.ObjectType {
 }
 
 func (fi *VeryLargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	if newType <= quantumfs.ObjectTypeVeryLargeFile {
+		return fi
+	}
+
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }

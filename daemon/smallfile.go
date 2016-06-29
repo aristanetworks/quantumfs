@@ -125,11 +125,16 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 		return &rtn
 	}
 
-	if newType == quantumfs.ObjectTypeLargeFile {
-		rtn := newLargeShell()
+	if newType == quantumfs.ObjectTypeLargeFile ||
+		newType == quantumfs.ObjectTypeVeryLargeFile {
 
-		rtn.MultiBlockFile = fi.convertToMultiBlock(rtn.MultiBlockFile)
-		return &rtn
+		lrg := newLargeShell()
+
+		lrg.MultiBlockFile = fi.convertToMultiBlock(lrg.MultiBlockFile)
+		if newType == quantumfs.ObjectTypeVeryLargeFile {
+			return newVeryLargeShell(&lrg)
+		}
+		return &lrg
 	}
 
 	c.elog("Unable to convert file accessor to type %d", newType)

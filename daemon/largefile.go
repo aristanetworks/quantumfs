@@ -42,6 +42,10 @@ func (fi *LargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 		return fi
 	}
 
+	if newType == quantumfs.ObjectTypeVeryLargeFile {
+		return newVeryLargeShell(fi)
+	}
+
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }

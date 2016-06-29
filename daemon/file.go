@@ -41,6 +41,14 @@ func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId
 	return newFile_(c, inodeNum, key, parent, accessor)
 }
 
+func newVeryLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
+	parent Inode) Inode {
+
+	accessor := newVeryLargeAccessor(c, key)
+
+	return newFile_(c, inodeNum, key, parent, accessor)
+}
+
 func newFile_(c *ctx, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
