@@ -50,7 +50,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	return &buffer{
 		data:      in,
-		dirty:     false,
+		dirty:     true,
 		keyType:   keyType,
 		dataStore: c.dataStore,
 	}
