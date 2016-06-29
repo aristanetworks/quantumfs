@@ -110,7 +110,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 			return 0, errors.New("Unable to write to block")
 		}
 		//store the key and update the metadata
-		fi.data.Blocks[blockIdx] = *newFileKey
+		fi.data.Blocks[blockIdx] = newFileKey
 		if blockIdx == len(fi.data.Blocks)-1 {
 			fi.data.LastBlockBytes = uint32(len(data.Get()))
 		}
@@ -139,15 +139,13 @@ func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 		panic("Unable to marshal file metadata")
 	}
 
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
+	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
 
-	newFileKey := buffer.Key(quantumfs.KeyTypeMetadata)
-	if err := c.durableStore.Set(newFileKey, &buffer); err != nil {
+	if err := c.durableStore.Set(buffer.Key(), &buffer); err != nil {
 		panic("Failed to upload new file metadata")
 	}
 
-	return newFileKey
+	return buffer.Key()
 }
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
@@ -186,13 +184,13 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	}
 
 	newFileKey, err := pushData(c, data)
-	if err != nil || newFileKey == nil {
+	if err != nil {
 		c.elog("Block data write failed")
 		return errors.New("Unable to write to block")
 	}
 
 	// Now that everything has succeeded and is in the datastore, update metadata
-	fi.data.Blocks[newEndBlkIdx] = *newFileKey
+	fi.data.Blocks[newEndBlkIdx] = newFileKey
 	fi.data.Blocks = fi.data.Blocks[:newNumBlocks]
 	fi.data.LastBlockBytes = uint32(lastBlockLen)
 

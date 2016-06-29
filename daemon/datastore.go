@@ -16,23 +16,21 @@ type dataStore struct {
 }
 
 func (store *dataStore) Get(c *ctx, key quantumfs.ObjectKey) *quantumfs.Buffer {
-	buffer := quantumfs.Buffer{}
-	err := quantumfs.ConstantStore.Get(key, &buffer)
+	buf, err := quantumfs.ConstantStore.Get(key)
 	if err == nil {
-		return &buffer
+		return &buf
 	}
 
-	err = c.durableStore.Get(key, &buffer)
+	buf, err = c.durableStore.Get(key)
 	if err == nil {
-		return &buffer
+		return &buf
 	}
 	c.elog("Couldn't get from any store: %v. Key %s", err, key)
 
 	return nil
 }
 
-func (store *dataStore) Set(c *ctx, key quantumfs.ObjectKey,
-	buffer *quantumfs.Buffer) error {
+func (store *dataStore) Set(c *ctx, buffer *quantumfs.Buffer) error {
 
-	return c.durableStore.Set(key, buffer)
+	return c.durableStore.Set(buffer.Key(), buffer)
 }

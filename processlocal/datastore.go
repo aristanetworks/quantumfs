@@ -21,18 +21,18 @@ type DataStore struct {
 	data  map[quantumfs.ObjectKey][]byte
 }
 
-func (store *DataStore) Get(key quantumfs.ObjectKey,
-	buffer *quantumfs.Buffer) error {
+func (store *DataStore) Get(key quantumfs.ObjectKey) (quantumfs.Buffer, error) {
 
 	var err error
+	var buf quantumfs.Buffer
 	store.mutex.RLock()
+	defer store.mutex.RUnlock()
 	if data, exists := store.data[key]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
-		buffer.Set(data)
+		buf = quantumfs.NewBuffer(data, key.Type())
 	}
-	store.mutex.RUnlock()
-	return err
+	return buf, err
 }
 
 func (store *DataStore) Set(key quantumfs.ObjectKey,

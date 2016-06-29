@@ -40,8 +40,7 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	hash := sha1.Sum(bytes)
 	newBaseLayerId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
 
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
+	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
 	if err := c.durableStore.Set(newBaseLayerId, &buffer); err != nil {
 		panic("Failed to upload new baseLayer object")
 	}

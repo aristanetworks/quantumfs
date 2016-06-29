@@ -3,7 +3,6 @@
 
 package daemon
 
-import "crypto/sha1"
 import "encoding/json"
 import "sync"
 
@@ -82,11 +81,8 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		panic("Failed to marshal workspace root")
 	}
 
-	hash := sha1.Sum(bytes)
-	newRootId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
+	buffer := quantumfs.NewBuffer(bytes, quantumfs.KeyTypeMetadata)
+	newRootId := buffer.Key()
 	if err := c.durableStore.Set(newRootId, &buffer); err != nil {
 		panic("Failed to upload new workspace root")
 	}

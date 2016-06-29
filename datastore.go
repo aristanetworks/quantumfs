@@ -4,12 +4,12 @@
 // The datastore interface
 package quantumfs
 
+import "crypto/sha1"
+import "encoding/hex"
+import "encoding/json"
 import "fmt"
 import "time"
 
-import "crypto/sha1"
-import "encoding/json"
-import "encoding/hex"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 // Maximum size of a block which can be stored in a datastore
@@ -74,9 +74,9 @@ type ObjectKey struct {
 	Key [ObjectKeyLength]byte
 }
 
-// Extract the type of the object. Returns a KeyType*
-func (key *ObjectKey) Type() byte {
-	return key.Key[0]
+// Extract the type of the object. Returns a KeyType
+func (key *ObjectKey) Type() KeyType {
+	return KeyType(key.Key[0])
 }
 
 func (key ObjectKey) String() string {
@@ -294,11 +294,10 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 }
 
 type Buffer struct {
-	data []byte
-}
-
-func (buf *Buffer) Set(in []byte) {
-	buf.data = in
+	data    []byte
+	dirty   bool
+	keyType KeyType
+	key     ObjectKey
 }
 
 func (buf *Buffer) Write(in []byte, offset uint32) uint32 {
@@ -346,18 +345,25 @@ func (buf *Buffer) ContentHash() [ObjectKeyLength - 1]byte {
 	return sha1.Sum(buf.data)
 }
 
-func (buf *Buffer) Key(keyType KeyType) ObjectKey {
-	return NewObjectKey(keyType, buf.ContentHash())
+func (buf *Buffer) Key() ObjectKey {
+	if !buf.dirty {
+		return buf.key
+	}
+
+	buf.key = NewObjectKey(buf.keyType, buf.ContentHash())
+	return buf.key
 }
 
-func NewBuffer(in []byte) *Buffer {
-	return &Buffer{
-		data: in,
+func NewBuffer(in []byte, keyType KeyType) Buffer {
+	return Buffer{
+		data:    in,
+		dirty:   true,
+		keyType: keyType,
 	}
 }
 
 type DataStore interface {
-	Get(key ObjectKey, buffer *Buffer) error
+	Get(key ObjectKey) (Buffer, error)
 	Set(key ObjectKey, buffer *Buffer) error
 	Exists(key ObjectKey) bool
 }
@@ -376,12 +382,11 @@ type ConstDataStore struct {
 	store map[ObjectKey][]byte
 }
 
-func (store *ConstDataStore) Get(key ObjectKey, buffer *Buffer) error {
+func (store *ConstDataStore) Get(key ObjectKey) (Buffer, error) {
 	if data, ok := store.store[key]; ok {
-		buffer.Set(data)
-		return nil
+		return NewBuffer(data, key.Type()), nil
 	}
-	return fmt.Errorf("Object not found")
+	return NewBuffer([]byte{}, key.Type()), fmt.Errorf("Object not found")
 }
 
 func (store *ConstDataStore) Set(key ObjectKey, buffer *Buffer) error {
