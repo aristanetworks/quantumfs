@@ -306,8 +306,10 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 		oldRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
 			quantumfs.NullWorkspaceName)
 
-		file.key.Key[1]++
-		fileDescriptor.dirty(test.newCtx())
+		c := test.newCtx()
+		_, err = file.accessor.writeBlock(c, 0, 0, []byte("update"))
+		test.assert(err == nil, "Failure modifying small file")
+		fileDescriptor.dirty(c)
 
 		test.syncAllWorkspaces()
 		newRootId := test.workspaceRootId(quantumfs.NullNamespaceName,

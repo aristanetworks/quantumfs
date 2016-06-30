@@ -49,7 +49,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		key:      key,
 		parent:   parent,
 		accessor: accessor,
 	}
@@ -63,7 +62,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	key      quantumfs.ObjectKey
 	parent   Inode
 	accessor blockAccessor
 }
@@ -171,8 +169,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			// Update the entry metadata
-			fi.key = fi.accessor.sync(c)
+			fi.setDirty(true)
 		}
 
 		return fuse.OK
@@ -413,9 +410,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			return 0, fuse.EIO
 		}
-
-		// Update the direct entry
-		fi.key = fi.accessor.sync(c)
+		fi.setDirty(true)
 		return uint32(writeCount), fuse.OK
 	}()
 
