@@ -74,7 +74,7 @@ func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	return int(blkIdx), remainingOffset
 }
 
-func (fi *SmallFile) writeToStore(c *ctx) quantumfs.ObjectKey {
+func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
 	// No metadata to marshal for small files
 	key, err := fi.buf.Key(&c.Ctx)
 	if err != nil {
@@ -99,7 +99,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 		float64(input.data.BlockSize)))
 	input.expandTo(numBlocks)
 	if numBlocks > 0 {
-		input.data.Blocks[0] = fi.writeToStore(c)
+		input.data.Blocks[0] = fi.sync(c)
 	}
 	input.data.LastBlockBytes = uint32(fi.buf.Size() % int(input.data.BlockSize))
 

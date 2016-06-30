@@ -172,7 +172,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			}
 
 			// Update the entry metadata
-			fi.key = fi.accessor.writeToStore(c)
+			fi.key = fi.accessor.sync(c)
 		}
 
 		return fuse.OK
@@ -315,7 +315,7 @@ type blockAccessor interface {
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
 
 	// Write file's metadata to the datastore and provide the key
-	writeToStore(c *ctx) quantumfs.ObjectKey
+	sync(c *ctx) quantumfs.ObjectKey
 
 	// Truncate to lessen length *only*, error otherwise
 	truncate(c *ctx, newLength uint64) error
@@ -415,7 +415,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		}
 
 		// Update the direct entry
-		fi.key = fi.accessor.writeToStore(c)
+		fi.key = fi.accessor.sync(c)
 		return uint32(writeCount), fuse.OK
 	}()
 
