@@ -90,6 +90,9 @@ func (fi *SmallFile) getType() quantumfs.ObjectType {
 func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	input MultiBlockFile) MultiBlockFile {
 
+	c.vlog("SmallFile::convertToMultiBlock Enter")
+	defer c.vlog("SmallFile::convertToMultiBlock Exit")
+
 	input.data.BlockSize = quantumfs.MaxBlockSize
 
 	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
@@ -104,6 +107,9 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 }
 
 func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	c.vlog("SmallFile::convertTo %v Enter", newType)
+	defer c.vlog("SmallFile::convertTo Exit")
+
 	if newType == quantumfs.ObjectTypeSmallFile {
 		return fi
 	}
