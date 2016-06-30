@@ -94,6 +94,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	defer c.vlog("SmallFile::convertToMultiBlock Exit")
 
 	input.metadata.BlockSize = quantumfs.MaxBlockSize
+	input.setFile(fi.file)
 
 	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
 		float64(input.metadata.BlockSize)))
