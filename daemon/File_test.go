@@ -223,8 +223,9 @@ func TestFileSizeChanges_test(t *testing.T) {
 
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil && string(output) == testText,
-			"Couldn't read back from file")
+		test.assert(err == nil, "Failed reading from file: %v", err)
+		test.assert(string(output) == testText,
+			"File contents incorrect: '%s'", string(output))
 
 		err = os.Truncate(testFilename, 4)
 		test.assert(err == nil, "Problem truncating file")
