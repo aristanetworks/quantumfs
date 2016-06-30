@@ -10,9 +10,8 @@ import "errors"
 import "math"
 
 type SmallFile struct {
-	file  *File
-	bytes uint64
-	buf   quantumfs.Buffer
+	file *File
+	buf  quantumfs.Buffer
 }
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
@@ -93,14 +92,13 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 
 	input.data.BlockSize = quantumfs.MaxBlockSize
 
-	numBlocks := int(math.Ceil(float64(fi.bytes) /
+	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
 		float64(input.data.BlockSize)))
 	input.expandTo(numBlocks)
 	if numBlocks > 0 {
 		input.data.Blocks[0] = fi.writeToStore(c)
 	}
-	input.data.LastBlockBytes = uint32(fi.bytes %
-		uint64(input.data.BlockSize))
+	input.data.LastBlockBytes = uint32(fi.buf.Size() % int(input.data.BlockSize))
 
 	return input
 }
