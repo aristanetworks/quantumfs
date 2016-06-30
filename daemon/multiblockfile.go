@@ -18,6 +18,7 @@ type MultiBlockContainer struct {
 }
 
 type MultiBlockFile struct {
+	file      *File
 	data      MultiBlockContainer
 	maxBlocks int
 }
@@ -195,4 +196,8 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	fi.data.LastBlockBytes = uint32(lastBlockLen)
 
 	return nil
+}
+
+func (fi *MultiBlockFile) setFile(file *File) {
+	fi.file = file
 }
