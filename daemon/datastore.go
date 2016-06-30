@@ -151,3 +151,7 @@ func (buf *buffer) SetSize(size int) {
 
 	buf.dirty = true
 }
+
+func (buf *buffer) Size() int {
+	return len(buf.data)
+}

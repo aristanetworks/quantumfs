@@ -17,7 +17,6 @@ type SmallFile struct {
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
 	var rtn SmallFile
-	rtn.bytes = size
 	rtn.buf = c.dataStore.Get(&c.Ctx, key)
 	if rtn.buf != nil {
 		rtn.buf.SetSize(int(size))
@@ -66,7 +65,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 }
 
 func (fi *SmallFile) fileLength() uint64 {
-	return uint64(fi.bytes)
+	return uint64(fi.buf.Size())
 }
 
 func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {

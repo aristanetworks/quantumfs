@@ -301,6 +301,7 @@ type Buffer interface {
 	ContentHash() [ObjectKeyLength - 1]byte
 	Key(c *Ctx) (ObjectKey, error)
 	SetSize(size int)
+	Size() int
 }
 
 type DataStore interface {
