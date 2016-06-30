@@ -28,8 +28,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 	maxBlocks int) *MultiBlockFile {
 
 	var rtn MultiBlockFile
-	rtn.maxBlocks = maxBlocks
-	rtn.dataBlocks = make(map[int]quantumfs.Buffer)
+	initMultiBlockAccessor(&rtn, maxBlocks)
 
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
@@ -42,6 +41,11 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 	}
 
 	return &rtn
+}
+
+func initMultiBlockAccessor(multiBlock *MultiBlockFile, maxBlocks int) {
+	multiBlock.maxBlocks = maxBlocks
+	multiBlock.dataBlocks = make(map[int]quantumfs.Buffer)
 }
 
 func (fi *MultiBlockFile) expandTo(length int) {

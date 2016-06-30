@@ -14,7 +14,7 @@ type MediumFile struct {
 // Shell constructor
 func newMediumShell() MediumFile {
 	var rtn MediumFile
-	rtn.maxBlocks = quantumfs.MaxBlocksMediumFile
+	initMultiBlockAccessor(&rtn.MultiBlockFile, quantumfs.MaxBlocksMediumFile)
 
 	return rtn
 }
