@@ -386,7 +386,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	defer fi.RLock().RUnlock()
+	defer fi.Lock().Unlock()
 
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
 		fi.accessor.readBlock)
