@@ -144,6 +144,10 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 }
 
 func (buf *buffer) SetSize(size int) {
+	if size > quantumfs.MaxBlockSize {
+		panic("New block size greater than maximum")
+	}
+
 	if len(buf.data) > size {
 		buf.data = buf.data[:size]
 		return
