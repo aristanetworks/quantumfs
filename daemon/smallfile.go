@@ -10,8 +10,7 @@ import "errors"
 import "math"
 
 type SmallFile struct {
-	file *File
-	buf  quantumfs.Buffer
+	buf quantumfs.Buffer
 }
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
@@ -55,7 +54,6 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 
 	copied := fi.buf.Write(&c.Ctx, buf, uint32(offset))
 	if copied > 0 {
-		fi.file.setDirty(true)
 		return int(copied), nil
 	}
 
@@ -94,14 +92,13 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	defer c.vlog("SmallFile::convertToMultiBlock Exit")
 
 	input.metadata.BlockSize = quantumfs.MaxBlockSize
-	input.setFile(fi.file)
 
 	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
 		float64(input.metadata.BlockSize)))
 	input.expandTo(numBlocks)
 	if numBlocks > 0 {
 		c.dlog("Syncing smallFile dataBlock")
-		input.metadata.Blocks[0] = fi.sync(c)
+		input.dataBlocks[0] = fi.buf
 	}
 	input.metadata.LastBlockBytes =
 		uint32(fi.buf.Size() % int(input.metadata.BlockSize))
@@ -138,8 +135,4 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
 	fi.buf.SetSize(int(newLengthBytes))
 	return nil
-}
-
-func (fi *SmallFile) setFile(file *File) {
-	fi.file = file
 }
