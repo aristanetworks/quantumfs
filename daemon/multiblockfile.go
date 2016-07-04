@@ -18,7 +18,6 @@ type MultiBlockContainer struct {
 }
 
 type MultiBlockFile struct {
-	file       *File
 	metadata   MultiBlockContainer
 	dataBlocks map[int]quantumfs.Buffer
 	maxBlocks  int
@@ -120,7 +119,6 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		if blockIdx == len(fi.metadata.Blocks)-1 {
 			fi.metadata.LastBlockBytes = uint32(block.Size())
 		}
-		fi.file.setDirty(true)
 		return int(copied), nil
 	}
 
@@ -198,8 +196,4 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	fi.metadata.LastBlockBytes = uint32(lastBlockLen)
 
 	return nil
-}
-
-func (fi *MultiBlockFile) setFile(file *File) {
-	fi.file = file
 }
