@@ -675,7 +675,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 		return fuse.EIO
 	}
 
-	defer fileHandle.RLockTree().RUnlock()
+	defer fileHandle.LockTree().Unlock()
 	return fileHandle.Sync(c)
 }
 
