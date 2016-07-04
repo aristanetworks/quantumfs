@@ -49,7 +49,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		key:      key,
 		parent:   parent,
 		accessor: accessor,
 	}
@@ -62,7 +61,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	key      quantumfs.ObjectKey
 	parent   Inode
 	accessor blockAccessor
 }
@@ -170,8 +168,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			// Update the entry metadata
-			fi.key = fi.accessor.writeToStore(c)
+			fi.setDirty(true)
 		}
 
 		return fuse.OK
@@ -314,10 +311,10 @@ type blockAccessor interface {
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
 
 	// Write file's metadata to the datastore and provide the key
-	writeToStore(c *ctx) quantumfs.ObjectKey
+	sync(c *ctx) quantumfs.ObjectKey
 
 	// Truncate to lessen length *only*, error otherwise
-	truncate(*ctx, uint64) error
+	truncate(c *ctx, newLength uint64) error
 }
 
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -409,9 +406,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			return 0, fuse.EIO
 		}
-
-		// Update the direct entry
-		fi.key = fi.accessor.writeToStore(c)
+		fi.setDirty(true)
 		return uint32(writeCount), fuse.OK
 	}()
 

@@ -10,14 +10,15 @@ import "errors"
 import "math"
 
 type SmallFile struct {
-	key   quantumfs.ObjectKey
-	bytes uint64
+	buf quantumfs.Buffer
 }
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
 	var rtn SmallFile
-	rtn.key = key
-	rtn.bytes = size
+	rtn.buf = c.dataStore.Get(&c.Ctx, key)
+	if rtn.buf != nil {
+		rtn.buf.SetSize(int(size))
+	}
 
 	return &rtn
 }
@@ -35,10 +36,7 @@ func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 		return 0, nil
 	}
 
-	expectedSize := fi.bytes
-	data := fetchDataSized(c, fi.key, int(expectedSize))
-
-	copied := copy(buf, data.Get()[offset:])
+	copied := fi.buf.Read(buf, uint32(offset))
 	return copied, nil
 }
 
@@ -54,23 +52,8 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, errors.New("Offset exceeds small file")
 	}
 
-	// Grab the data
-	data := c.dataStore.Get(&c.Ctx, fi.key)
-	if data == nil {
-		c.elog("Unable to fetch data for block")
-		return 0, errors.New("Unable to fetch block data")
-	}
-
-	copied := data.Write(buf, uint32(offset))
+	copied := fi.buf.Write(buf, uint32(offset))
 	if copied > 0 {
-		newFileKey, err := pushData(c, data)
-		if err != nil {
-			c.elog("Write failed")
-			return 0, errors.New("Unable to write to block")
-		}
-		//store the key
-		fi.bytes = uint64(len(data.Get()))
-		fi.key = newFileKey
 		return int(copied), nil
 	}
 
@@ -79,7 +62,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 }
 
 func (fi *SmallFile) fileLength() uint64 {
-	return uint64(fi.bytes)
+	return uint64(fi.buf.Size())
 }
 
 func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
@@ -89,31 +72,42 @@ func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	return int(blkIdx), remainingOffset
 }
 
-func (fi *SmallFile) writeToStore(c *ctx) quantumfs.ObjectKey {
+func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
 	// No metadata to marshal for small files
-	return fi.key
+	key, err := fi.buf.Key(&c.Ctx)
+	if err != nil {
+		panic("TODO Unable to upload file data")
+	}
+	return key
 }
 
 func (fi *SmallFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeSmallFile
 }
 
-func (fi *SmallFile) convertToMultiBlock(input MultiBlockFile) MultiBlockFile {
+func (fi *SmallFile) convertToMultiBlock(c *ctx,
+	input MultiBlockFile) MultiBlockFile {
+
+	c.vlog("SmallFile::convertToMultiBlock Enter")
+	defer c.vlog("SmallFile::convertToMultiBlock Exit")
+
 	input.data.BlockSize = quantumfs.MaxBlockSize
 
-	numBlocks := int(math.Ceil(float64(fi.bytes) /
+	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
 		float64(input.data.BlockSize)))
 	input.expandTo(numBlocks)
 	if numBlocks > 0 {
-		input.data.Blocks[0] = fi.key
+		input.data.Blocks[0] = fi.sync(c)
 	}
-	input.data.LastBlockBytes = uint32(fi.bytes %
-		uint64(input.data.BlockSize))
+	input.data.LastBlockBytes = uint32(fi.buf.Size() % int(input.data.BlockSize))
 
 	return input
 }
 
 func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	c.vlog("SmallFile::convertTo %v Enter", newType)
+	defer c.vlog("SmallFile::convertTo Exit")
+
 	if newType == quantumfs.ObjectTypeSmallFile {
 		return fi
 	}
@@ -121,14 +115,14 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 	if newType == quantumfs.ObjectTypeMediumFile {
 		rtn := newMediumShell()
 
-		rtn.MultiBlockFile = fi.convertToMultiBlock(rtn.MultiBlockFile)
+		rtn.MultiBlockFile = fi.convertToMultiBlock(c, rtn.MultiBlockFile)
 		return &rtn
 	}
 
 	if newType == quantumfs.ObjectTypeLargeFile {
 		rtn := newLargeShell()
 
-		rtn.MultiBlockFile = fi.convertToMultiBlock(rtn.MultiBlockFile)
+		rtn.MultiBlockFile = fi.convertToMultiBlock(c, rtn.MultiBlockFile)
 		return &rtn
 	}
 
@@ -137,27 +131,6 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 }
 
 func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
-
-	// If we're increasing the length, then we can just update
-	if newLengthBytes > fi.bytes {
-		fi.bytes = newLengthBytes
-		return nil
-	}
-
-	data := fetchDataSized(c, fi.key, int(newLengthBytes))
-	if data == nil {
-		c.elog("Unable to fetch existing data for block")
-		return errors.New("Unable to fetch existing data")
-	}
-
-	newFileKey, err := pushData(c, data)
-	if err != nil {
-		c.elog("Block data write failed")
-		return errors.New("Unable to write to block")
-	}
-
-	// Now that everything has succeeded and is in the datastore, update metadata
-	fi.key = newFileKey
-	fi.bytes = newLengthBytes
+	fi.buf.SetSize(int(newLengthBytes))
 	return nil
 }

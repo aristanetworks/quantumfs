@@ -295,10 +295,13 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 type Buffer interface {
 	Write(in []byte, offset uint32) uint32
+	Read(out []byte, offset uint32) int
 	Get() []byte
 	Set(data []byte, keyType KeyType)
 	ContentHash() [ObjectKeyLength - 1]byte
 	Key(c *Ctx) (ObjectKey, error)
+	SetSize(size int)
+	Size() int
 }
 
 type DataStore interface {

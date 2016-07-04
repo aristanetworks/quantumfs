@@ -109,6 +109,10 @@ func (buf *buffer) Write(in []byte, offset uint32) uint32 {
 	return copied
 }
 
+func (buf *buffer) Read(out []byte, offset uint32) int {
+	return copy(out, buf.data[offset:])
+}
+
 func (buf *buffer) Get() []byte {
 	return buf.data
 }
@@ -132,4 +136,22 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 	buf.dirty = false
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
+}
+
+func (buf *buffer) SetSize(size int) {
+	if len(buf.data) > size {
+		buf.data = buf.data[:size]
+		return
+	}
+
+	for len(buf.data) < size {
+		extraBytes := make([]byte, size-len(buf.data))
+		buf.data = append(buf.data, extraBytes...)
+	}
+
+	buf.dirty = true
+}
+
+func (buf *buffer) Size() int {
+	return len(buf.data)
 }

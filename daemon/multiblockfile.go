@@ -133,7 +133,7 @@ func (fi *MultiBlockFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	return int(blkIdx), remainingOffset
 }
 
-func (fi *MultiBlockFile) writeToStore(c *ctx) quantumfs.ObjectKey {
+func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	bytes, err := json.Marshal(fi.data)
 	if err != nil {
 		panic("Unable to marshal file metadata")
