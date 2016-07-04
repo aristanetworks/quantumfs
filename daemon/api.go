@@ -147,6 +147,10 @@ func (api *ApiInode) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
+func (api *ApiInode) Sync(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
@@ -284,4 +288,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 func (api *ApiHandle) syncAll(c *ctx) {
 	c.qfs.syncAll(c)
 	api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
+}
+
+func (api *ApiHandle) Sync(c *ctx) fuse.Status {
+	return fuse.OK
 }

@@ -212,6 +212,10 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
+func (fi *File) Sync(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -472,4 +476,8 @@ func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32
 	buf []byte) (uint32, fuse.Status) {
 
 	return fd.file.Write(c, offset, size, flags, buf)
+}
+
+func (fd *FileDescriptor) Sync(c *ctx) fuse.Status {
+	return fd.file.Sync(c)
 }

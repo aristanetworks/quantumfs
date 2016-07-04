@@ -47,6 +47,8 @@ type Inode interface {
 
 	Readlink(c *ctx) ([]byte, fuse.Status)
 
+	Sync(c *ctx) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
@@ -150,6 +152,8 @@ type FileHandle interface {
 
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
+
+	Sync(c *ctx) fuse.Status
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex

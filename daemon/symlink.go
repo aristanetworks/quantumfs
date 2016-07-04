@@ -115,6 +115,10 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return data.Get(), fuse.OK
 }
 
+func (link *Symlink) Sync(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
 func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {

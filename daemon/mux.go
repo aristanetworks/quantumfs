@@ -559,8 +559,14 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 	c.vlog("QuantumFs::Flush Enter Fh: %v", input.Fh)
 	defer c.vlog("QuantumFs::Flush Exit")
 
-	c.elog("Unhandled request Flush")
-	return fuse.ENOSYS
+	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	if fileHandle == nil {
+		c.elog("Flush failed")
+		return fuse.EIO
+	}
+
+	defer fileHandle.RLockTree().RUnlock()
+	return fileHandle.Sync(c)
 }
 
 func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
@@ -571,8 +577,14 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 	c.vlog("QuantumFs::Fsync Enter")
 	defer c.vlog("QuantumFs::Fsync Exit")
 
-	c.elog("Unhandled request Fsync")
-	return fuse.ENOSYS
+	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	if fileHandle == nil {
+		c.elog("Fsync failed")
+		return fuse.EIO
+	}
+
+	defer fileHandle.RLockTree().RUnlock()
+	return fileHandle.Sync(c)
 }
 
 func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
@@ -657,8 +669,14 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 	c.vlog("QuantumFs::FsyncDir Enter")
 	defer c.vlog("QuantumFs::FsyncDir Exit")
 
-	c.elog("Unhandled request FsyncDir")
-	return fuse.ENOSYS
+	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	if fileHandle == nil {
+		c.elog("FsyncDir failed")
+		return fuse.EIO
+	}
+
+	defer fileHandle.RLockTree().RUnlock()
+	return fileHandle.Sync(c)
 }
 
 func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
