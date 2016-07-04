@@ -18,7 +18,7 @@ type ctx struct {
 	qfs         *QuantumFs
 	config      *QuantumFsConfig
 	workspaceDB quantumfs.WorkspaceDB
-	dataStore   dataStore
+	dataStore   *dataStore
 	fuseCtx     *fuse.Context
 }
 

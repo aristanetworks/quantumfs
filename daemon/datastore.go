@@ -8,22 +8,17 @@ import "crypto/sha1"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 
-type dataStore interface {
-	Get(c *quantumfs.Ctx, key quantumfs.ObjectKey) quantumfs.Buffer
-	Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error
-}
-
-func newDataStore(durableStore quantumfs.DataStore) *dataStore_ {
-	return &dataStore_{
+func newDataStore(durableStore quantumfs.DataStore) *dataStore {
+	return &dataStore{
 		durableStore: durableStore,
 	}
 }
 
-type dataStore_ struct {
+type dataStore struct {
 	durableStore quantumfs.DataStore
 }
 
-func (store *dataStore_) Get(c *quantumfs.Ctx,
+func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
 	var buf buffer
@@ -43,7 +38,7 @@ func (store *dataStore_) Get(c *quantumfs.Ctx,
 	return nil
 }
 
-func (store *dataStore_) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
+func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	key, err := buffer.Key(c)
 	if err != nil {
 		return err
@@ -61,7 +56,7 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	}
 }
 
-func initBuffer(buf *buffer, dataStore dataStore, key quantumfs.ObjectKey) {
+func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
 	buf.dirty = false
 	buf.dataStore = dataStore
 	buf.keyType = key.Type()
@@ -73,7 +68,7 @@ type buffer struct {
 	dirty     bool
 	keyType   quantumfs.KeyType
 	key       quantumfs.ObjectKey
-	dataStore dataStore
+	dataStore *dataStore
 }
 
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
