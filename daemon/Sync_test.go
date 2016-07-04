@@ -108,14 +108,13 @@ func TestNoImplicitSync(t *testing.T) {
 		// Confirm the only sync at this point was the move from small file
 		// to medium file.
 		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount == 1, "Expected one store write, got %d",
-			setCount)
+		test.assert(setCount == 0, "Unexpected store writes %d", setCount)
 
 		// Now we sync everything and confirm that writes to the datastore
 		// happen
 		test.syncAllWorkspaces()
 		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount > 2, "Datastore sets didn't happen! %d",
+		test.assert(setCount > 0, "Datastore sets didn't happen! %d",
 			setCount)
 	})
 }
