@@ -17,12 +17,13 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 	qfs := &QuantumFs{
-		RawFileSystem: fuse.NewDefaultRawFileSystem(),
-		config:        config,
-		inodes:        make(map[InodeId]Inode),
-		fileHandles:   make(map[FileHandleId]FileHandle),
-		inodeNum:      quantumfs.InodeIdReservedEnd,
-		fileHandleNum: quantumfs.InodeIdReservedEnd,
+		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
+		config:           config,
+		inodes:           make(map[InodeId]Inode),
+		fileHandles:      make(map[FileHandleId]FileHandle),
+		inodeNum:         quantumfs.InodeIdReservedEnd,
+		fileHandleNum:    quantumfs.InodeIdReservedEnd,
+		activeWorkspaces: make(map[string]*WorkspaceRoot),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlog.NewQlog(),
@@ -49,9 +50,10 @@ type QuantumFs struct {
 	fileHandleNum uint64
 	c             ctx
 
-	mapMutex    sync.RWMutex
-	inodes      map[InodeId]Inode
-	fileHandles map[FileHandleId]FileHandle
+	mapMutex         sync.RWMutex
+	inodes           map[InodeId]Inode
+	fileHandles      map[FileHandleId]FileHandle
+	activeWorkspaces map[string]*WorkspaceRoot
 }
 
 // Get an inode in a thread safe way
@@ -103,6 +105,57 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 // Retrieve a unique filehandle number
 func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 	return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
+}
+
+// Track a workspace as active so we know if we have to sync it
+func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
+	workspaceroot *WorkspaceRoot) {
+
+	c.vlog("QuantumFs::activateWorkspace %s", name)
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+	if _, exists := qfs.activeWorkspaces[name]; exists {
+		panic("Workspace registered twice")
+	}
+	qfs.activeWorkspaces[name] = workspaceroot
+}
+
+// Untrack a workspace as active so we won't sync it. Usually this is called when
+// the workspaceroot Inode is about to be deleted
+func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string) {
+	c.vlog("QuantumFs::deactivateWorkspace %s", name)
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+	delete(qfs.activeWorkspaces, name)
+}
+
+// Trigger all active workspaces to sync
+func (qfs *QuantumFs) syncAll(c *ctx) {
+	c.vlog("QuantumFs::syncAll Enter")
+	defer c.vlog("QuantumFs::syncAll Exit")
+
+	var workspaces []*WorkspaceRoot
+
+	func() {
+		qfs.mapMutex.RLock()
+		defer qfs.mapMutex.RUnlock()
+
+		workspaces = make([]*WorkspaceRoot, 0, len(qfs.activeWorkspaces))
+
+		for _, workspace := range qfs.activeWorkspaces {
+			workspaces = append(workspaces, workspace)
+		}
+	}()
+
+	for _, workspace := range workspaces {
+		func() {
+			c.vlog("Locking and syncing workspace %v", workspace)
+			defer workspace.LockTree().Unlock()
+			workspace.sync_DOWN(c)
+		}()
+	}
 }
 
 func logRequestPanic(c *ctx) {

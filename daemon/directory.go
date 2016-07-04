@@ -581,7 +581,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.vlog("ReadDirPlus directorySnapshot", input, out)
+	c.vlog("ReadDirPlus directorySnapshot in: %v out: %v", input, out)
 	offset := input.Offset
 
 	// Add .

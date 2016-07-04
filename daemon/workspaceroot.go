@@ -57,13 +57,14 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.workspace = name
 	wsr.rootId = rootId
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+
+	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr
 }
 
-// Mark this workspace dirty and update the workspace DB
+// Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	wsr.setDirty(true)
-	wsr.advanceRootId(c)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb

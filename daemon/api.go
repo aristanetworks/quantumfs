@@ -249,6 +249,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdBranchRequest:
 		c.vlog("Received branch request")
 		api.branchWorkspace(c, buf)
+	case quantumfs.CmdSyncAll:
+		c.vlog("Received all workspace sync request")
+		api.syncAll(c)
 
 	}
 
@@ -266,6 +269,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
+	c.qfs.syncAll(c)
+
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], dst[0],
 		dst[1]); err != nil {
 
@@ -274,4 +279,9 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	}
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
+}
+
+func (api *ApiHandle) syncAll(c *ctx) {
+	c.qfs.syncAll(c)
+	api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
 }
