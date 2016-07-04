@@ -294,7 +294,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 }
 
 type Buffer interface {
-	Write(in []byte, offset uint32) uint32
+	Write(c *Ctx, in []byte, offset uint32) uint32
 	Read(out []byte, offset uint32) int
 	Get() []byte
 	Set(data []byte, keyType KeyType)
@@ -305,9 +305,9 @@ type Buffer interface {
 }
 
 type DataStore interface {
-	Get(key ObjectKey, buf Buffer) error
-	Set(key ObjectKey, buf Buffer) error
-	Exists(key ObjectKey) bool
+	Get(c *Ctx, key ObjectKey, buf Buffer) error
+	Set(c *Ctx, key ObjectKey, buf Buffer) error
+	Exists(c *Ctx, key ObjectKey) bool
 }
 
 // A pseudo-store which contains all the constant objects
@@ -324,7 +324,7 @@ type ConstDataStore struct {
 	store map[ObjectKey][]byte
 }
 
-func (store *ConstDataStore) Get(key ObjectKey, buf Buffer) error {
+func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	if data, ok := store.store[key]; ok {
 		buf.Set(data, key.Type())
 		return nil
@@ -332,11 +332,11 @@ func (store *ConstDataStore) Get(key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Object not found")
 }
 
-func (store *ConstDataStore) Set(key ObjectKey, buf Buffer) error {
+func (store *ConstDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
 }
 
-func (store *ConstDataStore) Exists(key ObjectKey) bool {
+func (store *ConstDataStore) Exists(c *Ctx, key ObjectKey) bool {
 	return false
 }
 

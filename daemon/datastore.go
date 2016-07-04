@@ -29,12 +29,12 @@ func (store *dataStore_) Get(c *quantumfs.Ctx,
 	var buf buffer
 	initBuffer(&buf, store, key)
 
-	err := quantumfs.ConstantStore.Get(key, &buf)
+	err := quantumfs.ConstantStore.Get(c, key, &buf)
 	if err == nil {
 		return &buf
 	}
 
-	err = store.durableStore.Get(key, &buf)
+	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
 		return &buf
 	}
@@ -48,7 +48,7 @@ func (store *dataStore_) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	if err != nil {
 		return err
 	}
-	return store.durableStore.Set(key, buffer)
+	return store.durableStore.Set(c, key, buffer)
 }
 
 // buffer is the central data-handling type of quantumfsd
@@ -76,7 +76,7 @@ type buffer struct {
 	dataStore dataStore
 }
 
-func (buf *buffer) Write(in []byte, offset uint32) uint32 {
+func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
 	// Sanity check offset and length
 	maxWriteLen := quantumfs.MaxBlockSize - int(offset)
 	if maxWriteLen <= 0 {
@@ -108,6 +108,7 @@ func (buf *buffer) Write(in []byte, offset uint32) uint32 {
 		finalBuffer = append(finalBuffer, buf.data[remainingStart:]...)
 	}
 
+	c.Vlog(qlog.LogDaemon, "Marking buffer dirty")
 	buf.dirty = true
 	buf.data = finalBuffer
 
@@ -134,11 +135,13 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 	if !buf.dirty {
+		c.Vlog(qlog.LogDaemon, "Buffer not dirty")
 		return buf.key, nil
 	}
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
+	c.Vlog(qlog.LogDaemon, "New buffer key %v", buf.key)
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
 }

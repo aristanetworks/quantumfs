@@ -53,7 +53,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, errors.New("Offset exceeds small file")
 	}
 
-	copied := fi.buf.Write(buf, uint32(offset))
+	copied := fi.buf.Write(&c.Ctx, buf, uint32(offset))
 	if copied > 0 {
 		fi.file.setDirty(true)
 		return int(copied), nil
@@ -100,6 +100,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 		float64(input.metadata.BlockSize)))
 	input.expandTo(numBlocks)
 	if numBlocks > 0 {
+		c.dlog("Syncing smallFile dataBlock")
 		input.metadata.Blocks[0] = fi.sync(c)
 	}
 	input.metadata.LastBlockBytes =
