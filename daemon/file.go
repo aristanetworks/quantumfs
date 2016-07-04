@@ -150,6 +150,9 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	c.vlog("File::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
+	defer c.vlog("File::SetAttr Exit")
+
 	result := func() fuse.Status {
 		defer fi.Lock().Unlock()
 
@@ -278,8 +281,8 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 // Given the block index to write into the file, ensure that we are the
 // correct file type
 func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
-
 	neededType := calcTypeGivenBlocks(blockIdx + 1)
+	c.dlog("File::reconcileFileType blockIdx %d", blockIdx)
 	newAccessor := fi.accessor.convertTo(c, neededType)
 	if newAccessor == nil {
 		return errors.New("Unable to process needed type for accessor")
@@ -382,7 +385,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	defer fi.RLock().RUnlock()
+	defer fi.Lock().Unlock()
 
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
 		fi.accessor.readBlock)
@@ -396,6 +399,9 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
+
+	c.vlog("File::Write Enter offset %d size %d flags %x", offset, size, flags)
+	defer c.vlog("File::Write Exit")
 
 	writeCount, result := func() (uint32, fuse.Status) {
 		defer fi.Lock().Unlock()

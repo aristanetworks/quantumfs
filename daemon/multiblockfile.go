@@ -114,7 +114,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 
 	block := fi.retrieveDataBlock(c, blockIdx)
 
-	copied := block.Write(buf, uint32(offset))
+	copied := block.Write(&c.Ctx, buf, uint32(offset))
 	if copied > 0 {
 		if blockIdx == len(fi.metadata.Blocks)-1 {
 			fi.metadata.LastBlockBytes = uint32(block.Size())
