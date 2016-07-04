@@ -166,7 +166,8 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	newEndBlkIdx := (newLengthBytes - 1) / uint64(fi.metadata.BlockSize)
 	newNumBlocks := newEndBlkIdx + 1
-	lastBlockLen := newLengthBytes - (newEndBlkIdx * uint64(fi.metadata.BlockSize))
+	lastBlockLen := newLengthBytes -
+		(newEndBlkIdx * uint64(fi.metadata.BlockSize))
 
 	// Handle the special zero length case
 	if newLengthBytes == 0 {

@@ -64,8 +64,9 @@ func TestNoImplicitSync(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
-		expectedPermissions |= syscall.S_IRUSR | syscall.S_IRGRP | syscall.S_IROTH
-		expectedPermissions |= syscall.S_IWUSR | syscall.S_IWGRP | syscall.S_IWOTH
+		expectedPermissions |= syscall.S_IRUSR | syscall.S_IWUSR
+		expectedPermissions |= syscall.S_IRGRP | syscall.S_IWGRP
+		expectedPermissions |= syscall.S_IROTH | syscall.S_IWOTH
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -114,6 +115,7 @@ func TestNoImplicitSync(t *testing.T) {
 		// happen
 		test.syncAllWorkspaces()
 		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount != 0, "Datastore sets didn't happen! %d", setCount)
+		test.assert(setCount != 0, "Datastore sets didn't happen! %d",
+			setCount)
 	})
 }
