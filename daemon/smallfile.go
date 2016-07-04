@@ -97,7 +97,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 		float64(input.metadata.BlockSize)))
 	input.expandTo(numBlocks)
 	if numBlocks > 0 {
-		input.metadata.Blocks[0] = fi.sync(c)
+		input.dataBlocks[0] = fi.buf
 	}
 	input.metadata.LastBlockBytes =
 		uint32(fi.buf.Size() % int(input.metadata.BlockSize))
