@@ -29,9 +29,9 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 				Qlog:      qlog.NewQlog(),
 				RequestId: qlog.DummyReqId,
 			},
-			config:       &config,
-			workspaceDB:  config.WorkspaceDB,
-			durableStore: config.DurableStore,
+			config:      &config,
+			workspaceDB: config.WorkspaceDB,
+			dataStore:   newDataStore(config.DurableStore),
 		},
 	}
 

@@ -55,7 +55,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	}
 
 	// Grab the data
-	data := DataStore.Get(c, fi.key)
+	data := c.dataStore.Get(&c.Ctx, fi.key)
 	if data == nil {
 		c.elog("Unable to fetch data for block")
 		return 0, errors.New("Unable to fetch block data")
@@ -70,7 +70,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		}
 		//store the key
 		fi.bytes = uint64(len(data.Get()))
-		fi.key = *newFileKey
+		fi.key = newFileKey
 		return int(copied), nil
 	}
 
@@ -157,7 +157,7 @@ func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
 	}
 
 	// Now that everything has succeeded and is in the datastore, update metadata
-	fi.key = *newFileKey
+	fi.key = newFileKey
 	fi.bytes = newLengthBytes
 	return nil
 }
