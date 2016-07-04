@@ -51,6 +51,3 @@ func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAcces
 	c.elog("Unable to convert file accessor to type %d", newType)
 	return nil
 }
-
-func (fi *MediumFile) setFile(file *File) {
-}
