@@ -14,7 +14,7 @@ type MediumFile struct {
 // Shell constructor
 func newMediumShell() MediumFile {
 	var rtn MediumFile
-	rtn.maxBlocks = quantumfs.MaxBlocksMediumFile
+	initMultiBlockAccessor(&rtn.MultiBlockFile, quantumfs.MaxBlocksMediumFile)
 
 	return rtn
 }
@@ -43,7 +43,8 @@ func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAcces
 
 	if newType == quantumfs.ObjectTypeLargeFile {
 		rtn := newLargeShell()
-		rtn.data = fi.data
+		rtn.metadata = fi.metadata
+		rtn.dataBlocks = fi.dataBlocks
 
 		return &rtn
 	}
