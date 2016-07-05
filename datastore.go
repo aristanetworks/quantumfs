@@ -4,12 +4,12 @@
 // The datastore interface
 package quantumfs
 
+import "crypto/sha1"
+import "encoding/hex"
+import "encoding/json"
 import "fmt"
 import "time"
 
-import "crypto/sha1"
-import "encoding/json"
-import "encoding/hex"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 // Maximum size of a block which can be stored in a datastore
@@ -75,9 +75,9 @@ type ObjectKey struct {
 	Key [ObjectKeyLength]byte
 }
 
-// Extract the type of the object. Returns a KeyType*
-func (key *ObjectKey) Type() byte {
-	return key.Key[0]
+// Extract the type of the object. Returns a KeyType
+func (key *ObjectKey) Type() KeyType {
+	return KeyType(key.Key[0])
 }
 
 func (key ObjectKey) String() string {
@@ -294,73 +294,21 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 	return emptyWorkspaceKey
 }
 
-type Buffer struct {
-	data []byte
-}
-
-func (buf *Buffer) Set(in []byte) {
-	buf.data = in
-}
-
-func (buf *Buffer) Write(in []byte, offset uint32) uint32 {
-	// Sanity check offset and length
-	maxWriteLen := MaxBlockSize - int(offset)
-	if maxWriteLen <= 0 {
-		return 0
-	}
-
-	if len(in) > maxWriteLen {
-		in = in[:maxWriteLen]
-	}
-
-	// Ensure that our data ends where we need it to. This allows us to write
-	// past the end of a block, but not past the block's max capacity
-	deltaLen := int(offset) - len(buf.data)
-	if deltaLen > 0 {
-		buf.data = append(buf.data, make([]byte, deltaLen)...)
-	}
-
-	var finalBuffer []byte
-	// append our write data to the first split of the existing data
-	finalBuffer = append(buf.data[:offset], in...)
-
-	// record how much was actually appended (in case len(in) < size)
-	copied := uint32(len(finalBuffer)) - uint32(offset)
-
-	// then add on the rest of the existing data afterwards, excluding the amount
-	// that we just wrote (to overwrite instead of insert)
-	remainingStart := offset + copied
-	if int(remainingStart) < len(buf.data) {
-		finalBuffer = append(finalBuffer, buf.data[remainingStart:]...)
-	}
-
-	buf.data = finalBuffer
-
-	return copied
-}
-
-func (buf *Buffer) Get() []byte {
-	return buf.data
-}
-
-func (buf *Buffer) ContentHash() [ObjectKeyLength - 1]byte {
-	return sha1.Sum(buf.data)
-}
-
-func (buf *Buffer) Key(keyType KeyType) ObjectKey {
-	return NewObjectKey(keyType, buf.ContentHash())
-}
-
-func NewBuffer(in []byte) *Buffer {
-	return &Buffer{
-		data: in,
-	}
+type Buffer interface {
+	Write(c *Ctx, in []byte, offset uint32) uint32
+	Read(out []byte, offset uint32) int
+	Get() []byte
+	Set(data []byte, keyType KeyType)
+	ContentHash() [ObjectKeyLength - 1]byte
+	Key(c *Ctx) (ObjectKey, error)
+	SetSize(size int)
+	Size() int
 }
 
 type DataStore interface {
-	Get(key ObjectKey, buffer *Buffer) error
-	Set(key ObjectKey, buffer *Buffer) error
-	Exists(key ObjectKey) bool
+	Get(c *Ctx, key ObjectKey, buf Buffer) error
+	Set(c *Ctx, key ObjectKey, buf Buffer) error
+	Exists(c *Ctx, key ObjectKey) bool
 }
 
 // A pseudo-store which contains all the constant objects
@@ -377,19 +325,19 @@ type ConstDataStore struct {
 	store map[ObjectKey][]byte
 }
 
-func (store *ConstDataStore) Get(key ObjectKey, buffer *Buffer) error {
+func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	if data, ok := store.store[key]; ok {
-		buffer.Set(data)
+		buf.Set(data, key.Type())
 		return nil
 	}
 	return fmt.Errorf("Object not found")
 }
 
-func (store *ConstDataStore) Set(key ObjectKey, buffer *Buffer) error {
+func (store *ConstDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
 }
 
-func (store *ConstDataStore) Exists(key ObjectKey) bool {
+func (store *ConstDataStore) Exists(c *Ctx, key ObjectKey) bool {
 	return false
 }
 

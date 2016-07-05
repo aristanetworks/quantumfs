@@ -126,15 +126,18 @@ func TestRecursiveDirectoryFileDescriptorDirtying_test(t *testing.T) {
 
 		// Save the workspace rootId, change the File key, simulating
 		// changing the data, then mark the matching FileDescriptor dirty.
-		// This should trigger a refresh up the hierarchy and, because we
-		// currently do not support delayed syncing, change the workspace
-		// rootId and mark the fileDescriptor clean.
+		// This should trigger a refresh up the hierarchy and, after we
+		// trigger a delayed sync, change the workspace rootId and mark the
+		// fileDescriptor clean.
 		oldRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
 			quantumfs.NullWorkspaceName)
 
-		file.key.Key[1]++
-		fileDescriptor.dirty(test.newCtx())
+		c := test.newCtx()
+		_, err = file.accessor.writeBlock(c, 0, 0, []byte("update"))
+		test.assert(err == nil, "Failure modifying small file")
+		fileDescriptor.dirty(c)
 
+		test.syncAllWorkspaces()
 		newRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
 			quantumfs.NullWorkspaceName)
 

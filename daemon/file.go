@@ -57,7 +57,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		key:      key,
 		parent:   parent,
 		accessor: accessor,
 	}
@@ -70,7 +69,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	key      quantumfs.ObjectKey
 	parent   Inode
 	accessor blockAccessor
 }
@@ -160,6 +158,9 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	c.vlog("File::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
+	defer c.vlog("File::SetAttr Exit")
+
 	result := func() fuse.Status {
 		defer fi.Lock().Unlock()
 
@@ -178,8 +179,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			// Update the entry metadata
-			fi.key = fi.accessor.writeToStore(c)
+			fi.setDirty(true)
 		}
 
 		return fuse.OK
@@ -248,33 +248,29 @@ func resize(buffer []byte, size int) []byte {
 }
 
 func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
-	targetSize int) *quantumfs.Buffer {
+	targetSize int) quantumfs.Buffer {
 
-	rtn := DataStore.Get(c, key)
-	if rtn == nil {
+	orig := c.dataStore.Get(&c.Ctx, key)
+	if orig == nil {
 		c.elog("Data for key missing from datastore")
 		return nil
 	}
 
 	// Before we return the buffer, make sure it's the size it needs to be
-	rtn.Set(resize(rtn.Get(), targetSize))
+	rtn := newBuffer(c, resize(orig.Get(), targetSize), key.Type())
 
 	return rtn
 }
 
-func pushData(c *ctx, buffer *quantumfs.Buffer) (*quantumfs.ObjectKey,
-	error) {
-
-	newFileKey := buffer.Key(quantumfs.KeyTypeData)
-
-	err := DataStore.Set(c, newFileKey,
-		quantumfs.NewBuffer(buffer.Get()))
+func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+	key, err := buffer.Key(&c.Ctx)
 	if err != nil {
 		c.elog("Unable to write data to the datastore")
-		return nil, errors.New("Unable to write to the datastore")
+		return quantumfs.ObjectKey{},
+			errors.New("Unable to write to the datastore")
 	}
 
-	return &newFileKey, nil
+	return key, nil
 }
 
 func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
@@ -293,8 +289,8 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 // Given the block index to write into the file, ensure that we are the
 // correct file type
 func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
-
 	neededType := calcTypeGivenBlocks(blockIdx + 1)
+	c.dlog("File::reconcileFileType blockIdx %d", blockIdx)
 	newAccessor := fi.accessor.convertTo(c, neededType)
 	if newAccessor == nil {
 		return errors.New("Unable to process needed type for accessor")
@@ -326,10 +322,10 @@ type blockAccessor interface {
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
 
 	// Write file's metadata to the datastore and provide the key
-	writeToStore(c *ctx) quantumfs.ObjectKey
+	sync(c *ctx) quantumfs.ObjectKey
 
 	// Truncate to lessen length *only*, error otherwise
-	truncate(*ctx, uint64) error
+	truncate(c *ctx, newLength uint64) error
 }
 
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -397,7 +393,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	defer fi.RLock().RUnlock()
+	defer fi.Lock().Unlock()
 
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
 		fi.accessor.readBlock)
@@ -412,6 +408,9 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
+	c.vlog("File::Write Enter offset %d size %d flags %x", offset, size, flags)
+	defer c.vlog("File::Write Exit")
+
 	writeCount, result := func() (uint32, fuse.Status) {
 		defer fi.Lock().Unlock()
 
@@ -421,9 +420,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			return 0, fuse.EIO
 		}
-
-		// Update the direct entry
-		fi.key = fi.accessor.writeToStore(c)
+		fi.setDirty(true)
 		return uint32(writeCount), fuse.OK
 	}()
 

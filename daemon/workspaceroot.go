@@ -3,7 +3,6 @@
 
 package daemon
 
-import "crypto/sha1"
 import "encoding/json"
 import "sync"
 
@@ -44,7 +43,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
 
-	object := DataStore.Get(c, rootId)
+	object := c.dataStore.Get(&c.Ctx, rootId)
 	var workspaceRoot quantumfs.WorkspaceRoot
 	if err := json.Unmarshal(object.Get(), &workspaceRoot); err != nil {
 		panic("Couldn't decode WorkspaceRoot Object")
@@ -57,13 +56,14 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.workspace = name
 	wsr.rootId = rootId
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+
+	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr
 }
 
-// Mark this workspace dirty and update the workspace DB
+// Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	wsr.setDirty(true)
-	wsr.advanceRootId(c)
 }
 
 // If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
@@ -81,12 +81,9 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		panic("Failed to marshal workspace root")
 	}
 
-	hash := sha1.Sum(bytes)
-	newRootId := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, hash)
-
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
-	if err := c.durableStore.Set(newRootId, &buffer); err != nil {
+	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
+	newRootId, err := buf.Key(&c.Ctx)
+	if err != nil {
 		panic("Failed to upload new workspace root")
 	}
 

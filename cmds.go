@@ -90,6 +90,7 @@ type CommandCommon struct {
 const (
 	CmdError         = iota
 	CmdBranchRequest = iota
+	CmdSyncAll       = iota
 )
 
 // The various error codes
@@ -110,6 +111,34 @@ type BranchRequest struct {
 	CommandCommon
 	Src string
 	Dst string
+}
+
+type SyncAllRequest struct {
+	CommandCommon
+}
+
+func (api *Api) sendCmd(bytes []byte) (ErrorResponse, error) {
+	err := writeAll(api.fd, bytes)
+	if err != nil {
+		return ErrorResponse{}, err
+	}
+
+	api.fd.Seek(0, 0)
+	buf := make([]byte, 4096)
+	n, err := api.fd.Read(buf)
+	if err != nil {
+		return ErrorResponse{}, err
+	}
+
+	buf = buf[:n]
+
+	var response ErrorResponse
+	err = json.Unmarshal(buf, &response)
+	if err != nil {
+		return ErrorResponse{}, err
+	}
+
+	return response, nil
 }
 
 // branch the src workspace into a new workspace called dst.
@@ -133,23 +162,25 @@ func (api *Api) Branch(src string, dst string) error {
 		return err
 	}
 
-	err = writeAll(api.fd, bytes)
+	if _, err = api.sendCmd(bytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Sync all the active workspaces
+func (api *Api) SyncAll() error {
+	cmd := SyncAllRequest{
+		CommandCommon: CommandCommon{CommandId: CmdSyncAll},
+	}
+
+	bytes, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	api.fd.Seek(0, 0)
-	buf := make([]byte, 4096)
-	n, err := api.fd.Read(buf)
-	if err != nil {
-		return err
-	}
-
-	buf = buf[:n]
-
-	var response ErrorResponse
-	err = json.Unmarshal(buf, &response)
-	if err != nil {
+	if _, err := api.sendCmd(bytes); err != nil {
 		return err
 	}
 

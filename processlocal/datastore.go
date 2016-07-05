@@ -7,6 +7,7 @@ import "fmt"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 func NewDataStore() quantumfs.DataStore {
 	store := &DataStore{
@@ -21,27 +22,29 @@ type DataStore struct {
 	data  map[quantumfs.ObjectKey][]byte
 }
 
-func (store *DataStore) Get(key quantumfs.ObjectKey,
-	buffer *quantumfs.Buffer) error {
+func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buf quantumfs.Buffer) error {
 
 	var err error
+
 	store.mutex.RLock()
+	defer store.mutex.RUnlock()
 	if data, exists := store.data[key]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
-		buffer.Set(data)
+		buf.Set(data, key.Type())
 	}
-	store.mutex.RUnlock()
 	return err
 }
 
-func (store *DataStore) Set(key quantumfs.ObjectKey,
-	buffer *quantumfs.Buffer) error {
+func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buffer quantumfs.Buffer) error {
 
 	if len(buffer.Get()) > quantumfs.MaxBlockSize {
 		panic("Attempted to store overlarge block")
 	}
 
+	c.Vlog(qlog.LogDatastore, "Storing key %v len %d", key, buffer.Size())
 	store.mutex.Lock()
 	store.data[key] = buffer.Get()
 	store.mutex.Unlock()
@@ -49,7 +52,7 @@ func (store *DataStore) Set(key quantumfs.ObjectKey,
 	return nil
 }
 
-func (store *DataStore) Exists(key quantumfs.ObjectKey) bool {
+func (store *DataStore) Exists(c *quantumfs.Ctx, key quantumfs.ObjectKey) bool {
 	store.mutex.RLock()
 	_, exists := store.data[key]
 	store.mutex.RUnlock()

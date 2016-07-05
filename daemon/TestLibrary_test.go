@@ -426,6 +426,14 @@ func (th *testHelper) branchWorkspace(original string) string {
 	return dst
 }
 
+// Sync all the active workspaces
+func (th *testHelper) syncAllWorkspaces() {
+	api := th.getApi()
+	err := api.SyncAll()
+
+	th.assert(err == nil, "Error when syncing all workspaces: %v", err)
+}
+
 // Retrieve a list of FileDescriptor from an Inode
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
@@ -515,11 +523,11 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 			Qlog:      c.Qlog,
 			RequestId: request,
 		},
-		qfs:          c.qfs,
-		config:       c.config,
-		workspaceDB:  c.workspaceDB,
-		durableStore: c.durableStore,
-		fuseCtx:      nil,
+		qfs:         c.qfs,
+		config:      c.config,
+		workspaceDB: c.workspaceDB,
+		dataStore:   c.dataStore,
+		fuseCtx:     nil,
 	}
 	return requestCtx
 }

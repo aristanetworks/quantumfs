@@ -37,7 +37,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
 
-	object := DataStore.Get(c, baseLayerId)
+	object := c.dataStore.Get(&c.Ctx, baseLayerId)
 	if object == nil {
 		panic("No baseLayer object")
 	}
@@ -525,10 +525,9 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return fuse.Status(syscall.EEXIST)
 		}
 
-		buf := quantumfs.NewBuffer([]byte(pointedTo))
-		key = buf.Key(quantumfs.KeyTypeData)
-
-		if err := DataStore.Set(c, key, buf); err != nil {
+		buf := newBuffer(c, []byte(pointedTo), quantumfs.KeyTypeMetadata)
+		key, err := buf.Key(&c.Ctx)
+		if err != nil {
 			c.elog("Failed to upload block: %v", err)
 			return fuse.EIO
 		}
@@ -583,7 +582,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.vlog("ReadDirPlus directorySnapshot", input, out)
+	c.vlog("ReadDirPlus directorySnapshot in: %v out: %v", input, out)
 	offset := input.Offset
 
 	// Add .
