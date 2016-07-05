@@ -139,7 +139,11 @@ func (fi *MultiBlockFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 }
 
 func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
+	c.vlog("MultiBlockFile::sync Enter")
+	defer c.vlog("MultiBlockFile::sync Exit")
+
 	for i, block := range fi.dataBlocks {
+		c.vlog("Syncing block %d", i)
 		key, err := block.Key(&c.Ctx)
 		if err != nil {
 			panic("TODO Failed to update datablock")
