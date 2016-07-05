@@ -37,53 +37,65 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
 
-	object := c.dataStore.Get(&c.Ctx, baseLayerId)
-	if object == nil {
-		panic("No baseLayer object")
-	}
-
-	var baseLayer quantumfs.DirectoryEntry
-	if err := json.Unmarshal(object.Get(), &baseLayer); err != nil {
-		c.elog("Invalid base layer object: %v %v", err, string(object.Get()))
-		panic("Couldn't decode base layer object")
-	}
-
-	children := make(map[string]InodeId, baseLayer.NumEntries)
-	childrenRecords := make(map[InodeId]*quantumfs.DirectoryRecord,
-		baseLayer.NumEntries)
-
 	// Set directory data before processing the children incase the children
 	// access the parent.
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.parent = parent
 	dir.treeLock_ = treeLock
-	dir.children = children
-	dir.childrenRecords = childrenRecords
 	dir.dirtyChildren_ = make([]Inode, 0)
 	dir.baseLayerId = baseLayerId
 
-	for i, entry := range baseLayer.Entries {
-		inodeId := c.qfs.newInodeId()
-		children[BytesToString(entry.Filename[:])] = inodeId
-		childrenRecords[inodeId] = &baseLayer.Entries[i]
-		var constructor InodeConstructor
-		switch entry.Type {
-		default:
-			c.elog("Unknown InodeConstructor type: %d", entry.Type)
-		case quantumfs.ObjectTypeDirectoryEntry:
-			constructor = newDirectory
-		case quantumfs.ObjectTypeSmallFile:
-			constructor = newSmallFile
-		case quantumfs.ObjectTypeMediumFile:
-			constructor = newMediumFile
-		case quantumfs.ObjectTypeLargeFile:
-			constructor = newLargeFile
-		case quantumfs.ObjectTypeSymlink:
-			constructor = newSymlink
+	key := baseLayerId
+	for {
+		c.vlog("Fetching baselayer %v", key)
+		object := c.dataStore.Get(&c.Ctx, key)
+		if object == nil {
+			panic("No baseLayer object")
 		}
 
-		c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
-			inodeId, dir))
+		var baseLayer quantumfs.DirectoryEntry
+		if err := json.Unmarshal(object.Get(), &baseLayer); err != nil {
+			c.elog("Invalid base layer object: %v %v", err, string(object.Get()))
+			panic("Couldn't decode base layer object")
+		}
+
+		if dir.children == nil {
+			dir.children = make(map[string]InodeId, baseLayer.NumEntries)
+			dir.childrenRecords = make(map[InodeId]*quantumfs.DirectoryRecord,
+				baseLayer.NumEntries)
+		}
+
+		for i, entry := range baseLayer.Entries {
+			inodeId := c.qfs.newInodeId()
+			dir.children[BytesToString(entry.Filename[:])] = inodeId
+			dir.childrenRecords[inodeId] = &baseLayer.Entries[i]
+			var constructor InodeConstructor
+			switch entry.Type {
+			default:
+				c.elog("Unknown InodeConstructor type: %d", entry.Type)
+			case quantumfs.ObjectTypeDirectoryEntry:
+				constructor = newDirectory
+			case quantumfs.ObjectTypeSmallFile:
+				constructor = newSmallFile
+			case quantumfs.ObjectTypeMediumFile:
+				constructor = newMediumFile
+			case quantumfs.ObjectTypeLargeFile:
+				constructor = newLargeFile
+			case quantumfs.ObjectTypeSymlink:
+				constructor = newSymlink
+			}
+
+			c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
+				inodeId, dir))
+		}
+
+		if baseLayer.Next == quantumfs.EmptyDirKey ||
+			baseLayer.NumEntries == 0 {
+
+			break
+		} else {
+			key = baseLayer.Next
+		}
 	}
 
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")

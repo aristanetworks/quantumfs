@@ -107,6 +107,7 @@ func (key ObjectKey) String() string {
 
 type DirectoryEntry struct {
 	NumEntries uint32
+	Next       ObjectKey
 	Entries    []DirectoryRecord
 }
 

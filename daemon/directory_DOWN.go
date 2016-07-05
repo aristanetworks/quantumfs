@@ -31,6 +31,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 	// datastore.
 	baseLayer := quantumfs.NewDirectoryEntry(len(dir.childrenRecords))
 	baseLayer.NumEntries = uint32(len(dir.childrenRecords))
+	baseLayer.Next = quantumfs.EmptyDirKey
 
 	for _, entry := range dir.childrenRecords {
 		baseLayer.Entries = append(baseLayer.Entries, *entry)
