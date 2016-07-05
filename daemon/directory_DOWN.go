@@ -23,31 +23,53 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	return dir.publish(c)
 }
 
-func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
-	c.vlog("Directory::publish Enter")
-	defer c.vlog("Directory::publish Exit")
+func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
+	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
 
-	// Compile the internal records into a block which can be placed in the
-	// datastore.
-	baseLayer := quantumfs.NewDirectoryEntry(len(dir.childrenRecords))
-	baseLayer.NumEntries = uint32(len(dir.childrenRecords))
-	baseLayer.Next = quantumfs.EmptyDirKey
-
-	for _, entry := range dir.childrenRecords {
-		baseLayer.Entries = append(baseLayer.Entries, *entry)
-	}
-
-	// Upload the base layer object
-	bytes, err := json.Marshal(baseLayer)
+	layer.NumEntries = uint32(len(layer.Entries))
+	layer.Next = nextKey
+	bytes, err := json.Marshal(layer)
 	if err != nil {
 		panic("Failed to marshal baselayer")
 	}
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newBaseLayerId, err := buf.Key(&c.Ctx)
+	newKey, err := buf.Key(&c.Ctx)
 	if err != nil {
 		panic("Failed to upload new baseLayer object")
 	}
+
+	return newKey
+}
+
+func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
+	c.vlog("Directory::publish Enter")
+	defer c.vlog("Directory::publish Exit")
+
+	// Compile the internal records into a series of blocks which can be placed
+	// in the datastore.
+
+	newBaseLayerId := quantumfs.EmptyDirKey
+
+	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
+	// metadata block
+	baseLayer := quantumfs.NewDirectoryEntry()
+	entryIdx := 0
+	for _, child := range dir.childrenRecords {
+		if entryIdx > quantumfs.MaxDirectoryRecords {
+			// This block is full, upload and create a new one
+			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
+				newBaseLayerId)
+			baseLayer = quantumfs.NewDirectoryEntry()
+			entryIdx = 0
+		}
+
+		baseLayer.Entries = append(baseLayer.Entries, *child)
+
+		entryIdx++
+	}
+
+	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
 
 	c.vlog("Directory key %v -> %v", dir.baseLayerId, newBaseLayerId)
 	dir.baseLayerId = newBaseLayerId
