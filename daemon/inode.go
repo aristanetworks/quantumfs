@@ -55,6 +55,10 @@ type Inode interface {
 
 	getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord, error)
 
+	// Update the key for only this child and then notify all the grandparents of
+	// the cascading changes.
+	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
+
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child Inode)

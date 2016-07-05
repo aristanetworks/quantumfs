@@ -552,6 +552,12 @@ func (dir *Directory) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.elog("Invalid syncChild on Directory")
+}
+
 type directoryContents struct {
 	// All immutable after creation
 	filename string

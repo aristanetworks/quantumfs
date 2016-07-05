@@ -151,6 +151,11 @@ func (api *ApiInode) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.elog("Invalid syncChild on ApiInode")
+}
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {

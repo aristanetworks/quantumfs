@@ -213,7 +213,14 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 }
 
 func (fi *File) Sync(c *ctx) fuse.Status {
+	key := fi.sync_DOWN(c)
+	fi.parent.syncChild(c, fi.InodeCommon.id, key)
+
 	return fuse.OK
+}
+
+func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
+	c.elog("Invalid syncChild on File")
 }
 
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,

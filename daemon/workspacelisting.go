@@ -248,6 +248,12 @@ func (nsl *NamespaceList) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.elog("Invalid syncChild on NamespaceList")
+}
+
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
@@ -393,6 +399,12 @@ func (wsl *WorkspaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
 
 func (wsl *WorkspaceList) Sync(c *ctx) fuse.Status {
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.elog("Invalid syncChild on WorkspaceList")
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
