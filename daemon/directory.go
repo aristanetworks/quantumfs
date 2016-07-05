@@ -55,13 +55,15 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 		var baseLayer quantumfs.DirectoryEntry
 		if err := json.Unmarshal(object.Get(), &baseLayer); err != nil {
-			c.elog("Invalid base layer object: %v %v", err, string(object.Get()))
+			c.elog("Invalid base layer object: %v %v", err,
+				string(object.Get()))
 			panic("Couldn't decode base layer object")
 		}
 
 		if dir.children == nil {
 			dir.children = make(map[string]InodeId, baseLayer.NumEntries)
-			dir.childrenRecords = make(map[InodeId]*quantumfs.DirectoryRecord,
+			dir.childrenRecords = make(
+				map[InodeId]*quantumfs.DirectoryRecord,
 				baseLayer.NumEntries)
 		}
 
