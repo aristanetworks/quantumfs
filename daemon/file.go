@@ -213,8 +213,16 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 }
 
 func (fi *File) Sync(c *ctx) fuse.Status {
-	key := fi.sync_DOWN(c)
-	fi.parent.syncChild(c, fi.InodeCommon.id, key)
+	c.vlog("File::Sync Enter")
+	defer c.vlog("File::Sync Exit")
+
+	func() {
+		defer fi.Lock().Unlock()
+		if fi.isDirty() {
+			key := fi.sync_DOWN(c)
+			fi.parent.syncChild(c, fi.InodeCommon.id, key)
+		}
+	}()
 
 	return fuse.OK
 }
