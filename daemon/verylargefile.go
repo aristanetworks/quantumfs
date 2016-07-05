@@ -183,7 +183,9 @@ func (fi *VeryLargeFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeVeryLargeFile
 }
 
-func (fi *VeryLargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+func (fi *VeryLargeFile) convertTo(c *ctx,
+	newType quantumfs.ObjectType) blockAccessor {
+
 	if newType <= quantumfs.ObjectTypeVeryLargeFile {
 		return fi
 	}
