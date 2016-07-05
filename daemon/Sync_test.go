@@ -75,23 +75,38 @@ func TestNoImplicitSync(t *testing.T) {
 		origData := []byte("test text")
 		_, err = file.Write(origData)
 		test.assert(err == nil, "Error writing to file %v", err)
-		data, err := ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading from file %v", err)
-		test.assert(bytes.Equal(data, origData), "Data does not match %v",
-			data)
 
 		// Confirm nothing to this point has synced anything
 		setCount := atomic.LoadUint64(&dataStore.setCount)
 		test.assert(setCount == 0, "Datastore sets occurred! %d", setCount)
 
+		// Confirm the data is correct
+		data, err := ioutil.ReadFile(testFilename)
+		test.assert(err == nil, "Error reading from file %v", err)
+		test.assert(bytes.Equal(data, origData), "Data does not match %v",
+			data)
+		// ioutil.ReadFile() opens and closes the file. This causes a
+		// Flush() which will sync the file. Record the number of datastore
+		// writes to compare against later.
+		expectedCount := atomic.LoadUint64(&dataStore.setCount)
+
 		// Write a medium file
 		err = file.Truncate(20 * 1024 * 1024)
 		test.assert(err == nil, "Error extending small file %v", err)
+
+		// Confirm the only sync at this point was the move from small file
+		// to medium file.
+		setCount = atomic.LoadUint64(&dataStore.setCount)
+		test.assert(setCount == expectedCount, "Unexpected store writes %d",
+			setCount)
+
 		data, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Error reading from file %v", err)
 		test.assert(bytes.Equal(data[:len(origData)], origData),
 			"Data does not match %v", data)
+		expectedCount = atomic.LoadUint64(&dataStore.setCount)
 
+		// Extend the file even further
 		origData = []byte("more text")
 		_, err = file.WriteAt(origData, 21*1024*1024)
 		test.assert(err == nil, "Error writing deep into medium file %v",
@@ -105,16 +120,11 @@ func TestNoImplicitSync(t *testing.T) {
 		test.assert(bytes.Equal(buf[:read], origData),
 			"Incorrect data read back %v", buf)
 
-		// Confirm the only sync at this point was the move from small file
-		// to medium file.
-		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount == 0, "Unexpected store writes %d", setCount)
-
 		// Now we sync everything and confirm that writes to the datastore
 		// happen
 		test.syncAllWorkspaces()
 		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount > 0, "Datastore sets didn't happen! %d",
-			setCount)
+		test.assert(setCount > expectedCount,
+			"Datastore sets didn't happen! %d", setCount)
 	})
 }
