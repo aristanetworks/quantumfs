@@ -65,28 +65,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 				baseLayer.NumEntries)
 		}
 
-		for i, entry := range baseLayer.Entries {
-			inodeId := c.qfs.newInodeId()
-			dir.children[BytesToString(entry.Filename[:])] = inodeId
-			dir.childrenRecords[inodeId] = &baseLayer.Entries[i]
-			var constructor InodeConstructor
-			switch entry.Type {
-			default:
-				c.elog("Unknown InodeConstructor type: %d", entry.Type)
-			case quantumfs.ObjectTypeDirectoryEntry:
-				constructor = newDirectory
-			case quantumfs.ObjectTypeSmallFile:
-				constructor = newSmallFile
-			case quantumfs.ObjectTypeMediumFile:
-				constructor = newMediumFile
-			case quantumfs.ObjectTypeLargeFile:
-				constructor = newLargeFile
-			case quantumfs.ObjectTypeSymlink:
-				constructor = newSymlink
-			}
-
-			c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
-				inodeId, dir))
+		for _, entry := range baseLayer.Entries {
+			dir.loadChild(c, entry)
 		}
 
 		if baseLayer.Next == quantumfs.EmptyDirKey ||
@@ -99,6 +79,30 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	}
 
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
+}
+
+func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
+	inodeId := c.qfs.newInodeId()
+	dir.children[BytesToString(entry.Filename[:])] = inodeId
+	dir.childrenRecords[inodeId] = &entry
+	var constructor InodeConstructor
+	switch entry.Type {
+	default:
+		c.elog("Unknown InodeConstructor type: %d", entry.Type)
+	case quantumfs.ObjectTypeDirectoryEntry:
+		constructor = newDirectory
+	case quantumfs.ObjectTypeSmallFile:
+		constructor = newSmallFile
+	case quantumfs.ObjectTypeMediumFile:
+		constructor = newMediumFile
+	case quantumfs.ObjectTypeLargeFile:
+		constructor = newLargeFile
+	case quantumfs.ObjectTypeSymlink:
+		constructor = newSymlink
+	}
+
+	c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
+		inodeId, dir))
 }
 
 func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
