@@ -74,6 +74,11 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	// Grab the data
 	data := fetchDataSized(c, fi.data.Blocks[blockIdx], int(expectedSize))
 
+	// If offset is too far, return nothing read
+	if offset >= uint64(len(data.Get())) {
+		return 0, nil
+	}
+
 	copied := copy(buf, data.Get()[offset:])
 	return copied, nil
 }
@@ -83,10 +88,12 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 
 	// Sanity checks
 	if blockIdx > fi.maxBlocks {
+		c.elog("BlockIdx exceeds bounds for accessor: %d", blockIdx)
 		return 0, errors.New("BlockIdx exceeds bounds for file accessor")
 	}
 
 	if offset >= uint64(fi.data.BlockSize) {
+		c.elog("Attempt to write past end of block, %d", offset)
 		return 0, errors.New("Attempt to write past end of block")
 	}
 
@@ -157,9 +164,9 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 
 	// Handle the special zero length case
 	if newLengthBytes == 0 {
-		newEndBlkIdx = 0
-		newNumBlocks = 0
-		lastBlockLen = 0
+		fi.data.Blocks = make([]quantumfs.ObjectKey, 0)
+		fi.data.LastBlockBytes = 0
+		return nil
 	}
 
 	// If we're increasing the length, we need to update the block num

@@ -16,7 +16,8 @@ type veryLargeStore struct {
 	Keys		[]quantumfs.ObjectKey
 }
 
-const MaxParts = 48000
+// TODO: Increase this to 48000 when we switch away from json
+const MaxParts = 22000
 
 func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 	var rtn VeryLargeFile
@@ -58,7 +59,25 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, nil
 	}
 
-	return fi.parts[partIdx].readBlock(c, blockIdxRem, offset, buf)
+	numRead, err := fi.parts[partIdx].readBlock(c, blockIdxRem, offset, buf)
+
+	// If this isn't the last block, ensure we read maximally
+	if err == nil && partIdx < len(fi.parts)-1 {
+		readQuota := uint32(len(buf))
+		if fi.parts[partIdx].data.BlockSize < readQuota {
+			readQuota = fi.parts[partIdx].data.BlockSize
+		}
+
+		if readQuota < uint32(numRead) {
+			c.elog("Inconsistency, readBlock returned more than buf")
+			panic("ReadBlock returned more than buf space")
+		}
+		padding := make([]byte, readQuota-uint32(numRead))
+		copy(buf[numRead:], padding)
+		numRead += len(padding)
+	}
+
+	return numRead, err
 }
 
 func (fi *VeryLargeFile) expandTo(lengthParts int) {
@@ -92,8 +111,8 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 
 	// Count everything except the last block as being full
 	for i := 0; i < len(fi.parts) - 1; i++ {
-		length += uint64(fi.parts[i].data.BlockSize *
-			quantumfs.MaxBlocksLargeFile)
+		length += uint64(fi.parts[i].data.BlockSize) *
+			uint64(quantumfs.MaxBlocksLargeFile)
 	}
 
 	// And add what's in the last block
@@ -106,29 +125,33 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// Variable multiblock data block sizes makes this function harder
 
 	for i := 0; i < len(fi.parts); i++ {
-		maxLengthBlock := uint64(fi.parts[i].data.BlockSize *
-			quantumfs.MaxBlocksLargeFile)
+		maxLengthFile := uint64(fi.parts[i].data.BlockSize) *
+			uint64(quantumfs.MaxBlocksLargeFile)
 
-		// If this block extends past the remaining offset, then this
-		// is the block we're looking for
-		if maxLengthBlock > absOffset {
-			return i, absOffset
+		// If this extends past the remaining offset, then this
+		// is the file we're looking for
+		if maxLengthFile > absOffset {
+			blockIdx, offset := fi.parts[i].blockIdxInfo(absOffset)
+			blockIdx += i * quantumfs.MaxBlocksLargeFile
+			return blockIdx, offset
 		}
 
-		absOffset -= maxLengthBlock
+		absOffset -= maxLengthFile
 	}
 
-	// If we're reached here, we've gone through all of the existing blocks.
+	// If we're reached here, we've gone through all of the existing files.
 	// New blocks will be quantumfs.MaxBlockSize, so use that info to calculate
 	// our return values
-	maxLengthBlock := uint64(quantumfs.MaxBlockSize *
-		quantumfs.MaxBlocksLargeFile)
-	i := len(fi.parts)
-	for {
-		if maxLengthBlock > absOffset {
-			return i, absOffset
+	maxLengthFile := uint64(quantumfs.MaxBlockSize) *
+		uint64(quantumfs.MaxBlocksLargeFile)
+	for i := len(fi.parts); ; i++{
+		if maxLengthFile > absOffset {
+			tmpLargeFile := newLargeShell()
+			blockIdx, offset := tmpLargeFile.blockIdxInfo(absOffset)
+			blockIdx += i * quantumfs.MaxBlocksLargeFile
+			return blockIdx, offset
 		}
-		absOffset -= maxLengthBlock
+		absOffset -= maxLengthFile
 	}
 }
 
@@ -171,16 +194,22 @@ func (fi *VeryLargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAc
 }
 
 func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
-
-	// If we're expanding the length, handle that first
-	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(newLengthBytes)
-	newNumBlocks := lastBlockIdx + 1
-
-	if newNumBlocks > len(fi.parts) {
-		fi.expandTo(newNumBlocks)
-	} else {
-		fi.parts = fi.parts[:newNumBlocks]
+	if newLengthBytes == 0 {
+		fi.parts = nil
+		return nil
 	}
 
-	return fi.parts[lastBlockIdx].truncate(c, lastBlockRem)
+	// If we're expanding the length, handle that first
+	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(newLengthBytes - 1)
+
+	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile
+	newNumParts := lastPartIdx + 1
+
+	if newNumParts > len(fi.parts) {
+		fi.expandTo(newNumParts)
+	} else {
+		fi.parts = fi.parts[:newNumParts]
+	}
+
+	return fi.parts[lastPartIdx].truncate(c, lastBlockRem)
 }

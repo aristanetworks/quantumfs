@@ -18,7 +18,8 @@ const MaxBlockSize = 1 * 1024 * 1024
 // Maximum number of blocks for each file type (determined by the encoding, which is
 // JSON currently, but will change. These should be updated then)
 const MaxBlocksMediumFile = 32
-const MaxBlocksLargeFile = 48000
+// TODO: Increase these to 48000 when we choose a more efficient encoding than json
+const MaxBlocksLargeFile = 22000
 
 // Maximum length of a filename
 const MaxFilenameLength = 256
