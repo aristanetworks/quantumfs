@@ -15,7 +15,6 @@ type LargeFile struct {
 func newLargeShell() LargeFile {
 	var rtn LargeFile
 	initMultiBlockAccessor(&rtn.MultiBlockFile, quantumfs.MaxBlocksLargeFile)
-	TODO rtn.data.BlockSize = quantumfs.MaxBlockSize
 
 	return rtn
 }

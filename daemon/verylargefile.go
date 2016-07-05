@@ -22,7 +22,7 @@ const MaxParts = 22000
 func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 	var rtn VeryLargeFile
 
-	buffer := DataStore.Get(c, key)
+	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		c.elog("Unable to fetch metadata for new vl file creation")
 		panic("Unable to fetch metadata for new vl file creation")
@@ -64,8 +64,8 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	// If this isn't the last block, ensure we read maximally
 	if err == nil && partIdx < len(fi.parts)-1 {
 		readQuota := uint32(len(buf))
-		if fi.parts[partIdx].data.BlockSize < readQuota {
-			readQuota = fi.parts[partIdx].data.BlockSize
+		if fi.parts[partIdx].metadata.BlockSize < readQuota {
+			readQuota = fi.parts[partIdx].metadata.BlockSize
 		}
 
 		if readQuota < uint32(numRead) {
@@ -111,7 +111,7 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 
 	// Count everything except the last block as being full
 	for i := 0; i < len(fi.parts) - 1; i++ {
-		length += uint64(fi.parts[i].data.BlockSize) *
+		length += uint64(fi.parts[i].metadata.BlockSize) *
 			uint64(quantumfs.MaxBlocksLargeFile)
 	}
 
@@ -125,7 +125,7 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// Variable multiblock data block sizes makes this function harder
 
 	for i := 0; i < len(fi.parts); i++ {
-		maxLengthFile := uint64(fi.parts[i].data.BlockSize) *
+		maxLengthFile := uint64(fi.parts[i].metadata.BlockSize) *
 			uint64(quantumfs.MaxBlocksLargeFile)
 
 		// If this extends past the remaining offset, then this
@@ -155,11 +155,11 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	}
 }
 
-func (fi *VeryLargeFile) writeToStore(c *ctx) quantumfs.ObjectKey {
+func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 	var store veryLargeStore
 
 	for i := 0; i < len(fi.parts); i++ {
-		newKey := fi.parts[i].writeToStore(c)
+		newKey := fi.parts[i].sync(c)
 
 		store.Keys = append(store.Keys, newKey)
 	}
@@ -169,11 +169,10 @@ func (fi *VeryLargeFile) writeToStore(c *ctx) quantumfs.ObjectKey {
 		panic("Unable to marshal very large file keys")
 	}
 
-	var buffer quantumfs.Buffer
-	buffer.Set(bytes)
+	buffer := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 
-	newFileKey := buffer.Key(quantumfs.KeyTypeMetadata)
-	if err := c.durableStore.Set(newFileKey, &buffer); err != nil {
+	newFileKey, err := buffer.Key(&c.Ctx)
+	if err != nil {
 		panic("Failed to upload new very large file keys")
 	}
 

@@ -15,8 +15,6 @@ type MediumFile struct {
 func newMediumShell() MediumFile {
 	var rtn MediumFile
 	initMultiBlockAccessor(&rtn.MultiBlockFile, quantumfs.MaxBlocksMediumFile)
-	TODO rtn.data.BlockSize = quantumfs.MaxBlockSize
-	TODO rtn.data.BlockSize = quantumfs.MaxBlockSize
 
 	return rtn
 }
@@ -50,10 +48,10 @@ func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAcces
 		rtn.dataBlocks = fi.dataBlocks
 
 		if newType == quantumfs.ObjectTypeVeryLargeFile {
-			return newVeryLargeShell(&lrg)
+			return newVeryLargeShell(&rtn)
 		}
 
-		return &lrg
+		return &rtn
 	}
 
 	c.elog("Unable to convert file accessor to type %d", newType)

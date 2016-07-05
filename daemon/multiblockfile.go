@@ -45,6 +45,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 func initMultiBlockAccessor(multiBlock *MultiBlockFile, maxBlocks int) {
 	multiBlock.maxBlocks = maxBlocks
 	multiBlock.dataBlocks = make(map[int]quantumfs.Buffer)
+	multiBlock.metadata.BlockSize = quantumfs.MaxBlockSize
 }
 
 func (fi *MultiBlockFile) expandTo(length int) {
@@ -87,9 +88,13 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 		// This is the last block, so it may not be filled
 		expectedSize = fi.metadata.LastBlockBytes
 	}
-TODO add into retrieveDataBlock an offset >= len(data.get()) check
+
 	block := fi.retrieveDataBlock(c, blockIdx)
 	block.SetSize(int(expectedSize))
+
+	if offset >= uint64(len(block.Get())) {
+		return 0, nil
+	}
 
 	copied := block.Read(buf, uint32(offset))
 	return copied, nil
@@ -171,8 +176,9 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 
 	// Handle the special zero length case
 	if newLengthBytes == 0 {
-		fi.data.Blocks = make([]quantumfs.ObjectKey, 0)
-		fi.data.LastBlockBytes = 0
+		fi.dataBlocks = make(map[int]quantumfs.Buffer)
+		fi.metadata.Blocks = make([]quantumfs.ObjectKey, 0)
+		fi.metadata.LastBlockBytes = 0
 		return nil
 	}
 

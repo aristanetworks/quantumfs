@@ -138,17 +138,6 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 }
 
 func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
-
-	// If we're increasing the length, then we can just update
-	if newLengthBytes > fi.bytes {
-		fi.bytes = newLengthBytes
-	}
-
-	c.elog("Unable to convert file accessor to type %d", newType)
-	return nil
-}
-
-func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
 	fi.buf.SetSize(int(newLengthBytes))
 	return nil
 }
