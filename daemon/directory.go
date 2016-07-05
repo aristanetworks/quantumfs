@@ -548,6 +548,36 @@ func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
+func (dir *Directory) Sync(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
+func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.vlog("Directory::syncChild Enter")
+	defer c.vlog("Directory::syncChild Exit")
+
+	ok, key := func() (bool, quantumfs.ObjectKey) {
+		defer dir.Lock().Unlock()
+		dir.setDirty(true)
+
+		entry, exists := dir.childrenRecords[inodeNum]
+		if !exists {
+			c.elog("Directory::syncChild inode %d not a valid child",
+				inodeNum)
+			return false, quantumfs.ObjectKey{}
+		}
+
+		entry.ID = newKey
+		return true, dir.publish(c)
+	}()
+
+	if ok && dir.parent != nil {
+		dir.parent.syncChild(c, dir.InodeCommon.id, key)
+	}
+}
+
 type directoryContents struct {
 	// All immutable after creation
 	filename string
@@ -646,4 +676,8 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
+}
+
+func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
+	return fuse.OK
 }
