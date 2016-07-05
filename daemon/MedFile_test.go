@@ -150,3 +150,25 @@ func TestMedFileAttr_test(t *testing.T) {
 			10)
 	})
 }
+
+func TestMedFileZero_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		data := genFibonacci(10 * 1024)
+		err := printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing tiny fib to new fd")
+		// expand this to be the desired file type
+		os.Truncate(testFilename, 2 * 1048576)
+
+		os.Truncate(testFilename, 0)
+		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+
+		output, err := ioutil.ReadFile(testFilename)
+		test.assert(len(output) == 0, "Empty file not really empty")
+		test.assert(err == nil, "Unable to read from empty file")
+	})
+}

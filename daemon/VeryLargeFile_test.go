@@ -6,6 +6,7 @@ package daemon
 // Test the very large file transitions
 
 import "bytes"
+import "io/ioutil"
 import "os"
 import "testing"
 
@@ -58,5 +59,27 @@ func TestSmallConvert_test(t *testing.T) {
 			"Data hole not in small to very large file expansion")
 		test.assert(bytes.Equal(data, endData[1000:]),
 			"Data entry error after small to very large expansion")
+	})
+}
+
+func TestVeryLargeFileZero_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		data := genFibonacci(10 * 1024)
+		err := printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing tiny fib to new fd")
+		// expand this to be the desired file type
+		os.Truncate(testFilename, 34 * 1024 * 1024 * 1024)
+
+		os.Truncate(testFilename, 0)
+		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+
+		output, err := ioutil.ReadFile(testFilename)
+		test.assert(len(output) == 0, "Empty file not really empty")
+		test.assert(err == nil, "Unable to read from empty file")
 	})
 }
