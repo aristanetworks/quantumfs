@@ -9,11 +9,11 @@ import "github.com/aristanetworks/quantumfs"
 import "encoding/json"
 
 type VeryLargeFile struct {
-	parts		[]LargeFile
+	parts []LargeFile
 }
 
 type veryLargeStore struct {
-	Keys		[]quantumfs.ObjectKey
+	Keys []quantumfs.ObjectKey
 }
 
 // TODO: Increase this to 48000 when we switch away from json
@@ -87,7 +87,7 @@ func (fi *VeryLargeFile) expandTo(lengthParts int) {
 
 	newLength := make([]LargeFile, lengthParts-len(fi.parts))
 	for i := 0; i < len(newLength); i++ {
-		newLength[i] = newLargeShell() 
+		newLength[i] = newLargeShell()
 	}
 	fi.parts = append(fi.parts, newLength...)
 }
@@ -110,13 +110,13 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 	var length uint64
 
 	// Count everything except the last block as being full
-	for i := 0; i < len(fi.parts) - 1; i++ {
+	for i := 0; i < len(fi.parts)-1; i++ {
 		length += uint64(fi.parts[i].metadata.BlockSize) *
 			uint64(quantumfs.MaxBlocksLargeFile)
 	}
 
 	// And add what's in the last block
-	length += fi.parts[len(fi.parts) - 1].fileLength()
+	length += fi.parts[len(fi.parts)-1].fileLength()
 
 	return length
 }
@@ -144,7 +144,7 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// our return values
 	maxLengthFile := uint64(quantumfs.MaxBlockSize) *
 		uint64(quantumfs.MaxBlocksLargeFile)
-	for i := len(fi.parts); ; i++{
+	for i := len(fi.parts); ; i++ {
 		if maxLengthFile > absOffset {
 			tmpLargeFile := newLargeShell()
 			blockIdx, offset := tmpLargeFile.blockIdxInfo(absOffset)

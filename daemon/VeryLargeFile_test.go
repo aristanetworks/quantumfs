@@ -32,10 +32,10 @@ func TestSmallConvert_test(t *testing.T) {
 		err = printToFile(testFilename, string(data))
 		test.assert(err == nil,
 			"Error writing 0.5MB fibonacci to existing fd: %v", err)
-		test.assert(test.fileSize(testFilename) == int64(newLen + len(data)),
+		test.assert(test.fileSize(testFilename) == int64(newLen+len(data)),
 			"Post truncation expansion write failed, %d",
 			test.fileSize(testFilename))
-		
+
 		// Read our fib back
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
@@ -73,7 +73,7 @@ func TestVeryLargeFileZero_test(t *testing.T) {
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error writing tiny fib to new fd")
 		// expand this to be the desired file type
-		os.Truncate(testFilename, 34 * 1024 * 1024 * 1024)
+		os.Truncate(testFilename, 34*1024*1024*1024)
 
 		os.Truncate(testFilename, 0)
 		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")

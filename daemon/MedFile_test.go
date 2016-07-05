@@ -162,7 +162,7 @@ func TestMedFileZero_test(t *testing.T) {
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error writing tiny fib to new fd")
 		// expand this to be the desired file type
-		os.Truncate(testFilename, 2 * 1048576)
+		os.Truncate(testFilename, 2*1048576)
 
 		os.Truncate(testFilename, 0)
 		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
