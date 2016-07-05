@@ -555,7 +555,27 @@ func (dir *Directory) Sync(c *ctx) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.elog("Invalid syncChild on Directory")
+	c.vlog("Directory::syncChild Enter")
+	defer c.vlog("Directory::syncChild Exit")
+
+	ok, key := func() (bool, quantumfs.ObjectKey) {
+		defer dir.Lock().Unlock()
+		dir.setDirty(true)
+
+		entry, exists := dir.childrenRecords[inodeNum]
+		if !exists {
+			c.elog("Directory::syncChild inode %d not a valid child",
+				inodeNum)
+			return false, quantumfs.ObjectKey{}
+		}
+
+		entry.ID = newKey
+		return true, dir.publish(c)
+	}()
+
+	if ok && dir.parent != nil {
+		dir.parent.syncChild(c, dir.InodeCommon.id, key)
+	}
 }
 
 type directoryContents struct {

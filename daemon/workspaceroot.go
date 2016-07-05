@@ -71,11 +71,17 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 	c.vlog("WorkspaceRoot::advanceRootId Enter")
 	defer c.vlog("WorkspaceRoot::advanceRootId Exit")
 
+	wsr.Directory.sync_DOWN(c)
+	wsr.publish(c)
+}
+
+func (wsr *WorkspaceRoot) publish(c *ctx) {
+	c.vlog("WorkspaceRoot::publish Enter")
+	defer c.vlog("WorkspaceRoot::publish Exit")
+
 	// Upload the workspaceroot object
 	var workspaceRoot quantumfs.WorkspaceRoot
-	wsr.Directory.sync_DOWN(c)
 	workspaceRoot.BaseLayer = wsr.baseLayerId
-
 	bytes, err := json.Marshal(workspaceRoot)
 	if err != nil {
 		panic("Failed to marshal workspace root")
@@ -99,4 +105,12 @@ func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
 		c.dlog("Advanced rootId %v -> %v", wsr.rootId, rootId)
 		wsr.rootId = rootId
 	}
+}
+
+func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.vlog("WorkspaceRoot::syncChild Enter")
+	defer c.vlog("WorkspaceRoot::syncChild Exit")
+	wsr.publish(c)
 }
