@@ -86,5 +86,5 @@ func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 		newKey := child.sync_DOWN(c)
 		dir.childrenRecords[child.inodeNum()].ID = newKey
 	}
-	dir.dirtyChildren_ = make([]Inode, 0)
+	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 }

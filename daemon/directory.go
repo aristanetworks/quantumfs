@@ -29,7 +29,7 @@ type Directory struct {
 	// Indexed by inode number
 	childrenRecords map[InodeId]*quantumfs.DirectoryRecord
 
-	dirtyChildren_ []Inode // list of children which are currently dirty
+	dirtyChildren_ map[InodeId]Inode // set of children which are currently dirty
 }
 
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
@@ -42,7 +42,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
 	dir.parent = parent
 	dir.treeLock_ = treeLock
-	dir.dirtyChildren_ = make([]Inode, 0)
+	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 	dir.baseLayerId = baseLayerId
 
 	key := baseLayerId
@@ -158,7 +158,7 @@ func (dir *Directory) dirty(c *ctx) {
 func (dir *Directory) dirtyChild(c *ctx, child Inode) {
 	func() {
 		defer dir.Lock().Unlock()
-		dir.dirtyChildren_ = append(dir.dirtyChildren_, child)
+		dir.dirtyChildren_[child.inodeNum()] = child
 	}()
 	dir.self.dirty(c)
 }
