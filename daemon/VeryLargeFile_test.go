@@ -65,19 +65,19 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 
 func TestSmallConvert_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		runConvertFrom(test, 512 * 1024)
+		runConvertFrom(test, 512*1024)
 	})
 }
 
 func TestMedConvert_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		runConvertFrom(test, 7 * 1024 * 1024)
+		runConvertFrom(test, 7*1024*1024)
 	})
 }
 
 func TestLargeConvert_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		runConvertFrom(test, 44 * 1024 * 1024)
+		runConvertFrom(test, 44*1024*1024)
 	})
 }
 
