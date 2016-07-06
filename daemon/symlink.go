@@ -115,6 +115,19 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return data.Get(), fuse.OK
 }
 
+func (link *Symlink) Sync(c *ctx) fuse.Status {
+	key := link.sync_DOWN(c)
+	link.parent.syncChild(c, link.InodeCommon.id, key)
+
+	return fuse.OK
+}
+
+func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.elog("Invalid syncChild on Symlink")
+}
+
 func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {

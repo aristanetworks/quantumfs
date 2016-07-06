@@ -220,6 +220,25 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
+func (fi *File) Sync(c *ctx) fuse.Status {
+	c.vlog("File::Sync Enter")
+	defer c.vlog("File::Sync Exit")
+
+	func() {
+		defer fi.Lock().Unlock()
+		if fi.isDirty() {
+			key := fi.sync_DOWN(c)
+			fi.parent.syncChild(c, fi.InodeCommon.id, key)
+		}
+	}()
+
+	return fuse.OK
+}
+
+func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
+	c.elog("Invalid syncChild on File")
+}
+
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
@@ -480,4 +499,8 @@ func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32
 	buf []byte) (uint32, fuse.Status) {
 
 	return fd.file.Write(c, offset, size, flags, buf)
+}
+
+func (fd *FileDescriptor) Sync(c *ctx) fuse.Status {
+	return fd.file.Sync(c)
 }

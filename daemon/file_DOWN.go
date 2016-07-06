@@ -8,6 +8,9 @@ package daemon
 import "github.com/aristanetworks/quantumfs"
 
 func (fi *File) sync_DOWN(c *ctx) quantumfs.ObjectKey {
+	c.vlog("File::sync_DOWN Enter")
+	defer c.vlog("File::sync_DOWN Exit")
+
 	key := fi.accessor.sync(c)
 	fi.setDirty(false)
 	return key

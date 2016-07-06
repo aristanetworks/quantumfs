@@ -52,6 +52,26 @@ const (
 	KeyTypeVCS       = iota // A block which is backed by a VCS
 )
 
+// String names for KeyTypes
+func KeyTypeToString(keyType KeyType) string {
+	switch keyType {
+	default:
+		return "Unknown"
+	case KeyTypeConstant:
+		return "Constant"
+	case KeyTypeOther:
+		return "Other"
+	case KeyTypeMetadata:
+		return "Metadata"
+	case KeyTypeBuildable:
+		return "Buildable"
+	case KeyTypeData:
+		return "Data"
+	case KeyTypeVCS:
+		return "VCS"
+	}
+}
+
 // One of the KeyType* values above
 type KeyType uint8
 
@@ -82,9 +102,9 @@ func (key *ObjectKey) Type() KeyType {
 }
 
 func (key ObjectKey) String() string {
-	hex := hex.EncodeToString(key.Key[:])
+	hex := hex.EncodeToString(key.Key[1:])
 
-	return "Key: " + hex
+	return "(" + KeyTypeToString(key.Type()) + ": " + hex + ")"
 }
 
 type DirectoryEntry struct {

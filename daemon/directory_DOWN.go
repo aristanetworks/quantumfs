@@ -20,6 +20,12 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	defer dir.Lock().Unlock()
 
 	dir.updateRecords_DOWN_(c)
+	return dir.publish(c)
+}
+
+func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
+	c.vlog("Directory::publish Enter")
+	defer c.vlog("Directory::publish Exit")
 
 	// Compile the internal records into a block which can be placed in the
 	// datastore.

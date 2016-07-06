@@ -73,6 +73,9 @@ func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 }
 
 func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
+	c.vlog("SmallFile::sync Enter")
+	defer c.vlog("SmallFile::sync Exit")
+
 	// No metadata to marshal for small files
 	key, err := fi.buf.Key(&c.Ctx)
 	if err != nil {

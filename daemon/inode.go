@@ -47,11 +47,17 @@ type Inode interface {
 
 	Readlink(c *ctx) ([]byte, fuse.Status)
 
+	Sync(c *ctx) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
 
 	getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord, error)
+
+	// Update the key for only this child and then notify all the grandparents of
+	// the cascading changes.
+	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty
@@ -150,6 +156,8 @@ type FileHandle interface {
 
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
+
+	Sync(c *ctx) fuse.Status
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
