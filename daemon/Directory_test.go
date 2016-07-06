@@ -5,6 +5,7 @@ package daemon
 
 // Test the various operations on directories, such as creation and traversing
 
+import "fmt"
 import "io/ioutil"
 import "os"
 import "syscall"
@@ -323,5 +324,61 @@ func TestDirectoryChildTypes(t *testing.T) {
 		test.assert(string(data) == fileContents,
 			"File contents differ in branched workspace: %v",
 			string(data))
+	})
+}
+
+func TestLargeDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		numToCreate := quantumfs.MaxDirectoryRecords +
+			quantumfs.MaxDirectoryRecords/4
+
+		// Create enough children to overflow a single block
+		for i := 0; i < numToCreate; i++ {
+			testFile := fmt.Sprintf("%s/testfile%d", workspace, i)
+			fd, err := os.Create(testFile)
+			test.assert(err == nil, "Error creating file: %v", err)
+			fd.Close()
+		}
+
+		// Confirm all the children are accounted for in the original
+		// workspace
+		files, err := ioutil.ReadDir(workspace)
+		test.assert(err == nil, "Error reading directory %v", err)
+		attendance := make(map[string]bool, numToCreate)
+
+		for _, file := range files {
+			attendance[file.Name()] = true
+		}
+		test.assert(len(attendance) == numToCreate,
+			"Incorrect number of files in directory %d", len(attendance))
+
+		for i := 0; i < numToCreate; i++ {
+			testFile := fmt.Sprintf("testfile%d", i)
+			test.assert(attendance[testFile], "File %s missing",
+				testFile)
+		}
+
+		// Confirm all the children are accounted for in a branched
+		// workspace
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		files, err = ioutil.ReadDir(workspace)
+		test.assert(err == nil, "Error reading directory %v", err)
+		attendance = make(map[string]bool, numToCreate)
+
+		for _, file := range files {
+			attendance[file.Name()] = true
+		}
+		test.assert(len(attendance) == numToCreate,
+			"Incorrect number of files in directory %d", len(attendance))
+
+		for i := 0; i < numToCreate; i++ {
+			testFile := fmt.Sprintf("testfile%d", i)
+			test.assert(attendance[testFile], "File %s missing",
+				testFile)
+		}
+
 	})
 }
