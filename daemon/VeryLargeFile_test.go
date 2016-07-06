@@ -10,7 +10,7 @@ import "io/ioutil"
 import "os"
 import "testing"
 
-func (test *testHelper) runConvertFrom(fromFileSize uint64) {
+func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	test.startDefaultQuantumFs()
 
 	workspace := test.nullWorkspace()
@@ -24,8 +24,8 @@ func (test *testHelper) runConvertFrom(fromFileSize uint64) {
 	err = os.Truncate(testFilename, int64(fromFileSize))
 	test.assert(err == nil, "Unable to truncate expand file to %d", fromFileSize)
 
-	// 49GB sparse file incoming
-	newLen := 49 * 1024 * 1024 * 1024
+	// 200GB sparse file incoming
+	newLen := 200 * 1024 * 1024 * 1024
 	os.Truncate(testFilename, int64(newLen))
 	test.assert(test.fileSize(testFilename) == int64(newLen),
 		"Truncation expansion failed")
@@ -65,19 +65,19 @@ func (test *testHelper) runConvertFrom(fromFileSize uint64) {
 
 func TestSmallConvert_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.runConvertFrom(512 * 1024)
+		runConvertFrom(test, 512 * 1024)
 	})
 }
 
 func TestMedConvert_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.runConvertFrom(7 * 1024 * 1024)
+		runConvertFrom(test, 7 * 1024 * 1024)
 	})
 }
 
 func TestLargeConvert_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.runConvertFrom(44 * 1024 * 1024)
+		runConvertFrom(test, 44 * 1024 * 1024)
 	})
 }
 
@@ -92,7 +92,7 @@ func TestVeryLargeFileZero_test(t *testing.T) {
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error writing tiny fib to new fd")
 		// expand this to be the desired file type
-		os.Truncate(testFilename, 34*1024*1024*1024)
+		os.Truncate(testFilename, 60*1024*1024*1024)
 
 		os.Truncate(testFilename, 0)
 		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
