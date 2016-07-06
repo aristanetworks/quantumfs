@@ -8,6 +8,7 @@ package daemon
 import "bytes"
 import "io/ioutil"
 import "os"
+import "strconv"
 import "testing"
 
 func runConvertFrom(test *testHelper, fromFileSize uint64) {
@@ -61,6 +62,15 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 		"Data hole not in small to very large file expansion")
 	test.assert(bytes.Equal(data, endData[1000:]),
 		"Data entry error after small to very large expansion")
+
+	// Branch the workspace
+	api := test.getApi()
+	dst := strconv.FormatUint(fromFileSize, 10) + "verylargeattrsparse/test"
+	err = api.Branch(test.relPath(workspace), dst)
+	test.assert(err == nil, "Unable to branch")
+
+	test.checkSparse(test.absPath(dst+"/test"), testFilename, 200*1024*1024,
+		10)
 }
 
 func TestSmallConvert_test(t *testing.T) {
