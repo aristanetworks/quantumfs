@@ -258,6 +258,7 @@ func (th *testHelper) startDefaultQuantumFs() {
 func (th *testHelper) findFuseConnection(mountPath string) int {
 	th.log("Finding FUSE Connection ID...")
 	for i := 0; i < 10; i++ {
+		th.log("Waiting for mount try %d...", i)
 		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
 			th.log("Failed opening mountinfo: %v", err)
@@ -270,7 +271,7 @@ func (th *testHelper) findFuseConnection(mountPath string) int {
 		for {
 			bline, _, err := mountinfo.ReadLine()
 			if err != nil {
-				continue
+				break
 			}
 
 			line := string(bline)
