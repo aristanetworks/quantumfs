@@ -136,18 +136,18 @@ func (th *testHelper) endTest() {
 		th.api.Close()
 	}
 
-	if th.server != nil {
+	if th.qfs != nil && th.qfs.server != nil {
 		if exception != nil {
 			th.t.Logf("Failed with exception, forcefully unmounting")
 			abortFuse(th)
 		}
 
-		if err := th.server.Unmount(); err != nil {
+		if err := th.qfs.server.Unmount(); err != nil {
 			abortFuse(th)
 
 			runtime.GC()
 
-			if err := th.server.Unmount(); err != nil {
+			if err := th.qfs.server.Unmount(); err != nil {
 				th.t.Fatalf("Failed to unmount quantumfs instance "+
 					"after aborting: %v", err)
 			}
@@ -217,7 +217,6 @@ type testHelper struct {
 	testName          string
 	qfs               *QuantumFs
 	tempDir           string
-	server            *fuse.Server
 	fuseConnection    int
 	api               *quantumfs.Api
 	testResult        chan string

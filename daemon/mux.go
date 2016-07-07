@@ -45,6 +45,7 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 
 type QuantumFs struct {
 	fuse.RawFileSystem
+	server        *fuse.Server
 	config        QuantumFsConfig
 	inodeNum      uint64
 	fileHandleNum uint64
@@ -62,7 +63,8 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 		return err
 	}
 
-	server.Serve()
+	qfs.server = server
+	qfs.server.Serve()
 	return nil
 }
 
