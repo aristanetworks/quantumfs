@@ -35,9 +35,13 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 		panic("Unable to fetch metadata for new file creation")
 	}
 
-	if err := json.Unmarshal(buffer.Get(), &rtn.metadata); err != nil {
+	var store quantumfs.MultiBlockStore
+	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
 		panic("Couldn't decode MultiBlockContainer object")
 	}
+	rtn.metadata.BlockSize = store.BlockSize
+	rtn.metadata.LastBlockBytes = store.SizeOfLastBlock
+	rtn.metadata.Blocks = store.ListOfBlocks
 
 	return &rtn
 }
@@ -158,7 +162,13 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 		fi.metadata.Blocks[i] = key
 	}
 
-	bytes, err := json.Marshal(fi.metadata)
+	var store quantumfs.MultiBlockStore
+	store.BlockSize = fi.metadata.BlockSize
+	store.NumberOfBlocks = uint32(len(fi.metadata.Blocks))
+	store.SizeOfLastBlock = fi.metadata.LastBlockBytes
+	store.ListOfBlocks = fi.metadata.Blocks
+
+	bytes, err := json.Marshal(store)
 	if err != nil {
 		panic("Unable to marshal file metadata")
 	}

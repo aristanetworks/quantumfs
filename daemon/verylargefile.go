@@ -26,8 +26,9 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 		panic("Couldn't decode VeryLargeStore object")
 	}
 
-	for i := 0; i < len(store.Keys); i++ {
-		rtn.parts = append(rtn.parts, *newLargeAccessor(c, store.Keys[i]))
+	for i := 0; i < len(store.LargeFileKeys); i++ {
+		rtn.parts = append(rtn.parts, *newLargeAccessor(c,
+			store.LargeFileKeys[i]))
 	}
 
 	return &rtn
@@ -150,11 +151,12 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 	var store quantumfs.VeryLargeStore
+	store.NumberOfParts = uint16(len(fi.parts))
 
 	for i := 0; i < len(fi.parts); i++ {
 		newKey := fi.parts[i].sync(c)
 
-		store.Keys = append(store.Keys, newKey)
+		store.LargeFileKeys = append(store.LargeFileKeys, newKey)
 	}
 
 	bytes, err := json.Marshal(store)

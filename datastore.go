@@ -375,5 +375,13 @@ func init() {
 }
 
 type VeryLargeStore struct {
-	Keys []ObjectKey
+	NumberOfParts	uint16
+	LargeFileKeys	[]ObjectKey
+}
+
+type MultiBlockStore struct {
+	BlockSize	uint32
+	NumberOfBlocks	uint32
+	SizeOfLastBlock	uint32
+	ListOfBlocks	[]ObjectKey
 }
