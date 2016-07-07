@@ -257,7 +257,7 @@ func (th *testHelper) startDefaultQuantumFs() {
 // Return the fuse connection id for the filesystem mounted at the given path
 func (th *testHelper) findFuseConnection(mountPath string) int {
 	th.log("Finding FUSE Connection ID...")
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		th.log("Waiting for mount try %d...", i)
 		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
