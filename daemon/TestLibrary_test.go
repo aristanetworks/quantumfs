@@ -46,11 +46,13 @@ func runTest(t *testing.T, test quantumFsTest) {
 		testName:   testName,
 		testResult: make(chan string),
 		testOutput: make([]string, 0, 1000),
+		startTime:  time.Now(),
 	}
 
 	defer th.endTest()
 
 	// Allow tests to run for up to 1 seconds before considering them timed out
+	th.log("Finished test preamble, starting test proper")
 	go th.execute(test)
 
 	var testResult string
@@ -63,8 +65,10 @@ func runTest(t *testing.T, test quantumFsTest) {
 	}
 
 	if !th.shouldFail && testResult != "" {
+		th.log(testResult)
 		th.t.Fatal(testResult)
 	} else if th.shouldFail && testResult == "" {
+		th.log("Test is expected to fail")
 		th.t.Fatal("Test is expected to fail")
 	}
 }
@@ -221,6 +225,7 @@ type testHelper struct {
 	api               *quantumfs.Api
 	testResult        chan string
 	testOutput        []string
+	startTime         time.Time
 	shouldFail        bool
 	shouldFailLogscan bool
 }
@@ -250,7 +255,7 @@ func (th *testHelper) startDefaultQuantumFs() {
 }
 
 // Return the fuse connection id for the filesystem mounted at the given path
-func fuseConnection(mountPath string) int {
+func fuseConnection(mountPath string) (int, error) {
 	for i := 0; i < 10; i++ {
 		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
@@ -273,15 +278,15 @@ func fuseConnection(mountPath string) int {
 				dev := strings.Split(fields[2], ":")[1]
 				devInt, err := strconv.Atoi(dev)
 				if err != nil {
-					panic("Failed to convert dev to integer")
+					return -1, fmt.Errorf("Failed to convert dev to integer")
 				}
-				return devInt
+				return devInt, nil
 			}
 		}
 
 		time.Sleep(50 * time.Millisecond)
 	}
-	panic("Mount not found")
+	return -1, fmt.Errorf("Mount not found")
 }
 
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
@@ -309,6 +314,7 @@ func serveSafely(th *testHelper) {
 }
 
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
+	th.log("Intantiating quantumfs instance...")
 	quantumfs := NewQuantumFs(config)
 	th.qfs = quantumfs
 
@@ -318,13 +324,24 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.qfs.c.Qlog.SetWriter(writer)
 	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacedb/*,test/*")
 
+	th.log("Waiting for QuantumFs instance to start...")
+
 	go serveSafely(th)
 
-	th.fuseConnection = fuseConnection(config.MountPath)
+	th.log("Finding FUSE Connection ID...")
+	fuseConn, err := fuseConnection(config.MountPath)
+	if err != nil {
+		th.log("Failed to find FUSE Connection ID")
+		panic(err.Error())
+	}
+	th.fuseConnection = fuseConn
+	th.log("QuantumFs instance started")
 }
 
 func (th *testHelper) log(format string, args ...interface{}) (int, error) {
-	output := fmt.Sprintf("["+th.testName+"] "+format, args...)
+	relTime := time.Now().Sub(th.startTime).Nanoseconds()
+	prefixedFmt := fmt.Sprintf("[%s+%010d] %s", th.testName, relTime, format)
+	output := fmt.Sprintf(prefixedFmt, args...)
 
 	th.mutex.Lock()
 	th.testOutput = append(th.testOutput, output)

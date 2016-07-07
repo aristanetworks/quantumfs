@@ -58,12 +58,14 @@ type QuantumFs struct {
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
+	qfs.c.dlog("QuantumFs::Serve Initializing server")
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
 	if err != nil {
 		return err
 	}
 
 	qfs.server = server
+	qfs.c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
 	return nil
 }
