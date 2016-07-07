@@ -298,10 +298,6 @@ func serveSafely(th *testHelper) {
 		}
 	}(th)
 
-	th.server.Serve()
-}
-
-func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
 		MaxBackground: 1024,
@@ -310,8 +306,12 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 		Name:          th.testName,
 	}
 
+	th.qfs.Serve(mountOptions)
+}
+
+func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	quantumfs := NewQuantumFs(config)
-	th.qfs = quantumfs.(*QuantumFs)
+	th.qfs = quantumfs
 
 	writer := func(format string, args ...interface{}) (int, error) {
 		return th.log(format, args...)
@@ -319,15 +319,9 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.qfs.c.Qlog.SetWriter(writer)
 	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacedb/*,test/*")
 
-	server, err := fuse.NewServer(quantumfs, config.MountPath, &mountOptions)
-	if err != nil {
-		th.t.Fatalf("Failed to create quantumfs instance: %v", err)
-	}
+	go serveSafely(th)
 
 	th.fuseConnection = fuseConnection(config.MountPath)
-
-	th.server = server
-	go serveSafely(th)
 }
 
 func (th *testHelper) log(format string, args ...interface{}) (int, error) {

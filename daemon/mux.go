@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
+func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
 		config:           config,
@@ -54,6 +54,16 @@ type QuantumFs struct {
 	inodes           map[InodeId]Inode
 	fileHandles      map[FileHandleId]FileHandle
 	activeWorkspaces map[string]*WorkspaceRoot
+}
+
+func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
+	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
+	if err != nil {
+		return err
+	}
+
+	server.Serve()
+	return nil
 }
 
 // Get an inode in a thread safe way
