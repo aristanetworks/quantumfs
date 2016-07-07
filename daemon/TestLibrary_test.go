@@ -255,11 +255,13 @@ func (th *testHelper) startDefaultQuantumFs() {
 }
 
 // Return the fuse connection id for the filesystem mounted at the given path
-func fuseConnection(mountPath string) (int, error) {
+func (th *testHelper) findFuseConnection(mountPath string) int {
+	th.log("Finding FUSE Connection ID...")
 	for i := 0; i < 10; i++ {
 		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
-			panic(fmt.Sprintf("Failed opening mountinfo: %v", err))
+			th.log("Failed opening mountinfo: %v", err)
+			return -1
 		}
 		defer file.Close()
 
@@ -278,15 +280,17 @@ func fuseConnection(mountPath string) (int, error) {
 				dev := strings.Split(fields[2], ":")[1]
 				devInt, err := strconv.Atoi(dev)
 				if err != nil {
-					return -1, fmt.Errorf("Failed to convert dev to integer")
+					th.log("Failed to convert dev to integer")
+					return -1
 				}
-				return devInt, nil
+				return devInt
 			}
 		}
 
 		time.Sleep(50 * time.Millisecond)
 	}
-	return -1, fmt.Errorf("Mount not found")
+	th.log("Mount not found")
+	return -1
 }
 
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
@@ -328,13 +332,8 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 
 	go serveSafely(th)
 
-	th.log("Finding FUSE Connection ID...")
-	fuseConn, err := fuseConnection(config.MountPath)
-	if err != nil {
-		th.log("Failed to find FUSE Connection ID")
-		panic(err.Error())
-	}
-	th.fuseConnection = fuseConn
+	th.fuseConnection = th.findFuseConnection(config.MountPath)
+	th.assert(th.fuseConnection != -1, "Failed to find mount")
 	th.log("QuantumFs instance started")
 }
 
