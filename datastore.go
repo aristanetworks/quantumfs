@@ -377,4 +377,3 @@ func init() {
 type VeryLargeStore struct {
 	Keys []ObjectKey
 }
-
