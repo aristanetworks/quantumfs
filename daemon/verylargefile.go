@@ -12,13 +12,6 @@ type VeryLargeFile struct {
 	parts []LargeFile
 }
 
-type veryLargeStore struct {
-	Keys []quantumfs.ObjectKey
-}
-
-// TODO: Increase this to 48000 when we switch away from json
-const MaxParts = 22000
-
 func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 	var rtn VeryLargeFile
 
@@ -28,9 +21,9 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 		panic("Unable to fetch metadata for new vl file creation")
 	}
 
-	var store veryLargeStore
+	var store quantumfs.VeryLargeStore
 	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
-		panic("Couldn't decode veryLargeStore object")
+		panic("Couldn't decode VeryLargeStore object")
 	}
 
 	for i := 0; i < len(store.Keys); i++ {
@@ -81,7 +74,7 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 }
 
 func (fi *VeryLargeFile) expandTo(lengthParts int) {
-	if lengthParts > MaxParts {
+	if lengthParts > quantumfs.MaxPartsVeryLargeFile {
 		panic("Invalid new length set to expandTo for file accessor")
 	}
 
@@ -156,7 +149,7 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 }
 
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
-	var store veryLargeStore
+	var store quantumfs.VeryLargeStore
 
 	for i := 0; i < len(fi.parts); i++ {
 		newKey := fi.parts[i].sync(c)

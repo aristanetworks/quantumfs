@@ -25,6 +25,9 @@ const MaxBlocksLargeFile = 22000
 // Maximum length of a filename
 const MaxFilenameLength = 256
 
+// TODO: Increase this to 48000 when we switch away from json
+const MaxPartsVeryLargeFile = 22000
+
 // Special reserved namespace/workspace names
 const (
 	ApiPath           = "api" // File used for the qfs api
@@ -370,3 +373,8 @@ func init() {
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
 }
+
+type VeryLargeStore struct {
+	Keys []ObjectKey
+}
+
