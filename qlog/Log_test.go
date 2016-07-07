@@ -16,15 +16,15 @@ func TestLogSet_test(t *testing.T) {
 	qlog.SetWriter(testutils.IoPipe(&logs))
 
 	qlog.SetLogLevels("Daemon|2")
-	qlog.Log(LogDaemon, DummyReqId, 1, "TestToken1")
+	qlog.Log(LogDaemon, MuxReqId, 1, "TestToken1")
 	if !strings.Contains(logs, "TestToken1") {
 		t.Fatal("Enabled log doesn't show up")
 	}
-	qlog.Log(LogDaemon, DummyReqId, 0, "TestToken0")
+	qlog.Log(LogDaemon, MuxReqId, 0, "TestToken0")
 	if strings.Contains(logs, "TestToken0") {
 		t.Fatal("Log level 0 not disabled by mask")
 	}
-	qlog.Log(LogWorkspaceDb, DummyReqId, 0, "TestToken2")
+	qlog.Log(LogWorkspaceDb, MuxReqId, 0, "TestToken2")
 	if !strings.Contains(logs, "TestToken2") {
 		t.Fatal("Different subsystem erroneously affected by log setting")
 	}
@@ -32,12 +32,12 @@ func TestLogSet_test(t *testing.T) {
 	qlog.SetLogLevels("")
 	logs = ""
 	for i := 1; i < int(maxLogLevels); i++ {
-		qlog.Log(LogDaemon, DummyReqId, uint8(i), "TestToken")
+		qlog.Log(LogDaemon, MuxReqId, uint8(i), "TestToken")
 		if strings.Contains(logs, "TestToken") {
 			t.Fatal("Disabled log appeared")
 		}
 	}
-	qlog.Log(LogDaemon, DummyReqId, 0, "TestToken")
+	qlog.Log(LogDaemon, MuxReqId, 0, "TestToken")
 	if !strings.Contains(logs, "TestToken") {
 		t.Fatal("Default log level not working")
 	}
@@ -45,7 +45,7 @@ func TestLogSet_test(t *testing.T) {
 	// Test variable arguments
 	a := 12345
 	b := 98765
-	qlog.Log(LogDaemon, DummyReqId, 0, "Testing args %d %d", a, b)
+	qlog.Log(LogDaemon, MuxReqId, 0, "Testing args %d %d", a, b)
 	if !strings.Contains(logs, "12345") ||
 		!strings.Contains(logs, "98765") {
 		t.Fatal("Variable insertion in logs not working.")

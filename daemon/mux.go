@@ -27,7 +27,7 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlog.NewQlog(),
-				RequestId: qlog.DummyReqId,
+				RequestId: qlog.MuxReqId,
 			},
 			config:      &config,
 			workspaceDB: config.WorkspaceDB,
