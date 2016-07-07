@@ -10,6 +10,7 @@ import "runtime/debug"
 import "syscall"
 import "sync"
 import "sync/atomic"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
@@ -64,10 +65,36 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 		return err
 	}
 
+	stopFlushTimer := make(chan bool)
+
+	go qfs.flushTimer(stopFlushTimer)
+
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
+
+	stopFlushTimer <- true
 	return nil
+}
+
+func (qfs *QuantumFs) flushTimer(quit chan bool) {
+	c := qfs.c.reqId(qlog.FlushReqId, nil)
+	for {
+		var stop bool
+		select {
+		case <-time.After(30 * time.Second):
+		case stop = <-quit:
+		}
+
+		func() {
+			defer logRequestPanic(c)
+			qfs.syncAll(c)
+		}()
+
+		if stop {
+			return
+		}
+	}
 }
 
 // Get an inode in a thread safe way
