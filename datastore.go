@@ -19,6 +19,7 @@ const MaxBlockSize = 1 * 1024 * 1024
 // JSON currently, but will change. These should be updated then)
 const MaxBlocksMediumFile = 32
 const MaxBlocksLargeFile = 49000
+const MaxDirectoryRecords = 1200
 
 // Maximum length of a filename
 const MaxFilenameLength = 256
@@ -107,12 +108,13 @@ func (key ObjectKey) String() string {
 
 type DirectoryEntry struct {
 	NumEntries uint32
+	Next       ObjectKey
 	Entries    []DirectoryRecord
 }
 
-func NewDirectoryEntry(capacity int) *DirectoryEntry {
+func NewDirectoryEntry() *DirectoryEntry {
 	var dirEntry DirectoryEntry
-	dirEntry.Entries = make([]DirectoryRecord, 0, capacity)
+	dirEntry.Entries = make([]DirectoryRecord, 0, MaxDirectoryRecords)
 
 	return &dirEntry
 }
