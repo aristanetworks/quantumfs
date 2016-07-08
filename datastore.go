@@ -375,7 +375,7 @@ func init() {
 }
 
 type VeryLargeFile struct {
-	NumberOfParts uint16
+	NumberOfParts uint32
 	LargeFileKeys []ObjectKey
 }
 
