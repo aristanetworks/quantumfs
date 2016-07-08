@@ -20,6 +20,7 @@ import "strings"
 import "strconv"
 import "sync"
 import "sync/atomic"
+import "syscall"
 import "testing"
 import "time"
 
@@ -679,4 +680,11 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 			rtnA, rtnB)
 		idx += int64(offset)
 	}
+}
+
+func (test *testHelper) fileSize(filename string) int64 {
+	var stat syscall.Stat_t
+	err := syscall.Stat(filename, &stat)
+	test.assert(err == nil, "Error stat'ing test file: %v", err)
+	return stat.Size
 }
