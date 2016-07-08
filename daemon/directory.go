@@ -143,7 +143,9 @@ func (dir *Directory) addChild_(c *ctx, name string, inodeNum InodeId,
 
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
-	delete(dir.childrenRecords, dir.children[name])
+	inodeNum := dir.children[name]
+	delete(dir.childrenRecords, inodeNum)
+	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
 	dir.updateSize_(c)
 }
