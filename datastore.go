@@ -22,16 +22,13 @@ const MaxBlocksMediumFile = 32
 // TODO: Increase these to 48000 when we choose a more efficient encoding than json
 const MaxBlocksLargeFile = 22000
 
+// TODO: Increase this to 48000 when we switch away from json
+const MaxPartsVeryLargeFile = 22000
+
 const MaxDirectoryRecords = 1200
 
 // Maximum length of a filename
 const MaxFilenameLength = 256
-
-// Maximum length of a filename
-const MaxFilenameLength = 256
-
-// TODO: Increase this to 48000 when we switch away from json
-const MaxPartsVeryLargeFile = 22000
 
 // Special reserved namespace/workspace names
 const (
