@@ -78,6 +78,12 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 	stopFlushTimer <- true
 	<-flushTimerStopped
+
+	func() {
+		defer logRequestPanic(&qfs.c)
+		qfs.syncAll(&qfs.c)
+	}()
+
 	return nil
 }
 
