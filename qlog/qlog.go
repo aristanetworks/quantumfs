@@ -56,6 +56,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 
 const logEnvTag = "TRACE"
 const maxLogLevels = 4
+const defaultMmapFile = "qlog"
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {
@@ -124,8 +125,9 @@ func (q *Qlog) SetLogLevels(levels string) {
 type Qlog struct {
 	// This is the logging system level store. Increase size as the number of
 	// LogSubsystems increases past your capacity
-	logLevels uint16
-	write     func(format string, args ...interface{}) (int, error)
+	logLevels	uint16
+	write		func(format string, args ...interface{}) (int, error)
+	logBuffer	*SharedMemory
 }
 
 func printToStdout(format string, args ...interface{}) (int, error) {
@@ -133,10 +135,11 @@ func printToStdout(format string, args ...interface{}) (int, error) {
 	return fmt.Printf(format, args...)
 }
 
-func NewQlog() *Qlog {
+func NewQlog(ramfsPath string) *Qlog {
 	q := Qlog{
 		logLevels: 0,
 		write:     printToStdout,
+		logBuffer: newSharedMemory(ramfsPath, defaultMmapFile),
 	}
 
 	// check that our logLevel container is large enough for our subsystems
@@ -155,11 +158,20 @@ func (q *Qlog) SetWriter(w func(format string, args ...interface{}) (int, error)
 	q.write = w
 }
 
+func (q *Qlog) logSharedMem(idx LogSubsystem, reqId uint64, level uint8,
+	timestamp int64, format string, args ...interface{}) {
+
+	
+}
+
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
-	// todo: send to shared memory
 	t := time.Now()
+
+	// Put into the shared circular buffer, UnixNano will work until year 2262
+	unixNano := t.UnixNano()
+	q.logSharedMem(idx, reqId, level, unixNano, format, args...)
 
 	const timeFormat = "2006-01-02T15:04:05.000000000"
 

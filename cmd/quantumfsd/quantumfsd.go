@@ -30,6 +30,7 @@ func init() {
 		defaultCachePath        = "/dev/shmem"
 		defaultCacheSize        = "8G"
 		defaultMountPath        = "/mnt/quantumfs"
+		defaultRamFsPath	= "/var/run/quantumfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
 	)
@@ -46,6 +47,8 @@ func init() {
 		"Number of seconds the kernel will cache response data")
 	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
+	flag.StringVar(&config.RamFsPath, "ramfsPath", defaultRamFsPath,
+		"Path to pre-existing ramfs directory")
 }
 
 // Process the command arguments. Will show the command usage if no arguments are

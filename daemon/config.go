@@ -8,9 +8,10 @@ package daemon
 import "github.com/aristanetworks/quantumfs"
 
 type QuantumFsConfig struct {
-	CachePath string
-	CacheSize uint64
-	MountPath string
+	CachePath	string
+	CacheSize	uint64
+	MountPath	string
+	RamFsPath	string
 
 	// How long the kernel is allowed to cache values
 	CacheTimeSeconds uint64

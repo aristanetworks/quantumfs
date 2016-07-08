@@ -26,7 +26,7 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 		activeWorkspaces: make(map[string]*WorkspaceRoot),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
-				Qlog:      qlog.NewQlog(),
+				Qlog:      qlog.NewQlog(config.RamFsPath),
 				RequestId: qlog.DummyReqId,
 			},
 			config:      &config,

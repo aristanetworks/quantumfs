@@ -10,7 +10,7 @@ import "strings"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestLogSet_test(t *testing.T) {
-	qlog := NewQlog()
+	qlog := NewQlog("")
 	// let's redirect the log writer in qfs
 	var logs string
 	qlog.SetWriter(testutils.IoPipe(&logs))
@@ -53,7 +53,7 @@ func TestLogSet_test(t *testing.T) {
 }
 
 func TestLoadLevels_test(t *testing.T) {
-	qlog := NewQlog()
+	qlog := NewQlog("")
 
 	qlog.SetLogLevels("Daemon/*")
 	if qlog.logLevels != 0x111F {

@@ -166,6 +166,13 @@ func (th *testHelper) endTest() {
 		}
 	}
 
+	// Remove any log files
+	if err := os.RemoveAll(th.tempDir + "/ramfs");
+		err != nil {
+
+		th.t.Fatalf("Failed to cleanup log file")
+	}
+
 	if exception != nil {
 		th.t.Fatalf("Test failed with exception: %v", exception)
 	}
@@ -239,6 +246,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
 		MountPath:        mountPath,
+		RamFsPath:	  th.tempDir + "/ramfs",
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
 		DurableStore:     processlocal.NewDataStore(),
 	}
@@ -247,6 +255,11 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 
 func (th *testHelper) startDefaultQuantumFs() {
 	config := th.defaultConfig()
+
+	if err := os.MkdirAll(config.RamFsPath, 0777); err != nil {
+		th.t.Fatalf("Unable to setup test ramfs path")
+	}
+
 	th.startQuantumFs(config)
 }
 
