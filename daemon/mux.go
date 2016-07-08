@@ -66,32 +66,37 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	}
 
 	stopFlushTimer := make(chan bool)
+	flushTimerStopped := make(chan bool)
 
-	go qfs.flushTimer(stopFlushTimer)
+	go qfs.flushTimer(stopFlushTimer, flushTimerStopped)
 
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
+	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
+	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 	stopFlushTimer <- true
+	<-flushTimerStopped
 	return nil
 }
 
-func (qfs *QuantumFs) flushTimer(quit chan bool) {
+func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 	c := qfs.c.reqId(qlog.FlushReqId, nil)
 	for {
 		var stop bool
 		select {
 		case <-time.After(30 * time.Second):
+			func() {
+				defer logRequestPanic(c)
+				qfs.syncAll(c)
+			}()
+
 		case stop = <-quit:
 		}
 
-		func() {
-			defer logRequestPanic(c)
-			qfs.syncAll(c)
-		}()
-
 		if stop {
+			finished <- true
 			return
 		}
 	}
