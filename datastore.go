@@ -22,6 +22,11 @@ const MaxBlocksMediumFile = 32
 // TODO: Increase these to 48000 when we choose a more efficient encoding than json
 const MaxBlocksLargeFile = 22000
 
+const MaxDirectoryRecords = 1200
+
+// Maximum length of a filename
+const MaxFilenameLength = 256
+
 // Maximum length of a filename
 const MaxFilenameLength = 256
 
@@ -112,12 +117,13 @@ func (key ObjectKey) String() string {
 
 type DirectoryEntry struct {
 	NumEntries uint32
+	Next       ObjectKey
 	Entries    []DirectoryRecord
 }
 
-func NewDirectoryEntry(capacity int) *DirectoryEntry {
+func NewDirectoryEntry() *DirectoryEntry {
 	var dirEntry DirectoryEntry
-	dirEntry.Entries = make([]DirectoryRecord, 0, capacity)
+	dirEntry.Entries = make([]DirectoryRecord, 0, MaxDirectoryRecords)
 
 	return &dirEntry
 }

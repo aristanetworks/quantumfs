@@ -6,6 +6,7 @@ package main
 
 import "flag"
 import "os"
+import "runtime/pprof"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
@@ -19,11 +20,13 @@ const (
 	exitOk           = iota
 	exitBadCacheSize = iota
 	exitMountFail    = iota
+	exitProfileFail  = iota
 )
 
 var cacheSizeString string
 var cacheTimeNsecs uint
 var config daemon.QuantumFsConfig
+var cpuProfileFile string
 
 func init() {
 	const (
@@ -46,6 +49,9 @@ func init() {
 		"Number of seconds the kernel will cache response data")
 	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
+
+	flag.StringVar(&cpuProfileFile, "profilePath", "",
+		"File to write CPU Profiling data to")
 }
 
 // Process the command arguments. Will show the command usage if no arguments are
@@ -69,6 +75,15 @@ func processArgs() {
 
 func main() {
 	processArgs()
+
+	if cpuProfileFile != "" {
+		profileFile, err := os.Create(cpuProfileFile)
+		if err != nil {
+			os.Exit(exitProfileFail)
+		}
+		pprof.StartCPUProfile(profileFile)
+		defer pprof.StopCPUProfile()
+	}
 
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
