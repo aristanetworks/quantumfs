@@ -24,3 +24,9 @@ Instructions
 * to build:
 
 	make all
+
+
+Limits
+------
+
+* Maximum supported file size is 2.25 Petabytes

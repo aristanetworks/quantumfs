@@ -41,10 +41,15 @@ func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAcces
 		return fi
 	}
 
-	if newType == quantumfs.ObjectTypeLargeFile {
+	if newType == quantumfs.ObjectTypeLargeFile ||
+		newType == quantumfs.ObjectTypeVeryLargeFile {
 		rtn := newLargeShell()
 		rtn.metadata = fi.metadata
 		rtn.dataBlocks = fi.dataBlocks
+
+		if newType == quantumfs.ObjectTypeVeryLargeFile {
+			return newVeryLargeShell(&rtn)
+		}
 
 		return &rtn
 	}

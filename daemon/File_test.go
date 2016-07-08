@@ -403,3 +403,23 @@ func TestFileAttrWriteUpdate_test(t *testing.T) {
 			"Workspace doesn't fully reflect file contents")
 	})
 }
+
+func TestSmallFileZero_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		data := genFibonacci(10 * 1024)
+		err := printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing tiny fib to new fd")
+
+		os.Truncate(testFilename, 0)
+		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+
+		output, err := ioutil.ReadFile(testFilename)
+		test.assert(len(output) == 0, "Empty file not really empty")
+		test.assert(err == nil, "Unable to read from empty file")
+	})
+}
