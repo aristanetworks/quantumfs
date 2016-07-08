@@ -600,14 +600,7 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 	c.vlog("QuantumFs::Flush Enter Fh: %v Context %v", input.Fh, input.Context)
 	defer c.vlog("QuantumFs::Flush Exit")
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
-	if fileHandle == nil {
-		c.elog("Flush failed")
-		return fuse.EIO
-	}
-
-	defer fileHandle.RLockTree().RUnlock()
-	return fileHandle.Sync(c)
+	return fuse.OK
 }
 
 func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
