@@ -96,7 +96,7 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	block := fi.retrieveDataBlock(c, blockIdx)
 	block.SetSize(int(expectedSize))
 
-	if offset >= uint64(len(block.Get())) {
+	if offset >= uint64(block.Size()) {
 		return 0, nil
 	}
 

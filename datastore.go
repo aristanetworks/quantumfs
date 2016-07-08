@@ -374,7 +374,7 @@ func init() {
 	EmptyWorkspaceKey = emptyWorkspaceKey
 }
 
-type VeryLargeStore struct {
+type VeryLargeFile struct {
 	NumberOfParts uint16
 	LargeFileKeys []ObjectKey
 }
