@@ -22,19 +22,23 @@ type ctx struct {
 	fuseCtx     *fuse.Context
 }
 
-func (c *ctx) req(header *fuse.InHeader) *ctx {
+func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
 			Qlog:      c.Qlog,
-			RequestId: header.Unique,
+			RequestId: reqId,
 		},
 		qfs:         c.qfs,
 		config:      c.config,
 		workspaceDB: c.workspaceDB,
 		dataStore:   c.dataStore,
-		fuseCtx:     &header.Context,
+		fuseCtx:     context,
 	}
 	return requestCtx
+}
+
+func (c *ctx) req(header *fuse.InHeader) *ctx {
+	return c.reqId(header.Unique, &header.Context)
 }
 
 // local daemon package specific log wrappers

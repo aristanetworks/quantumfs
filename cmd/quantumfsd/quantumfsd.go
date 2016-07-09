@@ -94,10 +94,8 @@ func main() {
 	}
 
 	quantumfs := daemon.NewQuantumFs(config)
-	server, err := fuse.NewServer(quantumfs, config.MountPath,
-		&mountOptions)
+	err := quantumfs.Serve(mountOptions)
 	if err != nil {
 		os.Exit(exitMountFail)
 	}
-	server.Serve()
 }
