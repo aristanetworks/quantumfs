@@ -35,9 +35,13 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 		panic("Unable to fetch metadata for new file creation")
 	}
 
-	if err := json.Unmarshal(buffer.Get(), &rtn.metadata); err != nil {
+	var store quantumfs.MultiBlockStore
+	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
 		panic("Couldn't decode MultiBlockContainer object")
 	}
+	rtn.metadata.BlockSize = store.BlockSize
+	rtn.metadata.LastBlockBytes = store.SizeOfLastBlock
+	rtn.metadata.Blocks = store.ListOfBlocks
 
 	return &rtn
 }
@@ -45,6 +49,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 func initMultiBlockAccessor(multiBlock *MultiBlockFile, maxBlocks int) {
 	multiBlock.maxBlocks = maxBlocks
 	multiBlock.dataBlocks = make(map[int]quantumfs.Buffer)
+	multiBlock.metadata.BlockSize = quantumfs.MaxBlockSize
 }
 
 func (fi *MultiBlockFile) expandTo(length int) {
@@ -91,6 +96,10 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	block := fi.retrieveDataBlock(c, blockIdx)
 	block.SetSize(int(expectedSize))
 
+	if offset >= uint64(block.Size()) {
+		return 0, nil
+	}
+
 	copied := block.Read(buf, uint32(offset))
 	return copied, nil
 }
@@ -100,10 +109,12 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 
 	// Sanity checks
 	if blockIdx > fi.maxBlocks {
+		c.elog("BlockIdx exceeds bounds for accessor: %d", blockIdx)
 		return 0, errors.New("BlockIdx exceeds bounds for file accessor")
 	}
 
 	if offset >= uint64(fi.metadata.BlockSize) {
+		c.elog("Attempt to write past end of block, %d", offset)
 		return 0, errors.New("Attempt to write past end of block")
 	}
 
@@ -151,7 +162,13 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 		fi.metadata.Blocks[i] = key
 	}
 
-	bytes, err := json.Marshal(fi.metadata)
+	var store quantumfs.MultiBlockStore
+	store.BlockSize = fi.metadata.BlockSize
+	store.NumberOfBlocks = uint32(len(fi.metadata.Blocks))
+	store.SizeOfLastBlock = fi.metadata.LastBlockBytes
+	store.ListOfBlocks = fi.metadata.Blocks
+
+	bytes, err := json.Marshal(store)
 	if err != nil {
 		panic("Unable to marshal file metadata")
 	}
@@ -173,9 +190,10 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 
 	// Handle the special zero length case
 	if newLengthBytes == 0 {
-		newEndBlkIdx = 0
-		newNumBlocks = 0
-		lastBlockLen = 0
+		fi.dataBlocks = make(map[int]quantumfs.Buffer)
+		fi.metadata.Blocks = make([]quantumfs.ObjectKey, 0)
+		fi.metadata.LastBlockBytes = 0
+		return nil
 	}
 
 	// If we're increasing the length, we need to update the block num

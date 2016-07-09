@@ -18,7 +18,13 @@ const MaxBlockSize = 1 * 1024 * 1024
 // Maximum number of blocks for each file type (determined by the encoding, which is
 // JSON currently, but will change. These should be updated then)
 const MaxBlocksMediumFile = 32
-const MaxBlocksLargeFile = 49000
+
+// TODO: Increase these to 48000 when we choose a more efficient encoding than json
+const MaxBlocksLargeFile = 22000
+
+// TODO: Increase this to 48000 when we switch away from json
+const MaxPartsVeryLargeFile = 22000
+
 const MaxDirectoryRecords = 1200
 
 // Maximum length of a filename
@@ -369,4 +375,16 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
+}
+
+type VeryLargeFile struct {
+	NumberOfParts uint32
+	LargeFileKeys []ObjectKey
+}
+
+type MultiBlockStore struct {
+	BlockSize       uint32
+	NumberOfBlocks  uint32
+	SizeOfLastBlock uint32
+	ListOfBlocks    []ObjectKey
 }
