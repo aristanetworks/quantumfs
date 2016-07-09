@@ -158,12 +158,6 @@ func (q *Qlog) SetWriter(w func(format string, args ...interface{}) (int, error)
 	q.write = w
 }
 
-func (q *Qlog) logSharedMem(idx LogSubsystem, reqId uint64, level uint8,
-	timestamp int64, format string, args ...interface{}) {
-
-	
-}
-
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
@@ -171,7 +165,7 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 
 	// Put into the shared circular buffer, UnixNano will work until year 2262
 	unixNano := t.UnixNano()
-	q.logSharedMem(idx, reqId, level, unixNano, format, args...)
+	q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
 
 	const timeFormat = "2006-01-02T15:04:05.000000000"
 

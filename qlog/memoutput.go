@@ -20,6 +20,10 @@ const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + 8
 type mmapHeader struct {
 	circBufSize	uint32
 	strMapSize	uint32
+
+	// These variables indicate the front and end of the circular buffer
+	cirBufFrontIdx	uint32
+	cirBufEndIdx	uint32
 }
 
 type SharedMemory struct {
@@ -61,7 +65,8 @@ func newSharedMemory(dir string, filename string) *SharedMemory {
 		panic("Unable to ensure shared memory log file path exists")
 	}
 
-	mapFile, err := os.Create(dir + "/" + filename)
+	mapFile, err := os.OpenFile(dir + "/" + filename,
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
 		panic("Unable to create shared memory log file")
 	}
@@ -93,3 +98,10 @@ func newSharedMemory(dir string, filename string) *SharedMemory {
 	return &rtn
 }
 
+func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
+	timestamp int64, format string, args ...interface{}) {
+
+	//data := generateLogEntry(reqId, timestamp, format, args...)
+
+	
+}
