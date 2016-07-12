@@ -14,8 +14,11 @@ fetch:
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
 
-$(COMMANDS):
+metadata.capnp.go: metadata.capnp
+	capnp compile -ogo metadata.capnp
+
+$(COMMANDS): metadata.capnp.go
 	go build github.com/aristanetworks/quantumfs/cmd/$@
 
-$(PKGS_TO_TEST):
+$(PKGS_TO_TEST): metadata.capnp.go
 	go test github.com/aristanetworks/quantumfs/$@
