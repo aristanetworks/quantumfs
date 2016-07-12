@@ -5,30 +5,12 @@
 package quantumfs
 
 import "crypto/sha1"
-import "encoding/hex"
+import "encoding/binary"
 import "encoding/json"
 import "fmt"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
-
-// Maximum size of a block which can be stored in a datastore
-const MaxBlockSize = 1 * 1024 * 1024
-
-// Maximum number of blocks for each file type (determined by the encoding, which is
-// JSON currently, but will change. These should be updated then)
-const MaxBlocksMediumFile = 32
-
-// TODO: Increase these to 48000 when we choose a more efficient encoding than json
-const MaxBlocksLargeFile = 22000
-
-// TODO: Increase this to 48000 when we switch away from json
-const MaxPartsVeryLargeFile = 22000
-
-const MaxDirectoryRecords = 1200
-
-// Maximum length of a filename
-const MaxFilenameLength = 256
 
 // Special reserved namespace/workspace names
 const (
@@ -90,32 +72,23 @@ const ObjectKeyLength = 1 + sha1.Size
 
 func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
 	key := ObjectKey{}
-	key.Key[0] = byte(type_)
-	for i := 1; i < ObjectKeyLength; i++ {
-		key.Key[i] = hash[i-1]
-	}
+	key.SetKeyType(byte(type_))
+	key.SetPart2(binary.LittleEndian.Uint64(hash[0:7]))
+	key.SetPart3(binary.LittleEndian.Uint64(hash[8:15]))
+	key.SetPart4(binary.LittleEndian.Uint32(hash[16:20]))
 	return key
-}
-
-type ObjectKey struct {
-	Key [ObjectKeyLength]byte
 }
 
 // Extract the type of the object. Returns a KeyType
 func (key *ObjectKey) Type() KeyType {
-	return KeyType(key.Key[0])
+	return KeyType(key.KeyType())
 }
 
 func (key ObjectKey) String() string {
-	hex := hex.EncodeToString(key.Key[1:])
+	hex := fmt.Sprintf("(%s: %016x%016x%08x)", KeyTypeToString(key.Type()),
+		key.Part2(), key.Part3(), key.Part4())
 
-	return "(" + KeyTypeToString(key.Type()) + ": " + hex + ")"
-}
-
-type DirectoryEntry struct {
-	NumEntries uint32
-	Next       ObjectKey
-	Entries    []DirectoryRecord
+	return hex
 }
 
 func NewDirectoryEntry() *DirectoryEntry {
@@ -250,19 +223,6 @@ func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
 	return Time(t)
 }
 
-type DirectoryRecord struct {
-	Filename           [MaxFilenameLength]byte
-	ID                 ObjectKey
-	Type               ObjectType
-	Permissions        uint8
-	Owner              UID
-	Group              GID
-	Size               uint64
-	ExtendedAttributes ObjectKey
-	CreationTime       Time
-	ModificationTime   Time
-}
-
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
@@ -291,13 +251,6 @@ func createEmptyBlock() ObjectKey {
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyBlockKey] = bytes
 	return emptyBlockKey
-}
-
-type WorkspaceRoot struct {
-	BaseLayer  ObjectKey
-	VCSLayer   ObjectKey
-	BuildLayer ObjectKey
-	UserLayer  ObjectKey
 }
 
 var EmptyWorkspaceKey ObjectKey
@@ -375,16 +328,4 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
-}
-
-type VeryLargeFile struct {
-	NumberOfParts uint32
-	LargeFileKeys []ObjectKey
-}
-
-type MultiBlockStore struct {
-	BlockSize       uint32
-	NumberOfBlocks  uint32
-	SizeOfLastBlock uint32
-	ListOfBlocks    []ObjectKey
 }
