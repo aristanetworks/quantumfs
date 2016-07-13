@@ -40,7 +40,7 @@ func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buffer quantumfs.Buffer) error {
 
-	if len(buffer.Get()) > quantumfs.MaxBlockSize {
+	if buffer.Size() > int(quantumfs.MaxBlockSize) {
 		panic("Attempted to store overlarge block")
 	}
 

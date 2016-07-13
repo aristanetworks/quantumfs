@@ -9,8 +9,26 @@ import "encoding/binary"
 import "fmt"
 import "time"
 
+import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
+
+// Maximum size of a block which can be stored in a datastore
+const MaxBlockSize = int(encoding.MaxBlockSize)
+
+// Maximum number of blocks for each file type
+const MaxBlocksMediumFile = int(encoding.MaxBlocksMediumFile)
+
+// TODO: Increase these to 48000 when we choose a more efficient encoding than json
+const MaxBlocksLargeFile = int(encoding.MaxBlocksLargeFile)
+
+// TODO: Increase this to 48000 when we switch away from json
+const MaxPartsVeryLargeFile = int(encoding.MaxPartsVeryLargeFile)
+
+const MaxDirectoryRecords = int(encoding.MaxDirectoryRecords)
+
+// Maximum length of a filename
+const MaxFilenameLength = int(encoding.MaxFilenameLength)
 
 // Special reserved namespace/workspace names
 const (
@@ -70,32 +88,79 @@ type KeyType uint8
 // additional byte used for routing.
 const ObjectKeyLength = 1 + sha1.Size
 
-func AllocObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
+type ObjectKey struct {
+	key encoding.ObjectKey
+}
+
+func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
 	key := ObjectKey{}
-	key.SetKeyType(byte(type_))
-	key.SetPart2(binary.LittleEndian.Uint64(hash[0:7]))
-	key.SetPart3(binary.LittleEndian.Uint64(hash[8:15]))
-	key.SetPart4(binary.LittleEndian.Uint32(hash[16:20]))
+	key.key.SetKeyType(byte(type_))
+	key.key.SetPart2(binary.LittleEndian.Uint64(hash[0:7]))
+	key.key.SetPart3(binary.LittleEndian.Uint64(hash[8:15]))
+	key.key.SetPart4(binary.LittleEndian.Uint32(hash[16:20]))
+	return key
+}
+
+func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
+	key := ObjectKey{
+		key: k,
+	}
 	return key
 }
 
 // Extract the type of the object. Returns a KeyType
-func (key *ObjectKey) Type() KeyType {
-	return KeyType(key.KeyType())
+func (key ObjectKey) Type() KeyType {
+	return KeyType(key.key.KeyType())
 }
 
 func (key ObjectKey) String() string {
 	hex := fmt.Sprintf("(%s: %016x%016x%08x)", KeyTypeToString(key.Type()),
-		key.Part2(), key.Part3(), key.Part4())
+		key.key.Part2(), key.key.Part3(), key.key.Part4())
 
 	return hex
 }
 
-func AllocDirectoryEntry() *DirectoryEntry {
+func (key ObjectKey) Bytes() []byte {
+	return key.key.Segment.Data
+}
+
+type DirectoryEntry struct {
+	dir encoding.DirectoryEntry
+}
+
+func NewDirectoryEntry() *DirectoryEntry {
 	segment := capn.NewBuffer(nil)
-	dirEntry := NewRootDirectoryEntry(segment)
+
+	dirEntry := DirectoryEntry{
+		dir: encoding.NewRootDirectoryEntry(segment),
+	}
+	dirEntry.dir.SetNumEntries(0)
 
 	return &dirEntry
+}
+
+func (dir *DirectoryEntry) Bytes() []byte {
+	return dir.dir.Segment.Data
+}
+
+func (dir *DirectoryEntry) NumEntries() int {
+	return int(dir.dir.NumEntries())
+}
+
+func (dir *DirectoryEntry) SetNumEntries(n int) {
+	dir.dir.SetNumEntries(uint32(n))
+}
+
+func (dir *DirectoryEntry) Entry(i int) DirectoryRecord {
+	return overlayDirectoryRecord(dir.dir.Entries().At(i))
+}
+
+func (dir *DirectoryEntry) Next() ObjectKey {
+	return overlayObjectKey(dir.dir.Next())
+}
+
+func (dir *DirectoryEntry) SetNext(key ObjectKey) {
+	dir.dir.SetNext(key.key)
 }
 
 // The various types the next referenced object could be
@@ -201,12 +266,12 @@ type GID uint8
 // Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
 
-func (t *Time) Seconds() uint64 {
-	return uint64(*t / 1000000)
+func (t Time) Seconds() uint64 {
+	return uint64(t / 1000000)
 }
 
-func (t *Time) Nanoseconds() uint32 {
-	return uint32(*t % 1000000)
+func (t Time) Nanoseconds() uint32 {
+	return uint32(t % 1000000)
 }
 
 func NewTime(instant time.Time) Time {
@@ -226,13 +291,12 @@ func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := AllocDirectoryEntry()
-	emptyDir.SetNumEntries(0)
+	emptyDir := NewDirectoryEntry()
 
-	bytes := emptyDir.Segment.Data
+	bytes := emptyDir.Bytes()
 
 	hash := sha1.Sum(bytes)
-	emptyDirKey := AllocObjectKey(KeyTypeConstant, hash)
+	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyDirKey] = bytes
 	return emptyDirKey
 }
@@ -243,33 +307,250 @@ func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
 	hash := sha1.Sum(bytes)
-	emptyBlockKey := AllocObjectKey(KeyTypeConstant, hash)
+	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyBlockKey] = bytes
 	return emptyBlockKey
 }
 
-func AllocWorkspaceRoot() *WorkspaceRoot {
+func NewWorkspaceRoot() *WorkspaceRoot {
 	segment := capn.NewBuffer(nil)
-	wsr := NewRootWorkspaceRoot(segment)
+	wsr := WorkspaceRoot{
+		wsr: encoding.NewRootWorkspaceRoot(segment),
+	}
 
 	return &wsr
+}
+
+type WorkspaceRoot struct {
+	wsr encoding.WorkspaceRoot
+}
+
+func (wsr *WorkspaceRoot) Bytes() []byte {
+	return wsr.wsr.Segment.Data
+}
+
+func (wsr *WorkspaceRoot) BaseLayer() ObjectKey {
+	return overlayObjectKey(wsr.wsr.BaseLayer())
+}
+
+func (wsr *WorkspaceRoot) SetBaseLayer(key ObjectKey) {
+	wsr.wsr.SetBaseLayer(key.key)
+}
+
+func (wsr *WorkspaceRoot) VcsLayer() ObjectKey {
+	return overlayObjectKey(wsr.wsr.VcsLayer())
+}
+
+func (wsr *WorkspaceRoot) SetVcsLayer(key ObjectKey) {
+	wsr.wsr.SetBaseLayer(key.key)
+}
+
+func (wsr *WorkspaceRoot) BuildLayer() ObjectKey {
+	return overlayObjectKey(wsr.wsr.BuildLayer())
+}
+
+func (wsr *WorkspaceRoot) SetBuildLayer(key ObjectKey) {
+	wsr.wsr.SetBuildLayer(key.key)
+}
+
+func (wsr *WorkspaceRoot) UserLayer() ObjectKey {
+	return overlayObjectKey(wsr.wsr.UserLayer())
+}
+
+func (wsr *WorkspaceRoot) SetUserLayer(key ObjectKey) {
+	wsr.wsr.SetUserLayer(key.key)
 }
 
 var EmptyWorkspaceKey ObjectKey
 
 func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
-	emptyWorkspace := AllocWorkspaceRoot()
+	emptyWorkspace := NewWorkspaceRoot()
 	emptyWorkspace.SetBaseLayer(emptyDirKey)
 	emptyWorkspace.SetVcsLayer(emptyDirKey)
 	emptyWorkspace.SetBuildLayer(emptyDirKey)
 	emptyWorkspace.SetUserLayer(emptyDirKey)
 
-	bytes := emptyDirKey.Segment.Data
+	bytes := emptyDirKey.Bytes()
 
 	hash := sha1.Sum(bytes)
-	emptyWorkspaceKey := AllocObjectKey(KeyTypeConstant, hash)
+	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyWorkspaceKey] = bytes
 	return emptyWorkspaceKey
+}
+
+func NewDirectoryRecord() *DirectoryRecord {
+	segment := capn.NewBuffer(nil)
+	record := DirectoryRecord{
+		record: encoding.NewRootDirectoryRecord(segment),
+	}
+
+	return &record
+}
+
+type DirectoryRecord struct {
+	record encoding.DirectoryRecord
+}
+
+func overlayDirectoryRecord(r encoding.DirectoryRecord) DirectoryRecord {
+	record := DirectoryRecord{
+		record: r,
+	}
+	return record
+}
+
+func (record *DirectoryRecord) Filename() string {
+	return record.record.Filename()
+}
+
+func (record *DirectoryRecord) SetFilename(name string) {
+	record.record.SetFilename(name)
+}
+
+func (record *DirectoryRecord) Type() ObjectType {
+	return ObjectType(record.record.Type())
+}
+
+func (record *DirectoryRecord) SetType(t ObjectType) {
+	record.record.SetType(uint8(t))
+}
+
+func (record *DirectoryRecord) ID() ObjectKey {
+	return overlayObjectKey(record.record.Id())
+}
+
+func (record *DirectoryRecord) SetID(key ObjectKey) {
+	record.record.SetId(key.key)
+}
+
+func (record *DirectoryRecord) Size() uint64 {
+	return record.record.Size()
+}
+
+func (record *DirectoryRecord) SetSize(s uint64) {
+	record.record.SetSize(s)
+}
+
+func (record *DirectoryRecord) ModificationTime() Time {
+	return Time(record.record.ModificationTime())
+}
+
+func (record *DirectoryRecord) SetModificationTime(t Time) {
+	record.record.SetModificationTime(uint64(t))
+}
+
+func (record *DirectoryRecord) CreationTime() Time {
+	return Time(record.record.CreationTime())
+}
+
+func (record *DirectoryRecord) SetCreationTime(t Time) {
+	record.record.SetCreationTime(uint64(t))
+}
+
+func (record *DirectoryRecord) Permissions() uint8 {
+	return record.record.Permissions()
+}
+
+func (record *DirectoryRecord) SetPermissions(p uint8) {
+	record.record.SetPermissions(p)
+}
+
+func (record *DirectoryRecord) Owner() UID {
+	return UID(record.record.Owner())
+}
+
+func (record *DirectoryRecord) SetOwner(u UID) {
+	record.record.SetOwner(uint8(u))
+}
+
+func (record *DirectoryRecord) Group() GID {
+	return GID(record.record.Group())
+}
+
+func (record *DirectoryRecord) SetGroup(g GID) {
+	record.record.SetGroup(uint8(g))
+}
+
+func (record *DirectoryRecord) ExtendedAttributes() ObjectKey {
+	return overlayObjectKey(record.record.ExtendedAttributes())
+}
+
+func (record *DirectoryRecord) SetExtendedAttributes(key ObjectKey) {
+	record.record.SetExtendedAttributes(key.key)
+}
+
+func NewMultiBlockFile() *MultiBlockFile {
+	segment := capn.NewBuffer(nil)
+	mb := MultiBlockFile{
+		mb: encoding.NewRootMultiBlockFile(segment),
+	}
+
+	return &mb
+}
+
+type MultiBlockFile struct {
+	mb encoding.MultiBlockFile
+}
+
+func (mb *MultiBlockFile) BlockSize() uint32 {
+	return mb.mb.BlockSize()
+}
+
+func (mb *MultiBlockFile) SetBlockSize(n uint32) {
+	mb.mb.SetBlockSize(n)
+}
+
+func (mb *MultiBlockFile) SizeOfLastBlock() uint32 {
+	return mb.mb.SizeOfLastBlock()
+}
+
+func (mb *MultiBlockFile) SetSizeOfLastBlock(n uint32) {
+	mb.mb.SetSizeOfLastBlock(n)
+}
+
+func (mb *MultiBlockFile) SetNumberOfBlocks(n int) {
+	mb.mb.SetNumberOfBlocks(uint32(n))
+}
+
+func (mb *MultiBlockFile) ListOfBlocks() []ObjectKey {
+	blocks := mb.mb.ListOfBlocks().ToArray()
+
+	keys := make([]ObjectKey, 0, len(blocks))
+	for _, block := range blocks {
+		keys = append(keys, overlayObjectKey(block))
+	}
+
+	return keys
+}
+
+func (mb *MultiBlockFile) SetListOfBlocks(keys []ObjectKey) {
+	for i, key := range keys {
+		mb.mb.ListOfBlocks().Set(i, key.key)
+	}
+}
+
+func NewVeryLargeFile() *VeryLargeFile {
+	segment := capn.NewBuffer(nil)
+	vlf := VeryLargeFile{
+		vlf: encoding.NewRootVeryLargeFile(segment),
+	}
+
+	return &vlf
+}
+
+type VeryLargeFile struct {
+	vlf encoding.VeryLargeFile
+}
+
+func (vlf *VeryLargeFile) NumberOfParts() int {
+	return int(vlf.vlf.NumberOfParts())
+}
+
+func (vlf *VeryLargeFile) SetNumberOfParts(n int) {
+	vlf.vlf.SetNumberOfParts(uint32(n))
+}
+
+func (vlf *VeryLargeFile) LargeFileKey(i int) ObjectKey {
+	return overlayObjectKey(vlf.vlf.LargeFileKeys().At(i))
 }
 
 type Buffer interface {

@@ -49,7 +49,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 		panic("Couldn't decode WorkspaceRoot Object")
 	}
 
-	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer, inodeNum, nil,
+	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer(), inodeNum, nil,
 		&wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
@@ -81,11 +81,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 	// Upload the workspaceroot object
 	var workspaceRoot quantumfs.WorkspaceRoot
-	workspaceRoot.BaseLayer = wsr.baseLayerId
-	bytes, err := json.Marshal(workspaceRoot)
-	if err != nil {
-		panic("Failed to marshal workspace root")
-	}
+	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
+	bytes := workspaceRoot.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	newRootId, err := buf.Key(&c.Ctx)

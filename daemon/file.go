@@ -117,12 +117,12 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 	//we need to confirm whether we can treat the root user/group specially.
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions & readBit) != 0
+		return (record.Permissions() & readBit) != 0
 	case syscall.O_WRONLY:
-		return (record.Permissions & writeBit) != 0
+		return (record.Permissions() & writeBit) != 0
 	case syscall.O_RDWR:
 		var bitmask uint8 = readBit | writeBit
-		return (record.Permissions & bitmask) == bitmask
+		return (record.Permissions() & bitmask) == bitmask
 	}
 
 	return false

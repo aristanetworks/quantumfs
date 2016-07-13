@@ -5,8 +5,6 @@ package daemon
 
 // This is _DOWN counterpart to directory.go
 
-import "encoding/json"
-
 import "github.com/aristanetworks/quantumfs"
 
 func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
@@ -26,12 +24,9 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
 
-	layer.NumEntries = uint32(len(layer.Entries))
-	layer.Next = nextKey
-	bytes, err := json.Marshal(layer)
-	if err != nil {
-		panic("Failed to marshal baselayer")
-	}
+	// TODO layer.SetNumEntries(len(layer.Entries))
+	layer.SetNext(nextKey)
+	bytes := layer.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	newKey, err := buf.Key(&c.Ctx)
@@ -64,7 +59,8 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 			entryIdx = 0
 		}
 
-		baseLayer.Entries = append(baseLayer.Entries, *child)
+		_ = child
+		// TODO baseLayer.Entries = append(baseLayer.Entries, *child)
 
 		entryIdx++
 	}
@@ -84,7 +80,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	for _, child := range dir.dirtyChildren_ {
 		newKey := child.sync_DOWN(c)
-		dir.childrenRecords[child.inodeNum()].ID = newKey
+		dir.childrenRecords[child.inodeNum()].SetID(newKey)
 	}
 	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 }

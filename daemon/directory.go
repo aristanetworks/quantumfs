@@ -61,22 +61,23 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		}
 
 		if dir.children == nil {
-			dir.children = make(map[string]InodeId, baseLayer.NumEntries)
+			dir.children = make(map[string]InodeId,
+				baseLayer.NumEntries())
 			dir.childrenRecords = make(
 				map[InodeId]*quantumfs.DirectoryRecord,
-				baseLayer.NumEntries)
+				baseLayer.NumEntries())
 		}
 
-		for _, entry := range baseLayer.Entries {
-			dir.loadChild(c, entry)
+		for i := 0; i < baseLayer.NumEntries(); i++ {
+			dir.loadChild(c, baseLayer.Entry(i))
 		}
 
-		if baseLayer.Next == quantumfs.EmptyDirKey ||
-			baseLayer.NumEntries == 0 {
+		if baseLayer.Next() == quantumfs.EmptyDirKey ||
+			baseLayer.NumEntries() == 0 {
 
 			break
 		} else {
-			key = baseLayer.Next
+			key = baseLayer.Next()
 		}
 	}
 
@@ -85,10 +86,10 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 	inodeId := c.qfs.newInodeId()
-	dir.children[BytesToString(entry.Filename[:])] = inodeId
+	dir.children[entry.Filename()] = inodeId
 	dir.childrenRecords[inodeId] = &entry
 	var constructor InodeConstructor
-	switch entry.Type {
+	switch entry.Type() {
 	default:
 		c.elog("Unknown InodeConstructor type: %d", entry.Type)
 	case quantumfs.ObjectTypeDirectoryEntry:
@@ -105,7 +106,7 @@ func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 		constructor = newSymlink
 	}
 
-	c.qfs.setInode(c, inodeId, constructor(c, entry.ID, entry.Size,
+	c.qfs.setInode(c, inodeId, constructor(c, entry.ID(), entry.Size(),
 		inodeId, dir))
 }
 
@@ -172,12 +173,12 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := objectTypeToFileType(c, entry.Type)
+	fileType := objectTypeToFileType(c, entry.Type())
 	switch fileType {
 	case fuse.S_IFDIR:
 		attr.Size = qfsBlockSize
 		attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
-		attr.Nlink = uint32(entry.Size) + 2
+		attr.Nlink = uint32(entry.Size()) + 2
 	default:
 		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -185,27 +186,27 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFREG,
 		fuse.S_IFLNK:
 
-		attr.Size = entry.Size
-		attr.Blocks = BlocksRoundUp(entry.Size, statBlockSize)
+		attr.Size = entry.Size()
+		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
 		attr.Nlink = 1
 	}
 
-	attr.Atime = entry.ModificationTime.Seconds()
-	attr.Mtime = entry.ModificationTime.Seconds()
-	attr.Ctime = entry.CreationTime.Seconds()
-	attr.Atimensec = entry.ModificationTime.Nanoseconds()
-	attr.Mtimensec = entry.ModificationTime.Nanoseconds()
-	attr.Ctimensec = entry.CreationTime.Nanoseconds()
+	attr.Atime = entry.ModificationTime().Seconds()
+	attr.Mtime = entry.ModificationTime().Seconds()
+	attr.Ctime = entry.CreationTime().Seconds()
+	attr.Atimensec = entry.ModificationTime().Nanoseconds()
+	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
+	attr.Ctimensec = entry.CreationTime().Nanoseconds()
 
 	var permissions uint32
-	permissions |= uint32(entry.Permissions)
-	permissions |= uint32(entry.Permissions) << 3
-	permissions |= uint32(entry.Permissions) << 6
+	permissions |= uint32(entry.Permissions())
+	permissions |= uint32(entry.Permissions()) << 3
+	permissions |= uint32(entry.Permissions()) << 6
 	permissions |= fileType
 
 	attr.Mode = permissions
-	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner, owner.Uid)
-	attr.Owner.Gid = quantumfs.SystemGid(entry.Group, owner.Gid)
+	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
+	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
 	attr.Blksize = qfsBlockSize
 }
 
@@ -233,7 +234,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 
 		// Update the type if needed
 		if newType != nil {
-			entry.Type = *newType
+			entry.SetType(*newType)
 		}
 
 		valid := uint(attr.SetAttrInCommon.Valid)
@@ -241,21 +242,21 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		// FATTR_LOCKOWNER
 
 		if BitFlagsSet(valid, fuse.FATTR_MODE) {
-			entry.Permissions = modeToPermissions(attr.Mode, 0)
+			entry.SetPermissions(modeToPermissions(attr.Mode, 0))
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_UID) {
-			entry.Owner = quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-				c.fuseCtx.Owner.Uid)
+			entry.SetOwner(quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
+				c.fuseCtx.Owner.Uid))
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_GID) {
-			entry.Group = quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-				c.fuseCtx.Owner.Gid)
+			entry.SetGroup(quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
+				c.fuseCtx.Owner.Gid))
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_SIZE) {
-			entry.Size = attr.Size
+			entry.SetSize(attr.Size)
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
@@ -263,17 +264,17 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-			entry.ModificationTime = quantumfs.NewTimeSeconds(attr.Mtime,
-				attr.Mtimensec)
+			entry.SetModificationTime(quantumfs.NewTimeSeconds(attr.Mtime,
+				attr.Mtimensec))
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-			entry.ModificationTime = quantumfs.NewTime(time.Now())
+			entry.SetModificationTime(quantumfs.NewTime(time.Now()))
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_CTIME) {
-			entry.CreationTime = quantumfs.NewTimeSeconds(attr.Ctime,
-				attr.Ctimensec)
+			entry.SetCreationTime(quantumfs.NewTimeSeconds(attr.Ctime,
+				attr.Ctimensec))
 		}
 
 		if out != nil {
@@ -306,7 +307,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 	for _, entry := range dir.childrenRecords {
-		if entry.Type == quantumfs.ObjectTypeDirectoryEntry {
+		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
 			childDirectories++
 		}
 	}
@@ -344,11 +345,11 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 
 	children := make([]directoryContents, 0, len(dir.childrenRecords))
 	for _, entry := range dir.childrenRecords {
-		filename := BytesToString(entry.Filename[:])
+		filename := entry.Filename()
 
 		entryInfo := directoryContents{
 			filename: filename,
-			fuseType: objectTypeToFileType(c, entry.Type),
+			fuseType: objectTypeToFileType(c, entry.Type()),
 		}
 		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
 			dir.children[filename], c.fuseCtx.Owner, entry)
@@ -375,27 +376,26 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	uid := c.fuseCtx.Owner.Uid
 	gid := c.fuseCtx.Owner.Gid
 
-	entry := quantumfs.DirectoryRecord{
-		Filename:           StringToBytes256(name),
-		ID:                 key,
-		Type:               type_,
-		Permissions:        modeToPermissions(mode, umask),
-		Owner:              quantumfs.ObjectUid(c.Ctx, uid, uid),
-		Group:              quantumfs.ObjectGid(c.Ctx, gid, gid),
-		Size:               0,
-		ExtendedAttributes: quantumfs.EmptyBlockKey,
-		CreationTime:       quantumfs.NewTime(now),
-		ModificationTime:   quantumfs.NewTime(now),
-	}
+	entry := quantumfs.NewDirectoryRecord()
+	entry.SetFilename(name)
+	entry.SetID(key)
+	entry.SetType(type_)
+	entry.SetPermissions(modeToPermissions(mode, umask))
+	entry.SetOwner(quantumfs.ObjectUid(c.Ctx, uid, uid))
+	entry.SetGroup(quantumfs.ObjectGid(c.Ctx, gid, gid))
+	entry.SetSize(0)
+	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
+	entry.SetCreationTime(quantumfs.NewTime(now))
+	entry.SetModificationTime(quantumfs.NewTime(now))
 
 	inodeNum := c.qfs.newInodeId()
-	dir.addChild_(c, name, inodeNum, &entry)
+	dir.addChild_(c, name, inodeNum, entry)
 	newEntity := constructor(c, key, 0, inodeNum, dir.self)
 	c.qfs.setInode(c, inodeNum, newEntity)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, &entry)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
 	return newEntity
 }
@@ -492,7 +492,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		}
 
 		inode := dir.children[name]
-		type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+		type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type())
 		if type_ == fuse.S_IFDIR {
 			return fuse.Status(syscall.EISDIR)
 		}
@@ -519,12 +519,12 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		}
 
 		inode := dir.children[name]
-		type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type)
+		type_ := objectTypeToFileType(c, dir.childrenRecords[inode].Type())
 		if type_ != fuse.S_IFDIR {
 			return fuse.ENOTDIR
 		}
 
-		if dir.childrenRecords[inode].Size != 0 {
+		if dir.childrenRecords[inode].Size() != 0 {
 			return fuse.Status(syscall.ENOTEMPTY)
 		}
 
@@ -596,7 +596,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 			return false, quantumfs.ObjectKey{}
 		}
 
-		entry.ID = newKey
+		entry.SetID(newKey)
 		return true, dir.publish(c)
 	}()
 
