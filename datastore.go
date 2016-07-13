@@ -6,7 +6,6 @@ package quantumfs
 
 import "crypto/sha1"
 import "encoding/binary"
-import "encoding/json"
 import "fmt"
 import "time"
 
@@ -71,7 +70,7 @@ type KeyType uint8
 // additional byte used for routing.
 const ObjectKeyLength = 1 + sha1.Size
 
-func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
+func AllocObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
 	key := ObjectKey{}
 	key.SetKeyType(byte(type_))
 	key.SetPart2(binary.LittleEndian.Uint64(hash[0:7]))
@@ -92,7 +91,7 @@ func (key ObjectKey) String() string {
 	return hex
 }
 
-func NewDirectoryEntry() *DirectoryEntry {
+func AllocDirectoryEntry() *DirectoryEntry {
 	segment := capn.NewBuffer(nil)
 	dirEntry := NewRootDirectoryEntry(segment)
 
@@ -227,13 +226,13 @@ func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := NewDirectoryEntry()
+	emptyDir := AllocDirectoryEntry()
 	emptyDir.SetNumEntries(0)
 
 	bytes := emptyDir.Segment.Data
 
 	hash := sha1.Sum(bytes)
-	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
+	emptyDirKey := AllocObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyDirKey] = bytes
 	return emptyDirKey
 }
@@ -244,28 +243,31 @@ func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
 	hash := sha1.Sum(bytes)
-	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
+	emptyBlockKey := AllocObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyBlockKey] = bytes
 	return emptyBlockKey
+}
+
+func AllocWorkspaceRoot() *WorkspaceRoot {
+	segment := capn.NewBuffer(nil)
+	wsr := NewRootWorkspaceRoot(segment)
+
+	return &wsr
 }
 
 var EmptyWorkspaceKey ObjectKey
 
 func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
-	emptyWorkspace := WorkspaceRoot{
-		BaseLayer:  emptyDirKey,
-		VCSLayer:   emptyDirKey,
-		BuildLayer: emptyDirKey,
-		UserLayer:  emptyDirKey,
-	}
+	emptyWorkspace := AllocWorkspaceRoot()
+	emptyWorkspace.SetBaseLayer(emptyDirKey)
+	emptyWorkspace.SetVcsLayer(emptyDirKey)
+	emptyWorkspace.SetBuildLayer(emptyDirKey)
+	emptyWorkspace.SetUserLayer(emptyDirKey)
 
-	bytes, err := json.Marshal(emptyWorkspace)
-	if err != nil {
-		panic("Failed to marhal empty workspace")
-	}
+	bytes := emptyDirKey.Segment.Data
 
 	hash := sha1.Sum(bytes)
-	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
+	emptyWorkspaceKey := AllocObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyWorkspaceKey] = bytes
 	return emptyWorkspaceKey
 }
