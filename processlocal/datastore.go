@@ -11,7 +11,7 @@ import "github.com/aristanetworks/quantumfs/qlog"
 
 func NewDataStore() quantumfs.DataStore {
 	store := &DataStore{
-		data: make(map[quantumfs.ObjectKey][]byte),
+		data: make(map[string][]byte),
 	}
 
 	return store
@@ -19,7 +19,7 @@ func NewDataStore() quantumfs.DataStore {
 
 type DataStore struct {
 	mutex sync.RWMutex
-	data  map[quantumfs.ObjectKey][]byte
+	data  map[string][]byte
 }
 
 func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
@@ -29,7 +29,7 @@ func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	store.mutex.RLock()
 	defer store.mutex.RUnlock()
-	if data, exists := store.data[key]; !exists {
+	if data, exists := store.data[key.String()]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
 		buf.Set(data, key.Type())
@@ -46,7 +46,7 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	c.Vlog(qlog.LogDatastore, "Storing key %v len %d", key, buffer.Size())
 	store.mutex.Lock()
-	store.data[key] = buffer.Get()
+	store.data[key.String()] = buffer.Get()
 	store.mutex.Unlock()
 
 	return nil
@@ -54,7 +54,7 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 func (store *DataStore) Exists(c *quantumfs.Ctx, key quantumfs.ObjectKey) bool {
 	store.mutex.RLock()
-	_, exists := store.data[key]
+	_, exists := store.data[key.String()]
 	store.mutex.RUnlock()
 
 	return exists

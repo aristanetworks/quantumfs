@@ -312,7 +312,7 @@ func createEmptyDirectory() ObjectKey {
 
 	hash := sha1.Sum(bytes)
 	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
-	constStore.store[emptyDirKey] = bytes
+	constStore.store[emptyDirKey.String()] = bytes
 	return emptyDirKey
 }
 
@@ -323,7 +323,7 @@ func createEmptyBlock() ObjectKey {
 
 	hash := sha1.Sum(bytes)
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
-	constStore.store[emptyBlockKey] = bytes
+	constStore.store[emptyBlockKey.String()] = bytes
 	return emptyBlockKey
 }
 
@@ -396,7 +396,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 	hash := sha1.Sum(bytes)
 	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
-	constStore.store[emptyWorkspaceKey] = bytes
+	constStore.store[emptyWorkspaceKey.String()] = bytes
 	return emptyWorkspaceKey
 }
 
@@ -622,16 +622,16 @@ var ConstantStore = DataStore(constStore)
 
 func newConstantStore() *ConstDataStore {
 	return &ConstDataStore{
-		store: make(map[ObjectKey][]byte),
+		store: make(map[string][]byte),
 	}
 }
 
 type ConstDataStore struct {
-	store map[ObjectKey][]byte
+	store map[string][]byte
 }
 
 func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
-	if data, ok := store.store[key]; ok {
+	if data, ok := store.store[key.String()]; ok {
 		buf.Set(data, key.Type())
 		return nil
 	}
