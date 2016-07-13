@@ -177,7 +177,7 @@ func TestDirectoryUpdate_test(t *testing.T) {
 		testFilename = test.absPath(dst + "/" + "test")
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
-		test.assert(err == nil, "Workspace copy doesn't match")
+		test.assert(err == nil, "Workspace copy doesn't match: %v", err)
 	})
 }
 
