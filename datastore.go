@@ -140,6 +140,9 @@ func NewDirectoryEntry() *DirectoryEntry {
 	}
 	dirEntry.dir.SetNumEntries(0)
 
+	recordList := encoding.NewDirectoryRecordList(segment, MaxDirectoryRecords)
+	dirEntry.dir.SetEntries(recordList)
+
 	return &dirEntry
 }
 
