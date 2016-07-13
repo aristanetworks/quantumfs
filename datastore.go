@@ -392,7 +392,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 	emptyWorkspace.SetBuildLayer(emptyDirKey)
 	emptyWorkspace.SetUserLayer(emptyDirKey)
 
-	bytes := emptyDirKey.Bytes()
+	bytes := emptyWorkspace.Bytes()
 
 	hash := sha1.Sum(bytes)
 	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
