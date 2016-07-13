@@ -76,7 +76,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	defer c.vlog("WorkspaceRoot::publish Exit")
 
 	// Upload the workspaceroot object
-	var workspaceRoot quantumfs.WorkspaceRoot
+	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
 	bytes := workspaceRoot.Bytes()
 
