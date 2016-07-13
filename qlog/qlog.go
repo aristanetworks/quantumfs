@@ -165,7 +165,9 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 
 	// Put into the shared circular buffer, UnixNano will work until year 2262
 	unixNano := t.UnixNano()
-	q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
+	if q.logBuffer != nil {
+		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
+	}
 
 	const timeFormat = "2006-01-02T15:04:05.000000000"
 

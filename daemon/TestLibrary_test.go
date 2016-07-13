@@ -167,13 +167,6 @@ func (th *testHelper) endTest() {
 		}
 	}
 
-	// Remove any log files
-	if err := os.RemoveAll(th.tempDir + "/ramfs");
-		err != nil {
-
-		th.t.Fatalf("Failed to cleanup log file")
-	}
-
 	if exception != nil {
 		th.t.Fatalf("Test failed with exception: %v", exception)
 	}
