@@ -35,10 +35,8 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 		panic("Unable to fetch metadata for new file creation")
 	}
 
-	store := quantumfs.NewMultiBlockFile()
-	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
-		panic("Couldn't decode MultiBlockContainer object")
-	}
+	store := buffer.AsMultiBlockFile()
+
 	rtn.metadata.BlockSize = store.BlockSize()
 	rtn.metadata.LastBlockBytes = store.SizeOfLastBlock()
 	rtn.metadata.Blocks = store.ListOfBlocks()

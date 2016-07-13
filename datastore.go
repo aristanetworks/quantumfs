@@ -139,6 +139,13 @@ func NewDirectoryEntry() *DirectoryEntry {
 	return &dirEntry
 }
 
+func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
+	dir := DirectoryEntry{
+		dir: edir,
+	}
+	return dir
+}
+
 func (dir *DirectoryEntry) Bytes() []byte {
 	return dir.dir.Segment.Data
 }
@@ -153,6 +160,10 @@ func (dir *DirectoryEntry) SetNumEntries(n int) {
 
 func (dir *DirectoryEntry) Entry(i int) DirectoryRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
+}
+
+func (dir *DirectoryEntry) SetEntry(i int, record *DirectoryRecord) {
+	dir.dir.Entries().Set(i, record.record)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
@@ -325,6 +336,13 @@ type WorkspaceRoot struct {
 	wsr encoding.WorkspaceRoot
 }
 
+func OverlayWorkspaceRoot(ewsr encoding.WorkspaceRoot) WorkspaceRoot {
+	wsr := WorkspaceRoot{
+		wsr: ewsr,
+	}
+	return wsr
+}
+
 func (wsr *WorkspaceRoot) Bytes() []byte {
 	return wsr.wsr.Segment.Data
 }
@@ -487,6 +505,13 @@ func NewMultiBlockFile() *MultiBlockFile {
 	return &mb
 }
 
+func OverlayMultiBlockFile(emb encoding.MultiBlockFile) MultiBlockFile {
+	mb := MultiBlockFile{
+		mb: emb,
+	}
+	return mb
+}
+
 type MultiBlockFile struct {
 	mb encoding.MultiBlockFile
 }
@@ -537,6 +562,13 @@ func NewVeryLargeFile() *VeryLargeFile {
 	return &vlf
 }
 
+func OverlayVeryLargeFile(evlf encoding.VeryLargeFile) VeryLargeFile {
+	vlf := VeryLargeFile{
+		vlf: evlf,
+	}
+	return vlf
+}
+
 type VeryLargeFile struct {
 	vlf encoding.VeryLargeFile
 }
@@ -553,6 +585,10 @@ func (vlf *VeryLargeFile) LargeFileKey(i int) ObjectKey {
 	return overlayObjectKey(vlf.vlf.LargeFileKeys().At(i))
 }
 
+func (vlf *VeryLargeFile) SetLargeFileKey(i int, key ObjectKey) {
+	vlf.vlf.LargeFileKeys().Set(i, key.key)
+}
+
 type Buffer interface {
 	Write(c *Ctx, in []byte, offset uint32) uint32
 	Read(out []byte, offset uint32) int
@@ -562,6 +598,12 @@ type Buffer interface {
 	Key(c *Ctx) (ObjectKey, error)
 	SetSize(size int)
 	Size() int
+
+	// These methods interpret the Buffer as various metadata types
+	AsWorkspaceRoot() WorkspaceRoot
+	AsDirectoryEntry() DirectoryEntry
+	AsMultiBlockFile() MultiBlockFile
+	AsVeryLargeFile() VeryLargeFile
 }
 
 type DataStore interface {

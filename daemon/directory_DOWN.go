@@ -24,7 +24,6 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
 
-	// TODO layer.SetNumEntries(len(layer.Entries))
 	layer.SetNext(nextKey)
 	bytes := layer.Bytes()
 
@@ -53,6 +52,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 	for _, child := range dir.childrenRecords {
 		if entryIdx > quantumfs.MaxDirectoryRecords {
 			// This block is full, upload and create a new one
+			baseLayer.SetNumEntries(entryIdx - 1)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
 				newBaseLayerId)
 			baseLayer = quantumfs.NewDirectoryEntry()
@@ -60,7 +60,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 		}
 
 		_ = child
-		// TODO baseLayer.Entries = append(baseLayer.Entries, *child)
+		baseLayer.SetEntry(entryIdx, child)
 
 		entryIdx++
 	}

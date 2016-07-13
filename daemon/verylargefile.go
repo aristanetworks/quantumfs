@@ -21,10 +21,7 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 		panic("Unable to fetch metadata for new vl file creation")
 	}
 
-	store := quantumfs.NewVeryLargeFile()
-	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
-		panic("Couldn't decode VeryLargeFile object")
-	}
+	store := buffer.AsVeryLargeFile()
 
 	rtn.parts = make([]LargeFile, store.NumberOfParts())
 	for i := 0; i < store.NumberOfParts(); i++ {
@@ -162,7 +159,7 @@ func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 		newKey := fi.parts[i].sync(c)
 
 		_ = newKey
-		// TODO store.LargeFileKeys = append(store.LargeFileKeys, newKey)
+		store.SetLargeFileKey(i, newKey)
 	}
 
 	bytes, err := json.Marshal(store)

@@ -3,7 +3,6 @@
 
 package daemon
 
-import "encoding/json"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
@@ -43,11 +42,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
 
-	object := c.dataStore.Get(&c.Ctx, rootId)
-	var workspaceRoot quantumfs.WorkspaceRoot
-	if err := json.Unmarshal(object.Get(), &workspaceRoot); err != nil {
-		panic("Couldn't decode WorkspaceRoot Object")
-	}
+	buffer := c.dataStore.Get(&c.Ctx, rootId)
+	workspaceRoot := buffer.AsWorkspaceRoot()
 
 	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer(), inodeNum, nil,
 		&wsr.realTreeLock)

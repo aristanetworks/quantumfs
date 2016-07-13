@@ -3,7 +3,6 @@
 
 package daemon
 
-import "encoding/json"
 import "errors"
 import "syscall"
 import "sync"
@@ -48,17 +47,12 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	key := baseLayerId
 	for {
 		c.vlog("Fetching baselayer %v", key)
-		object := c.dataStore.Get(&c.Ctx, key)
-		if object == nil {
+		buffer := c.dataStore.Get(&c.Ctx, key)
+		if buffer == nil {
 			panic("No baseLayer object")
 		}
 
-		var baseLayer quantumfs.DirectoryEntry
-		if err := json.Unmarshal(object.Get(), &baseLayer); err != nil {
-			c.elog("Invalid base layer object: %v %v", err,
-				string(object.Get()))
-			panic("Couldn't decode base layer object")
-		}
+		baseLayer := buffer.AsDirectoryEntry()
 
 		if dir.children == nil {
 			dir.children = make(map[string]InodeId,
