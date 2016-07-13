@@ -93,11 +93,15 @@ type ObjectKey struct {
 }
 
 func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
-	key := ObjectKey{}
+	segment := capn.NewBuffer(nil)
+	key := ObjectKey{
+		key: encoding.NewRootObjectKey(segment),
+	}
+
 	key.key.SetKeyType(byte(type_))
-	key.key.SetPart2(binary.LittleEndian.Uint64(hash[0:7]))
-	key.key.SetPart3(binary.LittleEndian.Uint64(hash[8:15]))
-	key.key.SetPart4(binary.LittleEndian.Uint32(hash[16:20]))
+	key.key.SetPart2(binary.LittleEndian.Uint64(hash[:8]))
+	key.key.SetPart3(binary.LittleEndian.Uint64(hash[8:16]))
+	key.key.SetPart4(binary.LittleEndian.Uint32(hash[16:]))
 	return key
 }
 
