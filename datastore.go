@@ -11,6 +11,7 @@ import "fmt"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
+import capn "github.com/glycerine/go-capnproto"
 
 // Special reserved namespace/workspace names
 const (
@@ -92,8 +93,8 @@ func (key ObjectKey) String() string {
 }
 
 func NewDirectoryEntry() *DirectoryEntry {
-	var dirEntry DirectoryEntry
-	dirEntry.Entries = make([]DirectoryRecord, 0, MaxDirectoryRecords)
+	segment := capn.NewBuffer(nil)
+	dirEntry := NewRootDirectoryEntry(segment)
 
 	return &dirEntry
 }
@@ -226,15 +227,10 @@ func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := DirectoryEntry{
-		NumEntries: 0,
-		Entries:    make([]DirectoryRecord, 0),
-	}
+	emptyDir := NewDirectoryEntry()
+	emptyDir.SetNumEntries(0)
 
-	bytes, err := json.Marshal(emptyDir)
-	if err != nil {
-		panic("Failed to marshal empty directory")
-	}
+	bytes := emptyDir.Segment.Data
 
 	hash := sha1.Sum(bytes)
 	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
