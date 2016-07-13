@@ -3,9 +3,9 @@
 
 @0xbf1bd07c841779d2;
 
-using Go = import "../../../github.com/glycerine/go-capnproto/go.capnp";
-$Go.package("quantumfs");
-$Go.import("github.com/aristanetworks.com/quantumfs");
+using Go = import "../../../../github.com/glycerine/go-capnproto/go.capnp";
+$Go.package("encoding");
+$Go.import("github.com/aristanetworks.com/quantumfs/encoding");
 
 # Maximum size of a block which can be stored in a datastore
 const maxBlockSize :UInt32 = 1048576;

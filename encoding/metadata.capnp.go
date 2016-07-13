@@ -1,4 +1,4 @@
-package quantumfs
+package encoding
 
 // AUTO GENERATED - DO NOT EDIT
 
