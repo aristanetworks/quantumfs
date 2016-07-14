@@ -164,8 +164,14 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	result := func() fuse.Status {
 		defer fi.Lock().Unlock()
 
+		c.vlog("Got file lock")
+
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size - 1)
+			if attr.Size == 0 {
+				fi.accessor.truncate(c, 0)
+				return fuse.OK
+			}
+			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
 
 			err := fi.reconcileFileType(c, endBlkIdx)
 			if err != nil {
