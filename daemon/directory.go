@@ -86,6 +86,7 @@ func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 	switch entry.Type() {
 	default:
 		c.elog("Unknown InodeConstructor type: %d", entry.Type)
+		panic("Unknown InodeConstructor type")
 	case quantumfs.ObjectTypeDirectoryEntry:
 		constructor = newDirectory
 	case quantumfs.ObjectTypeSmallFile:
