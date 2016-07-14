@@ -261,8 +261,8 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-			entry.SetModificationTime(quantumfs.NewTimeSeconds(attr.Mtime,
-				attr.Mtimensec))
+			entry.SetModificationTime(
+				quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
