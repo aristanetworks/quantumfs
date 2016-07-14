@@ -59,7 +59,6 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 			entryIdx = 0
 		}
 
-		_ = child
 		baseLayer.SetEntry(entryIdx, child)
 
 		entryIdx++

@@ -18,13 +18,8 @@ const MaxBlockSize = int(encoding.MaxBlockSize)
 
 // Maximum number of blocks for each file type
 const MaxBlocksMediumFile = int(encoding.MaxBlocksMediumFile)
-
-// TODO: Increase these to 48000 when we choose a more efficient encoding than json
 const MaxBlocksLargeFile = int(encoding.MaxBlocksLargeFile)
-
-// TODO: Increase this to 48000 when we switch away from json
 const MaxPartsVeryLargeFile = int(encoding.MaxPartsVeryLargeFile)
-
 const MaxDirectoryRecords = int(encoding.MaxDirectoryRecords)
 
 // Maximum length of a filename

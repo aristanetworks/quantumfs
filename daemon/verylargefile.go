@@ -164,7 +164,6 @@ func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 	for i := 0; i < len(fi.parts); i++ {
 		newKey := fi.parts[i].sync(c)
 
-		_ = newKey
 		store.SetLargeFileKey(i, newKey)
 	}
 
