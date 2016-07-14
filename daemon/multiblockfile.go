@@ -161,7 +161,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 		fi.metadata.Blocks[i] = key
 	}
 
-	store := quantumfs.NewMultiBlockFile()
+	store := quantumfs.NewMultiBlockFile(fi.maxBlocks)
 	store.SetBlockSize(fi.metadata.BlockSize)
 	store.SetNumberOfBlocks(len(fi.metadata.Blocks))
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)

@@ -503,12 +503,14 @@ func (record *DirectoryRecord) SetExtendedAttributes(key ObjectKey) {
 	record.record.SetExtendedAttributes(key.key)
 }
 
-func NewMultiBlockFile() *MultiBlockFile {
+func NewMultiBlockFile(maxBlocks int) *MultiBlockFile {
 	segment := capn.NewBuffer(nil)
 	mb := MultiBlockFile{
 		mb: encoding.NewRootMultiBlockFile(segment),
 	}
 
+	blocks := encoding.NewObjectKeyList(segment, maxBlocks)
+	mb.mb.SetListOfBlocks(blocks)
 	return &mb
 }
 
@@ -545,6 +547,7 @@ func (mb *MultiBlockFile) SetNumberOfBlocks(n int) {
 
 func (mb *MultiBlockFile) ListOfBlocks() []ObjectKey {
 	blocks := mb.mb.ListOfBlocks().ToArray()
+	blocks = blocks[:mb.mb.NumberOfBlocks()]
 
 	keys := make([]ObjectKey, 0, len(blocks))
 	for _, block := range blocks {
@@ -570,6 +573,8 @@ func NewVeryLargeFile() *VeryLargeFile {
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
+	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile)
+	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
 }
 
