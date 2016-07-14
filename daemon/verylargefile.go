@@ -116,9 +116,13 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 	return length
 }
 
-func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
+func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
+	c.vlog("VeryLargeFile::blockIdxInfo Enter absOffset %d", absOffset)
+	defer c.vlog("VeryLargeFile::blockIdxInfo Exit")
+
 	// Variable multiblock data block sizes makes this function harder
 
+	c.vlog("Searching existing large files")
 	for i := 0; i < len(fi.parts); i++ {
 		maxLengthFile := uint64(fi.parts[i].metadata.BlockSize) *
 			uint64(quantumfs.MaxBlocksLargeFile)
@@ -126,7 +130,7 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 		// If this extends past the remaining offset, then this
 		// is the file we're looking for
 		if maxLengthFile > absOffset {
-			blockIdx, offset := fi.parts[i].blockIdxInfo(absOffset)
+			blockIdx, offset := fi.parts[i].blockIdxInfo(c, absOffset)
 			blockIdx += i * quantumfs.MaxBlocksLargeFile
 			return blockIdx, offset
 		}
@@ -139,10 +143,11 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// our return values
 	maxLengthFile := uint64(quantumfs.MaxBlockSize) *
 		uint64(quantumfs.MaxBlocksLargeFile)
+	c.vlog("Extending into sparse space until %d > %d", maxLengthFile, absOffset)
 	for i := len(fi.parts); ; i++ {
 		if maxLengthFile > absOffset {
 			tmpLargeFile := newLargeShell()
-			blockIdx, offset := tmpLargeFile.blockIdxInfo(absOffset)
+			blockIdx, offset := tmpLargeFile.blockIdxInfo(c, absOffset)
 			blockIdx += i * quantumfs.MaxBlocksLargeFile
 			return blockIdx, offset
 		}
@@ -195,7 +200,7 @@ func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
 	}
 
 	// If we're expanding the length, handle that first
-	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(newLengthBytes - 1)
+	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(c, newLengthBytes-1)
 
 	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile
 	newNumParts := lastPartIdx + 1

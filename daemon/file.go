@@ -335,7 +335,7 @@ type blockAccessor interface {
 	fileLength() uint64
 
 	// Extract block and remaining offset from absolute offset
-	blockIdxInfo(uint64) (int, uint64)
+	blockIdxInfo(c *ctx, absOffset uint64) (int, uint64)
 
 	// Convert contents into new accessor type, nil accessor if current is fine
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
@@ -386,8 +386,8 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 
 	// Determine the block to start in
-	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(offset)
-	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size) - 1)
+	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(c, offset)
+	endBlkIdx, _ := fi.accessor.blockIdxInfo(c, offset+uint64(size)-1)
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)

@@ -141,7 +141,7 @@ func (fi *MultiBlockFile) fileLength() uint64 {
 		uint64(fi.metadata.LastBlockBytes)
 }
 
-func (fi *MultiBlockFile) blockIdxInfo(absOffset uint64) (int, uint64) {
+func (fi *MultiBlockFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	blkIdx := absOffset / uint64(fi.metadata.BlockSize)
 	remainingOffset := absOffset % uint64(fi.metadata.BlockSize)
 

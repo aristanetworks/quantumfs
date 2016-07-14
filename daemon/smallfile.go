@@ -65,7 +65,7 @@ func (fi *SmallFile) fileLength() uint64 {
 	return uint64(fi.buf.Size())
 }
 
-func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
+func (fi *SmallFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	blkIdx := absOffset / uint64(quantumfs.MaxBlockSize)
 	remainingOffset := absOffset % uint64(quantumfs.MaxBlockSize)
 
