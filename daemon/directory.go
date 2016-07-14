@@ -34,7 +34,9 @@ type Directory struct {
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
 
-	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
+	c.vlog("initDirectory Enter Fetching directory baselayer from %s",
+		baseLayerId)
+	defer c.vlog("initDirectory Exit")
 
 	// Set directory data before processing the children incase the children
 	// access the parent.
@@ -63,7 +65,6 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			c.dlog("Loading child %d", i)
 			dir.loadChild(c, baseLayer.Entry(i))
 		}
 
