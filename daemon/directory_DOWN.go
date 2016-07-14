@@ -50,7 +50,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
 	for _, child := range dir.childrenRecords {
-		if entryIdx > quantumfs.MaxDirectoryRecords {
+		if entryIdx == quantumfs.MaxDirectoryRecords {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
