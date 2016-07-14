@@ -69,7 +69,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	err = api.Branch(test.relPath(workspace), dst)
 	test.assert(err == nil, "Unable to branch")
 
-	test.checkSparse(test.absPath(dst+"/test"), testFilename, 200*1024*1024,
+	test.checkSparse(test.absPath(dst+"/test"), testFilename, 2*1024*1024*1024,
 		10)
 }
 
