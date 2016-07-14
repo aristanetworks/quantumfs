@@ -6,7 +6,6 @@ package daemon
 // This contains very large file types and methods
 
 import "github.com/aristanetworks/quantumfs"
-import "encoding/json"
 
 type VeryLargeFile struct {
 	parts []LargeFile
@@ -152,7 +151,7 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 }
 
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
-	var store quantumfs.VeryLargeFile
+	store := quantumfs.NewVeryLargeFile()
 	store.SetNumberOfParts(len(fi.parts))
 
 	for i := 0; i < len(fi.parts); i++ {
@@ -162,10 +161,7 @@ func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 		store.SetLargeFileKey(i, newKey)
 	}
 
-	bytes, err := json.Marshal(store)
-	if err != nil {
-		panic("Unable to marshal very large file keys")
-	}
+	bytes := store.Bytes()
 
 	buffer := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 

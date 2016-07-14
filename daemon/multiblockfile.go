@@ -6,7 +6,6 @@ package daemon
 // This contains the generic multi-block file types and methods
 
 import "github.com/aristanetworks/quantumfs"
-import "encoding/json"
 import "errors"
 
 // These variables are always correct. Where the datastore value length disagrees,
@@ -166,10 +165,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)
 	store.SetListOfBlocks(fi.metadata.Blocks)
 
-	bytes, err := json.Marshal(store)
-	if err != nil {
-		panic("Unable to marshal file metadata")
-	}
+	bytes := store.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	key, err := buf.Key(&c.Ctx)

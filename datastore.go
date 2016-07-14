@@ -560,6 +560,10 @@ func (mb *MultiBlockFile) SetListOfBlocks(keys []ObjectKey) {
 	}
 }
 
+func (mb *MultiBlockFile) Bytes() []byte {
+	return mb.mb.Segment.Data
+}
+
 func NewVeryLargeFile() *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
@@ -594,6 +598,10 @@ func (vlf *VeryLargeFile) LargeFileKey(i int) ObjectKey {
 
 func (vlf *VeryLargeFile) SetLargeFileKey(i int, key ObjectKey) {
 	vlf.vlf.LargeFileKeys().Set(i, key.key)
+}
+
+func (vlf *VeryLargeFile) Bytes() []byte {
+	return vlf.vlf.Segment.Data
 }
 
 type Buffer interface {
