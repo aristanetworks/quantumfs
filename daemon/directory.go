@@ -63,6 +63,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
+			c.dlog("Loading child %d", i)
 			dir.loadChild(c, baseLayer.Entry(i))
 		}
 
@@ -85,7 +86,7 @@ func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 	var constructor InodeConstructor
 	switch entry.Type() {
 	default:
-		c.elog("Unknown InodeConstructor type: %d", entry.Type)
+		c.elog("Unknown InodeConstructor type: %d", entry.Type())
 		panic("Unknown InodeConstructor type")
 	case quantumfs.ObjectTypeDirectoryEntry:
 		constructor = newDirectory

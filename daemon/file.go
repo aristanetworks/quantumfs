@@ -371,6 +371,9 @@ type blockFn func(*ctx, int, uint64, []byte) (int, error)
 func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	fn blockFn) (uint64, error) {
 
+	c.vlog("File::operateOnBlocks Enter offset %d size %d", offset, size)
+	defer c.vlog("File::operateOnBlocks Exit")
+
 	count := uint64(0)
 
 	// Ensure size and buf are consistent
@@ -388,6 +391,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
+	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	iterCount, err := fn(c, startBlkIdx, offset, buf[count:])
 	if err != nil {
 		c.elog("Unable to operate on first data block")

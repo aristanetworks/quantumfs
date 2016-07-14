@@ -62,6 +62,8 @@ func (fi *MultiBlockFile) expandTo(length int) {
 }
 
 func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buffer {
+	c.vlog("MultiBlockFile::retrieveDataBlock Enter %d", blockIdx)
+	defer c.vlog("MultiBlockFile::retrieveDataBlock Exit")
 	block, exists := fi.dataBlocks[blockIdx]
 	if !exists {
 		block = c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
@@ -164,6 +166,8 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	store.SetNumberOfBlocks(len(fi.metadata.Blocks))
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)
 	store.SetListOfBlocks(fi.metadata.Blocks)
+
+	c.vlog("Set blocks %d: %v", len(fi.metadata.Blocks), fi.metadata.Blocks)
 
 	bytes := store.Bytes()
 
