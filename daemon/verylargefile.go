@@ -22,6 +22,7 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 
 	store := buffer.AsVeryLargeFile()
 
+	c.vlog("Loading VeryLargeFile of %d parts", store.NumberOfParts())
 	rtn.parts = make([]LargeFile, store.NumberOfParts())
 	for i := 0; i < store.NumberOfParts(); i++ {
 		newPart := newLargeAccessor(c, store.LargeFileKey(i))
@@ -48,6 +49,8 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 
 	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile
 	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile
+
+	c.vlog("VeryLargeFile::readBlock part %d/%d", partIdx, len(fi.parts))
 
 	// If we try to read too far, there's nothing to read here
 	if partIdx >= len(fi.parts) {
@@ -118,7 +121,6 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 
 func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	c.vlog("VeryLargeFile::blockIdxInfo Enter absOffset %d", absOffset)
-	defer c.vlog("VeryLargeFile::blockIdxInfo Exit")
 
 	// Variable multiblock data block sizes makes this function harder
 

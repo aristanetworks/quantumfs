@@ -405,6 +405,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 	count += uint64(iterCount)
 
+	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
 	// Loop through the blocks, operating on them
 	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
 		iterCount, err = fn(c, i, 0, buf[count:])
