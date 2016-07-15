@@ -151,7 +151,8 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 
 	for _, workspace := range workspaces {
 		func() {
-			c.vlog("Locking and syncing workspace %v", workspace)
+			c.vlog("Locking and syncing workspace %s",
+				workspace.workspace)
 			defer workspace.LockTree().Unlock()
 			workspace.sync_DOWN(c)
 		}()
@@ -556,7 +557,8 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Flush Enter Fh: %v Context %v", input.Fh, input.Context)
+	c.vlog("QuantumFs::Flush Enter Fh: %v Context %d %d %d", input.Fh,
+		input.Context.Uid, input.Context.Gid, input.Context.Pid)
 	defer c.vlog("QuantumFs::Flush Exit")
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))

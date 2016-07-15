@@ -39,17 +39,17 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 
 // local daemon package specific log wrappers
 func (c ctx) elog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 0, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 0, format, args...)
 }
 
 func (c ctx) wlog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 1, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 1, format, args...)
 }
 
 func (c ctx) dlog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 2, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 2, format, args...)
 }
 
 func (c ctx) vlog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, c.RequestId, 3, format, args...)
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, format, args...)
 }

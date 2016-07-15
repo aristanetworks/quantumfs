@@ -16,6 +16,10 @@ import "math"
 
 type LogSubsystem uint8
 
+func (v LogSubsystem) Primitive() interface{} {
+	return uint8(v)
+}
+
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore

@@ -4,8 +4,14 @@
 package qlog
 
 // This file contains all quantumfs logging shared memory support
+import "bytes"
+import "encoding/binary"
+import "fmt"
+import "io"
+import "math"
 import "os"
 import "unsafe"
+import "reflect"
 import "sync"
 import "syscall"
 
@@ -69,11 +75,11 @@ func newLogStr(idx LogSubsystem, level uint8, format string) LogStr {
 }
 
 type IdStrMap struct {
-	data		map[string]uint32
+	data		map[string]uint16
 	mapLock		sync.RWMutex
 
 	buffer		*[mmapStrMapSize/logStrSize]LogStr
-	freeIdx		uint32
+	freeIdx		uint16
 }
 
 func newCircBuf(buf []byte) CircMemLogs {
@@ -84,7 +90,7 @@ func newCircBuf(buf []byte) CircMemLogs {
 
 func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
 	var rtn IdStrMap
-	rtn.data = make(map[string]uint32)
+	rtn.data = make(map[string]uint16)
 	rtn.freeIdx = 0
 	rtn.buffer = (*[mmapStrMapSize/
 		logStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
@@ -140,7 +146,7 @@ func newSharedMemory(dir string, filename string) *SharedMemory {
 	return &rtn
 }
 
-func (strMap *IdStrMap) mapGetLogIdx(format string) *uint32 {
+func (strMap *IdStrMap) mapGetLogIdx(format string) *uint16 {
 
 	strMap.mapLock.RLock()
 	defer strMap.mapLock.RUnlock()
@@ -154,7 +160,7 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) *uint32 {
 }
 
 func (strMap *IdStrMap) writeMapEntry(idx LogSubsystem, level uint8,
-	format string) uint32{
+	format string) uint16 {
 
 	strMap.mapLock.Lock()
 	defer strMap.mapLock.Unlock()
@@ -175,7 +181,7 @@ func (strMap *IdStrMap) writeMapEntry(idx LogSubsystem, level uint8,
 }
 
 func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
-	format string) uint32 {
+	format string) uint16 {
 
 	existingId := strMap.mapGetLogIdx(format)
 
@@ -186,10 +192,162 @@ func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 	return strMap.writeMapEntry(idx, level, format)
 }
 
-func generateLogEntry(strMapId uint32, reqId uint64, timestamp int64,
+type LogPrimitive interface {
+	// Return the type cast to a primitive, in interface form so that
+	// type asserts will work
+	Primitive() interface{}
+}
+
+type LogConverter interface {
+	// Return the two byte type number
+	ObjType() uint16
+
+	// Return the object's data
+	Data() []byte
+}
+
+func binaryWrite(w io.Writer, input interface{}, format string) {
+	data := input
+
+	// Handle primitive aliases first
+	if prim, ok := data.(LogPrimitive); ok {
+		// This takes the alias and provides a base class via an interface{}
+		// Without this, type casting will check against the alias instead
+		// of the base type
+		data = prim.Primitive()
+	}
+
+	handledWrite := true
+	byteType := make([]byte, 2)
+	switch v := data.(type) {
+		case *int8:
+			byteType[0] = 1
+		case int8:
+			byteType[0] = 2
+		case []int8:
+			byteType[0] = 3
+		case *uint8:
+			byteType[0] = 4
+		case uint8:
+			byteType[0] = 5
+		case []uint8:
+			byteType[0] = 6
+		case *int16:
+			byteType[0] = 7
+		case int16:
+			byteType[0] = 8
+		case []int16:
+			byteType[0] = 9
+		case *uint16:
+			byteType[0] = 10
+		case uint16:
+			byteType[0] = 11
+		case []uint16:
+			byteType[0] = 12
+		case *int32:
+			byteType[0] = 13
+		case int32:
+			byteType[0] = 14
+		case []int32:
+			byteType[0] = 15
+		case *uint32:
+			byteType[0] = 16
+		case uint32:
+			byteType[0] = 17
+		case []uint32:
+			byteType[0] = 18
+		case int:
+			byteType[0] = 14
+			data = interface{}(int32(v))
+		case uint:
+			byteType[0] = 17
+			data = interface{}(uint32(v))
+		case *int64:
+			byteType[0] = 19
+		case int64:
+			byteType[0] = 20
+		case []int64:
+			byteType[0] = 21
+		case *uint64:
+			byteType[0] = 22
+		case uint64:
+			byteType[0] = 23
+		case []uint64:
+			byteType[0] = 24
+		default:
+			handledWrite = false
+	}
+
+	if handledWrite {
+		count, err := w.Write(byteType)
+		if err != nil || count != len(byteType) {
+			panic("Unable to write basic type to memory")
+		}
+
+		err = binary.Write(w, binary.LittleEndian, data)
+		if err != nil {
+			panic(fmt.Sprintf("Unable to write basic type data : %v",
+				err))
+		}
+	} else if v, ok := data.(string); ok {
+		writeString(w, format, v)
+	} else if v, ok := data.(LogConverter); ok {
+		writeData := append(make([]byte, 2), v.Data()...)
+		*(*uint16)(unsafe.Pointer(&writeData[0])) = v.ObjType()
+		count, err := w.Write(writeData)
+		if err != nil || count != len(writeData) {
+			panic(fmt.Sprintf("Unable to write type to memory: %s",
+				reflect.ValueOf(data).String()))
+		}
+	} else {
+		str := fmt.Sprintf("%v", data)
+		writeString(w, format, str)
+		errorStr := fmt.Sprintf("Warning: LogConverter needed for type %s\n",
+			reflect.ValueOf(data).String())
+		fmt.Printf("%s", errorStr)
+	}
+}
+
+func writeString(w io.Writer, format string, output string) {
+	if len(output) > math.MaxUint16 {
+		panic(fmt.Sprintf("String len > 65535 unsupported: " +
+			"%s", format))
+	}
+	byteType := make([]byte, 1)
+	byteType[0] = 25
+	count, err := w.Write(byteType)
+	if err != nil || count != len(byteType) {
+		panic("Unable to write string type to memory")
+	}
+
+	byteLen := make([]byte, 2)
+	strLen := (*uint16)(unsafe.Pointer(&byteLen[0]))
+	*strLen = uint16(len(output))
+	count, err = w.Write(byteLen)
+	if err != nil || count != len(byteLen) {
+		panic("Unable to write string length to memory")
+	}
+
+	count, err = w.Write([]byte(output))
+	if err != nil || count != len(output) {
+		panic(fmt.Sprintf("Unable to write string to mem: " +
+			"%v", err))
+	}
+}
+
+func generateLogEntry(strMapId uint16, reqId uint64, timestamp int64, format string,
 	args ...interface{}) []byte {
 
-	return nil
+	buf := new(bytes.Buffer)
+	binaryWrite(buf, strMapId, format)
+	binaryWrite(buf, reqId, format)
+	binaryWrite(buf, timestamp, format)
+
+	for i := 0; i < len(args); i++ {
+		binaryWrite(buf, args[i], format)
+	}
+
+	return buf.Bytes()
 }
 
 func writeLogEntry(data []byte) {
@@ -203,7 +361,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	strId := mem.strIdMap.fetchLogIdx(idx, level, format)
 
 	// Generate the byte array packet
-	data := generateLogEntry(strId, reqId, timestamp, args...)
+	data := generateLogEntry(strId, reqId, timestamp, format, args...)
 
 	// Write it into the shared memory carefully
 	writeLogEntry(data)
