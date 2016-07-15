@@ -130,6 +130,14 @@ func (key ObjectKey) Bytes() []byte {
 	return key.key.Segment.Data
 }
 
+func (key ObjectKey) Hash() [ObjectKeyLength - 1]byte {
+	var hash [ObjectKeyLength - 1]byte
+	binary.LittleEndian.PutUint64(hash[0:8], key.key.Part2())
+	binary.LittleEndian.PutUint64(hash[8:16], key.key.Part3())
+	binary.LittleEndian.PutUint32(hash[16:20], key.key.Part4())
+	return hash
+}
+
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
@@ -196,6 +204,7 @@ const (
 	ObjectTypeMediumFile        = iota
 	ObjectTypeLargeFile         = iota
 	ObjectTypeVeryLargeFile     = iota
+	ObjectTypeSpecial           = iota
 )
 
 // One of the ObjectType* values

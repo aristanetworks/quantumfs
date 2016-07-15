@@ -101,6 +101,8 @@ func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 		constructor = newVeryLargeFile
 	case quantumfs.ObjectTypeSymlink:
 		constructor = newSymlink
+	case quantumfs.ObjectTypeSpecial:
+		constructor = newSpecial
 	}
 
 	c.qfs.setInode(c, inodeId, constructor(c, entry.ID(), entry.Size(),
