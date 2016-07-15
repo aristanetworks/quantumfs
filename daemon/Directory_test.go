@@ -382,3 +382,27 @@ func TestLargeDirectory(t *testing.T) {
 
 	})
 }
+
+func TestDirectoryChmod(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testDir := workspace + "/testdir"
+
+		err := os.Mkdir(testDir, 0)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		info, err := os.Stat(testDir)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode()&os.ModePerm == 0,
+			"Initial permissions incorrect %d", info.Mode()&os.ModePerm)
+
+		err = os.Chmod(testDir, 0777)
+		test.assert(err == nil, "Error setting permissions: %v", err)
+
+		info, err = os.Stat(testDir)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode()&os.ModePerm == 0777,
+			"Changed permissions incorrect %d", info.Mode()&os.ModePerm)
+	})
+}
