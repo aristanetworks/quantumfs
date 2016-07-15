@@ -39,6 +39,7 @@ type SharedMemory struct {
 	buffer		*[mmapTotalSize]byte
 	circBuf		CircMemLogs
 	strIdMap	IdStrMap
+	errOut		*func(format string, args ...interface{}) (int, error)
 }
 
 // Average Log Entry should be ~24 bytes
@@ -98,7 +99,8 @@ func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
 	return rtn
 }
 
-func newSharedMemory(dir string, filename string) *SharedMemory {
+func newSharedMemory(dir string, filename string, errOut *func(format string,
+	args ...interface{}) (int, error)) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -142,6 +144,7 @@ func newSharedMemory(dir string, filename string) *SharedMemory {
 	rtn.circBuf = newCircBuf(rtn.buffer[offset:offset+mmapCircBufSize])
 	offset += mmapCircBufSize
 	rtn.strIdMap = newIdStrMap(rtn.buffer, offset)
+	rtn.errOut = errOut
 
 	return &rtn
 }
@@ -206,7 +209,7 @@ type LogConverter interface {
 	Data() []byte
 }
 
-func binaryWrite(w io.Writer, input interface{}, format string) {
+func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format string) {
 	data := input
 
 	// Handle primitive aliases first
@@ -302,9 +305,9 @@ func binaryWrite(w io.Writer, input interface{}, format string) {
 	} else {
 		str := fmt.Sprintf("%v", data)
 		writeString(w, format, str)
-		errorStr := fmt.Sprintf("Warning: LogConverter needed for type %s\n",
+		errorStr := fmt.Sprintf("WARN: LogConverter needed for type %s\n",
 			reflect.ValueOf(data).String())
-		fmt.Printf("%s", errorStr)
+		(*mem.errOut)("%s", errorStr)
 	}
 }
 
@@ -335,19 +338,28 @@ func writeString(w io.Writer, format string, output string) {
 	}
 }
 
-func generateLogEntry(strMapId uint16, reqId uint64, timestamp int64, format string,
-	args ...interface{}) []byte {
+func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
+	timestamp int64, format string, args ...interface{}) []byte {
 
 	buf := new(bytes.Buffer)
-	binaryWrite(buf, strMapId, format)
-	binaryWrite(buf, reqId, format)
-	binaryWrite(buf, timestamp, format)
+	mem.binaryWrite(buf, strMapId, format)
+	mem.binaryWrite(buf, reqId, format)
+	mem.binaryWrite(buf, timestamp, format)
 
 	for i := 0; i < len(args); i++ {
-		binaryWrite(buf, args[i], format)
+		mem.binaryWrite(buf, args[i], format)
 	}
 
-	return buf.Bytes()
+	// Create the two byte packet length header at the front
+	rtn := make([]byte, buf.Len() + 2)
+	copy(rtn[2:], buf.Bytes())
+	if len(rtn) > math.MaxUint16 {
+		rtn = rtn[:math.MaxUint16]
+	}
+	lenField := (*uint16)(unsafe.Pointer(&rtn[0]))
+	*lenField = uint16(len(rtn))
+
+	return rtn
 }
 
 func writeLogEntry(data []byte) {
@@ -361,7 +373,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	strId := mem.strIdMap.fetchLogIdx(idx, level, format)
 
 	// Generate the byte array packet
-	data := generateLogEntry(strId, reqId, timestamp, format, args...)
+	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
 
 	// Write it into the shared memory carefully
 	writeLogEntry(data)

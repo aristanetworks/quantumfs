@@ -143,8 +143,8 @@ func NewQlog(ramfsPath string) *Qlog {
 	q := Qlog{
 		logLevels: 0,
 		write:     printToStdout,
-		logBuffer: newSharedMemory(ramfsPath, defaultMmapFile),
 	}
+	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, &q.write)
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >
