@@ -28,7 +28,22 @@ const (
 	logSubsystemMax = LogTest
 )
 
-const DummyReqId uint64 = math.MaxUint64
+const (
+	MuxReqId        uint64 = math.MaxUint64 - iota
+	FlushReqId      uint64 = math.MaxUint64 - iota
+	MinSpecialReqId uint64 = math.MaxUint64 - iota
+)
+
+func specialReq(reqId uint64) string {
+	switch reqId {
+	default:
+		return "UNKNOWN"
+	case MuxReqId:
+		return "[Mux]"
+	case FlushReqId:
+		return "[Flush]"
+	}
+}
 
 func (enum LogSubsystem) String() string {
 	switch enum {
@@ -177,14 +192,14 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 
 	if q.getLogLevel(idx, level) {
 		var front string
-		if reqId != DummyReqId {
-			const frontFmt = "%s | %12s %5d: "
+		if reqId < MinSpecialReqId {
+			const frontFmt = "%s | %12s %7d: "
 			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
 				idx, reqId)
 		} else {
-			const frontFmt = "%s | %12s [MUX]: "
+			const frontFmt = "%s | %12s % 7s: "
 			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
-				idx)
+				idx, specialReq(reqId))
 		}
 		q.write(front+format, args...)
 	}

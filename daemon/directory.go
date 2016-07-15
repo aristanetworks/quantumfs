@@ -145,7 +145,9 @@ func (dir *Directory) addChild_(c *ctx, name string, inodeNum InodeId,
 
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
-	delete(dir.childrenRecords, dir.children[name])
+	inodeNum := dir.children[name]
+	delete(dir.childrenRecords, inodeNum)
+	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
 	dir.updateSize_(c)
 }
@@ -480,6 +482,8 @@ func (dir *Directory) getChildRecord(c *ctx,
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
+	c.vlog("Directory::Unlink Enter %s", name)
+	defer c.vlog("Directory::Unlink Exit")
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
@@ -505,6 +509,9 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 }
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
+	c.vlog("Directory::Rmdir Enter %s", name)
+	defer c.vlog("Directory::Rmdir Exit")
+
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 		if _, exists := dir.children[name]; !exists {

@@ -10,12 +10,13 @@ import "runtime/debug"
 import "syscall"
 import "sync"
 import "sync/atomic"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
+func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
 		config:           config,
@@ -27,7 +28,7 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlog.NewQlog(config.RamFsPath),
-				RequestId: qlog.DummyReqId,
+				RequestId: qlog.MuxReqId,
 			},
 			config:      &config,
 			workspaceDB: config.WorkspaceDB,
@@ -45,6 +46,7 @@ func NewQuantumFs(config QuantumFsConfig) fuse.RawFileSystem {
 
 type QuantumFs struct {
 	fuse.RawFileSystem
+	server        *fuse.Server
 	config        QuantumFsConfig
 	inodeNum      uint64
 	fileHandleNum uint64
@@ -54,6 +56,56 @@ type QuantumFs struct {
 	inodes           map[InodeId]Inode
 	fileHandles      map[FileHandleId]FileHandle
 	activeWorkspaces map[string]*WorkspaceRoot
+}
+
+func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
+	qfs.c.dlog("QuantumFs::Serve Initializing server")
+	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
+	if err != nil {
+		return err
+	}
+
+	stopFlushTimer := make(chan bool)
+	flushTimerStopped := make(chan bool)
+
+	go qfs.flushTimer(stopFlushTimer, flushTimerStopped)
+
+	qfs.server = server
+	qfs.c.dlog("QuantumFs::Serve Serving")
+	qfs.server.Serve()
+	qfs.c.dlog("QuantumFs::Serve Finished serving")
+
+	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
+	stopFlushTimer <- true
+	<-flushTimerStopped
+
+	func() {
+		defer logRequestPanic(&qfs.c)
+		qfs.syncAll(&qfs.c)
+	}()
+
+	return nil
+}
+
+func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
+	c := qfs.c.reqId(qlog.FlushReqId, nil)
+	for {
+		var stop bool
+		select {
+		case <-time.After(30 * time.Second):
+			func() {
+				defer logRequestPanic(c)
+				qfs.syncAll(c)
+			}()
+
+		case stop = <-quit:
+		}
+
+		if stop {
+			finished <- true
+			return
+		}
+	}
 }
 
 // Get an inode in a thread safe way
@@ -151,8 +203,8 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 
 	for _, workspace := range workspaces {
 		func() {
-			c.vlog("Locking and syncing workspace %s",
-				workspace.workspace)
+			c.vlog("Locking and syncing workspace %s/%s",
+				workspace.namespace, workspace.workspace)
 			defer workspace.LockTree().Unlock()
 			workspace.sync_DOWN(c)
 		}()
@@ -561,14 +613,7 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 		input.Context.Uid, input.Context.Gid, input.Context.Pid)
 	defer c.vlog("QuantumFs::Flush Exit")
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
-	if fileHandle == nil {
-		c.elog("Flush failed")
-		return fuse.EIO
-	}
-
-	defer fileHandle.RLockTree().RUnlock()
-	return fileHandle.Sync(c)
+	return fuse.OK
 }
 
 func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
