@@ -166,11 +166,6 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 		c.vlog("Got file lock")
 
-		if BitFlagsUnknown(uint(attr.Valid), fuse.FATTR_SIZE) {
-			c.wlog("File::SetAttr Unsupported attributes %0x",
-				attr.Valid)
-		}
-
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			if attr.Size == 0 {
 				fi.accessor.truncate(c, 0)
