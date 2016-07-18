@@ -26,12 +26,16 @@ const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + mmapHeaderSize
 // this spec to change over time, but still ensuring a memory dump is self contained
 const mmapHeaderSize = 16
 type mmapHeader struct {
-	circBufSize	uint32
 	strMapSize	uint32
+	circBuf		circBufHeader
+}
+
+type circBufHeader struct {
+	size		uint32
 
 	// These variables indicate the front and end of the circular buffer
-	cirBufFrontIdx	uint32
-	cirBufEndIdx	uint32
+	frontIdx	uint32
+	pastEndIdx	uint32
 }
 
 type SharedMemory struct {
@@ -51,9 +55,88 @@ type LogEntry struct {
 }
 
 type CircMemLogs struct {
-	buffer []byte
+	header		*circBufHeader
+	buffer 		*[mmapCircBufSize]byte
+	writer		chan []byte
 }
 
+func (circ *CircMemLogs) Size() int {
+	return mmapCircBufSize + mmapHeaderSize
+}
+
+// Must only be called from inside writeLogEntries
+func (circ *CircMemLogs) curLen_() uint32 {
+	// Is the end ahead of us, or has it wrapped?
+	if circ.header.pastEndIdx >= circ.header.frontIdx {
+		return circ.header.pastEndIdx - circ.header.frontIdx
+	} else {
+		return (mmapCircBufSize - circ.header.frontIdx) + 1 +
+			circ.header.pastEndIdx
+	}
+}
+
+// Must only be called from inside writeLogEntries
+func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
+	rtn := make([]byte, num)
+
+	if idx + num > mmapCircBufSize {
+		secondNum := (idx + num) - mmapCircBufSize
+		num -= secondNum
+		copy(rtn[num:], circ.buffer[0:secondNum])
+	}
+
+	copy(rtn, circ.buffer[idx:idx+num])
+
+	return rtn
+}
+
+// Must only be called from inside writeLogEntries
+func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
+	if *lhs + addon < mmapCircBufSize {
+		*lhs = *lhs + addon
+		return
+	}
+
+	*lhs = (*lhs + addon) - mmapCircBufSize
+}
+
+// Must only be called from inside writeLogEntries
+func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
+	numWrite := uint32(len(data))
+	if idx + numWrite > mmapCircBufSize {
+		secondNum := (idx + numWrite) - mmapCircBufSize
+		numWrite -= secondNum
+		copy(circ.buffer[0:secondNum], data[numWrite:])
+	}
+
+	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
+}
+
+func (circ *CircMemLogs) writeLogEntries() {
+	// We need a dedicated thread writing to the buffer since memory copy can
+	// be slow and we need to ensure the consistency of the header section
+	for {
+		data := <-circ.writer
+
+		// For now, if the message is too long then just toss it
+		if len(data) > mmapCircBufSize {
+			continue
+		}
+
+		// Do we need to throw away some old entries to make space?
+		newLen := uint32(len(data)) + circ.curLen_()
+		for newLen > mmapCircBufSize {
+			entryLen := circ.wrapRead_(circ.header.frontIdx, 2)
+			packetLen := (*uint16)(unsafe.Pointer(&entryLen[0]))
+			circ.wrapPlusEquals_(&circ.header.frontIdx,
+				uint32(*packetLen))
+			newLen -= uint32(*packetLen)
+		}
+
+		// Now that we know we have space, write in the entry
+		circ.wrapWrite_(circ.header.pastEndIdx, data)
+	}
+}
 const logStrSize = 32
 const logTextMax = 30
 type LogStr struct {
@@ -83,10 +166,18 @@ type IdStrMap struct {
 	freeIdx		uint16
 }
 
-func newCircBuf(buf []byte) CircMemLogs {
-	return CircMemLogs {
-		buffer:	buf,
+func newCircBuf(mapHeader *circBufHeader,
+	mapBuffer *[mmapCircBufSize]byte) CircMemLogs {
+
+	rtn := CircMemLogs {
+		header:		mapHeader,
+		buffer:		mapBuffer,
+		writer:		make(chan []byte),
 	}
+
+	// Launch the asynchronous shared memory writer
+	go rtn.writeLogEntries()
+	return rtn
 }
 
 func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
@@ -140,10 +231,11 @@ func newSharedMemory(dir string, filename string, errOut *func(format string,
 	var rtn SharedMemory
 	rtn.fd = mapFile
 	rtn.buffer = (*[mmapTotalSize]byte)(unsafe.Pointer(&mmap[0]))
-	offset := mmapHeaderSize
-	rtn.circBuf = newCircBuf(rtn.buffer[offset:offset+mmapCircBufSize])
-	offset += mmapCircBufSize
-	rtn.strIdMap = newIdStrMap(rtn.buffer, offset)
+	header := (*mmapHeader)(unsafe.Pointer(&rtn.buffer[0]))
+	header.strMapSize = mmapStrMapSize
+	rtn.circBuf = newCircBuf(&header.circBuf,
+		(*[mmapCircBufSize]byte)(unsafe.Pointer(&rtn.buffer[mmapHeaderSize])))
+	rtn.strIdMap = newIdStrMap(rtn.buffer, rtn.circBuf.Size())
 	rtn.errOut = errOut
 
 	return &rtn
@@ -362,10 +454,6 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	return rtn
 }
 
-func writeLogEntry(data []byte) {
-
-}
-
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	timestamp int64, format string, args ...interface{}) {
 
@@ -375,6 +463,6 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Generate the byte array packet
 	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
 
-	// Write it into the shared memory carefully
-	writeLogEntry(data)
+	// Write it into the shared memory asynchronously
+	mem.circBuf.writer <- data
 }
