@@ -14,7 +14,8 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	if key.Type() != quantumfs.KeyTypeEmbedded {
 		panic("Non-embedded key when initializing Special file")

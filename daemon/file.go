@@ -18,7 +18,8 @@ const writeBit = 0x2
 const readBit = 0x4
 
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newSmallAccessor(c, size, key)
 
@@ -26,7 +27,8 @@ func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId
 }
 
 func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newMediumAccessor(c, key)
 
@@ -34,7 +36,8 @@ func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeI
 }
 
 func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newLargeAccessor(c, key)
 
@@ -42,7 +45,8 @@ func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId
 }
 
 func newVeryLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newVeryLargeAccessor(c, key)
 
