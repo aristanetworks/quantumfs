@@ -182,6 +182,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		attr.Size = qfsBlockSize
 		attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 		attr.Nlink = uint32(entry.Size()) + 2
+	case fuse.S_IFIFO:
+		fileType = specialOverrideAttr(entry, attr)
 	default:
 		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -352,10 +354,10 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 
 		entryInfo := directoryContents{
 			filename: filename,
-			fuseType: objectTypeToFileType(c, entry.Type()),
 		}
 		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
 			dir.children[filename], c.fuseCtx.Owner, entry)
+		entryInfo.fuseType = entryInfo.attr.Mode
 
 		children = append(children, entryInfo)
 	}
@@ -587,8 +589,27 @@ func (dir *Directory) Sync(c *ctx) fuse.Status {
 func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on Directory")
-	return fuse.ENOSYS
+	c.vlog("Directory::Mknod Enter")
+	defer c.vlog("Directory::Mknod Exit")
+
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		if _, exists := dir.children[name]; exists {
+			return fuse.Status(syscall.EEXIST)
+		}
+
+		dir.create_(c, name, input.Mode, input.Umask, input.Rdev, newSpecial,
+			quantumfs.ObjectTypeSpecial, quantumfs.EmptyDirKey,
+			out)
+		return fuse.OK
+	}()
+
+	if result == fuse.OK {
+		dir.self.dirty(c)
+	}
+
+	return result
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,

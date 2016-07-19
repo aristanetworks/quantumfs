@@ -13,27 +13,49 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
+func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
+	if key.Type() != quantumfs.KeyTypeEmbedded {
+		panic("Non-embedded key when initializing Special file")
+	}
+	hash := key.Hash()
+	filetype := binary.LittleEndian.Uint32(hash[0:4])
+	device := binary.LittleEndian.Uint32(hash[4:8])
+
+	return filetype, device
+}
+
 func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
-	if key.Type() != quantumfs.KeyTypeEmbedded {
-		panic("Non-embedded key when initializing Special file")
+	var filetype uint32
+	var device uint32
+	if dirRecord == nil {
+		// key is valid while mode and rdev are not
+		filetype, device = decodeSpecialKey(key)
+	} else {
+		// key is invalid, but mode and rdev contain the data we want and we
+		// must store it in directoryRecord
+		filetype = mode
+		device = rdev
+		c.wlog("mknod mode %x", filetype)
 	}
-
-	hash := key.Hash()
 
 	special := Special{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		filetype: binary.LittleEndian.Uint32(hash[0:4]),
-		device:   binary.LittleEndian.Uint32(hash[4:8]),
+		filetype: filetype,
+		device:   device,
 		parent:   parent,
 	}
 	special.self = &special
 	assert(special.treeLock() != nil, "Special treeLock nil at init")
+
+	if dirRecord != nil {
+		dirRecord.SetID(special.sync_DOWN(c))
+	}
 	return &special
 }
 
@@ -160,4 +182,15 @@ func (special *Special) getChildRecord(c *ctx,
 func (special *Special) dirty(c *ctx) {
 	special.setDirty(true)
 	special.parent.dirtyChild(c, special)
+}
+
+func specialOverrideAttr(entry *quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
+	attr.Size = qfsBlockSize
+	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+	attr.Nlink = 1
+
+	filetype, dev := decodeSpecialKey(entry.ID())
+	attr.Rdev = dev
+
+	return filetype
 }
