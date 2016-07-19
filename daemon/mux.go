@@ -293,8 +293,13 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	c.vlog("QuantumFs::Mknod Enter")
 	defer c.vlog("QuantumFs::Mknod Exit")
 
-	c.elog("Unhandled request Mknod")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	defer inode.RLockTree().RUnlock()
+	return inode.Mknod(c, name, input, out)
 }
 
 func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,

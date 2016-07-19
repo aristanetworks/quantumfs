@@ -49,6 +49,9 @@ type Inode interface {
 
 	Sync(c *ctx) fuse.Status
 
+	Mknod(c *ctx, name string, input *fuse.MknodIn,
+		out *fuse.EntryOut) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
