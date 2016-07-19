@@ -128,6 +128,13 @@ func (special *Special) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (special *Special) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on Special")
+	return fuse.ENOSYS
+}
+
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

@@ -151,6 +151,13 @@ func (api *ApiInode) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (api *ApiInode) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on ApiInode")
+	return fuse.ENOSYS
+}
+
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

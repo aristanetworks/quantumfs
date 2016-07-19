@@ -122,6 +122,13 @@ func (link *Symlink) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on Symlink")
+	return fuse.ENOSYS
+}
+
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

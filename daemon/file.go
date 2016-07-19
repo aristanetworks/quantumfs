@@ -241,6 +241,13 @@ func (fi *File) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (fi *File) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on File")
+	return fuse.ENOSYS
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }

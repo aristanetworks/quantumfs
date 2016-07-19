@@ -580,6 +580,13 @@ func (dir *Directory) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on Directory")
+	return fuse.ENOSYS
+}
+
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
