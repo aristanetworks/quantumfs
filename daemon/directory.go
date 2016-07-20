@@ -603,9 +603,23 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			return fuse.Status(syscall.EEXIST)
 		}
 
-		dir.create_(c, name, input.Mode, input.Umask, input.Rdev, newSpecial,
-			quantumfs.ObjectTypeSpecial, quantumfs.EmptyDirKey,
-			out)
+		c.dlog("Directory::Mknod Mode %x", input.Mode)
+		if BitFlagsSet(uint(input.Mode), syscall.S_IFIFO) ||
+			BitFlagsSet(uint(input.Mode), syscall.S_IFSOCK) ||
+			BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
+			BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
+
+			dir.create_(c, name, input.Mode, input.Umask, input.Rdev,
+				newSpecial, quantumfs.ObjectTypeSpecial,
+				quantumfs.ZeroKey, out)
+		} else if BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
+			dir.create_(c, name, input.Mode, input.Umask, 0,
+				newSmallFile, quantumfs.ObjectTypeSmallFile,
+				quantumfs.EmptyBlockKey, out)
+		} else {
+			c.dlog("Directory::Mknod invalid type %x", input.Mode)
+			return fuse.EINVAL
+		}
 		return fuse.OK
 	}()
 

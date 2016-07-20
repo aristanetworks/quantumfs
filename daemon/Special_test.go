@@ -66,3 +66,31 @@ func TestSocketCreation_test(t *testing.T) {
 		specialCreate(test, syscall.S_IFSOCK)
 	})
 }
+
+func TestFileMknodCreation_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		specialCreate(test, syscall.S_IFREG)
+	})
+}
+
+func specialCreateFail(test *testHelper, filetype uint32) {
+	test.startDefaultQuantumFs()
+
+	workspace := test.newWorkspace()
+	testFilename := workspace + "/" + "test"
+	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
+		0x12345678)
+	test.assert(err != nil, "Unexpected success creating node")
+}
+
+func TestDirectoryMknodCreation_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		specialCreateFail(test, syscall.S_IFDIR)
+	})
+}
+
+func TestSymlinkMknodCreation_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		specialCreateFail(test, syscall.S_IFLNK)
+	})
+}

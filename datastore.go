@@ -673,6 +673,8 @@ func (store *ConstDataStore) Exists(c *Ctx, key ObjectKey) bool {
 	return false
 }
 
+var ZeroKey ObjectKey
+
 func init() {
 	emptyDirKey := createEmptyDirectory()
 	emptyBlockKey := createEmptyBlock()
@@ -680,4 +682,5 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
+	ZeroKey = NewObjectKey(KeyTypeEmbedded, [ObjectKeyLength - 1]byte{})
 }
