@@ -117,12 +117,12 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 	//we need to confirm whether we can treat the root user/group specially.
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions & readBit) != 0
+		return (record.Permissions() & readBit) != 0
 	case syscall.O_WRONLY:
-		return (record.Permissions & writeBit) != 0
+		return (record.Permissions() & writeBit) != 0
 	case syscall.O_RDWR:
 		var bitmask uint8 = readBit | writeBit
-		return (record.Permissions & bitmask) == bitmask
+		return (record.Permissions() & bitmask) == bitmask
 	}
 
 	return false
@@ -164,8 +164,14 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	result := func() fuse.Status {
 		defer fi.Lock().Unlock()
 
+		c.vlog("Got file lock")
+
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size - 1)
+			if attr.Size == 0 {
+				fi.accessor.truncate(c, 0)
+				return fuse.OK
+			}
+			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
 
 			err := fi.reconcileFileType(c, endBlkIdx)
 			if err != nil {
@@ -335,7 +341,7 @@ type blockAccessor interface {
 	fileLength() uint64
 
 	// Extract block and remaining offset from absolute offset
-	blockIdxInfo(uint64) (int, uint64)
+	blockIdxInfo(c *ctx, absOffset uint64) (int, uint64)
 
 	// Convert contents into new accessor type, nil accessor if current is fine
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
@@ -371,6 +377,9 @@ type blockFn func(*ctx, int, uint64, []byte) (int, error)
 func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	fn blockFn) (uint64, error) {
 
+	c.vlog("File::operateOnBlocks Enter offset %d size %d", offset, size)
+	defer c.vlog("File::operateOnBlocks Exit")
+
 	count := uint64(0)
 
 	// Ensure size and buf are consistent
@@ -383,11 +392,12 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 
 	// Determine the block to start in
-	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(offset)
-	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size) - 1)
+	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(c, offset)
+	endBlkIdx, _ := fi.accessor.blockIdxInfo(c, offset+uint64(size)-1)
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
+	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	iterCount, err := fn(c, startBlkIdx, offset, buf[count:])
 	if err != nil {
 		c.elog("Unable to operate on first data block")
@@ -395,6 +405,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 	count += uint64(iterCount)
 
+	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
 	// Loop through the blocks, operating on them
 	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
 		iterCount, err = fn(c, i, 0, buf[count:])

@@ -658,7 +658,8 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 			if err == io.EOF {
 				return
 			}
-			test.assert(err == nil, "Error while reading from fileA")
+			test.assert(err == nil,
+				"Error while reading from fileA at %d", idx)
 			readA += readIt
 		}
 
@@ -669,7 +670,8 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 			if err == io.EOF {
 				return
 			}
-			test.assert(err == nil, "Error while reading from fileB")
+			test.assert(err == nil,
+				"Error while reading from fileB at %d", idx)
 			readB += readIt
 		}
 
