@@ -185,7 +185,7 @@ func (special *Special) dirty(c *ctx) {
 }
 
 func specialOverrideAttr(entry *quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
-	attr.Size = qfsBlockSize
+	attr.Size = 0
 	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = 1
 

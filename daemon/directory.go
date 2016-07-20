@@ -208,6 +208,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	permissions |= uint32(entry.Permissions()) << 3
 	permissions |= uint32(entry.Permissions()) << 6
 	permissions |= fileType
+	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %d", fileType,
+		entry.Permissions())
 
 	attr.Mode = permissions
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
@@ -386,6 +388,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	entry.SetID(key)
 	entry.SetType(type_)
 	entry.SetPermissions(modeToPermissions(mode, umask))
+	c.dlog("Directory::create_ mode %x umask %d permissions %d", mode, umask,
+		entry.Permissions())
 	entry.SetOwner(quantumfs.ObjectUid(c.Ctx, uid, uid))
 	entry.SetGroup(quantumfs.ObjectGid(c.Ctx, gid, gid))
 	entry.SetSize(0)
