@@ -284,7 +284,7 @@ func ObjectGid(c Ctx, gid uint32, userId uint32) GID {
 	case 0:
 		return GIDRoot
 	default:
-		c.Elog(qlog.LogDatastore, "Unknown GID", gid)
+		c.Elog(qlog.LogDatastore, "Unknown GID %d", gid)
 		return GIDUser
 	}
 }
