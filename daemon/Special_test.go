@@ -24,8 +24,14 @@ func specialCreate(test *testHelper, filetype uint32) {
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
 		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
 			stat.Nlink)
-		test.assert(stat.Rdev == 0x12345678,
-			"Node rdev incorrect %x", stat.Rdev)
+
+		if filetype == syscall.S_IFBLK || filetype == syscall.S_IFCHR {
+			test.assert(stat.Rdev == 0x12345678,
+				"Node rdev incorrect %x", stat.Rdev)
+		} else {
+			test.assert(stat.Rdev == 0, "Node rdev incorrectly set %x",
+				stat.Rdev)
+		}
 
 		var expectedPermissions uint32
 		expectedPermissions |= filetype
@@ -52,5 +58,11 @@ func TestBlockDevCreation_test(t *testing.T) {
 func TestCharDevCreation_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFCHR)
+	})
+}
+
+func TestSocketCreation_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		specialCreate(test, syscall.S_IFSOCK)
 	})
 }
