@@ -178,7 +178,7 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 			runtime.UnlockOSThread()
 		}(syscall.Geteuid())
 
-		err = syscall.Setreuid(-1, 1 /* nobody */)
+		err = syscall.Setreuid(-1, 99 /* nobody */)
 		test.assert(err == nil, "Failed to change test EUID: %v", err)
 
 		// Now create the test file
