@@ -8,9 +8,10 @@ package daemon
 import "bytes"
 import "io"
 import "io/ioutil"
+import "os"
+import "runtime"
 import "syscall"
 import "testing"
-import "os"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -153,9 +154,36 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.nullWorkspace()
-		testFilename := workspace + "/" + "test"
+		testDir := workspace + "/testDir"
+		testFilename := testDir + "/test"
+
+		err := syscall.Mkdir(testDir, 0777)
+		test.assert(err == nil, "Error creating directories: %v", err)
+
+		// The quantumfs tests are run as root because some tests require
+		// root privileges. However, root can read or write any file
+		// irrespective of the file permissions. Obviously if we want to test
+		// permissions then we cannot run as root.
+		//
+		// To accomplish this we lock this goroutine to a particular OS
+		// thread, then we change the EUID of that thread to something which
+		// isn't root. Finally at the end we need to restore the EUID of the
+		// thread before unlocking ourselves from that thread. If we do not
+		// follow this precise cleanup order other tests or goroutines may
+		// run using the other UID incorrectly.
+		runtime.LockOSThread()
+
+		defer func(origEuid int) {
+			syscall.Setreuid(-1, origEuid)
+			runtime.UnlockOSThread()
+		}(syscall.Geteuid())
+
+		err = syscall.Setreuid(-1, 1 /* nobody */)
+		test.assert(err == nil, "Failed to change test EUID: %v", err)
+
+		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.assert(err == nil, "Error creating file: %s %v", testFilename, err)
 		syscall.Close(fd)
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
