@@ -203,7 +203,8 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 
 	for _, workspace := range workspaces {
 		func() {
-			c.vlog("Locking and syncing workspace %v", workspace)
+			c.vlog("Locking and syncing workspace %s/%s",
+				workspace.namespace, workspace.workspace)
 			defer workspace.LockTree().Unlock()
 			workspace.sync_DOWN(c)
 		}()
