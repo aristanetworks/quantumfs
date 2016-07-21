@@ -236,7 +236,7 @@ func SystemUid(uid UID, userId uint32) uint32 {
 //
 // userId is the UID of the current user
 func ObjectUid(c Ctx, uid uint32, userId uint32) UID {
-	if uid == userId {
+	if uid == userId && uid > 1000 {
 		return UIDUser
 	}
 
@@ -275,8 +275,8 @@ func SystemGid(gid GID, userId uint32) uint32 {
 // Convert system GID to object GID
 //
 // userId is the GID of the current user
-func ObjectGid(c Ctx, gid uint32, userId uint32) GID {
-	if gid == userId {
+func ObjectGid(c Ctx, gid uint32, groupId uint32) GID {
+	if gid == groupId && gid > 1000 {
 		return GIDUser
 	}
 
