@@ -239,6 +239,66 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 	})
 }
 
+func TestRootFileDescriptorPermissions_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		fd, err := syscall.Creat(testFilename, 0000)
+		test.assert(err == nil, "Error creating file: %s %v", testFilename,
+			err)
+		syscall.Close(fd)
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		permissions := modeToPermissions(stat.Mode, 0x777)
+		test.assert(permissions == 0x0,
+			"Creating with mode not preserved, %d vs 0000", permissions)
+
+		//test write only
+		err = syscall.Chmod(testFilename, 0222)
+		test.assert(err == nil, "Error chmod-ing test file: %v", err)
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		permissions = modeToPermissions(stat.Mode, 0)
+		test.assert(permissions == 0x2,
+			"Chmodding not working, %d vs 0222", permissions)
+
+		var file *os.File
+		//ensure we can't read the file, only write
+		file, err = os.Open(testFilename)
+		test.assert(file != nil && err == nil,
+			"root unable to open write-only file for read")
+		file.Close()
+
+		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
+		test.assert(file != nil && err == nil,
+			"Unable to open file only for writing with permissions")
+		file.Close()
+
+		//test read only
+		err = syscall.Chmod(testFilename, 0444)
+		test.assert(err == nil, "Error chmod-ing test file: %v", err)
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		permissions = modeToPermissions(stat.Mode, 0)
+		test.assert(permissions == 0x4,
+			"Chmodding not working, %d vs 0444", permissions)
+
+		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
+		test.assert(file != nil && err == nil,
+			"root unable to open read-only file for write")
+		file.Close()
+
+		file, err = os.Open(testFilename)
+		test.assert(file != nil && err == nil,
+			"Unable to open file only for reading with permissions")
+		file.Close()
+	})
+}
+
 func TestFileSizeChanges_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
