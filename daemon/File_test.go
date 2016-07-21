@@ -8,9 +8,10 @@ package daemon
 import "bytes"
 import "io"
 import "io/ioutil"
+import "os"
+import "runtime"
 import "syscall"
 import "testing"
-import "os"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -153,9 +154,37 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.nullWorkspace()
-		testFilename := workspace + "/" + "test"
+		testDir := workspace + "/testDir"
+		testFilename := testDir + "/test"
+
+		err := syscall.Mkdir(testDir, 0777)
+		test.assert(err == nil, "Error creating directories: %v", err)
+
+		// The quantumfs tests are run as root because some tests require
+		// root privileges. However, root can read or write any file
+		// irrespective of the file permissions. Obviously if we want to test
+		// permissions then we cannot run as root.
+		//
+		// To accomplish this we lock this goroutine to a particular OS
+		// thread, then we change the EUID of that thread to something which
+		// isn't root. Finally at the end we need to restore the EUID of the
+		// thread before unlocking ourselves from that thread. If we do not
+		// follow this precise cleanup order other tests or goroutines may
+		// run using the other UID incorrectly.
+		runtime.LockOSThread()
+
+		defer func(origEuid int) {
+			syscall.Setreuid(-1, origEuid)
+			runtime.UnlockOSThread()
+		}(syscall.Geteuid())
+
+		err = syscall.Setreuid(-1, 99 /* nobody */)
+		test.assert(err == nil, "Failed to change test EUID: %v", err)
+
+		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.assert(err == nil, "Error creating file: %s %v", testFilename,
+			err)
 		syscall.Close(fd)
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
@@ -201,6 +230,66 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 			"Able to open read-only file for write")
 		test.assert(os.IsPermission(err),
 			"Expected permission error not returned: %v", err)
+		file.Close()
+
+		file, err = os.Open(testFilename)
+		test.assert(file != nil && err == nil,
+			"Unable to open file only for reading with permissions")
+		file.Close()
+	})
+}
+
+func TestRootFileDescriptorPermissions_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		fd, err := syscall.Creat(testFilename, 0000)
+		test.assert(err == nil, "Error creating file: %s %v", testFilename,
+			err)
+		syscall.Close(fd)
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		permissions := modeToPermissions(stat.Mode, 0x777)
+		test.assert(permissions == 0x0,
+			"Creating with mode not preserved, %d vs 0000", permissions)
+
+		//test write only
+		err = syscall.Chmod(testFilename, 0222)
+		test.assert(err == nil, "Error chmod-ing test file: %v", err)
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		permissions = modeToPermissions(stat.Mode, 0)
+		test.assert(permissions == 0x2,
+			"Chmodding not working, %d vs 0222", permissions)
+
+		var file *os.File
+		//ensure we can't read the file, only write
+		file, err = os.Open(testFilename)
+		test.assert(file != nil && err == nil,
+			"root unable to open write-only file for read")
+		file.Close()
+
+		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
+		test.assert(file != nil && err == nil,
+			"Unable to open file only for writing with permissions")
+		file.Close()
+
+		//test read only
+		err = syscall.Chmod(testFilename, 0444)
+		test.assert(err == nil, "Error chmod-ing test file: %v", err)
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		permissions = modeToPermissions(stat.Mode, 0)
+		test.assert(permissions == 0x4,
+			"Chmodding not working, %d vs 0444", permissions)
+
+		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
+		test.assert(file != nil && err == nil,
+			"root unable to open read-only file for write")
 		file.Close()
 
 		file, err = os.Open(testFilename)

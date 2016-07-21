@@ -242,6 +242,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		// Update the type if needed
 		if newType != nil {
 			entry.SetType(*newType)
+			c.vlog("Type now %d", *newType)
 		}
 
 		valid := uint(attr.SetAttrInCommon.Valid)
@@ -250,20 +251,27 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 
 		if BitFlagsSet(valid, fuse.FATTR_MODE) {
 			entry.SetPermissions(modeToPermissions(attr.Mode, 0))
+			c.vlog("Permissions now %d Mode %d", entry.Permissions(),
+				attr.Mode)
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_UID) {
 			entry.SetOwner(quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
 				c.fuseCtx.Owner.Uid))
+			c.vlog("Owner now %d UID %d context %d", entry.Owner(),
+				attr.Owner.Uid, c.fuseCtx.Owner.Uid)
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_GID) {
 			entry.SetGroup(quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
 				c.fuseCtx.Owner.Gid))
+			c.vlog("Group now %d GID %d context %d", entry.Group(),
+				attr.Owner.Gid, c.fuseCtx.Owner.Gid)
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_SIZE) {
 			entry.SetSize(attr.Size)
+			c.vlog("Size now %d", entry.Size())
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
@@ -273,15 +281,18 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
 			entry.SetModificationTime(
 				quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
+			c.vlog("ModificationTime now %d", entry.ModificationTime())
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
 			entry.SetModificationTime(quantumfs.NewTime(time.Now()))
+			c.vlog("ModificationTime now %d", entry.ModificationTime())
 		}
 
 		if BitFlagsSet(valid, fuse.FATTR_CTIME) {
 			entry.SetCreationTime(quantumfs.NewTimeSeconds(attr.Ctime,
 				attr.Ctimensec))
+			c.vlog("CreationTime now %d", entry.CreationTime())
 		}
 
 		if out != nil {
@@ -331,6 +342,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		return fuse.ENOENT
 	}
 
+	c.vlog("Directory::Lookup found inode %d", inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,

@@ -116,7 +116,13 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 		return false
 	}
 
-	c.vlog("Open permission check. Have %x, flags %x", record.Permissions, flags)
+	if c.fuseCtx.Owner.Uid == 0 {
+		c.vlog("Root permission check, allowing")
+		return true
+	}
+
+	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
+		flags)
 	//this only works because we don't have owner/group/other specific perms.
 	//we need to confirm whether we can treat the root user/group specially.
 	switch flags & syscall.O_ACCMODE {
