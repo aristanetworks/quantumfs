@@ -12,7 +12,8 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
@@ -120,6 +121,13 @@ func (link *Symlink) Sync(c *ctx) fuse.Status {
 	link.parent.syncChild(c, link.InodeCommon.id, key)
 
 	return fuse.OK
+}
+
+func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on Symlink")
+	return fuse.ENOSYS
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,

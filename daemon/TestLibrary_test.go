@@ -480,6 +480,8 @@ var requestId = uint64(1000000000)
 var testRunDir string
 
 func init() {
+	syscall.Umask(0)
+
 	var err error
 	for i := 0; i < 10; i++ {
 		testRunDir, err = ioutil.TempDir("", "quantumfsTest")

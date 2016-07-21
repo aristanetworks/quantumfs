@@ -26,6 +26,12 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 	case quantumfs.ObjectTypeSymlink:
 		return fuse.S_IFLNK
 
+	case quantumfs.ObjectTypeSpecial:
+		// Note, Special isn't really a FIFO, but it's used as a signal to
+		// the caller that the specialAttrOverride() function needs to be
+		// called.
+		return fuse.S_IFIFO
+
 	case quantumfs.ObjectTypeExtendedAttribute,
 		quantumfs.ObjectTypeWorkspaceRoot:
 		return 0

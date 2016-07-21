@@ -23,6 +23,10 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
+	if key.Type() == quantumfs.KeyTypeEmbedded {
+		panic("Attempted to fetch embedded key")
+	}
+
 	var buf buffer
 	initBuffer(&buf, store, key)
 
@@ -44,6 +48,10 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	key, err := buffer.Key(c)
 	if err != nil {
 		return err
+	}
+
+	if key.Type() == quantumfs.KeyTypeEmbedded {
+		panic("Attempted to set embedded key")
 	}
 	return store.durableStore.Set(c, key, buffer)
 }

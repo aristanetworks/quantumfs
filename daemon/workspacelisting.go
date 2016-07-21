@@ -248,6 +248,13 @@ func (nsl *NamespaceList) Sync(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
@@ -399,6 +406,13 @@ func (wsl *WorkspaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
 
 func (wsl *WorkspaceList) Sync(c *ctx) fuse.Status {
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on WorkspaceList")
+	return fuse.ENOSYS
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
