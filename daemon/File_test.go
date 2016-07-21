@@ -183,7 +183,8 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 
 		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)
-		test.assert(err == nil, "Error creating file: %s %v", testFilename, err)
+		test.assert(err == nil, "Error creating file: %s %v", testFilename,
+			err)
 		syscall.Close(fd)
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
