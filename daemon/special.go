@@ -158,6 +158,13 @@ func (special *Special) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	return fuse.ENOSYS
 }
 
+func (special *Special) RenameChild(c *ctx, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on Special")
+	return fuse.ENOSYS
+}
+
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

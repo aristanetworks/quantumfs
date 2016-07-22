@@ -52,6 +52,8 @@ type Inode interface {
 	Mknod(c *ctx, name string, input *fuse.MknodIn,
 		out *fuse.EntryOut) fuse.Status
 
+	RenameChild(c *ctx, oldName string, newName string) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status

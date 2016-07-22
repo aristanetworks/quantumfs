@@ -158,6 +158,13 @@ func (api *ApiInode) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) RenameChild(c *ctx, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on ApiInode")
+	return fuse.ENOSYS
+}
+
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

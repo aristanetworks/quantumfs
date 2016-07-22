@@ -258,6 +258,12 @@ func (fi *File) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	return fuse.ENOSYS
 }
 
+func (fi *File) RenameChild(c *ctx, oldName string, newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on File")
+	return fuse.ENOSYS
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }

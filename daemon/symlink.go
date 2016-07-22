@@ -130,6 +130,13 @@ func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) RenameChild(c *ctx, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on Symlink")
+	return fuse.ENOSYS
+}
+
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

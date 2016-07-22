@@ -642,6 +642,13 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	return result
 }
 
+func (dir *Directory) RenameChild(c *ctx, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on Directory")
+	return fuse.ENOSYS
+}
+
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
