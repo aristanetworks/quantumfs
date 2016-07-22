@@ -677,8 +677,55 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
-	c.elog("Invalid MvChild on Directory")
-	return fuse.ENOSYS
+	c.vlog("Directory::MvChild Enter %s -> %s", oldName, newName)
+	defer c.vlog("Directory::MvChild Exit")
+
+	result := func() fuse.Status {
+		dst := dstInode.(*Directory)
+
+		// Lock both directories in inode number order to prevent a lock
+		// ordering deadlock against a rename in the opposite direction.
+		if dir.inodeNum() > dst.inodeNum() {
+			defer dir.Lock().Unlock()
+			defer dst.Lock().Unlock()
+		} else {
+			defer dst.Lock().Unlock()
+			defer dir.Lock().Unlock()
+		}
+
+		if _, exists := dir.children[oldName]; !exists {
+			return fuse.ENOENT
+		}
+
+		oldInodeId := dir.children[oldName]
+		newInodeId := dst.children[newName]
+
+		dir.childrenRecords[oldInodeId].SetFilename(newName)
+
+		// Update entry in new directory
+		dst.children[newName] = oldInodeId
+		delete(dst.childrenRecords, newInodeId)
+		delete(dst.dirtyChildren_, newInodeId)
+		dst.childrenRecords[oldInodeId] = dir.childrenRecords[oldInodeId]
+		if _, exists := dir.dirtyChildren_[oldInodeId]; exists {
+			dst.dirtyChildren_[oldInodeId] =
+				dir.dirtyChildren_[oldInodeId]
+		}
+
+		// Remove entry in old directory
+		delete(dir.children, oldName)
+		delete(dir.childrenRecords, oldInodeId)
+		delete(dir.dirtyChildren_, oldInodeId)
+
+		dir.updateSize_(c)
+		dir.setDirty(true)
+		dst.updateSize_(c)
+		dst.setDirty(true)
+
+		return fuse.OK
+	}()
+
+	return result
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,

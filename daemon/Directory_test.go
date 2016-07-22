@@ -426,3 +426,30 @@ func TestIntraDirectoryRename(t *testing.T) {
 		test.assert(err == nil, "Rename failed: %v", err)
 	})
 }
+
+func TestInterDirectoryRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testDir1 := workspace + "/dir1"
+		testDir2 := workspace + "/dir2"
+		testFilename1 := testDir1 + "/test"
+		testFilename2 := testDir2 + "/test2"
+
+		err := os.Mkdir(testDir1, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.Mkdir(testDir2, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(testFilename1)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(testFilename1, testFilename2)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename2, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
