@@ -666,6 +666,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		delete(dir.dirtyChildren_, newInodeId)
 
 		dir.updateSize_(c)
+		dir.setDirty(true)
 
 		return fuse.OK
 	}()
