@@ -645,8 +645,32 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 func (dir *Directory) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
-	c.elog("Invalid RenameChild on Directory")
-	return fuse.ENOSYS
+	c.vlog("Directory::RenameChild Enter %s -> %s", oldName, newName)
+	defer c.vlog("Directory::RenameChild Exit")
+
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
+
+		if _, exists := dir.children[oldName]; !exists {
+			return fuse.ENOENT
+		}
+
+		oldInodeId := dir.children[oldName]
+		newInodeId := dir.children[newName]
+
+		dir.childrenRecords[oldInodeId].SetFilename(newName)
+
+		dir.children[newName] = oldInodeId
+		delete(dir.children, oldName)
+		delete(dir.childrenRecords, newInodeId)
+		delete(dir.dirtyChildren_, newInodeId)
+
+		dir.updateSize_(c)
+
+		return fuse.OK
+	}()
+
+	return result
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
