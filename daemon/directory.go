@@ -127,11 +127,11 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
 func (dir *Directory) updateSize_(c *ctx) {
 	// If we do not have a parent, then the parent is a workspacelist and we have
 	// nothing to update.
-	if dir.parent != nil {
+	if dir.parent() != nil {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = uint64(len(dir.childrenRecords))
-		dir.parent.setChildAttr(c, dir.id, nil, &attr, nil)
+		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil)
 	}
 }
 
@@ -155,7 +155,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 func (dir *Directory) dirty(c *ctx) {
 	dir.setDirty(true)
-	dir.parent.dirtyChild(c, dir)
+	dir.parent().dirtyChild(c, dir)
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
@@ -462,7 +462,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	c.vlog("Directory::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
 	defer c.vlog("Directory::SetAttr Exit")
 
-	return dir.parent.setChildAttr(c, dir.InodeCommon.id, nil, attr, out)
+	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out)
 }
 
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -749,8 +749,8 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 		return true, dir.publish(c)
 	}()
 
-	if ok && dir.parent != nil {
-		dir.parent.syncChild(c, dir.InodeCommon.id, key)
+	if ok && dir.parent() != nil {
+		dir.parent().syncChild(c, dir.InodeCommon.id, key)
 	}
 }
 

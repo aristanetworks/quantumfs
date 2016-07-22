@@ -66,6 +66,7 @@ type Inode interface {
 	// the cascading changes.
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
+	parent() Inode
 	setParent(newParent Inode)
 
 	dirty(c *ctx) // Mark this Inode dirty
@@ -86,9 +87,9 @@ type Inode interface {
 
 type InodeCommon struct {
 	// These fields are constant once instantiated
-	self   Inode // Leaf subclass instance
-	id     InodeId
-	parent Inode // nil if WorkspaceRoot
+	self    Inode // Leaf subclass instance
+	id      InodeId
+	parent_ Inode // nil if WorkspaceRoot
 
 	lock sync.RWMutex
 
@@ -132,8 +133,12 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 	panic(msg)
 }
 
+func (inode *InodeCommon) parent() Inode {
+	return inode.parent_
+}
+
 func (inode *InodeCommon) setParent(newParent Inode) {
-	inode.parent = newParent
+	inode.parent_ = newParent
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
