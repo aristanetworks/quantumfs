@@ -20,18 +20,17 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		key:    key,
-		parent: parent,
+		key: key,
 	}
 	symlink.self = &symlink
+	symlink.setParent(parent)
 	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 	return &symlink
 }
 
 type Symlink struct {
 	InodeCommon
-	key    quantumfs.ObjectKey
-	parent Inode
+	key quantumfs.ObjectKey
 }
 
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,

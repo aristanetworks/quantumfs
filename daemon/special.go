@@ -48,9 +48,9 @@ func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 		},
 		filetype: filetype,
 		device:   device,
-		parent:   parent,
 	}
 	special.self = &special
+	special.setParent(parent)
 	assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
@@ -63,7 +63,6 @@ type Special struct {
 	InodeCommon
 	filetype uint32
 	device   uint32
-	parent   Inode
 }
 
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,

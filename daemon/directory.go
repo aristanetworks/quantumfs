@@ -21,9 +21,6 @@ type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, size uint64,
 type Directory struct {
 	InodeCommon
 
-	// These fields are constant after instantiation
-	parent Inode
-
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
 	children    map[string]InodeId
@@ -44,7 +41,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	// Set directory data before processing the children incase the children
 	// access the parent.
 	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
-	dir.parent = parent
+	dir.setParent(parent)
 	dir.treeLock_ = treeLock
 	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 	dir.baseLayerId = baseLayerId
@@ -701,6 +698,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		newInodeId := dst.children[newName]
 
 		dir.childrenRecords[oldInodeId].SetFilename(newName)
+
+		child := c.qfs.inode(c, oldInodeId)
+		child.setParent(dst)
 
 		// Update entry in new directory
 		dst.children[newName] = oldInodeId

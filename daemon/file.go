@@ -61,10 +61,10 @@ func newFile_(c *ctx, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		parent:   parent,
 		accessor: accessor,
 	}
 	file.self = &file
+	file.setParent(parent)
 
 	assert(file.treeLock() != nil, "File treeLock nil at init")
 
@@ -73,7 +73,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	parent   Inode
 	accessor blockAccessor
 }
 
