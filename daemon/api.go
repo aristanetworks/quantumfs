@@ -165,6 +165,13 @@ func (api *ApiInode) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on ApiInode")
+	return fuse.ENOSYS
+}
+
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

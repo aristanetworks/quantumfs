@@ -137,6 +137,13 @@ func (link *Symlink) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on Symlink")
+	return fuse.ENOSYS
+}
+
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

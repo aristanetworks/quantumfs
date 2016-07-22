@@ -165,6 +165,13 @@ func (special *Special) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
+func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on Special")
+	return fuse.ENOSYS
+}
+
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

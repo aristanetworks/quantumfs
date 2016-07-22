@@ -380,6 +380,21 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 		defer inode.RLockTree().RUnlock()
 		return inode.RenameChild(c, oldName, newName)
+	} else {
+		srcInode := qfs.inode(c, InodeId(input.NodeId))
+		if srcInode == nil {
+			return fuse.ENOENT
+		}
+
+		dstInode := qfs.inode(c, InodeId(input.Newdir))
+		if dstInode == nil {
+			return fuse.ENOENT
+		}
+
+		defer srcInode.RLockTree().RUnlock()
+		defer dstInode.RLockTree().RUnlock()
+
+		return srcInode.MvChild(c, dstInode, oldName, newName)
 	}
 
 	c.elog("Unhandled request Rename")

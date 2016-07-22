@@ -264,6 +264,13 @@ func (fi *File) RenameChild(c *ctx, oldName string, newName string) fuse.Status 
 	return fuse.ENOSYS
 }
 
+func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on File")
+	return fuse.ENOSYS
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }

@@ -673,6 +673,13 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	return result
 }
 
+func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on Directory")
+	return fuse.ENOSYS
+}
+
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

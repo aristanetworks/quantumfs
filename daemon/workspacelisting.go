@@ -262,6 +262,13 @@ func (nsl *NamespaceList) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
+func (nsl *NamespaceList) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
@@ -426,6 +433,13 @@ func (wsl *WorkspaceList) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
 	c.elog("Invalid RenameChild on WorkspaceList")
+	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on WorkspaceList")
 	return fuse.ENOSYS
 }
 

@@ -54,6 +54,8 @@ type Inode interface {
 
 	RenameChild(c *ctx, oldName string, newName string) fuse.Status
 
+	MvChild(c *ctx, dstInode Inode, oldName string, newName string) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
