@@ -663,7 +663,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		delete(dir.dirtyChildren_, newInodeId)
 
 		dir.updateSize_(c)
-		dir.setDirty(true)
+		dir.self.dirty(c)
 
 		return fuse.OK
 	}()
@@ -718,9 +718,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		delete(dir.dirtyChildren_, oldInodeId)
 
 		dir.updateSize_(c)
-		dir.setDirty(true)
+		dir.self.dirty(c)
 		dst.updateSize_(c)
-		dst.setDirty(true)
+		dst.self.dirty(c)
 
 		return fuse.OK
 	}()
@@ -736,7 +736,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	ok, key := func() (bool, quantumfs.ObjectKey) {
 		defer dir.Lock().Unlock()
-		dir.setDirty(true)
+		dir.self.dirty(c)
 
 		entry, exists := dir.childrenRecords[inodeNum]
 		if !exists {

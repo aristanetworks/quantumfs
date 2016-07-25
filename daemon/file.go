@@ -194,7 +194,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			fi.setDirty(true)
+			fi.self.dirty(c)
 		}
 
 		return fuse.OK
@@ -479,7 +479,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			return 0, fuse.EIO
 		}
-		fi.setDirty(true)
+		fi.self.dirty(c)
 		return uint32(writeCount), fuse.OK
 	}()
 
