@@ -332,6 +332,8 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
+	c.vlog("Directory::Lookup Enter")
+	defer c.vlog("Directory::Lookup Exit")
 	defer dir.RLock().RUnlock()
 
 	inodeNum, exists := dir.children[name]
@@ -697,16 +699,28 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		oldInodeId := dir.children[oldName]
 		newInodeId := dst.children[newName]
 
-		dir.childrenRecords[oldInodeId].SetFilename(newName)
+		oldEntry := dir.childrenRecords[oldInodeId]
 
 		child := c.qfs.inode(c, oldInodeId)
 		child.setParent(dst)
+
+		newEntry := quantumfs.NewDirectoryRecord()
+		newEntry.SetFilename(newName)
+		newEntry.SetID(oldEntry.ID())
+		newEntry.SetType(oldEntry.Type())
+		newEntry.SetPermissions(oldEntry.Permissions())
+		newEntry.SetOwner(oldEntry.Owner())
+		newEntry.SetGroup(oldEntry.Group())
+		newEntry.SetSize(oldEntry.Size())
+		newEntry.SetExtendedAttributes(oldEntry.ExtendedAttributes())
+		newEntry.SetCreationTime(oldEntry.CreationTime())
+		newEntry.SetModificationTime(oldEntry.ModificationTime())
 
 		// Update entry in new directory
 		dst.children[newName] = oldInodeId
 		delete(dst.childrenRecords, newInodeId)
 		delete(dst.dirtyChildren_, newInodeId)
-		dst.childrenRecords[oldInodeId] = dir.childrenRecords[oldInodeId]
+		dst.childrenRecords[oldInodeId] = newEntry
 		if _, exists := dir.dirtyChildren_[oldInodeId]; exists {
 			dst.dirtyChildren_[oldInodeId] =
 				dir.dirtyChildren_[oldInodeId]
