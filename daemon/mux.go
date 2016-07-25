@@ -396,9 +396,6 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 		return srcInode.MvChild(c, dstInode, oldName, newName)
 	}
-
-	c.elog("Unhandled request Rename")
-	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
