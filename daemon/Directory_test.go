@@ -424,6 +424,12 @@ func TestIntraDirectoryRename(t *testing.T) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename2, &stat)
 		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename2 = workspace + "/test2"
+		err = syscall.Stat(testFilename2, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
 	})
 }
 
