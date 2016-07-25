@@ -230,7 +230,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.dlog("QuantumFs::Lookup Inode %d", header.NodeId)
+	c.dlog("QuantumFs::Lookup Inode %d Name %s", header.NodeId, name)
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		c.elog("Lookup failed", name)
@@ -396,9 +396,6 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 		return srcInode.MvChild(c, dstInode, oldName, newName)
 	}
-
-	c.elog("Unhandled request Rename")
-	return fuse.ENOSYS
 }
 
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
