@@ -20,18 +20,17 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		key:    key,
-		parent: parent,
+		key: key,
 	}
 	symlink.self = &symlink
+	symlink.setParent(parent)
 	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 	return &symlink
 }
 
 type Symlink struct {
 	InodeCommon
-	key    quantumfs.ObjectKey
-	parent Inode
+	key quantumfs.ObjectKey
 }
 
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
@@ -127,6 +126,20 @@ func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	c.elog("Invalid Mknod on Symlink")
+	return fuse.ENOSYS
+}
+
+func (link *Symlink) RenameChild(c *ctx, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on Symlink")
+	return fuse.ENOSYS
+}
+
+func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on Symlink")
 	return fuse.ENOSYS
 }
 

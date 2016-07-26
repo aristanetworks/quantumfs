@@ -230,7 +230,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.dlog("QuantumFs::Lookup Inode %d", header.NodeId)
+	c.dlog("QuantumFs::Lookup Inode %d Name %s", header.NodeId, name)
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		c.elog("Lookup failed", name)
@@ -368,11 +368,34 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Rename Enter")
+	c.vlog("QuantumFs::Rename Enter Inode %d newdir %d %s -> %s", input.NodeId,
+		input.Newdir, oldName, newName)
 	defer c.vlog("QuantumFs::Rename Exit")
 
-	c.elog("Unhandled request Rename")
-	return fuse.ENOSYS
+	if input.NodeId == input.Newdir {
+		inode := qfs.inode(c, InodeId(input.NodeId))
+		if inode == nil {
+			return fuse.ENOENT
+		}
+
+		defer inode.RLockTree().RUnlock()
+		return inode.RenameChild(c, oldName, newName)
+	} else {
+		srcInode := qfs.inode(c, InodeId(input.NodeId))
+		if srcInode == nil {
+			return fuse.ENOENT
+		}
+
+		dstInode := qfs.inode(c, InodeId(input.Newdir))
+		if dstInode == nil {
+			return fuse.ENOENT
+		}
+
+		defer srcInode.RLockTree().RUnlock()
+		defer dstInode.RLockTree().RUnlock()
+
+		return srcInode.MvChild(c, dstInode, oldName, newName)
+	}
 }
 
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,

@@ -52,6 +52,10 @@ type Inode interface {
 	Mknod(c *ctx, name string, input *fuse.MknodIn,
 		out *fuse.EntryOut) fuse.Status
 
+	RenameChild(c *ctx, oldName string, newName string) fuse.Status
+
+	MvChild(c *ctx, dstInode Inode, oldName string, newName string) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
@@ -61,6 +65,8 @@ type Inode interface {
 	// Update the key for only this child and then notify all the grandparents of
 	// the cascading changes.
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
+
+	setParent(newParent Inode)
 
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty
@@ -80,8 +86,9 @@ type Inode interface {
 
 type InodeCommon struct {
 	// These fields are constant once instantiated
-	self Inode // Leaf subclass instance
-	id   InodeId
+	self   Inode // Leaf subclass instance
+	id     InodeId
+	parent Inode // nil if WorkspaceRoot
 
 	lock sync.RWMutex
 
@@ -123,6 +130,10 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 	msg := fmt.Sprintf("Unsupported dirtyChild() call on leaf Inode: %v %v",
 		inodeType, inode)
 	panic(msg)
+}
+
+func (inode *InodeCommon) setParent(newParent Inode) {
+	inode.parent = newParent
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {

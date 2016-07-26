@@ -48,9 +48,9 @@ func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 		},
 		filetype: filetype,
 		device:   device,
-		parent:   parent,
 	}
 	special.self = &special
+	special.setParent(parent)
 	assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
@@ -63,7 +63,6 @@ type Special struct {
 	InodeCommon
 	filetype uint32
 	device   uint32
-	parent   Inode
 }
 
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
@@ -155,6 +154,20 @@ func (special *Special) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	c.elog("Invalid Mknod on Special")
+	return fuse.ENOSYS
+}
+
+func (special *Special) RenameChild(c *ctx, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on Special")
+	return fuse.ENOSYS
+}
+
+func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on Special")
 	return fuse.ENOSYS
 }
 

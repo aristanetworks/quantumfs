@@ -61,10 +61,10 @@ func newFile_(c *ctx, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		parent:   parent,
 		accessor: accessor,
 	}
 	file.self = &file
+	file.setParent(parent)
 
 	assert(file.treeLock() != nil, "File treeLock nil at init")
 
@@ -73,7 +73,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	parent   Inode
 	accessor blockAccessor
 }
 
@@ -195,7 +194,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			fi.setDirty(true)
+			fi.self.dirty(c)
 		}
 
 		return fuse.OK
@@ -255,6 +254,19 @@ func (fi *File) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
 	c.elog("Invalid Mknod on File")
+	return fuse.ENOSYS
+}
+
+func (fi *File) RenameChild(c *ctx, oldName string, newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on File")
+	return fuse.ENOSYS
+}
+
+func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on File")
 	return fuse.ENOSYS
 }
 
@@ -467,7 +479,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			return 0, fuse.EIO
 		}
-		fi.setDirty(true)
+		fi.self.dirty(c)
 		return uint32(writeCount), fuse.OK
 	}()
 
