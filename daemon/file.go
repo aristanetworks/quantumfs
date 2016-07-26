@@ -13,10 +13,6 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-const execBit = 0x1
-const writeBit = 0x2
-const readBit = 0x4
-
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
@@ -126,11 +122,12 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 	//we need to confirm whether we can treat the root user/group specially.
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions() & readBit) != 0
+		return (record.Permissions() & quantumfs.PermissionRead) != 0
 	case syscall.O_WRONLY:
-		return (record.Permissions() & writeBit) != 0
+		return (record.Permissions() & quantumfs.PermissionWrite) != 0
 	case syscall.O_RDWR:
-		var bitmask uint8 = readBit | writeBit
+		var bitmask uint8 = quantumfs.PermissionRead |
+			quantumfs.PermissionWrite
 		return (record.Permissions() & bitmask) == bitmask
 	}
 
