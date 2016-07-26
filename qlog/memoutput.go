@@ -248,7 +248,8 @@ func newSharedMemory(dir string, filename string, errOut *func(format string,
 	header := (*MmapHeader)(unsafe.Pointer(&rtn.buffer[0]))
 	header.StrMapSize = mmapStrMapSize
 	rtn.circBuf = newCircBuf(&header.CircBuf,
-		(*[mmapCircBufSize]byte)(unsafe.Pointer(&rtn.buffer[MmapHeaderSize])))
+		(*[mmapCircBufSize]byte)(unsafe.Pointer(
+			&rtn.buffer[MmapHeaderSize])))
 	rtn.strIdMap = newIdStrMap(rtn.buffer, rtn.circBuf.Size())
 	rtn.errOut = errOut
 
