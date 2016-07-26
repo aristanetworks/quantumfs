@@ -177,7 +177,7 @@ func TestDirectoryUpdate_test(t *testing.T) {
 		testFilename = test.absPath(dst + "/" + "test")
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
-		test.assert(err == nil, "Workspace copy doesn't match")
+		test.assert(err == nil, "Workspace copy doesn't match: %v", err)
 	})
 }
 
@@ -380,5 +380,88 @@ func TestLargeDirectory(t *testing.T) {
 				testFile)
 		}
 
+	})
+}
+
+func TestDirectoryChmod(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testDir := workspace + "/testdir"
+
+		err := os.Mkdir(testDir, 0)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		info, err := os.Stat(testDir)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode()&os.ModePerm == 0,
+			"Initial permissions incorrect %d", info.Mode()&os.ModePerm)
+
+		err = os.Chmod(testDir, 0777)
+		test.assert(err == nil, "Error setting permissions: %v", err)
+
+		info, err = os.Stat(testDir)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode()&os.ModePerm == 0777,
+			"Changed permissions incorrect %d", info.Mode()&os.ModePerm)
+	})
+}
+
+func TestIntraDirectoryRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename1 := workspace + "/test"
+		testFilename2 := workspace + "/test2"
+
+		fd, err := os.Create(testFilename1)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(testFilename1, testFilename2)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename2, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename2 = workspace + "/test2"
+		err = syscall.Stat(testFilename2, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
+func TestInterDirectoryRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testDir1 := workspace + "/dir1"
+		testDir2 := workspace + "/dir2"
+		testFilename1 := testDir1 + "/test"
+		testFilename2 := testDir2 + "/test2"
+
+		err := os.Mkdir(testDir1, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.Mkdir(testDir2, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(testFilename1)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(testFilename1, testFilename2)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename2, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename2 = workspace + "/dir2/test2"
+		err = syscall.Stat(testFilename2, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
 	})
 }

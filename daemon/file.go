@@ -18,7 +18,8 @@ const writeBit = 0x2
 const readBit = 0x4
 
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newSmallAccessor(c, size, key)
 
@@ -26,7 +27,8 @@ func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId
 }
 
 func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newMediumAccessor(c, key)
 
@@ -34,7 +36,8 @@ func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeI
 }
 
 func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newLargeAccessor(c, key)
 
@@ -42,7 +45,8 @@ func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId
 }
 
 func newVeryLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode) Inode {
+	parent Inode, mode uint32, rdev uint32,
+	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newVeryLargeAccessor(c, key)
 
@@ -57,10 +61,10 @@ func newFile_(c *ctx, inodeNum InodeId,
 			id:        inodeNum,
 			treeLock_: parent.treeLock(),
 		},
-		parent:   parent,
 		accessor: accessor,
 	}
 	file.self = &file
+	file.setParent(parent)
 
 	assert(file.treeLock() != nil, "File treeLock nil at init")
 
@@ -69,7 +73,6 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	parent   Inode
 	accessor blockAccessor
 }
 
@@ -112,17 +115,23 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 		return false
 	}
 
-	c.vlog("Open permission check. Have %x, flags %x", record.Permissions, flags)
+	if c.fuseCtx.Owner.Uid == 0 {
+		c.vlog("Root permission check, allowing")
+		return true
+	}
+
+	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
+		flags)
 	//this only works because we don't have owner/group/other specific perms.
 	//we need to confirm whether we can treat the root user/group specially.
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions & readBit) != 0
+		return (record.Permissions() & readBit) != 0
 	case syscall.O_WRONLY:
-		return (record.Permissions & writeBit) != 0
+		return (record.Permissions() & writeBit) != 0
 	case syscall.O_RDWR:
 		var bitmask uint8 = readBit | writeBit
-		return (record.Permissions & bitmask) == bitmask
+		return (record.Permissions() & bitmask) == bitmask
 	}
 
 	return false
@@ -164,8 +173,14 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	result := func() fuse.Status {
 		defer fi.Lock().Unlock()
 
+		c.vlog("Got file lock")
+
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-			endBlkIdx, _ := fi.accessor.blockIdxInfo(attr.Size - 1)
+			if attr.Size == 0 {
+				fi.accessor.truncate(c, 0)
+				return fuse.OK
+			}
+			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
 
 			err := fi.reconcileFileType(c, endBlkIdx)
 			if err != nil {
@@ -179,7 +194,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			fi.setDirty(true)
+			fi.self.dirty(c)
 		}
 
 		return fuse.OK
@@ -233,6 +248,26 @@ func (fi *File) Sync(c *ctx) fuse.Status {
 	}()
 
 	return fuse.OK
+}
+
+func (fi *File) Mknod(c *ctx, name string, input *fuse.MknodIn,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Mknod on File")
+	return fuse.ENOSYS
+}
+
+func (fi *File) RenameChild(c *ctx, oldName string, newName string) fuse.Status {
+
+	c.elog("Invalid RenameChild on File")
+	return fuse.ENOSYS
+}
+
+func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild on File")
+	return fuse.ENOSYS
 }
 
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
@@ -335,7 +370,7 @@ type blockAccessor interface {
 	fileLength() uint64
 
 	// Extract block and remaining offset from absolute offset
-	blockIdxInfo(uint64) (int, uint64)
+	blockIdxInfo(c *ctx, absOffset uint64) (int, uint64)
 
 	// Convert contents into new accessor type, nil accessor if current is fine
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
@@ -371,6 +406,9 @@ type blockFn func(*ctx, int, uint64, []byte) (int, error)
 func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	fn blockFn) (uint64, error) {
 
+	c.vlog("File::operateOnBlocks Enter offset %d size %d", offset, size)
+	defer c.vlog("File::operateOnBlocks Exit")
+
 	count := uint64(0)
 
 	// Ensure size and buf are consistent
@@ -383,11 +421,12 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 
 	// Determine the block to start in
-	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(offset)
-	endBlkIdx, _ := fi.accessor.blockIdxInfo(offset + uint64(size) - 1)
+	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(c, offset)
+	endBlkIdx, _ := fi.accessor.blockIdxInfo(c, offset+uint64(size)-1)
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
+	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	iterCount, err := fn(c, startBlkIdx, offset, buf[count:])
 	if err != nil {
 		c.elog("Unable to operate on first data block")
@@ -395,6 +434,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 	count += uint64(iterCount)
 
+	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
 	// Loop through the blocks, operating on them
 	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
 		iterCount, err = fn(c, i, 0, buf[count:])
@@ -439,7 +479,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		if err != nil {
 			return 0, fuse.EIO
 		}
-		fi.setDirty(true)
+		fi.self.dirty(c)
 		return uint32(writeCount), fuse.OK
 	}()
 

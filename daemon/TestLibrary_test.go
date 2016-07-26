@@ -488,10 +488,15 @@ var requestId = uint64(1000000000)
 var testRunDir string
 
 func init() {
+	syscall.Umask(0)
+
 	var err error
 	for i := 0; i < 10; i++ {
 		testRunDir, err = ioutil.TempDir("", "quantumfsTest")
 		if err != nil {
+			continue
+		}
+		if err := os.Chmod(testRunDir, 777); err != nil {
 			continue
 		}
 		return
@@ -672,7 +677,8 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 			if err == io.EOF {
 				return
 			}
-			test.assert(err == nil, "Error while reading from fileA")
+			test.assert(err == nil,
+				"Error while reading from fileA at %d", idx)
 			readA += readIt
 		}
 
@@ -683,7 +689,8 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 			if err == io.EOF {
 				return
 			}
-			test.assert(err == nil, "Error while reading from fileB")
+			test.assert(err == nil,
+				"Error while reading from fileB at %d", idx)
 			readB += readIt
 		}
 		test.assert(bytes.Equal(rtnA, rtnB), "data mismatch, %v vs %v",

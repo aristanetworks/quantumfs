@@ -48,7 +48,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, errors.New("BlockIdx must be zero for small files")
 	}
 
-	if uint32(offset) >= quantumfs.MaxBlockSize {
+	if int(offset) >= quantumfs.MaxBlockSize {
 		return 0, errors.New("Offset exceeds small file")
 	}
 
@@ -65,9 +65,9 @@ func (fi *SmallFile) fileLength() uint64 {
 	return uint64(fi.buf.Size())
 }
 
-func (fi *SmallFile) blockIdxInfo(absOffset uint64) (int, uint64) {
-	blkIdx := absOffset / quantumfs.MaxBlockSize
-	remainingOffset := absOffset % quantumfs.MaxBlockSize
+func (fi *SmallFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
+	blkIdx := absOffset / uint64(quantumfs.MaxBlockSize)
+	remainingOffset := absOffset % uint64(quantumfs.MaxBlockSize)
 
 	return int(blkIdx), remainingOffset
 }
@@ -94,7 +94,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	c.vlog("SmallFile::convertToMultiBlock Enter")
 	defer c.vlog("SmallFile::convertToMultiBlock Exit")
 
-	input.metadata.BlockSize = quantumfs.MaxBlockSize
+	input.metadata.BlockSize = uint32(quantumfs.MaxBlockSize)
 
 	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
 		float64(input.metadata.BlockSize)))

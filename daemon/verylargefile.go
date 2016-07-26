@@ -6,7 +6,6 @@ package daemon
 // This contains very large file types and methods
 
 import "github.com/aristanetworks/quantumfs"
-import "encoding/json"
 
 type VeryLargeFile struct {
 	parts []LargeFile
@@ -21,14 +20,12 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 		panic("Unable to fetch metadata for new vl file creation")
 	}
 
-	var store quantumfs.VeryLargeFile
-	if err := json.Unmarshal(buffer.Get(), &store); err != nil {
-		panic("Couldn't decode VeryLargeFile object")
-	}
+	store := buffer.AsVeryLargeFile()
 
-	rtn.parts = make([]LargeFile, len(store.LargeFileKeys))
-	for i := 0; i < len(store.LargeFileKeys); i++ {
-		newPart := newLargeAccessor(c, store.LargeFileKeys[i])
+	c.vlog("Loading VeryLargeFile of %d parts", store.NumberOfParts())
+	rtn.parts = make([]LargeFile, store.NumberOfParts())
+	for i := 0; i < store.NumberOfParts(); i++ {
+		newPart := newLargeAccessor(c, store.LargeFileKey(i))
 		if newPart == nil {
 			c.elog("Recieved nil accessor, system state inconsistent")
 			panic("Nil Large accessor in very large file")
@@ -52,6 +49,8 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 
 	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile
 	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile
+
+	c.vlog("VeryLargeFile::readBlock part %d/%d", partIdx, len(fi.parts))
 
 	// If we try to read too far, there's nothing to read here
 	if partIdx >= len(fi.parts) {
@@ -120,9 +119,12 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 	return length
 }
 
-func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
+func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
+	c.vlog("VeryLargeFile::blockIdxInfo Enter absOffset %d", absOffset)
+
 	// Variable multiblock data block sizes makes this function harder
 
+	c.vlog("Searching existing large files")
 	for i := 0; i < len(fi.parts); i++ {
 		maxLengthFile := uint64(fi.parts[i].metadata.BlockSize) *
 			uint64(quantumfs.MaxBlocksLargeFile)
@@ -130,7 +132,7 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 		// If this extends past the remaining offset, then this
 		// is the file we're looking for
 		if maxLengthFile > absOffset {
-			blockIdx, offset := fi.parts[i].blockIdxInfo(absOffset)
+			blockIdx, offset := fi.parts[i].blockIdxInfo(c, absOffset)
 			blockIdx += i * quantumfs.MaxBlocksLargeFile
 			return blockIdx, offset
 		}
@@ -143,10 +145,11 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 	// our return values
 	maxLengthFile := uint64(quantumfs.MaxBlockSize) *
 		uint64(quantumfs.MaxBlocksLargeFile)
+	c.vlog("Extending into sparse space until %d > %d", maxLengthFile, absOffset)
 	for i := len(fi.parts); ; i++ {
 		if maxLengthFile > absOffset {
 			tmpLargeFile := newLargeShell()
-			blockIdx, offset := tmpLargeFile.blockIdxInfo(absOffset)
+			blockIdx, offset := tmpLargeFile.blockIdxInfo(c, absOffset)
 			blockIdx += i * quantumfs.MaxBlocksLargeFile
 			return blockIdx, offset
 		}
@@ -155,19 +158,16 @@ func (fi *VeryLargeFile) blockIdxInfo(absOffset uint64) (int, uint64) {
 }
 
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
-	var store quantumfs.VeryLargeFile
-	store.NumberOfParts = uint32(len(fi.parts))
+	store := quantumfs.NewVeryLargeFile()
+	store.SetNumberOfParts(len(fi.parts))
 
 	for i := 0; i < len(fi.parts); i++ {
 		newKey := fi.parts[i].sync(c)
 
-		store.LargeFileKeys = append(store.LargeFileKeys, newKey)
+		store.SetLargeFileKey(i, newKey)
 	}
 
-	bytes, err := json.Marshal(store)
-	if err != nil {
-		panic("Unable to marshal very large file keys")
-	}
+	bytes := store.Bytes()
 
 	buffer := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 
@@ -201,7 +201,7 @@ func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
 	}
 
 	// If we're expanding the length, handle that first
-	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(newLengthBytes - 1)
+	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(c, newLengthBytes-1)
 
 	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile
 	newNumParts := lastPartIdx + 1

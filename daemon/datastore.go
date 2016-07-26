@@ -6,7 +6,9 @@ package daemon
 import "crypto/sha1"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/qlog"
+import capn "github.com/glycerine/go-capnproto"
 
 func newDataStore(durableStore quantumfs.DataStore) *dataStore {
 	return &dataStore{
@@ -20,6 +22,10 @@ type dataStore struct {
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
+
+	if key.Type() == quantumfs.KeyTypeEmbedded {
+		panic("Attempted to fetch embedded key")
+	}
 
 	var buf buffer
 	initBuffer(&buf, store, key)
@@ -42,6 +48,10 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	key, err := buffer.Key(c)
 	if err != nil {
 		return err
+	}
+
+	if key.Type() == quantumfs.KeyTypeEmbedded {
+		panic("Attempted to set embedded key")
 	}
 	return store.durableStore.Set(c, key, buffer)
 }
@@ -161,4 +171,32 @@ func (buf *buffer) SetSize(size int) {
 
 func (buf *buffer) Size() int {
 	return len(buf.data)
+}
+
+func (buf *buffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayDirectoryEntry(
+		encoding.ReadRootDirectoryEntry(segment))
+
+}
+
+func (buf *buffer) AsWorkspaceRoot() quantumfs.WorkspaceRoot {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayWorkspaceRoot(
+		encoding.ReadRootWorkspaceRoot(segment))
+
+}
+
+func (buf *buffer) AsMultiBlockFile() quantumfs.MultiBlockFile {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayMultiBlockFile(
+		encoding.ReadRootMultiBlockFile(segment))
+
+}
+
+func (buf *buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayVeryLargeFile(
+		encoding.ReadRootVeryLargeFile(segment))
+
 }
