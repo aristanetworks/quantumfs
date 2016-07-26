@@ -246,7 +246,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
 		MountPath:        mountPath,
-		RamFsPath:	  th.tempDir + "/ramfs",
+		RamFsPath:        th.tempDir + "/ramfs",
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
 		DurableStore:     processlocal.NewDataStore(),
 	}

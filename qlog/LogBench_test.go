@@ -35,7 +35,7 @@ func BenchmarkQuick0Params(test *testing.B) {
 	qlog := NewQlog("")
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, !!!!!!!!")
 	}
 }
@@ -44,7 +44,7 @@ func BenchmarkQuick1Params(test *testing.B) {
 	qlog := NewQlog("")
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, %d !!!!!", a)
 	}
 }
@@ -53,7 +53,7 @@ func BenchmarkQuick2Params(test *testing.B) {
 	qlog := NewQlog("")
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, %d %d !!", a, b)
 	}
 }
@@ -62,7 +62,7 @@ func BenchmarkQuick3Params(test *testing.B) {
 	qlog := NewQlog("")
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, %d %d %d", a, b, c)
 	}
 }
@@ -71,7 +71,7 @@ func BenchmarkQuickString(test *testing.B) {
 	qlog := NewQlog("")
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, %s", d)
 	}
 }
@@ -87,7 +87,7 @@ func BenchmarkBigLogArgsArray(test *testing.B) {
 	args = append(args, d)
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, %d %d %s", args...)
 	}
 }
@@ -96,7 +96,7 @@ func BenchmarkBigLog(test *testing.B) {
 	qlog := NewQlog("")
 
 	for i := 0; i < test.N; i++ {
-		qlog.Log(LogDaemon, MuxReqId, 1, 
+		qlog.Log(LogDaemon, MuxReqId, 1,
 			"TestToken with a few params, %d %d %s", a, b, d)
 	}
 }

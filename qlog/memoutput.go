@@ -18,47 +18,50 @@ import "unsafe"
 
 // Circ buf size for approx 1 hour of LogEntries at 1000 a second
 const mmapCircBufSize = 360000 * 24
+
 // Strmap size allows for up to ~10000 unique logs
 const mmapStrMapSize = 512 * 1024
+
 // This must include the MmapHeader len
 const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + MmapHeaderSize
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
 const MmapHeaderSize = 16
+
 type MmapHeader struct {
-	StrMapSize	uint32
-	CircBuf		circBufHeader
+	StrMapSize uint32
+	CircBuf    circBufHeader
 }
 
 type circBufHeader struct {
-	Size		uint32
+	Size uint32
 
 	// These variables indicate the front and end of the circular buffer
-	FrontIdx	uint32
-	PastEndIdx	uint32
+	FrontIdx   uint32
+	PastEndIdx uint32
 }
 
 type SharedMemory struct {
-	fd		*os.File
-	buffer		*[mmapTotalSize]byte
-	circBuf		CircMemLogs
-	strIdMap	IdStrMap
-	errOut		*func(format string, args ...interface{}) (int, error)
+	fd       *os.File
+	buffer   *[mmapTotalSize]byte
+	circBuf  CircMemLogs
+	strIdMap IdStrMap
+	errOut   *func(format string, args ...interface{}) (int, error)
 }
 
 // Average Log Entry should be ~24 bytes
 type LogEntry struct {
-	strIdx		uint16
-	reqId		uint64
-	timestamp	int64
-	vars		[]interface{}
+	strIdx    uint16
+	reqId     uint64
+	timestamp int64
+	vars      []interface{}
 }
 
 type CircMemLogs struct {
-	header		*circBufHeader
-	buffer 		*[mmapCircBufSize]byte
-	writer		chan []byte
+	header *circBufHeader
+	buffer *[mmapCircBufSize]byte
+	writer chan []byte
 }
 
 func (circ *CircMemLogs) Size() int {
@@ -80,7 +83,7 @@ func (circ *CircMemLogs) curLen_() uint32 {
 func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
 	rtn := make([]byte, num)
 
-	if idx + num > mmapCircBufSize {
+	if idx+num > mmapCircBufSize {
 		secondNum := (idx + num) - mmapCircBufSize
 		num -= secondNum
 		copy(rtn[num:], circ.buffer[0:secondNum])
@@ -93,7 +96,7 @@ func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
 
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
-	if *lhs + addon < mmapCircBufSize {
+	if *lhs+addon < mmapCircBufSize {
 		*lhs = *lhs + addon
 		return
 	}
@@ -104,7 +107,7 @@ func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 	numWrite := uint32(len(data))
-	if idx + numWrite > mmapCircBufSize {
+	if idx+numWrite > mmapCircBufSize {
 		secondNum := (idx + numWrite) - mmapCircBufSize
 		numWrite -= secondNum
 		copy(circ.buffer[0:secondNum], data[numWrite:])
@@ -141,12 +144,14 @@ func (circ *CircMemLogs) writeLogEntries() {
 		circ.wrapPlusEquals_(&circ.header.PastEndIdx, uint32(len(data)))
 	}
 }
+
 const LogStrSize = 64
 const logTextMax = 62
+
 type LogStr struct {
-	Text		[logTextMax]byte
-	LogSubsystem	uint8
-	LogLevel	uint8
+	Text         [logTextMax]byte
+	LogSubsystem uint8
+	LogLevel     uint8
 }
 
 func newLogStr(idx LogSubsystem, level uint8, format string) LogStr {
@@ -165,20 +170,20 @@ func newLogStr(idx LogSubsystem, level uint8, format string) LogStr {
 }
 
 type IdStrMap struct {
-	data		map[string]uint16
-	mapLock		sync.RWMutex
+	data    map[string]uint16
+	mapLock sync.RWMutex
 
-	buffer		*[mmapStrMapSize/LogStrSize]LogStr
-	freeIdx		uint16
+	buffer  *[mmapStrMapSize / LogStrSize]LogStr
+	freeIdx uint16
 }
 
 func newCircBuf(mapHeader *circBufHeader,
 	mapBuffer *[mmapCircBufSize]byte) CircMemLogs {
 
-	rtn := CircMemLogs {
-		header:		mapHeader,
-		buffer:		mapBuffer,
-		writer:		make(chan []byte),
+	rtn := CircMemLogs{
+		header: mapHeader,
+		buffer: mapBuffer,
+		writer: make(chan []byte),
 	}
 
 	rtn.header.Size = mmapCircBufSize
@@ -192,7 +197,7 @@ func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
 	var rtn IdStrMap
 	rtn.data = make(map[string]uint16)
 	rtn.freeIdx = 0
-	rtn.buffer = (*[mmapStrMapSize/
+	rtn.buffer = (*[mmapStrMapSize /
 		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
 
 	return rtn
@@ -211,10 +216,10 @@ func newSharedMemory(dir string, filename string, errOut *func(format string,
 		panic(fmt.Sprintf("Unable to ensure log file path exists: %s", dir))
 	}
 
-	mapFile, err := os.OpenFile(dir + "/" + filename,
+	mapFile, err := os.OpenFile(dir+"/"+filename,
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
-		panic(fmt.Sprintf("Unable to create shared memory log file: %s/%s", 
+		panic(fmt.Sprintf("Unable to create shared memory log file: %s/%s",
 			dir, filename))
 	}
 
@@ -317,52 +322,52 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 	needDataWrite := true
 	byteType := make([]byte, 2)
 	switch v := data.(type) {
-		case *int8:
-			byteType[0] = 1
-		case int8:
-			byteType[0] = 2
-		case *uint8:
-			byteType[0] = 3
-		case uint8:
-			byteType[0] = 4
-		case *int16:
-			byteType[0] = 5
-		case int16:
-			byteType[0] = 6
-		case *uint16:
-			byteType[0] = 7
-		case uint16:
-			byteType[0] = 8
-		case *int32:
-			byteType[0] = 9
-		case int32:
-			byteType[0] = 10
-		case *uint32:
-			byteType[0] = 11
-		case uint32:
-			byteType[0] = 12
-		case int:
-			byteType[0] = 10
-			data = interface{}(int32(v))
-		case uint:
-			byteType[0] = 12
-			data = interface{}(uint32(v))
-		case *int64:
-			byteType[0] = 13
-		case int64:
-			byteType[0] = 14
-		case *uint64:
-			byteType[0] = 15
-		case uint64:
-			byteType[0] = 16
-		case string:
-			writeArray(w, format, []byte(v), 17)
-			return
-		case []byte:
-			writeArray(w, format, v, 18)
-			return
-		default:
-			needDataWrite = false
+	case *int8:
+		byteType[0] = 1
+	case int8:
+		byteType[0] = 2
+	case *uint8:
+		byteType[0] = 3
+	case uint8:
+		byteType[0] = 4
+	case *int16:
+		byteType[0] = 5
+	case int16:
+		byteType[0] = 6
+	case *uint16:
+		byteType[0] = 7
+	case uint16:
+		byteType[0] = 8
+	case *int32:
+		byteType[0] = 9
+	case int32:
+		byteType[0] = 10
+	case *uint32:
+		byteType[0] = 11
+	case uint32:
+		byteType[0] = 12
+	case int:
+		byteType[0] = 10
+		data = interface{}(int32(v))
+	case uint:
+		byteType[0] = 12
+		data = interface{}(uint32(v))
+	case *int64:
+		byteType[0] = 13
+	case int64:
+		byteType[0] = 14
+	case *uint64:
+		byteType[0] = 15
+	case uint64:
+		byteType[0] = 16
+	case string:
+		writeArray(w, format, []byte(v), 17)
+		return
+	case []byte:
+		writeArray(w, format, v, 18)
+		return
+	default:
+		needDataWrite = false
 	}
 
 	if needDataWrite {
@@ -387,7 +392,7 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 
 func writeArray(w io.Writer, format string, output []byte, byteType uint16) {
 	if len(output) > math.MaxUint16 {
-		panic(fmt.Sprintf("String len > 65535 unsupported: " +
+		panic(fmt.Sprintf("String len > 65535 unsupported: "+
 			"%s", format))
 	}
 	err := binary.Write(w, binary.LittleEndian, byteType)
@@ -403,7 +408,7 @@ func writeArray(w io.Writer, format string, output []byte, byteType uint16) {
 
 	err = binary.Write(w, binary.LittleEndian, output)
 	if err != nil {
-		panic(fmt.Sprintf("Unable to write array to mem: " +
+		panic(fmt.Sprintf("Unable to write array to mem: "+
 			"%v", err))
 	}
 }
@@ -424,7 +429,7 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	}
 
 	// Create the two byte packet length header at the front
-	rtn := make([]byte, buf.Len() + 2)
+	rtn := make([]byte, buf.Len()+2)
 	copy(rtn[2:], buf.Bytes())
 	if len(rtn) > math.MaxUint16 {
 		fmt.Printf("Log data exceeds allowable length: %s\n",

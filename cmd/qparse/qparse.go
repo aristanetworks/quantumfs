@@ -54,7 +54,7 @@ func grabMemory(filepath string) []byte {
 func wrapRead(idx uint32, num uint32, data []byte) []byte {
 	rtn := make([]byte, num)
 
-	if idx + num > uint32(len(data)) {
+	if idx+num > uint32(len(data)) {
 		secondNum := (idx + num) - uint32(len(data))
 		num -= secondNum
 		copy(rtn[num:], data[0:secondNum])
@@ -75,7 +75,7 @@ func wrapLen(frontIdx uint32, pastEndIdx uint32, dataLen uint32) uint32 {
 }
 
 func wrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
-	if *lhs + addon < uint32(bufLen) {
+	if *lhs+addon < uint32(bufLen) {
 		*lhs = *lhs + addon
 		return
 	}
@@ -93,56 +93,56 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 	handledWrite := true
 	var rtn reflect.Value
 	switch byteType {
-		case 1:
-			var tmp *int8
-			rtn = reflect.ValueOf(&tmp)
-		case 2:
-			var tmp int8
-			rtn = reflect.ValueOf(&tmp)
-		case 3:
-			var tmp *uint8
-			rtn = reflect.ValueOf(&tmp)
-		case 4:
-			var tmp uint8
-			rtn = reflect.ValueOf(&tmp)
-		case 5:
-			var tmp *int16
-			rtn = reflect.ValueOf(&tmp)
-		case 6:
-			var tmp int16
-			rtn = reflect.ValueOf(&tmp)
-		case 7:
-			var tmp *uint16
-			rtn = reflect.ValueOf(&tmp)
-		case 8:
-			var tmp uint16
-			rtn = reflect.ValueOf(&tmp)
-		case 9:
-			var tmp *int32
-			rtn = reflect.ValueOf(&tmp)
-		case 10:
-			var tmp int32
-			rtn = reflect.ValueOf(&tmp)
-		case 11:
-			var tmp *uint32
-			rtn = reflect.ValueOf(&tmp)
-		case 12:
-			var tmp uint32
-			rtn = reflect.ValueOf(&tmp)
-		case 13:
-			var tmp *int64
-			rtn = reflect.ValueOf(&tmp)
-		case 14:
-			var tmp int64
-			rtn = reflect.ValueOf(&tmp)
-		case 15:
-			var tmp *uint64
-			rtn = reflect.ValueOf(&tmp)
-		case 16:
-			var tmp uint64
-			rtn = reflect.ValueOf(&tmp)
-		default:
-			handledWrite = false
+	case 1:
+		var tmp *int8
+		rtn = reflect.ValueOf(&tmp)
+	case 2:
+		var tmp int8
+		rtn = reflect.ValueOf(&tmp)
+	case 3:
+		var tmp *uint8
+		rtn = reflect.ValueOf(&tmp)
+	case 4:
+		var tmp uint8
+		rtn = reflect.ValueOf(&tmp)
+	case 5:
+		var tmp *int16
+		rtn = reflect.ValueOf(&tmp)
+	case 6:
+		var tmp int16
+		rtn = reflect.ValueOf(&tmp)
+	case 7:
+		var tmp *uint16
+		rtn = reflect.ValueOf(&tmp)
+	case 8:
+		var tmp uint16
+		rtn = reflect.ValueOf(&tmp)
+	case 9:
+		var tmp *int32
+		rtn = reflect.ValueOf(&tmp)
+	case 10:
+		var tmp int32
+		rtn = reflect.ValueOf(&tmp)
+	case 11:
+		var tmp *uint32
+		rtn = reflect.ValueOf(&tmp)
+	case 12:
+		var tmp uint32
+		rtn = reflect.ValueOf(&tmp)
+	case 13:
+		var tmp *int64
+		rtn = reflect.ValueOf(&tmp)
+	case 14:
+		var tmp int64
+		rtn = reflect.ValueOf(&tmp)
+	case 15:
+		var tmp *uint64
+		rtn = reflect.ValueOf(&tmp)
+	case 16:
+		var tmp uint64
+		rtn = reflect.ValueOf(&tmp)
+	default:
+		handledWrite = false
 	}
 
 	if handledWrite {
@@ -202,9 +202,9 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 		dataLen = uint32(len(data)) - *idx
 		// Because binary.Read is dumb and can't read less than the given
 		// array without EOFing *and* needs a fixed array, we have to do this
-		for i:= uint32(0); i < dataLen; i++ {
+		for i := uint32(0); i < dataLen; i++ {
 			var singleArray [1]byte
-			buf := bytes.NewReader(data[*idx+i:*idx+i+1])
+			buf := bytes.NewReader(data[*idx+i : *idx+i+1])
 			err := binary.Read(buf, binary.LittleEndian, &singleArray)
 			if err != nil {
 				return err
@@ -222,7 +222,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 			dataLen, *idx, len(data)))
 	}
 
-	buf := bytes.NewReader(data[*idx:*idx+dataLen])
+	buf := bytes.NewReader(data[*idx : *idx+dataLen])
 	err := binary.Read(buf, binary.LittleEndian, output.Interface())
 	if err != nil {
 		return err
@@ -271,7 +271,7 @@ func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
 		}
 
 		if err != nil {
-			fmt.Printf("WARN: Packet read error (%s). " +
+			fmt.Printf("WARN: Packet read error (%s). "+
 				"Dump of %d bytes:\n%x\n", err, packetLen,
 				packetData)
 			continue
@@ -279,7 +279,7 @@ func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
 
 		// Grab the string and output
 		strMapIdx := uint32(strMapId) * qlog.LogStrSize
-		if strMapIdx + qlog.LogStrSize > uint32(len(strMapData)) {
+		if strMapIdx+qlog.LogStrSize > uint32(len(strMapData)) {
 			fmt.Printf("Not enough entries in string map (%d %d)\n",
 				strMapId, len(strMapData)/qlog.LogStrSize)
 			continue
@@ -331,5 +331,5 @@ func main() {
 
 	outputLogs(header.CircBuf.FrontIdx, header.CircBuf.PastEndIdx,
 		data[qlog.MmapHeaderSize:qlog.MmapHeaderSize+header.CircBuf.Size],
-		data[qlog.MmapHeaderSize + header.CircBuf.Size:])
+		data[qlog.MmapHeaderSize+header.CircBuf.Size:])
 }

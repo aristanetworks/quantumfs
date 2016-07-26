@@ -146,9 +146,9 @@ func (q *Qlog) SetLogLevels(levels string) {
 type Qlog struct {
 	// This is the logging system level store. Increase size as the number of
 	// LogSubsystems increases past your capacity
-	logLevels	uint16
-	write		func(format string, args ...interface{}) (int, error)
-	logBuffer	*SharedMemory
+	logLevels uint16
+	write     func(format string, args ...interface{}) (int, error)
+	logBuffer *SharedMemory
 }
 
 func printToStdout(format string, args ...interface{}) (int, error) {

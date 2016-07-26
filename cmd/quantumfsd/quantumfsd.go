@@ -33,7 +33,7 @@ func init() {
 		defaultCachePath        = "/dev/shmem"
 		defaultCacheSize        = "8G"
 		defaultMountPath        = "/mnt/quantumfs"
-		defaultRamFsPath	= "/var/run/quantumfs"
+		defaultRamFsPath        = "/var/run/quantumfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
 	)
