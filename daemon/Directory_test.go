@@ -465,3 +465,24 @@ func TestInterDirectoryRename(t *testing.T) {
 		test.assert(err == nil, "Rename failed: %v", err)
 	})
 }
+
+func TestSUIDPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		fd, err := os.Create(testFilename)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		mode := 0777 | os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+		err = os.Chmod(testFilename, mode)
+		test.assert(err == nil, "Error setting permissions: %v", err)
+
+		info, err := os.Stat(testFilename)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode() == mode,
+			"Changed permissions incorrect %d", info.Mode())
+	})
+}
