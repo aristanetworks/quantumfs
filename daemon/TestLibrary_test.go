@@ -655,10 +655,16 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 	test.assert(err == nil, "Unable to open fileB for RDONLY")
 	defer fdB.Close()
 
+	statA, err := fdA.Stat()
+	test.assert(err == nil, "Unable to fetch fileA stats")
+	statB, err := fdB.Stat()
+	test.assert(err == nil, "Unable to fetch fileB stats")
+	test.assert(statB.Size() == statA.Size(), "file sizes don't match")
+
 	rtnA := make([]byte, len)
 	rtnB := make([]byte, len)
-	idx := int64(0)
-	for {
+
+	for idx := int64(0); idx+int64(len) < statA.Size(); idx += int64(offset) {
 		var readA int
 		for readA < len {
 			readIt, err := fdA.ReadAt(rtnA[readA:], idx+int64(readA))
@@ -680,10 +686,8 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 			test.assert(err == nil, "Error while reading from fileB")
 			readB += readIt
 		}
-
 		test.assert(bytes.Equal(rtnA, rtnB), "data mismatch, %v vs %v",
 			rtnA, rtnB)
-		idx += int64(offset)
 	}
 }
 

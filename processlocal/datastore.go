@@ -44,7 +44,7 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		panic("Attempted to store overlarge block")
 	}
 
-	c.Vlog(qlog.LogDatastore, "Storing key %v len %d", key, buffer.Size())
+	c.Vlog(qlog.LogDatastore, "Storing key %x len %d", key.Key[:], buffer.Size())
 	store.mutex.Lock()
 	store.data[key] = buffer.Get()
 	store.mutex.Unlock()

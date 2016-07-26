@@ -10,32 +10,33 @@ import "fmt"
 import "io"
 import "math"
 import "os"
-import "unsafe"
 import "reflect"
+import "runtime/debug"
 import "sync"
 import "syscall"
+import "unsafe"
 
 // Circ buf size for approx 1 hour of LogEntries at 1000 a second
 const mmapCircBufSize = 360000 * 24
 // Strmap size allows for up to ~10000 unique logs
 const mmapStrMapSize = 512 * 1024
-// This must include the mmapHeader len
-const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + mmapHeaderSize
+// This must include the MmapHeader len
+const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + MmapHeaderSize
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const mmapHeaderSize = 16
-type mmapHeader struct {
-	strMapSize	uint32
-	circBuf		circBufHeader
+const MmapHeaderSize = 16
+type MmapHeader struct {
+	StrMapSize	uint32
+	CircBuf		circBufHeader
 }
 
 type circBufHeader struct {
-	size		uint32
+	Size		uint32
 
 	// These variables indicate the front and end of the circular buffer
-	frontIdx	uint32
-	pastEndIdx	uint32
+	FrontIdx	uint32
+	PastEndIdx	uint32
 }
 
 type SharedMemory struct {
@@ -61,17 +62,17 @@ type CircMemLogs struct {
 }
 
 func (circ *CircMemLogs) Size() int {
-	return mmapCircBufSize + mmapHeaderSize
+	return mmapCircBufSize + MmapHeaderSize
 }
 
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) curLen_() uint32 {
 	// Is the end ahead of us, or has it wrapped?
-	if circ.header.pastEndIdx >= circ.header.frontIdx {
-		return circ.header.pastEndIdx - circ.header.frontIdx
+	if circ.header.PastEndIdx >= circ.header.FrontIdx {
+		return circ.header.PastEndIdx - circ.header.FrontIdx
 	} else {
-		return (mmapCircBufSize - circ.header.frontIdx) + 1 +
-			circ.header.pastEndIdx
+		return (mmapCircBufSize - circ.header.FrontIdx) + 1 +
+			circ.header.PastEndIdx
 	}
 }
 
@@ -126,34 +127,39 @@ func (circ *CircMemLogs) writeLogEntries() {
 		// Do we need to throw away some old entries to make space?
 		newLen := uint32(len(data)) + circ.curLen_()
 		for newLen > mmapCircBufSize {
-			entryLen := circ.wrapRead_(circ.header.frontIdx, 2)
+			entryLen := circ.wrapRead_(circ.header.FrontIdx, 2)
 			packetLen := (*uint16)(unsafe.Pointer(&entryLen[0]))
-			circ.wrapPlusEquals_(&circ.header.frontIdx,
+			circ.wrapPlusEquals_(&circ.header.FrontIdx,
 				uint32(*packetLen))
 			newLen -= uint32(*packetLen)
 		}
 
 		// Now that we know we have space, write in the entry
-		circ.wrapWrite_(circ.header.pastEndIdx, data)
+		circ.wrapWrite_(circ.header.PastEndIdx, data)
+
+		// Lastly, now that the data is all there, move the end back
+		circ.wrapPlusEquals_(&circ.header.PastEndIdx, uint32(len(data)))
 	}
 }
-const logStrSize = 32
-const logTextMax = 30
+const LogStrSize = 64
+const logTextMax = 62
 type LogStr struct {
-	text		[logTextMax]byte
-	logSubsystem	uint8
-	logLevel	uint8
+	Text		[logTextMax]byte
+	LogSubsystem	uint8
+	LogLevel	uint8
 }
 
 func newLogStr(idx LogSubsystem, level uint8, format string) LogStr {
 	var rtn LogStr
-	rtn.logSubsystem = uint8(idx)
-	rtn.logLevel = level
+	rtn.LogSubsystem = uint8(idx)
+	rtn.LogLevel = level
 	copyLen := len(format)
 	if copyLen > logTextMax {
+		fmt.Printf("Log format string exceeds allowable length: %s\n",
+			format)
 		copyLen = logTextMax
 	}
-	copy(rtn.text[:], format[:copyLen])
+	copy(rtn.Text[:], format[:copyLen])
 
 	return rtn
 }
@@ -162,7 +168,7 @@ type IdStrMap struct {
 	data		map[string]uint16
 	mapLock		sync.RWMutex
 
-	buffer		*[mmapStrMapSize/logStrSize]LogStr
+	buffer		*[mmapStrMapSize/LogStrSize]LogStr
 	freeIdx		uint16
 }
 
@@ -175,6 +181,8 @@ func newCircBuf(mapHeader *circBufHeader,
 		writer:		make(chan []byte),
 	}
 
+	rtn.header.Size = mmapCircBufSize
+
 	// Launch the asynchronous shared memory writer
 	go rtn.writeLogEntries()
 	return rtn
@@ -185,7 +193,7 @@ func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
 	rtn.data = make(map[string]uint16)
 	rtn.freeIdx = 0
 	rtn.buffer = (*[mmapStrMapSize/
-		logStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
+		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
 
 	return rtn
 }
@@ -200,13 +208,14 @@ func newSharedMemory(dir string, filename string, errOut *func(format string,
 	// Create a file and its path to be mmap'd
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
-		panic("Unable to ensure shared memory log file path exists")
+		panic(fmt.Sprintf("Unable to ensure log file path exists: %s", dir))
 	}
 
 	mapFile, err := os.OpenFile(dir + "/" + filename,
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
-		panic("Unable to create shared memory log file")
+		panic(fmt.Sprintf("Unable to create shared memory log file: %s/%s", 
+			dir, filename))
 	}
 
 	// Size the file to fit the shared memory requirements
@@ -231,10 +240,10 @@ func newSharedMemory(dir string, filename string, errOut *func(format string,
 	var rtn SharedMemory
 	rtn.fd = mapFile
 	rtn.buffer = (*[mmapTotalSize]byte)(unsafe.Pointer(&mmap[0]))
-	header := (*mmapHeader)(unsafe.Pointer(&rtn.buffer[0]))
-	header.strMapSize = mmapStrMapSize
-	rtn.circBuf = newCircBuf(&header.circBuf,
-		(*[mmapCircBufSize]byte)(unsafe.Pointer(&rtn.buffer[mmapHeaderSize])))
+	header := (*MmapHeader)(unsafe.Pointer(&rtn.buffer[0]))
+	header.StrMapSize = mmapStrMapSize
+	rtn.circBuf = newCircBuf(&header.CircBuf,
+		(*[mmapCircBufSize]byte)(unsafe.Pointer(&rtn.buffer[MmapHeaderSize])))
 	rtn.strIdMap = newIdStrMap(rtn.buffer, rtn.circBuf.Size())
 	rtn.errOut = errOut
 
@@ -293,14 +302,7 @@ type LogPrimitive interface {
 	Primitive() interface{}
 }
 
-type LogConverter interface {
-	// Return the two byte type number
-	ObjType() uint16
-
-	// Return the object's data
-	Data() []byte
-}
-
+// Writes the data, with a type prefix field two bytes long
 func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format string) {
 	data := input
 
@@ -312,70 +314,60 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 		data = prim.Primitive()
 	}
 
-	handledWrite := true
+	needDataWrite := true
 	byteType := make([]byte, 2)
 	switch v := data.(type) {
 		case *int8:
 			byteType[0] = 1
 		case int8:
 			byteType[0] = 2
-		case []int8:
-			byteType[0] = 3
 		case *uint8:
-			byteType[0] = 4
+			byteType[0] = 3
 		case uint8:
-			byteType[0] = 5
-		case []uint8:
-			byteType[0] = 6
+			byteType[0] = 4
 		case *int16:
-			byteType[0] = 7
+			byteType[0] = 5
 		case int16:
-			byteType[0] = 8
-		case []int16:
-			byteType[0] = 9
+			byteType[0] = 6
 		case *uint16:
-			byteType[0] = 10
+			byteType[0] = 7
 		case uint16:
-			byteType[0] = 11
-		case []uint16:
-			byteType[0] = 12
+			byteType[0] = 8
 		case *int32:
-			byteType[0] = 13
+			byteType[0] = 9
 		case int32:
-			byteType[0] = 14
-		case []int32:
-			byteType[0] = 15
+			byteType[0] = 10
 		case *uint32:
-			byteType[0] = 16
+			byteType[0] = 11
 		case uint32:
-			byteType[0] = 17
-		case []uint32:
-			byteType[0] = 18
+			byteType[0] = 12
 		case int:
-			byteType[0] = 14
+			byteType[0] = 10
 			data = interface{}(int32(v))
 		case uint:
-			byteType[0] = 17
+			byteType[0] = 12
 			data = interface{}(uint32(v))
 		case *int64:
-			byteType[0] = 19
+			byteType[0] = 13
 		case int64:
-			byteType[0] = 20
-		case []int64:
-			byteType[0] = 21
+			byteType[0] = 14
 		case *uint64:
-			byteType[0] = 22
+			byteType[0] = 15
 		case uint64:
-			byteType[0] = 23
-		case []uint64:
-			byteType[0] = 24
+			byteType[0] = 16
+		case string:
+			writeArray(w, format, []byte(v), 17)
+			return
+		case []byte:
+			writeArray(w, format, v, 18)
+			return
 		default:
-			handledWrite = false
+			needDataWrite = false
 	}
 
-	if handledWrite {
-		count, err := w.Write(byteType)
-		if err != nil || count != len(byteType) {
+	if needDataWrite {
+		err := binary.Write(w, binary.LittleEndian, byteType)
+		if err != nil {
 			panic("Unable to write basic type to memory")
 		}
 
@@ -384,48 +376,34 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 			panic(fmt.Sprintf("Unable to write basic type data : %v",
 				err))
 		}
-	} else if v, ok := data.(string); ok {
-		writeString(w, format, v)
-	} else if v, ok := data.(LogConverter); ok {
-		writeData := append(make([]byte, 2), v.Data()...)
-		*(*uint16)(unsafe.Pointer(&writeData[0])) = v.ObjType()
-		count, err := w.Write(writeData)
-		if err != nil || count != len(writeData) {
-			panic(fmt.Sprintf("Unable to write type to memory: %s",
-				reflect.ValueOf(data).String()))
-		}
 	} else {
 		str := fmt.Sprintf("%v", data)
-		writeString(w, format, str)
-		errorStr := fmt.Sprintf("WARN: LogConverter needed for type %s\n",
-			reflect.ValueOf(data).String())
+		writeArray(w, format, []byte(str), 17)
+		errorStr := fmt.Sprintf("WARN: LogConverter needed for %s:\n%s\n",
+			reflect.ValueOf(data).String(), string(debug.Stack()))
 		(*mem.errOut)("%s", errorStr)
 	}
 }
 
-func writeString(w io.Writer, format string, output string) {
+func writeArray(w io.Writer, format string, output []byte, byteType uint16) {
 	if len(output) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: " +
 			"%s", format))
 	}
-	byteType := make([]byte, 1)
-	byteType[0] = 25
-	count, err := w.Write(byteType)
-	if err != nil || count != len(byteType) {
-		panic("Unable to write string type to memory")
+	err := binary.Write(w, binary.LittleEndian, byteType)
+	if err != nil {
+		panic("Unable to write array type to memory")
 	}
 
-	byteLen := make([]byte, 2)
-	strLen := (*uint16)(unsafe.Pointer(&byteLen[0]))
-	*strLen = uint16(len(output))
-	count, err = w.Write(byteLen)
-	if err != nil || count != len(byteLen) {
-		panic("Unable to write string length to memory")
+	byteLen := uint16(len(output))
+	err = binary.Write(w, binary.LittleEndian, byteLen)
+	if err != nil {
+		panic("Unable to write array length to memory")
 	}
 
-	count, err = w.Write([]byte(output))
-	if err != nil || count != len(output) {
-		panic(fmt.Sprintf("Unable to write string to mem: " +
+	err = binary.Write(w, binary.LittleEndian, output)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to write array to mem: " +
 			"%v", err))
 	}
 }
@@ -434,9 +412,12 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	timestamp int64, format string, args ...interface{}) []byte {
 
 	buf := new(bytes.Buffer)
-	mem.binaryWrite(buf, strMapId, format)
-	mem.binaryWrite(buf, reqId, format)
-	mem.binaryWrite(buf, timestamp, format)
+	// Two bytes prefix for the total packet length, before the num of args.
+	// Write the log entry header with no prefixes
+	binary.Write(buf, binary.LittleEndian, uint16(len(args)))
+	binary.Write(buf, binary.LittleEndian, strMapId)
+	binary.Write(buf, binary.LittleEndian, reqId)
+	binary.Write(buf, binary.LittleEndian, timestamp)
 
 	for i := 0; i < len(args); i++ {
 		mem.binaryWrite(buf, args[i], format)
@@ -446,10 +427,13 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	rtn := make([]byte, buf.Len() + 2)
 	copy(rtn[2:], buf.Bytes())
 	if len(rtn) > math.MaxUint16 {
+		fmt.Printf("Log data exceeds allowable length: %s\n",
+			format)
 		rtn = rtn[:math.MaxUint16]
 	}
-	lenField := (*uint16)(unsafe.Pointer(&rtn[0]))
-	*lenField = uint16(len(rtn))
+	lenBuf := new(bytes.Buffer)
+	binary.Write(lenBuf, binary.LittleEndian, uint16(len(rtn)))
+	copy(rtn[:2], lenBuf.Bytes())
 
 	return rtn
 }

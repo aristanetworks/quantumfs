@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs
+COMMANDS=quantumfsd qfs qparse
 PKGS_TO_TEST=daemon qlog
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)

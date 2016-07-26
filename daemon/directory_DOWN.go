@@ -71,7 +71,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 
 	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
 
-	c.vlog("Directory key %v -> %v", dir.baseLayerId, newBaseLayerId)
+	c.vlog("Directory key %x -> %x", dir.baseLayerId.Key[:], newBaseLayerId.Key[:])
 	dir.baseLayerId = newBaseLayerId
 
 	dir.setDirty(false)

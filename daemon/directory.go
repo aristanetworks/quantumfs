@@ -35,7 +35,8 @@ type Directory struct {
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
 
-	c.vlog("initDirectory Fetching directory baselayer from %s", baseLayerId)
+	c.vlog("initDirectory Fetching directory baselayer from %x",
+		baseLayerId.Key[:])
 
 	// Set directory data before processing the children incase the children
 	// access the parent.
@@ -47,7 +48,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	key := baseLayerId
 	for {
-		c.vlog("Fetching baselayer %v", key)
+		c.vlog("Fetching baselayer %x", key.Key[:])
 		object := c.dataStore.Get(&c.Ctx, key)
 		if object == nil {
 			panic("No baseLayer object")
@@ -564,7 +565,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	if result == fuse.OK {
 		dir.self.dirty(c)
-		c.vlog("Created new symlink with key: %s", key)
+		c.vlog("Created new symlink with key: %x", key.Key[:])
 	}
 
 	return result

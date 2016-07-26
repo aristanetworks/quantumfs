@@ -34,7 +34,9 @@ const (
 	MinSpecialReqId uint64 = math.MaxUint64 - iota
 )
 
-func specialReq(reqId uint64) string {
+const TimeFormat = "2006-01-02T15:04:05.000000000"
+
+func SpecialReq(reqId uint64) string {
 	switch reqId {
 	default:
 		return "UNKNOWN"
@@ -188,18 +190,16 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
 	}
 
-	const timeFormat = "2006-01-02T15:04:05.000000000"
-
 	if q.getLogLevel(idx, level) {
 		var front string
 		if reqId < MinSpecialReqId {
 			const frontFmt = "%s | %12s %7d: "
-			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
+			front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
 				idx, reqId)
 		} else {
 			const frontFmt = "%s | %12s % 7s: "
-			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
-				idx, specialReq(reqId))
+			front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
+				idx, SpecialReq(reqId))
 		}
 		q.write(front+format, args...)
 	}

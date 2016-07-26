@@ -77,10 +77,6 @@ func KeyTypeToString(keyType KeyType) string {
 	}
 }
 
-const (
-	logObjectKey = 1000 + iota
-)
-
 // One of the KeyType* values above
 type KeyType uint8
 
@@ -107,14 +103,6 @@ func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
 
 type ObjectKey struct {
 	Key [ObjectKeyLength]byte
-}
-
-func (key ObjectKey) ObjType() uint16 {
-	return logObjectKey
-}
-
-func (key ObjectKey) Data() []byte {
-	return key.Key[:]
 }
 
 // Extract the type of the object. Returns a KeyType
