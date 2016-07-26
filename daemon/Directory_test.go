@@ -484,5 +484,13 @@ func TestSUIDPerms(t *testing.T) {
 		test.assert(err == nil, "Failed getting dir info: %v", err)
 		test.assert(info.Mode() == mode,
 			"Changed permissions incorrect %d", info.Mode())
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename = workspace + "/test"
+		info, err = os.Stat(testFilename)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode() == mode,
+			"Changed permissions incorrect %d", info.Mode())
 	})
 }
