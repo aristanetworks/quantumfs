@@ -327,16 +327,6 @@ func NewTime(instant time.Time) Time {
 	t := instant.Unix() * 1000000
 	t += int64(instant.Nanosecond() / 1000)
 
-}
-
-func (t Time) Nanoseconds() uint32 {
-	return uint32(t % 1000000)
-}
-
-func NewTime(instant time.Time) Time {
-	t := instant.Unix() * 1000000
-	t += int64(instant.Nanosecond() / 1000)
-
 	return Time(t)
 }
 

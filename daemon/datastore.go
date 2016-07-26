@@ -146,7 +146,7 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %x", buf.key.Key[:])
+	c.Vlog(qlog.LogDaemon, "New buffer key %x", buf.key.String())
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
 }

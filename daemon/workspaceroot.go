@@ -95,7 +95,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			panic("Unexpected workspace rootID update failure")
 		}
 
-		c.dlog("Advanced rootId %x -> %x", wsr.rootId.Key[:], rootId.Key[:])
+		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
+			rootId.String())
 		wsr.rootId = rootId
 	}
 }
