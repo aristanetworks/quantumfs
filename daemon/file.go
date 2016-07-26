@@ -13,6 +13,8 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
+const FMODE_EXEC = 0x20 // From Linux
+
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
@@ -99,13 +101,13 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
+func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	return fuse.ENOTDIR
 }
 
-func (fi *File) openPermission(c *ctx, flags uint32) bool {
+func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 	record, error := fi.parent().getChildRecord(c, fi.id)
 	if error != nil {
 		return false
@@ -116,22 +118,30 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 		return true
 	}
 
+	flags := uint(flags_)
+
 	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
 		flags)
-	//this only works because we don't have owner/group/other specific perms.
-	//we need to confirm whether we can treat the root user/group specially.
+
+	var userAccess bool
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions() & quantumfs.PermissionRead) != 0
+		userAccess = (record.Permissions() & quantumfs.PermissionRead) != 0
 	case syscall.O_WRONLY:
-		return (record.Permissions() & quantumfs.PermissionWrite) != 0
+		userAccess = (record.Permissions() & quantumfs.PermissionWrite) != 0
 	case syscall.O_RDWR:
 		var bitmask uint8 = quantumfs.PermissionRead |
 			quantumfs.PermissionWrite
-		return (record.Permissions() & bitmask) == bitmask
+		userAccess = (record.Permissions() & bitmask) == bitmask
 	}
 
-	return false
+	var setIdAccess bool
+	if BitFlagsSet(flags, FMODE_EXEC) {
+		setIdAccess = BitAnyFlagSet(flags, quantumfs.PermissionExec|
+			quantumfs.PermissionSUID|quantumfs.PermissionSGID)
+	}
+
+	return userAccess || setIdAccess
 }
 
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
