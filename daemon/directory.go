@@ -200,18 +200,32 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.CreationTime().Nanoseconds()
 
-	var permissions uint32
-	permissions |= uint32(entry.Permissions())
-	permissions |= uint32(entry.Permissions()) << 3
-	permissions |= uint32(entry.Permissions()) << 6
-	permissions |= fileType
 	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %d", fileType,
 		entry.Permissions())
 
-	attr.Mode = permissions
+	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
 	attr.Blksize = qfsBlockSize
+}
+
+func permissionsToMode(permissions uint8) uint32 {
+	var mode uint32
+	mode |= uint32(permissions & 0x7)
+	mode |= uint32(permissions&0x7) << 3
+	mode |= uint32(permissions&0x7) << 6
+
+	if BitFlagsSet(uint(permissions), quantumfs.PermissionSticky) {
+		mode |= syscall.S_ISVTX
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermissionSGID) {
+		mode |= syscall.S_ISGID
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermissionSUID) {
+		mode |= syscall.S_ISUID
+	}
+
+	return mode
 }
 
 func modeToPermissions(mode uint32, umask uint32) uint8 {
@@ -220,6 +234,16 @@ func modeToPermissions(mode uint32, umask uint32) uint8 {
 	permissions = mode & 0x7
 	permissions |= (mode >> 3) & 0x7
 	permissions |= (mode >> 6) & 0x7
+
+	if BitFlagsSet(uint(mode), syscall.S_ISVTX) {
+		permissions |= quantumfs.PermissionSticky
+	}
+	if BitFlagsSet(uint(mode), syscall.S_ISGID) {
+		permissions |= quantumfs.PermissionSGID
+	}
+	if BitFlagsSet(uint(mode), syscall.S_ISUID) {
+		permissions |= quantumfs.PermissionSUID
+	}
 
 	return uint8(permissions)
 }
