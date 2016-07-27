@@ -17,6 +17,15 @@ func BitFlagsSet(field uint, flags uint) bool {
 	return false
 }
 
+// Given a bitflag field and an integer of flags, return whether any flag is set or
+// not as a boolean.
+func BitAnyFlagSet(field uint, flags uint) bool {
+	if field&flags != 0 {
+		return true
+	}
+	return false
+}
+
 // Convert the given null terminated byte array into a string
 func BytesToString(data []byte) string {
 	length := bytes.IndexByte(data, 0)
