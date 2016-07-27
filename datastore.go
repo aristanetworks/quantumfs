@@ -414,6 +414,16 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 	return emptyWorkspaceKey
 }
 
+// Permission bit names
+const (
+	PermissionExec   = 1 << iota
+	PermissionWrite  = 1 << iota
+	PermissionRead   = 1 << iota
+	PermissionSticky = 1 << iota
+	PermissionSGID   = 1 << iota
+	PermissionSUID   = 1 << iota
+)
+
 func NewDirectoryRecord() *DirectoryRecord {
 	segment := capn.NewBuffer(nil)
 	record := DirectoryRecord{

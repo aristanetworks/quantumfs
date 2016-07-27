@@ -40,7 +40,7 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := link.parent.getChildRecord(c, link.InodeCommon.id)
+	record, err := link.parent().getChildRecord(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
 		return fuse.EIO
@@ -80,7 +80,7 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return link.parent.setChildAttr(c, link.InodeCommon.id, nil, attr, out)
+	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out)
 }
 
 func (link *Symlink) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -117,7 +117,7 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 
 func (link *Symlink) Sync(c *ctx) fuse.Status {
 	key := link.sync_DOWN(c)
-	link.parent.syncChild(c, link.InodeCommon.id, key)
+	link.parent().syncChild(c, link.InodeCommon.id, key)
 
 	return fuse.OK
 }
@@ -166,5 +166,5 @@ func (link *Symlink) getChildRecord(c *ctx,
 
 func (link *Symlink) dirty(c *ctx) {
 	link.setDirty(true)
-	link.parent.dirtyChild(c, link)
+	link.parent().dirtyChild(c, link)
 }

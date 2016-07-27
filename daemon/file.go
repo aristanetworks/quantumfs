@@ -13,9 +13,7 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-const execBit = 0x1
-const writeBit = 0x2
-const readBit = 0x4
+const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode, mode uint32, rdev uint32,
@@ -79,7 +77,7 @@ type File struct {
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
 	fi.setDirty(true)
-	fi.parent.dirtyChild(c, fi)
+	fi.parent().dirtyChild(c, fi)
 }
 
 func (fi *File) Access(c *ctx, mask uint32, uid uint32,
@@ -90,7 +88,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	record, err := fi.parent().getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
 		return fuse.EIO
@@ -103,14 +101,14 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
+func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	return fuse.ENOTDIR
 }
 
-func (fi *File) openPermission(c *ctx, flags uint32) bool {
-	record, error := fi.parent.getChildRecord(c, fi.id)
+func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
+	record, error := fi.parent().getChildRecord(c, fi.id)
 	if error != nil {
 		return false
 	}
@@ -120,21 +118,30 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 		return true
 	}
 
+	flags := uint(flags_)
+
 	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
 		flags)
-	//this only works because we don't have owner/group/other specific perms.
-	//we need to confirm whether we can treat the root user/group specially.
+
+	var userAccess bool
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions() & readBit) != 0
+		userAccess = (record.Permissions() & quantumfs.PermissionRead) != 0
 	case syscall.O_WRONLY:
-		return (record.Permissions() & writeBit) != 0
+		userAccess = (record.Permissions() & quantumfs.PermissionWrite) != 0
 	case syscall.O_RDWR:
-		var bitmask uint8 = readBit | writeBit
-		return (record.Permissions() & bitmask) == bitmask
+		var bitmask uint8 = quantumfs.PermissionRead |
+			quantumfs.PermissionWrite
+		userAccess = (record.Permissions() & bitmask) == bitmask
 	}
 
-	return false
+	var setIdAccess bool
+	if BitFlagsSet(flags, FMODE_EXEC) {
+		setIdAccess = BitAnyFlagSet(flags, quantumfs.PermissionExec|
+			quantumfs.PermissionSUID|quantumfs.PermissionSGID)
+	}
+
+	return userAccess || setIdAccess
 }
 
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
@@ -204,7 +211,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent.setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
+	return fi.parent().setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -243,7 +250,7 @@ func (fi *File) Sync(c *ctx) fuse.Status {
 		defer fi.Lock().Unlock()
 		if fi.isDirty() {
 			key := fi.sync_DOWN(c)
-			fi.parent.syncChild(c, fi.InodeCommon.id, key)
+			fi.parent().syncChild(c, fi.InodeCommon.id, key)
 		}
 	}()
 
@@ -353,7 +360,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		fi.parent.setChildAttr(c, fi.id, &neededType, &attr, nil)
+		fi.parent().setChildAttr(c, fi.id, &neededType, &attr, nil)
 	}
 	return nil
 }
@@ -491,7 +498,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent.setChildAttr(c, fi.id, nil, &attr, nil)
+	fi.parent().setChildAttr(c, fi.id, nil, &attr, nil)
 	fi.dirty(c)
 
 	return writeCount, fuse.OK
