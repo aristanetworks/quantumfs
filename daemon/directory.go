@@ -147,6 +147,7 @@ func (dir *Directory) addChild_(c *ctx, name string, inodeNum InodeId,
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
 	inodeNum := dir.children[name]
+	c.dlog("Unlinking inode %d", inodeNum)
 	delete(dir.childrenRecords, inodeNum)
 	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
