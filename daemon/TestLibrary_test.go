@@ -46,7 +46,6 @@ func runTest(t *testing.T, test quantumFsTest) {
 		t:          t,
 		testName:   testName,
 		testResult: make(chan string),
-		testOutput: make([]string, 0, 1000),
 		startTime:  time.Now(),
 	}
 
@@ -59,18 +58,16 @@ func runTest(t *testing.T, test quantumFsTest) {
 	var testResult string
 
 	select {
-	case <-time.After(1 * time.Second):
+	case <-time.After(1000 * time.Millisecond):
 		testResult = "TIMED OUT"
 
 	case testResult = <-th.testResult:
 	}
 
 	if !th.shouldFail && testResult != "" {
-		th.log(testResult)
-		th.t.Fatal(testResult)
+		th.log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
 	} else if th.shouldFail && testResult == "" {
-		th.log("Test is expected to fail")
-		th.t.Fatal("Test is expected to fail")
+		th.log("ERROR: Test is expected to fail, but didn't")
 	}
 }
 
@@ -165,6 +162,8 @@ func (th *testHelper) endTest() {
 		th.waitToBeUnmounted()
 		time.Sleep(1 * time.Second)
 
+		th.logscan()
+
 		if err := os.RemoveAll(th.tempDir); err != nil {
 			th.t.Fatalf("Failed to cleanup temporary mount point: %v",
 				err)
@@ -174,8 +173,6 @@ func (th *testHelper) endTest() {
 	if exception != nil {
 		th.t.Fatalf("Test failed with exception: %v", exception)
 	}
-
-	th.logscan()
 }
 
 func (th *testHelper) waitToBeUnmounted() {
@@ -198,8 +195,10 @@ func (th *testHelper) waitToBeUnmounted() {
 // Check the test output for errors
 func (th *testHelper) logscan() {
 	errors := make([]string, 0, 10)
+	testOutput := qlog.ParseLogs(th.qfs.config.RamFsPath + "/qlog")
 
-	for _, line := range th.testOutput {
+	lines := strings.Split(testOutput, "\n")
+	for _, line := range lines {
 		if strings.Contains(line, "PANIC") ||
 			strings.Contains(line, "WARN") ||
 			strings.Contains(line, "ERROR") {
@@ -211,9 +210,12 @@ func (th *testHelper) logscan() {
 		for _, err := range errors {
 			th.t.Logf("FATAL message logged: %s", err)
 		}
-		th.t.Fatal("Test FAILED due to FATAL messages")
+		th.t.Fatalf("Test FAILED due to FATAL messages. Dumping Logs:\n%s\n" +
+			"--- Test %s FAILED\n\n", testOutput, th.testName)
 	} else if th.shouldFailLogscan && len(errors) == 0 {
-		th.t.Fatal("Test FAILED due to missing FATAL messages")
+		th.t.Fatalf("Test FAILED due to missing FATAL messages." +
+			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n", testOutput,
+			th.testName)
 	}
 }
 
@@ -227,7 +229,6 @@ type testHelper struct {
 	fuseConnection    int
 	api               *quantumfs.Api
 	testResult        chan string
-	testOutput        []string
 	startTime         time.Time
 	shouldFail        bool
 	shouldFailLogscan bool
@@ -332,12 +333,6 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	quantumfs := NewQuantumFs(config)
 	th.qfs = quantumfs
 
-	writer := func(format string, args ...interface{}) (int, error) {
-		return th.log(format, args...)
-	}
-	th.qfs.c.Qlog.SetWriter(writer)
-	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacedb/*,test/*")
-
 	th.log("Waiting for QuantumFs instance to start...")
 
 	go serveSafely(th)
@@ -348,17 +343,15 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 }
 
 func (th *testHelper) log(format string, args ...interface{}) (int, error) {
-	relTime := time.Now().Sub(th.startTime).Nanoseconds()
-	prefixedFmt := fmt.Sprintf("[%s+%010d] %s", th.testName, relTime, format)
-	output := fmt.Sprintf(prefixedFmt, args...)
+	if th.qfs != nil && th.qfs.c.Qlog != nil {
+		th.qfs.c.Qlog.Log(qlog.LogTest, qlog.TestReqId, 1,
+			"[%s] "+format, append([]interface{}{th.testName},
+			args...)...)
+	}
 
-	th.mutex.Lock()
-	th.testOutput = append(th.testOutput, output)
-	th.mutex.Unlock()
+//	th.t.Log(output)
 
-	th.t.Log(output)
-
-	return len(output), nil
+	return len(format), nil
 }
 
 func (th *testHelper) getApi() *quantumfs.Api {

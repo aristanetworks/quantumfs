@@ -25,13 +25,16 @@ const (
 	LogDatastore
 	LogWorkspaceDb
 	LogTest
-	logSubsystemMax = LogTest
+	LogQlog
+	logSubsystemMax = LogQlog
 )
 
 const (
 	MuxReqId        uint64 = math.MaxUint64 - iota
-	FlushReqId      uint64 = math.MaxUint64 - iota
-	MinSpecialReqId uint64 = math.MaxUint64 - iota
+	FlushReqId
+	QlogReqId
+	TestReqId
+	MinSpecialReqId
 )
 
 const TimeFormat = "2006-01-02T15:04:05.000000000"
@@ -44,6 +47,10 @@ func SpecialReq(reqId uint64) string {
 		return "[Mux]"
 	case FlushReqId:
 		return "[Flush]"
+	case QlogReqId:
+		return "[Qlog]"
+	case TestReqId:
+		return "[TestReqId]"
 	}
 }
 
@@ -161,7 +168,7 @@ func NewQlog(ramfsPath string) *Qlog {
 		logLevels: 0,
 		write:     printToStdout,
 	}
-	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, &q.write)
+	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, &q)
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >

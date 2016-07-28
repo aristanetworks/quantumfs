@@ -47,7 +47,10 @@ type SharedMemory struct {
 	buffer   *[mmapTotalSize]byte
 	circBuf  CircMemLogs
 	strIdMap IdStrMap
-	errOut   *func(format string, args ...interface{}) (int, error)
+
+	// This is dangerous as Qlog also owns SharedMemory. SharedMemory must
+	// ensure that any call it makes to Qlog doesn't result in infinite recursion
+	errOut   *Qlog
 }
 
 // Average Log Entry should be ~24 bytes
@@ -160,7 +163,7 @@ func newLogStr(idx LogSubsystem, level uint8, format string) LogStr {
 	rtn.LogLevel = level
 	copyLen := len(format)
 	if copyLen > logTextMax {
-		fmt.Printf("Log format string exceeds allowable length: %s\n",
+		fmt.Printf("Log format string exceeds allowable length: |||%s|||\n",
 			format)
 		copyLen = logTextMax
 	}
@@ -203,8 +206,7 @@ func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
 	return rtn
 }
 
-func newSharedMemory(dir string, filename string, errOut *func(format string,
-	args ...interface{}) (int, error)) *SharedMemory {
+func newSharedMemory(dir string, filename string, errOut *Qlog) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -383,11 +385,21 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 				err))
 		}
 	} else {
+		errorPrefix := "WARN: LogConverter needed"
+
+		// Since we're going to do something recursive, ensure we're not
+		// already recursing and something horrible is happening.
+		if len(format) > len(errorPrefix) &&
+			errorPrefix == format[:len(errorPrefix)] {
+
+			panic("Stuck in impossible infinite recursion")
+		}
+
 		str := fmt.Sprintf("%v", data)
 		writeArray(w, format, []byte(str), 17)
-		errorStr := fmt.Sprintf("WARN: LogConverter needed for %s:\n%s\n",
+		errorStr := fmt.Sprintf(errorPrefix + " for %s:\n%s\n",
 			reflect.ValueOf(data).String(), string(debug.Stack()))
-		(*mem.errOut)("%s", errorStr)
+		mem.errOut.Log(LogQlog, QlogReqId, 1, "%s", errorStr)
 	}
 }
 
