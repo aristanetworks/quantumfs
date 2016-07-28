@@ -675,17 +675,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		child := c.qfs.inode(c, oldInodeId)
 		child.setParent(dst)
 
-		newEntry := quantumfs.NewDirectoryRecord()
+		newEntry := cloneDirectoryRecord(oldEntry)
 		newEntry.SetFilename(newName)
-		newEntry.SetID(oldEntry.ID())
-		newEntry.SetType(oldEntry.Type())
-		newEntry.SetPermissions(oldEntry.Permissions())
-		newEntry.SetOwner(oldEntry.Owner())
-		newEntry.SetGroup(oldEntry.Group())
-		newEntry.SetSize(oldEntry.Size())
-		newEntry.SetExtendedAttributes(oldEntry.ExtendedAttributes())
-		newEntry.SetCreationTime(oldEntry.CreationTime())
-		newEntry.SetModificationTime(oldEntry.ModificationTime())
 
 		// Update entry in new directory
 		dst.children[newName] = oldInodeId

@@ -126,3 +126,21 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 		c.vlog("CreationTime now %d", entry.CreationTime())
 	}
 }
+
+func cloneDirectoryRecord(
+	orig *quantumfs.DirectoryRecord) *quantumfs.DirectoryRecord {
+
+	newEntry := quantumfs.NewDirectoryRecord()
+	newEntry.SetFilename(orig.Filename())
+	newEntry.SetID(orig.ID())
+	newEntry.SetType(orig.Type())
+	newEntry.SetPermissions(orig.Permissions())
+	newEntry.SetOwner(orig.Owner())
+	newEntry.SetGroup(orig.Group())
+	newEntry.SetSize(orig.Size())
+	newEntry.SetExtendedAttributes(orig.ExtendedAttributes())
+	newEntry.SetCreationTime(orig.CreationTime())
+	newEntry.SetModificationTime(orig.ModificationTime())
+
+	return newEntry
+}
