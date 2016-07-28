@@ -1,8 +1,8 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// qlog is the shared memory log parser for the qlog quantumfs subsystem
-package main
+// qparse is the shared memory log parser for the qlog quantumfs subsystem
+package qlog
 
 import "bytes"
 import "encoding/binary"
@@ -10,12 +10,27 @@ import "errors"
 import "fmt"
 import "io"
 import "io/ioutil"
+import "math"
 import "os"
 import "reflect"
 import "strings"
 import "time"
 import "unsafe"
-import "github.com/aristanetworks/quantumfs/qlog"
+
+func ParseLogs(filepath string) string {
+	data := grabMemory(filepath)
+	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
+
+	if uint32(len(data)) != (header.StrMapSize + header.CircBuf.Size +
+		MmapHeaderSize) {
+		fmt.Println("Data length inconsistent with expectations. %d",
+			len(data))
+	}
+
+	return outputLogs(header.CircBuf.FrontIdx, header.CircBuf.PastEndIdx,
+		data[MmapHeaderSize:MmapHeaderSize+header.CircBuf.Size],
+		data[MmapHeaderSize+header.CircBuf.Size:])
+}
 
 func grabMemory(filepath string) []byte {
 
@@ -25,7 +40,8 @@ func grabMemory(filepath string) []byte {
 
 	fileData, err := ioutil.ReadFile(filepath)
 	if err != nil {
-		panic("Unable to read shared memory file data")
+		panic(fmt.Sprintf("Unable to read shared memory file data from %s\n",
+			filepath))
 	}
 
 	mapFile, err := os.OpenFile(filepath, os.O_RDONLY, 0777)
@@ -33,7 +49,7 @@ func grabMemory(filepath string) []byte {
 		panic("Unable to open shared memory log file")
 	}
 
-	afterHeader := make([]byte, qlog.MmapHeaderSize)
+	afterHeader := make([]byte, MmapHeaderSize)
 	count := 0
 	for count < len(afterHeader) {
 		dataLen, err := mapFile.Read(afterHeader[count:])
@@ -44,9 +60,11 @@ func grabMemory(filepath string) []byte {
 	}
 
 	// Replace the file data "frontIdx" field with the safest, newer value
-	header := (*qlog.MmapHeader)(unsafe.Pointer(&fileData[0]))
-	newerHeader := (*qlog.MmapHeader)(unsafe.Pointer(&afterHeader[0]))
+	header := (*MmapHeader)(unsafe.Pointer(&fileData[0]))
+	newerHeader := (*MmapHeader)(unsafe.Pointer(&afterHeader[0]))
 	header.CircBuf.FrontIdx = newerHeader.CircBuf.FrontIdx
+	
+	mapFile.Close()
 
 	return fileData
 }
@@ -160,7 +178,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 			return nil, err
 		}
 
-		var rtnRaw [qlog.LogStrSize]byte
+		var rtnRaw [math.MaxUint16]byte
 		err = readPacket(idx, data[:*idx+uint32(strLen)],
 			reflect.ValueOf(&rtnRaw))
 		if err != nil {
@@ -198,7 +216,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 	dataLen := uint32(output.Elem().Type().Size())
 
 	// If this is a string, then consume the rest of data provided
-	if byteArray, ok := output.Interface().(*[qlog.LogStrSize]byte); ok {
+	if byteArray, ok := output.Interface().(*[math.MaxUint16]byte); ok {
 		dataLen = uint32(len(data)) - *idx
 		// Because binary.Read is dumb and can't read less than the given
 		// array without EOFing *and* needs a fixed array, we have to do this
@@ -234,7 +252,9 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 }
 
 func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
-	strMapData []byte) {
+	strMapData []byte) string {
+
+	var buffer bytes.Buffer
 
 	for frontIdx != pastEndIdx {
 		var packetLen uint16
@@ -271,35 +291,36 @@ func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
 		}
 
 		if err != nil {
-			fmt.Printf("WARN: Packet read error (%s). "+
+			fmt.Sprintf("WARN: Packet read error (%s). "+
 				"Dump of %d bytes:\n%x\n", err, packetLen,
 				packetData)
 			continue
 		}
 
 		// Grab the string and output
-		strMapIdx := uint32(strMapId) * qlog.LogStrSize
-		if strMapIdx+qlog.LogStrSize > uint32(len(strMapData)) {
-			fmt.Printf("Not enough entries in string map (%d %d)\n",
-				strMapId, len(strMapData)/qlog.LogStrSize)
+		strMapIdx := uint32(strMapId) * LogStrSize
+		if strMapIdx+LogStrSize > uint32(len(strMapData)) {
+			buffer.WriteString(fmt.Sprintf("Not enough entries in " +
+				"string map (%d %d)\n", strMapId,
+				len(strMapData)/LogStrSize))
 			continue
 		}
 
-		mapEntry := *(*qlog.LogStr)(unsafe.Pointer(&strMapData[strMapIdx]))
-		logSubsystem := (qlog.LogSubsystem)(mapEntry.LogSubsystem)
+		mapEntry := *(*LogStr)(unsafe.Pointer(&strMapData[strMapIdx]))
+		logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
 
 		// Convert timestamp back into something useful
 		t := time.Unix(0, timestamp)
 
 		var front string
-		if reqId < qlog.MinSpecialReqId {
+		if reqId < MinSpecialReqId {
 			const frontFmt = "%s | %12s %7d: "
-			front = fmt.Sprintf(frontFmt, t.Format(qlog.TimeFormat),
+			front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
 				logSubsystem, reqId)
 		} else {
 			const frontFmt = "%s | %12s % 7s: "
-			front = fmt.Sprintf(frontFmt, t.Format(qlog.TimeFormat),
-				logSubsystem, qlog.SpecialReq(reqId))
+			front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
+				logSubsystem, SpecialReq(reqId))
 		}
 
 		// Finally, print with the front attached like normal
@@ -308,28 +329,8 @@ func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
 		if firstNullTerm != -1 {
 			mapStr = mapStr[:firstNullTerm]
 		}
-		fmt.Printf(front+mapStr+"\n", args...)
-	}
-}
-
-func main() {
-
-	if len(os.Args) < 2 {
-		fmt.Println("Please provide log filepath as argument")
-		return
+		buffer.WriteString(fmt.Sprintf(front+mapStr+"\n", args...))
 	}
 
-	data := grabMemory(os.Args[1])
-
-	header := (*qlog.MmapHeader)(unsafe.Pointer(&data[0]))
-
-	if uint32(len(data)) != (header.StrMapSize + header.CircBuf.Size +
-		qlog.MmapHeaderSize) {
-		fmt.Println("Data length inconsistent with expectations. %d",
-			len(data))
-	}
-
-	outputLogs(header.CircBuf.FrontIdx, header.CircBuf.PastEndIdx,
-		data[qlog.MmapHeaderSize:qlog.MmapHeaderSize+header.CircBuf.Size],
-		data[qlog.MmapHeaderSize+header.CircBuf.Size:])
+	return buffer.String()
 }
