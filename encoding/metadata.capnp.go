@@ -239,12 +239,12 @@ func (s ObjectKey_List) Set(i int, item ObjectKey) { C.PointerList(s).Set(i, C.O
 
 type DirectoryRecord C.Struct
 
-func NewDirectoryRecord(s *C.Segment) DirectoryRecord { return DirectoryRecord(s.NewStruct(32, 3)) }
+func NewDirectoryRecord(s *C.Segment) DirectoryRecord { return DirectoryRecord(s.NewStruct(40, 3)) }
 func NewRootDirectoryRecord(s *C.Segment) DirectoryRecord {
-	return DirectoryRecord(s.NewRootStruct(32, 3))
+	return DirectoryRecord(s.NewRootStruct(40, 3))
 }
 func AutoNewDirectoryRecord(s *C.Segment) DirectoryRecord {
-	return DirectoryRecord(s.NewStructAR(32, 3))
+	return DirectoryRecord(s.NewStructAR(40, 3))
 }
 func ReadRootDirectoryRecord(s *C.Segment) DirectoryRecord {
 	return DirectoryRecord(s.Root(0).ToStruct())
@@ -258,20 +258,20 @@ func (s DirectoryRecord) Type() uint8             { return C.Struct(s).Get8(0) }
 func (s DirectoryRecord) SetType(v uint8)         { C.Struct(s).Set8(0, v) }
 func (s DirectoryRecord) Permissions() uint32     { return C.Struct(s).Get32(4) }
 func (s DirectoryRecord) SetPermissions(v uint32) { C.Struct(s).Set32(4, v) }
-func (s DirectoryRecord) Owner() uint8            { return C.Struct(s).Get8(1) }
-func (s DirectoryRecord) SetOwner(v uint8)        { C.Struct(s).Set8(1, v) }
-func (s DirectoryRecord) Group() uint8            { return C.Struct(s).Get8(2) }
-func (s DirectoryRecord) SetGroup(v uint8)        { C.Struct(s).Set8(2, v) }
-func (s DirectoryRecord) Size() uint64            { return C.Struct(s).Get64(8) }
-func (s DirectoryRecord) SetSize(v uint64)        { C.Struct(s).Set64(8, v) }
+func (s DirectoryRecord) Owner() uint16           { return C.Struct(s).Get16(2) }
+func (s DirectoryRecord) SetOwner(v uint16)       { C.Struct(s).Set16(2, v) }
+func (s DirectoryRecord) Group() uint16           { return C.Struct(s).Get16(8) }
+func (s DirectoryRecord) SetGroup(v uint16)       { C.Struct(s).Set16(8, v) }
+func (s DirectoryRecord) Size() uint64            { return C.Struct(s).Get64(16) }
+func (s DirectoryRecord) SetSize(v uint64)        { C.Struct(s).Set64(16, v) }
 func (s DirectoryRecord) ExtendedAttributes() ObjectKey {
 	return ObjectKey(C.Struct(s).GetObject(2).ToStruct())
 }
 func (s DirectoryRecord) SetExtendedAttributes(v ObjectKey) { C.Struct(s).SetObject(2, C.Object(v)) }
-func (s DirectoryRecord) CreationTime() uint64              { return C.Struct(s).Get64(16) }
-func (s DirectoryRecord) SetCreationTime(v uint64)          { C.Struct(s).Set64(16, v) }
-func (s DirectoryRecord) ModificationTime() uint64          { return C.Struct(s).Get64(24) }
-func (s DirectoryRecord) SetModificationTime(v uint64)      { C.Struct(s).Set64(24, v) }
+func (s DirectoryRecord) CreationTime() uint64              { return C.Struct(s).Get64(24) }
+func (s DirectoryRecord) SetCreationTime(v uint64)          { C.Struct(s).Set64(24, v) }
+func (s DirectoryRecord) ModificationTime() uint64          { return C.Struct(s).Get64(32) }
+func (s DirectoryRecord) SetModificationTime(v uint64)      { C.Struct(s).Set64(32, v) }
 func (s DirectoryRecord) WriteJSON(w io.Writer) error {
 	b := bufio.NewWriter(w)
 	var err error
@@ -674,7 +674,7 @@ func (s DirectoryRecord) MarshalCapLit() ([]byte, error) {
 type DirectoryRecord_List C.PointerList
 
 func NewDirectoryRecordList(s *C.Segment, sz int) DirectoryRecord_List {
-	return DirectoryRecord_List(s.NewCompositeList(32, 3, sz))
+	return DirectoryRecord_List(s.NewCompositeList(40, 3, sz))
 }
 func (s DirectoryRecord_List) Len() int { return C.PointerList(s).Len() }
 func (s DirectoryRecord_List) At(i int) DirectoryRecord {
