@@ -83,8 +83,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 
 	if BitFlagsSet(valid, fuse.FATTR_MODE) {
 		entry.SetPermissions(modeToPermissions(attr.Mode, 0))
-		c.vlog("Permissions now %d Mode %d", entry.Permissions(),
-			attr.Mode)
+		c.vlog("Permissions now %d Mode %d", entry.Permissions(), attr.Mode)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
