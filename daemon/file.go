@@ -71,13 +71,20 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	accessor blockAccessor
+	accessor     blockAccessor
+	unlinkRecord *quantumfs.DirectoryRecord
 }
 
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
 	fi.setDirty(true)
 	fi.parent().dirtyChild(c, fi)
+}
+
+func (fi *File) dirtyChild(c *ctx, child Inode) {
+	if child != fi.self {
+		panic("Unsupported dirtyChild() call on File")
+	}
 }
 
 func (fi *File) Access(c *ctx, mask uint32, uid uint32,
@@ -281,18 +288,72 @@ func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) 
 	c.elog("Invalid syncChild on File")
 }
 
+// When a file is unlinked its parent forgets about it, so we cannot ask it for our
+// properties. Since the file cannot be accessed from the directory tree any longer
+// we do not need to upload it or any of its content. When being unlinked we'll
+// orphan the File by making it its own parent.
+//
+// Sometimes a File will access its own parent with or without its lock held. To
+// protect the internal DirectoryRecord we'll abuse the InodeCommon.parentLock.
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid setChildAttr on File")
-	return fuse.ENOSYS
+	if inodeNum != fi.inodeNum() {
+		c.elog("Invalid setChildAttr on File")
+		return fuse.ENOSYS
+	}
+
+	c.dlog("File::setChildAttr Enter")
+	defer c.dlog("File::setChildAttr Exit")
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	if fi.unlinkRecord == nil {
+		panic("setChildAttr on self file before unlinking")
+	}
+
+	modifyEntryWithAttr(c, newType, attr, fi.unlinkRecord)
+
+	if out != nil {
+		fillAttrOutCacheData(c, out)
+		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
+			c.fuseCtx.Owner, fi.unlinkRecord)
+	}
+
+	return fuse.OK
 }
 
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
 	error) {
 
-	c.elog("Unsupported record fetch on file")
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	if inodeNum != fi.inodeNum() {
+		c.elog("Unsupported record fetch on file")
+		return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	}
+
+	c.dlog("File::getChildRecord Enter")
+	defer c.dlog("File::getChildRecord Exit")
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	if fi.unlinkRecord == nil {
+		panic("getChildRecord on self file before unlinking")
+	}
+
+	return *fi.unlinkRecord, nil
+}
+
+func (fi *File) setChildRecord(c *ctx, record *quantumfs.DirectoryRecord) {
+	c.dlog("File::setChildRecord Enter")
+	defer c.dlog("File::setChildRecord Exit")
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	if fi.unlinkRecord != nil {
+		panic("setChildRecord on self file after unlinking")
+	}
+
+	fi.unlinkRecord = cloneDirectoryRecord(record)
 }
 
 func resize(buffer []byte, size int) []byte {

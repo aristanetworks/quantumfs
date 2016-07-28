@@ -148,6 +148,22 @@ func (dir *Directory) addChild_(c *ctx, name string, inodeNum InodeId,
 func (dir *Directory) delChild_(c *ctx, name string) {
 	inodeNum := dir.children[name]
 	c.dlog("Unlinking inode %d", inodeNum)
+
+	// If this is a file we need to reparent it to itself
+	record := dir.childrenRecords[inodeNum]
+	if record.Type() == quantumfs.ObjectTypeSmallFile ||
+		record.Type() == quantumfs.ObjectTypeMediumFile ||
+		record.Type() == quantumfs.ObjectTypeLargeFile ||
+		record.Type() == quantumfs.ObjectTypeVeryLargeFile {
+
+		if inode := c.qfs.inode(c, inodeNum); inode != nil {
+			if file, isFile := inode.(*File); isFile {
+				file.setChildRecord(c, record)
+				file.setParent(file)
+			}
+		}
+	}
+
 	delete(dir.childrenRecords, inodeNum)
 	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
