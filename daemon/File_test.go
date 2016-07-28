@@ -35,8 +35,8 @@ func TestFileCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -199,7 +199,7 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x2,
+		test.assert(permissions == 0222,
 			"Chmodding not working, %d vs 0222", permissions)
 
 		var file *os.File
@@ -222,7 +222,7 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x4,
+		test.assert(permissions == 0444,
 			"Chmodding not working, %d vs 0444", permissions)
 
 		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
@@ -263,7 +263,7 @@ func TestRootFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x2,
+		test.assert(permissions == 0222,
 			"Chmodding not working, %d vs 0222", permissions)
 
 		var file *os.File
@@ -284,7 +284,7 @@ func TestRootFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x4,
+		test.assert(permissions == 0444,
 			"Chmodding not working, %d vs 0444", permissions)
 
 		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)

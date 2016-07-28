@@ -416,12 +416,18 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 // Permission bit names
 const (
-	PermissionExec   = 1 << iota
-	PermissionWrite  = 1 << iota
-	PermissionRead   = 1 << iota
-	PermissionSticky = 1 << iota
-	PermissionSGID   = 1 << iota
-	PermissionSUID   = 1 << iota
+	PermExecOther  = 1 << iota
+	PermWriteOther = 1 << iota
+	PermReadOther  = 1 << iota
+	PermExecGroup  = 1 << iota
+	PermWriteGroup = 1 << iota
+	PermReadGroup  = 1 << iota
+	PermExecOwner  = 1 << iota
+	PermWriteOwner = 1 << iota
+	PermReadOwner  = 1 << iota
+	PermSticky     = 1 << iota
+	PermSGID       = 1 << iota
+	PermSUID       = 1 << iota
 )
 
 func NewDirectoryRecord() *DirectoryRecord {
@@ -492,11 +498,11 @@ func (record *DirectoryRecord) SetCreationTime(t Time) {
 	record.record.SetCreationTime(uint64(t))
 }
 
-func (record *DirectoryRecord) Permissions() uint8 {
+func (record *DirectoryRecord) Permissions() uint32 {
 	return record.record.Permissions()
 }
 
-func (record *DirectoryRecord) SetPermissions(p uint8) {
+func (record *DirectoryRecord) SetPermissions(p uint32) {
 	record.record.SetPermissions(p)
 }
 

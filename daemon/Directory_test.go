@@ -31,8 +31,8 @@ func TestDirectoryCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFDIR
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"Directory permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -57,8 +57,8 @@ func TestRecursiveDirectoryCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFDIR
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"Directory permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -90,8 +90,8 @@ func TestRecursiveDirectoryFileCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)

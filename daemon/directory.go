@@ -226,43 +226,91 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Blksize = qfsBlockSize
 }
 
-func permissionsToMode(permissions uint8) uint32 {
+func permissionsToMode(permissions uint32) uint32 {
 	var mode uint32
-	mode |= uint32(permissions & 0x7)
-	mode |= uint32(permissions&0x7) << 3
-	mode |= uint32(permissions&0x7) << 6
 
-	if BitFlagsSet(uint(permissions), quantumfs.PermissionSticky) {
+	if BitFlagsSet(uint(permissions), quantumfs.PermExecOther) {
+		mode |= syscall.S_IXOTH
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermWriteOther) {
+		mode |= syscall.S_IWOTH
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermReadOther) {
+		mode |= syscall.S_IROTH
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermExecGroup) {
+		mode |= syscall.S_IXGRP
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermWriteGroup) {
+		mode |= syscall.S_IWGRP
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermReadGroup) {
+		mode |= syscall.S_IRGRP
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermExecOwner) {
+		mode |= syscall.S_IXUSR
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermWriteOwner) {
+		mode |= syscall.S_IWUSR
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermReadOwner) {
+		mode |= syscall.S_IRUSR
+	}
+	if BitFlagsSet(uint(permissions), quantumfs.PermSticky) {
 		mode |= syscall.S_ISVTX
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermissionSGID) {
+	if BitFlagsSet(uint(permissions), quantumfs.PermSGID) {
 		mode |= syscall.S_ISGID
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermissionSUID) {
+	if BitFlagsSet(uint(permissions), quantumfs.PermSUID) {
 		mode |= syscall.S_ISUID
 	}
 
 	return mode
 }
 
-func modeToPermissions(mode uint32, umask uint32) uint8 {
+func modeToPermissions(mode uint32, umask uint32) uint32 {
 	var permissions uint32
 	mode = mode & ^umask
-	permissions = mode & 0x7
-	permissions |= (mode >> 3) & 0x7
-	permissions |= (mode >> 6) & 0x7
 
+	if BitFlagsSet(uint(mode), syscall.S_IXOTH) {
+		permissions |= quantumfs.PermExecOther
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IWOTH) {
+		permissions |= quantumfs.PermWriteOther
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IROTH) {
+		permissions |= quantumfs.PermReadOther
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IXGRP) {
+		permissions |= quantumfs.PermExecGroup
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IWGRP) {
+		permissions |= quantumfs.PermWriteGroup
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IRGRP) {
+		permissions |= quantumfs.PermReadGroup
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IXUSR) {
+		permissions |= quantumfs.PermExecOwner
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IWUSR) {
+		permissions |= quantumfs.PermWriteOwner
+	}
+	if BitFlagsSet(uint(mode), syscall.S_IRUSR) {
+		permissions |= quantumfs.PermReadOwner
+	}
 	if BitFlagsSet(uint(mode), syscall.S_ISVTX) {
-		permissions |= quantumfs.PermissionSticky
+		permissions |= quantumfs.PermSticky
 	}
 	if BitFlagsSet(uint(mode), syscall.S_ISGID) {
-		permissions |= quantumfs.PermissionSGID
+		permissions |= quantumfs.PermSGID
 	}
 	if BitFlagsSet(uint(mode), syscall.S_ISUID) {
-		permissions |= quantumfs.PermissionSUID
+		permissions |= quantumfs.PermSUID
 	}
 
-	return uint8(permissions)
+	return permissions
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
