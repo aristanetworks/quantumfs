@@ -512,3 +512,53 @@ func TestSmallFileZero_test(t *testing.T) {
 		test.assert(err == nil, "Unable to read from empty file")
 	})
 }
+
+func TestFileAccessAfterUnlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genFibonacci(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		// Then confirm we can read back from it fine while it is still
+		// linked
+		input := make([]byte, 100*1024)
+		_, err = file.Seek(0, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Read(input)
+		test.assert(err == nil, "Error reading from file: %v", err)
+		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		// Then Unlink the file and confirm we can still read and write to it
+		err = os.Remove(testFilename)
+		test.assert(err == nil, "Error unlinking test file: %v", err)
+
+		_, err = file.Seek(0, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Read(input)
+		test.assert(err == nil, "Error reading from file: %v", err)
+		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		// Extend the file and read again
+		data = genFibonacci(100 * 1024)
+		_, err = file.Seek(100*1024*1024, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		_, err = file.Seek(100*1024*1024, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Read(input)
+		test.assert(err == nil, "Error reading from file: %v", err)
+		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		file.Close()
+	})
+}

@@ -147,6 +147,23 @@ func (dir *Directory) addChild_(c *ctx, name string, inodeNum InodeId,
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
 	inodeNum := dir.children[name]
+	c.dlog("Unlinking inode %d", inodeNum)
+
+	// If this is a file we need to reparent it to itself
+	record := dir.childrenRecords[inodeNum]
+	if record.Type() == quantumfs.ObjectTypeSmallFile ||
+		record.Type() == quantumfs.ObjectTypeMediumFile ||
+		record.Type() == quantumfs.ObjectTypeLargeFile ||
+		record.Type() == quantumfs.ObjectTypeVeryLargeFile {
+
+		if inode := c.qfs.inode(c, inodeNum); inode != nil {
+			if file, isFile := inode.(*File); isFile {
+				file.setChildRecord(c, record)
+				file.setParent(file)
+			}
+		}
+	}
+
 	delete(dir.childrenRecords, inodeNum)
 	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
@@ -260,61 +277,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			return fuse.ENOENT
 		}
 
-		// Update the type if needed
-		if newType != nil {
-			entry.SetType(*newType)
-			c.vlog("Type now %d", *newType)
-		}
-
-		valid := uint(attr.SetAttrInCommon.Valid)
-		// We don't support file locks yet, but when we do we need
-		// FATTR_LOCKOWNER
-
-		if BitFlagsSet(valid, fuse.FATTR_MODE) {
-			entry.SetPermissions(modeToPermissions(attr.Mode, 0))
-			c.vlog("Permissions now %d Mode %d", entry.Permissions(),
-				attr.Mode)
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_UID) {
-			entry.SetOwner(quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
-				c.fuseCtx.Owner.Uid))
-			c.vlog("Owner now %d UID %d context %d", entry.Owner(),
-				attr.Owner.Uid, c.fuseCtx.Owner.Uid)
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_GID) {
-			entry.SetGroup(quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
-				c.fuseCtx.Owner.Gid))
-			c.vlog("Group now %d GID %d context %d", entry.Group(),
-				attr.Owner.Gid, c.fuseCtx.Owner.Gid)
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_SIZE) {
-			entry.SetSize(attr.Size)
-			c.vlog("Size now %d", entry.Size())
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
-			// atime is ignored and not stored
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-			entry.SetModificationTime(
-				quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
-			c.vlog("ModificationTime now %d", entry.ModificationTime())
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-			entry.SetModificationTime(quantumfs.NewTime(time.Now()))
-			c.vlog("ModificationTime now %d", entry.ModificationTime())
-		}
-
-		if BitFlagsSet(valid, fuse.FATTR_CTIME) {
-			entry.SetCreationTime(quantumfs.NewTimeSeconds(attr.Ctime,
-				attr.Ctimensec))
-			c.vlog("CreationTime now %d", entry.CreationTime())
-		}
+		modifyEntryWithAttr(c, newType, attr, entry)
 
 		if out != nil {
 			fillAttrOutCacheData(c, out)
@@ -728,17 +691,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		child := c.qfs.inode(c, oldInodeId)
 		child.setParent(dst)
 
-		newEntry := quantumfs.NewDirectoryRecord()
+		newEntry := cloneDirectoryRecord(oldEntry)
 		newEntry.SetFilename(newName)
-		newEntry.SetID(oldEntry.ID())
-		newEntry.SetType(oldEntry.Type())
-		newEntry.SetPermissions(oldEntry.Permissions())
-		newEntry.SetOwner(oldEntry.Owner())
-		newEntry.SetGroup(oldEntry.Group())
-		newEntry.SetSize(oldEntry.Size())
-		newEntry.SetExtendedAttributes(oldEntry.ExtendedAttributes())
-		newEntry.SetCreationTime(oldEntry.CreationTime())
-		newEntry.SetModificationTime(oldEntry.ModificationTime())
 
 		// Update entry in new directory
 		dst.children[newName] = oldInodeId
