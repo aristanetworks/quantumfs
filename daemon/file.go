@@ -328,7 +328,8 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 
 	if inodeNum != fi.inodeNum() {
 		c.elog("Unsupported record fetch on file")
-		return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+		return quantumfs.DirectoryRecord{},
+			errors.New("Unsupported record fetch")
 	}
 
 	c.dlog("File::getChildRecord Enter")
