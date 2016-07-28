@@ -35,7 +35,7 @@ struct DirectoryRecord {
         filename           @0 :Text;
         id                 @1 :ObjectKey;
         type               @2 :UInt8;
-        permissions        @3 :UInt8;
+        permissions        @3 :UInt32;
         owner              @4 :UInt8;
         group              @5 :UInt8;
         size               @6 :UInt64;
