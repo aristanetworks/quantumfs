@@ -300,14 +300,14 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			// atime is ignored and not stored
 		}
 
-		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
-			entry.SetModificationTime(
-				quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
+		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
+			entry.SetModificationTime(quantumfs.NewTime(time.Now()))
 			c.vlog("ModificationTime now %d", entry.ModificationTime())
 		}
 
-		if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-			entry.SetModificationTime(quantumfs.NewTime(time.Now()))
+		if BitFlagsSet(valid, fuse.FATTR_MTIME) {
+			entry.SetModificationTime(
+				quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
 			c.vlog("ModificationTime now %d", entry.ModificationTime())
 		}
 
