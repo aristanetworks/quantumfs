@@ -149,12 +149,15 @@ func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 
 	var execAccess bool
 	if BitFlagsSet(flags, FMODE_EXEC) {
-		execAccess = BitAnyFlagSet(flags, quantumfs.PermExecOther|
-			quantumfs.PermExecGroup|quantumfs.PermExecOwner|
-			quantumfs.PermSUID|quantumfs.PermSGID)
+		execAccess = BitAnyFlagSet(uint(record.Permissions()),
+			quantumfs.PermExecOther|quantumfs.PermExecGroup|
+				quantumfs.PermExecOwner|quantumfs.PermSUID|
+				quantumfs.PermSGID)
 	}
 
-	return userAccess || execAccess
+	success := userAccess || execAccess
+	c.vlog("Permission check result %d", success)
+	return success
 }
 
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
