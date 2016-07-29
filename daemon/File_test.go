@@ -562,3 +562,27 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 		file.Close()
 	})
 }
+
+func TestSmallFileReadPathEnd(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genFibonacci(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		// Then confirm we can read back past the data and get the correct
+		// EOF return value.
+		input := make([]byte, 100*1024)
+		_, err = file.ReadAt(input, 100*1024)
+		test.assert(err == io.EOF, "Expected EOF got: %v", err)
+
+		file.Close()
+	})
+}
