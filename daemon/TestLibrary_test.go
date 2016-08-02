@@ -242,12 +242,11 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 	th.log("Using mountpath %s", mountPath)
 
 	config := QuantumFsConfig{
-		CachePath:        "",
+		CachePath:        th.tempDir + "/ramfs",
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
 		MountPath:        mountPath,
-		RamFsPath:        th.tempDir + "/ramfs",
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
 		DurableStore:     processlocal.NewDataStore(),
 	}
@@ -257,7 +256,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 func (th *testHelper) startDefaultQuantumFs() {
 	config := th.defaultConfig()
 
-	if err := os.MkdirAll(config.RamFsPath, 0777); err != nil {
+	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
 		th.t.Fatalf("Unable to setup test ramfs path")
 	}
 

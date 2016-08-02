@@ -30,10 +30,9 @@ var cpuProfileFile string
 
 func init() {
 	const (
-		defaultCachePath        = "/dev/shmem"
+		defaultCachePath        = "/var/run/quantumfs"
 		defaultCacheSize        = "8G"
 		defaultMountPath        = "/mnt/quantumfs"
-		defaultRamFsPath        = "/var/run/quantumfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
 	)
@@ -50,8 +49,6 @@ func init() {
 		"Number of seconds the kernel will cache response data")
 	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
-	flag.StringVar(&config.RamFsPath, "ramfsPath", defaultRamFsPath,
-		"Path to pre-existing ramfs directory")
 
 	flag.StringVar(&cpuProfileFile, "profilePath", "",
 		"File to write CPU Profiling data to")
