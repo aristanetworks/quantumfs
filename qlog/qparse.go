@@ -21,9 +21,9 @@ func ParseLogs(filepath string) string {
 	data := grabMemory(filepath)
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
 
-	if header.Version != qlog.MmapHeaderVersion {
+	if header.Version != MmapHeaderVersion {
 		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, qlog.MmapHeaderVersion))
+			header.Version, MmapHeaderVersion))
 	}
 
 	if uint32(len(data)) != (header.StrMapSize + header.CircBuf.Size +
@@ -84,52 +84,52 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 	handledWrite := true
 	var rtn reflect.Value
 	switch byteType {
-	case qlog.TypeInt8Pointer:
+	case TypeInt8Pointer:
 		var tmp *int8
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt8:
+	case TypeInt8:
 		var tmp int8
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint8Pointer:
+	case TypeUint8Pointer:
 		var tmp *uint8
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint8:
+	case TypeUint8:
 		var tmp uint8
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt16Pointer:
+	case TypeInt16Pointer:
 		var tmp *int16
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt16:
+	case TypeInt16:
 		var tmp int16
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint16Pointer:
+	case TypeUint16Pointer:
 		var tmp *uint16
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint16:
+	case TypeUint16:
 		var tmp uint16
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt32Pointer:
+	case TypeInt32Pointer:
 		var tmp *int32
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt32:
+	case TypeInt32:
 		var tmp int32
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint32Pointer:
+	case TypeUint32Pointer:
 		var tmp *uint32
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint32:
+	case TypeUint32:
 		var tmp uint32
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt64Pointer:
+	case TypeInt64Pointer:
 		var tmp *int64
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeInt64:
+	case TypeInt64:
 		var tmp int64
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint64Pointer:
+	case TypeUint64Pointer:
 		var tmp *uint64
 		rtn = reflect.ValueOf(&tmp)
-	case qlog.TypeUint64:
+	case TypeUint64:
 		var tmp uint64
 		rtn = reflect.ValueOf(&tmp)
 	default:
@@ -144,7 +144,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 		return rtn.Elem().Interface(), nil
 	}
 
-	if byteType == qlog.TypeString || byteType == qlog.TypeByteArray {
+	if byteType == TypeString || byteType == TypeByteArray {
 		var strLen uint16
 		err = readPacket(idx, data, reflect.ValueOf(&strLen))
 		if err != nil {
@@ -158,7 +158,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 			return nil, err
 		}
 
-		if byteType == qlog.TypeString {
+		if byteType == TypeString {
 			return string(rtnRaw[:strLen]), nil
 		}
 
@@ -173,8 +173,8 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 // to a variable of that type for the data to be placed into
 func readInto(idx *uint32, data []byte, outputType interface{}, output interface{}) {
 	dataLen := uint32(reflect.TypeOf(outputType).Size())
-	rawData := qlog.WrapRead(*idx, dataLen, data)
-	qlog.WrapPlusEquals(idx, dataLen, len(data))
+	rawData := wrapRead(*idx, dataLen, data)
+	wrapPlusEquals(idx, dataLen, len(data))
 
 	buf := bytes.NewReader(rawData)
 	err := binary.Read(buf, binary.LittleEndian, output)
@@ -234,8 +234,8 @@ func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
 		readInto(&frontIdx, data, packetLen, &packetLen)
 
 		// Read the packet data into a separate buffer
-		packetData := qlog.WrapRead(frontIdx, uint32(packetLen-2), data)
-		qlog.WrapPlusEquals(&frontIdx, uint32(packetLen-2), len(data))
+		packetData := wrapRead(frontIdx, uint32(packetLen-2), data)
+		wrapPlusEquals(&frontIdx, uint32(packetLen-2), len(data))
 
 		read := uint32(0)
 		var numFields uint16

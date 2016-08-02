@@ -117,10 +117,6 @@ func (circ *CircMemLogs) curLen_() uint32 {
 	return wrapLen(circ.header.FrontIdx, circ.header.PastEndIdx, mmapCircBufSize)
 }
 
-func WrapRead(idx uint32, num uint32, data []byte) []byte {
-	return wrapRead(idx, num, data)
-}
-
 func wrapRead(idx uint32, num uint32, data []byte) []byte {
 	rtn := make([]byte, num)
 
@@ -138,10 +134,6 @@ func wrapRead(idx uint32, num uint32, data []byte) []byte {
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
 	return wrapRead(idx, num, circ.buffer[:])
-}
-
-func WrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
-	wrapPlusEquals(lhs, addon, bufLen)
 }
 
 func wrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
