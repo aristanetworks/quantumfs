@@ -6,6 +6,7 @@ package qlog
 // This file contains all quantumfs logging shared memory support
 import "bytes"
 import "encoding/binary"
+import "errors"
 import "fmt"
 import "io"
 import "math"
@@ -16,7 +17,7 @@ import "sync"
 import "syscall"
 import "unsafe"
 
-const writerBufferBytes = 64 * 1024
+const writerBufferMsgs = 1000
 
 // Circular buf size for approx 1 hour of LogEntries at 1000 a second
 const mmapCircBufSize = 360000 * 24
@@ -200,19 +201,28 @@ type LogStr struct {
 	LogLevel     uint8
 }
 
-func newLogStr(idx LogSubsystem, level uint8, format string) LogStr {
+func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
+	var err error
 	var rtn LogStr
 	rtn.LogSubsystem = uint8(idx)
 	rtn.LogLevel = level
 	copyLen := len(format)
 	if copyLen > logTextMax {
-		fmt.Printf("Log format string exceeds allowable length: |||%s|||\n",
-			format)
+		errorPrefix := "Log format string exceeds allowable length"
+
+		// Ensure we're not already recursing
+		if len(format) >= len(errorPrefix) &&
+			errorPrefix == format[:len(errorPrefix)] {
+
+			panic("Stuck in infinite recursion due to format length")
+		}
+
+		err = errors.New(errorPrefix)
 		copyLen = logTextMax
 	}
 	copy(rtn.Text[:], format[:copyLen])
 
-	return rtn
+	return rtn, err
 }
 
 type IdStrMap struct {
@@ -229,7 +239,7 @@ func newCircBuf(mapHeader *circBufHeader,
 	rtn := CircMemLogs{
 		header: mapHeader,
 		buffer: mapBuffer,
-		writer: make(chan []byte, writerBufferBytes),
+		writer: make(chan []byte, writerBufferMsgs),
 	}
 
 	rtn.header.Size = mmapCircBufSize
@@ -321,7 +331,7 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) *uint16 {
 }
 
 func (strMap *IdStrMap) writeMapEntry(idx LogSubsystem, level uint8,
-	format string) uint16 {
+	format string) (uint16, error) {
 
 	strMap.mapLock.Lock()
 	defer strMap.mapLock.Unlock()
@@ -329,25 +339,26 @@ func (strMap *IdStrMap) writeMapEntry(idx LogSubsystem, level uint8,
 	// Re-check for existing key now that we have the lock to avoid races
 	existingId, ok := strMap.data[format]
 	if ok {
-		return existingId
+		return existingId, nil
 	}
 
 	newIdx := strMap.freeIdx
 	strMap.freeIdx++
 
 	strMap.data[format] = newIdx
-	strMap.buffer[newIdx] = newLogStr(idx, level, format)
+	var err error
+	strMap.buffer[newIdx], err = newLogStr(idx, level, format)
 
-	return newIdx
+	return newIdx, err
 }
 
 func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
-	format string) uint16 {
+	format string) (uint16, error) {
 
 	existingId := strMap.mapGetLogIdx(format)
 
 	if existingId != nil {
-		return *existingId
+		return *existingId, nil
 	}
 
 	return strMap.writeMapEntry(idx, level, format)
@@ -393,46 +404,46 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 	}
 
 	needDataWrite := true
-	byteType := make([]byte, 2)
+	var byteType uint16
 	switch v := data.(type) {
 	case *int8:
-		byteType[0] = TypeInt8Pointer
+		byteType = TypeInt8Pointer
 	case int8:
-		byteType[0] = TypeInt8
+		byteType = TypeInt8
 	case *uint8:
-		byteType[0] = TypeUint8Pointer
+		byteType = TypeUint8Pointer
 	case uint8:
-		byteType[0] = TypeUint8
+		byteType = TypeUint8
 	case *int16:
-		byteType[0] = TypeInt16Pointer
+		byteType = TypeInt16Pointer
 	case int16:
-		byteType[0] = TypeInt16
+		byteType = TypeInt16
 	case *uint16:
-		byteType[0] = TypeUint16Pointer
+		byteType = TypeUint16Pointer
 	case uint16:
-		byteType[0] = TypeUint16
+		byteType = TypeUint16
 	case *int32:
-		byteType[0] = TypeInt32Pointer
+		byteType = TypeInt32Pointer
 	case int32:
-		byteType[0] = TypeInt32
+		byteType = TypeInt32
 	case *uint32:
-		byteType[0] = TypeUint32Pointer
+		byteType = TypeUint32Pointer
 	case uint32:
-		byteType[0] = TypeUint32
+		byteType = TypeUint32
 	case int:
-		byteType[0] = TypeInt64
+		byteType = TypeInt64
 		data = interface{}(int64(v))
 	case uint:
-		byteType[0] = TypeUint64
+		byteType = TypeUint64
 		data = interface{}(uint64(v))
 	case *int64:
-		byteType[0] = TypeInt64Pointer
+		byteType = TypeInt64Pointer
 	case int64:
-		byteType[0] = TypeInt64
+		byteType = TypeInt64
 	case *uint64:
-		byteType[0] = TypeUint64Pointer
+		byteType = TypeUint64Pointer
 	case uint64:
-		byteType[0] = TypeUint64
+		byteType = TypeUint64
 	case string:
 		writeArray(w, format, []byte(v), TypeString)
 		return
@@ -455,11 +466,11 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 				err))
 		}
 	} else {
-		errorPrefix := "WARN: LogConverter needed"
+		errorPrefix := "WARN: LogConverter needed for %s:\n%s\n"
 
 		// Since we're going to do something recursive, ensure we're not
 		// already recursing and something horrible is happening.
-		if len(format) > len(errorPrefix) &&
+		if len(format) >= len(errorPrefix) &&
 			errorPrefix == format[:len(errorPrefix)] {
 
 			panic("Stuck in impossible infinite recursion")
@@ -467,9 +478,8 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 
 		str := fmt.Sprintf("%v", data)
 		writeArray(w, format, []byte(str), 17)
-		errorStr := fmt.Sprintf(errorPrefix + " for %s:\n%s\n",
+		mem.errOut.Log(LogQlog, QlogReqId, 1, errorPrefix,
 			reflect.ValueOf(data).String(), string(debug.Stack()))
-		mem.errOut.Log(LogQlog, QlogReqId, 1, "%s", errorStr)
 	}
 }
 
@@ -515,8 +525,17 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	rtn := make([]byte, buf.Len()+2)
 	copy(rtn[2:], buf.Bytes())
 	if len(rtn) > math.MaxUint16 {
-		fmt.Printf("Log data exceeds allowable length: %s\n",
-			format)
+		errorPrefix := "Log data exceeds allowable length: %s\n"
+
+		// Ensure we're not already recursing
+		if len(format) >= len(errorPrefix) &&
+			errorPrefix == format[:len(errorPrefix)] {
+
+			panic("Stuck in impossible infinite recursion from length")
+		}
+
+		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
+
 		rtn = rtn[:math.MaxUint16]
 	}
 	lenBuf := new(bytes.Buffer)
@@ -530,7 +549,11 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	timestamp int64, format string, args ...interface{}) {
 
 	// Create the string map entry / fetch existing one
-	strId := mem.strIdMap.fetchLogIdx(idx, level, format)
+	strId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
+	if err != nil {
+		mem.errOut.Log(LogQlog, reqId, 1, err.Error() + ": %s\n", format)
+		return
+	}
 
 	// Generate the byte array packet
 	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
