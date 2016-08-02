@@ -35,8 +35,7 @@ func specialCreate(test *testHelper, filetype uint32) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= filetype
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IRWXU
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)

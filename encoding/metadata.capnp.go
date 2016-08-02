@@ -249,21 +249,21 @@ func AutoNewDirectoryRecord(s *C.Segment) DirectoryRecord {
 func ReadRootDirectoryRecord(s *C.Segment) DirectoryRecord {
 	return DirectoryRecord(s.Root(0).ToStruct())
 }
-func (s DirectoryRecord) Filename() string       { return C.Struct(s).GetObject(0).ToText() }
-func (s DirectoryRecord) FilenameBytes() []byte  { return C.Struct(s).GetObject(0).ToDataTrimLastByte() }
-func (s DirectoryRecord) SetFilename(v string)   { C.Struct(s).SetObject(0, s.Segment.NewText(v)) }
-func (s DirectoryRecord) Id() ObjectKey          { return ObjectKey(C.Struct(s).GetObject(1).ToStruct()) }
-func (s DirectoryRecord) SetId(v ObjectKey)      { C.Struct(s).SetObject(1, C.Object(v)) }
-func (s DirectoryRecord) Type() uint8            { return C.Struct(s).Get8(0) }
-func (s DirectoryRecord) SetType(v uint8)        { C.Struct(s).Set8(0, v) }
-func (s DirectoryRecord) Permissions() uint8     { return C.Struct(s).Get8(1) }
-func (s DirectoryRecord) SetPermissions(v uint8) { C.Struct(s).Set8(1, v) }
-func (s DirectoryRecord) Owner() uint8           { return C.Struct(s).Get8(2) }
-func (s DirectoryRecord) SetOwner(v uint8)       { C.Struct(s).Set8(2, v) }
-func (s DirectoryRecord) Group() uint8           { return C.Struct(s).Get8(3) }
-func (s DirectoryRecord) SetGroup(v uint8)       { C.Struct(s).Set8(3, v) }
-func (s DirectoryRecord) Size() uint64           { return C.Struct(s).Get64(8) }
-func (s DirectoryRecord) SetSize(v uint64)       { C.Struct(s).Set64(8, v) }
+func (s DirectoryRecord) Filename() string        { return C.Struct(s).GetObject(0).ToText() }
+func (s DirectoryRecord) FilenameBytes() []byte   { return C.Struct(s).GetObject(0).ToDataTrimLastByte() }
+func (s DirectoryRecord) SetFilename(v string)    { C.Struct(s).SetObject(0, s.Segment.NewText(v)) }
+func (s DirectoryRecord) Id() ObjectKey           { return ObjectKey(C.Struct(s).GetObject(1).ToStruct()) }
+func (s DirectoryRecord) SetId(v ObjectKey)       { C.Struct(s).SetObject(1, C.Object(v)) }
+func (s DirectoryRecord) Type() uint8             { return C.Struct(s).Get8(0) }
+func (s DirectoryRecord) SetType(v uint8)         { C.Struct(s).Set8(0, v) }
+func (s DirectoryRecord) Permissions() uint32     { return C.Struct(s).Get32(4) }
+func (s DirectoryRecord) SetPermissions(v uint32) { C.Struct(s).Set32(4, v) }
+func (s DirectoryRecord) Owner() uint8            { return C.Struct(s).Get8(1) }
+func (s DirectoryRecord) SetOwner(v uint8)        { C.Struct(s).Set8(1, v) }
+func (s DirectoryRecord) Group() uint8            { return C.Struct(s).Get8(2) }
+func (s DirectoryRecord) SetGroup(v uint8)        { C.Struct(s).Set8(2, v) }
+func (s DirectoryRecord) Size() uint64            { return C.Struct(s).Get64(8) }
+func (s DirectoryRecord) SetSize(v uint64)        { C.Struct(s).Set64(8, v) }
 func (s DirectoryRecord) ExtendedAttributes() ObjectKey {
 	return ObjectKey(C.Struct(s).GetObject(2).ToStruct())
 }
