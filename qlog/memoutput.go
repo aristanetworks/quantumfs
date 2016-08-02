@@ -16,7 +16,9 @@ import "sync"
 import "syscall"
 import "unsafe"
 
-// Circ buf size for approx 1 hour of LogEntries at 1000 a second
+const writerBufferBytes = 64 * 1024
+
+// Circular buf size for approx 1 hour of LogEntries at 1000 a second
 const mmapCircBufSize = 360000 * 24
 
 // Strmap size allows for up to ~10000 unique logs
@@ -27,11 +29,13 @@ const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + MmapHeaderSize
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const MmapHeaderSize = 16
+const MmapHeaderSize = 20
+const MmapHeaderVersion = 1
 
 type MmapHeader struct {
-	StrMapSize uint32
-	CircBuf    circBufHeader
+	Version		uint32
+	StrMapSize	uint32
+	CircBuf		circBufHeader
 }
 
 type circBufHeader struct {
@@ -58,6 +62,34 @@ type LogEntry struct {
 	vars      []interface{}
 }
 
+/*
+The circular memory object contains a byte array that it writes data to in a
+circular fashion. It is designed to be written to and read from at the same time
+without any locks. To do so requires that readers and the writer adhere to the
+following rules...
+
+Writer:
+- The CircMemLogs must only have one writer at a time, and must modify the front
+	pointer if it needs to make space before writing any data. It needs to update
+	the end pointer *after* all data is written, to prevent any reader from
+	reading invalid data in a race
+
+Readers:
+- Must first copy the end pointer
+- Must then copy the circular buffer in its entirety
+- Must then copy the front pointer
+- Must then only consider the data in the buffer between front (sampled after) and
+	end (sampled before) as valid.
+- Since the buffer is being written to, the pointers are constantly updated and data
+	is constantly changing. If we read the end pointer *after* we've copied the
+	buffer, it's possible that the end points to a further place than our copy
+	of the buffer has been updated to. That's why we need to sample the end
+	pointer first.
+	If we read the front pointer *before* we've copied the data, it's possible
+	that the packets near our front pointer were removed by the time that we got
+	around to copying that section of the buffer. That's why we sample the front
+	afterwards, since it most probably points to valid packets.
+*/
 type CircMemLogs struct {
 	header *circBufHeader
 	buffer *[mmapCircBufSize]byte
@@ -68,40 +100,59 @@ func (circ *CircMemLogs) Size() int {
 	return mmapCircBufSize + MmapHeaderSize
 }
 
-// Must only be called from inside writeLogEntries
-func (circ *CircMemLogs) curLen_() uint32 {
+func wrapLen(frontIdx uint32, pastEndIdx uint32, dataLen uint32) uint32 {
 	// Is the end ahead of us, or has it wrapped?
-	if circ.header.PastEndIdx >= circ.header.FrontIdx {
-		return circ.header.PastEndIdx - circ.header.FrontIdx
+	if pastEndIdx >= frontIdx {
+		return pastEndIdx - frontIdx
 	} else {
-		return (mmapCircBufSize - circ.header.FrontIdx) + 1 +
-			circ.header.PastEndIdx
+		return (dataLen - frontIdx) + 1 + pastEndIdx
 	}
 }
 
 // Must only be called from inside writeLogEntries
-func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
+func (circ *CircMemLogs) curLen_() uint32 {
+	return wrapLen(circ.header.FrontIdx, circ.header.PastEndIdx, mmapCircBufSize)
+}
+
+func WrapRead(idx uint32, num uint32, data []byte) []byte {
+	return wrapRead(idx, num, data)
+}
+
+func wrapRead(idx uint32, num uint32, data []byte) []byte {
 	rtn := make([]byte, num)
 
-	if idx+num > mmapCircBufSize {
-		secondNum := (idx + num) - mmapCircBufSize
+	if idx+num > uint32(len(data)) {
+		secondNum := (idx + num) - uint32(len(data))
 		num -= secondNum
-		copy(rtn[num:], circ.buffer[0:secondNum])
+		copy(rtn[num:], data[0:secondNum])
 	}
 
-	copy(rtn, circ.buffer[idx:idx+num])
+	copy(rtn, data[idx:idx+num])
 
 	return rtn
 }
 
 // Must only be called from inside writeLogEntries
-func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
-	if *lhs+addon < mmapCircBufSize {
+func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
+	return wrapRead(idx, num, circ.buffer[:])
+}
+
+func WrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
+	wrapPlusEquals(lhs, addon, bufLen)
+}
+
+func wrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
+	if *lhs+addon < uint32(bufLen) {
 		*lhs = *lhs + addon
 		return
 	}
 
-	*lhs = (*lhs + addon) - mmapCircBufSize
+	*lhs = (*lhs + addon) - uint32(bufLen)
+}
+
+// Must only be called from inside writeLogEntries
+func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
+	wrapPlusEquals(lhs, addon, mmapCircBufSize)
 }
 
 // Must only be called from inside writeLogEntries
@@ -183,7 +234,7 @@ func newCircBuf(mapHeader *circBufHeader,
 	rtn := CircMemLogs{
 		header: mapHeader,
 		buffer: mapBuffer,
-		writer: make(chan []byte),
+		writer: make(chan []byte, writerBufferBytes),
 	}
 
 	rtn.header.Size = mmapCircBufSize
@@ -242,10 +293,16 @@ func newSharedMemory(dir string, filename string, errOut *func(format string,
 		panic("Unable to map shared memory file for logging")
 	}
 
+	// Make sure we touch every byte to ensure that the mmap isn't sparse
+	for i := 0; i < mmapTotalSize; i++ {
+		mmap[i] = 0
+	}
+
 	var rtn SharedMemory
 	rtn.fd = mapFile
 	rtn.buffer = (*[mmapTotalSize]byte)(unsafe.Pointer(&mmap[0]))
 	header := (*MmapHeader)(unsafe.Pointer(&rtn.buffer[0]))
+	header.Version = MmapHeaderVersion
 	header.StrMapSize = mmapStrMapSize
 	rtn.circBuf = newCircBuf(&header.CircBuf,
 		(*[mmapCircBufSize]byte)(unsafe.Pointer(
@@ -275,7 +332,7 @@ func (strMap *IdStrMap) writeMapEntry(idx LogSubsystem, level uint8,
 	strMap.mapLock.Lock()
 	defer strMap.mapLock.Unlock()
 
-	// Re-check for existing key now that we have the log to avoid races
+	// Re-check for existing key now that we have the lock to avoid races
 	existingId, ok := strMap.data[format]
 	if ok {
 		return existingId
@@ -308,6 +365,27 @@ type LogPrimitive interface {
 	Primitive() interface{}
 }
 
+const (
+	TypeInt8Pointer = 1
+	TypeInt8 = 2
+	TypeUint8Pointer = 3
+	TypeUint8 = 4
+	TypeInt16Pointer = 5
+	TypeInt16 = 6
+	TypeUint16Pointer = 7
+	TypeUint16 = 8
+	TypeInt32Pointer = 9
+	TypeInt32 = 10
+	TypeUint32Pointer = 11
+	TypeUint32 = 12
+	TypeInt64Pointer = 13
+	TypeInt64 = 14
+	TypeUint64Pointer = 15
+	TypeUint64 = 16
+	TypeString = 17
+	TypeByteArray = 18
+)
+
 // Writes the data, with a type prefix field two bytes long
 func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format string) {
 	data := input
@@ -324,48 +402,48 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 	byteType := make([]byte, 2)
 	switch v := data.(type) {
 	case *int8:
-		byteType[0] = 1
+		byteType[0] = TypeInt8Pointer
 	case int8:
-		byteType[0] = 2
+		byteType[0] = TypeInt8
 	case *uint8:
-		byteType[0] = 3
+		byteType[0] = TypeUint8Pointer
 	case uint8:
-		byteType[0] = 4
+		byteType[0] = TypeUint8
 	case *int16:
-		byteType[0] = 5
+		byteType[0] = TypeInt16Pointer
 	case int16:
-		byteType[0] = 6
+		byteType[0] = TypeInt16
 	case *uint16:
-		byteType[0] = 7
+		byteType[0] = TypeUint16Pointer
 	case uint16:
-		byteType[0] = 8
+		byteType[0] = TypeUint16
 	case *int32:
-		byteType[0] = 9
+		byteType[0] = TypeInt32Pointer
 	case int32:
-		byteType[0] = 10
+		byteType[0] = TypeInt32
 	case *uint32:
-		byteType[0] = 11
+		byteType[0] = TypeUint32Pointer
 	case uint32:
-		byteType[0] = 12
+		byteType[0] = TypeUint32
 	case int:
-		byteType[0] = 10
-		data = interface{}(int32(v))
+		byteType[0] = TypeInt64
+		data = interface{}(int64(v))
 	case uint:
-		byteType[0] = 12
-		data = interface{}(uint32(v))
+		byteType[0] = TypeUint64
+		data = interface{}(uint64(v))
 	case *int64:
-		byteType[0] = 13
+		byteType[0] = TypeInt64Pointer
 	case int64:
-		byteType[0] = 14
+		byteType[0] = TypeInt64
 	case *uint64:
-		byteType[0] = 15
+		byteType[0] = TypeUint64Pointer
 	case uint64:
-		byteType[0] = 16
+		byteType[0] = TypeUint64
 	case string:
-		writeArray(w, format, []byte(v), 17)
+		writeArray(w, format, []byte(v), TypeString)
 		return
 	case []byte:
-		writeArray(w, format, v, 18)
+		writeArray(w, format, v, TypeByteArray)
 		return
 	default:
 		needDataWrite = false
