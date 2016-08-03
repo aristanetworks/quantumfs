@@ -791,7 +791,8 @@ func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := dir.loadChild_(c, *newRecord)
 
-	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName, inodeNum)
+	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
+		inodeNum)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
