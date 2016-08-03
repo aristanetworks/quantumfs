@@ -172,6 +172,13 @@ func (api *ApiInode) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on ApiInode")
+	return fuse.ENOTDIR
+}
+
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
