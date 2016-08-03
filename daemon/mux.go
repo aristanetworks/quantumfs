@@ -444,12 +444,15 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	defer dstDir.Lock().Unlock()
 	dstDir.addChild_(c, filename, inodeNum, newRecord)
 
+	c.dlog("CoW linked %d to %s as inode %d", input.NodeId, filename, inodeNum)
+
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		newRecord)
 
-	result = fuse.OK
+	dstDir.self.dirty(c)
+
 	return fuse.OK
 }
 
