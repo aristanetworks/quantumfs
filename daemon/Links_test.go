@@ -21,8 +21,7 @@ func TestHardlink(t *testing.T) {
 
 		file2 := workspace + "/hardlink"
 		err = syscall.Link(file1, file2)
-		test.assert(err != nil, "Expected hardlink to fail")
-		test.assert(err == syscall.EPERM, "Expected EPERM error: %v", err)
+		test.assert(err == nil, "Creating hardlink failed: %v", err)
 	})
 }
 

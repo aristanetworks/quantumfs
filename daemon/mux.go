@@ -405,10 +405,52 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Link Enter")
+	c.vlog("QuantumFs::Link Enter name %s dstDir %d inode %d", filename,
+		input.NodeId, input.Oldnodeid)
 	defer c.vlog("QuantumFs::Link Exit")
 
-	return fuse.EPERM
+	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
+	if srcInode == nil {
+		return fuse.ENOENT
+	}
+
+	dstInode := qfs.inode(c, InodeId(input.NodeId))
+	if dstInode == nil {
+		return fuse.ENOENT
+	}
+
+	dstDir, isDir := dstInode.(*Directory)
+	if !isDir {
+		if dstWsr, isWsr := dstInode.(*WorkspaceRoot); isWsr {
+			dstDir = &dstWsr.Directory
+		} else {
+			c.elog("QuantumFs::Link dstInode isn't a Directory")
+			return fuse.ENOTDIR
+		}
+	}
+
+	defer srcInode.RLockTree().RUnlock()
+	defer dstInode.RLockTree().RUnlock()
+
+	origRecord, err := srcInode.parent().getChildRecord(c, InodeId(input.Oldnodeid))
+	if err != nil {
+		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
+		return fuse.EIO
+	}
+	newRecord := cloneDirectoryRecord(&origRecord)
+	newRecord.SetFilename(filename)
+
+	inodeNum := qfs.newInodeId()
+	defer dstDir.Lock().Unlock()
+	dstDir.addChild_(c, filename, inodeNum, newRecord)
+
+	out.NodeId = uint64(inodeNum)
+	fillEntryOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+		newRecord)
+
+	result = fuse.OK
+	return fuse.OK
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
