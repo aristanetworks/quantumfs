@@ -80,7 +80,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
-func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
+func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) InodeId {
 	inodeId := c.qfs.newInodeId()
 	dir.children[entry.Filename()] = inodeId
 	dir.childrenRecords[inodeId] = &entry
@@ -107,6 +107,8 @@ func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 
 	c.qfs.setInode(c, inodeId, constructor(c, entry.ID(), entry.Size(),
 		inodeId, dir, 0, 0, nil))
+
+	return inodeId
 }
 
 func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
@@ -771,8 +773,28 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on Directory")
-	return fuse.ENOTDIR
+	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
+	if err != nil {
+		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
+		return fuse.EIO
+	}
+	newRecord := cloneDirectoryRecord(&origRecord)
+	newRecord.SetFilename(newName)
+
+	defer dir.Lock().Unlock()
+
+	inodeNum := dir.loadChild(c, *newRecord)
+
+	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName, inodeNum)
+
+	out.NodeId = uint64(inodeNum)
+	fillEntryOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+		newRecord)
+
+	dir.self.dirty(c)
+
+	return fuse.OK
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,

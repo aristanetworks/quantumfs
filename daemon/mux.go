@@ -419,41 +419,10 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		return fuse.ENOENT
 	}
 
-	dstDir, isDir := dstInode.(*Directory)
-	if !isDir {
-		if dstWsr, isWsr := dstInode.(*WorkspaceRoot); isWsr {
-			dstDir = &dstWsr.Directory
-		} else {
-			c.elog("QuantumFs::Link dstInode isn't a Directory")
-			return fuse.ENOTDIR
-		}
-	}
-
 	defer srcInode.RLockTree().RUnlock()
 	defer dstInode.RLockTree().RUnlock()
 
-	origRecord, err := srcInode.parent().getChildRecord(c, InodeId(input.Oldnodeid))
-	if err != nil {
-		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
-		return fuse.EIO
-	}
-	newRecord := cloneDirectoryRecord(&origRecord)
-	newRecord.SetFilename(filename)
-
-	inodeNum := qfs.newInodeId()
-	defer dstDir.Lock().Unlock()
-	dstDir.addChild_(c, filename, inodeNum, newRecord)
-
-	c.dlog("CoW linked %d to %s as inode %d", input.NodeId, filename, inodeNum)
-
-	out.NodeId = uint64(inodeNum)
-	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-		newRecord)
-
-	dstDir.self.dirty(c)
-
-	return fuse.OK
+	return dstInode.Link(c, srcInode, filename, out)
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
