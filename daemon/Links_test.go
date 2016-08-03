@@ -29,7 +29,7 @@ func TestHardlink(t *testing.T) {
 		file.Close()
 
 		// Branch and confirm the hardlink is still there
-		workspace = test.branchWorkspace(workspace)
+		workspace = test.absPath(test.branchWorkspace(workspace))
 		file2 = workspace + "/hardlink"
 		file, err = os.Open(file2)
 		test.assert(err == nil, "Error opening file after branching: %v",
