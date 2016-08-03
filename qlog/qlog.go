@@ -164,11 +164,16 @@ func printToStdout(format string, args ...interface{}) (int, error) {
 }
 
 func NewQlog(ramfsPath string) *Qlog {
+	return NewQlogExt(ramfsPath, MaxMmapCircBufSize)
+}
+
+func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
 	q := Qlog{
 		logLevels: 0,
 		write:     printToStdout,
 	}
-	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, &q)
+	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, int(sharedMemLen),
+		&q)
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >

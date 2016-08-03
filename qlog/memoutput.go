@@ -19,18 +19,14 @@ import "unsafe"
 
 const writerBufferMsgs = 1000
 
-// Circular buf size for approx 1 hour of LogEntries at 1000 a second
-const mmapCircBufSize = 360000 * 24
+// We need a static array sized upper bound on our memory. Increase this as needed.
+const MaxMmapCircBufSize = 360000 * 24
 
 // Strmap size allows for up to ~10000 unique logs
 const mmapStrMapSize = 512 * 1024
 
-// This must include the MmapHeader len
-const mmapTotalSize = mmapCircBufSize + mmapStrMapSize + MmapHeaderSize
-
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const MmapHeaderSize = 20
 const MmapHeaderVersion = 1
 
 type MmapHeader struct {
@@ -48,14 +44,14 @@ type circBufHeader struct {
 }
 
 type SharedMemory struct {
-	fd       *os.File
-	buffer   *[mmapTotalSize]byte
-	circBuf  CircMemLogs
-	strIdMap IdStrMap
+	fd		*os.File
+	circBuf		CircMemLogs
+	strIdMap	IdStrMap
+	buffer		[]byte
 
 	// This is dangerous as Qlog also owns SharedMemory. SharedMemory must
 	// ensure that any call it makes to Qlog doesn't result in infinite recursion
-	errOut   *Qlog
+	errOut		*Qlog
 }
 
 // Average Log Entry should be ~24 bytes
@@ -96,12 +92,12 @@ Readers:
 */
 type CircMemLogs struct {
 	header *circBufHeader
-	buffer *[mmapCircBufSize]byte
+	buffer []byte
 	writer chan []byte
 }
 
 func (circ *CircMemLogs) Size() int {
-	return mmapCircBufSize + MmapHeaderSize
+	return len(circ.buffer) + int(unsafe.Sizeof(MmapHeader{}))
 }
 
 func wrapLen(frontIdx uint32, pastEndIdx uint32, dataLen uint32) uint32 {
@@ -115,7 +111,8 @@ func wrapLen(frontIdx uint32, pastEndIdx uint32, dataLen uint32) uint32 {
 
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) curLen_() uint32 {
-	return wrapLen(circ.header.FrontIdx, circ.header.PastEndIdx, mmapCircBufSize)
+	return wrapLen(circ.header.FrontIdx, circ.header.PastEndIdx,
+		uint32(len(circ.buffer)))
 }
 
 func wrapRead(idx uint32, num uint32, data []byte) []byte {
@@ -148,14 +145,14 @@ func wrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
 
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
-	wrapPlusEquals(lhs, addon, mmapCircBufSize)
+	wrapPlusEquals(lhs, addon, len(circ.buffer))
 }
 
 // Must only be called from inside writeLogEntries
 func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 	numWrite := uint32(len(data))
-	if idx+numWrite > mmapCircBufSize {
-		secondNum := (idx + numWrite) - mmapCircBufSize
+	if idx+numWrite > uint32(len(circ.buffer)) {
+		secondNum := (idx + numWrite) - uint32(len(circ.buffer))
 		numWrite -= secondNum
 		copy(circ.buffer[0:secondNum], data[numWrite:])
 	}
@@ -170,13 +167,13 @@ func (circ *CircMemLogs) writeLogEntries() {
 		data := <-circ.writer
 
 		// For now, if the message is too long then just toss it
-		if len(data) > mmapCircBufSize {
+		if len(data) > len(circ.buffer) {
 			continue
 		}
 
 		// Do we need to throw away some old entries to make space?
 		newLen := uint32(len(data)) + circ.curLen_()
-		for newLen > mmapCircBufSize {
+		for newLen > uint32(len(circ.buffer)) {
 			entryLen := circ.wrapRead_(circ.header.FrontIdx, 2)
 			packetLen := (*uint16)(unsafe.Pointer(&entryLen[0]))
 			circ.wrapPlusEquals_(&circ.header.FrontIdx,
@@ -234,7 +231,7 @@ type IdStrMap struct {
 }
 
 func newCircBuf(mapHeader *circBufHeader,
-	mapBuffer *[mmapCircBufSize]byte) CircMemLogs {
+	mapBuffer []byte) CircMemLogs {
 
 	rtn := CircMemLogs{
 		header: mapHeader,
@@ -242,14 +239,14 @@ func newCircBuf(mapHeader *circBufHeader,
 		writer: make(chan []byte, writerBufferMsgs),
 	}
 
-	rtn.header.Size = mmapCircBufSize
+	rtn.header.Size = uint32(len(mapBuffer))
 
 	// Launch the asynchronous shared memory writer
 	go rtn.writeLogEntries()
 	return rtn
 }
 
-func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
+func newIdStrMap(buf []byte, offset int) IdStrMap {
 	var rtn IdStrMap
 	rtn.data = make(map[string]uint16)
 	rtn.freeIdx = 0
@@ -259,7 +256,8 @@ func newIdStrMap(buf *[mmapTotalSize]byte, offset int) IdStrMap {
 	return rtn
 }
 
-func newSharedMemory(dir string, filename string, errOut *Qlog) *SharedMemory {
+func newSharedMemory(dir string, filename string, mmapTotalSize int,
+	errOut *Qlog) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -278,8 +276,10 @@ func newSharedMemory(dir string, filename string, errOut *Qlog) *SharedMemory {
 			dir, filename))
 	}
 
+	circBufSize := mmapTotalSize - (mmapStrMapSize +
+		int(unsafe.Sizeof(MmapHeader{})))
 	// Size the file to fit the shared memory requirements
-	_, err = mapFile.Seek(mmapTotalSize-1, 0)
+	_, err = mapFile.Seek(int64(mmapTotalSize-1), 0)
 	if err != nil {
 		panic("Unable to seek to shared memory end in file")
 	}
@@ -304,14 +304,14 @@ func newSharedMemory(dir string, filename string, errOut *Qlog) *SharedMemory {
 
 	var rtn SharedMemory
 	rtn.fd = mapFile
-	rtn.buffer = (*[mmapTotalSize]byte)(unsafe.Pointer(&mmap[0]))
-	header := (*MmapHeader)(unsafe.Pointer(&rtn.buffer[0]))
+	rtn.buffer = mmap
+	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
 	header.Version = MmapHeaderVersion
 	header.StrMapSize = mmapStrMapSize
+	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,
-		(*[mmapCircBufSize]byte)(unsafe.Pointer(
-			&rtn.buffer[MmapHeaderSize])))
-	rtn.strIdMap = newIdStrMap(rtn.buffer, rtn.circBuf.Size())
+		mmap[headerOffset:headerOffset+circBufSize])
+	rtn.strIdMap = newIdStrMap(mmap, headerOffset+circBufSize)
 	rtn.errOut = errOut
 
 	return &rtn

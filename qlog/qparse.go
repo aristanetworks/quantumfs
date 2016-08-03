@@ -26,15 +26,17 @@ func ParseLogs(filepath string) string {
 			header.Version, MmapHeaderVersion))
 	}
 
+	mmapHeaderSize := uint32(unsafe.Sizeof(MmapHeader{}))
+
 	if uint32(len(data)) != (header.StrMapSize + header.CircBuf.Size +
-		MmapHeaderSize) {
+		mmapHeaderSize) {
 		fmt.Println("Data length inconsistent with expectations. %d",
 			len(data))
 	}
 
 	return outputLogs(header.CircBuf.FrontIdx, header.CircBuf.PastEndIdx,
-		data[MmapHeaderSize:MmapHeaderSize+header.CircBuf.Size],
-		data[MmapHeaderSize+header.CircBuf.Size:])
+		data[mmapHeaderSize:mmapHeaderSize+header.CircBuf.Size],
+		data[mmapHeaderSize+header.CircBuf.Size:])
 }
 
 func grabMemory(filepath string) []byte {
@@ -54,7 +56,7 @@ func grabMemory(filepath string) []byte {
 		panic("Unable to open shared memory log file")
 	}
 
-	afterHeader := make([]byte, MmapHeaderSize)
+	afterHeader := make([]byte, unsafe.Sizeof(MmapHeader{}))
 	count := 0
 	for count < len(afterHeader) {
 		dataLen, err := mapFile.Read(afterHeader[count:])
