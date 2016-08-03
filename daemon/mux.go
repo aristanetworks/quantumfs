@@ -614,7 +614,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
-		c.elog("Open failed", input)
+		c.elog("Open failed %v", input)
 		return fuse.ENOENT
 	}
 
