@@ -4,7 +4,7 @@
 // go-fuse creates a goroutine for every request. The code here simply takes these
 // requests and forwards them to the correct Inode.
 package daemon
-
+import "fmt"
 import "math"
 import "runtime/debug"
 import "syscall"
@@ -27,7 +27,8 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 		activeWorkspaces: make(map[string]*WorkspaceRoot),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
-				Qlog:      qlog.NewQlog(config.CachePath),
+				Qlog:      qlog.NewQlogExt(config.CachePath,
+					config.MemLogBytes),
 				RequestId: qlog.MuxReqId,
 			},
 			config:      &config,

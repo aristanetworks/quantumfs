@@ -168,6 +168,12 @@ func NewQlog(ramfsPath string) *Qlog {
 }
 
 func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
+
+	if sharedMemLen == 0 {
+		panic(fmt.Sprintf("Invalid shared memory length provided: %d\n",
+			sharedMemLen))
+	}
+
 	q := Qlog{
 		logLevels: 0,
 		write:     printToStdout,
