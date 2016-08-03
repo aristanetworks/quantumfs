@@ -774,6 +774,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("Directory::Link Enter")
+	defer c.vlog("Directory::Link Exit")
+
 	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
 	if err != nil {
 		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
