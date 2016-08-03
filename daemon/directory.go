@@ -65,7 +65,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			dir.loadChild(c, baseLayer.Entry(i))
+			dir.loadChild_(c, baseLayer.Entry(i))
 		}
 
 		if baseLayer.Next() == quantumfs.EmptyDirKey ||
@@ -80,7 +80,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
-func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) InodeId {
+// The directory must be exclusively locked (or unlisted)
+func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord) InodeId {
 	inodeId := c.qfs.newInodeId()
 	dir.children[entry.Filename()] = inodeId
 	dir.childrenRecords[inodeId] = &entry
@@ -784,7 +785,7 @@ func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := dir.loadChild(c, *newRecord)
+	inodeNum := dir.loadChild_(c, *newRecord)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName, inodeNum)
 
