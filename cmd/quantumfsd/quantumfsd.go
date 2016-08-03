@@ -3,7 +3,7 @@
 
 // quantumfsd is the central daemon of the filesystem
 package main
-import "fmt"
+
 import "flag"
 import "os"
 import "runtime/pprof"
