@@ -10,7 +10,6 @@ import "fmt"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
-import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
 
 // Maximum size of a block which can be stored in a datastore
@@ -213,22 +212,18 @@ type ObjectType uint8
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
 // be owned by some special system accounts or the current user. The translation to
 // UID is done at access time.
-const (
-	UIDRoot = iota
-	UIDUser = iota // The currently accessing user
-)
+const UIDUser = 1001 // The currently accessing user
 
 // Convert object UID to system UID.
 //
 // userId is the UID of the current user
 func SystemUid(uid UID, userId uint32) uint32 {
-	switch uid {
-	case UIDRoot:
-		return 0
-	case UIDUser:
+	if uid < UIDUser {
+		return uint32(uid)
+	} else if uid == UIDUser {
 		return userId
-	default:
-		return 0
+	} else {
+		panic(fmt.Sprintf("Unknown Owner %d", uid))
 	}
 }
 
@@ -236,39 +231,29 @@ func SystemUid(uid UID, userId uint32) uint32 {
 //
 // userId is the UID of the current user
 func ObjectUid(c Ctx, uid uint32, userId uint32) UID {
-	if uid == userId && uid > 1000 {
-		return UIDUser
-	}
-
-	switch uid {
-	case 0:
-		return UIDRoot
-	default:
-		c.Elog(qlog.LogDatastore, "Unknown UID %d", uid)
+	if uid < UIDUser {
+		return UID(uid)
+	} else {
 		return UIDUser
 	}
 }
 
 // One of the UID* values
-type UID uint8
+type UID uint16
 
 // Similar to the UIDs above, group ownership is divided into special classes.
-const (
-	GIDRoot = iota
-	GIDUser = iota // The currently accessing user
-)
+const GIDUser = 1001 // The currently accessing user
 
 // Convert object GID to system GID.
 //
 // userId is the GID of the current user
 func SystemGid(gid GID, userId uint32) uint32 {
-	switch gid {
-	case GIDRoot:
-		return 0
-	case GIDUser:
+	if gid < GIDUser {
+		return uint32(gid)
+	} else if gid == GIDUser {
 		return userId
-	default:
-		return 0
+	} else {
+		panic(fmt.Sprintf("Unknown Group %d", gid))
 	}
 }
 
@@ -276,21 +261,15 @@ func SystemGid(gid GID, userId uint32) uint32 {
 //
 // userId is the GID of the current user
 func ObjectGid(c Ctx, gid uint32, groupId uint32) GID {
-	if gid == groupId && gid > 1000 {
-		return GIDUser
-	}
-
-	switch gid {
-	case 0:
-		return GIDRoot
-	default:
-		c.Elog(qlog.LogDatastore, "Unknown GID %d", gid)
+	if gid < GIDUser {
+		return GID(gid)
+	} else {
 		return GIDUser
 	}
 }
 
 // One of the GID* values
-type GID uint8
+type GID uint16
 
 // Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
@@ -511,7 +490,7 @@ func (record *DirectoryRecord) Owner() UID {
 }
 
 func (record *DirectoryRecord) SetOwner(u UID) {
-	record.record.SetOwner(uint8(u))
+	record.record.SetOwner(uint16(u))
 }
 
 func (record *DirectoryRecord) Group() GID {
@@ -519,7 +498,7 @@ func (record *DirectoryRecord) Group() GID {
 }
 
 func (record *DirectoryRecord) SetGroup(g GID) {
-	record.record.SetGroup(uint8(g))
+	record.record.SetGroup(uint16(g))
 }
 
 func (record *DirectoryRecord) ExtendedAttributes() ObjectKey {
