@@ -781,6 +781,7 @@ func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
 	newRecord := cloneDirectoryRecord(&origRecord)
 	newRecord.SetFilename(newName)
 
+	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
 	inodeNum := dir.loadChild(c, *newRecord)
