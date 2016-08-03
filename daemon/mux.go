@@ -405,8 +405,8 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Link Enter name %s dstDir %d inode %d", filename,
-		input.NodeId, input.Oldnodeid)
+	c.vlog("QuantumFs::Link Enter inode %d to name %s in dstDir %d",
+		input.NodeId, filename, input.Oldnodeid)
 	defer c.vlog("QuantumFs::Link Exit")
 
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
