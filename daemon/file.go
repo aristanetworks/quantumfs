@@ -163,6 +163,9 @@ func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("File::Open Enter")
+	defer c.vlog("File::Open Exit")
+
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
 	}
@@ -170,6 +173,8 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+
+	c.dlog("Opened Inode %d as Fh: %d", fi.inodeNum(), fileHandleNum)
 
 	out.OpenFlags = 0
 	out.Fh = uint64(fileHandleNum)
