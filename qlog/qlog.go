@@ -164,7 +164,7 @@ func printToStdout(format string, args ...interface{}) (int, error) {
 }
 
 func NewQlog(ramfsPath string) *Qlog {
-	return NewQlogExt(ramfsPath, MaxMmapCircBufSize)
+	return NewQlogExt(ramfsPath, uint32(DefaultMmapSize))
 }
 
 func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {

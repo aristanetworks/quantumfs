@@ -8,10 +8,8 @@ import "bytes"
 import "encoding/binary"
 import "errors"
 import "fmt"
-import "io"
 import "io/ioutil"
 import "math"
-import "os"
 import "reflect"
 import "strings"
 import "time"
@@ -34,7 +32,7 @@ func ParseLogs(filepath string) string {
 			len(data))
 	}
 
-	return outputLogs(header.CircBuf.FrontIdx, header.CircBuf.PastEndIdx,
+	return outputLogs(header.CircBuf.PastEndIdx,
 		data[mmapHeaderSize:mmapHeaderSize+header.CircBuf.Size],
 		data[mmapHeaderSize+header.CircBuf.Size:])
 }
@@ -50,28 +48,6 @@ func grabMemory(filepath string) []byte {
 		panic(fmt.Sprintf("Unable to read shared memory file data from %s\n",
 			filepath))
 	}
-
-	mapFile, err := os.OpenFile(filepath, os.O_RDONLY, 0777)
-	if mapFile == nil || err != nil {
-		panic("Unable to open shared memory log file")
-	}
-
-	afterHeader := make([]byte, unsafe.Sizeof(MmapHeader{}))
-	count := 0
-	for count < len(afterHeader) {
-		dataLen, err := mapFile.Read(afterHeader[count:])
-		if err != nil && err != io.EOF {
-			panic("Unable to re-read file header")
-		}
-		count += dataLen
-	}
-
-	// Replace the file data "frontIdx" field with the safest, newer value
-	header := (*MmapHeader)(unsafe.Pointer(&fileData[0]))
-	newerHeader := (*MmapHeader)(unsafe.Pointer(&afterHeader[0]))
-	header.CircBuf.FrontIdx = newerHeader.CircBuf.FrontIdx
-	
-	mapFile.Close()
 
 	return fileData
 }
@@ -171,12 +147,38 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 	panic(fmt.Sprintf("Unsupported field type %d\n", byteType))
 }
 
+func wrapRead(idx uint32, num uint32, data []byte) []byte {
+	rtn := make([]byte, num)
+
+	if idx+num > uint32(len(data)) {
+		secondNum := (idx + num) - uint32(len(data))
+		num -= secondNum
+		copy(rtn[num:], data[0:secondNum])
+	}
+
+	copy(rtn, data[idx:idx+num])
+
+	return rtn
+}
+
+func wrapMinusEquals(lhs *uint32, rhs uint32, bufLen int) {
+	if *lhs < rhs {
+		*lhs += uint32(bufLen)
+	}
+
+	*lhs -= rhs
+}
+
 // outputType is an instance of that same type as output, output *must* be a pointer
-// to a variable of that type for the data to be placed into
-func readInto(idx *uint32, data []byte, outputType interface{}, output interface{}) {
+// to a variable of that type for the data to be placed into.
+// PastIdx is the index of the element just *past* what we want to read
+func readBack(pastIdx *uint32, data []byte, outputType interface{},
+	output interface{}) {
+
 	dataLen := uint32(reflect.TypeOf(outputType).Size())
-	rawData := wrapRead(*idx, dataLen, data)
-	wrapPlusEquals(idx, dataLen, len(data))
+
+	wrapMinusEquals(pastIdx, dataLen, len(data))
+	rawData := wrapRead(*pastIdx, dataLen, data)
 
 	buf := bytes.NewReader(rawData)
 	err := binary.Read(buf, binary.LittleEndian, output)
@@ -226,18 +228,25 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 	return nil
 }
 
-func outputLogs(frontIdx uint32, pastEndIdx uint32, data []byte,
-	strMapData []byte) string {
+func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 
 	var buffer bytes.Buffer
+	readCount := uint32(0)
 
-	for frontIdx != pastEndIdx {
+	for readCount < uint32(len(data)) {
 		var packetLen uint16
-		readInto(&frontIdx, data, packetLen, &packetLen)
+		readBack(&pastEndIdx, data, packetLen, &packetLen)
+
+		// If we read a packet of zero length, that means our buffer wasn't
+		// full and we've hit the unused area
+		if packetLen == 0 {
+			return buffer.String()
+		}
 
 		// Read the packet data into a separate buffer
-		packetData := wrapRead(frontIdx, uint32(packetLen-2), data)
-		wrapPlusEquals(&frontIdx, uint32(packetLen-2), len(data))
+		wrapMinusEquals(&pastEndIdx, uint32(packetLen), len(data))
+		packetData := wrapRead(pastEndIdx, uint32(packetLen), data)
+		readCount += uint32(packetLen) + 2
 
 		read := uint32(0)
 		var numFields uint16

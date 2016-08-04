@@ -17,10 +17,8 @@ import "sync"
 import "syscall"
 import "unsafe"
 
-const writerBufferMsgs = 1000
-
 // We need a static array sized upper bound on our memory. Increase this as needed.
-const MaxMmapCircBufSize = 360000 * 24
+const DefaultMmapSize = (360000 * 24) + mmapStrMapSize + unsafe.Sizeof(MmapHeader{})
 
 // Strmap size allows for up to ~10000 unique logs
 const mmapStrMapSize = 512 * 1024
@@ -38,8 +36,7 @@ type MmapHeader struct {
 type circBufHeader struct {
 	Size uint32
 
-	// These variables indicate the front and end of the circular buffer
-	FrontIdx   uint32
+	// This marks one past the end of the circular buffer
 	PastEndIdx uint32
 }
 
@@ -54,7 +51,6 @@ type SharedMemory struct {
 	errOut		*Qlog
 }
 
-// Average Log Entry should be ~24 bytes
 type LogEntry struct {
 	strIdx    uint16
 	reqId     uint64
@@ -93,62 +89,16 @@ Readers:
 type CircMemLogs struct {
 	header *circBufHeader
 	buffer []byte
-	writer chan []byte
+
+	// Lock this for as short a period as possible
+	writeMutex	sync.Mutex
 }
 
 func (circ *CircMemLogs) Size() int {
 	return len(circ.buffer) + int(unsafe.Sizeof(MmapHeader{}))
 }
 
-func wrapLen(frontIdx uint32, pastEndIdx uint32, dataLen uint32) uint32 {
-	// Is the end ahead of us, or has it wrapped?
-	if pastEndIdx >= frontIdx {
-		return pastEndIdx - frontIdx
-	} else {
-		return (dataLen - frontIdx) + 1 + pastEndIdx
-	}
-}
-
-// Must only be called from inside writeLogEntries
-func (circ *CircMemLogs) curLen_() uint32 {
-	return wrapLen(circ.header.FrontIdx, circ.header.PastEndIdx,
-		uint32(len(circ.buffer)))
-}
-
-func wrapRead(idx uint32, num uint32, data []byte) []byte {
-	rtn := make([]byte, num)
-
-	if idx+num > uint32(len(data)) {
-		secondNum := (idx + num) - uint32(len(data))
-		num -= secondNum
-		copy(rtn[num:], data[0:secondNum])
-	}
-
-	copy(rtn, data[idx:idx+num])
-
-	return rtn
-}
-
-// Must only be called from inside writeLogEntries
-func (circ *CircMemLogs) wrapRead_(idx uint32, num uint32) []byte {
-	return wrapRead(idx, num, circ.buffer[:])
-}
-
-func wrapPlusEquals(lhs *uint32, addon uint32, bufLen int) {
-	if *lhs+addon < uint32(bufLen) {
-		*lhs = *lhs + addon
-		return
-	}
-
-	*lhs = (*lhs + addon) - uint32(bufLen)
-}
-
-// Must only be called from inside writeLogEntries
-func (circ *CircMemLogs) wrapPlusEquals_(lhs *uint32, addon uint32) {
-	wrapPlusEquals(lhs, addon, len(circ.buffer))
-}
-
-// Must only be called from inside writeLogEntries
+// Must only be called on a section of data where nobody else is writing to it
 func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 	numWrite := uint32(len(data))
 	if idx+numWrite > uint32(len(circ.buffer)) {
@@ -160,33 +110,33 @@ func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
 }
 
-func (circ *CircMemLogs) writeLogEntries() {
-	// We need a dedicated thread writing to the buffer since memory copy can
-	// be slow and we need to ensure the consistency of the header section
-	for {
-		data := <-circ.writer
-
-		// For now, if the message is too long then just toss it
-		if len(data) > len(circ.buffer) {
-			continue
-		}
-
-		// Do we need to throw away some old entries to make space?
-		newLen := uint32(len(data)) + circ.curLen_()
-		for newLen > uint32(len(circ.buffer)) {
-			entryLen := circ.wrapRead_(circ.header.FrontIdx, 2)
-			packetLen := (*uint16)(unsafe.Pointer(&entryLen[0]))
-			circ.wrapPlusEquals_(&circ.header.FrontIdx,
-				uint32(*packetLen))
-			newLen -= uint32(*packetLen)
-		}
-
-		// Now that we know we have space, write in the entry
-		circ.wrapWrite_(circ.header.PastEndIdx, data)
-
-		// Lastly, now that the data is all there, move the end back
-		circ.wrapPlusEquals_(&circ.header.PastEndIdx, uint32(len(data)))
+func (circ *CircMemLogs) writeData(data []byte) {
+	// For now, if the message is too long then just toss it
+	if len(data) > len(circ.buffer) {
+		return
 	}
+
+	circBufLen := uint32(len(circ.buffer))
+	dataLen := uint16(len(data))
+	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
+	var dataStart uint32
+	{
+		circ.writeMutex.Lock()
+		defer circ.writeMutex.Unlock()
+
+		dataStart = circ.header.PastEndIdx
+
+		circ.header.PastEndIdx += uint32(dataLen)
+		circ.wrapWrite_(uint32(circ.header.PastEndIdx % circBufLen),
+			dataRaw[:])
+
+		circ.header.PastEndIdx += 2
+		circ.header.PastEndIdx %= circBufLen
+
+	}
+
+	// Now that we know we have space, write in the entry
+	circ.wrapWrite_(uint32(dataStart), data)
 }
 
 const LogStrSize = 64
@@ -236,13 +186,10 @@ func newCircBuf(mapHeader *circBufHeader,
 	rtn := CircMemLogs{
 		header: mapHeader,
 		buffer: mapBuffer,
-		writer: make(chan []byte, writerBufferMsgs),
 	}
 
 	rtn.header.Size = uint32(len(mapBuffer))
 
-	// Launch the asynchronous shared memory writer
-	go rtn.writeLogEntries()
 	return rtn
 }
 
@@ -521,10 +468,8 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 		mem.binaryWrite(buf, args[i], format)
 	}
 
-	// Create the two byte packet length header at the front
-	rtn := make([]byte, buf.Len()+2)
-	copy(rtn[2:], buf.Bytes())
-	if len(rtn) > math.MaxUint16 {
+	// Make sure length isn't too long, excluding the size bytes
+	if buf.Len() > math.MaxUint16 {
 		errorPrefix := "Log data exceeds allowable length: %s\n"
 
 		// Ensure we're not already recursing
@@ -536,13 +481,10 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 
 		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
 
-		rtn = rtn[:math.MaxUint16]
+		buf.Truncate(math.MaxUint16)
 	}
-	lenBuf := new(bytes.Buffer)
-	binary.Write(lenBuf, binary.LittleEndian, uint16(len(rtn)))
-	copy(rtn[:2], lenBuf.Bytes())
 
-	return rtn
+	return buf.Bytes()
 }
 
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
@@ -558,6 +500,5 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Generate the byte array packet
 	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
 
-	// Write it into the shared memory asynchronously
-	mem.circBuf.writer <- data
+	mem.circBuf.writeData(data)
 }
