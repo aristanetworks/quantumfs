@@ -230,7 +230,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 
 func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 
-	var buffer bytes.Buffer
+	var buffer string
 	readCount := uint32(0)
 
 	for readCount < uint32(len(data)) {
@@ -240,7 +240,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		// If we read a packet of zero length, that means our buffer wasn't
 		// full and we've hit the unused area
 		if packetLen == 0 {
-			return buffer.String()
+			return buffer
 		}
 
 		// Read the packet data into a separate buffer
@@ -284,9 +284,9 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		// Grab the string and output
 		strMapIdx := uint32(strMapId) * LogStrSize
 		if strMapIdx+LogStrSize > uint32(len(strMapData)) {
-			buffer.WriteString(fmt.Sprintf("Not enough entries in " +
+			buffer = fmt.Sprintf("Not enough entries in " +
 				"string map (%d %d)\n", strMapId,
-				len(strMapData)/LogStrSize))
+				len(strMapData)/LogStrSize) + buffer
 			continue
 		}
 
@@ -296,25 +296,16 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		// Convert timestamp back into something useful
 		t := time.Unix(0, timestamp)
 
-		var front string
-		if reqId < MinSpecialReqId {
-			const frontFmt = "%s | %12s %7d: "
-			front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
-				logSubsystem, reqId)
-		} else {
-			const frontFmt = "%s | %12s % 7s: "
-			front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
-				logSubsystem, SpecialReq(reqId))
-		}
-
 		// Finally, print with the front attached like normal
 		mapStr := string(mapEntry.Text[:])
 		firstNullTerm := strings.Index(mapStr, "\x00")
 		if firstNullTerm != -1 {
 			mapStr = mapStr[:firstNullTerm]
 		}
-		buffer.WriteString(fmt.Sprintf(front+mapStr+"\n", args...))
+		// We're reading backwards, so we have to *prepend* new lines
+		buffer = fmt.Sprintf(formatString(logSubsystem, reqId, t,
+			mapStr)+"\n", args...) + buffer
 	}
 
-	return buffer.String()
+	return buffer
 }
