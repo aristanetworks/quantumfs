@@ -30,7 +30,7 @@ const (
 )
 
 const (
-	MuxReqId        uint64 = math.MaxUint64 - iota
+	MuxReqId uint64 = math.MaxUint64 - iota
 	FlushReqId
 	QlogReqId
 	TestReqId
@@ -92,7 +92,7 @@ const defaultMmapFile = "qlog"
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {
-	var mask uint32 = (1 << uint32((uint8(idx) * maxLogLevels) + level))
+	var mask uint32 = (1 << uint32((uint8(idx)*maxLogLevels)+level))
 	return (q.LogLevels & mask) != 0
 }
 
@@ -215,7 +215,7 @@ func formatString(idx LogSubsystem, reqId uint64, t time.Time,
 			idx, SpecialReq(reqId))
 	}
 
-	return front+format
+	return front + format
 }
 
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,

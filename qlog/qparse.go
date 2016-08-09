@@ -52,7 +52,7 @@ func extractFields(filepath string) (uint32, []byte, []byte) {
 	}
 
 	return header.CircBuf.PastEndIdx,
-		data[mmapHeaderSize:mmapHeaderSize+header.CircBuf.Size],
+		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size],
 		data[mmapHeaderSize+header.CircBuf.Size:]
 }
 
@@ -302,7 +302,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		// Grab the string and output
 		strMapIdx := uint32(strMapId) * LogStrSize
 		if strMapIdx+LogStrSize > uint32(len(strMapData)) {
-			buffer = fmt.Sprintf("Not enough entries in " +
+			buffer = fmt.Sprintf("Not enough entries in "+
 				"string map (%d %d)\n", strMapId,
 				len(strMapData)/LogStrSize) + buffer
 			continue

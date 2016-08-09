@@ -27,7 +27,7 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 		activeWorkspaces: make(map[string]*WorkspaceRoot),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
-				Qlog:      qlog.NewQlogExt(config.CachePath,
+				Qlog: qlog.NewQlogExt(config.CachePath,
 					config.MemLogBytes),
 				RequestId: qlog.MuxReqId,
 			},

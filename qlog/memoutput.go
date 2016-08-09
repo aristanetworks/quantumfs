@@ -28,9 +28,9 @@ const mmapStrMapSize = 512 * 1024
 const MmapHeaderVersion = 1
 
 type MmapHeader struct {
-	Version		uint32
-	StrMapSize	uint32
-	CircBuf		circBufHeader
+	Version    uint32
+	StrMapSize uint32
+	CircBuf    circBufHeader
 }
 
 type circBufHeader struct {
@@ -41,14 +41,14 @@ type circBufHeader struct {
 }
 
 type SharedMemory struct {
-	fd		*os.File
-	circBuf		CircMemLogs
-	strIdMap	IdStrMap
-	buffer		[]byte
+	fd       *os.File
+	circBuf  CircMemLogs
+	strIdMap IdStrMap
+	buffer   []byte
 
 	// This is dangerous as Qlog also owns SharedMemory. SharedMemory must
 	// ensure that any call it makes to Qlog doesn't result in infinite recursion
-	errOut		*Qlog
+	errOut *Qlog
 }
 
 type LogEntry struct {
@@ -91,7 +91,7 @@ type CircMemLogs struct {
 	buffer []byte
 
 	// Lock this for as short a period as possible
-	writeMutex	sync.Mutex
+	writeMutex sync.Mutex
 }
 
 func (circ *CircMemLogs) Size() int {
@@ -127,7 +127,7 @@ func (circ *CircMemLogs) writeData(data []byte) {
 		dataStart = circ.header.PastEndIdx
 
 		circ.header.PastEndIdx += uint32(dataLen)
-		circ.wrapWrite_(uint32(circ.header.PastEndIdx % circBufLen),
+		circ.wrapWrite_(uint32(circ.header.PastEndIdx%circBufLen),
 			dataRaw[:])
 
 		circ.header.PastEndIdx += 2
@@ -318,24 +318,24 @@ type LogPrimitive interface {
 }
 
 const (
-	TypeInt8Pointer = 1
-	TypeInt8 = 2
-	TypeUint8Pointer = 3
-	TypeUint8 = 4
-	TypeInt16Pointer = 5
-	TypeInt16 = 6
+	TypeInt8Pointer   = 1
+	TypeInt8          = 2
+	TypeUint8Pointer  = 3
+	TypeUint8         = 4
+	TypeInt16Pointer  = 5
+	TypeInt16         = 6
 	TypeUint16Pointer = 7
-	TypeUint16 = 8
-	TypeInt32Pointer = 9
-	TypeInt32 = 10
+	TypeUint16        = 8
+	TypeInt32Pointer  = 9
+	TypeInt32         = 10
 	TypeUint32Pointer = 11
-	TypeUint32 = 12
-	TypeInt64Pointer = 13
-	TypeInt64 = 14
+	TypeUint32        = 12
+	TypeInt64Pointer  = 13
+	TypeInt64         = 14
 	TypeUint64Pointer = 15
-	TypeUint64 = 16
-	TypeString = 17
-	TypeByteArray = 18
+	TypeUint64        = 16
+	TypeString        = 17
+	TypeByteArray     = 18
 )
 
 // Writes the data, with a type prefix field two bytes long
@@ -493,7 +493,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Create the string map entry / fetch existing one
 	strId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
 	if err != nil {
-		mem.errOut.Log(LogQlog, reqId, 1, err.Error() + ": %s\n", format)
+		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n", format)
 		return
 	}
 

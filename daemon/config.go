@@ -17,7 +17,7 @@ type QuantumFsConfig struct {
 	CacheTimeNsecs   uint32
 
 	// How many bytes to allocate to the shared memory logs
-	MemLogBytes	uint32
+	MemLogBytes uint32
 
 	WorkspaceDB  quantumfs.WorkspaceDB
 	DurableStore quantumfs.DataStore

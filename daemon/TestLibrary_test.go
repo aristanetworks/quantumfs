@@ -216,10 +216,10 @@ func (th *testHelper) logscan() {
 		for _, err := range errors {
 			th.t.Logf("FATAL message logged: %s", err)
 		}
-		th.t.Fatalf("Test FAILED due to FATAL messages. Dumping Logs:\n%s\n" +
+		th.t.Fatalf("Test FAILED due to FATAL messages. Dumping Logs:\n%s\n"+
 			"--- Test %s FAILED\n\n", testOutput, th.testName)
 	} else if th.shouldFailLogscan && len(errors) == 0 {
-		th.t.Fatalf("Test FAILED due to missing FATAL messages." +
+		th.t.Fatalf("Test FAILED due to missing FATAL messages."+
 			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n", testOutput,
 			th.testName)
 	}
@@ -252,7 +252,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
-		MemLogBytes:	  uint32(qlog.DefaultMmapSize),
+		MemLogBytes:      uint32(qlog.DefaultMmapSize),
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
 		DurableStore:     processlocal.NewDataStore(),
@@ -352,10 +352,8 @@ func (th *testHelper) log(format string, args ...interface{}) (int, error) {
 	if th.qfs != nil && th.qfs.c.Qlog != nil {
 		th.qfs.c.Qlog.Log(qlog.LogTest, qlog.TestReqId, 1,
 			"[%s] "+format, append([]interface{}{th.testName},
-			args...)...)
+				args...)...)
 	}
-
-//	th.t.Log(output)
 
 	return len(format), nil
 }

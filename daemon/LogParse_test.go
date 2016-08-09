@@ -28,7 +28,7 @@ func TestQParse_test(t *testing.T) {
 			args ...interface{}) (int, error) {
 
 			testMutex.Lock()
-			logOut.WriteString(fmt.Sprintf(format + "\n", args...))
+			logOut.WriteString(fmt.Sprintf(format+"\n", args...))
 			testMutex.Unlock()
 			return len(format), nil
 		}
@@ -70,7 +70,7 @@ func TestQParse_test(t *testing.T) {
 		sort.Sort(SortByTime(logOutLines))
 
 		// Trim any excess empty lines
-		for (logOutLines[0] == "") {
+		for logOutLines[0] == "" {
 			logOutLines = logOutLines[1:]
 		}
 

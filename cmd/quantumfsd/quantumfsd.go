@@ -36,7 +36,7 @@ func init() {
 		defaultMountPath        = "/mnt/quantumfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
-		defaultMemLogBytes	= 360000 * 24
+		defaultMemLogBytes      = 360000 * 24
 	)
 
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,

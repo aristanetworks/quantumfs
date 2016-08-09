@@ -8,9 +8,8 @@ package qlog
 import "testing"
 import "sync"
 
-
 func DoBench(qlog *Qlog, n int, wg *sync.WaitGroup) {
-	
+
 	var args []interface{}
 	args = append(args, a)
 	args = append(args, b)
