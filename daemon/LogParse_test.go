@@ -5,10 +5,13 @@ package daemon
 
 // Test to ensure Qparse works as desired
 
+import "bytes"
 import "fmt"
 import "io/ioutil"
 import "os"
+import "sort"
 import "strings"
+import "sync"
 import "syscall"
 import "testing"
 import "unsafe"
@@ -19,11 +22,14 @@ func TestQParse_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		var logOut string
+		var logOut bytes.Buffer
+		var testMutex sync.Mutex
 		test.qfs.c.Qlog.Write = func(format string,
 			args ...interface{}) (int, error) {
 
-			logOut += fmt.Sprintf(format + "\n", args...)
+			testMutex.Lock()
+			logOut.WriteString(fmt.Sprintf(format + "\n", args...))
+			testMutex.Unlock()
 			return len(format), nil
 		}
 		// Enable *all* logs
@@ -41,41 +47,62 @@ func TestQParse_test(t *testing.T) {
 		err = printToFile(testFilename, string(data))
 		test.assert(err == nil, "Couldn't write 1KB data to file")
 
+		test.log("This is a test string, %d", 12345)
+
 		err = os.Truncate(testFilename, 0)
 		test.assert(err == nil, "Couldn't truncate file to zero")
 
 		_, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Unable to read file contents")
 
-		test.log("This is a test string, %d", 12345)
-
 		// Now grab the log file and compare against std out. Since logOut
 		// started being appended to a bit late, and we sample it first, it
 		// should be a subset of the qarsed logs
-		logOutCopy := logOut
+		testMutex.Lock()
+		logOutCopy := string(logOut.Bytes())
+		testMutex.Unlock()
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
-		test.assert(strings.Contains(testLogs, logOutCopy), fmt.Sprintf(
-			"Qparse and stdout don't match:\n%s\n\n=========\n\n%s",
-			testLogs, logOutCopy))
-		if false && !strings.Contains(testLogs, logOutCopy) {
-			testLogLines := strings.Split(testLogs, "\n")
-			logOutLines := strings.Split(logOutCopy, "\n")
 
-			for i := 0; i < len(testLogLines); i++ {
-				test.assert(len(logOutLines) > i,
-					"More test stdout lines than qparse lines")
+		// There's nothing ensuring the order is the same, so we have to sort
+		testLogLines := strings.Split(testLogs, "\n")
+		logOutLines := strings.Split(logOutCopy, "\n")
+		sort.Sort(SortByTime(testLogLines))
+		sort.Sort(SortByTime(logOutLines))
 
-				errStr := ""
-				if testLogLines[i] != logOutLines[i] {
-					errStr += "\n=====START=====\n"
-					errStr += testLogs
-					errStr += "\n======SPLIT====\n"
-					errStr += logOutCopy
-					errStr += "\n=====END=====\n"
+		// Trim any excess empty lines
+		for (logOutLines[0] == "") {
+			logOutLines = logOutLines[1:]
+		}
+
+		// Find out at what point logOut starts in testLog
+		offset := 0
+		for i := 0; i < len(testLogLines); i++ {
+			if logOutLines[0] == testLogLines[i] {
+				offset = i
+				break
+			}
+		}
+
+		debugStr := ""
+		for i := 0; i < len(logOutLines); i++ {
+			if logOutLines[i] != testLogLines[i+offset] {
+				startOut := i - 5
+				endOut := i + 5
+				if startOut < 0 {
+					startOut = 0
+				}
+				if endOut >= len(testLogLines) {
+					endOut = len(testLogLines) - 1
 				}
 
-				test.assert(testLogLines[i] == logOutLines[i],
-					"Line mismatch @ %d:\n%s", i, errStr)
+				for j := startOut; j <= endOut; j++ {
+					debugStr += fmt.Sprintf("!!Q%d: %s\n",
+						j, testLogLines[j+offset])
+					debugStr += fmt.Sprintf("!!L%d: %s\n",
+						j, logOutLines[j])
+				}
+				test.assert(false, "Qparse/stdout mismatch:\n"+
+					debugStr)
 			}
 		}
 	})

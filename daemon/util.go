@@ -54,3 +54,17 @@ func assert(condition bool, msg string) {
 		panic(msg)
 	}
 }
+
+type SortByTime []string
+
+func (s SortByTime) Len() int {
+	return len(s)
+}
+
+func (s SortByTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortByTime) Less(i, j int) bool {
+	return s[i] < s[j]
+}

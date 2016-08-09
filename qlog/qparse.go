@@ -15,7 +15,26 @@ import "strings"
 import "time"
 import "unsafe"
 
+// Returns true if the log file string map given failed the logscan
+func LogscanSkim(filepath string) bool {
+	_, _, strMapData := extractFields(filepath)
+
+	if bytes.Contains(strMapData, []byte("PANIC")) ||
+		bytes.Contains(strMapData, []byte("WARN")) ||
+		bytes.Contains(strMapData, []byte("ERROR")) {
+
+		return true
+	}
+
+	return false
+}
+
 func ParseLogs(filepath string) string {
+	return outputLogs(extractFields(filepath))
+}
+
+// Returns the pastEndIdx, data array, and strMapData
+func extractFields(filepath string) (uint32, []byte, []byte) {
 	data := grabMemory(filepath)
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
 
@@ -32,13 +51,12 @@ func ParseLogs(filepath string) string {
 			len(data))
 	}
 
-	return outputLogs(header.CircBuf.PastEndIdx,
+	return header.CircBuf.PastEndIdx,
 		data[mmapHeaderSize:mmapHeaderSize+header.CircBuf.Size],
-		data[mmapHeaderSize+header.CircBuf.Size:])
+		data[mmapHeaderSize+header.CircBuf.Size:]
 }
 
 func grabMemory(filepath string) []byte {
-
 	if filepath == "" {
 		return nil
 	}
@@ -275,9 +293,9 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		}
 
 		if err != nil {
-			fmt.Sprintf("WARN: Packet read error (%s). "+
+			buffer = fmt.Sprintf("WARN: Packet read error (%s). "+
 				"Dump of %d bytes:\n%x\n", err, packetLen,
-				packetData)
+				packetData) + buffer
 			continue
 		}
 

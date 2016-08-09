@@ -194,8 +194,14 @@ func (th *testHelper) waitToBeUnmounted() {
 
 // Check the test output for errors
 func (th *testHelper) logscan() {
+	// Check the format string map for the log first to speed this up
+	logFile := th.qfs.config.CachePath + "/qlog"
+	if !qlog.LogscanSkim(logFile) {
+		return
+	}
+
 	errors := make([]string, 0, 10)
-	testOutput := qlog.ParseLogs(th.qfs.config.CachePath + "/qlog")
+	testOutput := qlog.ParseLogs(logFile)
 
 	lines := strings.Split(testOutput, "\n")
 	for _, line := range lines {
