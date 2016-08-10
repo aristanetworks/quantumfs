@@ -296,30 +296,25 @@ func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
 func (fi *File) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on File")
-	return 0, fuse.ENOSYS
+	return fi.parent().getChildXAttrSize(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on File")
-	return nil, fuse.ENOSYS
+	return fi.parent().getChildXAttrData(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on File")
-	return nil, fuse.ENOSYS
+	return fi.parent().listChildXAttr(c, fi.inodeNum())
 }
 
 func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on File")
-	return fuse.ENOSYS
+	return fi.parent().setChildXAttr(c, fi.inodeNum(), attr, data)
 }
 
 func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on File")
-	return fuse.ENOSYS
+	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
@@ -359,6 +354,41 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 	}
 
 	return fuse.OK
+}
+
+func (fi *File) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on File")
+	return 0, fuse.Status(syscall.ENOTSUP)
+}
+
+func (fi *File) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on File")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (fi *File) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on File")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on File")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
+func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on File")
+	return fuse.Status(syscall.ENOTSUP)
 }
 
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,

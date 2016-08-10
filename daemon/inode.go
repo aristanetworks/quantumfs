@@ -76,6 +76,19 @@ type Inode interface {
 	// the cascading changes.
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
+	getChildXAttrSize(c *ctx, inodeNum InodeId,
+		attr string) (size int, result fuse.Status)
+
+	getChildXAttrData(c *ctx,
+		inodeNum InodeId, attr string) (data []byte, result fuse.Status)
+
+	listChildXAttr(c *ctx,
+		inodeNum InodeId) (attributes []byte, result fuse.Status)
+
+	setChildXAttr(c *ctx, inodeNum InodeId, attr string, data []byte) fuse.Status
+
+	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
+
 	parent() Inode
 	setParent(newParent Inode)
 

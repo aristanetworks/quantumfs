@@ -7,6 +7,7 @@ package daemon
 
 import "errors"
 import "sync"
+import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -312,6 +313,41 @@ func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENOSYS
 }
 
+func (nsl *NamespaceList) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on NamespaceList")
+	return 0, fuse.Status(syscall.ENOTSUP)
+}
+
+func (nsl *NamespaceList) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on NamespaceList")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (nsl *NamespaceList) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on NamespaceList")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (nsl *NamespaceList) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on NamespaceList")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
+func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on NamespaceList")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -513,4 +549,39 @@ func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on WorkspaceList")
+	return 0, fuse.Status(syscall.ENOTSUP)
+}
+
+func (wsl *WorkspaceList) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on WorkspaceList")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (wsl *WorkspaceList) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on WorkspaceList")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (wsl *WorkspaceList) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on WorkspaceList")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
+func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on WorkspaceList")
+	return fuse.Status(syscall.ENOTSUP)
 }

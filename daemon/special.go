@@ -8,6 +8,7 @@ package daemon
 
 import "encoding/binary"
 import "errors"
+import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -213,6 +214,41 @@ func (special *Special) setChildAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid setChildAttr on Special")
 	return fuse.ENOSYS
+}
+
+func (special *Special) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on Special")
+	return 0, fuse.Status(syscall.ENOTSUP)
+}
+
+func (special *Special) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on Special")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (special *Special) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on Special")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (special *Special) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on Special")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
+func (special *Special) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on Special")
+	return fuse.Status(syscall.ENOTSUP)
 }
 
 func (special *Special) getChildRecord(c *ctx,

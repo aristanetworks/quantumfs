@@ -771,30 +771,25 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on Directory")
-	return 0, fuse.ENOSYS
+	return dir.parent().getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on Directory")
-	return nil, fuse.ENOSYS
+	return dir.parent().getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on Directory")
-	return nil, fuse.ENOSYS
+	return dir.parent().listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on Directory")
-	return fuse.ENOSYS
+	return dir.parent().setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on Directory")
-	return fuse.ENOSYS
+	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
@@ -821,6 +816,41 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	if ok && dir.parent() != nil {
 		dir.parent().syncChild(c, dir.InodeCommon.id, key)
 	}
+}
+
+func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on Directory")
+	return 0, fuse.Status(syscall.ENOTSUP)
+}
+
+func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on Directory")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (dir *Directory) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on Directory")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on Directory")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
+func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on Directory")
+	return fuse.Status(syscall.ENOTSUP)
 }
 
 type directoryContents struct {

@@ -10,6 +10,7 @@ import "errors"
 import "fmt"
 import "strings"
 import "sync"
+import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -212,6 +213,41 @@ func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid setChildAttr on ApiInode")
 	return fuse.ENOSYS
+}
+
+func (api *ApiInode) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on ApiInode")
+	return 0, fuse.Status(syscall.ENOTSUP)
+}
+
+func (api *ApiInode) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on ApiInode")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (api *ApiInode) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on ApiInode")
+	return nil, fuse.Status(syscall.ENOTSUP)
+}
+
+func (api *ApiInode) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on ApiInode")
+	return fuse.Status(syscall.ENOTSUP)
+}
+
+func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on ApiInode")
+	return fuse.Status(syscall.ENOTSUP)
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
