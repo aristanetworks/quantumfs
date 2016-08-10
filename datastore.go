@@ -20,6 +20,7 @@ const MaxBlocksMediumFile = int(encoding.MaxBlocksMediumFile)
 const MaxBlocksLargeFile = int(encoding.MaxBlocksLargeFile)
 const MaxPartsVeryLargeFile = int(encoding.MaxPartsVeryLargeFile)
 const MaxDirectoryRecords = int(encoding.MaxDirectoryRecords)
+const MaxNumExtendedAttributes = int(encoding.MaxNumExtendedAttributes)
 
 // Maximum length of a filename
 const MaxFilenameLength = int(encoding.MaxFilenameLength)
@@ -615,6 +616,50 @@ func (vlf *VeryLargeFile) Bytes() []byte {
 	return vlf.vlf.Segment.Data
 }
 
+func NewExtendedAttributes() *ExtendedAttributes {
+	segment := capn.NewBuffer(nil)
+	ea := ExtendedAttributes{
+		ea: encoding.NewRootExtendedAttributes(segment),
+	}
+
+	attributes := encoding.NewExtendedAttributeList(segment,
+		MaxNumExtendedAttributes)
+	ea.ea.SetAttributes(attributes)
+	return &ea
+}
+
+func OverlayExtendedAttributes(eea encoding.ExtendedAttributes) ExtendedAttributes {
+	ea := ExtendedAttributes{
+		ea: eea,
+	}
+	return ea
+}
+
+type ExtendedAttributes struct {
+	ea encoding.ExtendedAttributes
+}
+
+func (ea *ExtendedAttributes) NumAttributes() int {
+	return int(ea.ea.NumAttributes())
+}
+
+func (ea *ExtendedAttributes) SetNumAttributes(num int) {
+	ea.ea.SetNumAttributes(uint32(num))
+}
+
+func (ea *ExtendedAttributes) Attribute(i int) (name string, id ObjectKey) {
+	attribute := ea.ea.Attributes().At(i)
+	return attribute.Name(), overlayObjectKey(attribute.Id())
+}
+
+func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {
+	segment := capn.NewBuffer(nil)
+	attribute := encoding.NewRootExtendedAttribute(segment)
+	attribute.SetName(name)
+	attribute.SetId(id.key)
+	ea.ea.Attributes().Set(i, attribute)
+}
+
 type Buffer interface {
 	Write(c *Ctx, in []byte, offset uint32) uint32
 	Read(out []byte, offset uint32) int
@@ -630,6 +675,7 @@ type Buffer interface {
 	AsDirectoryEntry() DirectoryEntry
 	AsMultiBlockFile() MultiBlockFile
 	AsVeryLargeFile() VeryLargeFile
+	AsExtendedAttributes() ExtendedAttributes
 }
 
 type DataStore interface {

@@ -200,3 +200,10 @@ func (buf *buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
 		encoding.ReadRootVeryLargeFile(segment))
 
 }
+
+func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayExtendedAttributes(
+		encoding.ReadRootExtendedAttributes(segment))
+
+}
