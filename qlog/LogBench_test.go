@@ -28,7 +28,7 @@ func tmpDir() string {
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
-	return "/tmp/"+testName[lastSlash+1:]
+	return "/tmp/" + testName[lastSlash+1:]
 }
 
 func BenchmarkBigStdLog(test *testing.B) {
