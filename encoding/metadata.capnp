@@ -68,3 +68,13 @@ struct MultiBlockFile {
         sizeOfLastBlock @2 :UInt32;
         listOfBlocks    @3 :List(ObjectKey);
 }
+
+struct ExtendedAttribute {
+        name @0 :Text;
+        id   @1 :ObjectKey;
+}
+
+struct ExtendedAttributes {
+        numAttributes    @0 :UInt32;
+        listOfAttributes @1 :List(ExtendedAttribute);
+}
