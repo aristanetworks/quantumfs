@@ -293,6 +293,35 @@ func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (fi *File) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on File")
+	return 0, fuse.ENOSYS
+}
+
+func (fi *File) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on File")
+	return nil, fuse.ENOSYS
+}
+
+func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on File")
+	return nil, fuse.ENOSYS
+}
+
+func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on File")
+	return fuse.ENOSYS
+}
+
+func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on File")
+	return fuse.ENOSYS
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }

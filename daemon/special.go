@@ -172,6 +172,35 @@ func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (special *Special) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Special")
+	return 0, fuse.ENOSYS
+}
+
+func (special *Special) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Special")
+	return nil, fuse.ENOSYS
+}
+
+func (special *Special) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Special")
+	return nil, fuse.ENOSYS
+}
+
+func (special *Special) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Special")
+	return fuse.ENOSYS
+}
+
+func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Special")
+	return fuse.ENOSYS
+}
+
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

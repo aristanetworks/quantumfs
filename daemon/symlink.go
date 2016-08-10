@@ -143,6 +143,35 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Symlink")
+	return 0, fuse.ENOSYS
+}
+
+func (link *Symlink) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Symlink")
+	return nil, fuse.ENOSYS
+}
+
+func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Symlink")
+	return nil, fuse.ENOSYS
+}
+
+func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Symlink")
+	return fuse.ENOSYS
+}
+
+func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Symlink")
+	return fuse.ENOSYS
+}
+
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

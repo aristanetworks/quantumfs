@@ -768,6 +768,35 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	return result
 }
 
+func (dir *Directory) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Directory")
+	return 0, fuse.ENOSYS
+}
+
+func (dir *Directory) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Directory")
+	return nil, fuse.ENOSYS
+}
+
+func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Directory")
+	return nil, fuse.ENOSYS
+}
+
+func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Directory")
+	return fuse.ENOSYS
+}
+
+func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Directory")
+	return fuse.ENOSYS
+}
+
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

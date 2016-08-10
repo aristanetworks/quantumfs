@@ -478,8 +478,13 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	c.vlog("QuantumFs::GetXAttrSize Enter Inode %d", header.NodeId)
 	defer c.vlog("QuantumFs::GetXAttrSize Exit")
 
-	c.elog("Unhandled request GetXAttrSize")
-	return 0, fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return 0, fuse.ENOENT
+	}
+
+	defer inode.RLockTree().RUnlock()
+	return inode.GetXAttrSize(c, attr)
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
@@ -493,8 +498,13 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	c.vlog("QuantumFs::GetXAttrData Enter Inode %d", header.NodeId)
 	defer c.vlog("QuantumFs::GetXAttrData Exit")
 
-	c.elog("Unhandled request GetXAttrData")
-	return nil, fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return nil, fuse.ENOENT
+	}
+
+	defer inode.RLockTree().RUnlock()
+	return inode.GetXAttrData(c, attr)
 }
 
 func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
@@ -508,8 +518,13 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 	c.vlog("QuantumFs::ListXAttr Enter Inode %d", header.NodeId)
 	defer c.vlog("QuantumFs::ListXAttr Exit")
 
-	c.elog("Unhandled request ListXAttr")
-	return nil, fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return nil, fuse.ENOENT
+	}
+
+	defer inode.RLockTree().RUnlock()
+	return inode.ListXAttr(c)
 }
 
 func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
@@ -522,8 +537,13 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	c.vlog("QuantumFs::SetXAttr Enter Inode %d", input.NodeId)
 	defer c.vlog("QuantumFs::SetXAttr Exit")
 
-	c.elog("Unhandled request SetXAttr")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	defer inode.RLockTree().RUnlock()
+	return inode.SetXAttr(c, attr, data)
 }
 
 func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
@@ -536,8 +556,13 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	c.vlog("QuantumFs::RemoveXAttr Enter Inode %d", header.NodeId)
 	defer c.vlog("QuantumFs::RemoveXAttr Exit")
 
-	c.elog("Unhandled request RemoveXAttr")
-	return fuse.ENOSYS
+	inode := qfs.inode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+
+	defer inode.RLockTree().RUnlock()
+	return inode.RemoveXAttr(c, attr)
 }
 
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,

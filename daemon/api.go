@@ -172,6 +172,35 @@ func (api *ApiInode) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on ApiInode")
+	return 0, fuse.ENOSYS
+}
+
+func (api *ApiInode) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on ApiInode")
+	return nil, fuse.ENOSYS
+}
+
+func (api *ApiInode) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on ApiInode")
+	return nil, fuse.ENOSYS
+}
+
+func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on ApiInode")
+	return fuse.ENOSYS
+}
+
+func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on ApiInode")
+	return fuse.ENOSYS
+}
+
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

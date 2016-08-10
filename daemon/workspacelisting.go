@@ -269,6 +269,35 @@ func (nsl *NamespaceList) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (nsl *NamespaceList) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on NamespaceList")
+	return 0, fuse.ENOSYS
+}
+
+func (nsl *NamespaceList) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on NamespaceList")
+	return nil, fuse.ENOSYS
+}
+
+func (nsl *NamespaceList) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on NamespaceList")
+	return nil, fuse.ENOSYS
+}
+
+func (nsl *NamespaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
+func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on NamespaceList")
+	return fuse.ENOSYS
+}
+
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
@@ -440,6 +469,35 @@ func (wsl *WorkspaceList) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
 	c.elog("Invalid MvChild on WorkspaceList")
+	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on WorkspaceList")
+	return 0, fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on WorkspaceList")
+	return nil, fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on WorkspaceList")
+	return nil, fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on WorkspaceList")
+	return fuse.ENOSYS
+}
+
+func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on WorkspaceList")
 	return fuse.ENOSYS
 }
 

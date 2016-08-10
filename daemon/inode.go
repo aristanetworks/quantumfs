@@ -56,6 +56,16 @@ type Inode interface {
 
 	MvChild(c *ctx, dstInode Inode, oldName string, newName string) fuse.Status
 
+	GetXAttrSize(c *ctx, attr string) (size int, result fuse.Status)
+
+	GetXAttrData(c *ctx, attr string) (data []byte, result fuse.Status)
+
+	ListXAttr(c *ctx) (attributes []byte, result fuse.Status)
+
+	SetXAttr(c *ctx, attr string, data []byte) fuse.Status
+
+	RemoveXAttr(c *ctx, attr string) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
