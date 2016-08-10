@@ -174,7 +174,7 @@ func TestMedFileZero_test(t *testing.T) {
 	})
 }
 
-func TestMultiBlockFileReadPathEnd(t *testing.T) {
+func TestMultiBlockFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
