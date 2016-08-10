@@ -24,7 +24,7 @@ func DoBench(qlog *Qlog, n int, wg *sync.WaitGroup) {
 }
 
 func ConcurrentLog(cores int, test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 	var wg sync.WaitGroup
 
 	for i := 0; i < cores; i++ {
