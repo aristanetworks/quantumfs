@@ -11,12 +11,13 @@ import (
 )
 
 const (
-	MaxBlockSize          = uint32(1048576)
-	MaxBlocksMediumFile   = uint32(32)
-	MaxBlocksLargeFile    = uint32(22000)
-	MaxPartsVeryLargeFile = uint32(22000)
-	MaxDirectoryRecords   = uint32(1200)
-	MaxFilenameLength     = uint32(256)
+	MaxBlockSize             = uint32(1048576)
+	MaxBlocksMediumFile      = uint32(32)
+	MaxBlocksLargeFile       = uint32(22000)
+	MaxPartsVeryLargeFile    = uint32(22000)
+	MaxDirectoryRecords      = uint32(1200)
+	MaxFilenameLength        = uint32(256)
+	MaxNumExtendedAttributes = uint32(3700)
 )
 
 type ObjectKey C.Struct
@@ -1655,10 +1656,10 @@ func ReadRootExtendedAttributes(s *C.Segment) ExtendedAttributes {
 }
 func (s ExtendedAttributes) NumAttributes() uint32     { return C.Struct(s).Get32(0) }
 func (s ExtendedAttributes) SetNumAttributes(v uint32) { C.Struct(s).Set32(0, v) }
-func (s ExtendedAttributes) ListOfAttributes() ExtendedAttribute_List {
+func (s ExtendedAttributes) Attributes() ExtendedAttribute_List {
 	return ExtendedAttribute_List(C.Struct(s).GetObject(0))
 }
-func (s ExtendedAttributes) SetListOfAttributes(v ExtendedAttribute_List) {
+func (s ExtendedAttributes) SetAttributes(v ExtendedAttribute_List) {
 	C.Struct(s).SetObject(0, C.Object(v))
 }
 func (s ExtendedAttributes) WriteJSON(w io.Writer) error {
@@ -1689,12 +1690,12 @@ func (s ExtendedAttributes) WriteJSON(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.WriteString("\"listOfAttributes\":")
+	_, err = b.WriteString("\"attributes\":")
 	if err != nil {
 		return err
 	}
 	{
-		s := s.ListOfAttributes()
+		s := s.Attributes()
 		{
 			err = b.WriteByte('[')
 			if err != nil {
@@ -1758,12 +1759,12 @@ func (s ExtendedAttributes) WriteCapLit(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.WriteString("listOfAttributes = ")
+	_, err = b.WriteString("attributes = ")
 	if err != nil {
 		return err
 	}
 	{
-		s := s.ListOfAttributes()
+		s := s.Attributes()
 		{
 			err = b.WriteByte('[')
 			if err != nil {
