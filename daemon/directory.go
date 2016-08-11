@@ -954,7 +954,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		dataKey = quantumfs.EmptyBlockKey
 	} else {
 		var err error
-		dataBuf := newBuffer(c, data, quantumfs.KeyTypeData)
+		dataBuf := newBufferCopy(c, data, quantumfs.KeyTypeData)
 		dataKey, err = dataBuf.Key(&c.Ctx)
 		if err != nil {
 			c.elog("Error uploading XAttr data: %v", err)
