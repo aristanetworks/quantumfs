@@ -138,6 +138,17 @@ func (key ObjectKey) Hash() [ObjectKeyLength - 1]byte {
 	return hash
 }
 
+func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
+	if key.key.KeyType() == other.key.KeyType() &&
+		key.key.Part2() == other.key.Part2() &&
+		key.key.Part3() == other.key.Part3() &&
+		key.key.Part4() == other.key.Part4() {
+
+		return true
+	}
+	return false
+}
+
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
@@ -658,6 +669,10 @@ func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {
 	attribute.SetName(name)
 	attribute.SetId(id.key)
 	ea.ea.Attributes().Set(i, attribute)
+}
+
+func (ea *ExtendedAttributes) Bytes() []byte {
+	return ea.ea.Segment.Data
 }
 
 type Buffer interface {
