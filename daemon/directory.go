@@ -847,18 +847,62 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 	return &attributeList, fuse.OK
 }
 
+func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
+	attr string) (quantumfs.Buffer, fuse.Status) {
+
+	c.vlog("Directory::getChildXAttrBuffer Enter %d %s", inodeNum, attr)
+	defer c.vlog("Directory::getChildXAttrBuffer Exit")
+
+	defer dir.RLock().RUnlock()
+
+	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
+	if ok == fuse.ENOENT {
+		return nil, fuse.ENODATA
+	}
+
+	if ok == fuse.EIO {
+		return nil, fuse.EIO
+	}
+
+	for i := 0; i < attributeList.NumAttributes(); i++ {
+		name, key := attributeList.Attribute(i)
+		if name != attr {
+			continue
+		}
+
+		c.vlog("Found attribute key: %v", key)
+		buffer := c.dataStore.Get(&c.Ctx, key)
+		if buffer == nil {
+			c.elog("Failed to retrieve attribute datablock")
+			return nil, fuse.EIO
+		}
+
+		return buffer, fuse.OK
+	}
+
+	return nil, fuse.ENODATA
+}
+
 func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid getChildXAttrSize on Directory")
-	return 0, fuse.Status(syscall.ENOTSUP)
+	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
+	if status != fuse.OK {
+		return 0, status
+	}
+
+	return buffer.Size(), fuse.OK
 }
 
 func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid getChildXAttrData on Directory")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
+	if status != fuse.OK {
+		return []byte{}, status
+	}
+
+	return buffer.Get(), fuse.OK
 }
 
 func (dir *Directory) listChildXAttr(c *ctx,
