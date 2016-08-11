@@ -974,6 +974,13 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	// Append attribute
 	if !set {
+		if attributeList.NumAttributes() >
+			quantumfs.MaxNumExtendedAttributes {
+
+			c.vlog("XAttr list full %d", attributeList.NumAttributes())
+			return fuse.Status(syscall.ENOSPC)
+		}
+
 		c.vlog("Appending new attribute %v", attributeList)
 		attributeList.SetAttribute(attributeList.NumAttributes(), attr,
 			dataKey)
