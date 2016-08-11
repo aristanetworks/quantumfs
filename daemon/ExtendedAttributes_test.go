@@ -43,5 +43,18 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 			"data XAttr size incorrect: %d", size)
 		test.assert(bytes.Equal(data[:size], attrDataData),
 			"Didn't get the same data back '%s' '%s'", data, attrDataData)
+
+		// Finally confirm we can overwrite an attribute and read it back
+		data = make([]byte, 100)
+		attrDataData = []byte("extendedattributedata2")
+		err = syscall.Setxattr(testFilename, attrData, attrDataData, 0)
+		test.assert(err == nil, "Error setting data XAttr: %v", err)
+
+		size, err = syscall.Getxattr(testFilename, attrData, data)
+		test.assert(err == nil, "Error reading data XAttr: %v", err)
+		test.assert(size == len(attrDataData),
+			"data XAttr size incorrect: %d", size)
+		test.assert(bytes.Equal(data[:size], attrDataData),
+			"Didn't get the same data back '%s' '%s'", data, attrDataData)
 	})
 }
