@@ -360,35 +360,35 @@ func (fi *File) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
 	c.elog("Invalid getChildXAttrSize on File")
-	return 0, fuse.Status(syscall.ENOTSUP)
+	return 0, fuse.ENODATA
 }
 
 func (fi *File) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
 	c.elog("Invalid getChildXAttrData on File")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	return nil, fuse.ENODATA
 }
 
 func (fi *File) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
 	c.elog("Invalid listChildXAttr on File")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	return []byte{}, fuse.OK
 }
 
 func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
 	c.elog("Invalid setChildXAttr on File")
-	return fuse.Status(syscall.ENOTSUP)
+	return fuse.Status(syscall.ENOSPC)
 }
 
 func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	c.elog("Invalid removeChildXAttr on File")
-	return fuse.Status(syscall.ENOTSUP)
+	return fuse.ENODATA
 }
 
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,

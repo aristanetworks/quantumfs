@@ -148,29 +148,29 @@ func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
 	c.elog("Invalid GetXAttrSize on Symlink")
-	return 0, fuse.ENOSYS
+	return 0, fuse.ENODATA
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
 	c.elog("Invalid GetXAttrData on Symlink")
-	return nil, fuse.ENOSYS
+	return nil, fuse.ENODATA
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
 	c.elog("Invalid ListXAttr on Symlink")
-	return nil, fuse.ENOSYS
+	return []byte{}, fuse.OK
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 	c.elog("Invalid SetXAttr on Symlink")
-	return fuse.ENOSYS
+	return fuse.Status(syscall.ENOSPC)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on Symlink")
-	return fuse.ENOSYS
+	return fuse.ENODATA
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
@@ -191,35 +191,35 @@ func (link *Symlink) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
 	c.elog("Invalid getChildXAttrSize on Symlink")
-	return 0, fuse.Status(syscall.ENOTSUP)
+	return 0, fuse.ENODATA
 }
 
 func (link *Symlink) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
 	c.elog("Invalid getChildXAttrData on Symlink")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	return nil, fuse.ENODATA
 }
 
 func (link *Symlink) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
 	c.elog("Invalid listChildXAttr on Symlink")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	return []byte{}, fuse.OK
 }
 
 func (link *Symlink) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
 	c.elog("Invalid setChildXAttr on Symlink")
-	return fuse.Status(syscall.ENOTSUP)
+	return fuse.Status(syscall.ENOSPC)
 }
 
 func (link *Symlink) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	c.elog("Invalid removeChildXAttr on Symlink")
-	return fuse.Status(syscall.ENOTSUP)
+	return fuse.ENODATA
 }
 
 func (link *Symlink) getChildRecord(c *ctx,

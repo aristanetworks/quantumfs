@@ -177,29 +177,29 @@ func (api *ApiInode) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
 	c.elog("Invalid GetXAttrSize on ApiInode")
-	return 0, fuse.ENOSYS
+	return 0, fuse.ENODATA
 }
 
 func (api *ApiInode) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
 	c.elog("Invalid GetXAttrData on ApiInode")
-	return nil, fuse.ENOSYS
+	return nil, fuse.ENODATA
 }
 
 func (api *ApiInode) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
 	c.elog("Invalid ListXAttr on ApiInode")
-	return nil, fuse.ENOSYS
+	return []byte{}, fuse.OK
 }
 
 func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 	c.elog("Invalid SetXAttr on ApiInode")
-	return fuse.ENOSYS
+	return fuse.Status(syscall.ENOSPC)
 }
 
 func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on ApiInode")
-	return fuse.ENOSYS
+	return fuse.ENODATA
 }
 
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
@@ -219,35 +219,35 @@ func (api *ApiInode) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
 	c.elog("Invalid getChildXAttrSize on ApiInode")
-	return 0, fuse.Status(syscall.ENOTSUP)
+	return 0, fuse.ENODATA
 }
 
 func (api *ApiInode) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
 	c.elog("Invalid getChildXAttrData on ApiInode")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	return nil, fuse.ENODATA
 }
 
 func (api *ApiInode) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
 	c.elog("Invalid listChildXAttr on ApiInode")
-	return nil, fuse.Status(syscall.ENOTSUP)
+	return []byte{}, fuse.OK
 }
 
 func (api *ApiInode) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
 	c.elog("Invalid setChildXAttr on ApiInode")
-	return fuse.Status(syscall.ENOTSUP)
+	return fuse.Status(syscall.ENOSPC)
 }
 
 func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	c.elog("Invalid removeChildXAttr on ApiInode")
-	return fuse.Status(syscall.ENOTSUP)
+	return fuse.ENODATA
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
