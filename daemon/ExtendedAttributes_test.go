@@ -106,3 +106,25 @@ func TestExtendedAttrList(t *testing.T) {
 		}
 	})
 }
+
+func TestExtendedAttrReadNonExist(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/" + "test"
+		fd, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+		fd.Close()
+
+		data := make([]byte, 100)
+
+		size, err := syscall.Getxattr(testFilename, "user.does_not_exist",
+			data)
+		test.assert(err != nil, "Expected error reading nodata XAttr")
+		test.assert(strings.Contains(err.Error(), "no data available"),
+			"Expected no data available: %v", err)
+		test.assert(size <= 0, "Non-zero size with non-existant XAttr: %d",
+			size)
+	})
+}
