@@ -880,6 +880,7 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 		return buffer, fuse.OK
 	}
 
+	c.vlog("XAttr name not found")
 	return nil, fuse.ENODATA
 }
 
