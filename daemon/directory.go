@@ -1003,8 +1003,55 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	c.elog("Invalid removeChildXAttr on Directory")
-	return fuse.Status(syscall.ENOTSUP)
+	c.vlog("Directory::removeChildXAttr Enter %d, %s", inodeNum, attr)
+	defer c.vlog("Directory::removeChildXAttr Exit")
+
+	defer dir.Lock().Unlock()
+
+	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
+	if ok == fuse.EIO {
+		return fuse.EIO
+	}
+
+	if ok == fuse.ENOENT {
+		return fuse.ENODATA
+	}
+
+	var i int
+	for i = 0; i < attributeList.NumAttributes(); i++ {
+		name, _ := attributeList.Attribute(i)
+		if name == attr {
+			c.vlog("Found attribute %d", i)
+			break
+		}
+	}
+
+	var key quantumfs.ObjectKey
+	if attributeList.NumAttributes() != 1 {
+		// Move the last attribute over the one to be removed
+		lastIndex := attributeList.NumAttributes() - 1
+		lastName, lastId := attributeList.Attribute(lastIndex)
+		attributeList.SetAttribute(i, lastName, lastId)
+		attributeList.SetNumAttributes(lastIndex)
+
+		buffer := newBuffer(c, attributeList.Bytes(),
+			quantumfs.KeyTypeMetadata)
+		var err error
+		key, err = buffer.Key(&c.Ctx)
+		if err != nil {
+			c.elog("Error computing extended attribute key: %v", err)
+			return fuse.EIO
+		}
+	} else {
+		// We are deleting the only extended attribute. Change the
+		// DirectoryRecord key only
+		key = quantumfs.EmptyBlockKey
+	}
+
+	dir.childrenRecords[inodeNum].SetExtendedAttributes(key)
+	dir.self.dirty(c)
+
+	return fuse.OK
 }
 
 type directoryContents struct {
