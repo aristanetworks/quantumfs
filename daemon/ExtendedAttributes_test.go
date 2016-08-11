@@ -44,7 +44,8 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.assert(size == len(attrDataData),
 			"data XAttr size incorrect: %d", size)
 		test.assert(bytes.Equal(data[:size], attrDataData),
-			"Didn't get the same data back '%s' '%s'", data, attrDataData)
+			"Didn't get the same data back '%s' '%s'", data,
+			attrDataData)
 
 		// Finally confirm we can overwrite an attribute and read it back
 		data = make([]byte, 100)
@@ -57,7 +58,8 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.assert(size == len(attrDataData),
 			"data XAttr size incorrect: %d", size)
 		test.assert(bytes.Equal(data[:size], attrDataData),
-			"Didn't get the same data back '%s' '%s'", data, attrDataData)
+			"Didn't get the same data back '%s' '%s'", data,
+			attrDataData)
 	})
 }
 
@@ -145,13 +147,14 @@ func TestExtendedAttrRemove(t *testing.T) {
 			size, err := syscall.Listxattr(testFilename, data)
 			test.assert(err == nil, "Error listing XAttr: %v", err)
 			test.assert(size > 0, "Expected XAttr, but didn't find any")
-			test.assert(size <= len(data), "XAttr names overflowed buffer")
+			test.assert(size <= len(data),
+				"XAttr names overflowed buffer")
 
 			data = data[:size]
 			names := bytes.Split(data, []byte("\x00"))
 			names = names[:len(names)-1] // Remove empty last element
-			test.assert(len(names) == N, "Fewer XAttr than expected: %d != %d",
-				len(names), N)
+			test.assert(len(names) == N,
+				"Fewer XAttr than expected: %d != %d", len(names), N)
 
 			nameSet := make(map[string]bool)
 			for _, nameBytes := range names {
