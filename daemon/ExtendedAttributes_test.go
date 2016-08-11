@@ -128,3 +128,70 @@ func TestExtendedAttrReadNonExist(t *testing.T) {
 			size)
 	})
 }
+
+func TestExtendedAttrRemove(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/" + "test"
+		fd, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+		fd.Close()
+
+		verify := func(N int) {
+			// Confirm they are all there
+			data := make([]byte, 64000)
+			size, err := syscall.Listxattr(testFilename, data)
+			test.assert(err == nil, "Error listing XAttr: %v", err)
+			test.assert(size > 0, "Expected XAttr, but didn't find any")
+			test.assert(size <= len(data), "XAttr names overflowed buffer")
+
+			data = data[:size]
+			names := bytes.Split(data, []byte("\x00"))
+			names = names[:len(names)-1] // Remove empty last element
+			test.assert(len(names) == N, "Fewer XAttr than expected: %d != %d",
+				len(names), N)
+
+			nameSet := make(map[string]bool)
+			for _, nameBytes := range names {
+				name := string(nameBytes)
+				test.assert(strings.HasPrefix(name, "user.attr"),
+					"Incorrect XAttr name %s", name)
+				nameSet[name] = true
+			}
+			// Ensure we have no duplicates
+			test.assert(len(nameSet) == N, "Duplicated names retrieved")
+		}
+
+		// Add a bunch of attributes
+		N := 100
+		for i := 0; i < N; i++ {
+			attrName := fmt.Sprintf("user.attr%d", i)
+			err = syscall.Setxattr(testFilename, attrName, []byte{}, 0)
+			test.assert(err == nil, "Error setting XAttr %s: %v",
+				attrName, err)
+		}
+
+		// Delete a non-existent attribute
+		err = syscall.Removexattr(testFilename, "user.does_not_exist")
+		test.assert(err != nil,
+			"Expected error when deleting non-existent XAttr")
+		test.assert(strings.Contains(err.Error(), "no data available"),
+			"Expected error 'no data available': %s", err.Error())
+
+		// Delete an attribute from the middle
+		err = syscall.Removexattr(testFilename, "user.attr50")
+		test.assert(err == nil, "Error when removing XAttr from middle: %v",
+			err)
+		N--
+		verify(N)
+
+		// Delete an attribute from the end
+		err = syscall.Removexattr(testFilename, "user.attr99")
+		test.assert(err == nil, "Error when removing XAttr from end: %v",
+			err)
+		N--
+		verify(N)
+	})
+}

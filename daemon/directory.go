@@ -1027,6 +1027,11 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		}
 	}
 
+	if i == attributeList.NumAttributes() {
+		// We didn't find the attribute
+		return fuse.ENODATA
+	}
+
 	var key quantumfs.ObjectKey
 	if attributeList.NumAttributes() != 1 {
 		// Move the last attribute over the one to be removed
