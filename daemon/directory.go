@@ -904,12 +904,25 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		return fuse.EIO
 	}
 
+	var dataKey quantumfs.ObjectKey
+	if len(data) == 0 {
+		dataKey = quantumfs.EmptyBlockKey
+	} else {
+		var err error
+		dataBuf := newBuffer(c, data, quantumfs.KeyTypeData)
+		dataKey, err = dataBuf.Key(&c.Ctx)
+		if err != nil {
+			c.elog("Error uploading XAttr data: %v", err)
+			return fuse.EIO
+		}
+	}
+
 	set := false
 	for i := 0; i < attributeList.NumAttributes(); i++ {
 		name, _ := attributeList.Attribute(i)
 		if name == attr {
 			c.vlog("Overwriting existing attribute %d", i)
-			attributeList.SetAttribute(i, name, quantumfs.EmptyBlockKey)
+			attributeList.SetAttribute(i, name, dataKey)
 			set = true
 			break
 		}
@@ -919,7 +932,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	if !set {
 		c.vlog("Appending new attribute %v", attributeList)
 		attributeList.SetAttribute(attributeList.NumAttributes(), attr,
-			quantumfs.EmptyBlockKey)
+			dataKey)
 		attributeList.SetNumAttributes(attributeList.NumAttributes() + 1)
 	}
 
