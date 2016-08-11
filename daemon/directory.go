@@ -897,7 +897,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	c.vlog("Directory::setChildXAttr Enter %d, %s", inodeNum, attr)
 	defer c.vlog("Directory::setChildXAttr Exit")
 
-	defer dir.RLock().RUnlock()
+	defer dir.Lock().Unlock()
 
 	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
 	if ok == fuse.EIO {
