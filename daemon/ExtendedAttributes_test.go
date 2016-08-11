@@ -31,7 +31,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.assert(err == nil, "Error setting data XAttr: %v", err)
 
 		// Now confirm we can read them out again
-		data := []byte{}
+		data := make([]byte, 100)
 
 		size, err := syscall.Getxattr(testFilename, attrNoData, data)
 		test.assert(err == nil, "Error reading nodata XAttr: %v", err)
@@ -41,7 +41,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.assert(err == nil, "Error reading data XAttr: %v", err)
 		test.assert(size == len(attrDataData),
 			"data XAttr size incorrect: %d", size)
-		test.assert(bytes.Equal(data, attrDataData),
+		test.assert(bytes.Equal(data[:size], attrDataData),
 			"Didn't get the same data back '%s' '%s'", data, attrDataData)
 	})
 }
