@@ -210,7 +210,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 		attr.Size = entry.Size()
 		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
-		attr.Nlink = 2
+		attr.Nlink = 2 // Workaround for BUG166665
 	}
 
 	attr.Atime = entry.ModificationTime().Seconds()
