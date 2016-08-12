@@ -198,6 +198,12 @@ func TestDirectoryFileDeletion_test(t *testing.T) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err != nil, "Error test file not deleted: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename = workspace + "/" + "test"
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err != nil, "Error test file not deleted: %v", err)
 	})
 }
 
