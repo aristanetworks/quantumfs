@@ -293,6 +293,13 @@ func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (fi *File) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on File")
+	return fuse.ENOTDIR
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }

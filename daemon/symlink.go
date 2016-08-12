@@ -143,6 +143,13 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on Symlink")
+	return fuse.ENOTDIR
+}
+
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

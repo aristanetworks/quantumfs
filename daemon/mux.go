@@ -405,10 +405,24 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Link Enter")
+	c.vlog("QuantumFs::Link Enter inode %d to name %s in dstDir %d",
+		input.NodeId, filename, input.Oldnodeid)
 	defer c.vlog("QuantumFs::Link Exit")
 
-	return fuse.EPERM
+	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
+	if srcInode == nil {
+		return fuse.ENOENT
+	}
+
+	dstInode := qfs.inode(c, InodeId(input.NodeId))
+	if dstInode == nil {
+		return fuse.ENOENT
+	}
+
+	defer srcInode.RLockTree().RUnlock()
+	defer dstInode.RLockTree().RUnlock()
+
+	return dstInode.Link(c, srcInode, filename, out)
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
@@ -572,7 +586,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
-		c.elog("Open failed", input)
+		c.elog("Open failed %v", input)
 		return fuse.ENOENT
 	}
 

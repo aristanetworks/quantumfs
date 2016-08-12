@@ -172,6 +172,13 @@ func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (special *Special) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on Special")
+	return fuse.ENOTDIR
+}
+
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
