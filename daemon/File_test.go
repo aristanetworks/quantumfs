@@ -563,7 +563,7 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 	})
 }
 
-func TestSmallFileReadPathEnd(t *testing.T) {
+func TestSmallFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()

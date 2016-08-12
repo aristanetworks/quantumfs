@@ -244,6 +244,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer logRequestPanic(&qfs.c)
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
+	// Disabled due to BUG166010
 	//qfs.setInode(&qfs.c, InodeId(nodeID), nil)
 }
 
