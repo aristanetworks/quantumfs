@@ -6,6 +6,7 @@ package daemon
 // Test the small/medium file transitions and medium file operations
 
 import "bytes"
+import "io"
 import "io/ioutil"
 import "os"
 import "testing"
@@ -170,5 +171,31 @@ func TestMedFileZero_test(t *testing.T) {
 		output, err := ioutil.ReadFile(testFilename)
 		test.assert(len(output) == 0, "Empty file not really empty")
 		test.assert(err == nil, "Unable to read from empty file")
+	})
+}
+
+func TestMultiBlockFileReadPastEnd(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genFibonacci(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		os.Truncate(testFilename, 3*1024*1024)
+
+		// Then confirm we can read back past the data and get the correct
+		// EOF return value.
+		input := make([]byte, 100*1024)
+		_, err = file.ReadAt(input, 10*1024*1024)
+		test.assert(err == io.EOF, "Expected EOF got: %v", err)
+
+		file.Close()
 	})
 }
