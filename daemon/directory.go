@@ -741,16 +741,18 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// releasing locks we update the dst metadata. Then we drop the locks
 		// of dst, which is fine since it is up to date. Finally we update
 		// the metadata of dir before dropping its lock.
+		dirLocked := false
 		if dir.inodeNum() > dst.inodeNum() {
 			dir.Lock()
+			dirLocked = true
 		}
 		defer dir.lock.Unlock()
 
 		result := func() fuse.Status {
 			defer dst.Lock().Unlock()
 
-			if dir.inodeNum() < dst.inodeNum() {
-				defer dir.Lock()
+			if !dirLocked {
+				dir.Lock()
 			}
 
 			if _, exists := dir.children[oldName]; !exists {
