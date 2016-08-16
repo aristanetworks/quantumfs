@@ -299,6 +299,13 @@ func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fuse.ENODATA
 }
 
+func (nsl *NamespaceList) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on NamespaceList")
+	return fuse.ENOTDIR
+}
+
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
@@ -535,6 +542,13 @@ func (wsl *WorkspaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status
 func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on WorkspaceList")
 	return fuse.ENODATA
+}
+
+func (wsl *WorkspaceList) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on WorkspaceList")
+	return fuse.ENOTDIR
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,

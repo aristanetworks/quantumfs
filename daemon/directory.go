@@ -66,7 +66,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			dir.loadChild(c, baseLayer.Entry(i))
+			dir.loadChild_(c, baseLayer.Entry(i))
 		}
 
 		if baseLayer.Next() == quantumfs.EmptyDirKey ||
@@ -81,7 +81,8 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
-func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
+// The directory must be exclusively locked (or unlisted)
+func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord) InodeId {
 	inodeId := c.qfs.newInodeId()
 	dir.children[entry.Filename()] = inodeId
 	dir.childrenRecords[inodeId] = &entry
@@ -108,6 +109,8 @@ func (dir *Directory) loadChild(c *ctx, entry quantumfs.DirectoryRecord) {
 
 	c.qfs.setInode(c, inodeId, constructor(c, entry.ID(), entry.Size(),
 		inodeId, dir, 0, 0, nil))
+
+	return inodeId
 }
 
 func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
@@ -208,7 +211,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 		attr.Size = entry.Size()
 		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
-		attr.Nlink = 1
+		attr.Nlink = 2 // Workaround for BUG166665
 	}
 
 	attr.Atime = entry.ModificationTime().Seconds()
@@ -791,6 +794,39 @@ func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
+}
+
+func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.vlog("Directory::Link Enter")
+	defer c.vlog("Directory::Link Exit")
+
+	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
+	if err != nil {
+		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
+		return fuse.EIO
+	}
+	newRecord := cloneDirectoryRecord(&origRecord)
+	newRecord.SetFilename(newName)
+	newRecord.SetID(srcInode.sync_DOWN(c))
+
+	// We cannot lock earlier because the parent of srcInode may be us
+	defer dir.Lock().Unlock()
+
+	inodeNum := dir.loadChild_(c, *newRecord)
+
+	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
+		inodeNum)
+
+	out.NodeId = uint64(inodeNum)
+	fillEntryOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+		newRecord)
+
+	dir.self.dirty(c)
+
+	return fuse.OK
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,

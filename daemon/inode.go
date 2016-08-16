@@ -66,6 +66,8 @@ type Inode interface {
 
 	RemoveXAttr(c *ctx, attr string) fuse.Status
 
+	Link(c *ctx, srcInode Inode, newName string, out *fuse.EntryOut) fuse.Status
+
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status

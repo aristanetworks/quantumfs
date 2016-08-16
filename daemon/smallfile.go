@@ -32,7 +32,7 @@ func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 	}
 
 	// If we try to read too far, there's nothing to read here
-	if blockIdx > 0 {
+	if blockIdx > 0 || offset > uint64(fi.buf.Size()) {
 		return 0, nil
 	}
 

@@ -31,7 +31,7 @@ func TestFileCreation_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
-		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
+		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
@@ -558,6 +558,30 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 		_, err = file.Read(input)
 		test.assert(err == nil, "Error reading from file: %v", err)
 		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		file.Close()
+	})
+}
+
+func TestSmallFileReadPastEnd(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genFibonacci(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		// Then confirm we can read back past the data and get the correct
+		// EOF return value.
+		input := make([]byte, 100*1024)
+		_, err = file.ReadAt(input, 100*1024)
+		test.assert(err == io.EOF, "Expected EOF got: %v", err)
 
 		file.Close()
 	})
