@@ -720,9 +720,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	result := func() fuse.Status {
 		dst := dstInode.(*Directory)
 
-		// Lock both directories in inode number order to prevent a lock
-		// ordering deadlock against a rename in the opposite direction.
-
 		// The locking here is subtle.
 		//
 		// Firstly we must protect against the case where a concurrent rename
