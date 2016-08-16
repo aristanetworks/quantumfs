@@ -505,6 +505,39 @@ func TestRenameIntoParent(t *testing.T) {
 	})
 }
 
+func TestRenameIntoChild(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		parent := workspace + "/parent"
+		child := workspace + "/parent/child"
+		parentFile := parent + "/test"
+		childFile := child + "/test2"
+
+		err := os.Mkdir(parent, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.Mkdir(child, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(parentFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(parentFile, childFile)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(childFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		childFile = workspace + "/parent/child/test2"
+		err = syscall.Stat(childFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
