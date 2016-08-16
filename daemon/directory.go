@@ -738,18 +738,47 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// So we have two phases of locking. In the first phase we lock dir
 		// and dst according to their inode number. Then, with both those
 		// locks held we perform the bulk of the logic. Just before we start
-		// releasing locks we update the dst metadata. Then we drop the locks
-		// of dst, which is fine since it is up to date. Finally we update
-		// the metadata of dir before dropping its lock.
+		// releasing locks we update the parent metadata. Then we drop the
+		// locks of the parent, which is fine since it is up to date. Finally
+		// we update the metadata of the child before dropping its lock.
+		//
+		// We need to update and release the parent first so we can
+		// successfully update the child. If the two directories are not
+		// related in that way then we choose arbitrarily because it doesn't
+		// matter.
+
+		// Determine if a parent-child relationship between the
+		// directories exist
+		var parent *Directory
+		var child *Directory
+		if dst.parent() != nil &&
+			dst.parent().inodeNum() == dir.inodeNum() {
+
+			// dst is a child of dir
+			parent = dir
+			child = dst
+		} else if dir.parent() != nil &&
+			dir.parent().inodeNum() == dst.inodeNum() {
+
+			// dir is a child of dst
+			parent = dst
+			child = dir
+		} else {
+			// No relationship, choose arbitrarily
+			parent = dst
+			child = dir
+		}
+
 		dirLocked := false
 		if dir.inodeNum() > dst.inodeNum() {
 			dir.Lock()
 			dirLocked = true
 		}
-		defer dir.lock.Unlock()
+		defer child.lock.Unlock()
 
 		result := func() fuse.Status {
-			defer dst.Lock().Unlock()
+			dst.Lock()
+			defer parent.lock.Unlock()
 
 			if !dirLocked {
 				dir.Lock()
@@ -785,15 +814,15 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			delete(dir.childrenRecords, oldInodeId)
 			delete(dir.dirtyChildren_, oldInodeId)
 
-			dst.updateSize_(c)
-			dst.self.dirty(c)
+			parent.updateSize_(c)
+			parent.self.dirty(c)
 
 			return fuse.OK
 		}()
 
 		if result == fuse.OK {
-			dir.updateSize_(c)
-			dir.self.dirty(c)
+			child.updateSize_(c)
+			child.self.dirty(c)
 		}
 		return result
 	}()
