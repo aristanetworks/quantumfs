@@ -298,6 +298,30 @@ func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (fi *File) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	return fi.parent().getChildXAttrSize(c, fi.inodeNum(), attr)
+}
+
+func (fi *File) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	return fi.parent().getChildXAttrData(c, fi.inodeNum(), attr)
+}
+
+func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	return fi.parent().listChildXAttr(c, fi.inodeNum())
+}
+
+func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	return fi.parent().setChildXAttr(c, fi.inodeNum(), attr, data)
+}
+
+func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
+}
+
 func (fi *File) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -342,6 +366,41 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 	}
 
 	return fuse.OK
+}
+
+func (fi *File) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on File")
+	return 0, fuse.ENODATA
+}
+
+func (fi *File) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on File")
+	return nil, fuse.ENODATA
+}
+
+func (fi *File) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on File")
+	return []byte{}, fuse.OK
+}
+
+func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on File")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on File")
+	return fuse.ENODATA
 }
 
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,

@@ -56,6 +56,16 @@ type Inode interface {
 
 	MvChild(c *ctx, dstInode Inode, oldName string, newName string) fuse.Status
 
+	GetXAttrSize(c *ctx, attr string) (size int, result fuse.Status)
+
+	GetXAttrData(c *ctx, attr string) (data []byte, result fuse.Status)
+
+	ListXAttr(c *ctx) (attributes []byte, result fuse.Status)
+
+	SetXAttr(c *ctx, attr string, data []byte) fuse.Status
+
+	RemoveXAttr(c *ctx, attr string) fuse.Status
+
 	Link(c *ctx, srcInode Inode, newName string, out *fuse.EntryOut) fuse.Status
 
 	// Methods called by children
@@ -67,6 +77,19 @@ type Inode interface {
 	// Update the key for only this child and then notify all the grandparents of
 	// the cascading changes.
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
+
+	getChildXAttrSize(c *ctx, inodeNum InodeId,
+		attr string) (size int, result fuse.Status)
+
+	getChildXAttrData(c *ctx,
+		inodeNum InodeId, attr string) (data []byte, result fuse.Status)
+
+	listChildXAttr(c *ctx,
+		inodeNum InodeId) (attributes []byte, result fuse.Status)
+
+	setChildXAttr(c *ctx, inodeNum InodeId, attr string, data []byte) fuse.Status
+
+	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
 	parent() Inode
 	setParent(newParent Inode)
