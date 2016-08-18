@@ -321,7 +321,10 @@ func serveSafely(th *testHelper) {
 		MaxWrite:      quantumfs.MaxBlockSize,
 		FsName:        "cluster",
 		Name:          th.testName,
+		Options:       make([]string, 0),
 	}
+	mountOptions.Options = append(mountOptions.Options, "suid")
+	mountOptions.Options = append(mountOptions.Options, "dev")
 
 	th.qfs.Serve(mountOptions)
 }

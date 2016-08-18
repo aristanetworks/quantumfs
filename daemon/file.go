@@ -13,9 +13,7 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-const execBit = 0x1
-const writeBit = 0x2
-const readBit = 0x4
+const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	parent Inode, mode uint32, rdev uint32,
@@ -73,13 +71,20 @@ func newFile_(c *ctx, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	accessor blockAccessor
+	accessor     blockAccessor
+	unlinkRecord *quantumfs.DirectoryRecord
 }
 
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
 	fi.setDirty(true)
-	fi.parent.dirtyChild(c, fi)
+	fi.parent().dirtyChild(c, fi)
+}
+
+func (fi *File) dirtyChild(c *ctx, child Inode) {
+	if child != fi.self {
+		panic("Unsupported dirtyChild() call on File")
+	}
 }
 
 func (fi *File) Access(c *ctx, mask uint32, uid uint32,
@@ -90,7 +95,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := fi.parent.getChildRecord(c, fi.InodeCommon.id)
+	record, err := fi.parent().getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
 		return fuse.EIO
@@ -103,14 +108,14 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (fi *File) OpenDir(c *ctx, flags uint32, mode uint32,
+func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	return fuse.ENOTDIR
 }
 
-func (fi *File) openPermission(c *ctx, flags uint32) bool {
-	record, error := fi.parent.getChildRecord(c, fi.id)
+func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
+	record, error := fi.parent().getChildRecord(c, fi.id)
 	if error != nil {
 		return false
 	}
@@ -120,25 +125,46 @@ func (fi *File) openPermission(c *ctx, flags uint32) bool {
 		return true
 	}
 
+	flags := uint(flags_)
+
 	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
 		flags)
-	//this only works because we don't have owner/group/other specific perms.
-	//we need to confirm whether we can treat the root user/group specially.
+
+	var userAccess bool
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		return (record.Permissions() & readBit) != 0
+		userAccess = BitAnyFlagSet(uint(record.Permissions()),
+			quantumfs.PermReadOther|quantumfs.PermReadGroup|
+				quantumfs.PermReadOwner)
 	case syscall.O_WRONLY:
-		return (record.Permissions() & writeBit) != 0
+		userAccess = BitAnyFlagSet(uint(record.Permissions()),
+			quantumfs.PermWriteOwner|quantumfs.PermWriteGroup|
+				quantumfs.PermWriteOwner)
 	case syscall.O_RDWR:
-		var bitmask uint8 = readBit | writeBit
-		return (record.Permissions() & bitmask) == bitmask
+		userAccess = BitAnyFlagSet(uint(record.Permissions()),
+			quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
+				quantumfs.PermWriteOwner|quantumfs.PermReadOther|
+				quantumfs.PermReadGroup|quantumfs.PermReadOwner)
 	}
 
-	return false
+	var execAccess bool
+	if BitFlagsSet(flags, FMODE_EXEC) {
+		execAccess = BitAnyFlagSet(uint(record.Permissions()),
+			quantumfs.PermExecOther|quantumfs.PermExecGroup|
+				quantumfs.PermExecOwner|quantumfs.PermSUID|
+				quantumfs.PermSGID)
+	}
+
+	success := userAccess || execAccess
+	c.vlog("Permission check result %d", success)
+	return success
 }
 
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
+
+	c.vlog("File::Open Enter")
+	defer c.vlog("File::Open Exit")
 
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
@@ -147,6 +173,8 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+
+	c.dlog("Opened Inode %d as Fh: %d", fi.inodeNum(), fileHandleNum)
 
 	out.OpenFlags = 0
 	out.Fh = uint64(fileHandleNum)
@@ -204,7 +232,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent.setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
+	return fi.parent().setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -243,7 +271,7 @@ func (fi *File) Sync(c *ctx) fuse.Status {
 		defer fi.Lock().Unlock()
 		if fi.isDirty() {
 			key := fi.sync_DOWN(c)
-			fi.parent.syncChild(c, fi.InodeCommon.id, key)
+			fi.parent().syncChild(c, fi.InodeCommon.id, key)
 		}
 	}()
 
@@ -270,22 +298,143 @@ func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (fi *File) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	return fi.parent().getChildXAttrSize(c, fi.inodeNum(), attr)
+}
+
+func (fi *File) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	return fi.parent().getChildXAttrData(c, fi.inodeNum(), attr)
+}
+
+func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	return fi.parent().listChildXAttr(c, fi.inodeNum())
+}
+
+func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	return fi.parent().setChildXAttr(c, fi.inodeNum(), attr, data)
+}
+
+func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
+}
+
+func (fi *File) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on File")
+	return fuse.ENOTDIR
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }
 
+// When a file is unlinked its parent forgets about it, so we cannot ask it for our
+// properties. Since the file cannot be accessed from the directory tree any longer
+// we do not need to upload it or any of its content. When being unlinked we'll
+// orphan the File by making it its own parent.
+//
+// Sometimes a File will access its own parent with or without its lock held. To
+// protect the internal DirectoryRecord we'll abuse the InodeCommon.parentLock.
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid setChildAttr on File")
-	return fuse.ENOSYS
+	if inodeNum != fi.inodeNum() {
+		c.elog("Invalid setChildAttr on File")
+		return fuse.ENOSYS
+	}
+
+	c.dlog("File::setChildAttr Enter")
+	defer c.dlog("File::setChildAttr Exit")
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	if fi.unlinkRecord == nil {
+		panic("setChildAttr on self file before unlinking")
+	}
+
+	modifyEntryWithAttr(c, newType, attr, fi.unlinkRecord)
+
+	if out != nil {
+		fillAttrOutCacheData(c, out)
+		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
+			c.fuseCtx.Owner, fi.unlinkRecord)
+	}
+
+	return fuse.OK
+}
+
+func (fi *File) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on File")
+	return 0, fuse.ENODATA
+}
+
+func (fi *File) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on File")
+	return nil, fuse.ENODATA
+}
+
+func (fi *File) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on File")
+	return []byte{}, fuse.OK
+}
+
+func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on File")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on File")
+	return fuse.ENODATA
 }
 
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
 	error) {
 
-	c.elog("Unsupported record fetch on file")
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	if inodeNum != fi.inodeNum() {
+		c.elog("Unsupported record fetch on file")
+		return quantumfs.DirectoryRecord{},
+			errors.New("Unsupported record fetch")
+	}
+
+	c.dlog("File::getChildRecord Enter")
+	defer c.dlog("File::getChildRecord Exit")
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	if fi.unlinkRecord == nil {
+		panic("getChildRecord on self file before unlinking")
+	}
+
+	return *fi.unlinkRecord, nil
+}
+
+func (fi *File) setChildRecord(c *ctx, record *quantumfs.DirectoryRecord) {
+	c.dlog("File::setChildRecord Enter")
+	defer c.dlog("File::setChildRecord Exit")
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	if fi.unlinkRecord != nil {
+		panic("setChildRecord on self file after unlinking")
+	}
+
+	fi.unlinkRecord = cloneDirectoryRecord(record)
 }
 
 func resize(buffer []byte, size int) []byte {
@@ -353,7 +502,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		fi.parent.setChildAttr(c, fi.id, &neededType, &attr, nil)
+		fi.parent().setChildAttr(c, fi.id, &neededType, &attr, nil)
 	}
 	return nil
 }
@@ -491,7 +640,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent.setChildAttr(c, fi.id, nil, &attr, nil)
+	fi.parent().setChildAttr(c, fi.id, nil, &attr, nil)
 	fi.dirty(c)
 
 	return writeCount, fuse.OK

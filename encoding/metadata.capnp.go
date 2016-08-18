@@ -11,12 +11,13 @@ import (
 )
 
 const (
-	MaxBlockSize          = uint32(1048576)
-	MaxBlocksMediumFile   = uint32(32)
-	MaxBlocksLargeFile    = uint32(22000)
-	MaxPartsVeryLargeFile = uint32(22000)
-	MaxDirectoryRecords   = uint32(1200)
-	MaxFilenameLength     = uint32(256)
+	MaxBlockSize             = uint32(1048576)
+	MaxBlocksMediumFile      = uint32(32)
+	MaxBlocksLargeFile       = uint32(22000)
+	MaxPartsVeryLargeFile    = uint32(22000)
+	MaxDirectoryRecords      = uint32(1200)
+	MaxFilenameLength        = uint32(256)
+	MaxNumExtendedAttributes = uint32(3700)
 )
 
 type ObjectKey C.Struct
@@ -239,39 +240,39 @@ func (s ObjectKey_List) Set(i int, item ObjectKey) { C.PointerList(s).Set(i, C.O
 
 type DirectoryRecord C.Struct
 
-func NewDirectoryRecord(s *C.Segment) DirectoryRecord { return DirectoryRecord(s.NewStruct(32, 3)) }
+func NewDirectoryRecord(s *C.Segment) DirectoryRecord { return DirectoryRecord(s.NewStruct(40, 3)) }
 func NewRootDirectoryRecord(s *C.Segment) DirectoryRecord {
-	return DirectoryRecord(s.NewRootStruct(32, 3))
+	return DirectoryRecord(s.NewRootStruct(40, 3))
 }
 func AutoNewDirectoryRecord(s *C.Segment) DirectoryRecord {
-	return DirectoryRecord(s.NewStructAR(32, 3))
+	return DirectoryRecord(s.NewStructAR(40, 3))
 }
 func ReadRootDirectoryRecord(s *C.Segment) DirectoryRecord {
 	return DirectoryRecord(s.Root(0).ToStruct())
 }
-func (s DirectoryRecord) Filename() string       { return C.Struct(s).GetObject(0).ToText() }
-func (s DirectoryRecord) FilenameBytes() []byte  { return C.Struct(s).GetObject(0).ToDataTrimLastByte() }
-func (s DirectoryRecord) SetFilename(v string)   { C.Struct(s).SetObject(0, s.Segment.NewText(v)) }
-func (s DirectoryRecord) Id() ObjectKey          { return ObjectKey(C.Struct(s).GetObject(1).ToStruct()) }
-func (s DirectoryRecord) SetId(v ObjectKey)      { C.Struct(s).SetObject(1, C.Object(v)) }
-func (s DirectoryRecord) Type() uint8            { return C.Struct(s).Get8(0) }
-func (s DirectoryRecord) SetType(v uint8)        { C.Struct(s).Set8(0, v) }
-func (s DirectoryRecord) Permissions() uint8     { return C.Struct(s).Get8(1) }
-func (s DirectoryRecord) SetPermissions(v uint8) { C.Struct(s).Set8(1, v) }
-func (s DirectoryRecord) Owner() uint8           { return C.Struct(s).Get8(2) }
-func (s DirectoryRecord) SetOwner(v uint8)       { C.Struct(s).Set8(2, v) }
-func (s DirectoryRecord) Group() uint8           { return C.Struct(s).Get8(3) }
-func (s DirectoryRecord) SetGroup(v uint8)       { C.Struct(s).Set8(3, v) }
-func (s DirectoryRecord) Size() uint64           { return C.Struct(s).Get64(8) }
-func (s DirectoryRecord) SetSize(v uint64)       { C.Struct(s).Set64(8, v) }
+func (s DirectoryRecord) Filename() string        { return C.Struct(s).GetObject(0).ToText() }
+func (s DirectoryRecord) FilenameBytes() []byte   { return C.Struct(s).GetObject(0).ToDataTrimLastByte() }
+func (s DirectoryRecord) SetFilename(v string)    { C.Struct(s).SetObject(0, s.Segment.NewText(v)) }
+func (s DirectoryRecord) Id() ObjectKey           { return ObjectKey(C.Struct(s).GetObject(1).ToStruct()) }
+func (s DirectoryRecord) SetId(v ObjectKey)       { C.Struct(s).SetObject(1, C.Object(v)) }
+func (s DirectoryRecord) Type() uint8             { return C.Struct(s).Get8(0) }
+func (s DirectoryRecord) SetType(v uint8)         { C.Struct(s).Set8(0, v) }
+func (s DirectoryRecord) Permissions() uint32     { return C.Struct(s).Get32(4) }
+func (s DirectoryRecord) SetPermissions(v uint32) { C.Struct(s).Set32(4, v) }
+func (s DirectoryRecord) Owner() uint16           { return C.Struct(s).Get16(2) }
+func (s DirectoryRecord) SetOwner(v uint16)       { C.Struct(s).Set16(2, v) }
+func (s DirectoryRecord) Group() uint16           { return C.Struct(s).Get16(8) }
+func (s DirectoryRecord) SetGroup(v uint16)       { C.Struct(s).Set16(8, v) }
+func (s DirectoryRecord) Size() uint64            { return C.Struct(s).Get64(16) }
+func (s DirectoryRecord) SetSize(v uint64)        { C.Struct(s).Set64(16, v) }
 func (s DirectoryRecord) ExtendedAttributes() ObjectKey {
 	return ObjectKey(C.Struct(s).GetObject(2).ToStruct())
 }
 func (s DirectoryRecord) SetExtendedAttributes(v ObjectKey) { C.Struct(s).SetObject(2, C.Object(v)) }
-func (s DirectoryRecord) CreationTime() uint64              { return C.Struct(s).Get64(16) }
-func (s DirectoryRecord) SetCreationTime(v uint64)          { C.Struct(s).Set64(16, v) }
-func (s DirectoryRecord) ModificationTime() uint64          { return C.Struct(s).Get64(24) }
-func (s DirectoryRecord) SetModificationTime(v uint64)      { C.Struct(s).Set64(24, v) }
+func (s DirectoryRecord) CreationTime() uint64              { return C.Struct(s).Get64(24) }
+func (s DirectoryRecord) SetCreationTime(v uint64)          { C.Struct(s).Set64(24, v) }
+func (s DirectoryRecord) ModificationTime() uint64          { return C.Struct(s).Get64(32) }
+func (s DirectoryRecord) SetModificationTime(v uint64)      { C.Struct(s).Set64(32, v) }
 func (s DirectoryRecord) WriteJSON(w io.Writer) error {
 	b := bufio.NewWriter(w)
 	var err error
@@ -674,7 +675,7 @@ func (s DirectoryRecord) MarshalCapLit() ([]byte, error) {
 type DirectoryRecord_List C.PointerList
 
 func NewDirectoryRecordList(s *C.Segment, sz int) DirectoryRecord_List {
-	return DirectoryRecord_List(s.NewCompositeList(32, 3, sz))
+	return DirectoryRecord_List(s.NewCompositeList(40, 3, sz))
 }
 func (s DirectoryRecord_List) Len() int { return C.PointerList(s).Len() }
 func (s DirectoryRecord_List) At(i int) DirectoryRecord {
@@ -1497,3 +1498,326 @@ func (s MultiBlockFile_List) ToArray() []MultiBlockFile {
 	return a
 }
 func (s MultiBlockFile_List) Set(i int, item MultiBlockFile) { C.PointerList(s).Set(i, C.Object(item)) }
+
+type ExtendedAttribute C.Struct
+
+func NewExtendedAttribute(s *C.Segment) ExtendedAttribute { return ExtendedAttribute(s.NewStruct(0, 2)) }
+func NewRootExtendedAttribute(s *C.Segment) ExtendedAttribute {
+	return ExtendedAttribute(s.NewRootStruct(0, 2))
+}
+func AutoNewExtendedAttribute(s *C.Segment) ExtendedAttribute {
+	return ExtendedAttribute(s.NewStructAR(0, 2))
+}
+func ReadRootExtendedAttribute(s *C.Segment) ExtendedAttribute {
+	return ExtendedAttribute(s.Root(0).ToStruct())
+}
+func (s ExtendedAttribute) Name() string      { return C.Struct(s).GetObject(0).ToText() }
+func (s ExtendedAttribute) NameBytes() []byte { return C.Struct(s).GetObject(0).ToDataTrimLastByte() }
+func (s ExtendedAttribute) SetName(v string)  { C.Struct(s).SetObject(0, s.Segment.NewText(v)) }
+func (s ExtendedAttribute) Id() ObjectKey     { return ObjectKey(C.Struct(s).GetObject(1).ToStruct()) }
+func (s ExtendedAttribute) SetId(v ObjectKey) { C.Struct(s).SetObject(1, C.Object(v)) }
+func (s ExtendedAttribute) WriteJSON(w io.Writer) error {
+	b := bufio.NewWriter(w)
+	var err error
+	var buf []byte
+	_ = buf
+	err = b.WriteByte('{')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("\"name\":")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Name()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte(',')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("\"id\":")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Id()
+		err = s.WriteJSON(b)
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte('}')
+	if err != nil {
+		return err
+	}
+	err = b.Flush()
+	return err
+}
+func (s ExtendedAttribute) MarshalJSON() ([]byte, error) {
+	b := bytes.Buffer{}
+	err := s.WriteJSON(&b)
+	return b.Bytes(), err
+}
+func (s ExtendedAttribute) WriteCapLit(w io.Writer) error {
+	b := bufio.NewWriter(w)
+	var err error
+	var buf []byte
+	_ = buf
+	err = b.WriteByte('(')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("name = ")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Name()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = b.WriteString(", ")
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("id = ")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Id()
+		err = s.WriteCapLit(b)
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte(')')
+	if err != nil {
+		return err
+	}
+	err = b.Flush()
+	return err
+}
+func (s ExtendedAttribute) MarshalCapLit() ([]byte, error) {
+	b := bytes.Buffer{}
+	err := s.WriteCapLit(&b)
+	return b.Bytes(), err
+}
+
+type ExtendedAttribute_List C.PointerList
+
+func NewExtendedAttributeList(s *C.Segment, sz int) ExtendedAttribute_List {
+	return ExtendedAttribute_List(s.NewCompositeList(0, 2, sz))
+}
+func (s ExtendedAttribute_List) Len() int { return C.PointerList(s).Len() }
+func (s ExtendedAttribute_List) At(i int) ExtendedAttribute {
+	return ExtendedAttribute(C.PointerList(s).At(i).ToStruct())
+}
+func (s ExtendedAttribute_List) ToArray() []ExtendedAttribute {
+	n := s.Len()
+	a := make([]ExtendedAttribute, n)
+	for i := 0; i < n; i++ {
+		a[i] = s.At(i)
+	}
+	return a
+}
+func (s ExtendedAttribute_List) Set(i int, item ExtendedAttribute) {
+	C.PointerList(s).Set(i, C.Object(item))
+}
+
+type ExtendedAttributes C.Struct
+
+func NewExtendedAttributes(s *C.Segment) ExtendedAttributes {
+	return ExtendedAttributes(s.NewStruct(8, 1))
+}
+func NewRootExtendedAttributes(s *C.Segment) ExtendedAttributes {
+	return ExtendedAttributes(s.NewRootStruct(8, 1))
+}
+func AutoNewExtendedAttributes(s *C.Segment) ExtendedAttributes {
+	return ExtendedAttributes(s.NewStructAR(8, 1))
+}
+func ReadRootExtendedAttributes(s *C.Segment) ExtendedAttributes {
+	return ExtendedAttributes(s.Root(0).ToStruct())
+}
+func (s ExtendedAttributes) NumAttributes() uint32     { return C.Struct(s).Get32(0) }
+func (s ExtendedAttributes) SetNumAttributes(v uint32) { C.Struct(s).Set32(0, v) }
+func (s ExtendedAttributes) Attributes() ExtendedAttribute_List {
+	return ExtendedAttribute_List(C.Struct(s).GetObject(0))
+}
+func (s ExtendedAttributes) SetAttributes(v ExtendedAttribute_List) {
+	C.Struct(s).SetObject(0, C.Object(v))
+}
+func (s ExtendedAttributes) WriteJSON(w io.Writer) error {
+	b := bufio.NewWriter(w)
+	var err error
+	var buf []byte
+	_ = buf
+	err = b.WriteByte('{')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("\"numAttributes\":")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.NumAttributes()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte(',')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("\"attributes\":")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Attributes()
+		{
+			err = b.WriteByte('[')
+			if err != nil {
+				return err
+			}
+			for i, s := range s.ToArray() {
+				if i != 0 {
+					_, err = b.WriteString(", ")
+				}
+				if err != nil {
+					return err
+				}
+				err = s.WriteJSON(b)
+				if err != nil {
+					return err
+				}
+			}
+			err = b.WriteByte(']')
+		}
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte('}')
+	if err != nil {
+		return err
+	}
+	err = b.Flush()
+	return err
+}
+func (s ExtendedAttributes) MarshalJSON() ([]byte, error) {
+	b := bytes.Buffer{}
+	err := s.WriteJSON(&b)
+	return b.Bytes(), err
+}
+func (s ExtendedAttributes) WriteCapLit(w io.Writer) error {
+	b := bufio.NewWriter(w)
+	var err error
+	var buf []byte
+	_ = buf
+	err = b.WriteByte('(')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("numAttributes = ")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.NumAttributes()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = b.WriteString(", ")
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("attributes = ")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Attributes()
+		{
+			err = b.WriteByte('[')
+			if err != nil {
+				return err
+			}
+			for i, s := range s.ToArray() {
+				if i != 0 {
+					_, err = b.WriteString(", ")
+				}
+				if err != nil {
+					return err
+				}
+				err = s.WriteCapLit(b)
+				if err != nil {
+					return err
+				}
+			}
+			err = b.WriteByte(']')
+		}
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte(')')
+	if err != nil {
+		return err
+	}
+	err = b.Flush()
+	return err
+}
+func (s ExtendedAttributes) MarshalCapLit() ([]byte, error) {
+	b := bytes.Buffer{}
+	err := s.WriteCapLit(&b)
+	return b.Bytes(), err
+}
+
+type ExtendedAttributes_List C.PointerList
+
+func NewExtendedAttributesList(s *C.Segment, sz int) ExtendedAttributes_List {
+	return ExtendedAttributes_List(s.NewCompositeList(8, 1, sz))
+}
+func (s ExtendedAttributes_List) Len() int { return C.PointerList(s).Len() }
+func (s ExtendedAttributes_List) At(i int) ExtendedAttributes {
+	return ExtendedAttributes(C.PointerList(s).At(i).ToStruct())
+}
+func (s ExtendedAttributes_List) ToArray() []ExtendedAttributes {
+	n := s.Len()
+	a := make([]ExtendedAttributes, n)
+	for i := 0; i < n; i++ {
+		a[i] = s.At(i)
+	}
+	return a
+}
+func (s ExtendedAttributes_List) Set(i int, item ExtendedAttributes) {
+	C.PointerList(s).Set(i, C.Object(item))
+}

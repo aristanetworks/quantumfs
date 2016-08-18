@@ -8,6 +8,7 @@ package daemon
 
 import "encoding/binary"
 import "errors"
+import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -72,7 +73,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := special.parent.getChildRecord(c, special.InodeCommon.id)
+	record, err := special.parent().getChildRecord(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
 		return fuse.EIO
@@ -112,7 +113,8 @@ func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return special.parent.setChildAttr(c, special.InodeCommon.id, nil, attr, out)
+	return special.parent().setChildAttr(c, special.InodeCommon.id,
+		nil, attr, out)
 }
 
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -145,7 +147,7 @@ func (special *Special) Readlink(c *ctx) ([]byte, fuse.Status) {
 
 func (special *Special) Sync(c *ctx) fuse.Status {
 	key := special.sync_DOWN(c)
-	special.parent.syncChild(c, special.InodeCommon.id, key)
+	special.parent().syncChild(c, special.InodeCommon.id, key)
 
 	return fuse.OK
 }
@@ -171,6 +173,42 @@ func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (special *Special) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Special")
+	return 0, fuse.ENODATA
+}
+
+func (special *Special) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Special")
+	return nil, fuse.ENODATA
+}
+
+func (special *Special) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Special")
+	return []byte{}, fuse.OK
+}
+
+func (special *Special) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Special")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Special")
+	return fuse.ENODATA
+}
+
+func (special *Special) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on Special")
+	return fuse.ENOTDIR
+}
+
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
@@ -185,6 +223,41 @@ func (special *Special) setChildAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENOSYS
 }
 
+func (special *Special) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on Special")
+	return 0, fuse.ENODATA
+}
+
+func (special *Special) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on Special")
+	return nil, fuse.ENODATA
+}
+
+func (special *Special) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on Special")
+	return []byte{}, fuse.OK
+}
+
+func (special *Special) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on Special")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (special *Special) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on Special")
+	return fuse.ENODATA
+}
+
 func (special *Special) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
@@ -194,7 +267,7 @@ func (special *Special) getChildRecord(c *ctx,
 
 func (special *Special) dirty(c *ctx) {
 	special.setDirty(true)
-	special.parent.dirtyChild(c, special)
+	special.parent().dirtyChild(c, special)
 }
 
 func specialOverrideAttr(entry *quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {

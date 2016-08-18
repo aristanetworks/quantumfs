@@ -31,8 +31,8 @@ func TestDirectoryCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFDIR
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"Directory permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -57,8 +57,8 @@ func TestRecursiveDirectoryCreation_test(t *testing.T) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFDIR
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"Directory permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -86,12 +86,12 @@ func TestRecursiveDirectoryFileCreation_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
-		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
+		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -196,6 +196,12 @@ func TestDirectoryFileDeletion_test(t *testing.T) {
 		test.assert(err == nil, "Error unlinking file: %v", err)
 
 		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err != nil, "Error test file not deleted: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename = workspace + "/" + "test"
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err != nil, "Error test file not deleted: %v", err)
 	})
@@ -463,5 +469,100 @@ func TestInterDirectoryRename(t *testing.T) {
 		testFilename2 = workspace + "/dir2/test2"
 		err = syscall.Stat(testFilename2, &stat)
 		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
+func TestRenameIntoParent(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		parent := workspace + "/parent"
+		child := workspace + "/parent/child"
+		childFile := child + "/test"
+		parentFile := parent + "/test2"
+
+		err := os.Mkdir(parent, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.Mkdir(child, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(childFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(childFile, parentFile)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(parentFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		parentFile = workspace + "/parent/test2"
+		err = syscall.Stat(parentFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
+func TestRenameIntoChild(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		parent := workspace + "/parent"
+		child := workspace + "/parent/child"
+		parentFile := parent + "/test"
+		childFile := child + "/test2"
+
+		err := os.Mkdir(parent, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.Mkdir(child, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(parentFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(parentFile, childFile)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(childFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		childFile = workspace + "/parent/child/test2"
+		err = syscall.Stat(childFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
+func TestSUIDPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		fd, err := os.Create(testFilename)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		mode := 0777 | os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+		err = os.Chmod(testFilename, mode)
+		test.assert(err == nil, "Error setting permissions: %v", err)
+
+		info, err := os.Stat(testFilename)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode() == mode,
+			"Changed permissions incorrect %d", info.Mode())
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		testFilename = workspace + "/test"
+		info, err = os.Stat(testFilename)
+		test.assert(err == nil, "Failed getting dir info: %v", err)
+		test.assert(info.Mode() == mode,
+			"Changed permissions incorrect %d", info.Mode())
 	})
 }

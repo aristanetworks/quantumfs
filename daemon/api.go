@@ -10,6 +10,7 @@ import "errors"
 import "fmt"
 import "strings"
 import "sync"
+import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -172,17 +173,89 @@ func (api *ApiInode) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on ApiInode")
+	return 0, fuse.ENODATA
+}
+
+func (api *ApiInode) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on ApiInode")
+	return nil, fuse.ENODATA
+}
+
+func (api *ApiInode) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on ApiInode")
+	return []byte{}, fuse.OK
+}
+
+func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on ApiInode")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on ApiInode")
+	return fuse.ENODATA
+}
+
+func (api *ApiInode) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on ApiInode")
+	return fuse.ENOTDIR
+}
+
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
 	c.elog("Invalid syncChild on ApiInode")
 }
+
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	c.elog("Invalid setChildAttr on ApiInode")
 	return fuse.ENOSYS
+}
+
+func (api *ApiInode) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on ApiInode")
+	return 0, fuse.ENODATA
+}
+
+func (api *ApiInode) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on ApiInode")
+	return nil, fuse.ENODATA
+}
+
+func (api *ApiInode) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on ApiInode")
+	return []byte{}, fuse.OK
+}
+
+func (api *ApiInode) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on ApiInode")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on ApiInode")
+	return fuse.ENODATA
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {

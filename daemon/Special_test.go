@@ -22,8 +22,14 @@ func specialCreate(test *testHelper, filetype uint32) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
-		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
-			stat.Nlink)
+
+		if filetype == syscall.S_IFREG {
+			test.assert(stat.Nlink == 2, "Incorrect Nlink: %d",
+				stat.Nlink)
+		} else {
+			test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
+				stat.Nlink)
+		}
 
 		if filetype == syscall.S_IFBLK || filetype == syscall.S_IFCHR {
 			test.assert(stat.Rdev == 0x12345678,
@@ -35,8 +41,7 @@ func specialCreate(test *testHelper, filetype uint32) {
 
 		var expectedPermissions uint32
 		expectedPermissions |= filetype
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IRWXU
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)

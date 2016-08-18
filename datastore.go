@@ -10,7 +10,6 @@ import "fmt"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
-import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
 
 // Maximum size of a block which can be stored in a datastore
@@ -21,6 +20,7 @@ const MaxBlocksMediumFile = int(encoding.MaxBlocksMediumFile)
 const MaxBlocksLargeFile = int(encoding.MaxBlocksLargeFile)
 const MaxPartsVeryLargeFile = int(encoding.MaxPartsVeryLargeFile)
 const MaxDirectoryRecords = int(encoding.MaxDirectoryRecords)
+const MaxNumExtendedAttributes = int(encoding.MaxNumExtendedAttributes)
 
 // Maximum length of a filename
 const MaxFilenameLength = int(encoding.MaxFilenameLength)
@@ -142,6 +142,17 @@ func (key ObjectKey) Hash() [ObjectKeyLength - 1]byte {
 	return hash
 }
 
+func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
+	if key.key.KeyType() == other.key.KeyType() &&
+		key.key.Part2() == other.key.Part2() &&
+		key.key.Part3() == other.key.Part3() &&
+		key.key.Part4() == other.key.Part4() {
+
+		return true
+	}
+	return false
+}
+
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
@@ -221,22 +232,18 @@ func (v ObjectType) Primitive() interface{} {
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
 // be owned by some special system accounts or the current user. The translation to
 // UID is done at access time.
-const (
-	UIDRoot = iota
-	UIDUser = iota // The currently accessing user
-)
+const UIDUser = 1001 // The currently accessing user
 
 // Convert object UID to system UID.
 //
 // userId is the UID of the current user
 func SystemUid(uid UID, userId uint32) uint32 {
-	switch uid {
-	case UIDRoot:
-		return 0
-	case UIDUser:
+	if uid < UIDUser {
+		return uint32(uid)
+	} else if uid == UIDUser {
 		return userId
-	default:
-		return 0
+	} else {
+		panic(fmt.Sprintf("Unknown Owner %d", uid))
 	}
 }
 
@@ -244,43 +251,33 @@ func SystemUid(uid UID, userId uint32) uint32 {
 //
 // userId is the UID of the current user
 func ObjectUid(c Ctx, uid uint32, userId uint32) UID {
-	if uid == userId && uid > 1000 {
-		return UIDUser
-	}
-
-	switch uid {
-	case 0:
-		return UIDRoot
-	default:
-		c.Elog(qlog.LogDatastore, "Unknown UID %d", uid)
+	if uid < UIDUser {
+		return UID(uid)
+	} else {
 		return UIDUser
 	}
 }
 
 // One of the UID* values
-type UID uint8
+type UID uint16
 
 func (v UID) Primitive() interface{} {
 	return uint8(v)
 }
 
 // Similar to the UIDs above, group ownership is divided into special classes.
-const (
-	GIDRoot = iota
-	GIDUser = iota // The currently accessing user
-)
+const GIDUser = 1001 // The currently accessing user
 
 // Convert object GID to system GID.
 //
 // userId is the GID of the current user
 func SystemGid(gid GID, userId uint32) uint32 {
-	switch gid {
-	case GIDRoot:
-		return 0
-	case GIDUser:
+	if gid < GIDUser {
+		return uint32(gid)
+	} else if gid == GIDUser {
 		return userId
-	default:
-		return 0
+	} else {
+		panic(fmt.Sprintf("Unknown Group %d", gid))
 	}
 }
 
@@ -288,21 +285,15 @@ func SystemGid(gid GID, userId uint32) uint32 {
 //
 // userId is the GID of the current user
 func ObjectGid(c Ctx, gid uint32, groupId uint32) GID {
-	if gid == groupId && gid > 1000 {
-		return GIDUser
-	}
-
-	switch gid {
-	case 0:
-		return GIDRoot
-	default:
-		c.Elog(qlog.LogDatastore, "Unknown GID %d", gid)
+	if gid < GIDUser {
+		return GID(gid)
+	} else {
 		return GIDUser
 	}
 }
 
 // One of the GID* values
-type GID uint8
+type GID uint16
 
 func (v GID) Primitive() interface{} {
 	return uint8(v)
@@ -434,6 +425,22 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 	return emptyWorkspaceKey
 }
 
+// Permission bit names
+const (
+	PermExecOther  = 1 << iota
+	PermWriteOther = 1 << iota
+	PermReadOther  = 1 << iota
+	PermExecGroup  = 1 << iota
+	PermWriteGroup = 1 << iota
+	PermReadGroup  = 1 << iota
+	PermExecOwner  = 1 << iota
+	PermWriteOwner = 1 << iota
+	PermReadOwner  = 1 << iota
+	PermSticky     = 1 << iota
+	PermSGID       = 1 << iota
+	PermSUID       = 1 << iota
+)
+
 func NewDirectoryRecord() *DirectoryRecord {
 	segment := capn.NewBuffer(nil)
 	record := DirectoryRecord{
@@ -502,11 +509,11 @@ func (record *DirectoryRecord) SetCreationTime(t Time) {
 	record.record.SetCreationTime(uint64(t))
 }
 
-func (record *DirectoryRecord) Permissions() uint8 {
+func (record *DirectoryRecord) Permissions() uint32 {
 	return record.record.Permissions()
 }
 
-func (record *DirectoryRecord) SetPermissions(p uint8) {
+func (record *DirectoryRecord) SetPermissions(p uint32) {
 	record.record.SetPermissions(p)
 }
 
@@ -515,7 +522,7 @@ func (record *DirectoryRecord) Owner() UID {
 }
 
 func (record *DirectoryRecord) SetOwner(u UID) {
-	record.record.SetOwner(uint8(u))
+	record.record.SetOwner(uint16(u))
 }
 
 func (record *DirectoryRecord) Group() GID {
@@ -523,7 +530,7 @@ func (record *DirectoryRecord) Group() GID {
 }
 
 func (record *DirectoryRecord) SetGroup(g GID) {
-	record.record.SetGroup(uint8(g))
+	record.record.SetGroup(uint16(g))
 }
 
 func (record *DirectoryRecord) ExtendedAttributes() ObjectKey {
@@ -640,6 +647,54 @@ func (vlf *VeryLargeFile) Bytes() []byte {
 	return vlf.vlf.Segment.Data
 }
 
+func NewExtendedAttributes() *ExtendedAttributes {
+	segment := capn.NewBuffer(nil)
+	ea := ExtendedAttributes{
+		ea: encoding.NewRootExtendedAttributes(segment),
+	}
+
+	attributes := encoding.NewExtendedAttributeList(segment,
+		MaxNumExtendedAttributes)
+	ea.ea.SetAttributes(attributes)
+	return &ea
+}
+
+func OverlayExtendedAttributes(eea encoding.ExtendedAttributes) ExtendedAttributes {
+	ea := ExtendedAttributes{
+		ea: eea,
+	}
+	return ea
+}
+
+type ExtendedAttributes struct {
+	ea encoding.ExtendedAttributes
+}
+
+func (ea *ExtendedAttributes) NumAttributes() int {
+	return int(ea.ea.NumAttributes())
+}
+
+func (ea *ExtendedAttributes) SetNumAttributes(num int) {
+	ea.ea.SetNumAttributes(uint32(num))
+}
+
+func (ea *ExtendedAttributes) Attribute(i int) (name string, id ObjectKey) {
+	attribute := ea.ea.Attributes().At(i)
+	return attribute.Name(), overlayObjectKey(attribute.Id())
+}
+
+func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {
+	segment := capn.NewBuffer(nil)
+	attribute := encoding.NewRootExtendedAttribute(segment)
+	attribute.SetName(name)
+	attribute.SetId(id.key)
+	ea.ea.Attributes().Set(i, attribute)
+}
+
+func (ea *ExtendedAttributes) Bytes() []byte {
+	return ea.ea.Segment.Data
+}
+
 type Buffer interface {
 	Write(c *Ctx, in []byte, offset uint32) uint32
 	Read(out []byte, offset uint32) int
@@ -655,6 +710,7 @@ type Buffer interface {
 	AsDirectoryEntry() DirectoryEntry
 	AsMultiBlockFile() MultiBlockFile
 	AsVeryLargeFile() VeryLargeFile
+	AsExtendedAttributes() ExtendedAttributes
 }
 
 type DataStore interface {

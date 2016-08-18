@@ -5,6 +5,8 @@ package daemon
 
 // Test operations on hardlinks and symlinks
 
+import "bytes"
+import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
@@ -13,16 +15,28 @@ func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
+		testData := []byte("arstarst")
+
 		workspace := test.newWorkspace()
 		file1 := workspace + "/orig_file"
-		fd, err := os.Create(file1)
+		err := ioutil.WriteFile(file1, testData, 0777)
 		test.assert(err == nil, "Error creating file: %v", err)
-		fd.Close()
 
 		file2 := workspace + "/hardlink"
 		err = syscall.Link(file1, file2)
-		test.assert(err != nil, "Expected hardlink to fail")
-		test.assert(err == syscall.EPERM, "Expected EPERM error: %v", err)
+		test.assert(err == nil, "Creating hardlink failed: %v", err)
+
+		// Open the file to ensure we linked successfully
+		data, err := ioutil.ReadFile(file2)
+		test.assert(err == nil, "Error reading linked file: %v", err)
+		test.assert(bytes.Equal(data, testData), "Data corrupt!")
+
+		// Branch and confirm the hardlink is still there
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		file2 = workspace + "/hardlink"
+		data, err = ioutil.ReadFile(file2)
+		test.assert(err == nil, "Error reading linked file: %v", err)
+		test.assert(bytes.Equal(data, testData), "Data corrupt!")
 	})
 }
 

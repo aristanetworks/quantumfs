@@ -31,12 +31,12 @@ func TestFileCreation_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
-		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
+		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
-		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
-			syscall.S_IRWXO
+		expectedPermissions |= syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH
 		test.assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
@@ -199,7 +199,7 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x2,
+		test.assert(permissions == 0222,
 			"Chmodding not working, %d vs 0222", permissions)
 
 		var file *os.File
@@ -222,7 +222,7 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x4,
+		test.assert(permissions == 0444,
 			"Chmodding not working, %d vs 0444", permissions)
 
 		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
@@ -263,7 +263,7 @@ func TestRootFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x2,
+		test.assert(permissions == 0222,
 			"Chmodding not working, %d vs 0222", permissions)
 
 		var file *os.File
@@ -284,7 +284,7 @@ func TestRootFileDescriptorPermissions_test(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		permissions = modeToPermissions(stat.Mode, 0)
-		test.assert(permissions == 0x4,
+		test.assert(permissions == 0444,
 			"Chmodding not working, %d vs 0444", permissions)
 
 		file, err = os.OpenFile(testFilename, os.O_WRONLY, 0x2)
@@ -510,5 +510,79 @@ func TestSmallFileZero_test(t *testing.T) {
 		output, err := ioutil.ReadFile(testFilename)
 		test.assert(len(output) == 0, "Empty file not really empty")
 		test.assert(err == nil, "Unable to read from empty file")
+	})
+}
+
+func TestFileAccessAfterUnlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genFibonacci(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		// Then confirm we can read back from it fine while it is still
+		// linked
+		input := make([]byte, 100*1024)
+		_, err = file.Seek(0, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Read(input)
+		test.assert(err == nil, "Error reading from file: %v", err)
+		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		// Then Unlink the file and confirm we can still read and write to it
+		err = os.Remove(testFilename)
+		test.assert(err == nil, "Error unlinking test file: %v", err)
+
+		_, err = file.Seek(0, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Read(input)
+		test.assert(err == nil, "Error reading from file: %v", err)
+		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		// Extend the file and read again
+		data = genFibonacci(100 * 1024)
+		_, err = file.Seek(100*1024*1024, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		_, err = file.Seek(100*1024*1024, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Read(input)
+		test.assert(err == nil, "Error reading from file: %v", err)
+		test.assert(bytes.Equal(data, input), "Didn't read same bytes back!")
+
+		file.Close()
+	})
+}
+
+func TestSmallFileReadPastEnd(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genFibonacci(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		// Then confirm we can read back past the data and get the correct
+		// EOF return value.
+		input := make([]byte, 100*1024)
+		_, err = file.ReadAt(input, 100*1024)
+		test.assert(err == io.EOF, "Expected EOF got: %v", err)
+
+		file.Close()
 	})
 }

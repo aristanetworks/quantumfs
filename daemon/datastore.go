@@ -57,9 +57,22 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 }
 
 // buffer is the central data-handling type of quantumfsd
+// newBuffer takes ownership of the []byte passed in
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	return &buffer{
 		data:      in,
+		dirty:     true,
+		keyType:   keyType,
+		dataStore: c.dataStore,
+	}
+}
+
+// Like newBuffer(), but 'in' is copied and ownership is not assumed
+func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
+	data := make([]byte, len(in))
+	copy(data, in)
+	return &buffer{
+		data:      data,
 		dirty:     true,
 		keyType:   keyType,
 		dataStore: c.dataStore,
@@ -198,5 +211,12 @@ func (buf *buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayVeryLargeFile(
 		encoding.ReadRootVeryLargeFile(segment))
+
+}
+
+func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayExtendedAttributes(
+		encoding.ReadRootExtendedAttributes(segment))
 
 }
