@@ -6,6 +6,7 @@ package daemon
 // This file holds the Symlink type, which represents symlinks
 
 import "errors"
+import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -40,7 +41,7 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := link.parent.getChildRecord(c, link.InodeCommon.id)
+	record, err := link.parent().getChildRecord(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
 		return fuse.EIO
@@ -80,7 +81,7 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return link.parent.setChildAttr(c, link.InodeCommon.id, nil, attr, out)
+	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out)
 }
 
 func (link *Symlink) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -117,7 +118,7 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 
 func (link *Symlink) Sync(c *ctx) fuse.Status {
 	key := link.sync_DOWN(c)
-	link.parent.syncChild(c, link.InodeCommon.id, key)
+	link.parent().syncChild(c, link.InodeCommon.id, key)
 
 	return fuse.OK
 }
@@ -143,6 +144,42 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Symlink")
+	return 0, fuse.ENODATA
+}
+
+func (link *Symlink) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Symlink")
+	return nil, fuse.ENODATA
+}
+
+func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Symlink")
+	return []byte{}, fuse.OK
+}
+
+func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Symlink")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Symlink")
+	return fuse.ENODATA
+}
+
+func (link *Symlink) Link(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on Symlink")
+	return fuse.ENOTDIR
+}
+
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
@@ -157,6 +194,41 @@ func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on Symlink")
+	return 0, fuse.ENODATA
+}
+
+func (link *Symlink) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on Symlink")
+	return nil, fuse.ENODATA
+}
+
+func (link *Symlink) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on Symlink")
+	return []byte{}, fuse.OK
+}
+
+func (link *Symlink) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on Symlink")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (link *Symlink) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on Symlink")
+	return fuse.ENODATA
+}
+
 func (link *Symlink) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
@@ -166,5 +238,5 @@ func (link *Symlink) getChildRecord(c *ctx,
 
 func (link *Symlink) dirty(c *ctx) {
 	link.setDirty(true)
-	link.parent.dirtyChild(c, link)
+	link.parent().dirtyChild(c, link)
 }

@@ -24,6 +24,8 @@ const maxDirectoryRecords :UInt32 = 1200;
 # Maximum length of a filename
 const maxFilenameLength :UInt32 = 256;
 
+const maxNumExtendedAttributes :UInt32 = 3700;
+
 struct ObjectKey {
         keyType @0 :UInt8; # 1
         part2   @1 :UInt64; # 9
@@ -35,9 +37,9 @@ struct DirectoryRecord {
         filename           @0 :Text;
         id                 @1 :ObjectKey;
         type               @2 :UInt8;
-        permissions        @3 :UInt8;
-        owner              @4 :UInt8;
-        group              @5 :UInt8;
+        permissions        @3 :UInt32;
+        owner              @4 :UInt16;
+        group              @5 :UInt16;
         size               @6 :UInt64;
         extendedAttributes @7 :ObjectKey;
         creationTime       @8 :UInt64;
@@ -67,4 +69,14 @@ struct MultiBlockFile {
         numberOfBlocks  @1 :UInt32;
         sizeOfLastBlock @2 :UInt32;
         listOfBlocks    @3 :List(ObjectKey);
+}
+
+struct ExtendedAttribute {
+        name @0 :Text;
+        id   @1 :ObjectKey;
+}
+
+struct ExtendedAttributes {
+        numAttributes    @0 :UInt32;
+        attributes @1 :List(ExtendedAttribute);
 }

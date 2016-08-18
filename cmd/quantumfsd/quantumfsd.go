@@ -96,7 +96,10 @@ func main() {
 		MaxWrite:      quantumfs.MaxBlockSize,
 		FsName:        "cluster",
 		Name:          "quantumfs",
+		Options:       make([]string, 0),
 	}
+	mountOptions.Options = append(mountOptions.Options, "suid")
+	mountOptions.Options = append(mountOptions.Options, "dev")
 
 	quantumfs := daemon.NewQuantumFs(config)
 	err := quantumfs.Serve(mountOptions)

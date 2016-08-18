@@ -4,6 +4,10 @@
 package daemon
 
 import "bytes"
+import "time"
+
+import "github.com/aristanetworks/quantumfs"
+import "github.com/hanwen/go-fuse/fuse"
 
 // A number of utility functions. It'd be nice to create packages for these
 // elsewhere. Maybe a 'bit' package.
@@ -12,6 +16,15 @@ import "bytes"
 // not as a boolean.
 func BitFlagsSet(field uint, flags uint) bool {
 	if field&flags == flags {
+		return true
+	}
+	return false
+}
+
+// Given a bitflag field and an integer of flags, return whether any flag is set or
+// not as a boolean.
+func BitAnyFlagSet(field uint, flags uint) bool {
+	if field&flags != 0 {
 		return true
 	}
 	return false
@@ -55,16 +68,79 @@ func assert(condition bool, msg string) {
 	}
 }
 
-type SortByTime []string
+func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	entry *quantumfs.DirectoryRecord) {
 
-func (s SortByTime) Len() int {
-	return len(s)
+	// Update the type if needed
+	if newType != nil {
+		entry.SetType(*newType)
+		c.vlog("Type now %d", *newType)
+	}
+
+	valid := uint(attr.SetAttrInCommon.Valid)
+	// We don't support file locks yet, but when we do we need
+	// FATTR_LOCKOWNER
+
+	if BitFlagsSet(valid, fuse.FATTR_MODE) {
+		entry.SetPermissions(modeToPermissions(attr.Mode, 0))
+		c.vlog("Permissions now %d Mode %d", entry.Permissions(), attr.Mode)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_UID) {
+		entry.SetOwner(quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
+			c.fuseCtx.Owner.Uid))
+		c.vlog("Owner now %d UID %d context %d", entry.Owner(),
+			attr.Owner.Uid, c.fuseCtx.Owner.Uid)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_GID) {
+		entry.SetGroup(quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
+			c.fuseCtx.Owner.Gid))
+		c.vlog("Group now %d GID %d context %d", entry.Group(),
+			attr.Owner.Gid, c.fuseCtx.Owner.Gid)
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_SIZE) {
+		entry.SetSize(attr.Size)
+		c.vlog("Size now %d", entry.Size())
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_ATIME|fuse.FATTR_ATIME_NOW) {
+		// atime is ignored and not stored
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
+		entry.SetModificationTime(quantumfs.NewTime(time.Now()))
+		c.vlog("ModificationTime now %d", entry.ModificationTime())
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_MTIME) {
+		entry.SetModificationTime(
+			quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
+		c.vlog("ModificationTime now %d", entry.ModificationTime())
+	}
+
+	if BitFlagsSet(valid, fuse.FATTR_CTIME) {
+		entry.SetCreationTime(quantumfs.NewTimeSeconds(attr.Ctime,
+			attr.Ctimensec))
+		c.vlog("CreationTime now %d", entry.CreationTime())
+	}
 }
 
-func (s SortByTime) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
+func cloneDirectoryRecord(
+	orig *quantumfs.DirectoryRecord) *quantumfs.DirectoryRecord {
 
-func (s SortByTime) Less(i, j int) bool {
-	return s[i] < s[j]
+	newEntry := quantumfs.NewDirectoryRecord()
+	newEntry.SetFilename(orig.Filename())
+	newEntry.SetID(orig.ID())
+	newEntry.SetType(orig.Type())
+	newEntry.SetPermissions(orig.Permissions())
+	newEntry.SetOwner(orig.Owner())
+	newEntry.SetGroup(orig.Group())
+	newEntry.SetSize(orig.Size())
+	newEntry.SetExtendedAttributes(orig.ExtendedAttributes())
+	newEntry.SetCreationTime(orig.CreationTime())
+	newEntry.SetModificationTime(orig.ModificationTime())
+
+	return newEntry
 }
