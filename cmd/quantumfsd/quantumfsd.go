@@ -100,7 +100,6 @@ func processArgs() {
 	config.WorkspaceDB = processlocal.NewWorkspaceDB()
 
 	for _, datastore := range datastores {
-		fmt.Printf("Checking against datastore '%s'\n", datastore.name)
 		if datastore.name != config.DataStoreName {
 			continue
 		}
