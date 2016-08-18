@@ -8,6 +8,7 @@ package daemon
 
 import "encoding/binary"
 import "errors"
+import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -172,6 +173,35 @@ func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (special *Special) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Special")
+	return 0, fuse.ENODATA
+}
+
+func (special *Special) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Special")
+	return nil, fuse.ENODATA
+}
+
+func (special *Special) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Special")
+	return []byte{}, fuse.OK
+}
+
+func (special *Special) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Special")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Special")
+	return fuse.ENODATA
+}
+
 func (special *Special) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -191,6 +221,41 @@ func (special *Special) setChildAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid setChildAttr on Special")
 	return fuse.ENOSYS
+}
+
+func (special *Special) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on Special")
+	return 0, fuse.ENODATA
+}
+
+func (special *Special) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on Special")
+	return nil, fuse.ENODATA
+}
+
+func (special *Special) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on Special")
+	return []byte{}, fuse.OK
+}
+
+func (special *Special) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on Special")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (special *Special) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on Special")
+	return fuse.ENODATA
 }
 
 func (special *Special) getChildRecord(c *ctx,

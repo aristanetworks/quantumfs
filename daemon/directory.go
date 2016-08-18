@@ -3,6 +3,7 @@
 
 package daemon
 
+import "bytes"
 import "errors"
 import "syscall"
 import "sync"
@@ -830,6 +831,30 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	return result
 }
 
+func (dir *Directory) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	return dir.parent().getChildXAttrSize(c, dir.inodeNum(), attr)
+}
+
+func (dir *Directory) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	return dir.parent().getChildXAttrData(c, dir.inodeNum(), attr)
+}
+
+func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	return dir.parent().listChildXAttr(c, dir.inodeNum())
+}
+
+func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	return dir.parent().setChildXAttr(c, dir.inodeNum(), attr, data)
+}
+
+func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
+}
+
 func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -887,6 +912,247 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	if ok && dir.parent() != nil {
 		dir.parent().syncChild(c, dir.InodeCommon.id, key)
 	}
+}
+
+// Get the extended attributes object. The status is EIO on error or ENOENT if there
+// are no extended attributes for that child.
+func (dir *Directory) getExtendedAttributes_(c *ctx,
+	inodeNum InodeId) (*quantumfs.ExtendedAttributes, fuse.Status) {
+
+	c.vlog("Directory::getExtendedAttributes_ Enter")
+
+	record, ok := dir.childrenRecords[inodeNum]
+	if !ok {
+		c.vlog("Child not found")
+		return nil, fuse.EIO
+	}
+
+	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
+		c.vlog("Directory::getExtendedAttributes_ returning new object")
+		return quantumfs.NewExtendedAttributes(), fuse.ENOENT
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
+	if buffer == nil {
+		c.dlog("Failed to retrieve attribute list")
+		return nil, fuse.EIO
+	}
+
+	attributeList := buffer.AsExtendedAttributes()
+	return &attributeList, fuse.OK
+}
+
+func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
+	attr string) (quantumfs.Buffer, fuse.Status) {
+
+	c.vlog("Directory::getChildXAttrBuffer Enter %d %s", inodeNum, attr)
+	defer c.vlog("Directory::getChildXAttrBuffer Exit")
+
+	defer dir.RLock().RUnlock()
+
+	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
+	if ok == fuse.ENOENT {
+		return nil, fuse.ENODATA
+	}
+
+	if ok == fuse.EIO {
+		return nil, fuse.EIO
+	}
+
+	for i := 0; i < attributeList.NumAttributes(); i++ {
+		name, key := attributeList.Attribute(i)
+		if name != attr {
+			continue
+		}
+
+		c.vlog("Found attribute key: %v", key)
+		buffer := c.dataStore.Get(&c.Ctx, key)
+		if buffer == nil {
+			c.elog("Failed to retrieve attribute datablock")
+			return nil, fuse.EIO
+		}
+
+		return buffer, fuse.OK
+	}
+
+	c.vlog("XAttr name not found")
+	return nil, fuse.ENODATA
+}
+
+func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
+	if status != fuse.OK {
+		return 0, status
+	}
+
+	return buffer.Size(), fuse.OK
+}
+
+func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
+	if status != fuse.OK {
+		return []byte{}, status
+	}
+
+	return buffer.Get(), fuse.OK
+}
+
+func (dir *Directory) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.vlog("Directory::listChildXAttr Enter %d", inodeNum)
+	defer c.vlog("Directory::listChildXAttr Exit")
+
+	defer dir.RLock().RUnlock()
+
+	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
+	if ok == fuse.ENOENT {
+		return []byte{}, fuse.OK
+	}
+
+	if ok == fuse.EIO {
+		return nil, fuse.EIO
+	}
+
+	var nameBuffer bytes.Buffer
+	for i := 0; i < attributeList.NumAttributes(); i++ {
+		name, _ := attributeList.Attribute(i)
+		c.vlog("Appending %s", name)
+		nameBuffer.WriteString(name)
+		nameBuffer.WriteByte(0)
+	}
+
+	c.vlog("Returning %d bytes", nameBuffer.Len())
+
+	return nameBuffer.Bytes(), fuse.OK
+}
+
+func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.vlog("Directory::setChildXAttr Enter %d, %s", inodeNum, attr)
+	defer c.vlog("Directory::setChildXAttr Exit")
+
+	defer dir.Lock().Unlock()
+
+	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
+	if ok == fuse.EIO {
+		return fuse.EIO
+	}
+
+	var dataKey quantumfs.ObjectKey
+	if len(data) == 0 {
+		dataKey = quantumfs.EmptyBlockKey
+	} else {
+		var err error
+		dataBuf := newBufferCopy(c, data, quantumfs.KeyTypeData)
+		dataKey, err = dataBuf.Key(&c.Ctx)
+		if err != nil {
+			c.elog("Error uploading XAttr data: %v", err)
+			return fuse.EIO
+		}
+	}
+
+	set := false
+	for i := 0; i < attributeList.NumAttributes(); i++ {
+		name, _ := attributeList.Attribute(i)
+		if name == attr {
+			c.vlog("Overwriting existing attribute %d", i)
+			attributeList.SetAttribute(i, name, dataKey)
+			set = true
+			break
+		}
+	}
+
+	// Append attribute
+	if !set {
+		if attributeList.NumAttributes() >
+			quantumfs.MaxNumExtendedAttributes {
+
+			c.vlog("XAttr list full %d", attributeList.NumAttributes())
+			return fuse.Status(syscall.ENOSPC)
+		}
+
+		c.vlog("Appending new attribute %v", attributeList)
+		attributeList.SetAttribute(attributeList.NumAttributes(), attr,
+			dataKey)
+		attributeList.SetNumAttributes(attributeList.NumAttributes() + 1)
+	}
+
+	buffer := newBuffer(c, attributeList.Bytes(), quantumfs.KeyTypeMetadata)
+	key, err := buffer.Key(&c.Ctx)
+	if err != nil {
+		c.elog("Error computing extended attribute key: %v", err)
+		return fuse.EIO
+	}
+
+	dir.childrenRecords[inodeNum].SetExtendedAttributes(key)
+	dir.self.dirty(c)
+
+	return fuse.OK
+}
+
+func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.vlog("Directory::removeChildXAttr Enter %d, %s", inodeNum, attr)
+	defer c.vlog("Directory::removeChildXAttr Exit")
+
+	defer dir.Lock().Unlock()
+
+	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
+	if ok == fuse.EIO {
+		return fuse.EIO
+	}
+
+	if ok == fuse.ENOENT {
+		return fuse.ENODATA
+	}
+
+	var i int
+	for i = 0; i < attributeList.NumAttributes(); i++ {
+		name, _ := attributeList.Attribute(i)
+		if name == attr {
+			c.vlog("Found attribute %d", i)
+			break
+		}
+	}
+
+	if i == attributeList.NumAttributes() {
+		// We didn't find the attribute
+		return fuse.ENODATA
+	}
+
+	var key quantumfs.ObjectKey
+	if attributeList.NumAttributes() != 1 {
+		// Move the last attribute over the one to be removed
+		lastIndex := attributeList.NumAttributes() - 1
+		lastName, lastId := attributeList.Attribute(lastIndex)
+		attributeList.SetAttribute(i, lastName, lastId)
+		attributeList.SetNumAttributes(lastIndex)
+
+		buffer := newBuffer(c, attributeList.Bytes(),
+			quantumfs.KeyTypeMetadata)
+		var err error
+		key, err = buffer.Key(&c.Ctx)
+		if err != nil {
+			c.elog("Error computing extended attribute key: %v", err)
+			return fuse.EIO
+		}
+	} else {
+		// We are deleting the only extended attribute. Change the
+		// DirectoryRecord key only
+		key = quantumfs.EmptyBlockKey
+	}
+
+	dir.childrenRecords[inodeNum].SetExtendedAttributes(key)
+	dir.self.dirty(c)
+
+	return fuse.OK
 }
 
 type directoryContents struct {

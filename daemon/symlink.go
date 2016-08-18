@@ -6,6 +6,7 @@ package daemon
 // This file holds the Symlink type, which represents symlinks
 
 import "errors"
+import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -143,6 +144,35 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 	return fuse.ENOSYS
 }
 
+func (link *Symlink) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrSize on Symlink")
+	return 0, fuse.ENODATA
+}
+
+func (link *Symlink) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid GetXAttrData on Symlink")
+	return nil, fuse.ENODATA
+}
+
+func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on Symlink")
+	return []byte{}, fuse.OK
+}
+
+func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on Symlink")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on Symlink")
+	return fuse.ENODATA
+}
+
 func (link *Symlink) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -162,6 +192,41 @@ func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid setChildAttr on Symlink")
 	return fuse.ENOSYS
+}
+
+func (link *Symlink) getChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrSize on Symlink")
+	return 0, fuse.ENODATA
+}
+
+func (link *Symlink) getChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.elog("Invalid getChildXAttrData on Symlink")
+	return nil, fuse.ENODATA
+}
+
+func (link *Symlink) listChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	c.elog("Invalid listChildXAttr on Symlink")
+	return []byte{}, fuse.OK
+}
+
+func (link *Symlink) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	c.elog("Invalid setChildXAttr on Symlink")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (link *Symlink) removeChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	c.elog("Invalid removeChildXAttr on Symlink")
+	return fuse.ENODATA
 }
 
 func (link *Symlink) getChildRecord(c *ctx,
