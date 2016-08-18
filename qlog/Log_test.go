@@ -10,7 +10,7 @@ import "strings"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestLogSet_test(t *testing.T) {
-	qlog := NewQlog("")
+	qlog := NewQlogTiny()
 	// let's redirect the log writer in qfs
 	var logs string
 	qlog.SetWriter(testutils.IoPipe(&logs))
@@ -53,25 +53,25 @@ func TestLogSet_test(t *testing.T) {
 }
 
 func TestLoadLevels_test(t *testing.T) {
-	qlog := NewQlog("")
+	qlog := NewQlogTiny()
 
 	qlog.SetLogLevels("Daemon/*")
-	if qlog.logLevels != 0x111F {
-		t.Fatalf("Wildcard log levels incorrectly set: %x != %x", 0x111f,
-			qlog.logLevels)
+	if qlog.LogLevels != 0x1111F {
+		t.Fatalf("Wildcard log levels incorrectly set: %x != %x", 0x1111f,
+			qlog.LogLevels)
 	}
 
 	// test out of order, combo setting, and general bitmask
 	qlog.SetLogLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
-	if qlog.logLevels != 0x1FA3 {
+	if qlog.LogLevels != 0x11FA3 {
 		t.Fatalf("Out of order, combo setting, or general bitmask broken %x",
-			qlog.logLevels)
+			qlog.LogLevels)
 	}
 
 	// test misspelling ignores misspelt entry. Ensure case insensitivity
 	qlog.SetLogLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
-	if qlog.logLevels != 0x1F11 {
+	if qlog.LogLevels != 0x11F11 {
 		t.Fatalf("Case insensitivity broken / mis-spelling not ignored %x",
-			qlog.logLevels)
+			qlog.LogLevels)
 	}
 }

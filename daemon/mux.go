@@ -16,7 +16,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
+func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
 		config:           config,
@@ -27,7 +27,7 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 		activeWorkspaces: make(map[string]*WorkspaceRoot),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
-				Qlog:      qlog.NewQlog(config.CachePath),
+				Qlog:      qlogIn,
 				RequestId: qlog.MuxReqId,
 			},
 			config:      &config,
@@ -42,6 +42,15 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 	qfs.inodes[quantumfs.InodeIdRoot] = namespaceList
 	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock())
 	return qfs
+}
+
+func NewQuantumFsLogs(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
+	return NewQuantumFs_(config, qlogIn)
+}
+
+func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
+	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
+		config.MemLogBytes))
 }
 
 type QuantumFs struct {

@@ -5,6 +5,8 @@ package qlog
 
 // Test the logging subsystem performance
 
+import "runtime"
+import "strings"
 import "testing"
 
 var a uint32
@@ -19,8 +21,15 @@ func init() {
 	d = "0xDEADBEEF"
 }
 
+func tmpDir() string {
+	testPc, _, _, _ := runtime.Caller(1)
+	testName := runtime.FuncForPC(testPc).Name()
+	lastSlash := strings.LastIndex(testName, "/")
+	return "/tmp/" + testName[lastSlash+1:]
+}
+
 func BenchmarkBigStdLog(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	qlog.SetLogLevels("Daemon/*")
 	for i := 0; i < test.N; i++ {
@@ -32,7 +41,7 @@ func BenchmarkBigStdLog(test *testing.B) {
 }
 
 func BenchmarkQuick0Params(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -41,7 +50,7 @@ func BenchmarkQuick0Params(test *testing.B) {
 }
 
 func BenchmarkQuick1Params(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -50,7 +59,7 @@ func BenchmarkQuick1Params(test *testing.B) {
 }
 
 func BenchmarkQuick2Params(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -59,7 +68,7 @@ func BenchmarkQuick2Params(test *testing.B) {
 }
 
 func BenchmarkQuick3Params(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -68,7 +77,7 @@ func BenchmarkQuick3Params(test *testing.B) {
 }
 
 func BenchmarkQuickString(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -79,7 +88,7 @@ func BenchmarkQuickString(test *testing.B) {
 func BenchmarkBigLogArgsArray(test *testing.B) {
 	// This benchmark is to illustrate that most of the time consumed is in
 	// golang taking variadic params and sticking them into the args... slice
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	var args []interface{}
 	args = append(args, a)
@@ -93,7 +102,7 @@ func BenchmarkBigLogArgsArray(test *testing.B) {
 }
 
 func BenchmarkBigLog(test *testing.B) {
-	qlog := NewQlog("")
+	qlog := NewQlog(tmpDir())
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
