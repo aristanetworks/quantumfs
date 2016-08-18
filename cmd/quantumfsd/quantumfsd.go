@@ -5,6 +5,7 @@
 package main
 
 import "flag"
+import "fmt"
 import "os"
 import "runtime/pprof"
 
@@ -17,16 +18,25 @@ import "github.com/pivotal-golang/bytefmt"
 
 // Various exist reasons, will be returned to the shell as an exit code
 const (
-	exitOk           = iota
-	exitBadCacheSize = iota
-	exitMountFail    = iota
-	exitProfileFail  = iota
+	exitOk                = iota
+	exitBadCacheSize      = iota
+	exitMountFail         = iota
+	exitProfileFail       = iota
+	exitDataStoreInitFail = iota
 )
 
 var cacheSizeString string
 var cacheTimeNsecs uint
 var config daemon.QuantumFsConfig
 var cpuProfileFile string
+
+type datastoreConstructor func(conf string) quantumfs.DataStore
+type datastore struct {
+	name        string
+	constructor datastoreConstructor
+}
+
+var datastores []datastore
 
 func init() {
 	const (
@@ -40,15 +50,25 @@ func init() {
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
 		"Default location of the internal cache. Should be on a ramfs or "+
 			"tmpfs filsystem")
+
 	flag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
 		"Size of the local cache, e.g. 8G or 512M")
+
 	flag.StringVar(&config.MountPath, "mountpath", defaultMountPath,
 		"Path to mount quantumfs at")
+
 	flag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
 		defaultCacheTimeSeconds,
 		"Number of seconds the kernel will cache response data")
+
 	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
+
+	flag.StringVar(&config.DataStoreName, "datastore", "processlocal",
+		"Name of the datastore to use")
+
+	flag.StringVar(&config.DataStoreConf, "datastoreconf", "",
+		"Options to pass to datastore")
 
 	flag.StringVar(&cpuProfileFile, "profilePath", "",
 		"File to write CPU Profiling data to")
@@ -69,8 +89,25 @@ func processArgs() {
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
 
 	config.WorkspaceDB = processlocal.NewWorkspaceDB()
-	config.DurableStore = processlocal.NewDataStore()
 
+	for _, datastore := range datastores {
+		fmt.Printf("Checking against datastore '%s'\n", datastore.name)
+		if datastore.name != config.DataStoreName {
+			continue
+		}
+
+		config.DurableStore = datastore.constructor(config.DataStoreConf)
+		if config.DurableStore == nil {
+			fmt.Printf("Datastore Constructor failed\n")
+			os.Exit(exitDataStoreInitFail)
+		} else {
+			break
+		}
+	}
+	if config.DurableStore == nil {
+		fmt.Printf("Failed to find datastore '%s'\n", config.DataStoreName)
+		os.Exit(exitDataStoreInitFail)
+	}
 }
 
 func main() {

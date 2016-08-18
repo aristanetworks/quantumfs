@@ -245,7 +245,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		CacheTimeNsecs:   0,
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
-		DurableStore:     processlocal.NewDataStore(),
+		DurableStore:     processlocal.NewDataStore(""),
 	}
 	return config
 }
