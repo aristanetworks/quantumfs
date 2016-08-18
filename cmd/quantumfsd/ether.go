@@ -14,7 +14,7 @@ import "github.com/aristanetworks/ether/filesystem"
 import "github.com/aristanetworks/quantumfs"
 
 func init() {
-	registerDatastore("ether.filename", NewEtherFilesystemStore)
+	registerDatastore("ether.filesystem", NewEtherFilesystemStore)
 }
 
 func NewEtherFilesystemStore(path string) quantumfs.DataStore {
