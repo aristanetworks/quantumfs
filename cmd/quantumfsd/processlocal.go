@@ -10,10 +10,5 @@ package main
 import "github.com/aristanetworks/quantumfs/processlocal"
 
 func init() {
-	pl := datastore{
-		name:        "processlocal",
-		constructor: processlocal.NewDataStore,
-	}
-
-	datastores = append(datastores, pl)
+	registerDatastore("processlocal", processlocal.NewDataStore)
 }

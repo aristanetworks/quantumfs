@@ -38,6 +38,15 @@ type datastore struct {
 
 var datastores []datastore
 
+func registerDatastore(name string, constructor datastoreConstructor) {
+	store := datastore{
+		name:        name,
+		constructor: constructor,
+	}
+
+	datastores = append(datastores, store)
+}
+
 func init() {
 	const (
 		defaultCachePath        = "/dev/shmem"
