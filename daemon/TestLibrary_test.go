@@ -702,6 +702,30 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 	}
 }
 
+func (test *testHelper) checkZeroSparse(fileA string, offset int) {
+
+	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
+	test.assert(err == nil, "Unable to open fileA for RDONLY")
+	defer fdA.Close()
+
+	statA, err := fdA.Stat()
+	test.assert(err == nil, "Unable to fetch fileA stats")
+
+	rtnA := make([]byte, 1)
+	for idx := int64(0); idx < statA.Size(); idx += int64(offset) {
+		_, err := fdA.ReadAt(rtnA, idx)
+
+		if err == io.EOF {
+			return
+		}
+		test.assert(err == nil,
+			"Error while reading from fileA at %d", idx)
+
+		test.assert(bytes.Equal(rtnA, []byte{0}), "file %s not zeroed",
+			fileA)
+	}
+}
+
 func (test *testHelper) fileSize(filename string) int64 {
 	var stat syscall.Stat_t
 	err := syscall.Stat(filename, &stat)

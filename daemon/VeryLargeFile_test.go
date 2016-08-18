@@ -18,10 +18,10 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	workspace := test.nullWorkspace()
 	testFilename := workspace + "/test"
 
-	data := genFibonacci(512 * 1024)
+	data := genFibonacci(4096)
 	err := printToFile(testFilename, string(data))
 	test.assert(err == nil,
-		"Error writing 0.5MB fibonacci to new fd: %v", err)
+		"Error writing 4kB fibonacci to new fd: %v", err)
 	// Make this the file size desired (and hence type)
 	err = os.Truncate(testFilename, int64(fromFileSize))
 	test.assert(err == nil, "Unable to truncate expand file to %d", fromFileSize)

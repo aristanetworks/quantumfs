@@ -36,7 +36,6 @@ func LogscanSkim(filepath string) bool {
 
 	// This takes too much time, so only count one string as failing
 	if bytes.Contains(strMapData, []byte("ERROR")) {
-
 		return true
 	}
 
