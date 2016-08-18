@@ -158,13 +158,18 @@ type Qlog struct {
 	// This is the logging system level store. Increase size as the number of
 	// LogSubsystems increases past your capacity
 	LogLevels uint32
-	Write     func(format string, args ...interface{}) (int, error)
+	Write     func(format string, args ...interface{}) error
 	logBuffer *SharedMemory
 }
 
-func printToStdout(format string, args ...interface{}) (int, error) {
+func printToStdout(format string, args ...interface{}) error {
 	format += "\n"
-	return fmt.Printf(format, args...)
+	_, err := fmt.Printf(format, args...)
+	return err
+}
+
+func NewQlogTiny() *Qlog {
+	return NewQlogExt("", uint32(DefaultMmapSize))
 }
 
 func NewQlog(ramfsPath string) *Qlog {
@@ -197,7 +202,7 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
 	return &q
 }
 
-func (q *Qlog) SetWriter(w func(format string, args ...interface{}) (int, error)) {
+func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
 	q.Write = w
 }
 

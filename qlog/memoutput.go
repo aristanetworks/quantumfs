@@ -397,6 +397,13 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 	case []byte:
 		writeArray(w, format, v, TypeByteArray)
 		return
+	case bool:
+		byteType = TypeUint16
+		if v {
+			data = interface{}(uint16(1))
+		} else {
+			data = interface{}(uint16(0))
+		}
 	default:
 		needDataWrite = false
 	}
@@ -413,7 +420,7 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 				err))
 		}
 	} else {
-		errorPrefix := "WARN: LogConverter needed for %s:\n%s\n"
+		errorPrefix := "ERROR: LogConverter needed for %s:\n%s\n"
 
 		// Since we're going to do something recursive, ensure we're not
 		// already recursing and something horrible is happening.

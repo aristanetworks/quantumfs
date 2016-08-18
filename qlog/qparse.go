@@ -11,17 +11,31 @@ import "fmt"
 import "io/ioutil"
 import "math"
 import "reflect"
+import "sort"
 import "strings"
 import "time"
 import "unsafe"
+
+type SortByTime []string
+
+func (s SortByTime) Len() int {
+	return len(s)
+}
+
+func (s SortByTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortByTime) Less(i, j int) bool {
+	return s[i] < s[j]
+}
 
 // Returns true if the log file string map given failed the logscan
 func LogscanSkim(filepath string) bool {
 	_, _, strMapData := extractFields(filepath)
 
-	if bytes.Contains(strMapData, []byte("PANIC")) ||
-		bytes.Contains(strMapData, []byte("WARN")) ||
-		bytes.Contains(strMapData, []byte("ERROR")) {
+	// This takes too much time, so only count one string as failing
+	if bytes.Contains(strMapData, []byte("ERROR")) {
 
 		return true
 	}
@@ -248,7 +262,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 
 func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 
-	var buffer string
+	var rtn []string
 	readCount := uint32(0)
 
 	for readCount < uint32(len(data)) {
@@ -258,7 +272,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		// If we read a packet of zero length, that means our buffer wasn't
 		// full and we've hit the unused area
 		if packetLen == 0 {
-			return buffer
+			break
 		}
 
 		// Read the packet data into a separate buffer
@@ -293,18 +307,20 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		}
 
 		if err != nil {
-			buffer = fmt.Sprintf("WARN: Packet read error (%s). "+
+			newLine := fmt.Sprintf("ERROR: Packet read error (%s). "+
 				"Dump of %d bytes:\n%x\n", err, packetLen,
-				packetData) + buffer
+				packetData)
+			rtn = append(rtn, newLine)
 			continue
 		}
 
 		// Grab the string and output
 		strMapIdx := uint32(strMapId) * LogStrSize
 		if strMapIdx+LogStrSize > uint32(len(strMapData)) {
-			buffer = fmt.Sprintf("Not enough entries in "+
+			newLine := fmt.Sprintf("Not enough entries in "+
 				"string map (%d %d)\n", strMapId,
-				len(strMapData)/LogStrSize) + buffer
+				len(strMapData)/LogStrSize)
+			rtn = append(rtn, newLine)
 			continue
 		}
 
@@ -321,9 +337,11 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 			mapStr = mapStr[:firstNullTerm]
 		}
 		// We're reading backwards, so we have to *prepend* new lines
-		buffer = fmt.Sprintf(formatString(logSubsystem, reqId, t,
-			mapStr)+"\n", args...) + buffer
+		newLine := fmt.Sprintf(formatString(logSubsystem, reqId, t,
+			mapStr)+"\n", args...)
+		rtn = append(rtn, newLine)
 	}
 
-	return buffer
+	sort.Sort(SortByTime(rtn))
+	return strings.Join(rtn, "")
 }

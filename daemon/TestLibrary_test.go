@@ -42,11 +42,15 @@ func runTest(t *testing.T, test quantumFsTest) {
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
+	cachePath := testRunDir + "/" + testName
 	th := &testHelper{
 		t:          t,
 		testName:   testName,
 		testResult: make(chan string),
 		startTime:  time.Now(),
+		cachePath:  cachePath,
+		logger: qlog.NewQlogExt(cachePath+"/ramfs",
+			uint32(qlog.DefaultMmapSize)),
 	}
 
 	defer th.endTest()
@@ -231,6 +235,8 @@ type testHelper struct {
 	t                 *testing.T
 	testName          string
 	qfs               *QuantumFs
+	cachePath         string
+	logger            *qlog.Qlog
 	tempDir           string
 	fuseConnection    int
 	api               *quantumfs.Api
@@ -339,7 +345,7 @@ func serveSafely(th *testHelper) {
 
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.log("Intantiating quantumfs instance...")
-	quantumfs := NewQuantumFs(config)
+	quantumfs := NewQuantumFsLogs(config, th.logger)
 	th.qfs = quantumfs
 
 	th.log("Waiting for QuantumFs instance to start...")
@@ -352,11 +358,9 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 }
 
 func (th *testHelper) log(format string, args ...interface{}) (int, error) {
-	if th.qfs != nil && th.qfs.c.Qlog != nil {
-		th.qfs.c.Qlog.Log(qlog.LogTest, qlog.TestReqId, 1,
-			"[%s] "+format, append([]interface{}{th.testName},
-				args...)...)
-	}
+	th.logger.Log(qlog.LogTest, qlog.TestReqId, 1,
+		"[%s] "+format, append([]interface{}{th.testName},
+			args...)...)
 
 	return len(format), nil
 }

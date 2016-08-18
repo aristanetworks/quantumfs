@@ -25,12 +25,12 @@ func TestQParse_test(t *testing.T) {
 		var logOut bytes.Buffer
 		var testMutex sync.Mutex
 		test.qfs.c.Qlog.Write = func(format string,
-			args ...interface{}) (int, error) {
+			args ...interface{}) error {
 
 			testMutex.Lock()
 			logOut.WriteString(fmt.Sprintf(format+"\n", args...))
 			testMutex.Unlock()
-			return len(format), nil
+			return nil
 		}
 		// Enable *all* logs
 		test.qfs.c.Qlog.LogLevels = (1 <<
@@ -66,8 +66,7 @@ func TestQParse_test(t *testing.T) {
 		// There's nothing ensuring the order is the same, so we have to sort
 		testLogLines := strings.Split(testLogs, "\n")
 		logOutLines := strings.Split(logOutCopy, "\n")
-		sort.Sort(SortByTime(testLogLines))
-		sort.Sort(SortByTime(logOutLines))
+		sort.Sort(qlog.SortByTime(logOutLines))
 
 		// Trim any excess empty lines
 		for logOutLines[0] == "" {
