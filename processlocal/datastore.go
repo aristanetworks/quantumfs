@@ -9,7 +9,7 @@ import "sync"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 
-func NewDataStore() quantumfs.DataStore {
+func NewDataStore(conf string) quantumfs.DataStore {
 	store := &DataStore{
 		data: make(map[string][]byte),
 	}
