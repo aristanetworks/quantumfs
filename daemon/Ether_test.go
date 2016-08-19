@@ -16,6 +16,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 	mountPath := th.createTestDirs()
 
 	datastorePath := th.tempDir + "/ether"
+	datastore := thirdparty_backends.NewEtherFilesystemStore(datastorePath)
 
 	config := QuantumFsConfig{
 		CachePath:        "",
@@ -24,7 +25,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 		CacheTimeNsecs:   0,
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
-		DurableStore:     thirdparty_backends.NewEtherFilesystemStore(datastorePath),
+		DurableStore:     datastore,
 	}
 	return config
 }
