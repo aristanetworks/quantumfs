@@ -721,52 +721,111 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	result := func() fuse.Status {
 		dst := dstInode.(*Directory)
 
-		// Lock both directories in inode number order to prevent a lock
-		// ordering deadlock against a rename in the opposite direction.
-		if dir.inodeNum() > dst.inodeNum() {
-			defer dir.Lock().Unlock()
-			defer dst.Lock().Unlock()
+		// The locking here is subtle.
+		//
+		// Firstly we must protect against the case where a concurrent rename
+		// in the opposite direction (from dst into dir) is occurring as we
+		// are renaming a file from dir into dst. If we lock naively we'll
+		// end up with a lock ordering inversion and deadlock in this case.
+		//
+		// We prevent this by locking dir and dst in a consistent ordering
+		// based upon their inode number.
+		//
+		// However, there is another wrinkle. It is possible to rename a file
+		// from a directory into its parent. If we keep the parent locked
+		// while we run dir.updateSize_(), then we'll deadlock as we try to
+		// lock the parent again down the call stack.
+		//
+		// So we have two phases of locking. In the first phase we lock dir
+		// and dst according to their inode number. Then, with both those
+		// locks held we perform the bulk of the logic. Just before we start
+		// releasing locks we update the parent metadata. Then we drop the
+		// locks of the parent, which is fine since it is up to date. Finally
+		// we update the metadata of the child before dropping its lock.
+		//
+		// We need to update and release the parent first so we can
+		// successfully update the child. If the two directories are not
+		// related in that way then we choose arbitrarily because it doesn't
+		// matter.
+
+		// Determine if a parent-child relationship between the
+		// directories exist
+		var parent *Directory
+		var child *Directory
+		if dst.parent() != nil &&
+			dst.parent().inodeNum() == dir.inodeNum() {
+
+			// dst is a child of dir
+			parent = dir
+			child = dst
+		} else if dir.parent() != nil &&
+			dir.parent().inodeNum() == dst.inodeNum() {
+
+			// dir is a child of dst
+			parent = dst
+			child = dir
 		} else {
-			defer dst.Lock().Unlock()
-			defer dir.Lock().Unlock()
+			// No relationship, choose arbitrarily
+			parent = dst
+			child = dir
 		}
 
-		if _, exists := dir.children[oldName]; !exists {
-			return fuse.ENOENT
+		dirLocked := false
+		if dir.inodeNum() > dst.inodeNum() {
+			dir.Lock()
+			dirLocked = true
 		}
+		defer child.lock.Unlock()
 
-		oldInodeId := dir.children[oldName]
-		newInodeId := dst.children[newName]
+		result := func() fuse.Status {
+			dst.Lock()
+			defer parent.lock.Unlock()
 
-		oldEntry := dir.childrenRecords[oldInodeId]
+			if !dirLocked {
+				dir.Lock()
+			}
 
-		child := c.qfs.inode(c, oldInodeId)
-		child.setParent(dst)
+			if _, exists := dir.children[oldName]; !exists {
+				return fuse.ENOENT
+			}
 
-		newEntry := cloneDirectoryRecord(oldEntry)
-		newEntry.SetFilename(newName)
+			oldInodeId := dir.children[oldName]
+			newInodeId := dst.children[newName]
 
-		// Update entry in new directory
-		dst.children[newName] = oldInodeId
-		delete(dst.childrenRecords, newInodeId)
-		delete(dst.dirtyChildren_, newInodeId)
-		dst.childrenRecords[oldInodeId] = newEntry
-		if _, exists := dir.dirtyChildren_[oldInodeId]; exists {
-			dst.dirtyChildren_[oldInodeId] =
-				dir.dirtyChildren_[oldInodeId]
+			oldEntry := dir.childrenRecords[oldInodeId]
+
+			child := c.qfs.inode(c, oldInodeId)
+			child.setParent(dst)
+
+			newEntry := cloneDirectoryRecord(oldEntry)
+			newEntry.SetFilename(newName)
+
+			// Update entry in new directory
+			dst.children[newName] = oldInodeId
+			delete(dst.childrenRecords, newInodeId)
+			delete(dst.dirtyChildren_, newInodeId)
+			dst.childrenRecords[oldInodeId] = newEntry
+			if _, exists := dir.dirtyChildren_[oldInodeId]; exists {
+				dst.dirtyChildren_[oldInodeId] =
+					dir.dirtyChildren_[oldInodeId]
+			}
+
+			// Remove entry in old directory
+			delete(dir.children, oldName)
+			delete(dir.childrenRecords, oldInodeId)
+			delete(dir.dirtyChildren_, oldInodeId)
+
+			parent.updateSize_(c)
+			parent.self.dirty(c)
+
+			return fuse.OK
+		}()
+
+		if result == fuse.OK {
+			child.updateSize_(c)
+			child.self.dirty(c)
 		}
-
-		// Remove entry in old directory
-		delete(dir.children, oldName)
-		delete(dir.childrenRecords, oldInodeId)
-		delete(dir.dirtyChildren_, oldInodeId)
-
-		dir.updateSize_(c)
-		dir.self.dirty(c)
-		dst.updateSize_(c)
-		dst.self.dirty(c)
-
-		return fuse.OK
+		return result
 	}()
 
 	return result
