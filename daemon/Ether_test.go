@@ -19,7 +19,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 	datastore := thirdparty_backends.NewEtherFilesystemStore(datastorePath)
 
 	config := QuantumFsConfig{
-		CachePath:        "",
+		CachePath:        th.tempDir + "/ramfs",
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
