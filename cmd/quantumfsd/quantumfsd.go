@@ -12,6 +12,7 @@ import "runtime/pprof"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/processlocal"
+import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 import "github.com/hanwen/go-fuse/fuse"
 import "github.com/pivotal-golang/bytefmt"
@@ -29,23 +30,6 @@ var cacheSizeString string
 var cacheTimeNsecs uint
 var config daemon.QuantumFsConfig
 var cpuProfileFile string
-
-type datastoreConstructor func(conf string) quantumfs.DataStore
-type datastore struct {
-	name        string
-	constructor datastoreConstructor
-}
-
-var datastores []datastore
-
-func registerDatastore(name string, constructor datastoreConstructor) {
-	store := datastore{
-		name:        name,
-		constructor: constructor,
-	}
-
-	datastores = append(datastores, store)
-}
 
 func init() {
 	const (
@@ -99,12 +83,12 @@ func processArgs() {
 
 	config.WorkspaceDB = processlocal.NewWorkspaceDB()
 
-	for _, datastore := range datastores {
-		if datastore.name != config.DataStoreName {
+	for _, datastore := range thirdparty_backends.Datastores {
+		if datastore.Name != config.DataStoreName {
 			continue
 		}
 
-		config.DurableStore = datastore.constructor(config.DataStoreConf)
+		config.DurableStore = datastore.Constructor(config.DataStoreConf)
 		if config.DurableStore == nil {
 			fmt.Printf("Datastore Constructor failed\n")
 			os.Exit(exitDataStoreInitFail)
