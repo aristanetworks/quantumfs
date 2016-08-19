@@ -10,6 +10,7 @@ import "errors"
 import "fmt"
 import "io/ioutil"
 import "math"
+import "os"
 import "reflect"
 import "sort"
 import "strings"
@@ -32,7 +33,7 @@ func (s SortByTime) Less(i, j int) bool {
 
 // Returns true if the log file string map given failed the logscan
 func LogscanSkim(filepath string) bool {
-	_, _, strMapData := extractFields(filepath)
+	strMapData := extractStrMapData(filepath)
 
 	// This takes too much time, so only count one string as failing
 	if bytes.Contains(strMapData, []byte("ERROR")) {
@@ -43,7 +44,20 @@ func LogscanSkim(filepath string) bool {
 }
 
 func ParseLogs(filepath string) string {
-	return outputLogs(extractFields(filepath))
+
+	pastEndIdx, dataArray, strMapData := extractFields(filepath)
+
+	// create a safer map to use
+	strMap := make([]LogStr, len(strMapData) / LogStrSize)
+	idx := 0
+	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
+		mapEntry := (*LogStr)(unsafe.Pointer(&strMapData[i]))
+		strMap[idx] = *mapEntry
+
+		idx++
+	}
+	
+	return outputLogs(pastEndIdx, dataArray, strMap)
 }
 
 func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
@@ -68,6 +82,38 @@ func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
 	return header.CircBuf.PastEndIdx,
 		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size],
 		data[mmapHeaderSize+header.CircBuf.Size:]
+}
+
+func readOrPanic(offset int64, len int64, fd *os.File) []byte {
+	raw := make([]byte, len)
+	readCount := int64(0)
+	for readCount < len {
+		sz, err := fd.ReadAt(raw[readCount:], offset+readCount)
+		if err != nil {
+			panic("Unable to read log file data")
+		}
+
+		readCount += int64(sz)
+	}
+
+	return raw
+}
+
+func extractStrMapData(filepath string) []byte {
+	// Extract just the strMapData, and avoid having to unecessarily read
+	// the rest of the potentially giant log file
+	file, err := os.Open(filepath)
+	if err != nil {
+		panic("Unable to open log file for strMapData read")
+	}
+	defer file.Close()
+
+	headerLen := int64(unsafe.Sizeof(MmapHeader{}))
+	headerRaw := readOrPanic(0, headerLen, file)
+	header := (*MmapHeader)(unsafe.Pointer(&headerRaw[0]))
+
+	return readOrPanic(headerLen+int64(header.CircBuf.Size),
+		int64(header.StrMapSize), file)
 }
 
 func grabMemory(filepath string) []byte {
@@ -229,8 +275,8 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 		dataLen = uint32(len(data)) - *idx
 		// Because binary.Read is dumb and can't read less than the given
 		// array without EOFing *and* needs a fixed array, we have to do this
+		var singleArray [1]byte
 		for i := uint32(0); i < dataLen; i++ {
-			var singleArray [1]byte
 			buf := bytes.NewReader(data[*idx+i : *idx+i+1])
 			err := binary.Read(buf, binary.LittleEndian, &singleArray)
 			if err != nil {
@@ -260,7 +306,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 	return nil
 }
 
-func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
+func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 
 	var rtn []string
 	readCount := uint32(0)
@@ -315,16 +361,14 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		}
 
 		// Grab the string and output
-		strMapIdx := uint32(strMapId) * LogStrSize
-		if strMapIdx+LogStrSize > uint32(len(strMapData)) {
+		if int(strMapId) > len(strMap) {
 			newLine := fmt.Sprintf("Not enough entries in "+
 				"string map (%d %d)\n", strMapId,
-				len(strMapData)/LogStrSize)
+				len(strMap)/LogStrSize)
 			rtn = append(rtn, newLine)
 			continue
 		}
-
-		mapEntry := *(*LogStr)(unsafe.Pointer(&strMapData[strMapIdx]))
+		mapEntry := strMap[strMapId]
 		logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
 
 		// Convert timestamp back into something useful

@@ -270,17 +270,17 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	return &rtn
 }
 
-func (strMap *IdStrMap) mapGetLogIdx(format string) *uint16 {
+func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 
 	strMap.mapLock.RLock()
 	defer strMap.mapLock.RUnlock()
 
 	entry, ok := strMap.data[format]
 	if ok {
-		return &entry
+		return entry, true
 	}
 
-	return nil
+	return 0, false
 }
 
 func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
@@ -308,10 +308,10 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
-	existingId := strMap.mapGetLogIdx(format)
+	existingId, idValid := strMap.mapGetLogIdx(format)
 
-	if existingId != nil {
-		return *existingId, nil
+	if idValid {
+		return existingId, nil
 	}
 
 	return strMap.createLogIdx(idx, level, format)
@@ -463,6 +463,9 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	timestamp int64, format string, args ...interface{}) []byte {
 
 	buf := new(bytes.Buffer)
+	// give the buffer some initial safe memory allocation
+	buf.Grow(128)
+
 	// Two bytes prefix for the total packet length, before the num of args.
 	// Write the log entry header with no prefixes
 	binary.Write(buf, binary.LittleEndian, uint16(len(args)))

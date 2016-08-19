@@ -25,7 +25,7 @@ const (
 
 var cacheSizeString string
 var cacheTimeNsecs uint
-var memLogBytes uint
+var memLogMegabytes uint
 var config daemon.QuantumFsConfig
 var cpuProfileFile string
 
@@ -36,7 +36,7 @@ func init() {
 		defaultMountPath        = "/mnt/quantumfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
-		defaultMemLogBytes      = 100 * 1024 * 1024
+		defaultMemLogMegabytes  = 100
 	)
 
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
@@ -51,8 +51,8 @@ func init() {
 		"Number of seconds the kernel will cache response data")
 	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
-	flag.UintVar(&memLogBytes, "memLogBytes", defaultMemLogBytes,
-		"The number of bytes to allocate, total, to the shared memory log.")
+	flag.UintVar(&memLogMegabytes, "memLogMegabytes", defaultMemLogMegabytes,
+		"The number of MB to allocate, total, to the shared memory log.")
 
 	flag.StringVar(&cpuProfileFile, "profilePath", "",
 		"File to write CPU Profiling data to")
@@ -71,7 +71,7 @@ func processArgs() {
 		config.CacheSize = cacheSize
 	}
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
-	config.MemLogBytes = uint32(memLogBytes)
+	config.MemLogBytes = uint32(memLogMegabytes) * 1024 * 1024
 
 	config.WorkspaceDB = processlocal.NewWorkspaceDB()
 	config.DurableStore = processlocal.NewDataStore()
