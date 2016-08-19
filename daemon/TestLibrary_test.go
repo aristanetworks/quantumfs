@@ -245,12 +245,20 @@ type testHelper struct {
 	shouldFailLogscan bool
 }
 
-func (th *testHelper) defaultConfig() QuantumFsConfig {
+func (th *testHelper) createTestDirs() string {
 	th.tempDir = testRunDir + "/" + th.testName
 	mountPath := th.tempDir + "/mnt"
 
 	os.MkdirAll(mountPath, 0777)
 	th.log("Using mountpath %s", mountPath)
+
+	os.MkdirAll(th.tempDir+"/ether", 0777)
+
+	return mountPath
+}
+
+func (th *testHelper) defaultConfig() QuantumFsConfig {
+	mountPath := th.createTestDirs()
 
 	config := QuantumFsConfig{
 		CachePath:        th.tempDir + "/ramfs",
@@ -260,7 +268,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		MemLogBytes:      uint32(qlog.DefaultMmapSize),
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
-		DurableStore:     processlocal.NewDataStore(),
+		DurableStore:     processlocal.NewDataStore(""),
 	}
 	return config
 }
