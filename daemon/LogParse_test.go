@@ -14,7 +14,6 @@ import "strings"
 import "sync"
 import "syscall"
 import "testing"
-import "unsafe"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -33,8 +32,8 @@ func TestQParse_test(t *testing.T) {
 			return nil
 		}
 		// Enable *all* logs
-		test.qfs.c.Qlog.LogLevels = (1 <<
-			(unsafe.Sizeof(test.qfs.c.Qlog.LogLevels) * 8)) - 1
+		test.qfs.c.Qlog.LogLevels = 0
+		test.qfs.c.Qlog.LogLevels--
 
 		// Do some stuff that should generate some logs
 		workspace := test.nullWorkspace()

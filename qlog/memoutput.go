@@ -110,30 +110,33 @@ func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
 }
 
+func (circ *CircMemLogs) reserveMem(dataLen uint16, dataRaw []byte) uint32 {
+	circ.writeMutex.Lock()
+	defer circ.writeMutex.Unlock()
+
+	dataStart := circ.header.PastEndIdx
+	circBufLen := uint32(len(circ.buffer))
+
+	circ.header.PastEndIdx += uint32(dataLen)
+	circ.wrapWrite_(uint32(circ.header.PastEndIdx)%circBufLen,
+		dataRaw)
+
+	circ.header.PastEndIdx += 2
+	circ.header.PastEndIdx %= circBufLen
+
+	return dataStart
+}
+
 func (circ *CircMemLogs) writeData(data []byte) {
 	// For now, if the message is too long then just toss it
 	if len(data) > len(circ.buffer) {
 		return
 	}
 
-	circBufLen := uint32(len(circ.buffer))
 	dataLen := uint16(len(data))
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
-	var dataStart uint32
-	{
-		circ.writeMutex.Lock()
-		defer circ.writeMutex.Unlock()
 
-		dataStart = circ.header.PastEndIdx
-
-		circ.header.PastEndIdx += uint32(dataLen)
-		circ.wrapWrite_(uint32(circ.header.PastEndIdx%circBufLen),
-			dataRaw[:])
-
-		circ.header.PastEndIdx += 2
-		circ.header.PastEndIdx %= circBufLen
-
-	}
+	dataStart := circ.reserveMem(dataLen, dataRaw[:])
 
 	// Now that we know we have space, write in the entry
 	circ.wrapWrite_(uint32(dataStart), data)
@@ -148,6 +151,15 @@ type LogStr struct {
 	LogLevel     uint8
 }
 
+func checkRecursion(errorPrefix string, format string) {
+	// Ensure log isn't ourselves
+	if len(format) >= len(errorPrefix) &&
+		errorPrefix == format[:len(errorPrefix)] {
+
+		panic(fmt.Sprintf("Stuck in infinite recursion: %s", format))
+	}
+}
+
 func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
 	var err error
 	var rtn LogStr
@@ -156,13 +168,7 @@ func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
 	copyLen := len(format)
 	if copyLen > logTextMax {
 		errorPrefix := "Log format string exceeds allowable length"
-
-		// Ensure we're not already recursing
-		if len(format) >= len(errorPrefix) &&
-			errorPrefix == format[:len(errorPrefix)] {
-
-			panic("Stuck in infinite recursion due to format length")
-		}
+		checkRecursion(errorPrefix, format)
 
 		err = errors.New(errorPrefix)
 		copyLen = logTextMax
@@ -277,7 +283,7 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) *uint16 {
 	return nil
 }
 
-func (strMap *IdStrMap) writeMapEntry(idx LogSubsystem, level uint8,
+func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
 	strMap.mapLock.Lock()
@@ -308,7 +314,7 @@ func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 		return *existingId, nil
 	}
 
-	return strMap.writeMapEntry(idx, level, format)
+	return strMap.createLogIdx(idx, level, format)
 }
 
 type LogPrimitive interface {
@@ -421,14 +427,7 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 		}
 	} else {
 		errorPrefix := "ERROR: LogConverter needed for %s:\n%s\n"
-
-		// Since we're going to do something recursive, ensure we're not
-		// already recursing and something horrible is happening.
-		if len(format) >= len(errorPrefix) &&
-			errorPrefix == format[:len(errorPrefix)] {
-
-			panic("Stuck in impossible infinite recursion")
-		}
+		checkRecursion(errorPrefix, format)
 
 		str := fmt.Sprintf("%v", data)
 		writeArray(w, format, []byte(str), 17)
@@ -478,13 +477,7 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	// Make sure length isn't too long, excluding the size bytes
 	if buf.Len() > math.MaxUint16 {
 		errorPrefix := "Log data exceeds allowable length: %s\n"
-
-		// Ensure we're not already recursing
-		if len(format) >= len(errorPrefix) &&
-			errorPrefix == format[:len(errorPrefix)] {
-
-			panic("Stuck in impossible infinite recursion from length")
-		}
+		checkRecursion(errorPrefix, format)
 
 		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
 

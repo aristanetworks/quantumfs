@@ -965,7 +965,7 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 			continue
 		}
 
-		c.vlog("Found attribute key: %v", key.String())
+		c.vlog("Found attribute key: %s", key.String())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			c.elog("Failed to retrieve attribute datablock")

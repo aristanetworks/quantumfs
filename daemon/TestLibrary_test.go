@@ -49,8 +49,7 @@ func runTest(t *testing.T, test quantumFsTest) {
 		testResult: make(chan string),
 		startTime:  time.Now(),
 		cachePath:  cachePath,
-		logger: qlog.NewQlogExt(cachePath+"/ramfs",
-			uint32(qlog.DefaultMmapSize)),
+		logger: qlog.NewQlogExt(cachePath+"/ramfs", 60 * 10000 * 24),
 	}
 
 	defer th.endTest()
@@ -357,12 +356,12 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.log("QuantumFs instance started")
 }
 
-func (th *testHelper) log(format string, args ...interface{}) (int, error) {
+func (th *testHelper) log(format string, args ...interface{}) error {
 	th.logger.Log(qlog.LogTest, qlog.TestReqId, 1,
 		"[%s] "+format, append([]interface{}{th.testName},
 			args...)...)
 
-	return len(format), nil
+	return nil
 }
 
 func (th *testHelper) getApi() *quantumfs.Api {

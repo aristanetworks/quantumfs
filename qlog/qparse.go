@@ -46,8 +46,9 @@ func ParseLogs(filepath string) string {
 	return outputLogs(extractFields(filepath))
 }
 
-// Returns the pastEndIdx, data array, and strMapData
-func extractFields(filepath string) (uint32, []byte, []byte) {
+func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
+	strMapData []byte) {
+
 	data := grabMemory(filepath)
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
 
@@ -335,7 +336,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMapData []byte) string {
 		if firstNullTerm != -1 {
 			mapStr = mapStr[:firstNullTerm]
 		}
-		// We're reading backwards, so we have to *prepend* new lines
+
 		newLine := fmt.Sprintf(formatString(logSubsystem, reqId, t,
 			mapStr)+"\n", args...)
 		rtn = append(rtn, newLine)
