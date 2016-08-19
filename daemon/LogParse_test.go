@@ -42,7 +42,7 @@ func TestQParse_test(t *testing.T) {
 		test.assert(err == nil, "Error creating file: %v", err)
 		syscall.Close(fd)
 
-		data := genFibonacci(1024)
+		data := genData(1024)
 		err = printToFile(testFilename, string(data))
 		test.assert(err == nil, "Couldn't write 1KB data to file")
 
