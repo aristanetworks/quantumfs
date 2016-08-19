@@ -116,13 +116,7 @@ func TestLargeFileAttr_test(t *testing.T) {
 
 		// Read what should be 34MB of zeros
 		var output []byte
-		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 34MB hole from file")
-
-		for i := 0; i < len(output); i += 1024 {
-			test.assert(output[i] == 0, "Data not zeroed in file, %s",
-				output[i])
-		}
+		test.checkZeroSparse(testFilename, 34000)
 
 		// Ensure that we can write data into the hole
 		testString := []byte("testData")

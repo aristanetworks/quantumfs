@@ -167,8 +167,6 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)
 	store.SetListOfBlocks(fi.metadata.Blocks)
 
-	c.vlog("Set blocks %d: %v", len(fi.metadata.Blocks), fi.metadata.Blocks)
-
 	bytes := store.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)

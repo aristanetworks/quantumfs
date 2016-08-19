@@ -1,5 +1,5 @@
-COMMANDS=quantumfsd qfs
-PKGS_TO_TEST=daemon qlog
+COMMANDS=quantumfsd qfs qparse
+PKGS_TO_TEST=daemon qlog thirdparty_backends
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 

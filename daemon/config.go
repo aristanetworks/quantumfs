@@ -12,9 +12,15 @@ type QuantumFsConfig struct {
 	CacheSize uint64
 	MountPath string
 
+	DataStoreName string
+	DataStoreConf string
+
 	// How long the kernel is allowed to cache values
 	CacheTimeSeconds uint64
 	CacheTimeNsecs   uint32
+
+	// How many bytes to allocate to the shared memory logs
+	MemLogBytes uint32
 
 	WorkspaceDB  quantumfs.WorkspaceDB
 	DurableStore quantumfs.DataStore

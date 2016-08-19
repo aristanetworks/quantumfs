@@ -18,10 +18,10 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	workspace := test.nullWorkspace()
 	testFilename := workspace + "/test"
 
-	data := genData(512 * 1024)
+	data := genData(4096)
 	err := printToFile(testFilename, string(data))
 	test.assert(err == nil,
-		"Error writing 0.5MB data to new fd: %v", err)
+		"Error writing 4kB data to new fd: %v", err)
 	// Make this the file size desired (and hence type)
 	err = os.Truncate(testFilename, int64(fromFileSize))
 	test.assert(err == nil, "Unable to truncate expand file to %d", fromFileSize)
@@ -70,8 +70,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	err = api.Branch(test.relPath(workspace), dst)
 	test.assert(err == nil, "Unable to branch")
 
-	test.checkSparse(test.absPath(dst+"/test"), testFilename, 2*1024*1024*1024,
-		10)
+	test.checkSparse(test.absPath(dst+"/test"), testFilename, newLen/100, 10)
 }
 
 func TestSmallConvert_test(t *testing.T) {
