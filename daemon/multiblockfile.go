@@ -210,6 +210,12 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		return nil
 	}
 
+	// If we're decreasing length, we need to throw away dataBlocks
+	for i := newEndBlkIdx + 1; i < uint64(len(fi.metadata.Blocks)); i++ {
+		delete(fi.dataBlocks, int(i))
+	}
+	fi.metadata.Blocks = fi.metadata.Blocks[:newEndBlkIdx+1]
+
 	// Truncate the new last block
 	block := fi.retrieveDataBlock(c, int(newEndBlkIdx))
 	block.SetSize(int(lastBlockLen))
