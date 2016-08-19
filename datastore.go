@@ -82,6 +82,10 @@ func KeyTypeToString(keyType KeyType) string {
 // One of the KeyType* values above
 type KeyType uint8
 
+func (v KeyType) Primitive() interface{} {
+	return uint8(v)
+}
+
 // The size of the object ID is determined by a number of bytes sufficient to contain
 // the identification hashes used by all the backing stores (most notably the VCS
 // such as git or Mercurial) and additional space to be used for datastore routing.
@@ -221,6 +225,10 @@ const (
 // One of the ObjectType* values
 type ObjectType uint8
 
+func (v ObjectType) Primitive() interface{} {
+	return uint8(v)
+}
+
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
 // be owned by some special system accounts or the current user. The translation to
 // UID is done at access time.
@@ -253,6 +261,10 @@ func ObjectUid(c Ctx, uid uint32, userId uint32) UID {
 // One of the UID* values
 type UID uint16
 
+func (v UID) Primitive() interface{} {
+	return uint8(v)
+}
+
 // Similar to the UIDs above, group ownership is divided into special classes.
 const GIDUser = 1001 // The currently accessing user
 
@@ -283,8 +295,16 @@ func ObjectGid(c Ctx, gid uint32, groupId uint32) GID {
 // One of the GID* values
 type GID uint16
 
+func (v GID) Primitive() interface{} {
+	return uint8(v)
+}
+
 // Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
+
+func (t Time) Primitive() interface{} {
+	return uint64(t)
+}
 
 func (t Time) Seconds() uint64 {
 	return uint64(t / 1000000)

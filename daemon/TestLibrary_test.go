@@ -42,12 +42,14 @@ func runTest(t *testing.T, test quantumFsTest) {
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
+	cachePath := testRunDir + "/" + testName
 	th := &testHelper{
 		t:          t,
 		testName:   testName,
 		testResult: make(chan string),
-		testOutput: make([]string, 0, 1000),
 		startTime:  time.Now(),
+		cachePath:  cachePath,
+		logger:     qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24),
 	}
 
 	defer th.endTest()
@@ -59,18 +61,16 @@ func runTest(t *testing.T, test quantumFsTest) {
 	var testResult string
 
 	select {
-	case <-time.After(1 * time.Second):
+	case <-time.After(1000 * time.Millisecond):
 		testResult = "TIMED OUT"
 
 	case testResult = <-th.testResult:
 	}
 
 	if !th.shouldFail && testResult != "" {
-		th.log(testResult)
-		th.t.Fatal(testResult)
+		th.log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
 	} else if th.shouldFail && testResult == "" {
-		th.log("Test is expected to fail")
-		th.t.Fatal("Test is expected to fail")
+		th.log("ERROR: Test is expected to fail, but didn't")
 	}
 }
 
@@ -165,6 +165,8 @@ func (th *testHelper) endTest() {
 		th.waitToBeUnmounted()
 		time.Sleep(1 * time.Second)
 
+		th.logscan()
+
 		if err := os.RemoveAll(th.tempDir); err != nil {
 			th.t.Fatalf("Failed to cleanup temporary mount point: %v",
 				err)
@@ -174,8 +176,6 @@ func (th *testHelper) endTest() {
 	if exception != nil {
 		th.t.Fatalf("Test failed with exception: %v", exception)
 	}
-
-	th.logscan()
 }
 
 func (th *testHelper) waitToBeUnmounted() {
@@ -197,10 +197,20 @@ func (th *testHelper) waitToBeUnmounted() {
 
 // Check the test output for errors
 func (th *testHelper) logscan() {
-	errors := make([]string, 0, 10)
+	// Check the format string map for the log first to speed this up
+	logFile := th.qfs.config.CachePath + "/qlog"
+	if !qlog.LogscanSkim(logFile) {
+		return
+	}
 
-	for _, line := range th.testOutput {
-		if strings.Contains(line, "PANIC") {
+	errors := make([]string, 0, 10)
+	testOutput := qlog.ParseLogs(logFile)
+
+	lines := strings.Split(testOutput, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "PANIC") ||
+			strings.Contains(line, "WARN") ||
+			strings.Contains(line, "ERROR") {
 			errors = append(errors, line)
 		}
 	}
@@ -209,9 +219,12 @@ func (th *testHelper) logscan() {
 		for _, err := range errors {
 			th.t.Logf("FATAL message logged: %s", err)
 		}
-		th.t.Fatal("Test FAILED due to FATAL messages")
+		th.t.Fatalf("Test FAILED due to FATAL messages. Dumping Logs:\n%s\n"+
+			"--- Test %s FAILED\n\n", testOutput, th.testName)
 	} else if th.shouldFailLogscan && len(errors) == 0 {
-		th.t.Fatal("Test FAILED due to missing FATAL messages")
+		th.t.Fatalf("Test FAILED due to missing FATAL messages."+
+			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n", testOutput,
+			th.testName)
 	}
 }
 
@@ -221,11 +234,12 @@ type testHelper struct {
 	t                 *testing.T
 	testName          string
 	qfs               *QuantumFs
+	cachePath         string
+	logger            *qlog.Qlog
 	tempDir           string
 	fuseConnection    int
 	api               *quantumfs.Api
 	testResult        chan string
-	testOutput        []string
 	startTime         time.Time
 	shouldFail        bool
 	shouldFailLogscan bool
@@ -247,10 +261,11 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 	mountPath := th.createTestDirs()
 
 	config := QuantumFsConfig{
-		CachePath:        "",
+		CachePath:        th.tempDir + "/ramfs",
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
+		MemLogBytes:      uint32(qlog.DefaultMmapSize),
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(),
 		DurableStore:     processlocal.NewDataStore(""),
@@ -260,6 +275,11 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 
 func (th *testHelper) startDefaultQuantumFs() {
 	config := th.defaultConfig()
+
+	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
+		th.t.Fatalf("Unable to setup test ramfs path")
+	}
+
 	th.startQuantumFs(config)
 }
 
@@ -332,14 +352,8 @@ func serveSafely(th *testHelper) {
 
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.log("Intantiating quantumfs instance...")
-	quantumfs := NewQuantumFs(config)
+	quantumfs := NewQuantumFsLogs(config, th.logger)
 	th.qfs = quantumfs
-
-	writer := func(format string, args ...interface{}) (int, error) {
-		return th.log(format, args...)
-	}
-	th.qfs.c.Qlog.SetWriter(writer)
-	th.qfs.c.Qlog.SetLogLevels("daemon/*,datastore/*,workspacedb/*,test/*")
 
 	th.log("Waiting for QuantumFs instance to start...")
 
@@ -350,18 +364,12 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.log("QuantumFs instance started")
 }
 
-func (th *testHelper) log(format string, args ...interface{}) (int, error) {
-	relTime := time.Now().Sub(th.startTime).Nanoseconds()
-	prefixedFmt := fmt.Sprintf("[%s+%010d] %s", th.testName, relTime, format)
-	output := fmt.Sprintf(prefixedFmt, args...)
+func (th *testHelper) log(format string, args ...interface{}) error {
+	th.logger.Log(qlog.LogTest, qlog.TestReqId, 1,
+		"[%s] "+format, append([]interface{}{th.testName},
+			args...)...)
 
-	th.mutex.Lock()
-	th.testOutput = append(th.testOutput, output)
-	th.mutex.Unlock()
-
-	th.t.Log(output)
-
-	return len(output), nil
+	return nil
 }
 
 func (th *testHelper) getApi() *quantumfs.Api {
@@ -663,10 +671,16 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 	test.assert(err == nil, "Unable to open fileB for RDONLY")
 	defer fdB.Close()
 
+	statA, err := fdA.Stat()
+	test.assert(err == nil, "Unable to fetch fileA stats")
+	statB, err := fdB.Stat()
+	test.assert(err == nil, "Unable to fetch fileB stats")
+	test.assert(statB.Size() == statA.Size(), "file sizes don't match")
+
 	rtnA := make([]byte, len)
 	rtnB := make([]byte, len)
-	idx := int64(0)
-	for {
+
+	for idx := int64(0); idx+int64(len) < statA.Size(); idx += int64(offset) {
 		var readA int
 		for readA < len {
 			readIt, err := fdA.ReadAt(rtnA[readA:], idx+int64(readA))
@@ -690,10 +704,32 @@ func (test *testHelper) checkSparse(fileA string, fileB string, offset int,
 				"Error while reading from fileB at %d", idx)
 			readB += readIt
 		}
-
 		test.assert(bytes.Equal(rtnA, rtnB), "data mismatch, %v vs %v",
 			rtnA, rtnB)
-		idx += int64(offset)
+	}
+}
+
+func (test *testHelper) checkZeroSparse(fileA string, offset int) {
+
+	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
+	test.assert(err == nil, "Unable to open fileA for RDONLY")
+	defer fdA.Close()
+
+	statA, err := fdA.Stat()
+	test.assert(err == nil, "Unable to fetch fileA stats")
+
+	rtnA := make([]byte, 1)
+	for idx := int64(0); idx < statA.Size(); idx += int64(offset) {
+		_, err := fdA.ReadAt(rtnA, idx)
+
+		if err == io.EOF {
+			return
+		}
+		test.assert(err == nil,
+			"Error while reading from fileA at %d", idx)
+
+		test.assert(bytes.Equal(rtnA, []byte{0}), "file %s not zeroed",
+			fileA)
 	}
 }
 

@@ -36,7 +36,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
 
 	c.vlog("initDirectory Enter Fetching directory baselayer from %s",
-		baseLayerId)
+		baseLayerId.String())
 	defer c.vlog("initDirectory Exit")
 
 	// Set directory data before processing the children incase the children
@@ -49,7 +49,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	key := baseLayerId
 	for {
-		c.vlog("Fetching baselayer %v", key)
+		c.vlog("Fetching baselayer %s", key.String())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			panic("No baseLayer object")
@@ -625,7 +625,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	if result == fuse.OK {
 		dir.self.dirty(c)
-		c.vlog("Created new symlink with key: %s", key)
+		c.vlog("Created new symlink with key: %s", key.String())
 	}
 
 	return result
@@ -965,7 +965,7 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 			continue
 		}
 
-		c.vlog("Found attribute key: %v", key)
+		c.vlog("Found attribute key: %s", key.String())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			c.elog("Failed to retrieve attribute datablock")
@@ -1077,7 +1077,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 			return fuse.Status(syscall.ENOSPC)
 		}
 
-		c.vlog("Appending new attribute %v", attributeList)
+		c.vlog("Appending new attribute %v", attributeList.Bytes())
 		attributeList.SetAttribute(attributeList.NumAttributes(), attr,
 			dataKey)
 		attributeList.SetNumAttributes(attributeList.NumAttributes() + 1)
@@ -1187,7 +1187,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.vlog("ReadDirPlus directorySnapshot in: %v out: %v", input, out)
+	c.vlog("ReadDirPlus directorySnapshot")
 	offset := input.Offset
 
 	// Add .
