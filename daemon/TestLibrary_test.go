@@ -49,7 +49,7 @@ func runTest(t *testing.T, test quantumFsTest) {
 		testResult: make(chan string),
 		startTime:  time.Now(),
 		cachePath:  cachePath,
-		logger: qlog.NewQlogExt(cachePath+"/ramfs", 60 * 10000 * 24),
+		logger:     qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24),
 	}
 
 	defer th.endTest()

@@ -48,7 +48,7 @@ func ParseLogs(filepath string) string {
 	pastEndIdx, dataArray, strMapData := extractFields(filepath)
 
 	// create a safer map to use
-	strMap := make([]LogStr, len(strMapData) / LogStrSize)
+	strMap := make([]LogStr, len(strMapData)/LogStrSize)
 	idx := 0
 	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
 		mapEntry := (*LogStr)(unsafe.Pointer(&strMapData[i]))
@@ -56,7 +56,7 @@ func ParseLogs(filepath string) string {
 
 		idx++
 	}
-	
+
 	return outputLogs(pastEndIdx, dataArray, strMap)
 }
 
