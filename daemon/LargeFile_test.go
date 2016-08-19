@@ -18,11 +18,11 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
-		// Write the fibonacci sequence to the file continually past what
+		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		data := genFibonacci(34 * 1024 * 1024)
+		data := genData(34 * 1024 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing 34MB fibonacci to new fd: %v",
+		test.assert(err == nil, "Error writing 34MB data to new fd: %v",
 			err)
 
 		var stat syscall.Stat_t
@@ -34,7 +34,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		// Read it back
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 34MB fibonacci from file")
+		test.assert(err == nil, "Error reading 34MB data from file")
 		test.assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
 		if !bytes.Equal(data, output) {
@@ -70,7 +70,23 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
 		copy(output[offset:], endOfFile)
-		test.assert(bytes.Equal(data, output), "Data and file mismatch")
+		allZeroes := true
+		for i := newLen; i < len(data); i++ {
+			if output[i] != 0 {
+				allZeroes = false
+				break
+			}
+		}
+		test.assert(allZeroes, "Data hole isn't all zeroes")
+		test.assert(len(data) == len(output), "data len %d, output len %d",
+			len(data), len(output))
+		if !bytes.Equal(data[:newLen], output[:newLen]) {
+			for i := 0; i < len(data); i++ {
+				test.assert(data[i] == output[i],
+					"byte mismatch %d %v %v", i, data[i],
+					output[i])
+			}
+		}
 	})
 }
 
@@ -145,9 +161,9 @@ func TestLargeFileZero_test(t *testing.T) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
-		data := genFibonacci(10 * 1024)
+		data := genData(10 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing tiny fib to new fd")
+		test.assert(err == nil, "Error writing tiny data to new fd")
 		// expand this to be the desired file type
 		os.Truncate(testFilename, 34*1048576)
 

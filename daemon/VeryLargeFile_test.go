@@ -18,10 +18,10 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	workspace := test.nullWorkspace()
 	testFilename := workspace + "/test"
 
-	data := genFibonacci(512 * 1024)
+	data := genData(512 * 1024)
 	err := printToFile(testFilename, string(data))
 	test.assert(err == nil,
-		"Error writing 0.5MB fibonacci to new fd: %v", err)
+		"Error writing 0.5MB data to new fd: %v", err)
 	// Make this the file size desired (and hence type)
 	err = os.Truncate(testFilename, int64(fromFileSize))
 	test.assert(err == nil, "Unable to truncate expand file to %d", fromFileSize)
@@ -32,15 +32,15 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	test.assert(test.fileSize(testFilename) == int64(newLen),
 		"Truncation expansion failed")
 
-	// Then append fib *again* to the end of it
+	// Then append data *again* to the end of it
 	err = printToFile(testFilename, string(data))
 	test.assert(err == nil,
-		"Error writing 0.5MB fibonacci to existing fd: %v", err)
+		"Error writing 0.5MB data to existing fd: %v", err)
 	test.assert(test.fileSize(testFilename) == int64(newLen+len(data)),
 		"Post truncation expansion write failed, %d",
 		test.fileSize(testFilename))
 
-	// Read our fib back
+	// Read our data back
 	fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 	test.assert(fdErr == nil, "Unable to open file for RDONLY")
 	// Try to read more than should exist
@@ -52,7 +52,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	test.assert(bytes.Equal(startData[len(data):], make([]byte, 1000)),
 		"Data hole not created in small to very large file expand")
 
-	// Now check the fib at the end of the file
+	// Now check the data at the end of the file
 	fd, fdErr = os.OpenFile(testFilename, os.O_RDONLY, 0777)
 	test.assert(fdErr == nil, "Unable to open file for RDONLY")
 	// Try to read more than should exist
@@ -99,9 +99,9 @@ func TestVeryLargeFileZero_test(t *testing.T) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
-		data := genFibonacci(10 * 1024)
+		data := genData(10 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing tiny fib to new fd")
+		test.assert(err == nil, "Error writing tiny data to new fd")
 		// expand this to be the desired file type
 		os.Truncate(testFilename, 60*1024*1024*1024)
 
@@ -124,7 +124,7 @@ func TestVeryLargeFileReadPastEnd(t *testing.T) {
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating test file: %v", err)
 
-		data := genFibonacci(100 * 1024)
+		data := genData(100 * 1024)
 		_, err = file.Write(data)
 		test.assert(err == nil, "Error writing data to file: %v", err)
 
