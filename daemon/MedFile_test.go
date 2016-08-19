@@ -13,46 +13,73 @@ import "testing"
 import "strconv"
 import "syscall"
 
-func genFibonacci(maxLen int) []byte {
+func genData(maxLen int) []byte {
 	rtn := make([]byte, maxLen)
-	copy(rtn, "11")
-	end := 2
-	lastFib := 1
-	lastLastFib := 1
+	end := 0
+	i := 0
 
-	for len(rtn) < maxLen {
-		fibNum := lastFib + lastLastFib
-		lastLastFib = lastFib
-		lastFib = fibNum
-
-		copy(rtn[end:], strconv.Itoa(fibNum))
+	for end < maxLen {
+		end += copy(rtn[end:], strconv.Itoa(i))
+		i++
 	}
 
 	return rtn[:maxLen]
 }
 
-func TestFileExpansion_test(t *testing.T) {
+func TestGenData_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		hardcoded := "012345678910111213141516171819202122232425262"
+		data := genData(len(hardcoded))
+
+		test.assert(bytes.Equal([]byte(hardcoded), data),
+			"Data gen function off: %s vs %s", hardcoded, data)
+	})
+}
+
+func TestMedBranch_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
-
-		api := test.getApi()
 
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
-		// Write the fibonacci sequence to the file continually past what
+		data := genData(4 * 1024 * 1024)
+		// Write the data to the file continually past what
 		// a single block could hold.
-		data := genFibonacci(4 * 1024 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing 4MB fibonacci to new fd: %v",
+		test.assert(err == nil, "Error writing 4MB data to new fd: %v",
+			err)
+
+		// Branch the workspace
+		dst := test.branchWorkspace(workspace)
+		test.assert(err == nil, "Unable to branch")
+
+		test.checkSparse(test.absPath(dst+"/test"), testFilename, 40000,
+			10)
+	})
+}
+
+func TestFileExpansion_test(t *testing.T) {
+	data := genData(4 * 1024 * 1024)
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		// Write the data sequence to the file continually past what
+		// a single block could hold.
+		err := printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing 4MB data to new fd: %v",
 			err)
 
 		// Read it back
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 4MB fibonacci back from file")
+		test.assert(err == nil, "Error reading 4MB data back from file")
 		test.assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
+
 		if !bytes.Equal(data, output) {
 			for i := 0; i < len(data); i++ {
 				test.assert(data[i] == output[i],
@@ -67,7 +94,7 @@ func TestFileExpansion_test(t *testing.T) {
 
 		// Ensure that the data remaining is what we expect
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 2.5MB fibonacci from file")
+		test.assert(err == nil, "Error reading 2.5MB data from file")
 		test.assert(len(output) == newLen, "Truncated length incorrect")
 		test.assert(bytes.Equal(data[:newLen], output),
 			"Post-truncation mismatch")
@@ -77,20 +104,12 @@ func TestFileExpansion_test(t *testing.T) {
 		os.Truncate(testFilename, truncLen)
 
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading fib+hole back from file")
+		test.assert(err == nil, "Error reading data+hole back from file")
 		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
 			"Data readback mismatch")
 		delta := truncLen - newLen
 		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
 			"File hole not filled with zeros")
-
-		// Branch the workspace
-		dst := "largeattrsparse/test"
-		err = api.Branch(test.relPath(workspace), dst)
-		test.assert(err == nil, "Unable to branch")
-
-		test.checkSparse(test.absPath(dst+"/test"), testFilename, 25000,
-			10)
 	})
 }
 
@@ -159,9 +178,9 @@ func TestMedFileZero_test(t *testing.T) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/test"
 
-		data := genFibonacci(10 * 1024)
+		data := genData(10 * 1024)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing tiny fib to new fd")
+		test.assert(err == nil, "Error writing tiny data to new fd")
 		// expand this to be the desired file type
 		os.Truncate(testFilename, 2*1048576)
 
@@ -184,7 +203,7 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating test file: %v", err)
 
-		data := genFibonacci(100 * 1024)
+		data := genData(100 * 1024)
 		_, err = file.Write(data)
 		test.assert(err == nil, "Error writing data to file: %v", err)
 
