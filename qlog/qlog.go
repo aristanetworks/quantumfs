@@ -16,21 +16,30 @@ import "math"
 
 type LogSubsystem uint8
 
+func (v LogSubsystem) Primitive() interface{} {
+	return uint8(v)
+}
+
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
 	LogWorkspaceDb
 	LogTest
-	logSubsystemMax = LogTest
+	LogQlog
+	logSubsystemMax = LogQlog
 )
 
 const (
-	MuxReqId        uint64 = math.MaxUint64 - iota
-	FlushReqId      uint64 = math.MaxUint64 - iota
-	MinSpecialReqId uint64 = math.MaxUint64 - iota
+	MuxReqId uint64 = math.MaxUint64 - iota
+	FlushReqId
+	QlogReqId
+	TestReqId
+	MinSpecialReqId
 )
 
-func specialReq(reqId uint64) string {
+const TimeFormat = "2006-01-02T15:04:05.000000000"
+
+func SpecialReq(reqId uint64) string {
 	switch reqId {
 	default:
 		return "UNKNOWN"
@@ -38,6 +47,10 @@ func specialReq(reqId uint64) string {
 		return "[Mux]"
 	case FlushReqId:
 		return "[Flush]"
+	case QlogReqId:
+		return "[Qlog]"
+	case TestReqId:
+		return "[Test]"
 	}
 }
 
@@ -51,6 +64,8 @@ func (enum LogSubsystem) String() string {
 		return "WorkspaceDb"
 	case LogTest:
 		return "Test"
+	case LogQlog:
+		return "Qlog"
 	}
 	return ""
 }
@@ -65,23 +80,26 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 		return LogWorkspaceDb, nil
 	case "test":
 		return LogTest, nil
+	case "qlog":
+		return LogQlog, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
 
 const logEnvTag = "TRACE"
 const maxLogLevels = 4
+const defaultMmapFile = "qlog"
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {
-	var mask uint16 = (1 << ((uint8(idx) * maxLogLevels) + level))
-	return (q.logLevels & mask) != 0
+	var mask uint32 = (1 << uint32((uint8(idx)*maxLogLevels)+level))
+	return (q.LogLevels & mask) != 0
 }
 
 func (q *Qlog) setLogLevelBitmask(sys LogSubsystem, level uint8) {
 	idx := uint8(sys)
-	q.logLevels &= ^(((1 << maxLogLevels) - 1) << (idx * maxLogLevels))
-	q.logLevels |= uint16(level) << uint16(idx*maxLogLevels)
+	q.LogLevels &= ^(((1 << maxLogLevels) - 1) << (idx * maxLogLevels))
+	q.LogLevels |= uint32(level) << uint32(idx*maxLogLevels)
 }
 
 // Load desired log levels from the environment variable
@@ -139,24 +157,42 @@ func (q *Qlog) SetLogLevels(levels string) {
 type Qlog struct {
 	// This is the logging system level store. Increase size as the number of
 	// LogSubsystems increases past your capacity
-	logLevels uint16
-	write     func(format string, args ...interface{}) (int, error)
+	LogLevels uint32
+	Write     func(format string, args ...interface{}) error
+	logBuffer *SharedMemory
 }
 
-func printToStdout(format string, args ...interface{}) (int, error) {
+func printToStdout(format string, args ...interface{}) error {
 	format += "\n"
-	return fmt.Printf(format, args...)
+	_, err := fmt.Printf(format, args...)
+	return err
 }
 
-func NewQlog() *Qlog {
-	q := Qlog{
-		logLevels: 0,
-		write:     printToStdout,
+func NewQlogTiny() *Qlog {
+	return NewQlogExt("", uint32(DefaultMmapSize))
+}
+
+func NewQlog(ramfsPath string) *Qlog {
+	return NewQlogExt(ramfsPath, uint32(DefaultMmapSize))
+}
+
+func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
+
+	if sharedMemLen == 0 {
+		panic(fmt.Sprintf("Invalid shared memory length provided: %d\n",
+			sharedMemLen))
 	}
+
+	q := Qlog{
+		LogLevels: 0,
+		Write:     printToStdout,
+	}
+	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, int(sharedMemLen),
+		&q)
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >
-		uint8(unsafe.Sizeof(q.logLevels))*8 {
+		uint8(unsafe.Sizeof(q.LogLevels))*8 {
 
 		panic("Log level structure not large enough for given subsystems")
 	}
@@ -166,29 +202,39 @@ func NewQlog() *Qlog {
 	return &q
 }
 
-func (q *Qlog) SetWriter(w func(format string, args ...interface{}) (int, error)) {
-	q.write = w
+func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
+	q.Write = w
+}
+
+func formatString(idx LogSubsystem, reqId uint64, t time.Time,
+	format string) string {
+
+	var front string
+	if reqId < MinSpecialReqId {
+		const frontFmt = "%s | %12s %7d: "
+		front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
+			idx, reqId)
+	} else {
+		const frontFmt = "%s | %12s % 7s: "
+		front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
+			idx, SpecialReq(reqId))
+	}
+
+	return front + format
 }
 
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
-	// todo: send to shared memory
 	t := time.Now()
 
-	const timeFormat = "2006-01-02T15:04:05.000000000"
+	// Put into the shared circular buffer, UnixNano will work until year 2262
+	unixNano := t.UnixNano()
+	if q.logBuffer != nil {
+		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
+	}
 
 	if q.getLogLevel(idx, level) {
-		var front string
-		if reqId < MinSpecialReqId {
-			const frontFmt = "%s | %12s %7d: "
-			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
-				idx, reqId)
-		} else {
-			const frontFmt = "%s | %12s % 7s: "
-			front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
-				idx, specialReq(reqId))
-		}
-		q.write(front+format, args...)
+		q.Write(formatString(idx, reqId, t, format), args...)
 	}
 }

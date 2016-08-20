@@ -167,8 +167,6 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)
 	store.SetListOfBlocks(fi.metadata.Blocks)
 
-	c.vlog("Set blocks %d: %v", len(fi.metadata.Blocks), fi.metadata.Blocks)
-
 	bytes := store.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
@@ -209,6 +207,12 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		fi.metadata.LastBlockBytes = uint32(lastBlockLen)
 		return nil
 	}
+
+	// If we're decreasing length, we need to throw away dataBlocks
+	for i := newEndBlkIdx + 1; i < uint64(len(fi.metadata.Blocks)); i++ {
+		delete(fi.dataBlocks, int(i))
+	}
+	fi.metadata.Blocks = fi.metadata.Blocks[:newEndBlkIdx+1]
 
 	// Truncate the new last block
 	block := fi.retrieveDataBlock(c, int(newEndBlkIdx))
