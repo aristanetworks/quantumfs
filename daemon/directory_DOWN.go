@@ -45,11 +45,11 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 
 	newBaseLayerId := quantumfs.EmptyDirKey
 
-	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
+	// childIdx indexes into childrenRecords, entryIdx indexes into the
 	// metadata block
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
-	for _, child := range dir.childrenRecords {
+	for _, child := range dir.dirChildren.getRecords() {
 		if entryIdx == quantumfs.MaxDirectoryRecords {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
@@ -79,9 +79,15 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
-	for _, child := range dir.dirtyChildren_ {
+	dirtyChildren := dir.dirChildren.popDirtyInodes()
+
+	for _, childId := range dirtyChildren {
+		child := c.qfs.inode(c, childId)
 		newKey := child.sync_DOWN(c)
-		dir.childrenRecords[child.inodeNum()].SetID(newKey)
+		record, exists := dir.dirChildren.getRecord(childId)
+		if !exists {
+			panic("Unexpected missing child during update")
+		}
+		record.SetID(newKey)
 	}
-	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 }
