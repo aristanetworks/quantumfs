@@ -96,8 +96,10 @@ func (dir *Directory) updateSize_(c *ctx) {
 }
 
 // Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, child *quantumfs.DirectoryRecord) {
-	dir.dirChildren.setRecord(child)
+func (dir *Directory) addChild_(c *ctx, inode InodeId,
+	child *quantumfs.DirectoryRecord) {
+
+	dir.dirChildren.setLoadedRecord(inode, child)
 	dir.updateSize_(c)
 }
 
@@ -385,8 +387,8 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 }
 
 func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
-	rdev uint32, type_ quantumfs.ObjectType, key quantumfs.ObjectKey,
-	out *fuse.EntryOut) Inode {
+	rdev uint32, constructor InodeConstructor, type_ quantumfs.ObjectType,
+	key quantumfs.ObjectKey, out *fuse.EntryOut) Inode {
 
 	c.vlog("Directory::create_ Enter")
 	defer c.vlog("Directory::create_ Exit")
@@ -409,17 +411,16 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	entry.SetCreationTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
 
-	dir.addChild_(c, entry)
+	inodeNum := c.qfs.newInodeId()
+	newEntity := constructor(c, key, 0, inodeNum, dir.self, mode, rdev, entry)
+	dir.addChild_(c, inodeNum, entry)
+	c.qfs.setInode(c, inodeNum, newEntity)
 
 	fillEntryOutCacheData(c, out)
-	inodeNum, ok := dir.dirChildren.getInode(name)
-	if !ok {
-		panic("Failed to add child entry")
-	}
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
-	return c.qfs.inode(c, inodeNum)
+	return newEntity
 }
 
 func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
@@ -435,7 +436,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 		c.vlog("Creating file: '%s'", name)
 
-		file = dir.create_(c, name, input.Mode, input.Umask, 0,
+		file = dir.create_(c, name, input.Mode, input.Umask, 0, newSmallFile,
 			quantumfs.ObjectTypeSmallFile, quantumfs.EmptyBlockKey,
 			&out.EntryOut)
 		return fuse.OK
@@ -479,7 +480,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return fuse.Status(syscall.EEXIST)
 		}
 
-		dir.create_(c, name, input.Mode, input.Umask, 0,
+		dir.create_(c, name, input.Mode, input.Umask, 0, newDirectory,
 			quantumfs.ObjectTypeDirectoryEntry, quantumfs.EmptyDirKey,
 			out)
 		return fuse.OK
@@ -591,8 +592,8 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return fuse.EIO
 		}
 
-		dir.create_(c, name, 0777, 0777, 0, quantumfs.ObjectTypeSymlink, key,
-			out)
+		dir.create_(c, name, 0777, 0777, 0, newSymlink,
+			quantumfs.ObjectTypeSymlink, key, out)
 		return fuse.OK
 	}()
 
@@ -633,11 +634,11 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
 
 			dir.create_(c, name, input.Mode, input.Umask, input.Rdev,
-				quantumfs.ObjectTypeSpecial,
+				newSpecial, quantumfs.ObjectTypeSpecial,
 				quantumfs.ZeroKey, out)
 		} else if BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
 			dir.create_(c, name, input.Mode, input.Umask, 0,
-				quantumfs.ObjectTypeSmallFile,
+				newSmallFile, quantumfs.ObjectTypeSmallFile,
 				quantumfs.EmptyBlockKey, out)
 		} else {
 			c.dlog("Directory::Mknod invalid type %x", input.Mode)

@@ -79,11 +79,7 @@ func (cr *childRecords) loadChild_(entry *quantumfs.DirectoryRecord) {
 	case quantumfs.ObjectTypeSpecial:
 		constructor = newSpecial
 	}
-	if cr.dir == nil{
-cr.c.vlog("SETTING NULL")
-} else {
-cr.c.vlog("SETTING NON NULL")
-}
+
 	cr.c.qfs.setInode(cr.c, inodeId, constructor(cr.c, entry.ID(), entry.Size(),
 		inodeId, cr.dir, 0, 0, nil))
 }
@@ -114,6 +110,17 @@ func (cr *childRecords) setRecord(entry *quantumfs.DirectoryRecord) {
 			cr.data.records[inode] = entry
 		}
 	}
+}
+
+func (cr *childRecords) setLoadedRecord(inode InodeId,
+	entry *quantumfs.DirectoryRecord) {
+
+	// If a child record has been loaded for us, we need to load the rest
+	cr.loadData_()
+
+	cr.entries[entry.Filename()] = entry
+	cr.data.fileToInode[entry.Filename()] = inode
+	cr.data.records[inode] = entry
 }
 
 // childRecords functions which require loaded data
