@@ -8,27 +8,26 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
-
 type childRecordsData struct {
-	fileToInode	map[string]InodeId
-	records		map[InodeId]*quantumfs.DirectoryRecord
-	dirtyInodes	map[InodeId]InodeId // set of children which need sync
+	fileToInode map[string]InodeId
+	records     map[InodeId]*quantumfs.DirectoryRecord
+	dirtyInodes map[InodeId]InodeId // set of children which need sync
 }
 
 type childRecords struct {
 	// Only load record data when we absolutely have to
-	data		*childRecordsData
-	entries		map[string]*quantumfs.DirectoryRecord
-	c		*ctx
-	dir		*Directory
+	data    *childRecordsData
+	entries map[string]*quantumfs.DirectoryRecord
+	c       *ctx
+	dir     *Directory
 }
 
 func newChildRecords(c *ctx, dirParent *Directory) childRecords {
-	return childRecords {
-		data:		nil,
-		entries:	make(map[string]*quantumfs.DirectoryRecord, 0),
-		c:		c,
-		dir:		dirParent,
+	return childRecords{
+		data:    nil,
+		entries: make(map[string]*quantumfs.DirectoryRecord, 0),
+		c:       c,
+		dir:     dirParent,
 	}
 }
 

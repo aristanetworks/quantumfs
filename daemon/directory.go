@@ -23,8 +23,8 @@ type Directory struct {
 	InodeCommon
 
 	// These fields are protected by the InodeCommon.lock
-	baseLayerId	quantumfs.ObjectKey
-	dirChildren	childRecords
+	baseLayerId quantumfs.ObjectKey
+	dirChildren childRecords
 }
 
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
@@ -113,7 +113,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 	// If this is a file we need to reparent it to itself
 	record, exists := dir.dirChildren.getRecord(inodeNum)
-	if !exists {		
+	if !exists {
 		panic("Unexpected missing child inode")
 	}
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
@@ -129,7 +129,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 		}
 	}
 
-	dir.dirChildren.delete(name)	
+	dir.dirChildren.delete(name)
 	dir.updateSize_(c)
 }
 

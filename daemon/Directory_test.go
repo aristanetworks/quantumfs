@@ -589,18 +589,18 @@ func TestLoadOnDemand(t *testing.T) {
 		err := os.MkdirAll(dirName, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
 
-		err = printToFile(workspace + fileA, string(dataA))
+		err = printToFile(workspace+fileA, string(dataA))
 		test.assert(err == nil, "Error creating file: %v", err)
-		err = printToFile(workspace + fileB, string(dataB))
+		err = printToFile(workspace+fileB, string(dataB))
 		test.assert(err == nil, "Error creating file: %v", err)
-		err = printToFile(workspace + fileC, string(dataC))
+		err = printToFile(workspace+fileC, string(dataC))
 		test.assert(err == nil, "Error creating file: %v", err)
 
 		newspace := test.branchWorkspace(workspace)
 
 		// Grab the inode of fileA
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.absPath(newspace + fileA), &stat)
+		err = syscall.Stat(test.absPath(newspace+fileA), &stat)
 		test.assert(err == nil, "Error grabbing file inode: %v", err)
 
 		// Now grab the File for it
