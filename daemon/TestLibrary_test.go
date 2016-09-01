@@ -34,6 +34,14 @@ const fusectlPath = "/sys/fs/fuse/"
 
 type quantumFsTest func(test *testHelper)
 
+type logscanError struct {
+	logFile			string
+	shouldFailLogscan	bool
+	testName		string
+}
+var errorMutex sync.Mutex
+var errorLogs []logscanError
+
 // startTest is a helper which configures the testing environment
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
@@ -62,7 +70,7 @@ func runTest(t *testing.T, test quantumFsTest) {
 
 	select {
 	case <-time.After(1000 * time.Millisecond):
-		testResult = "TIMED OUT"
+		testResult = "ERROR: TIMED OUT"
 
 	case testResult = <-th.testResult:
 	}
@@ -165,11 +173,11 @@ func (th *testHelper) endTest() {
 		th.waitToBeUnmounted()
 		time.Sleep(1 * time.Second)
 
-		th.logscan()
-
-		if err := os.RemoveAll(th.tempDir); err != nil {
-			th.t.Fatalf("Failed to cleanup temporary mount point: %v",
-				err)
+		if testFailed := th.logscan(); !testFailed {
+			if err := os.RemoveAll(th.tempDir); err != nil {
+				th.t.Fatalf("Failed to cleanup temporary mount " +
+					"point: %v", err)
+			}
 		}
 	}
 
@@ -196,35 +204,68 @@ func (th *testHelper) waitToBeUnmounted() {
 }
 
 // Check the test output for errors
-func (th *testHelper) logscan() {
+func (th *testHelper) logscan() (foundErrors bool) {
 	// Check the format string map for the log first to speed this up
 	logFile := th.qfs.config.CachePath + "/qlog"
-	if !qlog.LogscanSkim(logFile) {
-		return
+	errorsPresent := qlog.LogscanSkim(logFile)
+
+	// Nothing went wrong if either we should fail and there were errors,
+	// or we shouldn't fail and there weren't errors
+	if th.shouldFailLogscan == errorsPresent {
+		return false
 	}
 
+	// There was a problem
+	errorMutex.Lock()
+	errorLogs = append(errorLogs, logscanError {
+		logFile:		logFile,
+		shouldFailLogscan:	th.shouldFailLogscan,
+		testName:		th.testName,
+	})
+	errorMutex.Unlock()
+
+	if !th.shouldFailLogscan {
+		th.t.Fatalf("Test FAILED due to FATAL messages\n")
+	} else {
+		th.t.Fatalf("Test FAILED due to missing FATAL messages\n")
+	}
+
+	return true
+}
+
+func outputLogError(errInfo logscanError) (summary string) {
 	errors := make([]string, 0, 10)
-	testOutput := qlog.ParseLogs(logFile)
+	testOutput := qlog.ParseLogs(errInfo.logFile)
 
 	lines := strings.Split(testOutput, "\n")
+
+	extraLines := 0
 	for _, line := range lines {
 		if strings.Contains(line, "PANIC") ||
 			strings.Contains(line, "WARN") ||
 			strings.Contains(line, "ERROR") {
+			extraLines = 2
+		}
+
+		// Output a couple extra lines after an ERROR
+		if extraLines > 0 {
 			errors = append(errors, line)
+			extraLines--
 		}
 	}
 
-	if !th.shouldFailLogscan && len(errors) != 0 {
-		for _, err := range errors {
-			th.t.Logf("FATAL message logged: %s", err)
-		}
-		th.t.Fatalf("Test FAILED due to FATAL messages. Dumping Logs:\n%s\n"+
-			"--- Test %s FAILED\n\n", testOutput, th.testName)
-	} else if th.shouldFailLogscan && len(errors) == 0 {
-		th.t.Fatalf("Test FAILED due to missing FATAL messages."+
-			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n", testOutput,
-			th.testName)
+	if !errInfo.shouldFailLogscan {
+		fmt.Printf("Test %s FAILED due to ERROR. Dumping Logs:\n%s\n"+
+			"--- Test %s FAILED\n\n\n", errInfo.testName, testOutput,
+			errInfo.testName)
+		return fmt.Sprintf("--- Test %s FAILED due to errors:\n%s\n",
+			errInfo.testName, strings.Join(errors, "\n"))
+	} else {
+		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
+			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
+			errInfo.testName, testOutput, errInfo.testName)
+		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found" +
+			" none.\n", errInfo.testName)
 	}
 }
 
@@ -535,7 +576,18 @@ func TestMain(m *testing.M) {
 	// will never return to allow GC to progress, the test program is deadlocked.
 	debug.SetGCPercent(-1)
 
+	// Setup an array for tests with errors to be logscanned later
+	errorLogs = make([]logscanError, 0)
+
 	result := m.Run()
+
+	testSummary := ""
+	errorMutex.Lock()
+	for i := 0; i < len(errorLogs); i++ {
+		testSummary += outputLogError(errorLogs[i])
+	}
+	errorMutex.Unlock()
+	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	os.RemoveAll(testRunDir)
 	os.Exit(result)

@@ -11,7 +11,7 @@ import "os"
 import "testing"
 import "syscall"
 
-func TestLargeFileExpansion_test(t *testing.T) {
+func TestLargeFileRead_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -31,19 +31,32 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		test.assert(stat.Size == int64(len(data)), "File size incorrect, %d",
 			stat.Size)
 
-		// Read it back
-		var output []byte
-		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading 34MB data from file")
-		test.assert(len(data) == len(output),
-			"Data length mismatch, %d vs %d", len(data), len(output))
-		if !bytes.Equal(data, output) {
-			for i := 0; i < len(data); i += 1024 {
-				test.assert(data[i] == output[i],
-					"Data readback mismatch at idx %d, %s vs %s",
-					i, data[i], output[i])
-			}
-		}
+		// Read a sample of it back
+		offset := 28 * 1024 * 1024
+		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
+		test.assert(fdErr == nil, "Unable to open file for RDONLY")
+		// Try to read more than should exist
+		endOfFile := test.readTo(fd, offset, len(data))
+		err = fd.Close()
+		test.assert(err == nil, "Unable to close file")
+		test.assert(bytes.Equal(data[offset:offset+len(endOfFile)],
+			endOfFile), "Data expansion corruption in file contents")
+	})
+}
+
+func TestLargeFileExpansion_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.nullWorkspace()
+		testFilename := workspace + "/test"
+
+		// Write the data sequence to the file continually past what
+		// a medium file could hold.
+		data := genData(34 * 1024 * 1024)
+		err := printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing 34MB data to new fd: %v",
+			err)
 
 		// Test that we can truncate this
 		newLen := 2500000
@@ -54,7 +67,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
 		// Try to read more than should exist
-		endOfFile := test.readTo(fd, offset, len(data)-offset)
+		endOfFile := test.readTo(fd, offset, len(data))
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
 		test.assert(len(endOfFile) == newLen-offset, "Truncation incorrect")
@@ -66,26 +79,25 @@ func TestLargeFileExpansion_test(t *testing.T) {
 
 		fd, fdErr = os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open for for RDONLY")
-		endOfFile = test.readTo(fd, offset, len(data)-offset)
+		endOfFile = test.readTo(fd, offset, (newLen-offset)+1000)
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
-		copy(output[offset:], endOfFile)
 		allZeroes := true
-		for i := newLen; i < len(data); i++ {
-			if output[i] != 0 {
+		test.assert(endOfFile[newLen-offset-1] != 0, "Data zeros offset")
+		for i := newLen-offset; i < len(endOfFile); i++ {
+			if endOfFile[i] != 0 {
 				allZeroes = false
 				break
 			}
 		}
 		test.assert(allZeroes, "Data hole isn't all zeroes")
-		test.assert(len(data) == len(output), "data len %d, output len %d",
-			len(data), len(output))
-		if !bytes.Equal(data[:newLen], output[:newLen]) {
-			for i := 0; i < len(data); i++ {
-				test.assert(data[i] == output[i],
+		if !bytes.Equal(data[offset:newLen], endOfFile[:newLen-offset]) {
+			for i := 0; i < newLen-offset; i++ {
+				test.assert(data[offset+i] == endOfFile[i],
 					"byte mismatch %d %v %v", i, data[i],
-					output[i])
+					endOfFile[i])
 			}
+			test.assert(false, "Arrays not equal, but debug failed")
 		}
 	})
 }

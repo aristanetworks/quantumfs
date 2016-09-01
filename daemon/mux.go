@@ -228,7 +228,7 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("PANIC serving request %u: '%v' Stacktrace: %v", exception,
+	c.elog("ERROR: PANIC serving request %u: '%v' Stacktrace: %v", exception,
 		BytesToString(stackTrace))
 }
 
