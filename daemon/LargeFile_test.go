@@ -84,7 +84,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		test.assert(err == nil, "Unable to close file")
 		allZeroes := true
 		test.assert(endOfFile[newLen-offset-1] != 0, "Data zeros offset")
-		for i := newLen-offset; i < len(endOfFile); i++ {
+		for i := newLen - offset; i < len(endOfFile); i++ {
 			if endOfFile[i] != 0 {
 				allZeroes = false
 				break

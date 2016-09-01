@@ -35,10 +35,11 @@ const fusectlPath = "/sys/fs/fuse/"
 type quantumFsTest func(test *testHelper)
 
 type logscanError struct {
-	logFile			string
-	shouldFailLogscan	bool
-	testName		string
+	logFile           string
+	shouldFailLogscan bool
+	testName          string
 }
+
 var errorMutex sync.Mutex
 var errorLogs []logscanError
 
@@ -175,7 +176,7 @@ func (th *testHelper) endTest() {
 
 		if testFailed := th.logscan(); !testFailed {
 			if err := os.RemoveAll(th.tempDir); err != nil {
-				th.t.Fatalf("Failed to cleanup temporary mount " +
+				th.t.Fatalf("Failed to cleanup temporary mount "+
 					"point: %v", err)
 			}
 		}
@@ -217,10 +218,10 @@ func (th *testHelper) logscan() (foundErrors bool) {
 
 	// There was a problem
 	errorMutex.Lock()
-	errorLogs = append(errorLogs, logscanError {
-		logFile:		logFile,
-		shouldFailLogscan:	th.shouldFailLogscan,
-		testName:		th.testName,
+	errorLogs = append(errorLogs, logscanError{
+		logFile:           logFile,
+		shouldFailLogscan: th.shouldFailLogscan,
+		testName:          th.testName,
 	})
 	errorMutex.Unlock()
 
@@ -264,7 +265,7 @@ func outputLogError(errInfo logscanError) (summary string) {
 		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
 			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
 			errInfo.testName, testOutput, errInfo.testName)
-		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found" +
+		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
 			" none.\n", errInfo.testName)
 	}
 }
