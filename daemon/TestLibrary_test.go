@@ -60,6 +60,7 @@ func runTest(t *testing.T, test quantumFsTest) {
 		cachePath:  cachePath,
 		logger:     qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24),
 	}
+	th.createTestDirs()
 
 	defer th.endTest()
 
@@ -180,6 +181,8 @@ func (th *testHelper) endTest() {
 					"point: %v", err)
 			}
 		}
+	} else {
+		th.t.Fatalf("No temporary directory available for logs")
 	}
 
 	if exception != nil {
@@ -207,7 +210,7 @@ func (th *testHelper) waitToBeUnmounted() {
 // Check the test output for errors
 func (th *testHelper) logscan() (foundErrors bool) {
 	// Check the format string map for the log first to speed this up
-	logFile := th.qfs.config.CachePath + "/qlog"
+	logFile := th.tempDir + "/ramfs/qlog"
 	errorsPresent := qlog.LogscanSkim(logFile)
 
 	// Nothing went wrong if either we should fail and there were errors,
@@ -289,8 +292,8 @@ type testHelper struct {
 
 func (th *testHelper) createTestDirs() string {
 	th.tempDir = testRunDir + "/" + th.testName
-	mountPath := th.tempDir + "/mnt"
 
+	mountPath := th.tempDir + "/mnt"
 	os.MkdirAll(mountPath, 0777)
 	th.log("Using mountpath %s", mountPath)
 
@@ -300,7 +303,7 @@ func (th *testHelper) createTestDirs() string {
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
-	mountPath := th.createTestDirs()
+	mountPath := th.tempDir + "/mnt"
 
 	config := QuantumFsConfig{
 		CachePath:        th.tempDir + "/ramfs",

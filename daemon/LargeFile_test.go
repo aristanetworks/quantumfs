@@ -20,26 +20,30 @@ func TestLargeFileRead_test(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		data := genData(34 * 1024 * 1024)
-		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing 34MB data to new fd: %v",
+		fullLength := 34 * 2014 * 1024
+		offset := 30 * 1024 * 1024
+		data := genData(fullLength-offset)
+		err := printToFile(testFilename, string(data[0]))
+		test.assert(err == nil, "Error creating file")
+		os.Truncate(testFilename, int64(offset))
+		err = printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing into medium sparse file: %v",
 			err)
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Unable to stat file: %v", err)
-		test.assert(stat.Size == int64(len(data)), "File size incorrect, %d",
-			stat.Size)
+		test.assert(stat.Size == int64(fullLength),
+			"File size incorrect, %d", stat.Size)
 
 		// Read a sample of it back
-		offset := 28 * 1024 * 1024
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
 		// Try to read more than should exist
 		endOfFile := test.readTo(fd, offset, len(data))
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
-		test.assert(bytes.Equal(data[offset:offset+len(endOfFile)],
+		test.assert(bytes.Equal(data[:len(endOfFile)],
 			endOfFile), "Data expansion corruption in file contents")
 	})
 }
@@ -53,9 +57,14 @@ func TestLargeFileExpansion_test(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		data := genData(34 * 1024 * 1024)
+		fullLength := 33 * 2014 * 1024
+		offset := 31 * 1024 * 1024
+		data := genData(fullLength-offset)
 		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing 34MB data to new fd: %v",
+		test.assert(err == nil, "Error creating file")
+		os.Truncate(testFilename, int64(offset))
+		err = printToFile(testFilename, string(data))
+		test.assert(err == nil, "Error writing into medium sparse file: %v",
 			err)
 
 		// Test that we can truncate this
@@ -63,7 +72,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		os.Truncate(testFilename, int64(newLen))
 
 		// Ensure that the data ends where we expect
-		offset := 2432132
+		offset = 2432132
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
 		// Try to read more than should exist
@@ -84,7 +93,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 		test.assert(err == nil, "Unable to close file")
 		allZeroes := true
 		test.assert(endOfFile[newLen-offset-1] != 0, "Data zeros offset")
-		for i := newLen - offset; i < len(endOfFile); i++ {
+		for i := newLen - offset; i < len(endOfFile); i += 1000 {
 			if endOfFile[i] != 0 {
 				allZeroes = false
 				break
