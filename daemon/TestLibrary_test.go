@@ -580,6 +580,9 @@ func TestMain(m *testing.M) {
 	// will never return to allow GC to progress, the test program is deadlocked.
 	debug.SetGCPercent(-1)
 
+	// Precompute a bunch of our genData to save time during tests
+	genData(40 * 1024 * 1024)
+
 	// Setup an array for tests with errors to be logscanned later
 	errorLogs = make([]logscanError, 0)
 

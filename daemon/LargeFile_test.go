@@ -20,7 +20,7 @@ func TestLargeFileRead_test(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		fullLength := 34 * 2014 * 1024
+		fullLength := 34 * 1024 * 1024
 		offset := 30 * 1024 * 1024
 		data := genData(fullLength - offset)
 		err := printToFile(testFilename, string(data[0]))
@@ -57,8 +57,8 @@ func TestLargeFileExpansion_test(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		fullLength := 33 * 2014 * 1024
-		offset := 31 * 1024 * 1024
+		fullLength := 34 * 1024 * 1024
+		offset := 30 * 1024 * 1024
 		data := genData(fullLength - offset)
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error creating file")

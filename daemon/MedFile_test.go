@@ -11,19 +11,30 @@ import "io/ioutil"
 import "os"
 import "testing"
 import "strconv"
+import "sync"
 import "syscall"
 
+var genDataMutex sync.RWMutex
+var precompGenData []byte
+var genDataLast int
+
 func genData(maxLen int) []byte {
-	rtn := make([]byte, maxLen)
-	end := 0
-	i := 0
+	if maxLen > len(precompGenData) {
+		// we need to expand the array
+		genDataMutex.Lock()
 
-	for end < maxLen {
-		end += copy(rtn[end:], strconv.Itoa(i))
-		i++
+		for len(precompGenData) <= maxLen {
+			precompGenData = append(precompGenData,
+				strconv.Itoa(genDataLast)...)
+			genDataLast++
+		}
+
+		genDataMutex.Unlock()
 	}
+	genDataMutex.RLock()
+	defer genDataMutex.RUnlock()
 
-	return rtn[:maxLen]
+	return precompGenData[:maxLen]
 }
 
 func TestGenData_test(t *testing.T) {
