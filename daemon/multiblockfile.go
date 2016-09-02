@@ -92,14 +92,29 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 		expectedSize = fi.metadata.LastBlockBytes
 	}
 
-	block := fi.retrieveDataBlock(c, blockIdx)
-	block.SetSize(int(expectedSize))
-
-	if offset >= uint64(block.Size()) {
+	if offset >= uint64(expectedSize) {
 		return 0, nil
 	}
 
-	copied := block.Read(buf, uint32(offset))
+	block := fi.retrieveDataBlock(c, blockIdx)
+
+	// Copy only what we have, and then zero out the rest
+	copied := 0
+	if offset < uint64(block.Size()) {
+		copied = block.Read(buf, uint32(offset))
+	}
+	remainingLen := int(expectedSize) - (int(offset) + copied)
+
+	for i := 0; i < remainingLen; i++ {
+		// Stop if buf isn't big enough to hold all the data
+		if copied >= len(buf) {
+			break
+		}
+
+		buf[copied] = 0
+		copied++
+	}
+
 	return copied, nil
 }
 
