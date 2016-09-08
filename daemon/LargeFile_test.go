@@ -136,7 +136,6 @@ func TestLargeFileAttr_test(t *testing.T) {
 			stat.Size)
 
 		// Read what should be 34MB of zeros
-		var output []byte
 		test.checkZeroSparse(testFilename, 34000)
 
 		// Ensure that we can write data into the hole
@@ -150,13 +149,14 @@ func TestLargeFileAttr_test(t *testing.T) {
 		test.assert(err == nil, "Unable to write at offset: %v", err)
 		test.assert(count == len(testString),
 			"Unable to write data all at once")
+
+		output := make([]byte, len(testString))
+		_, err = file.ReadAt(output, int64(dataOffset))
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
 
-		output, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Failed to read large file with sparse data")
-		test.assert(bytes.Equal(output[dataOffset:dataOffset+
-			len(testString)], testString),
+		test.assert(bytes.Equal(output, testString),
 			"Offset write failed in sparse file")
 
 		// Branch the workspace
