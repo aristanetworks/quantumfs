@@ -157,7 +157,7 @@ func (cr *childRecords) getInode(c *ctx, filename string) (InodeId, bool) {
 
 func (cr *childRecords) getNameRecord(c *ctx,
 	filename string) (dr *quantumfs.DirectoryRecord, exists bool) {
-	
+
 	inode, ok := cr.data.fileToInode[filename]
 	if !ok {
 		return nil, false
