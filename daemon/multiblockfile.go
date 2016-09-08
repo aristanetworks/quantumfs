@@ -18,7 +18,7 @@ type MultiBlockContainer struct {
 
 type MultiBlockFile struct {
 	metadata   MultiBlockContainer
-	dataBlocks map[int]quantumfs.Buffer
+	toSync map[int]quantumfs.Buffer
 	maxBlocks  int
 }
 
@@ -45,7 +45,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 
 func initMultiBlockAccessor(multiBlock *MultiBlockFile, maxBlocks int) {
 	multiBlock.maxBlocks = maxBlocks
-	multiBlock.dataBlocks = make(map[int]quantumfs.Buffer)
+	multiBlock.toSync = make(map[int]quantumfs.Buffer)
 	multiBlock.metadata.BlockSize = uint32(quantumfs.MaxBlockSize)
 }
 
@@ -64,10 +64,9 @@ func (fi *MultiBlockFile) expandTo(length int) {
 func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buffer {
 	c.vlog("MultiBlockFile::retrieveDataBlock Enter %d", blockIdx)
 	defer c.vlog("MultiBlockFile::retrieveDataBlock Exit")
-	block, exists := fi.dataBlocks[blockIdx]
+	block, exists := fi.toSync[blockIdx]
 	if !exists {
-		block = c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
-		fi.dataBlocks[blockIdx] = block
+		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
 	}
 
 	return block
@@ -144,6 +143,10 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		if blockIdx == len(fi.metadata.Blocks)-1 {
 			fi.metadata.LastBlockBytes = uint32(block.Size())
 		}
+
+		// Ensure we note the block for syncing
+		fi.toSync[blockIdx] = block
+
 		return int(copied), nil
 	}
 
@@ -167,13 +170,14 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	c.vlog("MultiBlockFile::sync Enter")
 	defer c.vlog("MultiBlockFile::sync Exit")
 
-	for i, block := range fi.dataBlocks {
+	for i, block := range fi.toSync {
 		c.vlog("Syncing block %d", i)
 		key, err := block.Key(&c.Ctx)
 		if err != nil {
 			panic("TODO Failed to update datablock")
 		}
 		fi.metadata.Blocks[i] = key
+		delete(fi.toSync, i)
 	}
 
 	store := quantumfs.NewMultiBlockFile(fi.maxBlocks)
@@ -201,7 +205,7 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 
 	// Handle the special zero length case
 	if newLengthBytes == 0 {
-		fi.dataBlocks = make(map[int]quantumfs.Buffer)
+		fi.toSync = make(map[int]quantumfs.Buffer)
 		fi.metadata.Blocks = make([]quantumfs.ObjectKey, 0)
 		fi.metadata.LastBlockBytes = 0
 		return nil
@@ -223,9 +227,9 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		return nil
 	}
 
-	// If we're decreasing length, we need to throw away dataBlocks
+	// If we're decreasing length, we need to throw away toSync
 	for i := newEndBlkIdx + 1; i < uint64(len(fi.metadata.Blocks)); i++ {
-		delete(fi.dataBlocks, int(i))
+		delete(fi.toSync, int(i))
 	}
 	fi.metadata.Blocks = fi.metadata.Blocks[:newEndBlkIdx+1]
 
