@@ -512,12 +512,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
-		inode, exists := dir.dirChildren.getInode(c, name)
-		if !exists {
-			return fuse.ENOENT
-		}
-
-		record, exists := dir.dirChildren.getRecord(c, inode)
+		record, exists := dir.dirChildren.getNameRecord(c, name)
 		if !exists {
 			return fuse.ENOENT
 		}
@@ -544,12 +539,8 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
-		inode, exists := dir.dirChildren.getInode(c, name)
-		if !exists {
-			return fuse.ENOENT
-		}
 
-		record, exists := dir.dirChildren.getRecord(c, inode)
+		record, exists := dir.dirChildren.getNameRecord(c, name)
 		if !exists {
 			return fuse.ENOENT
 		}
@@ -802,49 +793,24 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	if dir.parent() == nil {
-		c.wlog("No parent in GetXAttrSize call %d", dir.inodeNum())
-		return 0, fuse.EIO
-	}
-
 	return dir.parent().getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	if dir.parent() == nil {
-		c.wlog("No parent in GetXAttrData call %d", dir.inodeNum())
-		return nil, fuse.EIO
-	}
-
 	return dir.parent().getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	if dir.parent() == nil {
-		c.wlog("No parent in ListXAttr call %d", dir.inodeNum())
-		return nil, fuse.EIO
-	}
-
 	return dir.parent().listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	if dir.parent() == nil {
-		c.wlog("No parent in SetXAttr call %d", dir.inodeNum())
-		return fuse.EIO
-	}
-
 	return dir.parent().setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	if dir.parent() == nil {
-		c.wlog("No parent in RemoveXAttr call %d", dir.inodeNum())
-		return fuse.EIO
-	}
-
 	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
 }
 

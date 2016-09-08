@@ -155,8 +155,19 @@ func (cr *childRecords) getInode(c *ctx, filename string) (InodeId, bool) {
 	return inode, ok
 }
 
-func (cr *childRecords) getRecord(c *ctx, inodeNum InodeId) (dr *quantumfs.DirectoryRecord,
-	exists bool) {
+func (cr *childRecords) getNameRecord(c *ctx,
+	filename string) (dr *quantumfs.DirectoryRecord, exists bool) {
+	
+	inode, ok := cr.data.fileToInode[filename]
+	if !ok {
+		return nil, false
+	}
+
+	return cr.getRecord(c, inode)
+}
+
+func (cr *childRecords) getRecord(c *ctx,
+	inodeNum InodeId) (dr *quantumfs.DirectoryRecord, exists bool) {
 
 	cr.loadData_(c)
 
@@ -185,7 +196,8 @@ func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 	cr.loadData_(c)
 
 	oldInodeId := cr.data.fileToInode[oldName]
-	preexistingId := cr.data.fileToInode[newName]
+	// If a file already exists with newName, we need to clean it up
+	cleanupInodeId := cr.data.fileToInode[newName]
 
 	cr.entries[newName] = cr.data.records[oldInodeId]
 	cr.data.records[oldInodeId].SetFilename(newName)
@@ -195,8 +207,8 @@ func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 	delete(cr.entries, oldName)
 
 	// cleanup / remove any existing inode with that name
-	delete(cr.data.records, preexistingId)
-	delete(cr.data.dirtyInodes, preexistingId)
+	delete(cr.data.records, cleanupInodeId)
+	delete(cr.data.dirtyInodes, cleanupInodeId)
 }
 
 func (cr *childRecords) popDirtyInodes() map[InodeId]InodeId {
