@@ -40,7 +40,7 @@ func TestLargeFileRead_test(t *testing.T) {
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
 		// Try to read more than should exist
-		endOfFile := test.readTo(fd, offset, len(data))
+		endOfFile := test.readTo(fd, offset, len(data)*2)
 		err = fd.Close()
 		test.assert(err == nil, "Unable to close file")
 		test.assert(bytes.Equal(data[:len(endOfFile)],

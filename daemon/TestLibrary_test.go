@@ -290,7 +290,7 @@ type testHelper struct {
 	shouldFailLogscan bool
 }
 
-func (th *testHelper) createTestDirs() string {
+func (th *testHelper) createTestDirs() {
 	th.tempDir = testRunDir + "/" + th.testName
 
 	mountPath := th.tempDir + "/mnt"
@@ -298,8 +298,6 @@ func (th *testHelper) createTestDirs() string {
 	th.log("Using mountpath %s", mountPath)
 
 	os.MkdirAll(th.tempDir+"/ether", 0777)
-
-	return mountPath
 }
 
 func (th *testHelper) defaultConfig() QuantumFsConfig {
@@ -798,3 +796,37 @@ func (test *testHelper) fileSize(filename string) int64 {
 	test.assert(err == nil, "Error stat'ing test file: %v", err)
 	return stat.Size
 }
+
+var genDataMutex sync.RWMutex
+var precompGenData []byte
+var genDataLast int
+
+func genData(maxLen int) []byte {
+	if maxLen > len(precompGenData) {
+		// we need to expand the array
+		genDataMutex.Lock()
+
+		for len(precompGenData) <= maxLen {
+			precompGenData = append(precompGenData,
+				strconv.Itoa(genDataLast)...)
+			genDataLast++
+		}
+
+		genDataMutex.Unlock()
+	}
+	genDataMutex.RLock()
+	defer genDataMutex.RUnlock()
+
+	return precompGenData[:maxLen]
+}
+
+func TestGenData_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		hardcoded := "012345678910111213141516171819202122232425262"
+		data := genData(len(hardcoded))
+
+		test.assert(bytes.Equal([]byte(hardcoded), data),
+			"Data gen function off: %s vs %s", hardcoded, data)
+	})
+}
+

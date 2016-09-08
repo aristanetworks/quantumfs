@@ -10,42 +10,7 @@ import "io"
 import "io/ioutil"
 import "os"
 import "testing"
-import "strconv"
-import "sync"
 import "syscall"
-
-var genDataMutex sync.RWMutex
-var precompGenData []byte
-var genDataLast int
-
-func genData(maxLen int) []byte {
-	if maxLen > len(precompGenData) {
-		// we need to expand the array
-		genDataMutex.Lock()
-
-		for len(precompGenData) <= maxLen {
-			precompGenData = append(precompGenData,
-				strconv.Itoa(genDataLast)...)
-			genDataLast++
-		}
-
-		genDataMutex.Unlock()
-	}
-	genDataMutex.RLock()
-	defer genDataMutex.RUnlock()
-
-	return precompGenData[:maxLen]
-}
-
-func TestGenData_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		hardcoded := "012345678910111213141516171819202122232425262"
-		data := genData(len(hardcoded))
-
-		test.assert(bytes.Equal([]byte(hardcoded), data),
-			"Data gen function off: %s vs %s", hardcoded, data)
-	})
-}
 
 func TestMedBranch_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
