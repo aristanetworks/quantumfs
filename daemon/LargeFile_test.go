@@ -154,7 +154,7 @@ func TestLargeFileAttr_test(t *testing.T) {
 		_, err = file.ReadAt(output, int64(dataOffset))
 		err = file.Close()
 		test.assert(err == nil, "Unable to close file handle")
-		
+
 		test.assert(err == nil, "Failed to read large file with sparse data")
 		test.assert(bytes.Equal(output, testString),
 			"Offset write failed in sparse file")
