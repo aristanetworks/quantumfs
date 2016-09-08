@@ -84,7 +84,7 @@ func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	for _, childId := range dirtyChildren {
 		child := c.qfs.inode(c, childId)
 		newKey := child.sync_DOWN(c)
-		record, exists := dir.dirChildren.getRecord(childId)
+		record, exists := dir.dirChildren.getRecord(c, childId)
 		if !exists {
 			panic("Unexpected missing child during update")
 		}
