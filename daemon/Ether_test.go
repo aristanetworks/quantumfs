@@ -13,7 +13,7 @@ import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
-	mountPath := th.createTestDirs()
+	mountPath := th.tempDir + "/mnt"
 
 	datastorePath := th.tempDir + "/ether"
 	datastore := thirdparty_backends.NewEtherFilesystemStore(datastorePath)

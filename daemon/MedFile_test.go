@@ -10,31 +10,7 @@ import "io"
 import "io/ioutil"
 import "os"
 import "testing"
-import "strconv"
 import "syscall"
-
-func genData(maxLen int) []byte {
-	rtn := make([]byte, maxLen)
-	end := 0
-	i := 0
-
-	for end < maxLen {
-		end += copy(rtn[end:], strconv.Itoa(i))
-		i++
-	}
-
-	return rtn[:maxLen]
-}
-
-func TestGenData_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		hardcoded := "012345678910111213141516171819202122232425262"
-		data := genData(len(hardcoded))
-
-		test.assert(bytes.Equal([]byte(hardcoded), data),
-			"Data gen function off: %s vs %s", hardcoded, data)
-	})
-}
 
 func TestMedBranch_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
