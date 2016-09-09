@@ -647,3 +647,63 @@ func TestLoadOnDemand(t *testing.T) {
 			"dynamically loaded inode data mismatch")
 	})
 }
+
+func TestInodeForget(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+
+		dirName := workspace + "/layerA/layerB"
+		fileA := "/layerA/fileA"
+		fileB := "/layerA/layerB/fileB"
+
+		data := genData(2400)
+		dataA := data[0:800]
+		dataB := data[800:1600]
+
+		err := os.MkdirAll(dirName, 0124)
+		test.assert(err == nil, "Error creating directories: %v", err)
+
+		err = printToFile(workspace+fileA, string(dataA))
+		test.assert(err == nil, "Error creating file: %v", err)
+		err = printToFile(workspace+fileB, string(dataB))
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		// Grab the inode of fileA
+		var stat syscall.Stat_t
+		err = syscall.Stat(workspace+fileA, &stat)
+		test.assert(err == nil, "Error grabbing file inode: %v", err)
+
+		// Grab layerA from fileA
+		fileNode := test.qfs.inode(&test.qfs.c, InodeId(stat.Ino))
+		test.assert(fileNode != nil, "File inode for fileA is nil")
+		layerA := fileNode.parent()
+		test.assert(layerA != nil, "FileA has no parent")
+
+		// Now lets forget fileA
+		test.qfs.allowForget = true
+		test.qfs.Forget(stat.Ino, 1)
+
+		// Make sure nothing else gets forgotten
+		test.qfs.allowForget = false
+		test.assert(test.qfs.inode(&test.qfs.c, layerA.inodeNum()) != nil,
+			"Parent of forgotten node also forgotten")
+		layerAPtr := layerA.(*Directory)
+		layerBId, exists := layerAPtr.dirChildren.getInode(&test.qfs.c,
+			"layerB")
+		test.assert(exists, "layerB missing from inode structure")
+		layerB := test.qfs.inode(&test.qfs.c, layerBId)
+		test.assert(layerB != nil,
+			"Sibling of forgotten node also forgotten")
+
+		layerBPtr := layerB.(*Directory)
+		fileBId, exists := layerBPtr.dirChildren.getInode(&test.qfs.c, "fileB")
+		test.assert(exists, "fileB missing from inode structure")
+		test.assert(test.qfs.inode(&test.qfs.c, fileBId) != nil,
+			"Cousin of forgotten node also forgotten")
+
+		// Make sure that fileA actually was forgotten
+		test.assert(test.qfs.inode(&test.qfs.c, InodeId(stat.Ino)) == nil,
+			"Forgotten inode not forgotten")
+	})
+}

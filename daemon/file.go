@@ -186,11 +186,6 @@ func (fi *File) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	return fuse.ENOSYS
 }
 
-func (fi *File) Forget(c *ctx) {
-	// Remove the inode from the map, ready to be garbage collected
-	c.qfs.setInode(c, fi.id, nil)
-}
-
 func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 

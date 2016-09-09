@@ -9,6 +9,10 @@ import "encoding/binary"
 
 import "github.com/aristanetworks/quantumfs"
 
+func (special *Special) forget_DOWN(c *ctx) {
+	c.elog("Invalid forget_DOWN call on Special")
+}
+
 func (special *Special) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	special.setDirty(false)
 	var hash [quantumfs.ObjectKeyLength - 1]byte

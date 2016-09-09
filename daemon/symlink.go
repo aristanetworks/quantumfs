@@ -59,10 +59,6 @@ func (link *Symlink) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status
 	return fuse.ENOSYS
 }
 
-func (link *Symlink) Forget(c *ctx) {
-	c.elog("Invalid Forget call on Symlink")
-}
-
 func (link *Symlink) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 

@@ -28,8 +28,6 @@ type Inode interface {
 	Lookup(c *ctx, name string,
 		out *fuse.EntryOut) fuse.Status
 
-	Forget(c *ctx)
-
 	Open(c *ctx, flags uint32, mode uint32,
 		out *fuse.OpenOut) fuse.Status
 
@@ -108,6 +106,8 @@ type Inode interface {
 	// Compute a new object key, possibly schedule the sync the object data
 	// itself to the datastore
 	sync_DOWN(c *ctx) quantumfs.ObjectKey
+
+	forget_DOWN(c *ctx)
 
 	inodeNum() InodeId
 

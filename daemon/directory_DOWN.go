@@ -7,6 +7,27 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
+func (dir *Directory) forget_DOWN(c *ctx) {
+	c.vlog("Directory::forget_DOWN Enter")
+	defer c.vlog("Directory::forget_DOWN Exit")
+
+	defer dir.Lock().Unlock()
+
+	// We need to ensure that we sync before we forget, or we won't save changes
+	if dir.isDirty() {
+		dir.updateRecords_DOWN_(c)
+		newKey := dir.publish(c)
+
+		dir.parent().syncChild(c, dir.InodeCommon.id, newKey)
+	}
+
+	// Tell all the children to forget themselves
+	dir.dirChildren.forget_DOWN(c)	
+
+	// Then remove the inode from the map, ready to be garbage collected
+	c.qfs.setInode(c, dir.id, nil)
+}
+
 func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory::sync Enter")
 	defer c.vlog("Directory::sync Exit")
@@ -83,6 +104,7 @@ func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 
 	for _, childId := range dirtyChildren {
 		child := c.qfs.inode(c, childId)
+
 		newKey := child.sync_DOWN(c)
 		record, exists := dir.dirChildren.getRecord(c, childId)
 		if !exists {

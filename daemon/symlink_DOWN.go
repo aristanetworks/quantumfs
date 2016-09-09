@@ -7,6 +7,10 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
+func (link *Symlink) forget_DOWN(c *ctx) {
+	c.elog("Invalid forget_DOWN call on Symlink")
+}
+
 func (link *Symlink) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	link.setDirty(false)
 	return link.key

@@ -196,10 +196,6 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) Forget(c *ctx) {
-	c.elog("Invalid Forget on NamespaceList")
-}
-
 func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
@@ -443,10 +439,6 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, name)
 
 	return fuse.OK
-}
-
-func (wsl *WorkspaceList) Forget(c *ctx) {
-	c.elog("Invalid Forget on WorkspaceList")
 }
 
 func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,

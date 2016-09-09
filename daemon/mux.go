@@ -5,6 +5,7 @@
 // requests and forwards them to the correct Inode.
 package daemon
 
+import "fmt"
 import "math"
 import "runtime/debug"
 import "syscall"
@@ -230,8 +231,8 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("ERROR: PANIC serving request %u: '%v' Stacktrace: %v", exception,
-		BytesToString(stackTrace))
+	c.elog("ERROR: PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
+		fmt.Sprintf("%v", exception), BytesToString(stackTrace))
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
@@ -268,7 +269,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	inode.Forget(&qfs.c)
+	inode.forget_DOWN(&qfs.c)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
