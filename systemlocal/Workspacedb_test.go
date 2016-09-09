@@ -56,3 +56,90 @@ func TestEmptyDB(t *testing.T) {
 		assert(key.IsEqualTo(quantumfs.EmptyDirKey), "null workspace isn't empty")
 	})
 }
+
+func TestBranching(t *testing.T) {
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		err := db.BranchWorkspace(nil, "notthere", "a", "somewhere", "else")
+		assert(err != nil, "Succeeded branching invalid namespace")
+
+		err = db.BranchWorkspace(nil, "_null", "notthere", "somewhere",
+			"else")
+		assert(err != nil, "Succeeded branching invalid workspace")
+
+		err = db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err == nil, "Failed branching null workspace")
+
+		err = db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err != nil, "Succeeded branching to existing workspace")
+
+		err = db.BranchWorkspace(nil, "test", "a", "test", "b")
+		assert(err == nil, "Failed rebranching workspace")
+	})
+}
+
+func TestNamespaceList(t *testing.T) {
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		err := db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err == nil, "Failed creating workspace")
+
+		err = db.BranchWorkspace(nil, "_null", "null", "test", "b")
+		assert(err == nil, "Failed creating workspace")
+
+		exists := db.WorkspaceExists(nil, "test", "a")
+		assert(exists, "Workspace not really created")
+		exists = db.WorkspaceExists(nil, "test", "b")
+		assert(exists, "Workspace not really created")
+
+		workspaces := db.WorkspaceList(nil, "test")
+		assert(len(workspaces) == 2, "Incorrect number of workspaces")
+
+		a := false
+		b := false
+
+		for _, workspace := range workspaces {
+			if workspace == "a" {
+				a = true
+			}
+
+			if workspace == "b" {
+				b = true
+			}
+		}
+
+		assert(a && b, "Expected workspaces not there")
+	})
+}
+
+func TestWorkspaceList(t *testing.T) {
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		err := db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err == nil, "Failed creating workspace")
+
+		exists := db.NamespaceExists(nil, "test")
+		assert(exists, "Namespace not really created")
+
+		namespaces := db.NamespaceList(nil)
+		assert(len(namespaces) == 2, "Incorrect number of namespaces")
+
+		_null := false
+		test := false
+
+		for _, namespace := range namespaces {
+			if namespace == "_null" {
+				_null = true
+			}
+
+			if namespace == "test" {
+				test = true
+			}
+		}
+
+		assert(_null && test, "Expected namespaces not there")
+	})
+}
