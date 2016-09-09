@@ -15,6 +15,8 @@ import "github.com/aristanetworks/quantumfs"
 type systemlocalTest func(path string)
 
 func runTest(t *testing.T, test systemlocalTest) {
+	t.Parallel()
+
 	// Create a temporary directory to contain the database
 	testDir, err := ioutil.TempDir("", "systemlocalTest")
 	if err != nil {
