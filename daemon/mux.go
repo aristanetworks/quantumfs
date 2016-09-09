@@ -35,7 +35,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 			workspaceDB: config.WorkspaceDB,
 			dataStore:   newDataStore(config.DurableStore),
 		},
-		allowForget:      true,
+		allowForget: true,
 	}
 
 	qfs.c.qfs = qfs
@@ -262,7 +262,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	}
 
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
-	
+
 	inode := qfs.inode(&qfs.c, InodeId(nodeID))
 	if inode == nil {
 		// Nothing to do

@@ -3,7 +3,6 @@
 
 package daemon
 
-
 func (cr *childRecords) forget_DOWN(c *ctx) {
 	if cr.data == nil {
 		// Nothing has been loaded, so nothing to forget

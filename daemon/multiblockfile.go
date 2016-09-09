@@ -17,9 +17,9 @@ type MultiBlockContainer struct {
 }
 
 type MultiBlockFile struct {
-	metadata   MultiBlockContainer
-	toSync map[int]quantumfs.Buffer
-	maxBlocks  int
+	metadata  MultiBlockContainer
+	toSync    map[int]quantumfs.Buffer
+	maxBlocks int
 }
 
 func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,

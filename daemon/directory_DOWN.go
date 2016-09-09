@@ -22,7 +22,7 @@ func (dir *Directory) forget_DOWN(c *ctx) {
 	}
 
 	// Tell all the children to forget themselves
-	dir.dirChildren.forget_DOWN(c)	
+	dir.dirChildren.forget_DOWN(c)
 
 	// Then remove the inode from the map, ready to be garbage collected
 	c.qfs.setInode(c, dir.id, nil)
