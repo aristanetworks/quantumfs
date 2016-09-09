@@ -88,9 +88,8 @@ func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) []string {
 	wsdb.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(namespacesBucket)
 		namespaces := bucket.Cursor()
-		for namespace, _ := namespaces.First(); namespace != nil; namespace, _ = namespaces.Next() {
-
-			namespaceList = append(namespaceList, string(namespace))
+		for n, _ := namespaces.First(); n != nil; n, _ = namespaces.Next() {
+			namespaceList = append(namespaceList, string(n))
 		}
 
 		return nil
@@ -123,9 +122,8 @@ func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) []str
 		namespaces := tx.Bucket(namespacesBucket)
 		bucket := namespaces.Bucket([]byte(namespace))
 		workspaces := bucket.Cursor()
-		for workspace, _ := workspaces.First(); workspace != nil; workspace, _ = workspaces.Next() {
-
-			workspaceList = append(workspaceList, string(workspace))
+		for w, _ := workspaces.First(); w != nil; w, _ = workspaces.Next() {
+			workspaceList = append(workspaceList, string(w))
 		}
 
 		return nil
