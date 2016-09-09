@@ -706,5 +706,14 @@ func TestInodeForget(t *testing.T) {
 		// Make sure that fileA actually was forgotten
 		test.assert(test.qfs.inode(&test.qfs.c, InodeId(stat.Ino)) == nil,
 			"Forgotten inode not forgotten")
+
+		// Now branch the workspace and check that fileA was synced
+		newspace := test.branchWorkspace(workspace)
+
+		var output []byte
+		output, err = ioutil.ReadFile(test.absPath(newspace+fileA))
+		test.assert(err == nil, "Error reading from branched fileA")
+		test.assert(bytes.Equal(output, dataA),
+			"FileA not synced before forget")
 	})
 }
