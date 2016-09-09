@@ -23,3 +23,20 @@ func registerDatastore(name string, constructor DatastoreConstructor) {
 
 	Datastores = append(Datastores, store)
 }
+
+type WorkspaceDBConstructor func(conf string) quantumfs.WorkspaceDB
+type WorkspaceDB struct {
+	Name        string
+	Constructor WorkspaceDBConstructor
+}
+
+var WorkspaceDBs []WorkspaceDB
+
+func registerWorkspaceDB(name string, constructor WorkspaceDBConstructor) {
+	db := WorkspaceDB{
+		Name:        name,
+		Constructor: constructor,
+	}
+
+	WorkspaceDBs = append(WorkspaceDBs, db)
+}

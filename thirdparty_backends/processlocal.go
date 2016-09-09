@@ -11,4 +11,5 @@ import "github.com/aristanetworks/quantumfs/processlocal"
 
 func init() {
 	registerDatastore("processlocal", processlocal.NewDataStore)
+	registerWorkspaceDB("processlocal", processlocal.NewWorkspaceDB)
 }

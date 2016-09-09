@@ -86,7 +86,7 @@ func processArgs() {
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
 	config.MemLogBytes = uint32(memLogMegabytes) * 1024 * 1024
 
-	config.WorkspaceDB = processlocal.NewWorkspaceDB()
+	config.WorkspaceDB = processlocal.NewWorkspaceDB("")
 
 	for _, datastore := range thirdparty_backends.Datastores {
 		if datastore.Name != config.DataStoreName {
