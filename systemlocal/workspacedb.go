@@ -5,6 +5,8 @@ package systemlocal
 
 import "bytes"
 import "fmt"
+import "strings"
+import "time"
 
 import "github.com/boltdb/bolt"
 
@@ -28,9 +30,23 @@ func init() {
 // helps us to perform namespace and workspace counts easily.
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
-	db, err := bolt.Open(conf, 0600, nil)
+	var options *bolt.Options
+
+	if strings.HasPrefix(conf, "/tmp") {
+		// We are running inside a test, don't wait forever
+		options = &bolt.Options{
+			Timeout: 100 * time.Millisecond,
+		}
+	}
+
+	db, err := bolt.Open(conf, 0600, options)
 	if err != nil {
 		panic(err.Error())
+	}
+
+	if strings.HasPrefix(conf, "/tmp") {
+		// We are running inside a test, don't sync
+		db.NoSync = true
 	}
 
 	wsdb := &WorkspaceDB{
