@@ -45,7 +45,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	}
 
 	if strings.HasPrefix(conf, "/tmp") {
-		// We are running inside a test, don't sync
+		// We are running inside a test, syncing can only slow us down
 		db.NoSync = true
 	}
 
