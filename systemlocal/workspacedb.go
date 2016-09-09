@@ -44,12 +44,12 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 			panic("Unable to create Namespaces bucket")
 		}
 
-		_null, err := namespaces.CreateBucketIfNotExists([]byte("null"))
+		_null, err := namespaces.CreateBucketIfNotExists([]byte("_null"))
 		if err != nil {
 			panic("Unable to create _null namespace")
 		}
 
-		err = _null.Put([]byte("null"), quantumfs.EmptyDirKey.Bytes())
+		err = _null.Put([]byte("null"), quantumfs.EmptyDirKey.Value())
 		if err != nil {
 			panic("Unable to reset null workspace")
 		}
@@ -70,8 +70,11 @@ func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx) int {
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
 		namespaces := tx.Bucket(namespacesBucket)
-		stats := namespaces.Stats()
-		num = stats.KeyN
+
+		namespaces.ForEach(func(k []byte, v []byte) error {
+			num++
+			return nil
+		})
 
 		return nil
 	})
@@ -102,8 +105,10 @@ func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, namespace string) int {
 	wsdb.db.View(func(tx *bolt.Tx) error {
 		namespaces := tx.Bucket(namespacesBucket)
 		workspaces := namespaces.Bucket([]byte(namespace))
-		stats := workspaces.Stats()
-		num = stats.KeyN
+		workspaces.ForEach(func(k []byte, v []byte) error {
+			num++
+			return nil
+		})
 
 		return nil
 	})
@@ -247,7 +252,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND)
 		}
 
-		if !bytes.Equal(currentRootId.Bytes(), rootId) {
+		if !bytes.Equal(currentRootId.Value(), rootId) {
 			dbRootId = quantumfs.NewObjectKeyFromBytes(rootId)
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_OUT_OF_DATE)
@@ -257,7 +262,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
 		// advance the rootid in the DB.
 		namespaces := tx.Bucket(namespacesBucket)
 		workspaces := namespaces.Bucket([]byte(namespace))
-		err := workspaces.Put([]byte(workspace), newRootId.Bytes())
+		err := workspaces.Put([]byte(workspace), newRootId.Value())
 		if err == nil {
 			dbRootId = newRootId
 		}
