@@ -28,9 +28,10 @@ func runTest(t *testing.T, test systemlocalTest) {
 	os.RemoveAll(testDir)
 }
 
-func assert(condition bool, message string) {
+func assert(condition bool, format string, args ...interface{}) {
 	if !condition {
-		panic(message)
+		msg := fmt.Sprintf(format, args...)
+		panic(msg)
 	}
 }
 
@@ -143,5 +144,53 @@ func TestWorkspaceList(t *testing.T) {
 		}
 
 		assert(_null && test, "Expected namespaces not there")
+	})
+}
+
+func TestAdvanceOk(t *testing.T) {
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		err := db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err == nil, "Failed branching workspace")
+
+		oldRootId := db.Workspace(nil, "_null", "null")
+
+		newRootId, err := db.AdvanceWorkspace(nil, "test", "a", oldRootId,
+			quantumfs.EmptyWorkspaceKey)
+		assert(err == nil, "Error when advancing root: %v", err)
+		assert(newRootId.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+			"New root doesn't match")
+	})
+}
+
+func TestAdvanceNotExist(t *testing.T) {
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		oldRootId := db.Workspace(nil, "_null", "null")
+
+		_, err := db.AdvanceWorkspace(nil, "test", "a", oldRootId,
+			quantumfs.EmptyWorkspaceKey)
+		assert(err != nil, "Succeeded advancing non-existant workspace")
+	})
+}
+
+func TestAdvanceOldRootId(t *testing.T) {
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		err := db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err == nil, "Failed branching workspace")
+
+		oldRootId := db.Workspace(nil, "_null", "null")
+
+		newRootId, err := db.AdvanceWorkspace(nil, "test", "a",
+			quantumfs.EmptyBlockKey, quantumfs.EmptyWorkspaceKey)
+		assert(err != nil, "Succeeded advancing with old rootid")
+		assert(!newRootId.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+			"New root matches what was set")
+		assert(newRootId.IsEqualTo(oldRootId),
+			"New root doesn't match old root id")
 	})
 }
