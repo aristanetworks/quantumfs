@@ -697,7 +697,8 @@ func TestInodeForget(t *testing.T) {
 			"Sibling of forgotten node also forgotten")
 
 		layerBPtr := layerB.(*Directory)
-		fileBId, exists := layerBPtr.dirChildren.getInode(&test.qfs.c, "fileB")
+		fileBId, exists := layerBPtr.dirChildren.getInode(&test.qfs.c,
+			"fileB")
 		test.assert(exists, "fileB missing from inode structure")
 		test.assert(test.qfs.inode(&test.qfs.c, fileBId) != nil,
 			"Cousin of forgotten node also forgotten")
