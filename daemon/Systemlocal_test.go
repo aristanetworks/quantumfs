@@ -16,7 +16,10 @@ func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 	mountPath := th.tempDir + "/mnt"
 
 	workspaceDbPath := th.tempDir + "/workspaceDB"
+
+	th.log("Starting initialization of workspaceDB")
 	workspaceDB := systemlocal.NewWorkspaceDB(workspaceDbPath)
+	th.log("Finished initialization of workspaceDB")
 
 	config := QuantumFsConfig{
 		CachePath:        th.tempDir + "/ramfs",
