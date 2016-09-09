@@ -182,6 +182,23 @@ func (cr *childRecords) getRecords() map[string]*quantumfs.DirectoryRecord {
 	return cr.entries
 }
 
+func (cr *childRecords) forget(c *ctx) {
+	if cr.data == nil {
+		// Nothing has been loaded, so nothing to forget
+		return
+	}
+
+	for _, inodeId := range cr.data.fileToInode {
+		inode := c.qfs.inode(c, inodeId)
+		if inode != nil {
+			inode.Forget(c)
+		}
+	}
+
+	// Now throw all the child metadata away
+	cr.data = nil
+}
+
 func (cr *childRecords) dirty(c *ctx, inodeNum InodeId) {
 	cr.loadData_(c)
 
@@ -212,6 +229,10 @@ func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 }
 
 func (cr *childRecords) popDirtyInodes() map[InodeId]InodeId {
+	if cr.data == nil {
+		return make(map[InodeId]InodeId)
+	}
+
 	rtn := cr.data.dirtyInodes
 	cr.data.dirtyInodes = make(map[InodeId]InodeId, 0)
 

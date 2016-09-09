@@ -34,6 +34,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 			workspaceDB: config.WorkspaceDB,
 			dataStore:   newDataStore(config.DurableStore),
 		},
+		allowForget:      true,
 	}
 
 	qfs.c.qfs = qfs
@@ -60,6 +61,7 @@ type QuantumFs struct {
 	inodeNum      uint64
 	fileHandleNum uint64
 	c             ctx
+	allowForget   bool
 
 	mapMutex         sync.RWMutex
 	inodes           map[InodeId]Inode
@@ -252,9 +254,21 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer logRequestPanic(&qfs.c)
+
+	// Allow tests to disable this feature
+	if !qfs.allowForget {
+		return
+	}
+
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
-	// Disabled due to BUG166010
-	//qfs.setInode(&qfs.c, InodeId(nodeID), nil)
+	
+	inode := qfs.inode(&qfs.c, InodeId(nodeID))
+	if inode == nil {
+		// Nothing to do
+		return
+	}
+
+	inode.Forget(&qfs.c)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,

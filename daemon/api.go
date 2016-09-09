@@ -123,6 +123,10 @@ func (api *ApiInode) Lookup(c *ctx, name string,
 	return fuse.ENOSYS
 }
 
+func (api *ApiInode) Forget(c *ctx) {
+	c.elog("Invalid Forget on Api")
+}
+
 func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 	c.vlog("creating file %s", name)

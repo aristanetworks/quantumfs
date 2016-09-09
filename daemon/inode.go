@@ -28,6 +28,8 @@ type Inode interface {
 	Lookup(c *ctx, name string,
 		out *fuse.EntryOut) fuse.Status
 
+	Forget(c *ctx)
+
 	Open(c *ctx, flags uint32, mode uint32,
 		out *fuse.OpenOut) fuse.Status
 

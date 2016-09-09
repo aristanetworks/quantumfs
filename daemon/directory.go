@@ -349,6 +349,16 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	return fuse.OK
 }
 
+func (dir *Directory) Forget(c *ctx) {
+	defer dir.Lock().Unlock()
+
+	// First, tell all the children to forget themselves
+	dir.dirChildren.forget(c)	
+
+	// Then remove the inode from the map, ready to be garbage collected
+	c.qfs.setInode(c, dir.id, nil)
+}
+
 func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
