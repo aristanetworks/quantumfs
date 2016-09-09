@@ -201,3 +201,24 @@ func TestAdvanceOldRootId(t *testing.T) {
 			"New root doesn't match old root id")
 	})
 }
+
+func TestDbRestart(t *testing.T) {
+	// Confirm that workspaces created persist across database restarts
+	runTest(t, func(path string) {
+		db := NewWorkspaceDB(path + "/db")
+
+		assert(db.NumNamespaces(nil) == 1, "Too many namespaces")
+
+		err := db.BranchWorkspace(nil, "_null", "null", "test", "a")
+		assert(err == nil, "Failed branching workspace")
+
+		systemdb := db.(*WorkspaceDB)
+		err = systemdb.db.Close()
+		assert(err == nil, "Error closing database: %v", err)
+
+		db = NewWorkspaceDB(path + "/db")
+
+		assert(db.WorkspaceExists(nil, "test", "a"),
+			"Workspace didn't persist across restart")
+	})
+}
