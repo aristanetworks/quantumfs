@@ -711,7 +711,7 @@ func TestInodeForget(t *testing.T) {
 		newspace := test.branchWorkspace(workspace)
 
 		var output []byte
-		output, err = ioutil.ReadFile(test.absPath(newspace+fileA))
+		output, err = ioutil.ReadFile(test.absPath(newspace + fileA))
 		test.assert(err == nil, "Error reading from branched fileA")
 		test.assert(bytes.Equal(output, dataA),
 			"FileA not synced before forget")
