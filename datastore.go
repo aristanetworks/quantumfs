@@ -155,6 +155,15 @@ func (key ObjectKey) Hash() [ObjectKeyLength - 1]byte {
 	return hash
 }
 
+func (key ObjectKey) Value() []byte {
+	var value [ObjectKeyLength]byte
+	value[0] = key.key.KeyType()
+	binary.LittleEndian.PutUint64(value[1:9], key.key.Part2())
+	binary.LittleEndian.PutUint64(value[9:17], key.key.Part3())
+	binary.LittleEndian.PutUint32(value[17:21], key.key.Part4())
+	return value[:]
+}
+
 func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
 	if key.key.KeyType() == other.key.KeyType() &&
 		key.key.Part2() == other.key.Part2() &&
