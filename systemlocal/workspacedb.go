@@ -49,7 +49,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 			panic("Unable to create _null namespace")
 		}
 
-		err = _null.Put([]byte("null"), quantumfs.EmptyDirKey.Value())
+		err = _null.Put([]byte("null"), quantumfs.EmptyWorkspaceKey.Value())
 		if err != nil {
 			panic("Unable to reset null workspace")
 		}

@@ -47,16 +47,19 @@ func TestEmptyDB(t *testing.T) {
 		db := NewWorkspaceDB(path + "/db")
 
 		assert(db.NumNamespaces(nil) == 1, "Too many namespaces")
-		assert(db.NamespaceExists(nil, "_null"), "Expected namespace not there")
+		assert(db.NamespaceExists(nil, "_null"),
+			"Expected namespace not there")
 		assert(!db.NamespaceExists(nil, "test"), "Unexpected namespace")
 
 		assert(db.NumWorkspaces(nil, "_null") == 1, "Too many workspaces")
 		assert(db.WorkspaceExists(nil, "_null", "null"),
 			"Expected workspace not there")
-		assert(!db.WorkspaceExists(nil, "_null", "other"), "Unexpected workspace")
+		assert(!db.WorkspaceExists(nil, "_null", "other"),
+			"Unexpected workspace")
 
 		key := db.Workspace(nil, "_null", "null")
-		assert(key.IsEqualTo(quantumfs.EmptyDirKey), "null workspace isn't empty")
+		assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+			"null workspace isn't empty")
 	})
 }
 
@@ -79,6 +82,10 @@ func TestBranching(t *testing.T) {
 
 		err = db.BranchWorkspace(nil, "test", "a", "test", "b")
 		assert(err == nil, "Failed rebranching workspace")
+
+		key := db.Workspace(nil, "test", "a")
+		assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+			"Branched rootid isn't the empty workspace")
 	})
 }
 
@@ -157,9 +164,9 @@ func TestAdvanceOk(t *testing.T) {
 		oldRootId := db.Workspace(nil, "_null", "null")
 
 		newRootId, err := db.AdvanceWorkspace(nil, "test", "a", oldRootId,
-			quantumfs.EmptyWorkspaceKey)
+			quantumfs.EmptyDirKey)
 		assert(err == nil, "Error when advancing root: %v", err)
-		assert(newRootId.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+		assert(newRootId.IsEqualTo(quantumfs.EmptyDirKey),
 			"New root doesn't match")
 	})
 }
@@ -171,7 +178,7 @@ func TestAdvanceNotExist(t *testing.T) {
 		oldRootId := db.Workspace(nil, "_null", "null")
 
 		_, err := db.AdvanceWorkspace(nil, "test", "a", oldRootId,
-			quantumfs.EmptyWorkspaceKey)
+			quantumfs.EmptyDirKey)
 		assert(err != nil, "Succeeded advancing non-existant workspace")
 	})
 }
@@ -186,9 +193,9 @@ func TestAdvanceOldRootId(t *testing.T) {
 		oldRootId := db.Workspace(nil, "_null", "null")
 
 		newRootId, err := db.AdvanceWorkspace(nil, "test", "a",
-			quantumfs.EmptyBlockKey, quantumfs.EmptyWorkspaceKey)
+			quantumfs.EmptyBlockKey, quantumfs.EmptyDirKey)
 		assert(err != nil, "Succeeded advancing with old rootid")
-		assert(!newRootId.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+		assert(!newRootId.IsEqualTo(quantumfs.EmptyDirKey),
 			"New root matches what was set")
 		assert(newRootId.IsEqualTo(oldRootId),
 			"New root doesn't match old root id")
