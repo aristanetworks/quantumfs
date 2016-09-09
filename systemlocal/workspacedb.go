@@ -209,11 +209,13 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 
 		err = workspaces.Put([]byte(dstWorkspace), srcKey)
 
-		objectKey := quantumfs.NewObjectKeyFromBytes(srcKey)
-		c.Dlog(qlog.LogWorkspaceDb,
-			"Branched workspace '%s/%s' to '%s/%s' with key %s",
-			srcNamespace, srcWorkspace, dstNamespace, dstWorkspace,
-			objectKey.String())
+		if c != nil {
+			objectKey := quantumfs.NewObjectKeyFromBytes(srcKey)
+			c.Dlog(qlog.LogWorkspaceDb,
+				"Branched workspace '%s/%s' to '%s/%s' with key %s",
+				srcNamespace, srcWorkspace, dstNamespace,
+				dstWorkspace, objectKey.String())
+		}
 
 		return nil
 	})
