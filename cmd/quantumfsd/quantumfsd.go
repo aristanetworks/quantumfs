@@ -11,7 +11,6 @@ import "runtime/pprof"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
-import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 import "github.com/hanwen/go-fuse/fuse"
@@ -19,11 +18,12 @@ import "github.com/pivotal-golang/bytefmt"
 
 // Various exist reasons, will be returned to the shell as an exit code
 const (
-	exitOk                = iota
-	exitBadCacheSize      = iota
-	exitMountFail         = iota
-	exitProfileFail       = iota
-	exitDataStoreInitFail = iota
+	exitOk                  = iota
+	exitBadCacheSize        = iota
+	exitMountFail           = iota
+	exitProfileFail         = iota
+	exitDataStoreInitFail   = iota
+	exitWorkspaceDbInitFail = iota
 )
 
 var cacheSizeString string
@@ -63,31 +63,19 @@ func init() {
 
 	flag.StringVar(&config.DataStoreName, "datastore", "processlocal",
 		"Name of the datastore to use")
-
 	flag.StringVar(&config.DataStoreConf, "datastoreconf", "",
 		"Options to pass to datastore")
+
+	flag.StringVar(&config.WorkspaceDbName, "workspaceDB", "processlocal",
+		"Name of the WorkspaceDB to use")
+	flag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf", "",
+		"Options to pass to workspaceDB")
 
 	flag.StringVar(&cpuProfileFile, "profilePath", "",
 		"File to write CPU Profiling data to")
 }
 
-// Process the command arguments. Will show the command usage if no arguments are
-// given since the mount point is mandatory.
-//
-// Exit if processing failed
-func processArgs() {
-	flag.Parse()
-
-	if cacheSize, err := bytefmt.ToBytes(cacheSizeString); err != nil {
-		os.Exit(exitBadCacheSize)
-	} else {
-		config.CacheSize = cacheSize
-	}
-	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
-	config.MemLogBytes = uint32(memLogMegabytes) * 1024 * 1024
-
-	config.WorkspaceDB = processlocal.NewWorkspaceDB("")
-
+func loadDatastore() {
 	for _, datastore := range thirdparty_backends.Datastores {
 		if datastore.Name != config.DataStoreName {
 			continue
@@ -105,6 +93,46 @@ func processArgs() {
 		fmt.Printf("Failed to find datastore '%s'\n", config.DataStoreName)
 		os.Exit(exitDataStoreInitFail)
 	}
+}
+
+func loadWorkspaceDB() {
+	for _, db := range thirdparty_backends.WorkspaceDBs {
+		if db.Name != config.WorkspaceDbName {
+			continue
+		}
+
+		config.WorkspaceDB = db.Constructor(config.WorkspaceDbConf)
+		if config.WorkspaceDB == nil {
+			fmt.Printf("WorkspaceDB Constructor failed\n")
+			os.Exit(exitWorkspaceDbInitFail)
+		} else {
+			break
+		}
+	}
+	if config.WorkspaceDB == nil {
+		fmt.Printf("Failed to find workspaceDB '%s'\n",
+			config.WorkspaceDbName)
+		os.Exit(exitWorkspaceDbInitFail)
+	}
+}
+
+// Process the command arguments. Will show the command usage if no arguments are
+// given since the mount point is mandatory.
+//
+// Exit if processing failed
+func processArgs() {
+	flag.Parse()
+
+	if cacheSize, err := bytefmt.ToBytes(cacheSizeString); err != nil {
+		os.Exit(exitBadCacheSize)
+	} else {
+		config.CacheSize = cacheSize
+	}
+	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
+	config.MemLogBytes = uint32(memLogMegabytes) * 1024 * 1024
+
+	loadDatastore()
+	loadWorkspaceDB()
 }
 
 func main() {
