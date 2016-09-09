@@ -111,6 +111,19 @@ func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
 	return key
 }
 
+func NewObjectKeyFromBytes(bytes []byte) ObjectKey {
+	segment := capn.NewBuffer(nil)
+	key := ObjectKey{
+		key: encoding.NewRootObjectKey(segment),
+	}
+
+	key.key.SetKeyType(byte(bytes[0]))
+	key.key.SetPart2(binary.LittleEndian.Uint64(bytes[1:9]))
+	key.key.SetPart3(binary.LittleEndian.Uint64(bytes[9:17]))
+	key.key.SetPart4(binary.LittleEndian.Uint32(bytes[17:]))
+	return key
+}
+
 func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
 	key := ObjectKey{
 		key: k,
