@@ -9,7 +9,7 @@ import "sync"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 
-func NewWorkspaceDB() quantumfs.WorkspaceDB {
+func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	wsdb := &WorkspaceDB{
 		cache: make(map[string]map[string]quantumfs.ObjectKey),
 	}

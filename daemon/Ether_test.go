@@ -24,7 +24,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
 		MountPath:        mountPath,
-		WorkspaceDB:      processlocal.NewWorkspaceDB(),
+		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
 		DurableStore:     datastore,
 	}
 	return config

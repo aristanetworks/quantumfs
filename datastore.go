@@ -111,6 +111,19 @@ func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
 	return key
 }
 
+func NewObjectKeyFromBytes(bytes []byte) ObjectKey {
+	segment := capn.NewBuffer(nil)
+	key := ObjectKey{
+		key: encoding.NewRootObjectKey(segment),
+	}
+
+	key.key.SetKeyType(byte(bytes[0]))
+	key.key.SetPart2(binary.LittleEndian.Uint64(bytes[1:9]))
+	key.key.SetPart3(binary.LittleEndian.Uint64(bytes[9:17]))
+	key.key.SetPart4(binary.LittleEndian.Uint32(bytes[17:]))
+	return key
+}
+
 func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
 	key := ObjectKey{
 		key: k,
@@ -140,6 +153,15 @@ func (key ObjectKey) Hash() [ObjectKeyLength - 1]byte {
 	binary.LittleEndian.PutUint64(hash[8:16], key.key.Part3())
 	binary.LittleEndian.PutUint32(hash[16:20], key.key.Part4())
 	return hash
+}
+
+func (key ObjectKey) Value() []byte {
+	var value [ObjectKeyLength]byte
+	value[0] = key.key.KeyType()
+	binary.LittleEndian.PutUint64(value[1:9], key.key.Part2())
+	binary.LittleEndian.PutUint64(value[9:17], key.key.Part3())
+	binary.LittleEndian.PutUint32(value[17:21], key.key.Part4())
+	return value[:]
 }
 
 func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
