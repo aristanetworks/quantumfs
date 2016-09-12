@@ -213,7 +213,7 @@ func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 
 func (cr *childRecords) popDirtyInodes() map[InodeId]InodeId {
 	if cr.data == nil {
-		return make(map[InodeId]InodeId)
+		return nil
 	}
 
 	rtn := cr.data.dirtyInodes

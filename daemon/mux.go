@@ -269,7 +269,10 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	inode.forget_DOWN(&qfs.c)
+	// We currently only support file forgetting
+	if file, ok := inode.(*File); ok {
+		file.forget_DOWN(&qfs.c)
+	}
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
