@@ -270,8 +270,11 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	}
 
 	// We currently only support file forgetting
-	if file, ok := inode.(*File); ok {
-		file.forget_DOWN(&qfs.c)
+	switch v := inode.(type) {
+	case *File:
+		v.forget_DOWN(&qfs.c)
+	case *Special:
+		v.forget_DOWN(&qfs.c)
 	}
 }
 
