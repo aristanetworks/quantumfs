@@ -397,6 +397,8 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.log("Intantiating quantumfs instance...")
 	quantumfs := NewQuantumFsLogs(config, th.logger)
 	th.qfs = quantumfs
+	// Keep all inodes to allow us to check the inode structure
+	th.qfs.allowForget = false
 
 	th.log("Waiting for QuantumFs instance to start...")
 

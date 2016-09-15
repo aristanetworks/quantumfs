@@ -7,6 +7,10 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
+func (dir *Directory) forget_DOWN(c *ctx) {
+	c.vlog("Directory::forget_DOWN not yet supported")
+}
+
 func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory::sync Enter")
 	defer c.vlog("Directory::sync Exit")
@@ -80,9 +84,13 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 // wsr can update its new key.
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	dirtyChildren := dir.dirChildren.popDirtyInodes()
+	if dirtyChildren == nil {
+		return
+	}
 
 	for _, childId := range dirtyChildren {
 		child := c.qfs.inode(c, childId)
+
 		newKey := child.sync_DOWN(c)
 		record, exists := dir.dirChildren.getRecord(c, childId)
 		if !exists {

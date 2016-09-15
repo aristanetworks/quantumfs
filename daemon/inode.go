@@ -107,6 +107,8 @@ type Inode interface {
 	// itself to the datastore
 	sync_DOWN(c *ctx) quantumfs.ObjectKey
 
+	forget_DOWN(c *ctx)
+
 	inodeNum() InodeId
 
 	treeLock() *sync.RWMutex

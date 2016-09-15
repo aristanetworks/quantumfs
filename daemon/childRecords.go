@@ -212,6 +212,10 @@ func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 }
 
 func (cr *childRecords) popDirtyInodes() map[InodeId]InodeId {
+	if cr.data == nil {
+		return nil
+	}
+
 	rtn := cr.data.dirtyInodes
 	cr.data.dirtyInodes = make(map[InodeId]InodeId, 0)
 

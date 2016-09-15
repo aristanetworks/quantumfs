@@ -7,8 +7,16 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
+func (wsl *WorkspaceList) forget_DOWN(c *ctx) {
+	c.elog("Invalid forget_DOWN on WorkspaceList")
+}
+
 func (wsl *WorkspaceList) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
+}
+
+func (nsl *NamespaceList) forget_DOWN(c *ctx) {
+	c.elog("Invalid forget_DOWN on NamespaceList")
 }
 
 func (nsl *NamespaceList) sync_DOWN(c *ctx) quantumfs.ObjectKey {

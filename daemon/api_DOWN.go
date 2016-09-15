@@ -7,6 +7,10 @@ package daemon
 
 import "github.com/aristanetworks/quantumfs"
 
+func (api *ApiInode) forget_DOWN(c *ctx) {
+	c.elog("Invalid forget_DOWN on Api")
+}
+
 func (api *ApiInode) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
