@@ -39,7 +39,7 @@ func TestForget_test(t *testing.T) {
 		logFile := test.tempDir + "/ramfs/qlog"
 		logOutput := qlog.ParseLogs(logFile)
 		test.assert(!strings.Contains(logOutput, "Forgetting"),
-			"No inode forget triggered during dentry drop. Try again")
+			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
 		for i := 0; i < numFiles; i++ {

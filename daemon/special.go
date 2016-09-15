@@ -91,10 +91,6 @@ func (special *Special) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Sta
 	return fuse.ENOSYS
 }
 
-func (special *Special) Forget(c *ctx) {
-	c.elog("Invalid Forget call on Special")
-}
-
 func (special *Special) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
