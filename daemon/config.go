@@ -15,6 +15,9 @@ type QuantumFsConfig struct {
 	DataStoreName string
 	DataStoreConf string
 
+	WorkspaceDbName string
+	WorkspaceDbConf string
+
 	// How long the kernel is allowed to cache values
 	CacheTimeSeconds uint64
 	CacheTimeNsecs   uint32
