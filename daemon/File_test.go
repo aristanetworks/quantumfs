@@ -15,7 +15,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 
-func TestFileCreation_test(t *testing.T) {
+func TestFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -43,7 +43,7 @@ func TestFileCreation_test(t *testing.T) {
 	})
 }
 
-func TestFileReadWrite_test(t *testing.T) {
+func TestFileReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -149,7 +149,7 @@ func TestFileReadWrite_test(t *testing.T) {
 	})
 }
 
-func TestFileDescriptorPermissions_test(t *testing.T) {
+func TestFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -239,7 +239,7 @@ func TestFileDescriptorPermissions_test(t *testing.T) {
 	})
 }
 
-func TestRootFileDescriptorPermissions_test(t *testing.T) {
+func TestRootFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -299,7 +299,7 @@ func TestRootFileDescriptorPermissions_test(t *testing.T) {
 	})
 }
 
-func TestFileSizeChanges_test(t *testing.T) {
+func TestFileSizeChanges(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -365,7 +365,7 @@ func TestFileSizeChanges_test(t *testing.T) {
 	})
 }
 
-func TestFileDescriptorDirtying_test(t *testing.T) {
+func TestFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -413,7 +413,7 @@ func TestFileDescriptorDirtying_test(t *testing.T) {
 }
 
 // Test file metadata updates
-func TestFileAttrUpdate_test(t *testing.T) {
+func TestFileAttrUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -451,7 +451,7 @@ func TestFileAttrUpdate_test(t *testing.T) {
 	})
 }
 
-func TestFileAttrWriteUpdate_test(t *testing.T) {
+func TestFileAttrWriteUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -493,7 +493,7 @@ func TestFileAttrWriteUpdate_test(t *testing.T) {
 	})
 }
 
-func TestSmallFileZero_test(t *testing.T) {
+func TestSmallFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

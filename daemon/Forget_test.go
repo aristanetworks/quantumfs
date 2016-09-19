@@ -14,7 +14,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-func TestForget_test(t *testing.T) {
+func TestForget(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
