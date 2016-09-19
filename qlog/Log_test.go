@@ -9,7 +9,7 @@ import "testing"
 import "strings"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-func TestLogSet_test(t *testing.T) {
+func TestLogSet(t *testing.T) {
 	qlog := NewQlogTiny()
 	// let's redirect the log writer in qfs
 	var logs string
@@ -52,7 +52,7 @@ func TestLogSet_test(t *testing.T) {
 	}
 }
 
-func TestLoadLevels_test(t *testing.T) {
+func TestLoadLevels(t *testing.T) {
 	qlog := NewQlogTiny()
 
 	qlog.SetLogLevels("Daemon/*")

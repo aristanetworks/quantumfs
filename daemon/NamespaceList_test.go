@@ -11,7 +11,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 
-func TestNamespaceListing_test(t *testing.T) {
+func TestNamespaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -29,7 +29,7 @@ func TestNamespaceListing_test(t *testing.T) {
 	})
 }
 
-func TestWorkspaceListing_test(t *testing.T) {
+func TestWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -42,7 +42,7 @@ func TestWorkspaceListing_test(t *testing.T) {
 	})
 }
 
-func TestNullWorkspaceListing_test(t *testing.T) {
+func TestNullWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

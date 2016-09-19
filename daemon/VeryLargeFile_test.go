@@ -73,25 +73,25 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	test.checkSparse(test.absPath(dst+"/test"), testFilename, newLen/100, 10)
 }
 
-func TestSmallConvert_test(t *testing.T) {
+func TestSmallConvert(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, 512*1024)
 	})
 }
 
-func TestMedConvert_test(t *testing.T) {
+func TestMedConvert(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, 7*1024*1024)
 	})
 }
 
-func TestLargeConvert_test(t *testing.T) {
+func TestLargeConvert(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, 44*1024*1024)
 	})
 }
 
-func TestVeryLargeFileZero_test(t *testing.T) {
+func TestVeryLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
