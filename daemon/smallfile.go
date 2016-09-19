@@ -79,7 +79,7 @@ func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
 	// No metadata to marshal for small files
 	key, err := fi.buf.Key(&c.Ctx)
 	if err != nil {
-		panic("TODO Unable to upload file data")
+		panic(err.Error())
 	}
 	return key
 }
