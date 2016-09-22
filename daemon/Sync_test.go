@@ -44,7 +44,8 @@ func TestNoImplicitSync(t *testing.T) {
 		}
 		test.qfs.c.dataStore.durableStore = &dataStore
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
 

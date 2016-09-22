@@ -36,7 +36,8 @@ func TestQParse(t *testing.T) {
 		test.qfs.c.Qlog.LogLevels--
 
 		// Do some stuff that should generate some logs
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
