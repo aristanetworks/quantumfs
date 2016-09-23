@@ -9,7 +9,7 @@ import "os"
 import "syscall"
 import "testing"
 
-func TestWorkspaceBranching_test(t *testing.T) {
+func TestWorkspaceBranching(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

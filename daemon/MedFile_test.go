@@ -12,7 +12,7 @@ import "os"
 import "testing"
 import "syscall"
 
-func TestMedBranch_test(t *testing.T) {
+func TestMedBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -35,7 +35,7 @@ func TestMedBranch_test(t *testing.T) {
 	})
 }
 
-func TestFileExpansion_test(t *testing.T) {
+func TestFileExpansion(t *testing.T) {
 	data := genData(4 * 1024 * 1024)
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
@@ -89,7 +89,7 @@ func TestFileExpansion_test(t *testing.T) {
 	})
 }
 
-func TestMedFileAttr_test(t *testing.T) {
+func TestMedFileAttr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -147,7 +147,7 @@ func TestMedFileAttr_test(t *testing.T) {
 	})
 }
 
-func TestMedFileZero_test(t *testing.T) {
+func TestMedFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

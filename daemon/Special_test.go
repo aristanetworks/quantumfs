@@ -54,25 +54,25 @@ func specialCreate(test *testHelper, filetype uint32) {
 	confirm(workspace)
 }
 
-func TestBlockDevCreation_test(t *testing.T) {
+func TestBlockDevCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFBLK)
 	})
 }
 
-func TestCharDevCreation_test(t *testing.T) {
+func TestCharDevCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFCHR)
 	})
 }
 
-func TestSocketCreation_test(t *testing.T) {
+func TestSocketCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFSOCK)
 	})
 }
 
-func TestFileMknodCreation_test(t *testing.T) {
+func TestFileMknodCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFREG)
 	})
@@ -88,13 +88,13 @@ func specialCreateFail(test *testHelper, filetype uint32) {
 	test.assert(err != nil, "Unexpected success creating node")
 }
 
-func TestDirectoryMknodCreation_test(t *testing.T) {
+func TestDirectoryMknodCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreateFail(test, syscall.S_IFDIR)
 	})
 }
 
-func TestSymlinkMknodCreation_test(t *testing.T) {
+func TestSymlinkMknodCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		specialCreateFail(test, syscall.S_IFLNK)
 	})

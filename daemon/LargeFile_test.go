@@ -11,7 +11,7 @@ import "os"
 import "testing"
 import "syscall"
 
-func TestLargeFileRead_test(t *testing.T) {
+func TestLargeFileRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -48,7 +48,7 @@ func TestLargeFileRead_test(t *testing.T) {
 	})
 }
 
-func TestLargeFileExpansion_test(t *testing.T) {
+func TestLargeFileExpansion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -111,7 +111,7 @@ func TestLargeFileExpansion_test(t *testing.T) {
 	})
 }
 
-func TestLargeFileAttr_test(t *testing.T) {
+func TestLargeFileAttr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -169,7 +169,7 @@ func TestLargeFileAttr_test(t *testing.T) {
 	})
 }
 
-func TestLargeFileZero_test(t *testing.T) {
+func TestLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
