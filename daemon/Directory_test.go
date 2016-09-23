@@ -105,9 +105,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
-		workspacerel := test.relPath(workspace)
 		wsNamespaceName, wsWorkspaceName :=
-			test.splitWorkspacerootRelPath(workspacerel)
+			test.getWorkspaceComponent(workspace)
 
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/" + "test"

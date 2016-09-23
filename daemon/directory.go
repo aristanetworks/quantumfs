@@ -672,6 +672,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
+	// moving any file into _null/null is not permitted
 	if _, ok := dstInode.(*NullWorkspaceRoot); ok {
 		return fuse.EPERM
 	}

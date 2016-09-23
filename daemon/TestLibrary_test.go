@@ -436,12 +436,13 @@ func (th *testHelper) relPath(path string) string {
 	return strings.TrimPrefix(path, th.tempDir+"/mnt/")
 }
 
-// Extract workspacelisting name and workspaceroot name
-// from the relative path of a workspaceroot
-func (th *testHelper) splitWorkspacerootRelPath(relpath string) (string, string) {
-	return strings.Split(th.relPath(relpath), "/")[0],
-		strings.Split(th.relPath(relpath), "/")[1]
+// Extract namespace and workspace path from the absolute path of
+// a workspaceroot
+func (th *testHelper) getWorkspaceComponent(abspath string) (string, string) {
+	relpath := th.relPath(abspath)
+	components := strings.Split(relpath, "/")
 
+	return components[0], components[1]
 }
 
 // Return a random namespace/workspace name of given length

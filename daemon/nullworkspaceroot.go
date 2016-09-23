@@ -15,6 +15,7 @@ type NullWorkspaceRoot struct {
 
 func newNullWorkspaceRoot(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
+
 	nwsr := NullWorkspaceRoot{
 		WorkspaceRoot: *(newWorkspaceRoot(c,
 			parentName, name, inodeNum).(*WorkspaceRoot)),
@@ -36,15 +37,18 @@ func (nwsr *NullWorkspaceRoot) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 func (nwsr *NullWorkspaceRoot) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
+
 	return fuse.EPERM
 }
 
 func (nwsr *NullWorkspaceRoot) Symlink(c *ctx, pointedTo string, name string,
 	out *fuse.EntryOut) fuse.Status {
+
 	return fuse.EPERM
 }
 
 func (nwsr *NullWorkspaceRoot) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
+
 	return fuse.EPERM
 }

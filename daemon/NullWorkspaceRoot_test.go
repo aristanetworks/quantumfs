@@ -103,7 +103,6 @@ func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 		err = syscall.Link(testFileName, testLinkName)
 		test.assert(err == syscall.EPERM,
 			"Unexpected success creating hardlink in null")
-
 	})
 }
 
