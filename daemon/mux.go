@@ -218,7 +218,7 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 			c.vlog("Locking and syncing workspace %s/%s",
 				workspace.namespace, workspace.workspace)
 			defer workspace.LockTree().Unlock()
-			workspace.sync_DOWN(c)
+			workspace.flush_DOWN(c)
 		}()
 	}
 }
@@ -269,12 +269,11 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	// We currently only support file forgetting
-	switch v := inode.(type) {
-	case *File:
-		v.forget_DOWN(&qfs.c)
-	case *Special:
-		v.forget_DOWN(&qfs.c)
+	// We currently only support file / special forgetting
+	switch inode.(type) {
+	case *File, *Special:
+		defer inode.LockTree().Unlock()
+		inode.forget_DOWN(&qfs.c)
 	}
 }
 
@@ -450,10 +449,18 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		return fuse.ENOENT
 	}
 
-	defer srcInode.RLockTree().RUnlock()
-	defer dstInode.RLockTree().RUnlock()
+	if srcInode.treeLock() == dstInode.treeLock() {
+		// If src and dst live in the same workspace, we only need one lock
+		defer dstInode.LockTree().Unlock()
+	} else {
+		// When we have to lock multiple inodes, we must make sure that we
+		// lock the inodes in correct sequence to prevent deadlock
+		firstLock, lastLock := getLockOrder(dstInode, srcInode)
+		defer firstLock.LockTree().Unlock()
+		defer lastLock.LockTree().Unlock()
+	}
 
-	return dstInode.Link(c, srcInode, filename, out)
+	return dstInode.link_DOWN(c, srcInode, filename, out)
 }
 
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
@@ -729,8 +736,8 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 		return fuse.EIO
 	}
 
-	defer fileHandle.RLockTree().RUnlock()
-	return fileHandle.Sync(c)
+	defer fileHandle.LockTree().Unlock()
+	return fileHandle.Sync_DOWN(c)
 }
 
 func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
@@ -822,7 +829,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 	}
 
 	defer fileHandle.LockTree().Unlock()
-	return fileHandle.Sync(c)
+	return fileHandle.Sync_DOWN(c)
 }
 
 func (qfs *QuantumFs) StatFs(input *fuse.InHeader,

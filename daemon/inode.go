@@ -51,8 +51,6 @@ type Inode interface {
 
 	Readlink(c *ctx) ([]byte, fuse.Status)
 
-	Sync(c *ctx) fuse.Status
-
 	Mknod(c *ctx, name string, input *fuse.MknodIn,
 		out *fuse.EntryOut) fuse.Status
 
@@ -69,8 +67,6 @@ type Inode interface {
 	SetXAttr(c *ctx, attr string, data []byte) fuse.Status
 
 	RemoveXAttr(c *ctx, attr string) fuse.Status
-
-	Link(c *ctx, srcInode Inode, newName string, out *fuse.EntryOut) fuse.Status
 
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
@@ -105,9 +101,11 @@ type Inode interface {
 
 	// Compute a new object key, possibly schedule the sync the object data
 	// itself to the datastore
-	sync_DOWN(c *ctx) quantumfs.ObjectKey
-
+	flush_DOWN(c *ctx) quantumfs.ObjectKey
+	Sync_DOWN(c *ctx) fuse.Status
 	forget_DOWN(c *ctx)
+	link_DOWN(c *ctx, srcInode Inode, newName string,
+		out *fuse.EntryOut) fuse.Status
 
 	inodeNum() InodeId
 
@@ -204,6 +202,15 @@ func (inode *InodeCommon) RLock() *sync.RWMutex {
 	return &inode.lock
 }
 
+func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
+	// Always lock the higher number inode first
+	if a.inodeNum() > b.inodeNum() {
+		return a, b
+	} else {
+		return b, a
+	}
+}
+
 // FileHandle represents a specific path at a specific point in time, even as the
 // tree changes underneath it. This is used to provide consistent snapshot views into
 // the tree.
@@ -215,7 +222,7 @@ type FileHandle interface {
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
 
-	Sync(c *ctx) fuse.Status
+	Sync_DOWN(c *ctx) fuse.Status
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex

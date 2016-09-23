@@ -62,15 +62,6 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	wsr.setDirty(true)
 }
 
-// If the WorkspaceRoot is dirty recompute the rootId and update the workspacedb
-func (wsr *WorkspaceRoot) advanceRootId(c *ctx) {
-	c.vlog("WorkspaceRoot::advanceRootId Enter")
-	defer c.vlog("WorkspaceRoot::advanceRootId Exit")
-
-	wsr.Directory.sync_DOWN(c)
-	wsr.publish(c)
-}
-
 func (wsr *WorkspaceRoot) publish(c *ctx) {
 	c.vlog("WorkspaceRoot::publish Enter")
 	defer c.vlog("WorkspaceRoot::publish Exit")
