@@ -276,6 +276,61 @@ func modeToPermissions(mode uint32, umask uint32) uint32 {
 	return permissions
 }
 
+func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
+	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
+
+	layer.SetNext(nextKey)
+	bytes := layer.Bytes()
+
+	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
+	newKey, err := buf.Key(&c.Ctx)
+	if err != nil {
+		panic("Failed to upload new baseLayer object")
+	}
+
+	return newKey
+}
+
+func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
+	c.vlog("Directory::publish Enter")
+	defer c.vlog("Directory::publish Exit")
+
+	// Compile the internal records into a series of blocks which can be placed
+	// in the datastore.
+
+	newBaseLayerId := quantumfs.EmptyDirKey
+
+	// childIdx indexes into childrenRecords, entryIdx indexes into the
+	// metadata block
+	baseLayer := quantumfs.NewDirectoryEntry()
+	entryIdx := 0
+	for _, child := range dir.dirChildren.getRecords() {
+		if entryIdx == quantumfs.MaxDirectoryRecords {
+			// This block is full, upload and create a new one
+			baseLayer.SetNumEntries(entryIdx)
+			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
+				newBaseLayerId)
+			baseLayer = quantumfs.NewDirectoryEntry()
+			entryIdx = 0
+		}
+
+		baseLayer.SetEntry(entryIdx, child)
+
+		entryIdx++
+	}
+
+	baseLayer.SetNumEntries(entryIdx)
+	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
+
+	c.vlog("Directory key %s -> %s", dir.baseLayerId.String(),
+		newBaseLayerId.String())
+	dir.baseLayerId = newBaseLayerId
+
+	dir.setDirty(false)
+
+	return dir.baseLayerId
+}
+
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
@@ -601,10 +656,6 @@ func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (dir *Directory) Sync(c *ctx) fuse.Status {
-	return fuse.OK
-}
-
 func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -669,6 +720,34 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	return result
 }
 
+func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
+	childDir *Directory) {
+
+	// Determine if a parent-child relationship between the
+	// directories exist
+	var parent *Directory
+	var child *Directory
+	if a.parent() != nil &&
+		a.parent().inodeNum() == b.inodeNum() {
+
+		// a is a child of b
+		parent = b
+		child = a
+	} else if b.parent() != nil &&
+		b.parent().inodeNum() == a.inodeNum() {
+
+		// b is a child of a
+		parent = a
+		child = b
+	} else {
+		// No relationship, choose arbitrarily
+		parent = a
+		child = b
+	}
+
+	return parent, child
+}
+
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
@@ -686,7 +765,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// end up with a lock ordering inversion and deadlock in this case.
 		//
 		// We prevent this by locking dir and dst in a consistent ordering
-		// based upon their inode number.
+		// based upon their inode number. All multi-inode locking must call
+		// getLockOrder() to facilitate this.
 		//
 		// However, there is another wrinkle. It is possible to rename a file
 		// from a directory into its parent. If we keep the parent locked
@@ -704,43 +784,16 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// successfully update the child. If the two directories are not
 		// related in that way then we choose arbitrarily because it doesn't
 		// matter.
+		parent, child := sortParentChild(dst, dir)
+		firstLock, lastLock := getLockOrder(dst, dir)
+		firstLock.(*Directory).Lock()
+		lastLock.(*Directory).Lock()
 
-		// Determine if a parent-child relationship between the
-		// directories exist
-		var parent *Directory
-		var child *Directory
-		if dst.parent() != nil &&
-			dst.parent().inodeNum() == dir.inodeNum() {
-
-			// dst is a child of dir
-			parent = dir
-			child = dst
-		} else if dir.parent() != nil &&
-			dir.parent().inodeNum() == dst.inodeNum() {
-
-			// dir is a child of dst
-			parent = dst
-			child = dir
-		} else {
-			// No relationship, choose arbitrarily
-			parent = dst
-			child = dir
-		}
-
-		dirLocked := false
-		if dir.inodeNum() > dst.inodeNum() {
-			dir.Lock()
-			dirLocked = true
-		}
 		defer child.lock.Unlock()
 
 		result := func() fuse.Status {
-			dst.Lock()
+			// we need to unlock the parent early
 			defer parent.lock.Unlock()
-
-			if !dirLocked {
-				dir.Lock()
-			}
 
 			if _, exists := dir.dirChildren.getInode(c,
 				oldName); !exists {
@@ -812,43 +865,6 @@ func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
-}
-
-func (dir *Directory) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.vlog("Directory::Link Enter")
-	defer c.vlog("Directory::Link Exit")
-
-	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
-	if err != nil {
-		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
-		return fuse.EIO
-	}
-	newRecord := cloneDirectoryRecord(&origRecord)
-	newRecord.SetFilename(newName)
-	newRecord.SetID(srcInode.sync_DOWN(c))
-
-	// We cannot lock earlier because the parent of srcInode may be us
-	defer dir.Lock().Unlock()
-
-	dir.dirChildren.setRecord(c, newRecord)
-	inodeNum, exists := dir.dirChildren.getInode(c, newRecord.Filename())
-	if !exists {
-		panic("Failure to set record in children")
-	}
-
-	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
-		inodeNum)
-
-	out.NodeId = uint64(inodeNum)
-	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-		newRecord)
-
-	dir.self.dirty(c)
-
-	return fuse.OK
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
@@ -1226,8 +1242,4 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
-}
-
-func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
-	return fuse.OK
 }
