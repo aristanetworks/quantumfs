@@ -52,7 +52,7 @@ func NewQuantumFsLogs(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
-		config.MemLogBytes))
+		config.MemLogBytes, qlog.PrintToStdout))
 }
 
 type QuantumFs struct {

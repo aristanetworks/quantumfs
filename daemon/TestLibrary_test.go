@@ -43,6 +43,11 @@ type logscanError struct {
 var errorMutex sync.Mutex
 var errorLogs []logscanError
 
+func noStdOut(format string, args ...interface{}) error {
+	// Do nothing
+	return nil
+}
+
 // startTest is a helper which configures the testing environment
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
@@ -58,7 +63,8 @@ func runTest(t *testing.T, test quantumFsTest) {
 		testResult: make(chan string),
 		startTime:  time.Now(),
 		cachePath:  cachePath,
-		logger:     qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24),
+		logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
+			noStdOut),
 	}
 	th.createTestDirs()
 

@@ -36,7 +36,7 @@ func TestQParse_test(t *testing.T) {
 		test.qfs.c.Qlog.LogLevels--
 
 		// Do some stuff that should generate some logs
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -103,5 +103,62 @@ func TestQParse_test(t *testing.T) {
 					debugStr)
 			}
 		}
+	})
+}
+
+func TestQParsePartials_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		// Before we enable logs, let's cause all File logs to be
+		// partially written
+		test.qfs.c.Qlog.EnterTestMode("File::")
+
+		// Enable *all* logs
+		test.qfs.c.Qlog.LogLevels = 0
+		test.qfs.c.Qlog.LogLevels--
+
+		// Do some stuff that should generate some logs
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/" + "test"
+		fd, err := syscall.Creat(testFilename, 0124)
+		test.assert(err == nil, "Error creating file: %v", err)
+		syscall.Close(fd)
+
+		data := genData(1024)
+		err = printToFile(testFilename, string(data))
+		test.assert(err == nil, "Couldn't write 1KB data to file")
+
+		test.log("This is a test string, %d", 12345)
+
+		err = os.Truncate(testFilename, 0)
+		test.assert(err == nil, "Couldn't truncate file to zero")
+
+		_, err = ioutil.ReadFile(testFilename)
+		test.assert(err == nil, "Unable to read file contents")
+
+		// Now grab the log file
+		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+
+		testLogLines := strings.Split(testLogs, "\n")
+		droppedEntry := false
+		count := 0
+		// Check to see if we see dropped packets interspersed with good ones
+		for i := 0; i < len(testLogLines); i++ {
+			test.assert(len(testLogLines[i]) < 6 ||
+				strings.Compare(testLogLines[i][:6], "File::") != 0,
+				"Not all File:: packets are broken")
+
+			// Count the number of times we go from a good to broken log
+			isPartial := strings.Contains(testLogLines[i],
+				"incomplete packet")
+			if isPartial && !droppedEntry {
+				count++
+			}
+			droppedEntry = isPartial
+		}
+
+		test.assert(count >= 10,
+			"Unable to confidently prove partial packet reading")
 	})
 }
