@@ -111,7 +111,7 @@ func updateChildren(c *ctx, parentName string, names []string,
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
-			if name == "null" && parentName == "_null" {
+			if parentName == "_null" && name == "null" {
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
 					parentName, name, inodeId))
 			} else {

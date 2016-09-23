@@ -672,6 +672,10 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
+	if _, ok := dstInode.(*NullWorkspaceRoot); ok {
+		return fuse.EPERM
+	}
+
 	c.vlog("Directory::MvChild Enter %s -> %s", oldName, newName)
 	defer c.vlog("Directory::MvChild Exit")
 

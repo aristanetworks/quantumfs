@@ -12,8 +12,6 @@ import "os"
 import "runtime"
 import "syscall"
 import "testing"
-import "strings"
-
 import "github.com/aristanetworks/quantumfs"
 
 func TestFileCreation(t *testing.T) {
@@ -377,8 +375,9 @@ func TestFileDescriptorDirtying(t *testing.T) {
 
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
-		wsNamespaceName := strings.Split(test.relPath(workspace), "/")[0]
-		wsWorkspaceName := strings.Split(test.relPath(workspace), "/")[1]
+		workspacerel := test.relPath(workspace)
+		wsNamespaceName, wsWorkspaceName :=
+			test.splitWorkspacerootRelPath(workspacerel)
 
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)

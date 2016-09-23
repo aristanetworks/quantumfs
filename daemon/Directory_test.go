@@ -11,8 +11,6 @@ import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
-import "strings"
-
 import "github.com/aristanetworks/quantumfs"
 
 func TestDirectoryCreation(t *testing.T) {
@@ -107,8 +105,9 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
-		wsNamespaceName := strings.Split(test.relPath(workspace), "/")[0]
-		wsWorkspaceName := strings.Split(test.relPath(workspace), "/")[1]
+		workspacerel := test.relPath(workspace)
+		wsNamespaceName, wsWorkspaceName :=
+			test.splitWorkspacerootRelPath(workspacerel)
 
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/" + "test"
