@@ -14,7 +14,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 
-func TestDirectoryCreation_test(t *testing.T) {
+func TestDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -40,7 +40,7 @@ func TestDirectoryCreation_test(t *testing.T) {
 	})
 }
 
-func TestRecursiveDirectoryCreation_test(t *testing.T) {
+func TestRecursiveDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -66,7 +66,7 @@ func TestRecursiveDirectoryCreation_test(t *testing.T) {
 	})
 }
 
-func TestRecursiveDirectoryFileCreation_test(t *testing.T) {
+func TestRecursiveDirectoryFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -99,7 +99,7 @@ func TestRecursiveDirectoryFileCreation_test(t *testing.T) {
 	})
 }
 
-func TestRecursiveDirectoryFileDescriptorDirtying_test(t *testing.T) {
+func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -155,7 +155,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying_test(t *testing.T) {
 // order to confirm the data has been written correctly we need to branch the
 // workspace after modifying the directory and confirm the newly loaded directory
 // contains the changes in the update.
-func TestDirectoryUpdate_test(t *testing.T) {
+func TestDirectoryUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -182,7 +182,7 @@ func TestDirectoryUpdate_test(t *testing.T) {
 	})
 }
 
-func TestDirectoryFileDeletion_test(t *testing.T) {
+func TestDirectoryFileDeletion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -208,7 +208,7 @@ func TestDirectoryFileDeletion_test(t *testing.T) {
 	})
 }
 
-func TestDirectoryUnlinkDirectory_test(t *testing.T) {
+func TestDirectoryUnlinkDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -227,7 +227,7 @@ func TestDirectoryUnlinkDirectory_test(t *testing.T) {
 	})
 }
 
-func TestDirectoryRmdirEmpty_test(t *testing.T) {
+func TestDirectoryRmdirEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -241,7 +241,7 @@ func TestDirectoryRmdirEmpty_test(t *testing.T) {
 	})
 }
 
-func TestDirectoryRmdirNewlyEmpty_test(t *testing.T) {
+func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -263,7 +263,7 @@ func TestDirectoryRmdirNewlyEmpty_test(t *testing.T) {
 	})
 }
 
-func TestDirectoryRmdirNotEmpty_test(t *testing.T) {
+func TestDirectoryRmdirNotEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -283,7 +283,7 @@ func TestDirectoryRmdirNotEmpty_test(t *testing.T) {
 	})
 }
 
-func TestDirectoryRmdirFile_test(t *testing.T) {
+func TestDirectoryRmdirFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

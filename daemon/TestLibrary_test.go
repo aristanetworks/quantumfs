@@ -455,7 +455,7 @@ func randomNamespaceName(size int) string {
 	return result
 }
 
-func TestRandomNamespaceName_test(t *testing.T) {
+func TestRandomNamespaceName(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		name1 := randomNamespaceName(8)
 		name2 := randomNamespaceName(8)
@@ -653,7 +653,7 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // If a quantumfs test fails then it may leave the filesystem mount hanging around in
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
-func TestPanicFilesystemAbort_test(t *testing.T) {
+func TestPanicFilesystemAbort(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.shouldFailLogscan = true
 
@@ -674,7 +674,7 @@ func TestPanicFilesystemAbort_test(t *testing.T) {
 
 // If a test never returns from some event, such as an inifinite loop, the test
 // should timeout and cleanup after itself.
-func TestTimeout_test(t *testing.T) {
+func TestTimeout(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -828,7 +828,7 @@ func genData(maxLen int) []byte {
 	return precompGenData[:maxLen]
 }
 
-func TestGenData_test(t *testing.T) {
+func TestGenData(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		hardcoded := "012345678910111213141516171819202122232425262"
 		data := genData(len(hardcoded))

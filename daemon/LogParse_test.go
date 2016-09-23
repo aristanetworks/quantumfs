@@ -17,7 +17,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-func TestQParse_test(t *testing.T) {
+func TestQParse(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

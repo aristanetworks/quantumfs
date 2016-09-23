@@ -263,21 +263,6 @@ func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (fi *File) Sync(c *ctx) fuse.Status {
-	c.vlog("File::Sync Enter")
-	defer c.vlog("File::Sync Exit")
-
-	func() {
-		defer fi.Lock().Unlock()
-		if fi.isDirty() {
-			key := fi.sync_DOWN(c)
-			fi.parent().syncChild(c, fi.InodeCommon.id, key)
-		}
-	}()
-
-	return fuse.OK
-}
-
 func (fi *File) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -320,13 +305,6 @@ func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 
 func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
-}
-
-func (fi *File) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on File")
-	return fuse.ENOTDIR
 }
 
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
@@ -688,8 +666,4 @@ func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32
 	buf []byte) (uint32, fuse.Status) {
 
 	return fd.file.Write(c, offset, size, flags, buf)
-}
-
-func (fd *FileDescriptor) Sync(c *ctx) fuse.Status {
-	return fd.file.Sync(c)
 }
