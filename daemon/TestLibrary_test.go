@@ -438,7 +438,7 @@ func (th *testHelper) relPath(path string) string {
 
 // Extract namespace and workspace path from the absolute path of
 // a workspaceroot
-func (th *testHelper) getWorkspaceComponent(abspath string) (string, string) {
+func (th *testHelper) getWorkspaceComponents(abspath string) (string, string) {
 	relpath := th.relPath(abspath)
 	components := strings.Split(relpath, "/")
 

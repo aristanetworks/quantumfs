@@ -376,7 +376,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
 		wsNamespaceName, wsWorkspaceName :=
-			test.getWorkspaceComponent(workspace)
+			test.getWorkspaceComponents(workspace)
 
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
