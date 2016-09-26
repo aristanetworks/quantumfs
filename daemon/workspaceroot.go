@@ -101,6 +101,67 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	}
 }
 
+func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
+	defer wsr.RLock().RUnlock()
+
+	children := make([]directoryContents, 0, wsr.dirChildren.count())
+	for _, entry := range wsr.dirChildren.getRecords() {
+		filename := entry.Filename()
+
+		entryInfo := directoryContents{
+			filename: filename,
+		}
+		inodeId, exists := wsr.dirChildren.getInode(c, filename)
+		if !exists {
+			panic("Missing inode in child records")
+		}
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr, inodeId,
+			c.fuseCtx.Owner, entry)
+		entryInfo.fuseType = entryInfo.attr.Mode
+
+		children = append(children, entryInfo)
+	}
+
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
+	}
+	fillApiAttr(&api.attr)
+	children = append(children, api)
+
+	ds := newDirectorySnapshot(c, children, wsr.InodeCommon.id, wsr.treeLock())
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	out.Fh = uint64(ds.FileHandleCommon.id)
+	out.OpenFlags = 0
+
+	return fuse.OK
+}
+
+func (wsr *WorkspaceRoot) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
+	c.vlog("WorkspaceRoot::Lookup Enter")
+	defer c.vlog("WorkspaceRoot::Lookup Exit")
+	defer wsr.RLock().RUnlock()
+
+	inodeNum, exists := wsr.dirChildren.getInode(c, name)
+	if !exists {
+		return fuse.ENOENT
+	}
+
+	record, exists := wsr.dirChildren.getRecord(c, inodeNum)
+	if !exists {
+		return fuse.ENOENT
+	}
+
+	c.vlog("Directory::Lookup found inode %d", inodeNum)
+	out.NodeId = uint64(inodeNum)
+	fillEntryOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, record)
+
+	return fuse.OK
+}
+
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
