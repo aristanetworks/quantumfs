@@ -89,6 +89,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 const logEnvTag = "TRACE"
 const maxLogLevels = 4
 const defaultMmapFile = "qlog"
+const entryCompleteBit = 1 << 15
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {
@@ -162,21 +163,22 @@ type Qlog struct {
 	logBuffer *SharedMemory
 }
 
-func printToStdout(format string, args ...interface{}) error {
+func PrintToStdout(format string, args ...interface{}) error {
 	format += "\n"
 	_, err := fmt.Printf(format, args...)
 	return err
 }
 
 func NewQlogTiny() *Qlog {
-	return NewQlogExt("", uint32(DefaultMmapSize))
+	return NewQlogExt("", uint32(DefaultMmapSize), PrintToStdout)
 }
 
 func NewQlog(ramfsPath string) *Qlog {
-	return NewQlogExt(ramfsPath, uint32(DefaultMmapSize))
+	return NewQlogExt(ramfsPath, uint32(DefaultMmapSize), PrintToStdout)
 }
 
-func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
+func NewQlogExt(ramfsPath string, sharedMemLen uint32, outLog func(format string,
+	args ...interface{}) error) *Qlog {
 
 	if sharedMemLen == 0 {
 		panic(fmt.Sprintf("Invalid shared memory length provided: %d\n",
@@ -185,7 +187,7 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
 
 	q := Qlog{
 		LogLevels: 0,
-		Write:     printToStdout,
+		Write:     outLog,
 	}
 	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, int(sharedMemLen),
 		&q)
@@ -204,6 +206,12 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint32) *Qlog {
 
 func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
 	q.Write = w
+}
+
+// Only for tests - causes all logs starting with prefix to be incompletely written
+func (q *Qlog) EnterTestMode(dropPrefix string) {
+	q.logBuffer.testDropStr = dropPrefix
+	q.logBuffer.testMode = true
 }
 
 func formatString(idx LogSubsystem, reqId uint64, t time.Time,

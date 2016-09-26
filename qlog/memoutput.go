@@ -13,7 +13,9 @@ import "math"
 import "os"
 import "reflect"
 import "runtime/debug"
+import "strings"
 import "sync"
+import "sync/atomic"
 import "syscall"
 import "unsafe"
 
@@ -25,7 +27,11 @@ const mmapStrMapSize = 512 * 1024
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const MmapHeaderVersion = 1
+const QlogVersion = 2
+
+// We use the upper-most bit of the length field to indicate the packet is ready,
+// so the max packet length is 7 bits long
+const MaxPacketLen = 32767
 
 type MmapHeader struct {
 	Version    uint32
@@ -49,6 +55,10 @@ type SharedMemory struct {
 	// This is dangerous as Qlog also owns SharedMemory. SharedMemory must
 	// ensure that any call it makes to Qlog doesn't result in infinite recursion
 	errOut *Qlog
+
+	// For testing only
+	testDropStr string
+	testMode    bool
 }
 
 type LogEntry struct {
@@ -110,7 +120,9 @@ func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
 }
 
-func (circ *CircMemLogs) reserveMem(dataLen uint16, dataRaw []byte) uint32 {
+func (circ *CircMemLogs) reserveMem(dataLen uint16,
+	dataRaw []byte) (dataStartIdx uint32, lenStartIdx uint32) {
+
 	circ.writeMutex.Lock()
 	defer circ.writeMutex.Unlock()
 
@@ -118,28 +130,42 @@ func (circ *CircMemLogs) reserveMem(dataLen uint16, dataRaw []byte) uint32 {
 	circBufLen := uint32(len(circ.buffer))
 
 	circ.header.PastEndIdx += uint32(dataLen)
-	circ.wrapWrite_(uint32(circ.header.PastEndIdx)%circBufLen,
-		dataRaw)
+	lenStart := uint32(circ.header.PastEndIdx) % circBufLen
+	circ.wrapWrite_(lenStart, dataRaw)
 
 	circ.header.PastEndIdx += 2
 	circ.header.PastEndIdx %= circBufLen
 
-	return dataStart
+	return dataStart, lenStart
 }
 
-func (circ *CircMemLogs) writeData(data []byte) {
+// Note: in development code, you should never provide a True partialWrite
+func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 	// For now, if the message is too long then just toss it
 	if len(data) > len(circ.buffer) {
 		return
 	}
 
-	dataLen := uint16(len(data))
+	// we only want to use the lower 2 bytes, but need all 4 to use sync/atomic
+	dataLen := uint32(len(data))
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
 
-	dataStart := circ.reserveMem(dataLen, dataRaw[:])
+	dataStart, lenStart := circ.reserveMem(uint16(dataLen), (*dataRaw)[:])
 
 	// Now that we know we have space, write in the entry
-	circ.wrapWrite_(uint32(dataStart), data)
+	circ.wrapWrite_(dataStart, data)
+
+	// For testing purposes only: if we need to generate some partially written
+	// packets, then do so by not finishing this one.
+	if partialWrite {
+		return
+	}
+
+	// Now that the entry is written completely, mark the packet as safe to read,
+	// but use an atomic operation to load to ensure a memory barrier
+	dataLen &= ^uint32(entryCompleteBit)
+	atomic.AddUint32(&dataLen, entryCompleteBit)
+	circ.wrapWrite_(lenStart, (*dataRaw)[:])
 }
 
 const LogStrSize = 64
@@ -259,7 +285,7 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	rtn.fd = mapFile
 	rtn.buffer = mmap
 	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
-	header.Version = MmapHeaderVersion
+	header.Version = QlogVersion
 	header.StrMapSize = mmapStrMapSize
 	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,
@@ -478,13 +504,13 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	}
 
 	// Make sure length isn't too long, excluding the size bytes
-	if buf.Len() > math.MaxUint16 {
+	if buf.Len() > MaxPacketLen {
 		errorPrefix := "Log data exceeds allowable length: %s\n"
 		checkRecursion(errorPrefix, format)
 
 		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
 
-		buf.Truncate(math.MaxUint16)
+		buf.Truncate(MaxPacketLen)
 	}
 
 	return buf.Bytes()
@@ -503,5 +529,13 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Generate the byte array packet
 	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
 
-	mem.circBuf.writeData(data)
+	partialWrite := false
+	if mem.testMode && len(mem.testDropStr) < len(format) &&
+		strings.Compare(mem.testDropStr,
+			format[:len(mem.testDropStr)]) == 0 {
+
+		partialWrite = true
+	}
+
+	mem.circBuf.writeData(data, partialWrite)
 }

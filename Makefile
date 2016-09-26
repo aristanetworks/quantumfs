@@ -3,7 +3,7 @@ PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
-all: $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -13,6 +13,9 @@ fetch:
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
+
+lockcheck:
+	./lockcheck.sh
 
 encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp

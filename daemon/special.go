@@ -11,7 +11,6 @@ import "errors"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
-
 import "github.com/hanwen/go-fuse/fuse"
 
 func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
@@ -55,7 +54,7 @@ func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
-		dirRecord.SetID(special.sync_DOWN(c))
+		dirRecord.SetID(special.embedDataIntoKey_(c))
 	}
 	return &special
 }
@@ -145,13 +144,6 @@ func (special *Special) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (special *Special) Sync(c *ctx) fuse.Status {
-	key := special.sync_DOWN(c)
-	special.parent().syncChild(c, special.InodeCommon.id, key)
-
-	return fuse.OK
-}
-
 func (special *Special) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -200,13 +192,6 @@ func (special *Special) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on Special")
 	return fuse.ENODATA
-}
-
-func (special *Special) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on Special")
-	return fuse.ENOTDIR
 }
 
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
@@ -268,6 +253,15 @@ func (special *Special) getChildRecord(c *ctx,
 func (special *Special) dirty(c *ctx) {
 	special.setDirty(true)
 	special.parent().dirtyChild(c, special)
+}
+
+func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
+	var hash [quantumfs.ObjectKeyLength - 1]byte
+
+	binary.LittleEndian.PutUint32(hash[0:4], special.filetype)
+	binary.LittleEndian.PutUint32(hash[4:8], special.device)
+
+	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 }
 
 func specialOverrideAttr(entry *quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {

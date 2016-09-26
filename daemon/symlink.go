@@ -116,13 +116,6 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return data.Get(), fuse.OK
 }
 
-func (link *Symlink) Sync(c *ctx) fuse.Status {
-	key := link.sync_DOWN(c)
-	link.parent().syncChild(c, link.InodeCommon.id, key)
-
-	return fuse.OK
-}
-
 func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -164,13 +157,6 @@ func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
-}
-
-func (link *Symlink) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on Symlink")
-	return fuse.ENOTDIR
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
