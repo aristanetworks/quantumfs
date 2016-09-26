@@ -732,7 +732,7 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
 		if upwardsParent.inodeNum() == b.inodeNum() {
 
-			// a is a (gran-)child of b
+			// a is a (grand-)child of b
 			parent = b
 			child = a
 			break
@@ -744,7 +744,7 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
 			if upwardsParent.inodeNum() == a.inodeNum() {
 
-				// b is a (gran-)child of a
+				// b is a (grand-)child of a
 				parent = a
 				child = b
 				break
