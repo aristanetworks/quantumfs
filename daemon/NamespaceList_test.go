@@ -49,7 +49,7 @@ func TestNullWorkspaceListing(t *testing.T) {
 		path := test.nullWorkspace()
 		entries, err := ioutil.ReadDir(path)
 		test.assert(err == nil, "Couldn't read workspace listing")
-		test.assert(len(entries) == 0,
+		test.assert(len(entries) == 1,
 			"Incorrect number of entries in null workspace: %d",
 			len(entries))
 	})

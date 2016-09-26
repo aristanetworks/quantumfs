@@ -359,7 +359,7 @@ func TestLargeDirectory(t *testing.T) {
 		for _, file := range files {
 			attendance[file.Name()] = true
 		}
-		test.assert(len(attendance) == numToCreate,
+		test.assert(len(attendance) == numToCreate+1,
 			"Incorrect number of files in directory %d", len(attendance))
 
 		for i := 0; i < numToCreate; i++ {
@@ -378,7 +378,7 @@ func TestLargeDirectory(t *testing.T) {
 		for _, file := range files {
 			attendance[file.Name()] = true
 		}
-		test.assert(len(attendance) == numToCreate,
+		test.assert(len(attendance) == numToCreate+1,
 			"Incorrect number of files in directory %d", len(attendance))
 
 		for i := 0; i < numToCreate; i++ {
