@@ -727,19 +727,32 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 	// directories exist
 	var parent *Directory
 	var child *Directory
-	if a.parent() != nil &&
-		a.parent().inodeNum() == b.inodeNum() {
 
-		// a is a child of b
-		parent = b
-		child = a
-	} else if b.parent() != nil &&
-		b.parent().inodeNum() == a.inodeNum() {
+	upwardsParent := a.parent()
+	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+		if upwardsParent.inodeNum() == b.inodeNum() {
 
-		// b is a child of a
-		parent = a
-		child = b
-	} else {
+			// a is a (grand-)child of b
+			parent = b
+			child = a
+			break
+		}
+	}
+
+	if upwardsParent == nil {
+		upwardsParent = b.parent()
+		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+			if upwardsParent.inodeNum() == a.inodeNum() {
+
+				// b is a (grand-)child of a
+				parent = a
+				child = b
+				break
+			}
+		}
+	}
+
+	if upwardsParent == nil {
 		// No relationship, choose arbitrarily
 		parent = a
 		child = b
