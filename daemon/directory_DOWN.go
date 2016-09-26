@@ -6,12 +6,50 @@ package daemon
 // This is _DOWN counterpart to directory.go
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/hanwen/go-fuse/fuse"
+
+func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.vlog("Directory::Link Enter")
+	defer c.vlog("Directory::Link Exit")
+
+	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
+	if err != nil {
+		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
+		return fuse.EIO
+	}
+	newRecord := cloneDirectoryRecord(&origRecord)
+	newRecord.SetFilename(newName)
+	newRecord.SetID(srcInode.flush_DOWN(c))
+
+	// We cannot lock earlier because the parent of srcInode may be us
+	defer dir.Lock().Unlock()
+
+	dir.dirChildren.setRecord(c, newRecord)
+	inodeNum, exists := dir.dirChildren.getInode(c, newRecord.Filename())
+	if !exists {
+		panic("Failure to set record in children")
+	}
+
+	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
+		inodeNum)
+
+	out.NodeId = uint64(inodeNum)
+	fillEntryOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+		newRecord)
+
+	dir.self.dirty(c)
+
+	return fuse.OK
+}
 
 func (dir *Directory) forget_DOWN(c *ctx) {
 	c.vlog("Directory::forget_DOWN not yet supported")
 }
 
-func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
+func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory::sync Enter")
 	defer c.vlog("Directory::sync Exit")
 	if !dir.isDirty() {
@@ -25,61 +63,6 @@ func (dir *Directory) sync_DOWN(c *ctx) quantumfs.ObjectKey {
 	return dir.publish(c)
 }
 
-func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
-	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
-
-	layer.SetNext(nextKey)
-	bytes := layer.Bytes()
-
-	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newKey, err := buf.Key(&c.Ctx)
-	if err != nil {
-		panic("Failed to upload new baseLayer object")
-	}
-
-	return newKey
-}
-
-func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
-	c.vlog("Directory::publish Enter")
-	defer c.vlog("Directory::publish Exit")
-
-	// Compile the internal records into a series of blocks which can be placed
-	// in the datastore.
-
-	newBaseLayerId := quantumfs.EmptyDirKey
-
-	// childIdx indexes into childrenRecords, entryIdx indexes into the
-	// metadata block
-	baseLayer := quantumfs.NewDirectoryEntry()
-	entryIdx := 0
-	for _, child := range dir.dirChildren.getRecords() {
-		if entryIdx == quantumfs.MaxDirectoryRecords {
-			// This block is full, upload and create a new one
-			baseLayer.SetNumEntries(entryIdx)
-			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
-				newBaseLayerId)
-			baseLayer = quantumfs.NewDirectoryEntry()
-			entryIdx = 0
-		}
-
-		baseLayer.SetEntry(entryIdx, child)
-
-		entryIdx++
-	}
-
-	baseLayer.SetNumEntries(entryIdx)
-	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
-
-	c.vlog("Directory key %s -> %s", dir.baseLayerId.String(),
-		newBaseLayerId.String())
-	dir.baseLayerId = newBaseLayerId
-
-	dir.setDirty(false)
-
-	return dir.baseLayerId
-}
-
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
@@ -91,11 +74,19 @@ func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	for _, childId := range dirtyChildren {
 		child := c.qfs.inode(c, childId)
 
-		newKey := child.sync_DOWN(c)
+		newKey := child.flush_DOWN(c)
 		record, exists := dir.dirChildren.getRecord(c, childId)
 		if !exists {
 			panic("Unexpected missing child during update")
 		}
 		record.SetID(newKey)
 	}
+}
+
+func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
+func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
+	return fuse.OK
 }

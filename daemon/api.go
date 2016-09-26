@@ -148,10 +148,6 @@ func (api *ApiInode) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (api *ApiInode) Sync(c *ctx) fuse.Status {
-	return fuse.OK
-}
-
 func (api *ApiInode) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -200,13 +196,6 @@ func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on ApiInode")
 	return fuse.ENODATA
-}
-
-func (api *ApiInode) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on ApiInode")
-	return fuse.ENOTDIR
 }
 
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
@@ -389,8 +378,4 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 func (api *ApiHandle) syncAll(c *ctx) {
 	c.qfs.syncAll(c)
 	api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
-}
-
-func (api *ApiHandle) Sync(c *ctx) fuse.Status {
-	return fuse.OK
 }
