@@ -709,19 +709,34 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// directories exist
 		var parent *Directory
 		var child *Directory
-		if dst.parent() != nil &&
-			dst.parent().inodeNum() == dir.inodeNum() {
 
-			// dst is a child of dir
-			parent = dir
-			child = dst
-		} else if dir.parent() != nil &&
-			dir.parent().inodeNum() == dst.inodeNum() {
+		upwardsParent := dst.parent()
+		for upwardsParent != nil {
+			if upwardsParent.inodeNum() == dir.inodeNum() {
 
-			// dir is a child of dst
-			parent = dst
-			child = dir
-		} else {
+				// dst is a (gran-)child of dir
+				parent = dir
+				child = dst
+				break
+			}
+			upwardsParent = upwardsParent.parent()
+		}
+
+		if upwardsParent == nil {
+			upwardsParent = dir.parent()
+			for upwardsParent != nil {
+				if upwardsParent.inodeNum() == dst.inodeNum() {
+
+					// dir is a (gran-)child of dst
+					parent = dst
+					child = dir
+					break
+				}
+				upwardsParent = upwardsParent.parent()
+			}
+		}
+
+		if upwardsParent == nil {
 			// No relationship, choose arbitrarily
 			parent = dst
 			child = dir
