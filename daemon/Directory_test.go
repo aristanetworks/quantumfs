@@ -11,14 +11,14 @@ import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
-
 import "github.com/aristanetworks/quantumfs"
 
 func TestDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/" + "test"
 		err := syscall.Mkdir(testFilename, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
@@ -44,7 +44,7 @@ func TestRecursiveDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 		dirName := workspace + "/test/a/b"
 		err := os.MkdirAll(dirName, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
@@ -70,7 +70,7 @@ func TestRecursiveDirectoryFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
 
@@ -104,7 +104,10 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		// Create a file and determine its inode numbers
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+		wsNamespaceName, wsWorkspaceName :=
+			test.getWorkspaceComponents(workspace)
+
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/" + "test"
 
@@ -131,8 +134,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, after we
 		// trigger a delayed sync, change the workspace rootId and mark the
 		// fileDescriptor clean.
-		oldRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
-			quantumfs.NullWorkspaceName)
+		oldRootId := test.workspaceRootId(wsNamespaceName,
+			wsWorkspaceName)
 
 		c := test.newCtx()
 		_, err = file.accessor.writeBlock(c, 0, 0, []byte("update"))
@@ -140,8 +143,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.syncAllWorkspaces()
-		newRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
-			quantumfs.NullWorkspaceName)
+		newRootId := test.workspaceRootId(wsNamespaceName,
+			wsWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
 		test.assert(!file.isDirty(),
@@ -161,7 +164,9 @@ func TestDirectoryUpdate(t *testing.T) {
 
 		api := test.getApi()
 
-		src := test.nullWorkspaceRel()
+		src := test.newWorkspace()
+		src = test.relPath(src)
+
 		dst := "dirupdate/test"
 
 		// First create a file
@@ -186,7 +191,7 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -212,7 +217,7 @@ func TestDirectoryUnlinkDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 		testDir := workspace + "/" + "test"
 		err := os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
@@ -306,7 +311,8 @@ func TestDirectoryChildTypes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testDir := workspace + "/testdir"
 		testFile := testDir + "/testfile"
 
@@ -322,7 +328,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 		test.assert(err == nil, "Error writing to file: %v", err)
 		fd.Close()
 
-		workspace = test.newWorkspace()
+		workspace = test.absPath(test.branchWorkspace(workspace))
 		testFile = workspace + "/testdir/testfile"
 
 		data, err := ioutil.ReadFile(testFile)
@@ -538,6 +544,72 @@ func TestRenameIntoChild(t *testing.T) {
 		// Confirm after branch
 		workspace = test.absPath(test.branchWorkspace(workspace))
 		childFile = workspace + "/parent/child/test2"
+		err = syscall.Stat(childFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
+func TestRenameIntoIndirectParent(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		parent := workspace + "/parent"
+		child := workspace + "/parent/indirect/child"
+		childFile := child + "/test"
+		parentFile := parent + "/test2"
+
+		err := os.Mkdir(parent, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.MkdirAll(child, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(childFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(childFile, parentFile)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(parentFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		parentFile = workspace + "/parent/test2"
+		err = syscall.Stat(parentFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+	})
+}
+
+func TestRenameIntoIndirectChild(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		parent := workspace + "/parent"
+		child := workspace + "/parent/indirect/child"
+		parentFile := parent + "/test"
+		childFile := child + "/test2"
+
+		err := os.Mkdir(parent, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+		err = os.MkdirAll(child, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		fd, err := os.Create(parentFile)
+		fd.Close()
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		err = os.Rename(parentFile, childFile)
+		test.assert(err == nil, "Error renaming file: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(childFile, &stat)
+		test.assert(err == nil, "Rename failed: %v", err)
+
+		// Confirm after branch
+		workspace = test.absPath(test.branchWorkspace(workspace))
+		childFile = workspace + "/parent/indirect/child/test2"
 		err = syscall.Stat(childFile, &stat)
 		test.assert(err == nil, "Rename failed: %v", err)
 	})

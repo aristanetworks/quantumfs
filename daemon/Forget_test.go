@@ -18,7 +18,7 @@ func TestForget(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 
 		numFiles := 10
 		data := genData(255)

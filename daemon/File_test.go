@@ -12,14 +12,14 @@ import "os"
 import "runtime"
 import "syscall"
 import "testing"
-
 import "github.com/aristanetworks/quantumfs"
 
 func TestFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -52,7 +52,8 @@ func TestFileReadWrite(t *testing.T) {
 		//write the test data in two goes
 		textSplit := len(testText) / 2
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/" + "testrw"
 		file, err := os.Create(testFilename)
 		test.assert(file != nil && err == nil,
@@ -153,7 +154,8 @@ func TestFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testDir := workspace + "/testDir"
 		testFilename := testDir + "/test"
 
@@ -243,7 +245,8 @@ func TestRootFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/test"
 
 		fd, err := syscall.Creat(testFilename, 0000)
@@ -303,7 +306,8 @@ func TestFileSizeChanges(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/" + "test"
 
 		testText := "TestString"
@@ -370,7 +374,10 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		// Create a file and determine its inode numbers
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+		wsNamespaceName, wsWorkspaceName :=
+			test.getWorkspaceComponents(workspace)
+
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
 		test.assert(err == nil, "Error creating file: %v", err)
@@ -392,8 +399,8 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, because we
 		// currently do not support delayed syncing, change the workspace
 		// rootId and mark the fileDescriptor clean.
-		oldRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
-			quantumfs.NullWorkspaceName)
+		oldRootId := test.workspaceRootId(wsNamespaceName,
+			wsWorkspaceName)
 
 		c := test.newCtx()
 		_, err = file.accessor.writeBlock(c, 0, 0, []byte("update"))
@@ -401,8 +408,8 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.syncAllWorkspaces()
-		newRootId := test.workspaceRootId(quantumfs.NullNamespaceName,
-			quantumfs.NullWorkspaceName)
+		newRootId := test.workspaceRootId(wsNamespaceName,
+			wsWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
 		test.assert(!file.isDirty(),
@@ -419,7 +426,9 @@ func TestFileAttrUpdate(t *testing.T) {
 
 		api := test.getApi()
 
-		src := test.nullWorkspaceRel()
+		src := test.newWorkspace()
+		src = test.relPath(src)
+
 		dst := "attrupdate/test"
 
 		// First create a file
@@ -457,7 +466,9 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 
 		api := test.getApi()
 
-		src := test.nullWorkspaceRel()
+		src := test.newWorkspace()
+		src = test.relPath(src)
+
 		dst := "attrwriteupdate/test"
 
 		// First create a file
@@ -497,7 +508,8 @@ func TestSmallFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/test"
 
 		data := genData(10 * 1024)
