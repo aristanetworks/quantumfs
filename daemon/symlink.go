@@ -146,24 +146,24 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
-        return link.parent().getChildXAttrSize(c, link.inodeNum(), attr)
+	return link.parent().getChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
-        attr string) (data []byte, result fuse.Status) {
-        return link.parent().getChildXAttrData(c, link.inodeNum(), attr)
+	attr string) (data []byte, result fuse.Status) {
+	return link.parent().getChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-        return link.parent().listChildXAttr(c, link.inodeNum())
+	return link.parent().listChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-        return link.parent().setChildXAttr(c, link.inodeNum(), attr, data)
+	return link.parent().setChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
-        return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
+	return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) Link(c *ctx, srcInode Inode, newName string,
