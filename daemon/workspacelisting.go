@@ -250,10 +250,6 @@ func (nsl *NamespaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (nsl *NamespaceList) Sync(c *ctx) fuse.Status {
-	return fuse.OK
-}
-
 func (nsl *NamespaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -302,13 +298,6 @@ func (nsl *NamespaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status
 func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on NamespaceList")
 	return fuse.ENODATA
-}
-
-func (nsl *NamespaceList) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on NamespaceList")
-	return fuse.ENOTDIR
 }
 
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
@@ -495,10 +484,6 @@ func (wsl *WorkspaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
-func (wsl *WorkspaceList) Sync(c *ctx) fuse.Status {
-	return fuse.OK
-}
-
 func (wsl *WorkspaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -547,13 +532,6 @@ func (wsl *WorkspaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status
 func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.elog("Invalid RemoveXAttr on WorkspaceList")
 	return fuse.ENODATA
-}
-
-func (wsl *WorkspaceList) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on WorkspaceList")
-	return fuse.ENOTDIR
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
