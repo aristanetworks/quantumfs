@@ -5,7 +5,6 @@ package daemon
 
 // Test the various operations on symlinks, only contains: CreateSymlink and
 // extended attributes related operations: set, get, list, remove
-// TODO: Add test functions for other symlink functions
 
 import "bytes"
 import "syscall"
@@ -166,7 +165,6 @@ func TestSymlinkAtrr_Set_Get(t *testing.T) {
 
 		workspace := test.nullWorkspace()
 
-		//workspace := "/home/yang/symTest/space1/_null/null"
 		symlFilename := createSymlink(workspace, test)
 
 		var space [32]byte
