@@ -543,7 +543,7 @@ func TestRenameIntoChild(t *testing.T) {
 	})
 }
 
-func TestRenameIntoIndirectnParent(t *testing.T) {
+func TestRenameIntoIndirectParent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
