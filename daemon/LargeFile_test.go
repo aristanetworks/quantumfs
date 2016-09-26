@@ -15,7 +15,7 @@ func TestLargeFileRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
 		// Write the data sequence to the file continually past what
@@ -52,7 +52,8 @@ func TestLargeFileExpansion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/test"
 
 		// Write the data sequence to the file continually past what
@@ -117,7 +118,8 @@ func TestLargeFileAttr(t *testing.T) {
 
 		api := test.getApi()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/test"
 
 		// Create a small file
@@ -173,7 +175,8 @@ func TestLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/test"
 
 		data := genData(10 * 1024)

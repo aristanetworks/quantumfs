@@ -751,6 +751,11 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
+	// moving any file into _null/null is not permitted
+	if _, ok := dstInode.(*NullWorkspaceRoot); ok {
+		return fuse.EPERM
+	}
+
 	c.vlog("Directory::MvChild Enter %s -> %s", oldName, newName)
 	defer c.vlog("Directory::MvChild Exit")
 

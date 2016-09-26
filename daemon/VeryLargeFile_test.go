@@ -15,7 +15,8 @@ import "testing"
 func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	test.startDefaultQuantumFs()
 
-	workspace := test.nullWorkspace()
+	workspace := test.newWorkspace()
+
 	testFilename := workspace + "/test"
 
 	data := genData(4096)
@@ -95,7 +96,8 @@ func TestVeryLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		workspace := test.nullWorkspace()
+		workspace := test.newWorkspace()
+
 		testFilename := workspace + "/test"
 
 		data := genData(10 * 1024)
