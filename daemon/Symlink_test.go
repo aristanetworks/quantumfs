@@ -266,7 +266,8 @@ func TestSymlinkAtrr_List_Remove(t *testing.T) {
                                 bytes.Contains(output, []byte("security.one")) && 
                                 !bytes.Contains(output, []byte("security.two")) && 
                                 bytes.Contains(output, []byte("security.three")),
-                                "Error listing no-existing XAttr: %v, %s", err, output)
+                                "Error listing no-existing XAttr: %v, %s", 
+                                err, output)
 
         })
 }
