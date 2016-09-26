@@ -203,8 +203,8 @@ func TestSymlinkAtrr_Set_Get(t *testing.T) {
                 test.assert(err == nil, "Error reset XAttr: %v", err)
                 size, err = getXAttr(symlFilename, "security.one", output)
                 test.assert(err == nil && !bytes.Contains(output, data) && 
-                        bytes.Contains(output, data2), "Error get reset XAttr: %v, %s",
-                        err, output)
+                        bytes.Contains(output, data2), 
+                        "Error get reset XAttr: %v, %s", err, output)
                 clearArray(output, size)
 
                 // Verify the impact on the normal attribute
@@ -232,7 +232,8 @@ func TestSymlinkAtrr_List_Remove(t *testing.T) {
                 err = setXAttr(symlFilename, "security.two", []byte("TestTwo"), 0)
                 test.assert(err == nil, 
                         "Error setXAttr for list function: %v", err)
-                err = setXAttr(symlFilename, "security.three", []byte("TestThree"), 0)
+                err = setXAttr(symlFilename, 
+                                "security.three", []byte("TestThree"), 0)
                 test.assert(err == nil, 
                         "Error setXAttr for list function: %v", err)
                 size, err := listXAttr(symlFilename, output)
