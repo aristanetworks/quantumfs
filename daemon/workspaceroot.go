@@ -111,7 +111,6 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
 	ds.appendApi()
 
 	return fuse.OK
-
 }
 
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
