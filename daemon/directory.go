@@ -30,9 +30,8 @@ type Directory struct {
 func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
 
-	c.vlog("initDirectory Enter Fetching directory baselayer from %s",
-		baseLayerId.String())
-	defer c.vlog("initDirectory Exit")
+	defer c.flog("initDirectory").exit()
+	c.vlog("Enter Fetching directory baselayer from %s", baseLayerId.String())
 
 	// Set directory data before processing the children incase the children
 	// access the parent.
@@ -73,8 +72,7 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
-	c.vlog("Directory::newDirectory Enter")
-	defer c.vlog("Directory::newDirectory Exit")
+	defer c.flog("Directory::newDirectory").exit()
 
 	var dir Directory
 
@@ -85,6 +83,8 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
 
 // Needs inode lock for read
 func (dir *Directory) updateSize_(c *ctx) {
+	defer c.flog("Directory::updateSize_").exit()
+
 	// If we do not have a parent, then the parent is a workspacelist and we have
 	// nothing to update.
 	if dir.parent() != nil {
@@ -99,12 +99,16 @@ func (dir *Directory) updateSize_(c *ctx) {
 func (dir *Directory) addChild_(c *ctx, inode InodeId,
 	child *quantumfs.DirectoryRecord) {
 
+	defer c.flog("Directory::addChild_").exit()
+
 	dir.dirChildren.setLoadedRecord(c, inode, child)
 	dir.updateSize_(c)
 }
 
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
+	defer c.flog("Directory::delChild_").exit()
+
 	inodeNum, exists := dir.dirChildren.getInode(c, name)
 	if !exists {
 		panic("Unexpected missing child inode")
@@ -134,6 +138,8 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 }
 
 func (dir *Directory) dirty(c *ctx) {
+	defer c.flog("Directory::dirty").exit()
+
 	dir.setDirty(true)
 	dir.parent().dirtyChild(c, dir)
 }
@@ -141,6 +147,8 @@ func (dir *Directory) dirty(c *ctx) {
 // Record that a specific child is dirty and when syncing heirarchically, sync them
 // as well.
 func (dir *Directory) dirtyChild(c *ctx, child Inode) {
+	defer c.flog("Directory::dirtyChild").exit()
+
 	func() {
 		defer dir.Lock().Unlock()
 		dir.dirChildren.dirty(c, child.inodeNum())
@@ -292,8 +300,7 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 }
 
 func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
-	c.vlog("Directory::publish Enter")
-	defer c.vlog("Directory::publish Exit")
+	defer c.flog("Directory::publish").exit()
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
@@ -335,6 +342,8 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	defer c.flog("Directory::setChildAttr").exit()
+
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
@@ -373,6 +382,8 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer dir.RLock().RUnlock()
 
+	defer c.flog("Directory::GetAttr").exit()
+
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 	fillAttr(&out.Attr, dir.InodeCommon.id,
@@ -382,8 +393,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-	c.vlog("Directory::Lookup Enter")
-	defer c.vlog("Directory::Lookup Exit")
+	defer c.flog("Directory::Lookup").exit()
 	defer dir.RLock().RUnlock()
 
 	inodeNum, exists := dir.dirChildren.getInode(c, name)
@@ -413,6 +423,7 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	defer c.flog("Directory::OpenDir").exit()
 	defer dir.RLock().RUnlock()
 
 	children := make([]directoryContents, 0, dir.dirChildren.count())
@@ -445,8 +456,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	rdev uint32, constructor InodeConstructor, type_ quantumfs.ObjectType,
 	key quantumfs.ObjectKey, out *fuse.EntryOut) Inode {
 
-	c.vlog("Directory::create_ Enter")
-	defer c.vlog("Directory::create_ Exit")
+	defer c.flog("Directory::create_").exit()
 
 	now := time.Now()
 	uid := c.fuseCtx.Owner.Uid
@@ -480,6 +490,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
+
+	defer c.flog("Directory::Create").exit()
 
 	var file Inode
 	result := func() fuse.Status {
@@ -519,14 +531,16 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	c.vlog("Directory::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
-	defer c.vlog("Directory::SetAttr Exit")
+	defer c.flog("Directory::SetAttr").exit()
+	c.vlog("valid %x size %d", attr.Valid, attr.Size)
 
 	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out)
 }
 
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
+
+	defer c.flog("Directory::Mkdir").exit()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -551,6 +565,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (dir *Directory) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
+	defer c.flog("Directory::getChildRecord").exit()
 	defer dir.RLock().RUnlock()
 
 	if val, ok := dir.dirChildren.getRecord(c, inodeNum); ok {
@@ -562,8 +577,9 @@ func (dir *Directory) getChildRecord(c *ctx,
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
-	c.vlog("Directory::Unlink Enter %s", name)
-	defer c.vlog("Directory::Unlink Exit")
+	defer c.flog("Directory::Unlink").exit()
+	c.vlog("Unlink %s", name)
+
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
@@ -589,8 +605,8 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 }
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
-	c.vlog("Directory::Rmdir Enter %s", name)
-	defer c.vlog("Directory::Rmdir Exit")
+	defer c.flog("Directory::Rmdir").exit()
+	c.vlog("Rmdir %s", name)
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -622,6 +638,8 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 	out *fuse.EntryOut) fuse.Status {
+
+	defer c.flog("Directory::Symlink").exit()
 
 	var key quantumfs.ObjectKey
 	result := func() fuse.Status {
@@ -659,8 +677,7 @@ func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
 func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.vlog("Directory::Mknod Enter")
-	defer c.vlog("Directory::Mknod Exit")
+	defer c.flog("Directory::Mknod").exit()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -699,8 +716,8 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 func (dir *Directory) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
-	c.vlog("Directory::RenameChild Enter %s -> %s", oldName, newName)
-	defer c.vlog("Directory::RenameChild Exit")
+	defer c.flog("Directory::RenameChild").exit()
+	c.vlog("RenameChild %s -> %s", oldName, newName)
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -751,8 +768,8 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
-	c.vlog("Directory::MvChild Enter %s -> %s", oldName, newName)
-	defer c.vlog("Directory::MvChild Exit")
+	defer c.flog("Directory::MvChild").exit()
+	c.vlog("MvChild Enter %s -> %s", oldName, newName)
 
 	result := func() fuse.Status {
 		dst := dstInode.(*Directory)
@@ -870,8 +887,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.vlog("Directory::syncChild Enter")
-	defer c.vlog("Directory::syncChild Exit")
+	defer c.flog("Directory::syncChild").exit()
 
 	ok, key := func() (bool, quantumfs.ObjectKey) {
 		defer dir.Lock().Unlock()
@@ -898,7 +914,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 func (dir *Directory) getExtendedAttributes_(c *ctx,
 	inodeNum InodeId) (*quantumfs.ExtendedAttributes, fuse.Status) {
 
-	c.vlog("Directory::getExtendedAttributes_ Enter")
+	defer c.flog("Directory::getExtendedAttributes_").exit()
 
 	record, ok := dir.dirChildren.getRecord(c, inodeNum)
 	if !ok {
@@ -924,8 +940,8 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 	attr string) (quantumfs.Buffer, fuse.Status) {
 
-	c.vlog("Directory::getChildXAttrBuffer Enter %d %s", inodeNum, attr)
-	defer c.vlog("Directory::getChildXAttrBuffer Exit")
+	defer c.flog("Directory::getChildXAttrBuffer").exit()
+	c.vlog("getChildXAttrBuffer %d %s", inodeNum, attr)
 
 	defer dir.RLock().RUnlock()
 
@@ -961,6 +977,8 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
+	defer c.flog("Directory::getChildXAttrSize").exit()
+
 	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
 	if status != fuse.OK {
 		return 0, status
@@ -971,6 +989,8 @@ func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
 
 func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
+
+	defer c.flog("Directory::getChildXAttrData").exit()
 
 	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
 	if status != fuse.OK {
@@ -983,8 +1003,8 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 func (dir *Directory) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
-	c.vlog("Directory::listChildXAttr Enter %d", inodeNum)
-	defer c.vlog("Directory::listChildXAttr Exit")
+	defer c.flog("Directory::listChildXAttr").exit()
+	c.vlog("listChildXAttr %d", inodeNum)
 
 	defer dir.RLock().RUnlock()
 
@@ -1013,8 +1033,8 @@ func (dir *Directory) listChildXAttr(c *ctx,
 func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	c.vlog("Directory::setChildXAttr Enter %d, %s", inodeNum, attr)
-	defer c.vlog("Directory::setChildXAttr Exit")
+	defer c.flog("Directory::listChildXAttr").exit()
+	c.vlog("setChildXAttr %d, %s", inodeNum, attr)
 
 	defer dir.Lock().Unlock()
 
@@ -1083,8 +1103,8 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	c.vlog("Directory::removeChildXAttr Enter %d, %s", inodeNum, attr)
-	defer c.vlog("Directory::removeChildXAttr Exit")
+	defer c.flog("Directory::removeChildXAttr").exit()
+	c.vlog("removeChildXAttr %d, %s", inodeNum, attr)
 
 	defer dir.Lock().Unlock()
 
@@ -1176,7 +1196,7 @@ type directorySnapshot struct {
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.vlog("ReadDirPlus directorySnapshot")
+	defer c.flog("Directory::ReadDirPlus").exit()
 	offset := input.Offset
 
 	// Add .
