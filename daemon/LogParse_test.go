@@ -112,7 +112,7 @@ func TestQParsePartials_test(t *testing.T) {
 
 		// Before we enable logs, let's cause all File logs to be
 		// partially written
-		test.qfs.c.Qlog.EnterTestMode("File::")
+		test.qfs.c.Qlog.EnterTestMode("---In File::")
 
 		// Enable *all* logs
 		test.qfs.c.Qlog.LogLevels = 0
