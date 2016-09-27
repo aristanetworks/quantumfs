@@ -49,6 +49,7 @@ func TestNullWorkspaceListing(t *testing.T) {
 		path := test.nullWorkspace()
 		entries, err := ioutil.ReadDir(path)
 		test.assert(err == nil, "Couldn't read workspace listing")
+		// The only file existing in nullworkspace is the api file
 		test.assert(len(entries) == 1,
 			"Incorrect number of entries in null workspace: %d",
 			len(entries))

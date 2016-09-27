@@ -142,10 +142,6 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.vlog("WorkspaceRoot::Lookup Enter")
-	defer c.vlog("WorkspaceRoot::Lookup Exit")
-	defer wsr.RLock().RUnlock()
-
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
@@ -153,22 +149,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 		return fuse.OK
 	}
 
-	inodeNum, exists := wsr.dirChildren.getInode(c, name)
-	if !exists {
-		return fuse.ENOENT
-	}
-
-	record, exists := wsr.dirChildren.getRecord(c, inodeNum)
-	if !exists {
-		return fuse.ENOENT
-	}
-
-	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	out.NodeId = uint64(inodeNum)
-	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, record)
-
-	return fuse.OK
+	return wsr.Directory.Lookup(c, name, out)
 }
 
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,

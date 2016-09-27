@@ -339,12 +339,16 @@ func TestLargeDirectory(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
+
+		testdir := workspace + "/testlargedir"
+		err := syscall.Mkdir(testdir, 0777)
+		test.assert(err == nil, "Error creating directory:%v", err)
 		numToCreate := quantumfs.MaxDirectoryRecords +
 			quantumfs.MaxDirectoryRecords/4
 
 		// Create enough children to overflow a single block
 		for i := 0; i < numToCreate; i++ {
-			testFile := fmt.Sprintf("%s/testfile%d", workspace, i)
+			testFile := fmt.Sprintf("%s/testfile%d", testdir, i)
 			fd, err := os.Create(testFile)
 			test.assert(err == nil, "Error creating file: %v", err)
 			fd.Close()
@@ -352,14 +356,14 @@ func TestLargeDirectory(t *testing.T) {
 
 		// Confirm all the children are accounted for in the original
 		// workspace
-		files, err := ioutil.ReadDir(workspace)
+		files, err := ioutil.ReadDir(testdir)
 		test.assert(err == nil, "Error reading directory %v", err)
 		attendance := make(map[string]bool, numToCreate)
 
 		for _, file := range files {
 			attendance[file.Name()] = true
 		}
-		test.assert(len(attendance) == numToCreate+1,
+		test.assert(len(attendance) == numToCreate,
 			"Incorrect number of files in directory %d", len(attendance))
 
 		for i := 0; i < numToCreate; i++ {
@@ -371,14 +375,15 @@ func TestLargeDirectory(t *testing.T) {
 		// Confirm all the children are accounted for in a branched
 		// workspace
 		workspace = test.absPath(test.branchWorkspace(workspace))
-		files, err = ioutil.ReadDir(workspace)
+		testdir = workspace + "/testlargedir"
+		files, err = ioutil.ReadDir(testdir)
 		test.assert(err == nil, "Error reading directory %v", err)
 		attendance = make(map[string]bool, numToCreate)
 
 		for _, file := range files {
 			attendance[file.Name()] = true
 		}
-		test.assert(len(attendance) == numToCreate+1,
+		test.assert(len(attendance) == numToCreate,
 			"Incorrect number of files in directory %d", len(attendance))
 
 		for i := 0; i < numToCreate; i++ {
