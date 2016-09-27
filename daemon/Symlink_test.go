@@ -59,7 +59,8 @@ func lSetXattr(path string, attr string, data []byte, flags int) (err error) {
 }
 
 // create a customized symlink XAttribute get command
-func lGetXattr(path string, attr string, size int) (sz int, err error, output []byte) {
+func lGetXattr(path string, attr string, 
+               size int) (sz int, err error, output []byte) {
 	var path_str_ptr *byte
 	path_str_ptr, err = syscall.BytePtrFromString(path)
 	if err != nil {
@@ -135,13 +136,6 @@ func lRemoveXattr(path string, attr string) (err error) {
 	}
 	return
 }
-/*
-func clearArray(dest []byte, size int) {
-	for i := 0; i < size; i++ {
-		dest[i] = 0
-	}
-	return
-}*/
 
 // Verify the creation of symlink file
 func TestSymlinkCreation(t *testing.T) {
