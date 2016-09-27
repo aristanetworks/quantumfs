@@ -105,14 +105,12 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	status := wsr.Directory.OpenDir(c, flags, mode, out)
-	if status != fuse.OK {
-		panic("Unexpected error opening directory")
+	if status == fuse.OK {
+		handleId := FileHandleId(out.Fh)
+		inode := c.qfs.fileHandle(c, handleId)
+		ds := inode.(*directorySnapshot)
+		ds.appendApi()
 	}
-
-	handleId := FileHandleId(out.Fh)
-	inode := c.qfs.fileHandle(c, handleId)
-	ds := inode.(*directorySnapshot)
-	ds.appendApi()
 
 	return status
 }
