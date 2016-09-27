@@ -49,8 +49,8 @@ func lSetXattr(path string, attr string, data []byte, flags int) (err error) {
 	}
 	_, _, e1 := syscall.Syscall6(syscall.SYS_LSETXATTR,
 		uintptr(unsafe.Pointer(path_str_ptr)),
-                uintptr(unsafe.Pointer(attr_str_ptr)),
-                uintptr(data_buf_ptr), uintptr(len(data)), uintptr(flags), 0)
+		uintptr(unsafe.Pointer(attr_str_ptr)),
+		uintptr(data_buf_ptr), uintptr(len(data)), uintptr(flags), 0)
 
 	if e1 != 0 {
 		err = e1
@@ -59,8 +59,8 @@ func lSetXattr(path string, attr string, data []byte, flags int) (err error) {
 }
 
 // create a customized symlink XAttribute get command
-func lGetXattr(path string, attr string, 
-               size int) (sz int, err error, output []byte) {
+func lGetXattr(path string, attr string,
+	size int) (sz int, err error, output []byte) {
 	var path_str_ptr *byte
 	path_str_ptr, err = syscall.BytePtrFromString(path)
 	if err != nil {
@@ -72,12 +72,12 @@ func lGetXattr(path string, attr string,
 		return
 	}
 	var dest_buf_ptr unsafe.Pointer
-        dest := make([]byte, size, size*2)
-        if size > 0 {
-                dest_buf_ptr = unsafe.Pointer(&dest[0])
-        } else {
-                dest_buf_ptr = unsafe.Pointer(&_zero)
-        }
+	dest := make([]byte, size, size*2)
+	if size > 0 {
+		dest_buf_ptr = unsafe.Pointer(&dest[0])
+	} else {
+		dest_buf_ptr = unsafe.Pointer(&_zero)
+	}
 	r0, _, e1 := syscall.Syscall6(syscall.SYS_LGETXATTR,
 		uintptr(unsafe.Pointer(path_str_ptr)),
 		uintptr(unsafe.Pointer(attr_str_ptr)),
@@ -87,7 +87,7 @@ func lGetXattr(path string, attr string,
 	if e1 != 0 {
 		err = e1
 	}
-        output = dest
+	output = dest
 	return
 }
 
@@ -99,7 +99,7 @@ func lListXattr(path string, size int) (sz int, err error, output []byte) {
 		return
 	}
 	var dest_buf_ptr unsafe.Pointer
-        dest := make([]byte, size, size*2)
+	dest := make([]byte, size, size*2)
 	if size > 0 {
 		dest_buf_ptr = unsafe.Pointer(&dest[0])
 	} else {
@@ -112,7 +112,7 @@ func lListXattr(path string, size int) (sz int, err error, output []byte) {
 	if e1 != 0 {
 		err = e1
 	}
-        output = dest
+	output = dest
 	return
 }
 
@@ -164,17 +164,17 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 
 		symlFilename := createSymlink(workspace, test)
 
-                const size = 32
+		const size = 32
 		data := []byte("TestOne")
 		data2 := []byte("TestTwo")
 
 		// verify the forbidden namespace "user"
-                // Test the consistance b/t Unix and QuantumFS
-                // The reference about namespace can be found on
-                // http://man7.org/linux/man-pages/man7/xattr.7.html
+		// Test the consistance b/t Unix and QuantumFS
+		// The reference about namespace can be found on
+		// http://man7.org/linux/man-pages/man7/xattr.7.html
 		err := lSetXattr(symlFilename, "user.one", data, 0)
-		test.assert(err != nil, 
-                           "Error setting XAttr not supposed to run")
+		test.assert(err != nil,
+			"Error setting XAttr not supposed to run")
 
 		// verify the normal namespace "security"
 		err = lSetXattr(symlFilename, "security.one", data, 0)
@@ -190,7 +190,7 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 		_, err, output = lGetXattr(symlFilename, "security.two", size)
 		test.assert(err != nil,
 			"Error getting non-existing Xattribute for symlink: %v, %s",
-                        err, output)
+			err, output)
 
 		// Switch Content of the assigned attribute
 		err = lSetXattr(symlFilename, "security.one", data2, 0)
@@ -201,8 +201,8 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 			"Error get reset XAttr: %v, %s", err, output)
 
 		// Verify the impact on the normal attribute
-                out := make([]byte, size, 2*size) 
-                _, err = syscall.Getxattr(symlFilename, "security.one", out)
+		out := make([]byte, size, 2*size)
+		_, err = syscall.Getxattr(symlFilename, "security.one", out)
 		test.assert(err != nil, "Error impact on the normal XAttr: %v, %s",
 			err, out)
 	})
@@ -216,7 +216,7 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 		workspace := test.newWorkspace()
 		symlFilename := createSymlink(workspace, test)
 
-                const size = 64
+		const size = 64
 
 		// Add three XAttr to test the list function
 		err := lSetXattr(symlFilename, "security.one", []byte("TestOne"), 0)
