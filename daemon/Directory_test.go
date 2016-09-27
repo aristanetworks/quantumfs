@@ -338,8 +338,6 @@ func TestLargeDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		// As there is always an api file under workspace root
-		// we perform the test in a new directory under root
 		workspace := test.newWorkspace()
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
