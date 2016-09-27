@@ -339,7 +339,6 @@ func TestLargeDirectory(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
-
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
 		test.assert(err == nil, "Error creating directory:%v", err)
