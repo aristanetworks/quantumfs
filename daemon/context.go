@@ -42,18 +42,38 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 }
 
 // local daemon package specific log wrappers
-func (c ctx) elog(format string, args ...interface{}) {
+func (c *ctx) elog(format string, args ...interface{}) {
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 0, format, args...)
 }
 
-func (c ctx) wlog(format string, args ...interface{}) {
+func (c *ctx) wlog(format string, args ...interface{}) {
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 1, format, args...)
 }
 
-func (c ctx) dlog(format string, args ...interface{}) {
+func (c *ctx) dlog(format string, args ...interface{}) {
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 2, format, args...)
 }
 
-func (c ctx) vlog(format string, args ...interface{}) {
+func (c *ctx) vlog(format string, args ...interface{}) {
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, format, args...)
+}
+
+type exitLog struct {
+	c *ctx
+	funcName string
+}
+
+func (c *ctx) flog(funcName string) exitLog {
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, "FnEnter: Daemon::"+
+		funcName)
+	
+	return exitLog {
+		c: c,
+		funcName: funcName,
+	}
+}
+
+func (e exitLog) exit() {
+	e.c.Qlog.Log(qlog.LogDaemon, uint64(e.c.RequestId), 3, "FnLeave: Daemon::"+
+		e.funcName)
 }
