@@ -104,39 +104,14 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	defer wsr.RLock().RUnlock()
-
-	children := make([]directoryContents, 0, wsr.dirChildren.count())
-	for _, entry := range wsr.dirChildren.getRecords() {
-		filename := entry.Filename()
-
-		entryInfo := directoryContents{
-			filename: filename,
-		}
-		inodeId, exists := wsr.dirChildren.getInode(c, filename)
-		if !exists {
-			panic("Missing inode in child records")
-		}
-		fillAttrWithDirectoryRecord(c, &entryInfo.attr, inodeId,
-			c.fuseCtx.Owner, entry)
-		entryInfo.fuseType = entryInfo.attr.Mode
-
-		children = append(children, entryInfo)
-	}
-
-	api := directoryContents{
-		filename: quantumfs.ApiPath,
-		fuseType: fuse.S_IFREG,
-	}
-	fillApiAttr(&api.attr)
-	children = append(children, api)
-
-	ds := newDirectorySnapshot(c, children, wsr.InodeCommon.id, wsr.treeLock())
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
-	out.Fh = uint64(ds.FileHandleCommon.id)
-	out.OpenFlags = 0
+	wsr.Directory.OpenDir(c, flags, mode, out)
+	handleId := FileHandleId(out.Fh)
+	inode := c.qfs.fileHandle(c, handleId)
+	ds := inode.(*directorySnapshot)
+	ds.appendApi()
 
 	return fuse.OK
+
 }
 
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
