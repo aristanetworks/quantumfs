@@ -60,7 +60,7 @@ func (ebt *EtherBlobStoreTranslator) Exists(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) bool {
 
 	_, _, err := ebt.blobstore.Get(key.String())
-	if err.ErrorCode != ether.ErrOk {
+	if err.ErrorCode == ether.ErrOk {
 		return true
 	} else {
 		return false

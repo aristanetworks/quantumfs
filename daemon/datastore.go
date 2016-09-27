@@ -39,7 +39,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	if err == nil {
 		return &buf
 	}
-	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %v. Key %s", err, key)
+	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %v. Key %s", err, key.String())
 
 	return nil
 }
@@ -53,6 +53,11 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to set embedded key")
 	}
+
+        if store.durableStore.Exists(c, key) {
+                return nil
+        }
+
 	return store.durableStore.Set(c, key, buffer)
 }
 
