@@ -114,7 +114,7 @@ func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
 	ds := inode.(*directorySnapshot)
 	ds.appendApi()
 
-	return fuse.OK
+	return status
 }
 
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
