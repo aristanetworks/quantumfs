@@ -178,7 +178,7 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 
 		// verify the normal namespace "security"
 		err = lSetXattr(symlFilename, "security.one", data, 0)
-		test.assert(err == nil, "Error seting XAttr: %v", err)
+		test.assert(err == nil, "Error setting XAttr: %v", err)
 
 		// verify the attribute is actually stored
 		_, err, output := lGetXattr(symlFilename, "security.one", size)
@@ -236,7 +236,7 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 			bytes.Contains(output, []byte("security.three")),
 			"Error listing all of XAttr: %v, %s", err, output)
 
-		// verify the remving function
+		// verify the removing function
 		err = lRemoveXattr(symlFilename, "security.two")
 		test.assert(err == nil, "Error removing XAttr: %v, %s", err, output)
 
