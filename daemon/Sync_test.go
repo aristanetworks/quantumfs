@@ -143,6 +143,41 @@ func TestIndentialContentSync(t *testing.T) {
                 test.qfs.c.dataStore.durableStore = &dataStore
 
                 workspace := test.newWorkspace()
-                testFilename := workspace + "/test1" 
-        })
+                testFilename := workspace + "/c"
+                
+                // Create a source directory
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating file: %v", err)
+		defer file.Close()
+
+                data := genData(1025 * 1024)
+                _, err = file.Write(data)
+                test.assert(err == nil, "Error writing to file %v", err)
+                
+                // Sync the new file upto the datastore, and record the number
+                // of datastore Set() is called against later
+                err = file.Sync()
+                test.assert(err == nil, "Error reading from file %v", err)
+                expectedCount := atomic.LoadUint64(&dataStore.setCount)
+                test.assert(expectedCount > 0, 
+                        "Error uploading to datastore: %v", expectedCount)
+
+                // Create an indetical file with a different file name
+                copyFilename := workspace +"/c_copy"
+                fileCopy, err := os.Create(copyFilename)
+                test.assert(err == nil, "Error creating second file: %v", err)
+                defer fileCopy.Close()
+
+                _, err = fileCopy.Write(data)
+                test.assert(err == nil, "Error writing to second file %v", err)
+
+                // Sync the same content upto datastore, so we expect
+                // Set() is not called: count stay the same
+                err = fileCopy.Sync()
+                test.assert(err == nil, "Error reading from second file %v", err)
+                compareCount := atomic.LoadUint64(&dataStore.setCount)
+                test.assert(compareCount == expectedCount,
+                        "Error skipping the uplaod to datastore: %v, %v",
+                         expectedCount, compareCount)
+                })
 }
