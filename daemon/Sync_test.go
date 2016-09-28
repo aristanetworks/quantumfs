@@ -129,3 +129,20 @@ func TestNoImplicitSync(t *testing.T) {
 			"Datastore sets didn't happen! %d", setCount)
 	})
 }
+
+// Put in place a proxy dataStore which counts the stores we make, then create a few
+// identical directories and files. Verify the number of store for all of the files 
+// and directories. Except that the first file and directory will make 1 store, the 
+// others are expected to consume 0 store.
+func TestIndentialContentSync(t *testing.T) {
+        runTest(t, func(test *testHelper){
+                test.startDefaultQuantumFs()
+                dataStore := setCountingDataStore{
+                        DataStore: test.qfs.c.dataStore.durableStore,
+                }
+                test.qfs.c.dataStore.durableStore = &dataStore
+
+                workspace := test.newWorkspace()
+                testFilename := workspace + "/test1" 
+        })
+}
