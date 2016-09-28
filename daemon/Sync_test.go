@@ -131,53 +131,53 @@ func TestNoImplicitSync(t *testing.T) {
 }
 
 // Put in place a proxy dataStore which counts the stores we make, then create a few
-// identical directories and files. Verify the number of store for all of the files 
-// and directories. Except that the first file and directory will make 1 store, the 
+// identical directories and files. Verify the number of store for all of the files
+// and directories. Except that the first file and directory will make 1 store, the
 // others are expected to consume 0 store.
 func TestIndentialContentSync(t *testing.T) {
-        runTest(t, func(test *testHelper){
-                test.startDefaultQuantumFs()
-                dataStore := setCountingDataStore{
-                        DataStore: test.qfs.c.dataStore.durableStore,
-                }
-                test.qfs.c.dataStore.durableStore = &dataStore
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		dataStore := setCountingDataStore{
+			DataStore: test.qfs.c.dataStore.durableStore,
+		}
+		test.qfs.c.dataStore.durableStore = &dataStore
 
-                workspace := test.newWorkspace()
-                testFilename := workspace + "/c"
-                
-                // Create a source directory
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/c"
+
+		// Create a source directory
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
 		defer file.Close()
 
-                data := genData(1025 * 1024)
-                _, err = file.Write(data)
-                test.assert(err == nil, "Error writing to file %v", err)
-                
-                // Sync the new file upto the datastore, and record the number
-                // of datastore Set() is called against later
-                err = file.Sync()
-                test.assert(err == nil, "Error reading from file %v", err)
-                expectedCount := atomic.LoadUint64(&dataStore.setCount)
-                test.assert(expectedCount > 0, 
-                        "Error uploading to datastore: %v", expectedCount)
+		data := genData(1025 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing to file %v", err)
 
-                // Create an indetical file with a different file name
-                copyFilename := workspace +"/c_copy"
-                fileCopy, err := os.Create(copyFilename)
-                test.assert(err == nil, "Error creating second file: %v", err)
-                defer fileCopy.Close()
+		// Sync the new file upto the datastore, and record the number
+		// of datastore Set() is called against later
+		err = file.Sync()
+		test.assert(err == nil, "Error reading from file %v", err)
+		expectedCount := atomic.LoadUint64(&dataStore.setCount)
+		test.assert(expectedCount > 0,
+			"Error uploading to datastore: %v", expectedCount)
 
-                _, err = fileCopy.Write(data)
-                test.assert(err == nil, "Error writing to second file %v", err)
+		// Create an indetical file with a different file name
+		copyFilename := workspace + "/c_copy"
+		fileCopy, err := os.Create(copyFilename)
+		test.assert(err == nil, "Error creating second file: %v", err)
+		defer fileCopy.Close()
 
-                // Sync the same content upto datastore, so we expect
-                // Set() is not called: count stay the same
-                err = fileCopy.Sync()
-                test.assert(err == nil, "Error reading from second file %v", err)
-                compareCount := atomic.LoadUint64(&dataStore.setCount)
-                test.assert(compareCount == expectedCount,
-                        "Error skipping the uplaod to datastore: %v, %v",
-                         expectedCount, compareCount)
-                })
+		_, err = fileCopy.Write(data)
+		test.assert(err == nil, "Error writing to second file %v", err)
+
+		// Sync the same content upto datastore, so we expect
+		// Set() is not called: count stay the same
+		err = fileCopy.Sync()
+		test.assert(err == nil, "Error reading from second file %v", err)
+		compareCount := atomic.LoadUint64(&dataStore.setCount)
+		test.assert(compareCount == expectedCount,
+			"Error skipping the uplaod to datastore: %v, %v",
+			expectedCount, compareCount)
+	})
 }
