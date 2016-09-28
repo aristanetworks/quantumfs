@@ -65,7 +65,7 @@ func TestQParse(t *testing.T) {
 		// There's nothing ensuring the order is the same, so we have to sort
 		testLogLines := strings.Split(testLogs, "\n")
 		logOutLines := strings.Split(logOutCopy, "\n")
-		sort.Sort(qlog.SortByTime(logOutLines))
+		sort.Sort(qlog.SortString(logOutLines))
 
 		// Trim any excess empty lines
 		for logOutLines[0] == "" {

@@ -20,6 +20,10 @@ func (v LogSubsystem) Primitive() interface{} {
 	return uint8(v)
 }
 
+// These should be short to save space, visually different to aid in reading
+const FnEnterStr = "---In "
+const FnExitStr = "Out-- "
+
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore

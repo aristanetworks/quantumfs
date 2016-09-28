@@ -17,7 +17,38 @@ import "strings"
 import "time"
 import "unsafe"
 
-type SortByTime []string
+type LogOutput struct {
+	subsystem	LogSubsystem
+	reqId		uint64
+	t		int64
+	format		string
+}
+
+func newLog(s LogSubsystem, r uint64, t int64, f string) LogOutput {
+
+	return LogOutput {
+		subsystem: s,
+		reqId: r,
+		t: t,
+		format: f,
+	}
+}
+
+type SortString []string
+
+func (s SortString) Len() int {
+	return len(s)
+}
+
+func (s SortString) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortString) Less(i, j int) bool {
+	return s[i] < s[j]
+}
+
+type SortByTime []LogOutput
 
 func (s SortByTime) Len() int {
 	return len(s)
@@ -28,7 +59,7 @@ func (s SortByTime) Swap(i, j int) {
 }
 
 func (s SortByTime) Less(i, j int) bool {
-	return s[i] < s[j]
+	return s[i].t < s[j].t
 }
 
 // Returns true if the log file string map given failed the logscan
@@ -44,6 +75,10 @@ func LogscanSkim(filepath string) bool {
 }
 
 func ParseLogs(filepath string) string {
+	return ParseLogsExt(filepath, 0)
+}
+
+func ParseLogsExt(filepath string, tabSpaces int) string {
 
 	pastEndIdx, dataArray, strMapData := extractFields(filepath)
 
@@ -57,7 +92,41 @@ func ParseLogs(filepath string) string {
 		idx++
 	}
 
-	return outputLogs(pastEndIdx, dataArray, strMap)
+	logs := outputLogs(pastEndIdx, dataArray, strMap, tabSpaces)
+
+	indentMap := make(map[uint64]int)
+	var rtn string
+	// Now that we have the logs in correct order, we can indent them
+	for i := 0; i < len(logs); i++ {
+		// Add any indents necessary
+		if tabSpaces > 0 {
+			indents := indentMap[logs[i].reqId]
+
+			if strings.Index(logs[i].format, FnExitStr) == 0 {
+				indents--
+			}
+
+			// Add the spaces we need
+			spaceStr := ""
+			for i := 0; i < indents * tabSpaces; i++ {
+				spaceStr += " "
+			}
+
+			if strings.Index(logs[i].format, FnEnterStr) == 0 {
+				indents++
+			}
+
+			logs[i].format = spaceStr + logs[i].format
+			indentMap[logs[i].reqId] = indents
+		}
+
+		// Convert timestamp back into something useful
+		t := time.Unix(0, logs[i].t)
+
+		rtn += formatString(logs[i].subsystem, logs[i].reqId, t,
+			logs[i].format)
+	}
+	return rtn
 }
 
 func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
@@ -306,9 +375,10 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 	return nil
 }
 
-func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
+func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr,
+	tabSpaces int) []LogOutput {
 
-	var rtn []string
+	var rtn []LogOutput
 	readCount := uint32(0)
 	var lastTimestamp int64
 
@@ -341,8 +411,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 		// At this point we know the packet is fully present, finished, and
 		// the idx / readCounts have been updated in prep for the next entry
 		if !completeEntry {
-			newLine := formatString(LogQlog, QlogReqId, time.Unix(0,
-				lastTimestamp),
+			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
 				"WARN: Dropping incomplete packet.\n")
 			rtn = append(rtn, newLine)
 			continue
@@ -379,26 +448,25 @@ func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 		}
 
 		if err != nil {
-			newLine := fmt.Sprintf("ERROR: Packet read error (%s). "+
-				"Dump of %d bytes:\n%x\n", err, packetLen,
-				packetData)
+			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
+				fmt.Sprintf("ERROR: Packet read error (%s). "+
+					"Dump of %d bytes:\n%x\n", err, packetLen,
+					packetData))
 			rtn = append(rtn, newLine)
 			continue
 		}
 
 		// Grab the string and output
 		if int(strMapId) > len(strMap) {
-			newLine := fmt.Sprintf("Not enough entries in "+
-				"string map (%d %d)\n", strMapId,
-				len(strMap)/LogStrSize)
+			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
+				fmt.Sprintf("Not enough entries in "+
+					"string map (%d %d)\n", strMapId,
+					len(strMap)/LogStrSize))
 			rtn = append(rtn, newLine)
 			continue
 		}
 		mapEntry := strMap[strMapId]
 		logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
-
-		// Convert timestamp back into something useful
-		t := time.Unix(0, timestamp)
 
 		// Finally, print with the front attached like normal
 		mapStr := string(mapEntry.Text[:])
@@ -407,11 +475,11 @@ func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 			mapStr = mapStr[:firstNullTerm]
 		}
 
-		newLine := fmt.Sprintf(formatString(logSubsystem, reqId, t,
-			mapStr)+"\n", args...)
+		newLine := newLog(logSubsystem, reqId, timestamp,
+			fmt.Sprintf(mapStr+"\n", args...))
 		rtn = append(rtn, newLine)
 	}
 
 	sort.Sort(SortByTime(rtn))
-	return strings.Join(rtn, "")
+	return rtn
 }

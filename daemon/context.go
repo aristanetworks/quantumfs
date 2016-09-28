@@ -64,7 +64,7 @@ type exitLog struct {
 }
 
 func (c *ctx) flog(funcName string) exitLog {
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, "---In "+
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+
 		funcName)
 	
 	return exitLog {
@@ -74,6 +74,6 @@ func (c *ctx) flog(funcName string) exitLog {
 }
 
 func (e exitLog) exit() {
-	e.c.Qlog.Log(qlog.LogDaemon, uint64(e.c.RequestId), 3, "Out-- "+
+	e.c.Qlog.Log(qlog.LogDaemon, uint64(e.c.RequestId), 3, qlog.FnExitStr+
 		e.funcName)
 }
