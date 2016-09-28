@@ -16,8 +16,7 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (fi *File) forget_DOWN(c *ctx) {
-	c.vlog("File::forget_DOWN Enter")
-	defer c.vlog("File::forget_DOWN Exit")
+	defer c.flog("File::forget_DOWN").exit()
 
 	key := fi.accessor.sync(c)
 	fi.setDirty(false)
@@ -28,8 +27,7 @@ func (fi *File) forget_DOWN(c *ctx) {
 }
 
 func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	c.vlog("File::flush_DOWN Enter")
-	defer c.vlog("File::flush_DOWN Exit")
+	defer c.flog("File::flush_DOWN").exit()
 
 	key := fi.accessor.sync(c)
 	fi.setDirty(false)
@@ -41,8 +39,7 @@ func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
 }
 
 func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
-	c.vlog("FileDescriptor::Sync_DOWN Enter")
-	defer c.vlog("FileDescriptor::Sync_DOWN Exit")
+	defer c.flog("File::Sync_DOWN").exit()
 
 	defer fd.file.Lock().Unlock()
 	if fd.file.isDirty() {
