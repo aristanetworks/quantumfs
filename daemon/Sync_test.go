@@ -134,7 +134,7 @@ func TestNoImplicitSync(t *testing.T) {
 // identical directories and files. Verify the number of store for all of the files
 // and directories. Except that the first file and directory will make 1 store, the
 // others are expected to consume 0 store.
-func TestIndentialContentSync(t *testing.T) {
+func TestIdenticalContentSync(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 		dataStore := setCountingDataStore{
@@ -154,7 +154,7 @@ func TestIndentialContentSync(t *testing.T) {
 		_, err = file.Write(data)
 		test.assert(err == nil, "Error writing to file %v", err)
 
-		// Sync the new file upto the datastore, and record the number
+		// Sync the new file up to the datastore, and record the number
 		// of datastore Set() is called against later
 		err = file.Sync()
 		test.assert(err == nil, "Error reading from file %v", err)
@@ -162,7 +162,7 @@ func TestIndentialContentSync(t *testing.T) {
 		test.assert(expectedCount > 0,
 			"Error uploading to datastore: %v", expectedCount)
 
-		// Create an indetical file with a different file name
+		// Create an identical file with a different file name
 		copyFilename := workspace + "/c_copy"
 		fileCopy, err := os.Create(copyFilename)
 		test.assert(err == nil, "Error creating second file: %v", err)
@@ -171,7 +171,7 @@ func TestIndentialContentSync(t *testing.T) {
 		_, err = fileCopy.Write(data)
 		test.assert(err == nil, "Error writing to second file %v", err)
 
-		// Sync the same content upto datastore, so we expect
+		// Sync the same content up to datastore, so we expect
 		// Set() is not called: count stay the same
 		err = fileCopy.Sync()
 		test.assert(err == nil, "Error reading from second file %v", err)
