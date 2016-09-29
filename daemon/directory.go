@@ -1261,3 +1261,16 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
+
+func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
+func (ds *directorySnapshot) appendApi() {
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
+	}
+	fillApiAttr(&api.attr)
+	ds.children = append(ds.children, api)
+}

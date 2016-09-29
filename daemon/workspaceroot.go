@@ -92,6 +92,33 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	}
 }
 
+func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
+	out *fuse.OpenOut) fuse.Status {
+
+	status := wsr.Directory.OpenDir(c, flags, mode, out)
+	if status == fuse.OK {
+		handleId := FileHandleId(out.Fh)
+		inode := c.qfs.fileHandle(c, handleId)
+		ds := inode.(*directorySnapshot)
+		ds.appendApi()
+	}
+
+	return status
+}
+
+func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
+	out *fuse.EntryOut) fuse.Status {
+
+	if name == quantumfs.ApiPath {
+		out.NodeId = quantumfs.InodeIdApi
+		fillEntryOutCacheData(c, out)
+		fillApiAttr(&out.Attr)
+		return fuse.OK
+	}
+
+	return wsr.Directory.Lookup(c, name, out)
+}
+
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
