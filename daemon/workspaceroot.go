@@ -54,6 +54,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
+	wsr.accessList = make(map[string]bool)
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)

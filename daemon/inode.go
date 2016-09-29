@@ -221,7 +221,7 @@ func (inode *InodeCommon) findPath(c *ctx) (string, bool) {
 	}
 
 	path := inode.name()
-	for parent != nil {
+	for parent.parent() != nil {
 		path = parent.name() + "/" + path
 		parent = parent.parent()
 	}
@@ -240,11 +240,17 @@ func (inode *InodeCommon) findWorkspace(c *ctx) (*WorkspaceRoot, bool) {
 		parent = parent.parent()
 	}
 
-	return parent.(*WorkspaceRoot), true
+	wsr, ok := parent.(*WorkspaceRoot)
+	if !ok {
+		path, _ := inode.findPath(c)
+		c.elog("Incorrect finding workspaceroot" + path)
+		return nil, false
+	}
+
+	return wsr, true
 }
 
 func (inode *InodeCommon) register(c *ctx) {
-
 	if inode.accessed != true {
 		path, pathok := inode.findPath(c)
 		ws, wsok := inode.findWorkspace(c)
@@ -254,6 +260,8 @@ func (inode *InodeCommon) register(c *ctx) {
 			inode.accessed = true
 		}
 	}
+
+	c.elog("file is already accessed")
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
