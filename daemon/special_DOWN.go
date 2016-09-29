@@ -5,27 +5,36 @@ package daemon
 
 // This is the _DOWN counterpart to special.go
 
-import "encoding/binary"
-
 import "github.com/aristanetworks/quantumfs"
+import "github.com/hanwen/go-fuse/fuse"
+
+func (special *Special) link_DOWN(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on Special")
+	return fuse.ENOTDIR
+}
 
 func (special *Special) forget_DOWN(c *ctx) {
 	c.vlog("Special::forget_DOWN Enter")
 	defer c.vlog("Special::forget_DOWN Exit")
 
-	key := special.sync_DOWN(c)
+	key := special.flush_DOWN(c)
 	special.parent().syncChild(c, special.InodeCommon.id, key)
 
 	// Remove the inode from the map, ready to be garbage collected
 	c.qfs.setInode(c, special.id, nil)
 }
 
-func (special *Special) sync_DOWN(c *ctx) quantumfs.ObjectKey {
+func (special *Special) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	special.setDirty(false)
-	var hash [quantumfs.ObjectKeyLength - 1]byte
 
-	binary.LittleEndian.PutUint32(hash[0:4], special.filetype)
-	binary.LittleEndian.PutUint32(hash[4:8], special.device)
+	return special.embedDataIntoKey_(c)
+}
 
-	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
+func (special *Special) Sync_DOWN(c *ctx) fuse.Status {
+	key := special.flush_DOWN(c)
+	special.parent().syncChild(c, special.InodeCommon.id, key)
+
+	return fuse.OK
 }

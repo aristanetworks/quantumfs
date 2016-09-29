@@ -116,13 +116,6 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return data.Get(), fuse.OK
 }
 
-func (link *Symlink) Sync(c *ctx) fuse.Status {
-	key := link.sync_DOWN(c)
-	link.parent().syncChild(c, link.InodeCommon.id, key)
-
-	return fuse.OK
-}
-
 func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -146,38 +139,24 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
-
-	c.elog("Invalid GetXAttrSize on Symlink")
-	return 0, fuse.ENODATA
+	return link.parent().getChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
-
-	c.elog("Invalid GetXAttrData on Symlink")
-	return nil, fuse.ENODATA
+	return link.parent().getChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on Symlink")
-	return []byte{}, fuse.OK
+	return link.parent().listChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on Symlink")
-	return fuse.Status(syscall.ENOSPC)
+	return link.parent().setChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on Symlink")
-	return fuse.ENODATA
-}
-
-func (link *Symlink) Link(c *ctx, srcInode Inode, newName string,
-	out *fuse.EntryOut) fuse.Status {
-
-	c.elog("Invalid Link on Symlink")
-	return fuse.ENOTDIR
+	return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,

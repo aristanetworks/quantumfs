@@ -43,6 +43,11 @@ type logscanError struct {
 var errorMutex sync.Mutex
 var errorLogs []logscanError
 
+func noStdOut(format string, args ...interface{}) error {
+	// Do nothing
+	return nil
+}
+
 // startTest is a helper which configures the testing environment
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
@@ -58,7 +63,8 @@ func runTest(t *testing.T, test quantumFsTest) {
 		testResult: make(chan string),
 		startTime:  time.Now(),
 		cachePath:  cachePath,
-		logger:     qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24),
+		logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
+			noStdOut),
 	}
 	th.createTestDirs()
 
@@ -434,6 +440,15 @@ func (th *testHelper) absPath(path string) string {
 // Make the given path relative to the mount root
 func (th *testHelper) relPath(path string) string {
 	return strings.TrimPrefix(path, th.tempDir+"/mnt/")
+}
+
+// Extract namespace and workspace path from the absolute path of
+// a workspaceroot
+func (th *testHelper) getWorkspaceComponents(abspath string) (string, string) {
+	relpath := th.relPath(abspath)
+	components := strings.Split(relpath, "/")
+
+	return components[0], components[1]
 }
 
 // Return a random namespace/workspace name of given length

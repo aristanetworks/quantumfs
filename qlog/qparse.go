@@ -66,9 +66,9 @@ func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
 	data := grabMemory(filepath)
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
 
-	if header.Version != MmapHeaderVersion {
+	if header.Version != QlogVersion {
 		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, MmapHeaderVersion))
+			header.Version, QlogVersion))
 	}
 
 	mmapHeaderSize := uint32(unsafe.Sizeof(MmapHeader{}))
@@ -222,7 +222,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 		return rtnRaw[:strLen], nil
 	}
 
-	panic(fmt.Sprintf("Unsupported field type %d\n", byteType))
+	return nil, errors.New(fmt.Sprintf("Unsupported field type %d\n", byteType))
 }
 
 func wrapRead(idx uint32, num uint32, data []byte) []byte {
@@ -310,6 +310,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 
 	var rtn []string
 	readCount := uint32(0)
+	var lastTimestamp int64
 
 	for readCount < uint32(len(data)) {
 		var packetLen uint16
@@ -321,10 +322,34 @@ func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 			break
 		}
 
-		// Read the packet data into a separate buffer
+		// If the packet's uppermost len bit isn't set, that means it's not
+		// fully written and needs to be discarded
+		completeEntry := (packetLen&entryCompleteBit != 0)
+
+		// Now clear the upper bit so it doesn't mess up our packetLen
+		packetLen &= ^(uint16(entryCompleteBit))
+
+		// Prepare the pastEndIdx and readCount variables to allow us to skip
 		wrapMinusEquals(&pastEndIdx, uint32(packetLen), len(data))
-		packetData := wrapRead(pastEndIdx, uint32(packetLen), data)
 		readCount += uint32(packetLen) + 2
+
+		if readCount > uint32(len(data)) {
+			// We've read everything, and this last packet isn't valid
+			break
+		}
+
+		// At this point we know the packet is fully present, finished, and
+		// the idx / readCounts have been updated in prep for the next entry
+		if !completeEntry {
+			newLine := formatString(LogQlog, QlogReqId, time.Unix(0,
+				lastTimestamp),
+				"WARN: Dropping incomplete packet.\n")
+			rtn = append(rtn, newLine)
+			continue
+		}
+
+		// Read the packet data into a separate buffer
+		packetData := wrapRead(pastEndIdx, uint32(packetLen), data)
 
 		read := uint32(0)
 		var numFields uint16
@@ -342,6 +367,7 @@ func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) string {
 		} else if err = readPacket(&read, packetData,
 			reflect.ValueOf(&timestamp)); err != nil {
 		}
+		lastTimestamp = timestamp
 
 		args := make([]interface{}, numFields)
 		for i := uint16(0); i < numFields; i++ {
