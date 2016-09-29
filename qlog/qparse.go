@@ -18,19 +18,19 @@ import "time"
 import "unsafe"
 
 type LogOutput struct {
-	subsystem	LogSubsystem
-	reqId		uint64
-	t		int64
-	format		string
+	Subsystem	LogSubsystem
+	ReqId		uint64
+	T		int64
+	Format		string
 }
 
 func newLog(s LogSubsystem, r uint64, t int64, f string) LogOutput {
 
 	return LogOutput {
-		subsystem: s,
-		reqId: r,
-		t: t,
-		format: f,
+		Subsystem: s,
+		ReqId: r,
+		T: t,
+		Format: f,
 	}
 }
 
@@ -59,7 +59,7 @@ func (s SortByTime) Swap(i, j int) {
 }
 
 func (s SortByTime) Less(i, j int) bool {
-	return s[i].t < s[j].t
+	return s[i].T < s[j].T
 }
 
 // Returns true if the log file string map given failed the logscan
@@ -80,29 +80,23 @@ func ParseLogs(filepath string) string {
 
 func ParseLogsExt(filepath string, tabSpaces int) string {
 
-	pastEndIdx, dataArray, strMapData := extractFields(filepath)
+	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
 
-	// create a safer map to use
-	strMap := make([]LogStr, len(strMapData)/LogStrSize)
-	idx := 0
-	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
-		mapEntry := (*LogStr)(unsafe.Pointer(&strMapData[i]))
-		strMap[idx] = *mapEntry
+	logs := OutputLogs(pastEndIdx, dataArray, strMap)
 
-		idx++
-	}
+	return FormatLogs(logs, tabSpaces)
+}
 
-	logs := outputLogs(pastEndIdx, dataArray, strMap, tabSpaces)
-
+func FormatLogs(logs []LogOutput, tabSpaces int) string {
 	indentMap := make(map[uint64]int)
 	var rtn string
 	// Now that we have the logs in correct order, we can indent them
 	for i := 0; i < len(logs); i++ {
 		// Add any indents necessary
 		if tabSpaces > 0 {
-			indents := indentMap[logs[i].reqId]
+			indents := indentMap[logs[i].ReqId]
 
-			if strings.Index(logs[i].format, FnExitStr) == 0 {
+			if strings.Index(logs[i].Format, FnExitStr) == 0 {
 				indents--
 			}
 
@@ -112,25 +106,25 @@ func ParseLogsExt(filepath string, tabSpaces int) string {
 				spaceStr += " "
 			}
 
-			if strings.Index(logs[i].format, FnEnterStr) == 0 {
+			if strings.Index(logs[i].Format, FnEnterStr) == 0 {
 				indents++
 			}
 
-			logs[i].format = spaceStr + logs[i].format
-			indentMap[logs[i].reqId] = indents
+			logs[i].Format = spaceStr + logs[i].Format
+			indentMap[logs[i].ReqId] = indents
 		}
 
 		// Convert timestamp back into something useful
-		t := time.Unix(0, logs[i].t)
+		t := time.Unix(0, logs[i].T)
 
-		rtn += formatString(logs[i].subsystem, logs[i].reqId, t,
-			logs[i].format)
+		rtn += formatString(logs[i].Subsystem, logs[i].ReqId, t,
+			logs[i].Format)
 	}
 	return rtn
 }
 
-func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
-	strMapData []byte) {
+func ExtractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
+	strMapRtn []LogStr) {
 
 	data := grabMemory(filepath)
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
@@ -148,9 +142,19 @@ func extractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
 			len(data))
 	}
 
+	// create a safer map to use
+	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
+	strMap := make([]LogStr, len(strMapData)/LogStrSize)
+	idx := 0
+	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
+		mapEntry := (*LogStr)(unsafe.Pointer(&strMapData[i]))
+		strMap[idx] = *mapEntry
+
+		idx++
+	}
+
 	return header.CircBuf.PastEndIdx,
-		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size],
-		data[mmapHeaderSize+header.CircBuf.Size:]
+		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
 }
 
 func readOrPanic(offset int64, len int64, fd *os.File) []byte {
@@ -375,9 +379,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 	return nil
 }
 
-func outputLogs(pastEndIdx uint32, data []byte, strMap []LogStr,
-	tabSpaces int) []LogOutput {
-
+func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
 	var rtn []LogOutput
 	readCount := uint32(0)
 	var lastTimestamp int64
