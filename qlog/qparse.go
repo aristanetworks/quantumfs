@@ -22,15 +22,18 @@ type LogOutput struct {
 	ReqId		uint64
 	T		int64
 	Format		string
+	Args		[]interface{}
 }
 
-func newLog(s LogSubsystem, r uint64, t int64, f string) LogOutput {
+func newLog(s LogSubsystem, r uint64, t int64, f string,
+	args []interface{}) LogOutput {
 
 	return LogOutput {
 		Subsystem: s,
 		ReqId: r,
 		T: t,
 		Format: f,
+		Args: args,
 	}
 }
 
@@ -118,7 +121,7 @@ func FormatLogs(logs []LogOutput, tabSpaces int) string {
 		t := time.Unix(0, logs[i].T)
 
 		rtn += formatString(logs[i].Subsystem, logs[i].ReqId, t,
-			logs[i].Format)
+			fmt.Sprintf(logs[i].Format, logs[i].Args...))
 	}
 	return rtn
 }
@@ -414,7 +417,7 @@ func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
 		// the idx / readCounts have been updated in prep for the next entry
 		if !completeEntry {
 			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
-				"WARN: Dropping incomplete packet.\n")
+				"WARN: Dropping incomplete packet.\n", nil)
 			rtn = append(rtn, newLine)
 			continue
 		}
@@ -451,9 +454,10 @@ func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
 
 		if err != nil {
 			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
-				fmt.Sprintf("ERROR: Packet read error (%s). "+
-					"Dump of %d bytes:\n%x\n", err, packetLen,
-					packetData))
+				"ERROR: Packet read error (%s). i"+
+					"Dump of %d bytes:\n%x\n",
+					[]interface{} { err, packetLen,
+						packetData })
 			rtn = append(rtn, newLine)
 			continue
 		}
@@ -461,9 +465,10 @@ func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
 		// Grab the string and output
 		if int(strMapId) > len(strMap) {
 			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
-				fmt.Sprintf("Not enough entries in "+
-					"string map (%d %d)\n", strMapId,
-					len(strMap)/LogStrSize))
+				"Not enough entries in "+
+					"string map (%d %d)\n",
+					[]interface{} { strMapId,
+						len(strMap)/LogStrSize })
 			rtn = append(rtn, newLine)
 			continue
 		}
@@ -478,7 +483,7 @@ func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
 		}
 
 		newLine := newLog(logSubsystem, reqId, timestamp,
-			fmt.Sprintf(mapStr+"\n", args...))
+			mapStr+"\n", args)
 		rtn = append(rtn, newLine)
 	}
 
