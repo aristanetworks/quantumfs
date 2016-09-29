@@ -78,8 +78,8 @@ func (cr *childRecords) instantiateChild_(c *ctx, entry *quantumfs.DirectoryReco
 		constructor = newSpecial
 	}
 
-	c.qfs.setInode(c, inodeId, constructor(c, entry.ID(), entry.Size(),
-		inodeId, cr.dir, 0, 0, nil))
+	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
+		entry.Size(), inodeId, cr.dir, 0, 0, nil))
 }
 
 func (cr *childRecords) insertRecord(c *ctx, inode InodeId,

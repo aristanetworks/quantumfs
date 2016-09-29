@@ -17,6 +17,9 @@ type WorkspaceRoot struct {
 	workspace string
 	rootId    quantumfs.ObjectKey
 
+	//accessed files
+	accessList map[string]bool
+
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
 	realTreeLock sync.RWMutex
@@ -45,7 +48,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
-	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer(), inodeNum, nil,
+	initDirectory(c, name, &wsr.Directory, workspaceRoot.BaseLayer(), inodeNum, nil,
 		&wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
@@ -98,4 +101,16 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	c.vlog("WorkspaceRoot::syncChild Enter")
 	defer c.vlog("WorkspaceRoot::syncChild Exit")
 	wsr.publish(c)
+}
+
+func (wsr *WorkspaceRoot) findPath(c *ctx) (string, bool) {
+	return "/", true
+}
+
+func (wsr *WorkspaceRoot) findWorkspace(c *ctx) (*WorkspaceRoot, bool) {
+	return wsr, true
+}
+
+func (wsr *WorkspaceRoot) register(c *ctx) {
+	return
 }

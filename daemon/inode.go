@@ -91,6 +91,11 @@ type Inode interface {
 
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
+	name() string
+	findPath(c *ctx) (string, bool)
+	findWorkspace(c *ctx) (*WorkspaceRoot, bool)
+	register(c *ctx)
+
 	parent() Inode
 	setParent(newParent Inode)
 
@@ -118,6 +123,9 @@ type InodeCommon struct {
 	// These fields are constant once instantiated
 	self Inode // Leaf subclass instance
 	id   InodeId
+
+	name_    string // '/' if WorkspaceRoot
+	accessed bool
 
 	parentLock sync.Mutex // Protects parent_
 	parent_    Inode      // nil if WorkspaceRoot
@@ -164,6 +172,10 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 	panic(msg)
 }
 
+func (inode *InodeCommon) name() string {
+	return inode.name_
+}
+
 func (inode *InodeCommon) parent() Inode {
 	inode.parentLock.Lock()
 	p := inode.parent_
@@ -200,6 +212,48 @@ func (inode *InodeCommon) Lock() *sync.RWMutex {
 func (inode *InodeCommon) RLock() *sync.RWMutex {
 	inode.lock.RLock()
 	return &inode.lock
+}
+
+func (inode *InodeCommon) findPath(c *ctx) (string, bool) {
+	parent := inode.parent()
+	if parent == nil {
+		return "", false
+	}
+
+	path := inode.name()
+	for parent != nil {
+		path = parent.name() + "/" + path
+		parent = parent.parent()
+	}
+	path = "/" + path
+	return path, true
+}
+
+func (inode *InodeCommon) findWorkspace(c *ctx) (*WorkspaceRoot, bool) {
+	parent := inode.parent()
+	if parent == nil {
+		c.elog("Invalid findWorkspace on directory not in workspace")
+		return nil, false
+	}
+
+	for parent.parent() != nil {
+		parent = parent.parent()
+	}
+
+	return parent.(*WorkspaceRoot), true
+}
+
+func (inode *InodeCommon) register(c *ctx) {
+
+	if inode.accessed != true {
+		path, pathok := inode.findPath(c)
+		ws, wsok := inode.findWorkspace(c)
+
+		if pathok && wsok {
+			ws.accessList[path] = true
+			inode.accessed = true
+		}
+	}
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {

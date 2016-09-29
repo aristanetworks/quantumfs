@@ -15,8 +15,10 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewNamespaceList() Inode {
 	nsl := NamespaceList{
-		InodeCommon: InodeCommon{id: quantumfs.InodeIdRoot},
-		namespaces:  make(map[string]InodeId),
+		InodeCommon: InodeCommon{
+			id: quantumfs.InodeIdRoot,
+		},
+		namespaces: make(map[string]InodeId),
 	}
 	nsl.self = &nsl
 	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock
@@ -349,6 +351,16 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+func (nsl *NamespaceList) findPath(c *ctx) (string, bool) {
+	c.elog("Invalid findPath on NamespaceList")
+	return "", false
+}
+
+func (wsl *NamespaceList) register(c *ctx) {
+	c.elog("Invalid register on NamespaceList")
+	return
+}
+
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -581,4 +593,14 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on WorkspaceList")
 	return fuse.ENODATA
+}
+
+func (wsl *WorkspaceList) findPath(c *ctx) (string, bool) {
+	c.elog("Invalid findPath on WorkspaceList")
+	return "", false
+}
+
+func (wsl *WorkspaceList) register(c *ctx) {
+	c.elog("Invalid register on WorkspaceList")
+	return
 }

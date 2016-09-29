@@ -20,6 +20,7 @@ func NewApiInode(treeLock *sync.RWMutex) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:        quantumfs.InodeIdApi,
+			name_:     quantumfs.ApiPath,
 			treeLock_: treeLock,
 		},
 	}

@@ -14,8 +14,8 @@ import "github.com/hanwen/go-fuse/fuse"
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
 // coming from a DirRecord and not passed in from create_.
-type InodeConstructor func(c *ctx, key quantumfs.ObjectKey, size uint64,
-	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
+type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
+	size uint64, inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode
 
 // This file contains the normal directory Inode type for a workspace
@@ -27,8 +27,9 @@ type Directory struct {
 	dirChildren childRecords
 }
 
-func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
-	inodeNum InodeId, parent Inode, treeLock *sync.RWMutex) {
+func initDirectory(c *ctx, name string, dir *Directory,
+	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
+	parent Inode, treeLock *sync.RWMutex) {
 
 	c.vlog("initDirectory Enter Fetching directory baselayer from %s",
 		baseLayerId.String())
@@ -36,7 +37,12 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	// Set directory data before processing the children incase the children
 	// access the parent.
-	dir.InodeCommon = InodeCommon{id: inodeNum, self: dir}
+	dir.InodeCommon = InodeCommon{
+		id:       inodeNum,
+		name_:    name,
+		accessed: false,
+		self:     dir,
+	}
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
 	dir.baseLayerId = baseLayerId
@@ -69,7 +75,7 @@ func initDirectory(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
-func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
+func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
@@ -78,7 +84,8 @@ func newDirectory(c *ctx, baseLayerId quantumfs.ObjectKey, size uint64,
 
 	var dir Directory
 
-	initDirectory(c, &dir, baseLayerId, inodeNum, parent, parent.treeLock())
+	initDirectory(c, name, &dir, baseLayerId, inodeNum,
+		parent, parent.treeLock())
 
 	return &dir
 }
@@ -467,7 +474,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	entry.SetModificationTime(quantumfs.NewTime(now))
 
 	inodeNum := c.qfs.newInodeId()
-	newEntity := constructor(c, key, 0, inodeNum, dir.self, mode, rdev, entry)
+	newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
+		mode, rdev, entry)
 	dir.addChild_(c, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
 
