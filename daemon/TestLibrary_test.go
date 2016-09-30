@@ -314,7 +314,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
-		MemLogBytes:      uint32(qlog.DefaultMmapSize),
+		MemLogBytes:      uint64(qlog.DefaultMmapSize),
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
 		DurableStore:     processlocal.NewDataStore(""),
