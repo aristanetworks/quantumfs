@@ -738,7 +738,6 @@ type Buffer interface {
 type DataStore interface {
 	Get(c *Ctx, key ObjectKey, buf Buffer) error
 	Set(c *Ctx, key ObjectKey, buf Buffer) error
-	Exists(c *Ctx, key ObjectKey) bool
 }
 
 // A pseudo-store which contains all the constant objects
@@ -765,10 +764,6 @@ func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 
 func (store *ConstDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
-}
-
-func (store *ConstDataStore) Exists(c *Ctx, key ObjectKey) bool {
-	return false
 }
 
 var ZeroKey ObjectKey
