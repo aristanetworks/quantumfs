@@ -44,6 +44,10 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		panic("Attempted to store overlarge block")
 	}
 
+        if store.Exists(c, key) {
+                return nil
+        }
+
 	c.Vlog(qlog.LogDatastore, "Storing key %s len %d", key.String(),
 		buffer.Size())
 	store.mutex.Lock()

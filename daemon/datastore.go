@@ -54,11 +54,6 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to set embedded key")
 	}
-
-	if store.durableStore.Exists(c, key) {
-		return nil
-	}
-
 	return store.durableStore.Set(c, key, buffer)
 }
 
