@@ -3,85 +3,85 @@
 
 package quantumfs
 
-// This file contains a test buffer only for the testing purpose.Some interface
-// functions are only briefly implemented with a dummy return value
+// This file contains a buffer for the testing purpose only.Some interface functions
+// are only briefly implemented with a dummy return value
 
 import "crypto/sha1"
 
 import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
 
-// Testing buffer only contains data and key to meet the requirements of the Set()
-// in datastore
+// Testing buffer only contains data and key to meet the requirements of Set() and
+// Get() in datastore
 type TestBuffer struct {
-	key  ObjectKey
-	data []byte
+   key  ObjectKey
+   data []byte
 }
 
 func NewTestBuffer(in []byte, q_key ObjectKey) Buffer {
-	return &TestBuffer{
-		key:  q_key,
-		data: in,
-	}
+        return &TestBuffer{
+                key:  q_key,
+                data: in,
+        }
 }
 
 // Implement the required interface functions. Only  Get() and Set() will be called,
 // so the others will be briefly implemented or be directly copied from
 // daemon/datastore.go
 func (buf *TestBuffer) Write(c *Ctx, in []byte, offset uint32) uint32 {
-	return uint32(111)
+        return uint32(111)
 }
 
 func (buf *TestBuffer) Read(out []byte, offset uint32) int {
-	return int(111)
+        return int(111)
 }
 
 func (buf *TestBuffer) Get() []byte {
-	return buf.data
+        return buf.data
 }
 
 func (buf *TestBuffer) Set(data []byte, keyType KeyType) {
-	buf.data = data
+        buf.data = data
 }
 
 func (buf *TestBuffer) ContentHash() [ObjectKeyLength - 1]byte {
-	return sha1.Sum(buf.data)
+        return sha1.Sum(buf.data)
 }
 
 func (buf *TestBuffer) Key(c *Ctx) (ObjectKey, error) {
-	return buf.key, nil
+        return buf.key, nil
 }
 
 func (buf *TestBuffer) SetSize(size int) {
-	buf.data = buf.data[:size]
+        buf.data = buf.data[:size]
 }
 
 func (buf *TestBuffer) Size() int {
-	return len(buf.data)
+        return len(buf.data)
 }
 
 func (buf *TestBuffer) AsDirectoryEntry() DirectoryEntry {
-	segment := capn.NewBuffer(buf.data)
-	return OverlayDirectoryEntry(encoding.ReadRootDirectoryEntry(segment))
+        segment := capn.NewBuffer(buf.data)
+        return OverlayDirectoryEntry(encoding.ReadRootDirectoryEntry(segment))
 }
 
 func (buf *TestBuffer) AsWorkspaceRoot() WorkspaceRoot {
-	segment := capn.NewBuffer(buf.data)
-	return OverlayWorkspaceRoot(encoding.ReadRootWorkspaceRoot(segment))
+        segment := capn.NewBuffer(buf.data)
+        return OverlayWorkspaceRoot(encoding.ReadRootWorkspaceRoot(segment))
 }
 
 func (buf *TestBuffer) AsMultiBlockFile() MultiBlockFile {
-	segment := capn.NewBuffer(buf.data)
-	return OverlayMultiBlockFile(encoding.ReadRootMultiBlockFile(segment))
+        segment := capn.NewBuffer(buf.data)
+        return OverlayMultiBlockFile(encoding.ReadRootMultiBlockFile(segment))
 }
 
 func (buf *TestBuffer) AsVeryLargeFile() VeryLargeFile {
-	segment := capn.NewBuffer(buf.data)
-	return OverlayVeryLargeFile(encoding.ReadRootVeryLargeFile(segment))
+        segment := capn.NewBuffer(buf.data)
+        return OverlayVeryLargeFile(encoding.ReadRootVeryLargeFile(segment))
 }
 
 func (buf *TestBuffer) AsExtendedAttributes() ExtendedAttributes {
-	segment := capn.NewBuffer(buf.data)
-	return OverlayExtendedAttributes(
-		encoding.ReadRootExtendedAttributes(segment))
+        segment := capn.NewBuffer(buf.data)
+        return OverlayExtendedAttributes(
+                encoding.ReadRootExtendedAttributes(segment))
 }

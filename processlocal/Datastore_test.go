@@ -3,8 +3,8 @@
 
 package processlocal
 
-// Unit test to ensure Set() in the package will only upload non-existing data
-// to the local datastore.
+// Unit test to ensure Set() in the package datastore will only upload non-existing
+// data to the local datastore.
 
 import "bytes"
 import "fmt"
