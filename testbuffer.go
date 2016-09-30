@@ -29,11 +29,11 @@ func NewTestBuffer(in []byte, q_key ObjectKey) Buffer {
 // so the others will be briefly implemented or be directly copied from
 // daemon/datastore.go
 func (buf *TestBuffer) Write(c *Ctx, in []byte, offset uint32) uint32 {
-	return uint32(111)
+        panic("Error: The Write function of TestBuffer is not implemented")
 }
 
 func (buf *TestBuffer) Read(out []byte, offset uint32) int {
-	return int(111)
+        panic("Error: The Read function of TestBuffer is not implemented")
 }
 
 func (buf *TestBuffer) Get() []byte {
