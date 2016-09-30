@@ -24,6 +24,33 @@ func (v LogSubsystem) Primitive() interface{} {
 const FnEnterStr = "---In "
 const FnExitStr = "Out-- "
 
+func IsFnIn(test string) bool {
+	return strings.Index(test, FnEnterStr) == 0
+}
+
+func IsFnOut(test string) bool {
+	return strings.Index(test, FnExitStr) == 0
+}
+
+// Returns whether the strings are a function in/out log pair
+func IsLogFnPair(formatIn string, formatOut string) bool {
+	if strings.Index(formatIn, FnEnterStr) != 0 {
+		return false
+	}
+
+	if strings.Index(formatOut, FnExitStr) != 0 {
+		return false
+	}
+
+	if strings.Compare(formatIn[len(FnEnterStr):],
+		formatOut[len(FnExitStr):]) != 0 {
+
+		return false
+	}
+
+	return true
+}
+
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
