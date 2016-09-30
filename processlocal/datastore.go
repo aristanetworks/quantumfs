@@ -43,10 +43,10 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	if buffer.Size() > int(quantumfs.MaxBlockSize) {
 		panic("Attempted to store overlarge block")
 	}
-        
-        store.mutex.RLock()
-        _, exists := store.data[key.String()]
-        store.mutex.RUnlock()
+
+	store.mutex.RLock()
+	_, exists := store.data[key.String()]
+	store.mutex.RUnlock()
 	if exists {
 		return nil
 	}
