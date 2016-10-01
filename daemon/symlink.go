@@ -39,6 +39,7 @@ type Symlink struct {
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	link.register(c, "", false)
 	return fuse.OK
 }
 
@@ -110,6 +111,7 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 }
 
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
+	link.register(c, "", false)
 	data := c.dataStore.Get(&c.Ctx, link.key)
 	if data == nil {
 		return nil, fuse.EIO

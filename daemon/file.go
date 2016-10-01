@@ -171,6 +171,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
 	}
+	fi.register(c, "", false)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())

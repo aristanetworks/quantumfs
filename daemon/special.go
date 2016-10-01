@@ -70,6 +70,7 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	special.register(c, "", false)
 	return fuse.OK
 }
 

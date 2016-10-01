@@ -356,11 +356,6 @@ func (nsl *NamespaceList) findPath(c *ctx) (string, bool) {
 	return "", false
 }
 
-func (wsl *NamespaceList) register(c *ctx) {
-	c.elog("Invalid register on NamespaceList")
-	return
-}
-
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -598,9 +593,4 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (wsl *WorkspaceList) findPath(c *ctx) (string, bool) {
 	c.elog("Invalid findPath on WorkspaceList")
 	return "", false
-}
-
-func (wsl *WorkspaceList) register(c *ctx) {
-	c.elog("Invalid register on WorkspaceList")
-	return
 }

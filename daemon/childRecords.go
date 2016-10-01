@@ -190,17 +190,24 @@ func (cr *childRecords) dirty(c *ctx, inodeNum InodeId) {
 
 func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 	if oldName == newName {
+		inodeId := cr.data.fileToInode[oldName]
+		child := c.qfs.inode(c, inodeId)
+		child.register(c, "", false)
 		return
 	}
 
 	cr.loadData_(c)
 
 	oldInodeId := cr.data.fileToInode[oldName]
+	child := c.qfs.inode(c, oldInodeId)
+	child.register(c, "", false)
 	// If a file already exists with newName, we need to clean it up
 	cleanupInodeId := cr.data.fileToInode[newName]
 
 	cr.entries[newName] = cr.data.records[oldInodeId]
 	cr.data.records[oldInodeId].SetFilename(newName)
+	child.setName(newName)
+	child.register(c, "", true)
 
 	cr.data.fileToInode[newName] = oldInodeId
 	delete(cr.data.fileToInode, oldName)

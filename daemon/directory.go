@@ -86,7 +86,6 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 
 	initDirectory(c, name, &dir, baseLayerId, inodeNum,
 		parent, parent.treeLock())
-
 	return &dir
 }
 
@@ -123,6 +122,9 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 	if !exists {
 		panic("Unexpected missing child inode")
 	}
+
+	child := c.qfs.inode(c, inodeNum)
+	child.register(c, "", false)
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
 		record.Type() == quantumfs.ObjectTypeMediumFile ||
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -403,6 +405,9 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		return fuse.ENOENT
 	}
 
+	child := c.qfs.inode(c, inodeNum)
+	child.register(c, "", false)
+
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -421,6 +426,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	defer dir.RLock().RUnlock()
+	dir.register(c, "", false)
 
 	children := make([]directoryContents, 0, dir.dirChildren.count())
 	for _, entry := range dir.dirChildren.getRecords() {
@@ -482,6 +488,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
+
+	newEntity.register(c, "", true)
 
 	return newEntity
 }
@@ -842,7 +850,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// update the inode
 			child := c.qfs.inode(c, oldInodeId)
+			child.register(c, "", false)
 			child.setParent(dst)
+			child.register(c, "", true)
 
 			//delete the target InodeId
 			dst.dirChildren.delete(newName)
