@@ -382,10 +382,58 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 	return nil
 }
 
+type LogStatus struct {
+	shownHeader	bool
+	pixWidth	int
+	lastPixShown	int
+}
+
+func NewLogStatus(displayWidth int) LogStatus {
+	return LogStatus {
+		shownHeader:	false,
+		pixWidth: displayWidth,
+		lastPixShown: 0,
+	}
+}
+
+func (l *LogStatus) Process(newPct float32) {
+	if !l.shownHeader {
+		leftHeader := "Processing: ||"
+		nextHeader := "             |"
+		fmt.Printf(leftHeader)
+		for i := 0; i < l.pixWidth; i++ {
+			fmt.Printf(" ")
+		}
+		fmt.Printf("||\n")
+		fmt.Printf(nextHeader)
+		l.shownHeader = true
+	}
+
+	// Calculate the amount of pixels to output
+	pixDone := int(float32(l.pixWidth) * newPct)
+	for i := l.lastPixShown+1; i <= pixDone; i++ {
+		fmt.Printf(".")
+	}
+
+	if pixDone == l.pixWidth && pixDone != l.lastPixShown {
+		fmt.Printf("| Done.\n")
+	}
+
+	l.lastPixShown = pixDone
+}
+
 func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
+	return OutputLogsExt(pastEndIdx, data, strMap, false)
+}
+
+func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr,
+	printStatus bool) []LogOutput {
+
 	var rtn []LogOutput
 	readCount := uint32(0)
 	var lastTimestamp int64
+
+	status := NewLogStatus(50)
 
 	for readCount < uint32(len(data)) {
 		var packetLen uint16
@@ -407,6 +455,15 @@ func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
 		// Prepare the pastEndIdx and readCount variables to allow us to skip
 		wrapMinusEquals(&pastEndIdx, uint32(packetLen), len(data))
 		readCount += uint32(packetLen) + 2
+
+		// Update a status bar if needed
+		if printStatus {
+			readCountClip := uint32(readCount)
+			if readCountClip > uint32(len(data)) {
+				readCountClip = uint32(len(data))
+			}
+			status.Process(float32(readCountClip) / float32(len(data)))
+		}
 
 		if readCount > uint32(len(data)) {
 			// We've read everything, and this last packet isn't valid

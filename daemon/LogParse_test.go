@@ -158,7 +158,7 @@ func TestQParsePartials_test(t *testing.T) {
 			droppedEntry = isPartial
 		}
 
-		test.assert(count >= 10,
+		test.assert(count >= 5,
 			"Unable to confidently prove partial packet reading")
 	})
 }

@@ -9,6 +9,7 @@ import "errors"
 import "flag"
 import "fmt"
 import "os"
+import "regexp"
 import "sort"
 import "strconv"
 import "strings"
@@ -18,6 +19,11 @@ import "github.com/aristanetworks/quantumfs/qlog"
 var tabSpaces *int
 var file *string
 var stats *bool
+
+// To limit the computational cost of pattern matching, we set the max number of
+// wildcards in a sequence to 30
+const maxSeqWildcards = 30
+var wildcardStr string
 
 // -- worker structures
 
@@ -67,6 +73,26 @@ func (s *sequenceTracker) Process(log qlog.LogOutput) error {
 	return nil
 }
 
+func collectData(wildcards []bool, seq []qlog.LogOutput,
+	sequences []sequenceData) sequenceData {
+
+	var rtn sequenceData
+	copy(rtn.seq, seq)
+
+	regex := regexp.MustCompile(genSeqRegex(seq, wildcards))
+
+	for i := 0; i < len(sequences); i++ {
+		toMatch := genSeqRegex(sequences[i].seq, []bool{})
+		if matches := regex.FindAllStringSubmatch(toMatch,
+			1); len(matches) > 0 {
+
+			rtn.times = append(rtn.times, sequences[i].times...)
+		}
+	}
+
+	return rtn
+}
+
 // Because Golang is a horrible language and doesn't support maps with slice keys,
 // we need to construct long string keys and save the slices in the value for later
 func extractSequences(logs []qlog.LogOutput) map[string]sequenceData {
@@ -74,8 +100,13 @@ func extractSequences(logs []qlog.LogOutput) map[string]sequenceData {
 
 	rtn := make(map[string]sequenceData)
 
+	fmt.Println("Extracing sequences from logs...")
+	status := qlog.NewLogStatus(50)
+
 	// Go through all the logs per request
 	for i := 0; i < len(reqIds); i++ {
+		status.Process(float32(i) / float32(len(reqIds)))
+
 		abortRequest := false
 		reqLogs := getReqLogs(reqIds[i], logs)
 
@@ -124,10 +155,7 @@ func extractSequences(logs []qlog.LogOutput) map[string]sequenceData {
 			}
 
 			rawSeq := trackers[k].seq
-			seq := ""
-			for n := 0; n < len(rawSeq); n++ {
-				seq += rawSeq[n].Format
-			}
+			seq := genSeqStr(rawSeq)
 			data := rtn[seq]
 			// For this sequence, append the time it took
 			if data.seq == nil {
@@ -188,6 +216,10 @@ func (s SortReqs) Less(i, j int) bool {
 // -- end
 
 func init() {
+	// The wildcard character / string needs to be something that would never
+	// show in a log so that we can use strings as map keys
+	wildcardStr = string([]byte { 7 })
+
 	tabSpaces = flag.Int("tab", 0, "Indent function logs with n spaces")
 	file = flag.String("f", "", "Log file to parse (required)")
 	stats = flag.Bool("stats", false, "Enter interactive mode to read stats.")
@@ -222,7 +254,7 @@ func interactiveMode(filepath string) {
 
 	// Parse the logs into log structs
 	pastEndIdx, dataArray, strMap := qlog.ExtractFields(filepath)
-	logs := qlog.OutputLogs(pastEndIdx, dataArray, strMap)
+	logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap, true)
 
 	for {
 		fmt.Printf(">> ")
@@ -244,10 +276,118 @@ func showHelp() {
 	fmt.Println("")
 }
 
+func genSeqStr(seq []qlog.LogOutput) string {
+	return genSeqStrExt(seq, []bool{})
+}
+
+func genSeqStrExt(seq []qlog.LogOutput, wildcardMask []bool) string {
+	rtn := ""
+	for n := 0; n < len(seq); n++ {
+		if n < len(wildcardMask) && wildcardMask[n] {
+			// This is a wildcard in the sequence, but skip consecutive
+			// wildcards
+			if rtn[len(rtn)-1:] == wildcardStr {
+				continue
+			}
+
+			rtn += wildcardStr
+			continue
+		}
+
+		rtn += seq[n].Format
+	}
+
+	return rtn
+}
+
+// This function is used to generate regex strings for checking for matches
+func genSeqRegex(seq []qlog.LogOutput, wildcards []bool) string {
+
+	rtn := "?s:"
+	for n := 0; n < len(seq); n++ {
+		if n < len(wildcards) && wildcards[n] {
+			rtn += ".*"
+		} else {
+			rtn += seq[n].Format
+		}
+	}
+
+	return "("+rtn+")"
+}
+
+// curMask is a map of indices into sequences which should be ignored when gathering
+// data (wildcards). The base cases of this function are when its called with zero
+// remaining in wildcardNum - that's how it knows to use curMask and collect the
+// data
+func recurseCalcTimes(curMask []bool, wildcardNum int, seq []qlog.LogOutput,
+	sequences []sequenceData, out map[string]sequenceData /*out*/) {
+
+	// If we've already collected times for this wildcard + sequence,
+	// then we don't need to do anything since other wildcard combinations will
+	// have already been covered
+	seqStr := genSeqStrExt(seq, curMask)
+	if _, exists := out[seqStr]; exists {
+		return
+	}
+
+	if wildcardNum > 0 {
+		// we need to place a new wildcard. Note: we don't allow the first /
+		// last logs to be wildcarded since we *know* they're functions and
+		// they define the function we're trying to analyze across variants
+		for i := 1; i < len(sequences)-1; i++ {
+			if !curMask[i] {
+				// This spot doesn't have a wildcard yet.
+				curMask[i] = true
+				recurseCalcTimes(curMask, wildcardNum-1, seq,
+					sequences, out)
+				// Make sure to remove the entry for the next loop
+				curMask[i] = false
+			}
+		}
+	} else {
+		out[seqStr] = collectData(curMask, seq, sequences)
+	}
+}
+
 // Given a set of logs, collect deltas within and between function in/out pairs
 func showOverallStats(logs []qlog.LogOutput) {
-	sequences := extractSequences(logs)
+	sequenceMap := extractSequences(logs)
+	sequences := make([]sequenceData, 0, len(sequenceMap))
+	for _, v := range sequenceMap {
+		sequences = append(sequences, v)
+	}
 
+	// Map of wildcard containing string to times and example logs
+	rtn := make(map[string]sequenceData)
+
+	status := qlog.NewLogStatus(50)
+
+	// Now generate all combinations of the sequences with wildcards in them,
+	// and collect stats for each generated sequence
+	for i := 0; i < len(sequences); i++ {
+		// Update the status bar
+		status.Process(float32(i) / float32(len(sequences)))
+
+		// If we've already got a result for this sequence, then this has
+		// been counted and we can skip it.
+		if _, exists := rtn[genSeqStr(sequences[i].seq)]; exists {
+			continue
+		}
+
+		maxWildcards := len(sequences) - 2
+		if maxWildcards > maxSeqWildcards {
+			maxWildcards = maxSeqWildcards
+		}
+
+		for wildcards := 0; wildcards < maxWildcards; wildcards++ {
+			wildcardMask := make([]bool, len(sequences[i].seq))
+			recurseCalcTimes(wildcardMask, wildcards, sequences[i].seq,
+				sequences, rtn /*out*/)
+		}
+	}
+
+	//debug now
+/*
 	//debug
 	for k, v := range sequences {
 		fmt.Printf("%s\n", k)
@@ -255,7 +395,7 @@ func showOverallStats(logs []qlog.LogOutput) {
 			fmt.Printf("%d ", v.times[i])
 		}
 		fmt.Printf("\n\n")
-	}
+	}*/
 }
 
 func extractRequestIds(logs []qlog.LogOutput) []uint64 {
