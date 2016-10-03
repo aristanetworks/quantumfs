@@ -95,6 +95,9 @@ type Inode interface {
 	setName(name string)
 	register(c *ctx, path string, create bool)
 
+	getAccessed() bool
+	setAccessed(label bool)
+
 	parent() Inode
 	setParent(newParent Inode)
 
@@ -125,7 +128,9 @@ type InodeCommon struct {
 
 	nameLock sync.Mutex
 	name_    string // '/' if WorkspaceRoot
-	accessed bool
+
+	accessedLock sync.Mutex
+	accessed     bool
 
 	accessList map[string]bool
 
@@ -188,6 +193,20 @@ func (inode *InodeCommon) setName(name string) {
 	inode.nameLock.Unlock()
 }
 
+func (inode *InodeCommon) getAccessed() bool {
+	inode.accessedLock.Lock()
+	a := inode.accessed
+	inode.accessedLock.Unlock()
+
+	return a
+}
+
+func (inode *InodeCommon) setAccessed(accessed bool) {
+	inode.accessedLock.Lock()
+	inode.accessed = accessed
+	inode.accessedLock.Unlock()
+}
+
 func (inode *InodeCommon) parent() Inode {
 	inode.parentLock.Lock()
 	p := inode.parent_
@@ -229,21 +248,14 @@ func (inode *InodeCommon) RLock() *sync.RWMutex {
 func (inode *InodeCommon) register(c *ctx, path string, create bool) {
 	if path == "" {
 		if inode.parent() == nil {
-			c.elog("Invalid register on namespace or workspaceroot")
 			return
 		}
-		if !create && inode.accessed {
+		if !create && inode.getAccessed() {
 			return
 		}
-		inode.accessed = true
+		inode.setAccessed(true)
 	} else {
 		if inode.parent() == nil && inode.accessList != nil {
-			if create {
-				c.elog("register:" + path + " value: true")
-			} else {
-				c.elog("register:" + path + " value: false")
-
-			}
 			inode.accessList[path] = create
 			return
 		}

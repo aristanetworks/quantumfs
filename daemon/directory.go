@@ -852,7 +852,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			child := c.qfs.inode(c, oldInodeId)
 			child.register(c, "", false)
 			child.setParent(dst)
-			child.register(c, "", true)
 
 			//delete the target InodeId
 			dst.dirChildren.delete(newName)
@@ -863,6 +862,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// Remove entry in old directory
 			dir.dirChildren.delete(oldName)
 
+			child.setName(newName)
+			child.register(c, "", true)
 			parent.updateSize_(c)
 			parent.self.dirty(c)
 

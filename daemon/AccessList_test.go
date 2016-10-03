@@ -23,14 +23,7 @@ func TestFileCreateAccessList(t *testing.T) {
 		test.assert(err == nil, "Create file error")
 		accessList[filename] = true
 		syscall.Close(fd)
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		path = test.absPath(bworkspace) + filename
@@ -38,16 +31,7 @@ func TestFileCreateAccessList(t *testing.T) {
 		test.assert(err == nil, "Open file error")
 		accessList[filename] = false
 		file.Close()
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -64,30 +48,14 @@ func TestFileCreateDeleteList(t *testing.T) {
 		test.assert(err == nil, "Create file error")
 		accessList[filename] = true
 		syscall.Close(fd)
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		path = test.absPath(bworkspace) + filename
 		err = os.Remove(path)
 		test.assert(err == nil, "Open file error")
 		accessList[filename] = false
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -103,30 +71,14 @@ func TestDirectoryCreateDeleteList(t *testing.T) {
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error")
 		accessList[dirname] = true
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		path = test.absPath(bworkspace) + dirname
 		err = syscall.Rmdir(path)
 		test.assert(err == nil, "Delete directory error")
 		accessList[dirname] = false
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -148,15 +100,7 @@ func TestRecursiveCreateRemoveList(t *testing.T) {
 		test.assert(err == nil, "Create file error:%v", err)
 		accessList[dirname+filename] = true
 		syscall.Close(fd)
-
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		path = test.absPath(bworkspace) + dirname + filename
@@ -167,16 +111,7 @@ func TestRecursiveCreateRemoveList(t *testing.T) {
 		err = syscall.Rmdir(path)
 		test.assert(err == nil, "Delete directory error")
 		accessList[dirname] = false
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -191,6 +126,7 @@ func TestMvChildList(t *testing.T) {
 		dirname2 := "/test2"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
+		filename3 := "/test3.c"
 		path := workspace + dirname1
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
@@ -211,36 +147,20 @@ func TestMvChildList(t *testing.T) {
 		accessList[dirname2+filename2] = true
 		syscall.Close(fd)
 
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		accessList = make(map[string]bool)
 
 		path1 := test.absPath(bworkspace) + dirname1 + filename1
-		path2 := test.absPath(bworkspace) + dirname2 + filename1
+		path2 := test.absPath(bworkspace) + dirname2 + filename3
 		err = os.Rename(path1, path2)
 		test.assert(err == nil, "Move file error")
 		accessList[dirname1] = false
 		accessList[dirname2] = false
 		accessList[dirname1+filename1] = false
-		accessList[dirname2+filename1] = true
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		accessList[dirname2+filename3] = true
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -263,15 +183,7 @@ func TestRenameChildList(t *testing.T) {
 		test.assert(err == nil, "Create file error:%v", err)
 		accessList[dirname+filename1] = true
 		syscall.Close(fd)
-
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		accessList = make(map[string]bool)
@@ -283,16 +195,7 @@ func TestRenameChildList(t *testing.T) {
 		accessList[dirname] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -315,15 +218,7 @@ func TestHardLinkList(t *testing.T) {
 		test.assert(err == nil, "Create file error:%v", err)
 		accessList[dirname+filename1] = true
 		syscall.Close(fd)
-
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		accessList = make(map[string]bool)
@@ -335,16 +230,7 @@ func TestHardLinkList(t *testing.T) {
 		accessList[dirname] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -367,15 +253,7 @@ func TestSymlinkList(t *testing.T) {
 		test.assert(err == nil, "Create file error:%v", err)
 		accessList[dirname+filename1] = true
 		syscall.Close(fd)
-
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		accessList = make(map[string]bool)
@@ -386,16 +264,7 @@ func TestSymlinkList(t *testing.T) {
 		test.assert(err == nil, "Create symlink error")
 		accessList[dirname] = false
 		accessList[dirname+filename2] = true
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -468,17 +337,9 @@ func TestReadSymlinkList(t *testing.T) {
 		syscall.Close(fd)
 		path2 := workspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
-		test.assert(err == nil, "Create symlink error")
+		test.assert(err == nil, "Create symlink error:%v", err)
 		accessList[dirname+filename2] = true
-
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		accessList = make(map[string]bool)
@@ -488,16 +349,7 @@ func TestReadSymlinkList(t *testing.T) {
 		test.assert(err == nil, "Read symlink error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename2] = false
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }
 
@@ -511,34 +363,18 @@ func TestOverwriteRemovedList(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error")
+		test.assert(err == nil, "Create file error:%v", err)
 		accessList[filename] = true
 		syscall.Close(fd)
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
-		eq := reflect.DeepEqual(accessList, wsr.accessList)
-		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
-			accessList, wsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map content:"+msg)
+		test.compareAccessList(relworkspace, accessList)
 
 		bworkspace := test.branchWorkspace(workspace)
 		path = test.absPath(bworkspace) + filename
 		err = os.Remove(path)
-		test.assert(err == nil, "Open file error")
+		test.assert(err == nil, "Remove file error:%v", err)
 		fd, err = syscall.Creat(path, 0666)
 		accessList[filename] = true
 		syscall.Close(fd)
-
-		bwsr, ok := test.qfs.activeWorkspaces[bworkspace]
-		msg = fmt.Sprintf("activeWorkspaces:%v", test.qfs.activeWorkspaces)
-		test.assert(ok,
-			"BWorkspaceRoot "+bworkspace+" doesn't exist msg:"+msg)
-		eq = reflect.DeepEqual(accessList, bwsr.accessList)
-		msg = fmt.Sprintf("testlist:%v bwsrlist:%v",
-			accessList, bwsr.accessList)
-		test.assert(eq,
-			"Error two maps not equal, map contents:"+msg)
+		test.compareAccessList(bworkspace, accessList)
 	})
 }

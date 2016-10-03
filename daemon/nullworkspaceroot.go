@@ -52,7 +52,3 @@ func (nwsr *NullWorkspaceRoot) Link(c *ctx, srcInode Inode, newName string,
 
 	return fuse.EPERM
 }
-
-func (nwsr *NullWorkspaceRoot) findWorkspace(c *ctx) (*WorkspaceRoot, bool) {
-	return &(nwsr.WorkspaceRoot), true
-}

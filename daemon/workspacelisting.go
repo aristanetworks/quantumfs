@@ -351,11 +351,6 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (nsl *NamespaceList) findPath(c *ctx) (string, bool) {
-	c.elog("Invalid findPath on NamespaceList")
-	return "", false
-}
-
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -588,9 +583,4 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on WorkspaceList")
 	return fuse.ENODATA
-}
-
-func (wsl *WorkspaceList) findPath(c *ctx) (string, bool) {
-	c.elog("Invalid findPath on WorkspaceList")
-	return "", false
 }
