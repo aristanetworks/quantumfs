@@ -90,6 +90,8 @@ type CommandCommon struct {
 const (
 	CmdError         = iota
 	CmdBranchRequest = iota
+	CmdGetAccessed   = iota
+	CmdClearAccessed = iota
 	CmdSyncAll       = iota
 )
 
@@ -111,6 +113,11 @@ type BranchRequest struct {
 	CommandCommon
 	Src string
 	Dst string
+}
+
+type AccessedRequest struct {
+	CommandCommon
+	WorkspaceRoot string
 }
 
 type SyncAllRequest struct {
@@ -155,6 +162,52 @@ func (api *Api) Branch(src string, dst string) error {
 		CommandCommon: CommandCommon{CommandId: CmdBranchRequest},
 		Src:           src,
 		Dst:           dst,
+	}
+
+	bytes, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	if _, err = api.sendCmd(bytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// branch the src workspace into a new workspace called dst.
+func (api *Api) GetAccessed(wsr string) error {
+	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
+	}
+
+	cmd := AccessedRequest{
+		CommandCommon: CommandCommon{CommandId: CmdGetAccessed},
+		WorkspaceRoot: wsr,
+	}
+
+	bytes, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	if _, err = api.sendCmd(bytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// branch the src workspace into a new workspace called dst.
+func (api *Api) ClearAccessed(wsr string) error {
+	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
+	}
+
+	cmd := AccessedRequest{
+		CommandCommon: CommandCommon{CommandId: CmdClearAccessed},
+		WorkspaceRoot: wsr,
 	}
 
 	bytes, err := json.Marshal(cmd)

@@ -344,6 +344,10 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdBranchRequest:
 		c.vlog("Received branch request")
 		api.branchWorkspace(c, buf)
+	case quantumfs.CmdGetAccessed:
+		c.vlog("Received GetAccessed request")
+	case quantumfs.CmdClearAccessed:
+		c.vlog("Received ClearAccessed request")
 	case quantumfs.CmdSyncAll:
 		c.vlog("Received all workspace sync request")
 		api.syncAll(c)
@@ -374,6 +378,32 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 	}
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
+}
+
+func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
+}
+
+func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
+	var cmd quantumfs.AccessRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	src := strings.Split(cmd.Src, "/")
+	dst := strings.Split(cmd.Dst, "/")
+
+	c.qfs.syncAll(c)
+
+	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], dst[0],
+		dst[1]); err != nil {
+
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return
+	}
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
+
 }
 
 func (api *ApiHandle) syncAll(c *ctx) {
