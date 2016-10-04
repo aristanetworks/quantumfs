@@ -105,7 +105,5 @@ func TestSymlinkSize(t *testing.T) {
 		test.assert(stat_t.Size == int64(len(orig)),
 			"Wrong size of symlink:%d, should be:%d",
 			stat_t.Size, len(orig))
-
 	})
-
 }
