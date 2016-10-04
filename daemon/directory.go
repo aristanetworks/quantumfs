@@ -638,16 +638,9 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return fuse.EIO
 		}
 
-		link := dir.create_(c, name, 0777, 0777, 0, newSymlink,
+		dir.create_(c, name, 0777, 0777, 0, newSymlink,
 			quantumfs.ObjectTypeSymlink, key, out)
 
-		size := len(pointedTo)
-		entry, ok := dir.dirChildren.getRecord(c, link.(*Symlink).id)
-		if ok {
-			entry.SetSize(uint64(size))
-			out.Attr.Size = entry.Size()
-
-		}
 		return fuse.OK
 	}()
 
