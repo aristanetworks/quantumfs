@@ -29,9 +29,9 @@ func main() {
 		fmt.Println("         - create a new workspaceN which is a copy of" +
 			" workspaceO")
 		fmt.Println("           as of this point in time")
-		fmt.Println("  accessed <workspace>")
+		fmt.Println("  access <workspace>")
 		fmt.Println("         - get the access list of workspace")
-		fmt.Println("  clearaccessed <workspace>")
+		fmt.Println("  clearaccess <workspace>")
 		fmt.Println("         - clear the access list of workspace")
 		os.Exit(exitBadCmd)
 	}
@@ -44,9 +44,9 @@ func main() {
 
 	case "branch":
 		branch()
-	case "accessed":
+	case "access":
 		getAccessed()
-	case "clearaccessed":
+	case "clearaccess":
 		clearAccessed()
 	}
 }
@@ -82,7 +82,7 @@ func getAccessed() {
 
 	wsr := flag.Arg(1)
 
-	fmt.Printf("Getting the accessed list of WorkspaceRoot:%s", wsr)
+	fmt.Printf("Getting the accessed list of WorkspaceRoot:\"%s\"\n", wsr)
 	api := quantumfs.NewApi()
 	err := api.GetAccessed(wsr)
 
@@ -101,7 +101,7 @@ func clearAccessed() {
 
 	wsr := flag.Arg(1)
 
-	fmt.Printf("Getting the accessed list of WorkspaceRoot:%s", wsr)
+	fmt.Printf("Clearing the accessed list of WorkspaceRoot:\"%s\"\n", wsr)
 	api := quantumfs.NewApi()
 	err := api.ClearAccessed(wsr)
 

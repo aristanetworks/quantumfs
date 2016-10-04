@@ -89,6 +89,7 @@ type CommandCommon struct {
 // The various command ID constants
 const (
 	CmdError         = iota
+	CmdResponse      = iota
 	CmdBranchRequest = iota
 	CmdGetAccessed   = iota
 	CmdClearAccessed = iota
@@ -103,10 +104,18 @@ const (
 	ErrorCommandFailed = iota // The Command failed, see the error for more info
 )
 
-type ErrorResponse struct {
+type GenericResponse struct {
 	CommandCommon
+	Data []byte
+}
+
+type ErrorResponse struct {
 	ErrorCode uint32
 	Message   string
+}
+
+type AccessListResponse struct {
+	Data map[string]bool
 }
 
 type BranchRequest struct {
@@ -124,25 +133,45 @@ type SyncAllRequest struct {
 	CommandCommon
 }
 
-func (api *Api) sendCmd(bytes []byte) (ErrorResponse, error) {
+func (api *Api) sendCmd(bytes []byte) (GenericResponse, error) {
 	err := writeAll(api.fd, bytes)
 	if err != nil {
-		return ErrorResponse{}, err
+		return GenericResponse{}, err
 	}
 
 	api.fd.Seek(0, 0)
 	buf := make([]byte, 4096)
 	n, err := api.fd.Read(buf)
 	if err != nil {
-		return ErrorResponse{}, err
+		return GenericResponse{}, err
 	}
 
 	buf = buf[:n]
 
-	var response ErrorResponse
+	var response GenericResponse
 	err = json.Unmarshal(buf, &response)
 	if err != nil {
+		return GenericResponse{}, err
+	}
+
+	return response, nil
+}
+
+func (api *Api) parseErrorResponse(bytes []byte) (ErrorResponse, error) {
+	var response ErrorResponse
+	err := json.Unmarshal(bytes, &response)
+	if err != nil {
 		return ErrorResponse{}, err
+	}
+
+	return response, nil
+}
+
+func (api *Api) parseAccessedResponse(bytes []byte) (AccessListResponse, error) {
+	var response AccessListResponse
+	err := json.Unmarshal(bytes, &response)
+	if err != nil {
+		return AccessListResponse{}, err
 	}
 
 	return response, nil
@@ -169,8 +198,17 @@ func (api *Api) Branch(src string, dst string) error {
 		return err
 	}
 
-	if _, err = api.sendCmd(bytes); err != nil {
+	genericResponse, err := api.sendCmd(bytes)
+	if err != nil {
 		return err
+	}
+
+	errorResponse, err := api.parseErrorResponse(genericResponse.Data)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
 	return nil
@@ -179,7 +217,7 @@ func (api *Api) Branch(src string, dst string) error {
 // branch the src workspace into a new workspace called dst.
 func (api *Api) GetAccessed(wsr string) error {
 	if slashes := strings.Count(wsr, "/"); slashes != 1 {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
+		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -192,17 +230,31 @@ func (api *Api) GetAccessed(wsr string) error {
 		return err
 	}
 
-	if _, err = api.sendCmd(bytes); err != nil {
+	genericResponse, err := api.sendCmd(bytes)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	if genericResponse.CommandId == CmdResponse {
+		accesslist, err := api.parseAccessedResponse(genericResponse.Data)
+		if err == nil {
+			fmt.Println("Accesslist of workspace %s:%v", wsr, accesslist)
+			return nil
+		}
+		return err
+	}
+
+	errorResponse, err := api.parseErrorResponse(genericResponse.Data)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 }
 
 // branch the src workspace into a new workspace called dst.
 func (api *Api) ClearAccessed(wsr string) error {
 	if slashes := strings.Count(wsr, "/"); slashes != 1 {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
+		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -215,8 +267,17 @@ func (api *Api) ClearAccessed(wsr string) error {
 		return err
 	}
 
-	if _, err = api.sendCmd(bytes); err != nil {
+	genericResponse, err := api.sendCmd(bytes)
+	if err != nil {
 		return err
+	}
+
+	errorResponse, err := api.parseErrorResponse(genericResponse.Data)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		fmt.Println("qfs command Error:%s", errorResponse.Message)
 	}
 
 	return nil

@@ -15,10 +15,8 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewNamespaceList() Inode {
 	nsl := NamespaceList{
-		InodeCommon: InodeCommon{
-			id: quantumfs.InodeIdRoot,
-		},
-		namespaces: make(map[string]InodeId),
+		InodeCommon: InodeCommon{id: quantumfs.InodeIdRoot},
+		namespaces:  make(map[string]InodeId),
 	}
 	nsl.self = &nsl
 	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock

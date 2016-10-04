@@ -300,11 +300,23 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 }
 
+func makeGenericResponse(code uint32, bytes []byte) []byte {
+	response := quantumfs.GenericResponse{
+		CommandCommon: quantumfs.CommandCommon{
+			CommandId: code,
+		},
+		Data: bytes,
+	}
+
+	data, err := json.Marshal(response)
+	if err != nil {
+		panic("Faild To marshall GenericResponse")
+	}
+	return data
+}
+
 func makeErrorResponse(code uint32, message string) []byte {
 	response := quantumfs.ErrorResponse{
-		CommandCommon: quantumfs.CommandCommon{
-			CommandId: quantumfs.CmdError,
-		},
 		ErrorCode: code,
 		Message:   message,
 	}
@@ -317,6 +329,25 @@ func makeErrorResponse(code uint32, message string) []byte {
 
 func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 	bytes := makeErrorResponse(code, message)
+	bytes = makeGenericResponse(quantumfs.CmdError, bytes)
+	api.responses <- fuse.ReadResultData(bytes)
+}
+
+func makeAccessListResponse(list map[string]bool) []byte {
+	response := quantumfs.AccessListResponse{
+		Data: list,
+	}
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		panic("Failed to marshall API AccessListResponse")
+	}
+	return bytes
+}
+
+func (api *ApiHandle) queueAccesslistResponse(list map[string]bool) {
+	bytes := makeAccessListResponse(list)
+	bytes = makeGenericResponse(quantumfs.CmdResponse, bytes)
 	api.responses <- fuse.ReadResultData(bytes)
 }
 
@@ -346,8 +377,10 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.branchWorkspace(c, buf)
 	case quantumfs.CmdGetAccessed:
 		c.vlog("Received GetAccessed request")
+		api.getAccessed(c, buf)
 	case quantumfs.CmdClearAccessed:
 		c.vlog("Received ClearAccessed request")
+		api.clearAccessed(c, buf)
 	case quantumfs.CmdSyncAll:
 		c.vlog("Received all workspace sync request")
 		api.syncAll(c)
@@ -381,29 +414,41 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 }
 
 func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
-}
-
-func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
-	var cmd quantumfs.AccessRequest
+	var cmd quantumfs.AccessedRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
 		return
 	}
 
-	src := strings.Split(cmd.Src, "/")
-	dst := strings.Split(cmd.Dst, "/")
-
-	c.qfs.syncAll(c)
-
-	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], dst[0],
-		dst[1]); err != nil {
-
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+	wsr := cmd.WorkspaceRoot
+	workspace, ok := c.qfs.activeWorkspaces[wsr]
+	if !ok {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"WorkspaceRoot "+wsr+" does not exist or is not active")
 		return
 	}
 
-	api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
+	accessList := workspace.accessList
+	api.queueAccesslistResponse(accessList)
+}
 
+func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
+	var cmd quantumfs.AccessedRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	wsr := cmd.WorkspaceRoot
+	workspace, ok := c.qfs.activeWorkspaces[wsr]
+	if !ok {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"WorkspaceRoot "+wsr+" does not exist or is not active")
+		return
+	}
+
+	workspace.accessList = make(map[string]bool)
+	api.queueErrorResponse(quantumfs.ErrorOK, "Clear AccessList Succeeded")
 }
 
 func (api *ApiHandle) syncAll(c *ctx) {
