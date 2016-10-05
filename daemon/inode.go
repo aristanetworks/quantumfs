@@ -92,12 +92,13 @@ type Inode interface {
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
 	getSelf() Inode
+
 	name() string
 	setName(name string)
-	markAccessed(c *ctx, path string, created bool)
-	markSelfAccessed(c *ctx, created bool)
 
 	accessed() bool
+	markAccessed(c *ctx, path string, created bool)
+	markSelfAccessed(c *ctx, created bool)
 
 	parent() Inode
 	setParent(newParent Inode)
@@ -179,17 +180,14 @@ func (inode *InodeCommon) getSelf() Inode {
 	return inode.self
 }
 func (inode *InodeCommon) name() string {
-	//defer inode.RLock().RUnlock()
 	return inode.name_
 }
 
 func (inode *InodeCommon) setName(name string) {
-	//defer inode.Lock().Unlock()
 	inode.name_ = name
 }
 
 func (inode *InodeCommon) accessed() bool {
-	//defer inode.Lock().Unlock()
 	old := inode.accessed_
 	inode.accessed_ = true
 	return old
@@ -235,7 +233,6 @@ func (inode *InodeCommon) RLock() *sync.RWMutex {
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	if inode.parent() == nil {
-		c.vlog("Fail Type:%v", reflect.TypeOf(inode.self))
 		panic("Non-workspaceroot inode has no parent")
 	}
 

@@ -277,9 +277,10 @@ func (api *Api) ClearAccessed(wsr string) error {
 		return err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		fmt.Println("qfs command Error:%s", errorResponse.Message)
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
+	fmt.Println("Cleared accesslist of workspace %s", wsr)
 	return nil
 }
 

@@ -102,23 +102,11 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	wsr.publish(c)
 }
 
-func (wsr *WorkspaceRoot) getAccessList(c *ctx) map[string]bool {
-	//defer wsr.RLock().RUnlock()
-	return wsr.accessList
-}
-
 func (wsr *WorkspaceRoot) setAccessList(c *ctx, path string, created bool) {
-	//defer wsr.Lock().Unlock()
 	if wsr.accessList == nil {
 		wsr.accessList = make(map[string]bool)
 	}
 	wsr.accessList[path] = created
-
-}
-
-func (wsr *WorkspaceRoot) clearAccessList(c *ctx) {
-	//defer wsr.Lock().Unlock()
-	wsr.accessList = make(map[string]bool)
 }
 
 func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
