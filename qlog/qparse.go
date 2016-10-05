@@ -598,6 +598,15 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 		rtn[i] = *logPtrs[i]
 	}
 
+	if printStatus {
+		fmt.Printf("Sorting parsed logs...")
+	}
+
 	sort.Sort(SortByTime(rtn))
+	
+	if printStatus {
+		fmt.Printf("done\n")
+	}
+
 	return rtn
 }

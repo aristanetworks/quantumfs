@@ -11,6 +11,7 @@ import "fmt"
 import "os"
 import "regexp"
 import "sort"
+import "sync"
 import "strconv"
 import "strings"
 
@@ -317,18 +318,43 @@ func genSeqRegex(seq []qlog.LogOutput, wildcards []bool) string {
 	return "("+rtn+")"
 }
 
+type wildcardedSequence struct {
+	sequence	[]qlog.LogOutput
+	wildcards	[]bool
+}
+
+type ConcurrentMap struct {
+	mutex	sync.RWMutex
+	data	map[string]wildcardedSequence
+}
+
+func (l *ConcurrentMap) Exists(key string) bool {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	_, exists := l.data[key]
+	return exists
+}
+
+func (l *ConcurrentMap) Set(newKey string, newData wildcardedSequence) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	l.data[newKey] = newData
+}
+
 // curMask is a map of indices into sequences which should be ignored when gathering
 // data (wildcards). The base cases of this function are when its called with zero
 // remaining in wildcardNum - that's how it knows to use curMask and collect the
 // data
 func recurseCalcTimes(curMask []bool, wildcardNum int, seq []qlog.LogOutput,
-	sequences []sequenceData, out map[string]sequenceData /*out*/) {
+	sequences []sequenceData, out *ConcurrentMap /*out*/) {
 
 	// If we've already collected times for this wildcard + sequence,
 	// then we don't need to do anything since other wildcard combinations will
 	// have already been covered
 	seqStr := genSeqStrExt(seq, curMask)
-	if _, exists := out[seqStr]; exists {
+	if out.Exists(seqStr) {
 		return
 	}
 
@@ -347,7 +373,10 @@ func recurseCalcTimes(curMask []bool, wildcardNum int, seq []qlog.LogOutput,
 			}
 		}
 	} else {
-		out[seqStr] = collectData(curMask, seq, sequences)
+		var newPattern wildcardedSequence
+		copy(newPattern.sequence, seq)
+		copy(newPattern.wildcards, curMask)
+		out.Set(seqStr, newPattern)
 	}
 }
 
@@ -366,6 +395,10 @@ func showOverallStats(logs []qlog.LogOutput) {
 
 	// Now generate all combinations of the sequences with wildcards in them,
 	// and collect stats for each generated sequence
+	fmt.Println("Generating all log sequence patterns...")
+	patterns := ConcurrentMap {
+		data:	make(map[string]wildcardedSequence),
+	}
 	for i := 0; i < len(sequences); i++ {
 		// Update the status bar
 		status.Process(float32(i) / float32(len(sequences)))
@@ -384,9 +417,13 @@ func showOverallStats(logs []qlog.LogOutput) {
 		for wildcards := 0; wildcards < maxWildcards; wildcards++ {
 			wildcardMask := make([]bool, len(sequences[i].seq))
 			recurseCalcTimes(wildcardMask, wildcards, sequences[i].seq,
-				sequences, rtn /*out*/)
+				sequences, &patterns /*out*/)
 		}
 	}
+
+	// Now collect all the data for the sequences
+
+	//out.Set(seqStr, collectData(curMask, seq, sequences))
 
 	//debug now
 /*
