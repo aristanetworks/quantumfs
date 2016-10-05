@@ -54,6 +54,16 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
+	c.elog("Invalid markSelfAccessed on NamespaceList")
+	return
+}
+
+func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
+	c.elog("Invalid markAccessed on NamespaceList")
+	return
+}
+
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	fillAttr(attr, inodeNum,
 		uint32(c.workspaceDB.NumNamespaces(&c.Ctx)))
@@ -581,4 +591,14 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on WorkspaceList")
 	return fuse.ENODATA
+}
+
+func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
+	c.elog("Invalid markSelfAccessed on WorkspaceList")
+	return
+}
+
+func (wsl *WorkspaceList) markAccessed(c *ctx, path string, created bool) {
+	c.elog("Invalid markAccessed on WorkspaceList")
+	return
 }

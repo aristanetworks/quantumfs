@@ -45,7 +45,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
 			name_:     name,
-			accessed:  false,
+			accessed_: false,
 			treeLock_: parent.treeLock(),
 		},
 		filetype: filetype,
@@ -70,7 +70,7 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
-	special.register(c, "", false)
+	special.self.markSelfAccessed(c, false)
 	return fuse.OK
 }
 

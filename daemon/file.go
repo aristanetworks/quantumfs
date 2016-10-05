@@ -58,7 +58,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
 			name_:     name,
-			accessed:  false,
+			accessed_: false,
 			treeLock_: parent.treeLock(),
 		},
 		accessor: accessor,
@@ -171,7 +171,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
 	}
-	fi.register(c, "", false)
+	fi.self.markSelfAccessed(c, false)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())

@@ -38,10 +38,10 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	// Set directory data before processing the children incase the children
 	// access the parent.
 	dir.InodeCommon = InodeCommon{
-		id:       inodeNum,
-		name_:    name,
-		accessed: false,
-		self:     dir,
+		id:        inodeNum,
+		name_:     name,
+		accessed_: false,
+		self:      dir,
 	}
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
@@ -124,7 +124,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 	}
 
 	child := c.qfs.inode(c, inodeNum)
-	child.register(c, "", false)
+	child.markSelfAccessed(c, false)
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
 		record.Type() == quantumfs.ObjectTypeMediumFile ||
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -391,8 +391,8 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-	c.vlog("Directory::Lookup Enter")
-	defer c.vlog("Directory::Lookup Exit")
+	c.vlog("Directory::Lookup Enter" + name)
+	defer c.vlog("Directory::Lookup Exit" + name)
 	defer dir.RLock().RUnlock()
 
 	inodeNum, exists := dir.dirChildren.getInode(c, name)
@@ -405,10 +405,10 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		return fuse.ENOENT
 	}
 
-	child := c.qfs.inode(c, inodeNum)
-	child.register(c, "", false)
-
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
+	child := c.qfs.inode(c, inodeNum)
+	child.markSelfAccessed(c, false)
+
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, record)
@@ -426,7 +426,10 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	defer dir.RLock().RUnlock()
-	dir.register(c, "", false)
+
+	// if we simply call dir.markSelfAccessed here, there must be cases
+	// that workspaceroot is dealt as normal directory, which causes panic
+	dir.self.markSelfAccessed(c, false)
 
 	children := make([]directoryContents, 0, dir.dirChildren.count())
 	for _, entry := range dir.dirChildren.getRecords() {
@@ -489,7 +492,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
-	newEntity.register(c, "", true)
+	newEntity.markSelfAccessed(c, true)
 
 	return newEntity
 }
@@ -850,7 +853,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// update the inode
 			child := c.qfs.inode(c, oldInodeId)
-			child.register(c, "", false)
+			child.markSelfAccessed(c, false)
 			child.setParent(dst)
 
 			//delete the target InodeId
@@ -863,7 +866,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.dirChildren.delete(oldName)
 
 			child.setName(newName)
-			child.register(c, "", true)
+			child.markSelfAccessed(c, true)
 			parent.updateSize_(c)
 			parent.self.dirty(c)
 

@@ -59,7 +59,7 @@ func TestFileCreateDeleteList(t *testing.T) {
 		bworkspace := test.branchWorkspace(workspace)
 		path = test.absPath(bworkspace) + filename
 		err = os.Remove(path)
-		test.assert(err == nil, "Open file error")
+		test.assert(err == nil, "Remove file error")
 		accessList[filename] = false
 
 		wsrlist = test.getAccessList(bworkspace)
