@@ -26,6 +26,13 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	symlink.self = &symlink
 	symlink.setParent(parent)
 	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
+
+	if dirRecord != nil {
+		buf := c.dataStore.Get(&(c.Ctx), key)
+		pointedTo := buf.Get()
+		size := len(pointedTo)
+		dirRecord.SetSize(uint64(size))
+	}
 	return &symlink
 }
 
