@@ -19,6 +19,7 @@ import "github.com/aristanetworks/quantumfs/qlog"
 var tabSpaces *int
 var file *string
 var stats *bool
+var maxThreads *int
 
 // To limit the computational cost of pattern matching, we set the max number of
 // wildcards in a sequence to 30
@@ -222,7 +223,8 @@ func init() {
 
 	tabSpaces = flag.Int("tab", 0, "Indent function logs with n spaces")
 	file = flag.String("f", "", "Log file to parse (required)")
-	stats = flag.Bool("stats", false, "Enter interactive mode to read stats.")
+	stats = flag.Bool("stats", false, "Enter interactive mode to read stats")
+	maxThreads = flag.Int("threads", 16, "Max threads to use")
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s -f <filepath> [flags]\n\n", os.Args[0])
@@ -241,7 +243,7 @@ func main() {
 
 	if !(*stats) {
 		// Log parse mode only
-		fmt.Println(qlog.ParseLogsExt(*file, *tabSpaces))
+		fmt.Println(qlog.ParseLogsExt(*file, *tabSpaces, *maxThreads))
 		return
 	} else {
 		interactiveMode(*file)
@@ -254,7 +256,7 @@ func interactiveMode(filepath string) {
 
 	// Parse the logs into log structs
 	pastEndIdx, dataArray, strMap := qlog.ExtractFields(filepath)
-	logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap, true)
+	logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap, *maxThreads, true)
 
 	for {
 		fmt.Printf(">> ")

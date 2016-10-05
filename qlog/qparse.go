@@ -14,8 +14,12 @@ import "os"
 import "reflect"
 import "sort"
 import "strings"
+import "sync"
 import "time"
 import "unsafe"
+
+// consts
+const defaultParseThreads = 30
 
 type LogOutput struct {
 	Subsystem	LogSubsystem
@@ -78,14 +82,14 @@ func LogscanSkim(filepath string) bool {
 }
 
 func ParseLogs(filepath string) string {
-	return ParseLogsExt(filepath, 0)
+	return ParseLogsExt(filepath, 0, defaultParseThreads)
 }
 
-func ParseLogsExt(filepath string, tabSpaces int) string {
+func ParseLogsExt(filepath string, tabSpaces int, maxThreads int) string {
 
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
 
-	logs := OutputLogs(pastEndIdx, dataArray, strMap)
+	logs := OutputLogs(pastEndIdx, dataArray, strMap, maxThreads)
 
 	return FormatLogs(logs, tabSpaces)
 }
@@ -422,17 +426,104 @@ func (l *LogStatus) Process(newPct float32) {
 	l.lastPixShown = pixDone
 }
 
-func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr) []LogOutput {
-	return OutputLogsExt(pastEndIdx, data, strMap, false)
+func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr,
+	maxWorkers int) []LogOutput {
+
+	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
 }
 
-func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr,
+func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
+	for j := range jobs {
+		packetData := j.packetData
+		strMap := j.strMap
+		out := j.out
+
+		read := uint32(0)
+		var numFields uint16
+		var strMapId uint16
+		var reqId uint64
+		var timestamp int64
+
+		var err error
+		if err = readPacket(&read, packetData,
+			reflect.ValueOf(&numFields)); err != nil {
+		} else if err = readPacket(&read, packetData,
+			reflect.ValueOf(&strMapId)); err != nil {
+		} else if err = readPacket(&read, packetData,
+			reflect.ValueOf(&reqId)); err != nil {
+		} else if err = readPacket(&read, packetData,
+			reflect.ValueOf(&timestamp)); err != nil {
+		}
+
+		args := make([]interface{}, numFields)
+		for i := uint16(0); i < numFields; i++ {
+			if err != nil {
+				break
+			}
+
+			args[i], err = parseArg(&read, packetData)
+		}
+
+		if err != nil {
+			// If the timestamp is zero, we will fill it in later with the
+			// previous log's timestamp
+			*out = newLog(LogQlog, QlogReqId, 0,
+				"ERROR: Packet read error (%s). i"+
+					"Dump of %d bytes:\n%x\n",
+					[]interface{} { err, len(packetData),
+						packetData })
+			continue
+		}
+
+		// Grab the string and output
+		if int(strMapId) > len(strMap) {
+			*out = newLog(LogQlog, QlogReqId, 0,
+				"Not enough entries in "+
+					"string map (%d %d)\n",
+					[]interface{} { strMapId,
+						len(strMap)/LogStrSize })
+			continue
+		}
+		mapEntry := strMap[strMapId]
+		logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
+
+		// Finally, print with the front attached like normal
+		mapStr := string(mapEntry.Text[:])
+		firstNullTerm := strings.Index(mapStr, "\x00")
+		if firstNullTerm != -1 {
+			mapStr = mapStr[:firstNullTerm]
+		}
+
+		*out = newLog(logSubsystem, reqId, timestamp,
+			mapStr+"\n", args)
+	}
+	wg.Done()
+}
+
+type logJob struct {
+	packetData	[]byte
+	strMap		[]LogStr
+	out		*LogOutput
+}
+
+func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers int,
 	printStatus bool) []LogOutput {
 
-	var rtn []LogOutput
+	var logPtrs []*LogOutput
 	readCount := uint32(0)
-	var lastTimestamp int64
 
+	jobs := make(chan logJob, 10)
+	var wg sync.WaitGroup
+
+	wg.Add(maxWorkers)
+	for w := 0; w < maxWorkers; w++ {
+		go ProcessJobs(jobs, &wg)
+	}
+
+	if printStatus {
+		fmt.Printf("Parsing logs in %d threads...\n",
+			maxWorkers)
+	}
 	status := NewLogStatus(50)
 
 	for readCount < uint32(len(data)) {
@@ -473,75 +564,38 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr,
 		// At this point we know the packet is fully present, finished, and
 		// the idx / readCounts have been updated in prep for the next entry
 		if !completeEntry {
-			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
+			newLine := newLog(LogQlog, QlogReqId, 0,
 				"WARN: Dropping incomplete packet.\n", nil)
-			rtn = append(rtn, newLine)
+			logPtrs = append(logPtrs, &newLine)
 			continue
 		}
 
 		// Read the packet data into a separate buffer
 		packetData := wrapRead(pastEndIdx, uint32(packetLen), data)
 
-		read := uint32(0)
-		var numFields uint16
-		var strMapId uint16
-		var reqId uint64
-		var timestamp int64
-
-		var err error
-		if err = readPacket(&read, packetData,
-			reflect.ValueOf(&numFields)); err != nil {
-		} else if err = readPacket(&read, packetData,
-			reflect.ValueOf(&strMapId)); err != nil {
-		} else if err = readPacket(&read, packetData,
-			reflect.ValueOf(&reqId)); err != nil {
-		} else if err = readPacket(&read, packetData,
-			reflect.ValueOf(&timestamp)); err != nil {
+		logPtrs = append(logPtrs, new(LogOutput))
+		jobs <- logJob {
+			packetData: packetData,
+			strMap: strMap,
+			out: logPtrs[len(logPtrs)-1],
 		}
-		lastTimestamp = timestamp
+	}
+	close(jobs)
 
-		args := make([]interface{}, numFields)
-		for i := uint16(0); i < numFields; i++ {
-			if err != nil {
-				break
-			}
+	wg.Wait()
 
-			args[i], err = parseArg(&read, packetData)
+	// Go through the logs and fix any missing timestamps. Use the last entry's,
+	// and de-pointer-ify them.
+	rtn := make([]LogOutput, len(logPtrs))
+	var lastTimestamp int64
+	for i := 0; i < len(logPtrs); i++ {
+		if logPtrs[i].T == 0 {
+			logPtrs[i].T = lastTimestamp
+		} else {
+			lastTimestamp = logPtrs[i].T
 		}
 
-		if err != nil {
-			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
-				"ERROR: Packet read error (%s). i"+
-					"Dump of %d bytes:\n%x\n",
-					[]interface{} { err, packetLen,
-						packetData })
-			rtn = append(rtn, newLine)
-			continue
-		}
-
-		// Grab the string and output
-		if int(strMapId) > len(strMap) {
-			newLine := newLog(LogQlog, QlogReqId, lastTimestamp,
-				"Not enough entries in "+
-					"string map (%d %d)\n",
-					[]interface{} { strMapId,
-						len(strMap)/LogStrSize })
-			rtn = append(rtn, newLine)
-			continue
-		}
-		mapEntry := strMap[strMapId]
-		logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
-
-		// Finally, print with the front attached like normal
-		mapStr := string(mapEntry.Text[:])
-		firstNullTerm := strings.Index(mapStr, "\x00")
-		if firstNullTerm != -1 {
-			mapStr = mapStr[:firstNullTerm]
-		}
-
-		newLine := newLog(logSubsystem, reqId, timestamp,
-			mapStr+"\n", args)
-		rtn = append(rtn, newLine)
+		rtn[i] = *logPtrs[i]
 	}
 
 	sort.Sort(SortByTime(rtn))
