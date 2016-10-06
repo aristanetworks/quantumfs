@@ -813,8 +813,9 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 				file.Close()
 			}
 
-			// Read some entries from the parent, then create a new child and
-			// seek to ensure the still open directory entry sees the new entry.
+			// Read some entries from the parent, then create a new child
+			// and seek to ensure the still open directory entry sees the
+			// new entry.
 			_, err = dir.Readdirnames(2)
 			test.assert(err == nil, "Error reading two entries: %v", err)
 
@@ -837,7 +838,8 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 					dirExists = true
 				}
 			}
-			test.assert(dirExists, "Failed to find new directory after rewind")
+			test.assert(dirExists,
+				"Failed to find new directory after rewind")
 
 			// Run again with the directory instead of the workspace
 			parent = childName
