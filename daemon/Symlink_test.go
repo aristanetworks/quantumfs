@@ -261,3 +261,23 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 
 	})
 }
+
+func TestSymlinkPermission(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		symlink := createSymlink(workspace, test)
+
+		var stat syscall.Stat_t
+		err := syscall.Lstat(symlink, &stat)
+		test.assert(err == nil, "Error stat'ing test symlink: %v", err)
+
+		var expectedPermissions uint32
+		expectedPermissions |= syscall.S_IFLNK
+		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
+			syscall.S_IRWXO
+		test.assert(stat.Mode == expectedPermissions,
+			"Symlink has wrong permissions %x", stat.Mode)
+	})
+}
