@@ -146,26 +146,6 @@ func (api *Api) sendCmd(bytes []byte) ([]byte, error) {
 	return buf, nil
 }
 
-func (api *Api) parseErrorResponse(bytes []byte) (ErrorResponse, error) {
-	var response ErrorResponse
-	err := json.Unmarshal(bytes, &response)
-	if err != nil {
-		return ErrorResponse{}, err
-	}
-
-	return response, nil
-}
-
-func (api *Api) parseAccessedResponse(bytes []byte) (AccessListResponse, error) {
-	var response AccessListResponse
-	err := json.Unmarshal(bytes, &response)
-	if err != nil {
-		return AccessListResponse{}, err
-	}
-
-	return response, nil
-}
-
 // branch the src workspace into a new workspace called dst.
 func (api *Api) Branch(src string, dst string) error {
 	if !isWorkspaceNameValid(src) {
