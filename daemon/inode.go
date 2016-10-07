@@ -242,8 +242,6 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	}
 
 	path = "/" + inode.name() + path
-	msg := fmt.Sprintf("inode.parent(): Type:%v", reflect.TypeOf(inode.parent()))
-	c.vlog(msg)
 	parent := inode.parent()
 	parent.markAccessed(c, path, created)
 }

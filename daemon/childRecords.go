@@ -201,6 +201,7 @@ func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 	oldInodeId := cr.data.fileToInode[oldName]
 	child := c.qfs.inode(c, oldInodeId)
 	child.markSelfAccessed(c, false)
+
 	// If a file already exists with newName, we need to clean it up
 	cleanupInodeId := cr.data.fileToInode[newName]
 
