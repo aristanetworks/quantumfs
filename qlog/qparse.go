@@ -512,7 +512,7 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 	var logPtrs []*LogOutput
 	readCount := uint32(0)
 
-	jobs := make(chan logJob, 10)
+	jobs := make(chan logJob, 2)
 	var wg sync.WaitGroup
 
 	wg.Add(maxWorkers)
@@ -581,6 +581,9 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 		}
 	}
 	close(jobs)
+	if printStatus {
+		status.Process(1)
+	}
 
 	wg.Wait()
 

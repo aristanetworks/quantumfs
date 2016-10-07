@@ -8,12 +8,14 @@ import "bufio"
 import "errors"
 import "flag"
 import "fmt"
+import "math"
 import "os"
 import "regexp"
 import "sort"
 import "sync"
 import "strconv"
 import "strings"
+import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -22,16 +24,26 @@ var file *string
 var stats *bool
 var maxThreads *int
 
-// To limit the computational cost of pattern matching, we set the max number of
-// wildcards in a sequence to 30
-const maxSeqWildcards = 30
 var wildcardStr string
+// All possible combinations of wildcards becomes exponentially large. Given a
+// sequence length, here's the number of wildcards that can be used to keep
+// nunber of iterations <= around 700k. Sequences > 30 in length won't be wildcarded.
+var maxCombinations map[int]int
+var longCombinationsStart int
 
 // -- worker structures
 
 type sequenceData struct {
 	times	[]int64
 	seq	[]qlog.LogOutput
+}
+
+type patternData struct {
+	data		sequenceData
+	wildcards	[]bool
+	avg		int64
+	sum		int64
+	stddev		float64
 }
 
 type sequenceTracker struct {
@@ -79,6 +91,7 @@ func collectData(wildcards []bool, seq []qlog.LogOutput,
 	sequences []sequenceData) sequenceData {
 
 	var rtn sequenceData
+	rtn.seq = make([]qlog.LogOutput, len(seq), len(seq))
 	copy(rtn.seq, seq)
 
 	regex := regexp.MustCompile(genSeqRegex(seq, wildcards))
@@ -98,61 +111,81 @@ func collectData(wildcards []bool, seq []qlog.LogOutput,
 // Because Golang is a horrible language and doesn't support maps with slice keys,
 // we need to construct long string keys and save the slices in the value for later
 func extractSequences(logs []qlog.LogOutput) map[string]sequenceData {
-	reqIds := extractRequestIds(logs)
+	trackerMap := make(map[uint64][]sequenceTracker)
 
-	rtn := make(map[string]sequenceData)
-
-	fmt.Println("Extracing sequences from logs...")
+	fmt.Println("Extracing sub-sequences from logs...")
 	status := qlog.NewLogStatus(50)
 
-	// Go through all the logs per request
-	for i := 0; i < len(reqIds); i++ {
-		status.Process(float32(i) / float32(len(reqIds)))
+	// Go through all the logs in one pass, constructing all subsequences
+	for i := 0; i < len(logs); i++ {
+		status.Process(float32(i) / float32(len(logs)))
 
-		abortRequest := false
-		reqLogs := getReqLogs(reqIds[i], logs)
+		reqId := logs[i].ReqId
 
 		// Skip it if its a special id since they're not self contained
-		if reqIds[i] >= qlog.MinSpecialReqId {
+		if reqId >= qlog.MinSpecialReqId {
 			continue
 		}
 
-		// Iterate through the request's logs, constructing all subsequences
-		trackers := make([]sequenceTracker, 0)
-		for j := 0; j < len(reqLogs); j++ {
+		// Grab the sequenceTracker list for this request
+		trackers, exists := trackerMap[reqId]
+		if len(trackers) == 0 && exists {
+			// If there's an empty entry that already exists, that means
+			// this request had an error and was aborted. Leave it alone.
+			continue
+		}
 
-			// Start a new subsequence
-			if qlog.IsFnIn(reqLogs[j].Format) {
-				trackers = append(trackers, newSequenceTracker())
-			}
+		// Start a new subsequence if we need to
+		if qlog.IsFnIn(logs[i].Format) {
+			trackers = append(trackers, newSequenceTracker())
+		}
 
-			// Inform all the trackers of the new token
-			for k := 0; k < len(trackers); k++ {
-				err := trackers[k].Process(reqLogs[j])
-				if err != nil {
-					fmt.Println(err)
-					abortRequest = true
-					break
-				}
-			}
-
-			if abortRequest {
+		abortRequest := false
+		// Inform all the trackers of the new token
+		for k := 0; k < len(trackers); k++ {
+			err := trackers[k].Process(logs[i])
+			if err != nil {
+				fmt.Println(err)
+				abortRequest = true
 				break
 			}
 		}
 
 		if abortRequest {
+			// Mark the request as bad
+			trackerMap[reqId] = make([]sequenceTracker, 0)
 			continue
 		}
 
-		// After going through the logs, add all our sequences to the rtn map
+		// Only update entry if it won't be empty
+		if exists || len(trackers) > 0 {
+			trackerMap[reqId] = trackers
+		}
+	}
+	status.Process(1)
+
+	fmt.Println("Collating subsequence time data into map...")
+	status = qlog.NewLogStatus(50)
+
+	// After going through the logs, add all our sequences to the rtn map
+	rtn := make(map[string]sequenceData)
+	mapIdx := 0
+	for reqId, trackers := range trackerMap {
+		status.Process(float32(mapIdx) / float32(len(trackerMap)))
+		mapIdx++
+
+		// Skip any requests marked as bad
+		if len(trackers) == 0 {
+			continue
+		}
+
+		// Go through each tracker
 		for k := 0; k < len(trackers); k++ {
 			// If the tracker isn't ready, that means there was a fnIn
 			// that missed its fnOut. That's an error
 			if trackers[k].ready == false {
 				fmt.Printf("Error: Mismatched '%s' in requestId %d"+
-					" log\n", qlog.FnEnterStr, reqIds[i])
-				abortRequest = true
+					" log\n", qlog.FnEnterStr, reqId)
 				break
 			}
 
@@ -167,11 +200,8 @@ func extractSequences(logs []qlog.LogOutput) map[string]sequenceData {
 				rawSeq[len(rawSeq)-1].T-rawSeq[0].T)
 			rtn[seq] = data
 		}
-
-		if abortRequest {
-			continue
-		}
 	}
+	status.Process(1)
 
 	return rtn
 }
@@ -201,6 +231,20 @@ func (s *logStack) Peek() (qlog.LogOutput, error) {
 	return (*s)[len(*s)-1], nil
 }
 
+type SortResultsTotal []patternData
+
+func (s SortResultsTotal) Len() int {
+	return len(s)
+}
+
+func (s SortResultsTotal) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortResultsTotal) Less(i, j int) bool {
+	return s[i].sum < s[j].sum
+}
+
 type SortReqs []uint64
 
 func (s SortReqs) Len() int {
@@ -221,6 +265,20 @@ func init() {
 	// The wildcard character / string needs to be something that would never
 	// show in a log so that we can use strings as map keys
 	wildcardStr = string([]byte { 7 })
+	maxCombinations = map[int]int {
+		30:	6,
+		29:	6,
+		28:	6,
+		27:	6,
+		26:	6,
+		25:	7,
+		24:	7,
+		23:	7,
+		22:	8,
+		21:	9,
+		20:	11,
+	}
+	longCombinationsStart = 20
 
 	tabSpaces = flag.Int("tab", 0, "Indent function logs with n spaces")
 	file = flag.String("f", "", "Log file to parse (required)")
@@ -272,10 +330,20 @@ func interactiveMode(filepath string) {
 
 func showHelp() {
 	fmt.Println("Commands:")
-	fmt.Println("overall          Show overall statistics")
-	fmt.Println("ids              List all request ids in log")
-	fmt.Println("log <id>         Show log sequence for request <id>")
-	fmt.Println("exit             Exit and return to the shell")
+	fmt.Println("topTotal <stddevmin> <stddevmax> <wmax>    "+
+		"List top function patterns by avg total time used where patterns")
+	fmt.Println("                                           "+
+		"contain < wmax wildcards, and stddevmin < sigma < stddevmax. Units")
+	fmt.Println("                                           "+
+		"for stddev are microseconds.")
+	fmt.Println("topFn <stddevmin> <stddevmax> <wmax>       "+
+		"Like topTotal, except using times per call")
+	fmt.Println("ids                                        "+
+		"List all request ids in log")
+	fmt.Println("log <id>                                   "+
+		"Show log sequence for request <id>")
+	fmt.Println("exit                                       "+
+		"Exit and return to the shell")
 	fmt.Println("")
 }
 
@@ -329,16 +397,16 @@ type ConcurrentMap struct {
 }
 
 func (l *ConcurrentMap) Exists(key string) bool {
-	l.mutex.RLock()
-	defer l.mutex.RUnlock()
+//	l.mutex.RLock()
+//	defer l.mutex.RUnlock()
 
 	_, exists := l.data[key]
 	return exists
 }
 
 func (l *ConcurrentMap) Set(newKey string, newData wildcardedSequence) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+//	l.mutex.Lock()
+//	defer l.mutex.Unlock()
 
 	l.data[newKey] = newData
 }
@@ -347,49 +415,43 @@ func (l *ConcurrentMap) Set(newKey string, newData wildcardedSequence) {
 // data (wildcards). The base cases of this function are when its called with zero
 // remaining in wildcardNum - that's how it knows to use curMask and collect the
 // data
-func recurseCalcTimes(curMask []bool, wildcardNum int, seq []qlog.LogOutput,
-	sequences []sequenceData, out *ConcurrentMap /*out*/) {
-
-	// If we've already collected times for this wildcard + sequence,
-	// then we don't need to do anything since other wildcard combinations will
-	// have already been covered
-	seqStr := genSeqStrExt(seq, curMask)
-	if out.Exists(seqStr) {
-		return
-	}
+func recurseCalcTimes(curMask []bool, wildcardNum int, wildcardStartIdx int,
+	seq []qlog.LogOutput, sequences []sequenceData, out *ConcurrentMap /*out*/) {
 
 	if wildcardNum > 0 {
 		// we need to place a new wildcard. Note: we don't allow the first /
 		// last logs to be wildcarded since we *know* they're functions and
 		// they define the function we're trying to analyze across variants
-		for i := 1; i < len(sequences)-1; i++ {
+		for i := wildcardStartIdx; i < len(seq)-1; i++ {
 			if !curMask[i] {
 				// This spot doesn't have a wildcard yet.
 				curMask[i] = true
-				recurseCalcTimes(curMask, wildcardNum-1, seq,
+				recurseCalcTimes(curMask, wildcardNum-1, i+1, seq,
 					sequences, out)
 				// Make sure to remove the entry for the next loop
 				curMask[i] = false
 			}
 		}
 	} else {
+		seqStr := genSeqStrExt(seq, curMask)
+
 		var newPattern wildcardedSequence
+		newPattern.sequence = make([]qlog.LogOutput, len(seq), len(seq))
+		newPattern.wildcards = make([]bool, len(curMask), len(curMask))
 		copy(newPattern.sequence, seq)
 		copy(newPattern.wildcards, curMask)
 		out.Set(seqStr, newPattern)
 	}
 }
 
-// Given a set of logs, collect deltas within and between function in/out pairs
-func showOverallStats(logs []qlog.LogOutput) {
+func getStatPatterns(logs []qlog.LogOutput) []patternData {
 	sequenceMap := extractSequences(logs)
-	sequences := make([]sequenceData, 0, len(sequenceMap))
+	sequences := make([]sequenceData, len(sequenceMap), len(sequenceMap))
+	idx := 0
 	for _, v := range sequenceMap {
-		sequences = append(sequences, v)
+		sequences[idx] = v
+		idx++
 	}
-
-	// Map of wildcard containing string to times and example logs
-	rtn := make(map[string]sequenceData)
 
 	status := qlog.NewLogStatus(50)
 
@@ -403,27 +465,134 @@ func showOverallStats(logs []qlog.LogOutput) {
 		// Update the status bar
 		status.Process(float32(i) / float32(len(sequences)))
 
+		curSeq := sequences[i].seq
+
 		// If we've already got a result for this sequence, then this has
-		// been counted and we can skip it.
-		if _, exists := rtn[genSeqStr(sequences[i].seq)]; exists {
+		// been generated and we can skip it.
+		if patterns.Exists(genSeqStr(curSeq)) {
 			continue
 		}
 
-		maxWildcards := len(sequences) - 2
-		if maxWildcards > maxSeqWildcards {
-			maxWildcards = maxSeqWildcards
+		maxWildcards := len(curSeq) - 2
+		if maxWildcards >= longCombinationsStart {
+			wildcardsSupported, exists := maxCombinations[maxWildcards]
+			if exists {
+				maxWildcards = wildcardsSupported
+			} else {
+				// if the sequence is too long, then do no wildcards
+				maxWildcards = 0
+			}
 		}
 
 		for wildcards := 0; wildcards < maxWildcards; wildcards++ {
-			wildcardMask := make([]bool, len(sequences[i].seq))
-			recurseCalcTimes(wildcardMask, wildcards, sequences[i].seq,
+			wildcardMask := make([]bool, len(curSeq), len(curSeq))
+			recurseCalcTimes(wildcardMask, wildcards, 1, curSeq,
 				sequences, &patterns /*out*/)
 		}
 	}
+	status.Process(1)
 
-	// Now collect all the data for the sequences
+	rtn := make([]patternData, len(patterns.data))
 
-	//out.Set(seqStr, collectData(curMask, seq, sequences))
+	// Now collect all the data for the sequences, allowing wildcards
+	fmt.Println("Collecting data for each wildcard-ed subsequence...", len(patterns.data))
+	status = qlog.NewLogStatus(50)
+	mapIdx := 0
+	for _, wcseq := range patterns.data {
+		status.Process(float32(mapIdx) / float32(len(patterns.data)))
+		mapIdx++
+
+		var newResult patternData
+		newResult.wildcards = wcseq.wildcards
+		newResult.data = collectData(wcseq.wildcards, wcseq.sequence,
+			sequences)
+
+		// Precompute more useful stats
+		var avgSum int64
+		for i := 0; i < len(newResult.data.times); i++ {
+			avgSum += newResult.data.times[i]
+		}
+		newResult.sum = avgSum
+		newResult.avg = avgSum / int64(len(newResult.data.times))
+
+		// Now we can compute the standard deviation of the data. This is
+		// used to determine whether a pattern's average time is probably
+		// caused by exactly that pattern's sequence, and not a subsequence
+		var deviationSum float64
+		for i := 0; i < len(newResult.data.times); i++ {
+			deviation := newResult.data.times[i] - newResult.avg
+			deviationSum += float64(deviation * deviation)
+		}
+		newResult.stddev = math.Sqrt(deviationSum)
+
+		rtn = append(rtn, newResult)
+	}
+	status.Process(1)
+
+	return rtn
+}
+
+// stddev units are microseconds
+func showTopTotalStats(patterns []patternData, minStdDev float64, maxStdDev float64,
+	maxWildcards int) {
+
+	minStdDevNano := minStdDev * 1000
+	maxStdDevNano := maxStdDev * 1000
+
+	funcResults := make([]patternData, 0)
+	// Go through all the patterns and collect ones within stddev
+	for i := 0; i < len(patterns); i++ {
+		wildcards := 0
+		for i := 0; i < len(patterns[i].wildcards); i++ {
+			if patterns[i].wildcards[i] {
+				wildcards++
+			}
+		}
+		if wildcards > maxWildcards {
+			continue
+		}
+
+		// time package's units are nanoseconds. So we need to convert our
+		// microsecond stddev bounds to nanoseconds so we can compare
+		if minStdDevNano <= patterns[i].stddev &&
+			patterns[i].stddev <= maxStdDevNano {
+
+			funcResults = append(funcResults, patterns[i])
+		}
+	}
+
+	// Now sort by total time usage
+	sort.Sort(SortResultsTotal(funcResults))
+
+	fmt.Println("Top function patterns by total time used:")
+	count := 0
+	for i := len(funcResults)-1; i >= 0; i-- {
+		result := funcResults[i]
+
+		fmt.Printf("=================%2d===================\n", count+1)
+		for j := 0; j < len(result.data.seq); j++ {
+			if result.wildcards[j] {
+				fmt.Println("***Wildcards***")
+			} else {
+				fmt.Printf("%s\n",
+					strings.TrimSpace(result.data.seq[j].Format))
+			}
+		}
+		fmt.Println("--------------------------------------")
+		fmt.Printf("Total sequence time: %12s\n",
+			time.Duration(result.sum).String())
+		fmt.Printf("Average sequence time: %12s\n",
+			time.Duration(result.avg).String())
+		fmt.Printf("Standard Deviation: %12s\n",
+			time.Duration(int64(result.stddev)).String())
+		fmt.Println("")
+		count++
+
+		// Stop when we've output enough of the top
+		if count >= 30 {
+			break;
+		}
+	}
 
 	//debug now
 /*
@@ -496,6 +665,7 @@ func showLogs(reqId uint64, logs []qlog.LogOutput) {
 	fmt.Println(qlog.FormatLogs(filteredLogs, *tabSpaces))
 }
 
+var patternStats []patternData
 func menuProcess(command string, logs []qlog.LogOutput) {
 	tokens := strings.Split(command, " ")
 
@@ -505,8 +675,38 @@ func menuProcess(command string, logs []qlog.LogOutput) {
 	}
 
 	switch tokens[0] {
-	case "overall":
-		showOverallStats(logs)
+	case "topTotal":
+		if len(tokens) < 4 {
+			fmt.Println("Error: log requires 3 parameters. See 'help'.")
+			return
+		}
+
+		minStdDev, err := strconv.ParseFloat(tokens[1], 64)
+		if err != nil {
+			fmt.Printf("Error: '%s' is not a valid float\n",
+				tokens[1])
+			return
+		}
+
+		maxStdDev, err := strconv.ParseFloat(tokens[2], 64)
+		if err != nil {
+			fmt.Printf("Error: '%s' is not a valid float\n",
+				tokens[2])
+			return
+		}
+
+		maxWcs, err := strconv.ParseInt(tokens[3], 10, 32)
+		if err != nil {
+			fmt.Printf("Error: '%s' is not a valid int\n",
+				tokens[3])
+			return
+		}
+
+		if patternStats == nil {
+			patternStats = getStatPatterns(logs)
+		}
+
+		showTopTotalStats(patternStats, minStdDev, maxStdDev, int(maxWcs))
 	case "ids":
 		showRequestIds(logs)
 	case "log":
