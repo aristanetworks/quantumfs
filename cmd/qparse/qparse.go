@@ -347,6 +347,16 @@ func showHelp() {
 	fmt.Println("")
 }
 
+func countWildcards(mask []bool) int {
+	count := 0
+	for i := 0; i < len(mask); i++ {
+		if mask[i] {
+			count++
+		}
+	}
+	return count
+}
+
 func genSeqStr(seq []qlog.LogOutput) string {
 	return genSeqStrExt(seq, []bool{})
 }
@@ -415,7 +425,7 @@ func (l *ConcurrentMap) Set(newKey string, newData wildcardedSequence) {
 // data (wildcards). The base cases of this function are when its called with zero
 // remaining in wildcardNum - that's how it knows to use curMask and collect the
 // data
-func recurseCalcTimes(curMask []bool, wildcardNum int, wildcardStartIdx int,
+func recurseGenPatterns(curMask []bool, wildcardNum int, wildcardStartIdx int,
 	seq []qlog.LogOutput, sequences []sequenceData, out *ConcurrentMap /*out*/) {
 
 	if wildcardNum > 0 {
@@ -426,7 +436,7 @@ func recurseCalcTimes(curMask []bool, wildcardNum int, wildcardStartIdx int,
 			if !curMask[i] {
 				// This spot doesn't have a wildcard yet.
 				curMask[i] = true
-				recurseCalcTimes(curMask, wildcardNum-1, i+1, seq,
+				recurseGenPatterns(curMask, wildcardNum-1, i+1, seq,
 					sequences, out)
 				// Make sure to remove the entry for the next loop
 				curMask[i] = false
@@ -486,7 +496,7 @@ func getStatPatterns(logs []qlog.LogOutput) []patternData {
 
 		for wildcards := 0; wildcards < maxWildcards; wildcards++ {
 			wildcardMask := make([]bool, len(curSeq), len(curSeq))
-			recurseCalcTimes(wildcardMask, wildcards, 1, curSeq,
+			recurseGenPatterns(wildcardMask, wildcards, 1, curSeq,
 				sequences, &patterns /*out*/)
 		}
 	}
@@ -564,10 +574,41 @@ func showTopTotalStats(patterns []patternData, minStdDev float64, maxStdDev floa
 	// Now sort by total time usage
 	sort.Sort(SortResultsTotal(funcResults))
 
+	// Filter out any duplicates (resulting from ineffectual wildcards)
+	currentSeq := ""
+	currentData := patternData{}
+	filteredResults := make([]patternData, 0)
+	for i := 0; i <= len(funcResults); i++ {
+		var result patternData
+		if i < len(funcResults) {
+			result = funcResults[i]
+		}
+
+		seqStr := genSeqStr(result.data.seq)
+		
+		if seqStr != currentSeq {
+			// We've finished going through a group of duplicates, so
+			// add their most wildcarded member
+			if i > 0 {
+				filteredResults = append(filteredResults,
+					currentData)
+			}
+			currentSeq = seqStr
+			currentData = result
+		} else {
+			// We have a duplicate
+			if countWildcards(result.wildcards) >
+				countWildcards(currentData.wildcards) {
+
+				currentData = result
+			}
+		}
+	}
+
 	fmt.Println("Top function patterns by total time used:")
 	count := 0
-	for i := len(funcResults)-1; i >= 0; i-- {
-		result := funcResults[i]
+	for i := len(filteredResults)-1; i >= 0; i-- {
+		result := filteredResults[i]
 
 		fmt.Printf("=================%2d===================\n", count+1)
 		for j := 0; j < len(result.data.seq); j++ {
