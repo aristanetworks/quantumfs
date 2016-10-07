@@ -857,3 +857,14 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 func (qfs *QuantumFs) Init(*fuse.Server) {
 	qfs.c.elog("Unhandled request Init")
 }
+
+func (qfs *QuantumFs) getWorkspace(c *ctx, name string) (*WorkspaceRoot, bool) {
+
+	c.vlog("QuantumFs::getWorkspace %s", name)
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+
+	wsr, exists := qfs.activeWorkspaces[name]
+	return wsr, exists
+}

@@ -55,7 +55,7 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
-	c.elog("Invalid markSelfAccessed on NamespaceList")
+	nsl.markAccessed(c, "", created)
 	return
 }
 
@@ -594,7 +594,7 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
-	c.elog("Invalid markSelfAccessed on WorkspaceList")
+	wsl.markAccessed(c, "", created)
 	return
 }
 

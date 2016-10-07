@@ -10,137 +10,201 @@ import "syscall"
 import "reflect"
 import "testing"
 
-func TestFileCreateAccessList(t *testing.T) {
+func TestAccessListFileCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error")
 		accessList[filename] = true
 		syscall.Close(fd)
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
+func TestAccessListFileOpen(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
 
+		workspace := test.newWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 0666)
+		test.assert(err == nil, "Create file error:%v", err)
+		syscall.Close(fd)
+
+		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
-		path = test.absPath(bworkspace) + filename
+		absbworkspace := test.absPath(bworkspace)
+		path = absbworkspace + filename
 		file, err := os.Open(path)
-		test.assert(err == nil, "Open file error")
+		test.assert(err == nil, "Open file error:%v", err)
 		accessList[filename] = false
 		file.Close()
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
+		accessList = make(map[string]bool)
+		path = workspace + filename
+		file, err = os.Open(path)
+		test.assert(err == nil, "Open file error%v", err)
+		file.Close()
+		accessList[filename] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }
 
-func TestFileCreateDeleteList(t *testing.T) {
+func TestAccessListFileDelete(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error")
-		accessList[filename] = true
+		test.assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
-		path = test.absPath(bworkspace) + filename
+		absbworkspace := test.absPath(bworkspace)
+		path = absbworkspace + filename
 		err = os.Remove(path)
-		test.assert(err == nil, "Remove file error")
+		test.assert(err == nil, "Remove file error:%v", err)
 		accessList[filename] = false
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		accessList = make(map[string]bool)
+		path = workspace + filename
+		err = os.Remove(path)
+		test.assert(err == nil,
+			"Remove file error:%v", err)
+		accessList[filename] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }
 
-func TestDirectoryCreateDeleteList(t *testing.T) {
+func TestAccessListDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		dirname := "/test"
-		path := workspace + dirname
-		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error")
-		accessList[dirname] = true
-
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
-		bworkspace := test.branchWorkspace(workspace)
-		path = test.absPath(bworkspace) + dirname
-		err = syscall.Rmdir(path)
-		test.assert(err == nil, "Delete directory error")
-		accessList[dirname] = false
-
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
-	})
-}
-
-func TestRecursiveCreateRemoveList(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
-		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
-		dirname := "/test"
-		filename := "/test.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
 		accessList[dirname] = true
-		path = workspace + dirname + filename
-		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname+filename] = true
-		syscall.Close(fd)
-
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
-		bworkspace := test.branchWorkspace(workspace)
-		path = test.absPath(bworkspace) + dirname + filename
-		err = os.Remove(path)
-		test.assert(err == nil, "Delete file error")
-		accessList[dirname+filename] = false
-		path = test.absPath(bworkspace) + dirname
-		err = syscall.Rmdir(path)
-		test.assert(err == nil, "Delete directory error")
-		accessList[dirname] = false
-
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }
 
-func TestMvChildList(t *testing.T) {
+func TestAccessListDirectoryDelete(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		dirname := "/test"
+		path := workspace + dirname
+		err := syscall.Mkdir(path, 0666)
+		test.assert(err == nil, "Create directory error:%v", err)
+
+		accessList := make(map[string]bool)
+		bworkspace := test.branchWorkspace(workspace)
+		absbworkspace := test.absPath(bworkspace)
+		path = absbworkspace + dirname
+		err = syscall.Rmdir(path)
+		test.assert(err == nil, "Delete directory error:%v", err)
+		accessList[dirname] = false
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+
+		accessList = make(map[string]bool)
+		path = workspace + dirname
+		err = syscall.Rmdir(path)
+		test.assert(err == nil, "Delete directory error:%v", err)
+		accessList[dirname] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
+func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
+		dir1 := "/dir1"
+		dir2 := "/dir2"
+		path := workspace + dir1 + dir2
+		err := os.MkdirAll(path, 0666)
+		test.assert(err == nil, "Create directory error:%v", err)
+		accessList[dir1] = true
+		accessList[dir1+dir2] = true
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
+func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		dir1 := "/dir1"
+		dir2 := "/dir2"
+		path := workspace + dir1 + dir2
+		err := os.MkdirAll(path, 0666)
+		test.assert(err == nil, "Create directory error:%v", err)
+
+		accessList := make(map[string]bool)
+		bworkspace := test.branchWorkspace(workspace)
+		absbworkspace := test.absPath(bworkspace)
+		path = absbworkspace + dir1
+		err = os.RemoveAll(path)
+		test.assert(err == nil, "Delete directory error:%v", err)
+		accessList[dir1] = false
+		accessList[dir1+dir2] = false
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+
+		accessList = make(map[string]bool)
+		path = workspace + dir1
+		err = os.RemoveAll(path)
+		test.assert(err == nil, "Delete directory error:%v", err)
+		accessList[dir1] = true
+		accessList[dir1+dir2] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
+func TestAccessListMvChild(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
 		dirname1 := "/test1"
 		dirname2 := "/test2"
 		filename1 := "/test1.c"
@@ -149,164 +213,183 @@ func TestMvChildList(t *testing.T) {
 		path := workspace + dirname1
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
-		accessList[dirname1] = true
 		path = workspace + dirname1 + filename1
 		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname1+filename1] = true
 		syscall.Close(fd)
 
 		path = workspace + dirname2
 		err = syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
-		accessList[dirname2] = true
 		path = workspace + dirname2 + filename2
 		fd, err = syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname2+filename2] = true
 		syscall.Close(fd)
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
 		bworkspace := test.branchWorkspace(workspace)
-		accessList = make(map[string]bool)
-
-		path1 := test.absPath(bworkspace) + dirname1 + filename1
-		path2 := test.absPath(bworkspace) + dirname2 + filename3
+		absbworkspace := test.absPath(bworkspace)
+		accessList := make(map[string]bool)
+		path1 := absbworkspace + dirname1 + filename1
+		path2 := absbworkspace + dirname2 + filename3
 		err = os.Rename(path1, path2)
-		test.assert(err == nil, "Move file error")
+		test.assert(err == nil, "Move file error:%v", err)
 		accessList[dirname1] = false
 		accessList[dirname2] = false
 		accessList[dirname1+filename1] = false
 		accessList[dirname2+filename3] = true
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		accessList = make(map[string]bool)
+		path1 = workspace + dirname1 + filename1
+		path2 = workspace + dirname2 + filename3
+		err = os.Rename(path1, path2)
+		test.assert(err == nil, "Move file error:%v", err)
+		accessList[dirname1] = true
+		accessList[dirname2] = true
+		accessList[dirname1+filename1] = true
+		accessList[dirname2+filename2] = true
+		accessList[dirname2+filename3] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }
 
-func TestRenameChildList(t *testing.T) {
+func TestAccessListRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
-		accessList[dirname] = true
 		path = workspace + dirname + filename1
 		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname+filename1] = true
 		syscall.Close(fd)
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
 		bworkspace := test.branchWorkspace(workspace)
-		accessList = make(map[string]bool)
-
-		path1 := test.absPath(bworkspace) + dirname + filename1
-		path2 := test.absPath(bworkspace) + dirname + filename2
+		absbworkspace := test.absPath(bworkspace)
+		accessList := make(map[string]bool)
+		path1 := absbworkspace + dirname + filename1
+		path2 := absbworkspace + dirname + filename2
 		err = os.Rename(path1, path2)
-		test.assert(err == nil, "Move file error")
+		test.assert(err == nil, "Move file error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
+		accessList = make(map[string]bool)
+		path1 = workspace + dirname + filename1
+		path2 = workspace + dirname + filename2
+		err = os.Rename(path1, path2)
+		test.assert(err == nil, "Move file error:%v", err)
+		accessList[dirname] = true
+		accessList[dirname+filename1] = true
+		accessList[dirname+filename2] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
 	})
 }
 
-func TestHardLinkList(t *testing.T) {
+func TestAccessListHardLink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
-		accessList[dirname] = true
 		path = workspace + dirname + filename1
 		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname+filename1] = true
 		syscall.Close(fd)
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
 		bworkspace := test.branchWorkspace(workspace)
-		accessList = make(map[string]bool)
-
-		path1 := test.absPath(bworkspace) + dirname + filename1
-		path2 := test.absPath(bworkspace) + dirname + filename2
+		absbworkspace := test.absPath(bworkspace)
+		accessList := make(map[string]bool)
+		path1 := absbworkspace + dirname + filename1
+		path2 := absbworkspace + dirname + filename2
 		err = syscall.Link(path1, path2)
 		test.assert(err == nil, "Create hard link error")
 		accessList[dirname] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		accessList = make(map[string]bool)
+		path1 = workspace + dirname + filename1
+		path2 = workspace + dirname + filename2
+		err = syscall.Link(path1, path2)
+		test.assert(err == nil, "Create hard link error")
+		accessList[dirname] = true
+		accessList[dirname+filename1] = true
+		accessList[dirname+filename2] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }
 
-func TestSymlinkList(t *testing.T) {
+func TestAccessListSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
-		accessList[dirname] = true
 		path = workspace + dirname + filename1
 		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname+filename1] = true
 		syscall.Close(fd)
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
 		bworkspace := test.branchWorkspace(workspace)
-		accessList = make(map[string]bool)
-
-		path1 := test.absPath(bworkspace) + dirname + filename1
-		path2 := test.absPath(bworkspace) + dirname + filename2
+		absbworkspace := test.absPath(bworkspace)
+		accessList := make(map[string]bool)
+		path1 := absbworkspace + dirname + filename1
+		path2 := absbworkspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
-		test.assert(err == nil, "Create symlink error")
+		test.assert(err == nil, "Create symlink error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename2] = true
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		accessList = make(map[string]bool)
+		path1 = workspace + dirname + filename1
+		path2 = workspace + dirname + filename2
+		err = syscall.Symlink(path1, path2)
+		test.assert(err == nil, "Create symlink error:%v", err)
+		accessList[dirname] = true
+		accessList[dirname+filename1] = true
+		accessList[dirname+filename2] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }
 
-func TestSpecialFilesList(t *testing.T) {
+func TestAccessSpecialFiles(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
@@ -341,7 +424,7 @@ func TestSpecialFilesList(t *testing.T) {
 
 		accessList["/test4"] = true
 
-		wsr, ok := test.qfs.activeWorkspaces[relworkspace]
+		wsr, ok := test.qfs.getWorkspace(&test.qfs.c, relworkspace)
 		test.assert(ok,
 			"WorkspaceRoot "+relworkspace+" doesn't exist")
 
@@ -350,79 +433,87 @@ func TestSpecialFilesList(t *testing.T) {
 			accessList, wsr.accessList)
 		test.assert(eq,
 			"Error two maps not equal, map content:"+msg)
-
 	})
 }
 
-func TestReadSymlinkList(t *testing.T) {
+func TestAccessListReadSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
 		test.assert(err == nil, "Create directory error:%v", err)
-		accessList[dirname] = true
 		path1 := workspace + dirname + filename1
 		fd, err := syscall.Creat(path1, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[dirname+filename1] = true
 		syscall.Close(fd)
 		path2 := workspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
 		test.assert(err == nil, "Create symlink error:%v", err)
-		accessList[dirname+filename2] = true
-
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
 
 		bworkspace := test.branchWorkspace(workspace)
-		accessList = make(map[string]bool)
-
-		path2 = test.absPath(bworkspace) + dirname + filename2
+		absbworkspace := test.absPath(bworkspace)
+		accessList := make(map[string]bool)
+		path2 = absbworkspace + dirname + filename2
 		path1, err = os.Readlink(path2)
 		test.assert(err == nil, "Read symlink error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename2] = false
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
+		accessList = make(map[string]bool)
+		path2 = workspace + dirname + filename2
+		path1, err = os.Readlink(path2)
+		test.assert(err == nil, "Read symlink error:%v", err)
+		accessList[dirname] = true
+		accessList[dirname+filename1] = true
+		accessList[dirname+filename2] = true
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
 	})
 }
 
-func TestOverwriteRemovedList(t *testing.T) {
+func TestAccessListOverwriteRemoval(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error:%v", err)
-		accessList[filename] = true
 		syscall.Close(fd)
 
-		wsrlist := test.getAccessList(relworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
 		bworkspace := test.branchWorkspace(workspace)
-		path = test.absPath(bworkspace) + filename
+		absbworkspace := test.absPath(bworkspace)
+		accessList := make(map[string]bool)
+		path = absbworkspace + filename
 		err = os.Remove(path)
 		test.assert(err == nil, "Remove file error:%v", err)
 		fd, err = syscall.Creat(path, 0666)
 		accessList[filename] = true
 		syscall.Close(fd)
+		wsrlist := test.getAccessList(absbworkspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 
-		wsrlist = test.getAccessList(bworkspace)
-		test.compareAccessList(accessList, wsrlist)
-
+		accessList = make(map[string]bool)
+		path = workspace + filename
+		err = os.Remove(path)
+		test.assert(err == nil, "Remove file error:%v", err)
+		fd, err = syscall.Creat(path, 0666)
+		accessList[filename] = true
+		syscall.Close(fd)
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
 	})
 }

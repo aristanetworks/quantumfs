@@ -300,23 +300,11 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 }
 
-func makeGenericResponse(code uint32, bytes []byte) []byte {
-	response := quantumfs.GenericResponse{
-		CommandCommon: quantumfs.CommandCommon{
-			CommandId: code,
-		},
-		Data: bytes,
-	}
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		panic("Faild To marshall GenericResponse")
-	}
-	return data
-}
-
 func makeErrorResponse(code uint32, message string) []byte {
 	response := quantumfs.ErrorResponse{
+		CommandCommon: quantumfs.CommandCommon{
+			CommandId: quantumfs.CmdError,
+		},
 		ErrorCode: code,
 		Message:   message,
 	}
@@ -329,13 +317,19 @@ func makeErrorResponse(code uint32, message string) []byte {
 
 func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
 	bytes := makeErrorResponse(code, message)
-	bytes = makeGenericResponse(quantumfs.CmdError, bytes)
 	api.responses <- fuse.ReadResultData(bytes)
 }
 
 func makeAccessListResponse(list map[string]bool) []byte {
 	response := quantumfs.AccessListResponse{
-		Data: list,
+		ErrorResponse: quantumfs.ErrorResponse{
+			CommandCommon: quantumfs.CommandCommon{
+				CommandId: quantumfs.CmdError,
+			},
+			ErrorCode: quantumfs.ErrorOK,
+			Message:   "",
+		},
+		AccessList: list,
 	}
 
 	bytes, err := json.Marshal(response)
@@ -347,7 +341,6 @@ func makeAccessListResponse(list map[string]bool) []byte {
 
 func (api *ApiHandle) queueAccesslistResponse(list map[string]bool) {
 	bytes := makeAccessListResponse(list)
-	bytes = makeGenericResponse(quantumfs.CmdResponse, bytes)
 	api.responses <- fuse.ReadResultData(bytes)
 }
 
@@ -421,14 +414,14 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.activeWorkspaces[wsr]
+	workspace, ok := c.qfs.getWorkspace(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot "+wsr+" does not exist or is not active")
 		return
 	}
 
-	accessList := workspace.accessList
+	accessList := workspace.getList()
 	api.queueAccesslistResponse(accessList)
 }
 
@@ -440,14 +433,14 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.activeWorkspaces[wsr]
+	workspace, ok := c.qfs.getWorkspace(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot "+wsr+" does not exist or is not active")
 		return
 	}
 
-	workspace.accessList = make(map[string]bool)
+	workspace.clearList()
 	api.queueErrorResponse(quantumfs.ErrorOK, "Clear AccessList Succeeded")
 }
 

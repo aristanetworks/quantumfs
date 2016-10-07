@@ -91,8 +91,6 @@ type Inode interface {
 
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
-	getSelf() Inode
-
 	name() string
 	setName(name string)
 
@@ -128,7 +126,9 @@ type InodeCommon struct {
 	self Inode // Leaf subclass instance
 	id   InodeId
 
-	name_     string // '/' if WorkspaceRoot
+	nameLock sync.Mutex
+	name_    string // '/' if WorkspaceRoot
+
 	accessed_ bool
 
 	parentLock sync.Mutex // Protects parent_
@@ -176,14 +176,15 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 	panic(msg)
 }
 
-func (inode *InodeCommon) getSelf() Inode {
-	return inode.self
-}
 func (inode *InodeCommon) name() string {
+	inode.nameLock.Lock()
+	defer inode.nameLock.Unlock()
 	return inode.name_
 }
 
 func (inode *InodeCommon) setName(name string) {
+	inode.nameLock.Lock()
+	defer inode.nameLock.Unlock()
 	inode.name_ = name
 }
 
@@ -241,24 +242,18 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	}
 
 	path = "/" + inode.name() + path
-	inode.parent().getSelf().markAccessed(c, path, created)
+	msg := fmt.Sprintf("inode.parent(): Type:%v", reflect.TypeOf(inode.parent()))
+	c.vlog(msg)
+	parent := inode.parent()
+	parent.markAccessed(c, path, created)
 }
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
-	if inode.parent() == nil {
-		panic("Non-workspaceroot inode has no parent")
-	}
-
-	if inode.parent().inodeNum() == inode.inodeNum() {
-		panic("Orphaned file")
-	}
-
-	if !created && inode.accessed() {
+	ac := inode.accessed()
+	if !created && ac {
 		return
 	}
-
-	path := "/" + inode.name()
-	inode.parent().getSelf().markAccessed(c, path, created)
+	inode.self.markAccessed(c, "", created)
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {

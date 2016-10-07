@@ -427,8 +427,6 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 
 	defer dir.RLock().RUnlock()
 
-	// if we simply call dir.markSelfAccessed here, there must be cases
-	// that workspaceroot is dealt as normal directory, which causes panic
 	dir.self.markSelfAccessed(c, false)
 
 	children := make([]directoryContents, 0, dir.dirChildren.count())
@@ -854,7 +852,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// update the inode
 			child := c.qfs.inode(c, oldInodeId)
 			child.markSelfAccessed(c, false)
-			child.setParent(dst)
+			child.setParent(dst.self)
 
 			//delete the target InodeId
 			dst.dirChildren.delete(newName)

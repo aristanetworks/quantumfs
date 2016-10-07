@@ -29,9 +29,9 @@ func main() {
 		fmt.Println("         - create a new workspaceN which is a copy of" +
 			" workspaceO")
 		fmt.Println("           as of this point in time")
-		fmt.Println("  access <workspace>")
+		fmt.Println("  accessedFiles <workspace>")
 		fmt.Println("         - get the access list of workspace")
-		fmt.Println("  clearaccess <workspace>")
+		fmt.Println("  clearAccessedFiles <workspace>")
 		fmt.Println("         - clear the access list of workspace")
 		os.Exit(exitBadCmd)
 	}
@@ -44,9 +44,9 @@ func main() {
 
 	case "branch":
 		branch()
-	case "access":
+	case "accessedFiles":
 		getAccessed()
-	case "clearaccess":
+	case "clearAccessedFiles":
 		clearAccessed()
 	}
 }
@@ -73,7 +73,7 @@ func branch() {
 	}
 }
 
-//Implement the accessed command
+// Implement the accessed command
 func getAccessed() {
 	if flag.NArg() != 2 {
 		fmt.Println("Too few arguments for getAccessed command")
@@ -92,7 +92,7 @@ func getAccessed() {
 	}
 }
 
-//Implement the clearaccessed command
+// Implement the clearaccessed command
 func clearAccessed() {
 	if flag.NArg() != 2 {
 		fmt.Println("Too few arguments for clearAccessed command")

@@ -816,18 +816,20 @@ func (test *testHelper) fileSize(filename string) int64 {
 }
 
 func (test *testHelper) getAccessList(workspace string) map[string]bool {
-	wsr, ok := test.qfs.activeWorkspaces[workspace]
+	relpath := test.relPath(workspace)
+	wsr, ok := test.qfs.getWorkspace(&test.qfs.c, relpath)
 	test.assert(ok,
 		"Workspace %s does not exist or is not active", workspace)
-	return wsr.accessList
+	return wsr.getList()
 }
-func (test *testHelper) compareAccessList(testlist map[string]bool,
-	wsrlist map[string]bool) {
+
+func (test *testHelper) assertAccessList(testlist map[string]bool,
+	wsrlist map[string]bool, message string) {
 
 	eq := reflect.DeepEqual(testlist, wsrlist)
-	test.assert(eq,
-		"Error two maps not equal\ntestlist:%v\n, wsrlist:%v\n",
-		testlist, wsrlist)
+	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
+	message = message + msg
+	test.assert(eq, message)
 }
 
 var genDataMutex sync.RWMutex

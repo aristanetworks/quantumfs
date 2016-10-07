@@ -89,7 +89,6 @@ type CommandCommon struct {
 // The various command ID constants
 const (
 	CmdError         = iota
-	CmdResponse      = iota
 	CmdBranchRequest = iota
 	CmdGetAccessed   = iota
 	CmdClearAccessed = iota
@@ -104,18 +103,15 @@ const (
 	ErrorCommandFailed = iota // The Command failed, see the error for more info
 )
 
-type GenericResponse struct {
-	CommandCommon
-	Data []byte
-}
-
 type ErrorResponse struct {
+	CommandCommon
 	ErrorCode uint32
 	Message   string
 }
 
 type AccessListResponse struct {
-	Data map[string]bool
+	ErrorResponse
+	AccessList map[string]bool
 }
 
 type BranchRequest struct {
@@ -133,28 +129,21 @@ type SyncAllRequest struct {
 	CommandCommon
 }
 
-func (api *Api) sendCmd(bytes []byte) (GenericResponse, error) {
+func (api *Api) sendCmd(bytes []byte) ([]byte, error) {
 	err := writeAll(api.fd, bytes)
 	if err != nil {
-		return GenericResponse{}, err
+		return nil, err
 	}
 
 	api.fd.Seek(0, 0)
 	buf := make([]byte, 4096)
 	n, err := api.fd.Read(buf)
 	if err != nil {
-		return GenericResponse{}, err
+		return nil, err
 	}
 
 	buf = buf[:n]
-
-	var response GenericResponse
-	err = json.Unmarshal(buf, &response)
-	if err != nil {
-		return GenericResponse{}, err
-	}
-
-	return response, nil
+	return buf, nil
 }
 
 func (api *Api) parseErrorResponse(bytes []byte) (ErrorResponse, error) {
@@ -179,11 +168,11 @@ func (api *Api) parseAccessedResponse(bytes []byte) (AccessListResponse, error) 
 
 // branch the src workspace into a new workspace called dst.
 func (api *Api) Branch(src string, dst string) error {
-	if slashes := strings.Count(src, "/"); slashes != 1 {
+	if !isWorkspaceNameValid(src) {
 		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
 	}
 
-	if slashes := strings.Count(dst, "/"); slashes != 1 {
+	if !isWorkspaceNameValid(dst) {
 		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", dst)
 	}
 
@@ -198,12 +187,13 @@ func (api *Api) Branch(src string, dst string) error {
 		return err
 	}
 
-	genericResponse, err := api.sendCmd(bytes)
+	buf, err := api.sendCmd(bytes)
 	if err != nil {
 		return err
 	}
 
-	errorResponse, err := api.parseErrorResponse(genericResponse.Data)
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
 		return err
 	}
@@ -214,9 +204,9 @@ func (api *Api) Branch(src string, dst string) error {
 	return nil
 }
 
-// branch the src workspace into a new workspace called dst.
+// Get the list of accessed file from workspaceroot
 func (api *Api) GetAccessed(wsr string) error {
-	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+	if !isWorkspaceNameValid(wsr) {
 		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
 	}
 
@@ -230,30 +220,33 @@ func (api *Api) GetAccessed(wsr string) error {
 		return err
 	}
 
-	genericResponse, err := api.sendCmd(bytes)
+	buf, err := api.sendCmd(bytes)
 	if err != nil {
 		return err
 	}
 
-	if genericResponse.CommandId == CmdResponse {
-		accesslist, err := api.parseAccessedResponse(genericResponse.Data)
-		if err == nil {
-			fmt.Println("Accesslist of workspace %s:%v", wsr, accesslist)
-			return nil
-		}
-		return err
-	}
-
-	errorResponse, err := api.parseErrorResponse(genericResponse.Data)
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+
+	var accesslistResponse AccessListResponse
+	err = json.Unmarshal(buf, &accesslistResponse)
+	if err != nil {
+		return err
+	}
+
+	printAccessList(accesslistResponse.AccessList)
+	return nil
 }
 
-// branch the src workspace into a new workspace called dst.
+// clear the list of accessed files in workspaceroot
 func (api *Api) ClearAccessed(wsr string) error {
-	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+	if !isWorkspaceNameValid(wsr) {
 		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
 	}
 
@@ -267,20 +260,19 @@ func (api *Api) ClearAccessed(wsr string) error {
 		return err
 	}
 
-	genericResponse, err := api.sendCmd(bytes)
+	buf, err := api.sendCmd(bytes)
 	if err != nil {
 		return err
 	}
 
-	errorResponse, err := api.parseErrorResponse(genericResponse.Data)
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
 		return err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
-
-	fmt.Println("Cleared accesslist of workspace %s", wsr)
 	return nil
 }
 
@@ -300,4 +292,26 @@ func (api *Api) SyncAll() error {
 	}
 
 	return nil
+}
+
+func isWorkspaceNameValid(wsr string) bool {
+	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+		return false
+	}
+	return true
+}
+
+func printAccessList(list map[string]bool) {
+	fmt.Println("------ Created Files ------")
+	for key, val := range list {
+		if val {
+			fmt.Println(key)
+		}
+	}
+	fmt.Println("------ Accessed Files ------")
+	for key, val := range list {
+		if !val {
+			fmt.Println(key)
+		}
+	}
 }
