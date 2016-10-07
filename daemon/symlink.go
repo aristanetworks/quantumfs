@@ -32,6 +32,7 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 		pointedTo := buf.Get()
 		size := len(pointedTo)
 		dirRecord.SetSize(uint64(size))
+		dirRecord.SetPermissions(modeToPermissions(0777, 0))
 	}
 	return &symlink
 }
