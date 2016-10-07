@@ -19,7 +19,7 @@ func TestAccessListFileCreate(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error")
+		test.assert(err == nil, "Create file error:%v", err)
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
@@ -324,7 +324,7 @@ func TestAccessListHardLink(t *testing.T) {
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = syscall.Link(path1, path2)
-		test.assert(err == nil, "Create hard link error")
+		test.assert(err == nil, "Create hard link error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
@@ -336,7 +336,7 @@ func TestAccessListHardLink(t *testing.T) {
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = syscall.Link(path1, path2)
-		test.assert(err == nil, "Create hard link error")
+		test.assert(err == nil, "Create hard link error:%v", err)
 		accessList[dirname] = true
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
@@ -400,27 +400,27 @@ func TestAccessSpecialFiles(t *testing.T) {
 		path := workspace + "/test1"
 		err := syscall.Mknod(path, syscall.S_IFBLK|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error")
+		test.assert(err == nil, "Make special file error:%v", err)
 		accessList["/test1"] = true
 
 		path = workspace + "/test2"
 		err = syscall.Mknod(path, syscall.S_IFCHR|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error")
+		test.assert(err == nil, "Make special file error:%v", err)
 
 		accessList["/test2"] = true
 
 		path = workspace + "/test3"
 		err = syscall.Mknod(path, syscall.S_IFSOCK|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error")
+		test.assert(err == nil, "Make special file error:%v", err)
 
 		accessList["/test3"] = true
 
 		path = workspace + "/test4"
 		err = syscall.Mknod(path, syscall.S_IFREG|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error")
+		test.assert(err == nil, "Make special file error:%v", err)
 
 		accessList["/test4"] = true
 
