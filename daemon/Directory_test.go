@@ -793,3 +793,27 @@ func TestInodeForget(t *testing.T) {
 			"FileA not synced before forget")
 	})
 }
+
+// Change the ownership of a file to be owned by the user and then confirm that the
+// dummy user is used when viewing the permissions as root.
+func TestChownUserAsRoot(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+
+		testFilename := workspace + "/test"
+		fd, err := syscall.Creat(testFilename, 0777)
+		syscall.Close(fd)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		err = os.Chown(testFilename, 10000, 10000)
+		test.assert(err == nil, "Failed to chown: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Failed to stat file: %v", err)
+		test.assert(stat.Uid == 10000, "UID doesn't match: %d", stat.Uid)
+		test.assert(stat.Gid == 10000, "GID doesn't match: %d", stat.Gid)
+	})
+}
