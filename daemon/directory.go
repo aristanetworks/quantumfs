@@ -371,13 +371,16 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer dir.RLock().RUnlock()
+	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", dir.id)
+		return fuse.EIO
+	}
 
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, dir.InodeCommon.id,
-		uint32(dir.dirChildren.countChildDirs()))
-	out.Attr.Mode = 0777 | fuse.S_IFDIR
+	fillAttrOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id, c.fuseCtx.Owner,
+		&record)
+
 	return fuse.OK
 }
 
