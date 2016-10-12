@@ -3,9 +3,13 @@
 
 package quantumfs
 
+import "bytes"
 import "fmt"
 import "encoding/json"
+
+//import "io"
 import "os"
+import "os/exec"
 import "strings"
 import "syscall"
 
@@ -90,6 +94,7 @@ type CommandCommon struct {
 const (
 	CmdError         = iota
 	CmdBranchRequest = iota
+	CmdChrootRequest = iota
 	CmdSyncAll       = iota
 )
 
@@ -113,27 +118,32 @@ type BranchRequest struct {
 	Dst string
 }
 
+type ChrootRequest struct {
+	CommandCommon
+	WorkspaceRoot string
+}
+
 type SyncAllRequest struct {
 	CommandCommon
 }
 
-func (api *Api) sendCmd(bytes []byte) (ErrorResponse, error) {
-	err := writeAll(api.fd, bytes)
+func (api *Api) sendCmd(buf []byte) (ErrorResponse, error) {
+	err := writeAll(api.fd, buf)
 	if err != nil {
 		return ErrorResponse{}, err
 	}
 
 	api.fd.Seek(0, 0)
-	buf := make([]byte, 4096)
-	n, err := api.fd.Read(buf)
+	buffer := make([]byte, 4096)
+	n, err := api.fd.Read(buffer)
 	if err != nil {
 		return ErrorResponse{}, err
 	}
 
-	buf = buf[:n]
+	buffer = buffer[:n]
 
 	var response ErrorResponse
-	err = json.Unmarshal(buf, &response)
+	err = json.Unmarshal(buffer, &response)
 	if err != nil {
 		return ErrorResponse{}, err
 	}
@@ -157,12 +167,156 @@ func (api *Api) Branch(src string, dst string) error {
 		Dst:           dst,
 	}
 
-	bytes, err := json.Marshal(cmd)
+	buf, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	if _, err = api.sendCmd(bytes); err != nil {
+	if _, err = api.sendCmd(buf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// chroot
+func (api *Api) Chroot() error {
+	mp, wsr, err := findLegitimateChrootPoint()
+	if err != nil {
+		return err
+	}
+
+	dirstat, err := os.Stat(mp + "/" + wsr)
+	if err != nil {
+		return err
+	}
+	rootstat, err := os.Stat("/")
+	if err != nil {
+		return err
+	}
+
+	if os.SameFile(dirstat, rootstat) {
+		return fmt.Errorf("Alreadly chrooted")
+	}
+
+	wsr = mp + "/" + wsr
+	err = os.Mkdir(wsr+"/etc", 0666)
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+
+	copy := exec.Command("cp", "/etc/resolv.conf", wsr+"/etc/resolv.conf")
+	err = copy.Run()
+	if err != nil {
+		return err
+	}
+
+	copy = exec.Command("cp", "/etc/AroraKernel-compatibility",
+		wsr+"/etc/AroraKernel-compatibility")
+	err = copy.Run()
+	if err != nil {
+		return err
+	}
+
+	ns := exec.Command("netns", "-q", wsr)
+	netnsd_running := true
+	err = ns.Run()
+	if err != nil {
+		netnsd_running = false
+	}
+
+	if netnsd_running {
+		ns = exec.Command("netns", wsr, "/bin/bash")
+		err = ns.Run()
+		if err != nil {
+			fmt.Println("netns " + wsr + " /bin/bash Error")
+		}
+	}
+
+	svrName := wsr + "/chroot"
+	ns = exec.Command("netns", "-q", svrName)
+	netnsd_running = true
+	err = ns.Run()
+	if err != nil {
+		netnsd_running = false
+	}
+
+	if netnsd_running {
+		netnsExec := exec.Command("sudo", "netns", svrName, "/usr/bin/sh", "-l", "-c", "$@", "/bin/bash", "/bin/bash")
+		var netnsExecBuf bytes.Buffer
+		netnsExec.Stderr = &netnsExecBuf
+		err = netnsExec.Run()
+		if err != nil {
+			fmt.Println("netns1 Login shell error")
+			fmt.Println(netnsExecBuf.String())
+			return err
+		}
+	}
+
+	prechrootScript := "sudo mount --rbind " + wsr + " " + wsr + ";"
+	dstdev := wsr + "/dev"
+	err = os.Mkdir(dstdev, 0666)
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	prechrootScript = prechrootScript + "sudo mount -t tmpfs none " + dstdev + ";"
+	prechrootScript = prechrootScript + "sudo cp -ax /dev/. " + dstdev + ";"
+
+	dstdev = wsr + "/var/run/netns"
+	_, err = os.Stat(dstdev)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(dstdev, 0666)
+			if err != nil {
+				fmt.Print("Create dir " + dstdev + " Error")
+			}
+		}
+	}
+	prechrootScript = prechrootScript + "sudo mount -t tmpfs tmpfs " + dstdev + ";"
+
+	archCommand := exec.Command("uname", "-m")
+	var archBuf bytes.Buffer
+	archCommand.Stdout = &archBuf
+	err = archCommand.Run()
+	if err != nil {
+		fmt.Println("Get architecture Error")
+	}
+	archstr := archBuf.String()
+	fmt.Println("archstr:", archstr)
+
+	// a tmp mnt directory for mounting old root
+	err = os.Mkdir(wsr+"/mnt", 0666)
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+
+	nsFlags := "m"
+	fmt.Println("--chroot:", wsr)
+	fmt.Println("--pre-chroot-cmd=:", prechrootScript)
+	netnsdCmd := exec.Command("sudo", "/usr/bin/setarch", "i686", "/usr/bin/netnsd", "-d",
+		"--no-netns-env", "-f", nsFlags, "--chroot="+wsr,
+		"--pre-chroot-cmd="+prechrootScript, svrName)
+	var netnsdBuf bytes.Buffer
+	netnsdCmd.Stderr = &netnsdBuf
+	err = netnsdCmd.Run()
+	if err != nil {
+		fmt.Println(netnsdBuf.String())
+		fmt.Println(err.Error())
+		return err
+	}
+
+	netnsExec := exec.Command("sudo", "/usr/bin/netns", svrName, "/usr/bin/sh", "-l", "-c", "$@", "/usr/bin/bash", "/usr/bin/bash")
+	netnsExec.Stderr = &netnsdBuf
+	err = netnsExec.Run()
+	if err != nil {
+		fmt.Println("netns2 Login shell error")
+		fmt.Println(netnsdBuf.String())
 		return err
 	}
 
@@ -185,4 +339,40 @@ func (api *Api) SyncAll() error {
 	}
 
 	return nil
+}
+
+func findLegitimateChrootPoint() (string, string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", "", err
+	}
+
+	cmd1 := exec.Command("cat", "/proc/self/mountstats")
+	var output1 bytes.Buffer
+	cmd1.Stdout = &output1
+	err = cmd1.Run()
+	if err != nil {
+		fmt.Println("cmd1 run error")
+		return "", "", err
+	}
+
+	//var mountpoint string
+	//var wsr string
+	dirs := strings.Split(wd, "/")
+	for len(dirs) >= 3 {
+		mountpoint := strings.Join(dirs[0:len(dirs)-2], "/")
+		wsr := strings.Join(dirs[len(dirs)-2:len(dirs)], "/")
+
+		arg := "mounted on " + mountpoint + " with fstype fuse.quantumfs"
+		cmd2 := exec.Command("grep", arg)
+		var output2 bytes.Buffer
+		cmd2.Stdin = strings.NewReader(output1.String())
+		cmd2.Stdout = &output2
+		err = cmd2.Run()
+		if err == nil {
+			return mountpoint, wsr, nil
+		}
+		dirs = dirs[0 : len(dirs)-1]
+	}
+	return "", "", fmt.Errorf("Not valid path for chroot")
 }
