@@ -378,8 +378,8 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	}
 
 	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id, c.fuseCtx.Owner,
-		&record)
+	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id,
+		c.fuseCtx.Owner, &record)
 
 	return fuse.OK
 }
