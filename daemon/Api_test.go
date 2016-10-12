@@ -68,6 +68,5 @@ func TestApiClearAccessList(t *testing.T) {
 		wsrlist = test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error maps not clear")
-
 	})
 }
