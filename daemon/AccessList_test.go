@@ -518,7 +518,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 	})
 }
 
-func TestClearAccessListFileCreate(t *testing.T) {
+func TestAccessListClear(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 

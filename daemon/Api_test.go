@@ -42,7 +42,7 @@ func TestWorkspaceBranching(t *testing.T) {
 	})
 }
 
-func TestAccessListApiClearing(t *testing.T) {
+func TestApiClearAccessList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
