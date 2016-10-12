@@ -129,7 +129,7 @@ type InodeCommon struct {
 	nameLock sync.Mutex
 	name_    string // '/' if WorkspaceRoot
 
-	accessed_ bool
+	accessed_ uint32
 
 	parentLock sync.Mutex // Protects parent_
 	parent_    Inode      // nil if WorkspaceRoot
@@ -189,9 +189,13 @@ func (inode *InodeCommon) setName(name string) {
 }
 
 func (inode *InodeCommon) accessed() bool {
-	old := inode.accessed_
-	inode.accessed_ = true
-	return old
+	old := atomic.SwapUint32(&(inode.accessed_), 1)
+
+	if old == 1 {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (inode *InodeCommon) parent() Inode {

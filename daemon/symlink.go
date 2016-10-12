@@ -20,7 +20,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
 			name_:     name,
-			accessed_: false,
+			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
 		key: key,

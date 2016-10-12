@@ -414,7 +414,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.getWorkspace(c, wsr)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot "+wsr+" does not exist or is not active")
@@ -433,7 +433,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.getWorkspace(c, wsr)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot "+wsr+" does not exist or is not active")

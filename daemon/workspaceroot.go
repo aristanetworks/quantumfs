@@ -17,8 +17,8 @@ type WorkspaceRoot struct {
 	workspace string
 	rootId    quantumfs.ObjectKey
 
-	accessList map[string]bool
 	listLock   sync.Mutex
+	accessList map[string]bool
 
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
@@ -56,7 +56,6 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.rootId = rootId
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.accessList = make(map[string]bool)
-	assert(&(wsr.listLock) != nil, "WorkspaceRoot listLock nil at init")
 
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr
@@ -106,7 +105,13 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 }
 
 func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
-	wsr.setList(path, created)
+	wsr.listLock.Lock()
+	defer wsr.listLock.Unlock()
+	if wsr.accessList == nil {
+		wsr.accessList = make(map[string]bool)
+	}
+	wsr.accessList[path] = created
+
 }
 
 func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, created bool) {
@@ -117,15 +122,6 @@ func (wsr *WorkspaceRoot) getList() map[string]bool {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	return wsr.accessList
-}
-
-func (wsr *WorkspaceRoot) setList(s string, b bool) {
-	wsr.listLock.Lock()
-	defer wsr.listLock.Unlock()
-	if wsr.accessList == nil {
-		wsr.accessList = make(map[string]bool)
-	}
-	wsr.accessList[s] = b
 }
 
 func (wsr *WorkspaceRoot) clearList() {

@@ -40,7 +40,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon = InodeCommon{
 		id:        inodeNum,
 		name_:     name,
-		accessed_: false,
+		accessed_: 0,
 		self:      dir,
 	}
 	dir.setParent(parent)

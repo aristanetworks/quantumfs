@@ -424,7 +424,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 
 		accessList["/test4"] = true
 
-		wsr, ok := test.qfs.getWorkspace(&test.qfs.c, relworkspace)
+		wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relworkspace)
 		test.assert(ok,
 			"WorkspaceRoot "+relworkspace+" doesn't exist")
 
@@ -515,5 +515,32 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		wsrlist = test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
+	})
+}
+
+func TestClearAccessListFileCreate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		accessList := make(map[string]bool)
+		workspace := test.newWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 0666)
+		test.assert(err == nil, "Create file error:%v", err)
+		accessList[filename] = true
+		syscall.Close(fd)
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+
+		relpath := test.relPath(workspace)
+		wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relpath)
+		test.assert(ok, "Error getting WorkspaceRoot:%s", relpath)
+		wsr.clearList()
+		accessList = make(map[string]bool)
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error maps not clear")
 	})
 }

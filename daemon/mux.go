@@ -858,9 +858,9 @@ func (qfs *QuantumFs) Init(*fuse.Server) {
 	qfs.c.elog("Unhandled request Init")
 }
 
-func (qfs *QuantumFs) getWorkspace(c *ctx, name string) (*WorkspaceRoot, bool) {
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, name string) (*WorkspaceRoot, bool) {
 
-	c.vlog("QuantumFs::getWorkspace %s", name)
+	c.vlog("QuantumFs::getWorkspaceRoot %s", name)
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()

@@ -80,11 +80,11 @@ func getAccessed() {
 		os.Exit(exitBadArgs)
 	}
 
-	wsr := flag.Arg(1)
+	workspaceName := flag.Arg(1)
 
-	fmt.Printf("Getting the accessed list of WorkspaceRoot:\"%s\"\n", wsr)
+	fmt.Printf("Getting the accessed list of Workspace:\"%s\"\n", workspaceName)
 	api := quantumfs.NewApi()
-	err := api.GetAccessed(wsr)
+	err := api.GetAccessed(workspaceName)
 
 	if err != nil {
 		fmt.Println("Operations failed:", err)

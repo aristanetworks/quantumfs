@@ -817,7 +817,7 @@ func (test *testHelper) fileSize(filename string) int64 {
 
 func (test *testHelper) getAccessList(workspace string) map[string]bool {
 	relpath := test.relPath(workspace)
-	wsr, ok := test.qfs.getWorkspace(&test.qfs.c, relpath)
+	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relpath)
 	test.assert(ok,
 		"Workspace %s does not exist or is not active", workspace)
 	return wsr.getList()
