@@ -43,14 +43,16 @@ var longCombinationsStart int
 type SequenceData struct {
 	Times	[]int64
 	Seq	[]qlog.LogOutput
+	SeqStr	string
 }
 
 type PatternData struct {
+	SeqStrRaw	string	// No wildcards in this string, just seq
 	Data		SequenceData
 	Wildcards	[]bool
 	Avg		int64
 	Sum		int64
-	Stddev		float64
+	Stddev		int64
 }
 
 type sequenceTracker struct {
@@ -104,7 +106,8 @@ func collectData(wildcards []bool, seq []qlog.LogOutput,
 	regex := regexp.MustCompile(genSeqRegex(seq, wildcards))
 
 	for i := 0; i < len(sequences); i++ {
-		toMatch := genSeqRegex(sequences[i].Seq, []bool{})
+		// Only the regex should use genSeqRegex, which escapes characters
+		toMatch := genSeqStr(sequences[i].Seq)
 		if matches := regex.FindAllStringSubmatch(toMatch,
 			1); len(matches) > 0 {
 
@@ -205,6 +208,9 @@ func extractSequences(logs []qlog.LogOutput) map[string]SequenceData {
 			}
 			data.Times = append(data.Times,
 				rawSeq[len(rawSeq)-1].T-rawSeq[0].T)
+			if data.SeqStr == "" {
+				data.SeqStr = seq
+			}
 			rtn[seq] = data
 		}
 	}
@@ -249,7 +255,11 @@ func (s SortResultsTotal) Swap(i, j int) {
 }
 
 func (s SortResultsTotal) Less(i, j int) bool {
-	return s[i].Sum < s[j].Sum
+	if s[i].Sum == s[j].Sum {
+		return (s[i].SeqStrRaw < s[j].SeqStrRaw)
+	} else {
+		return (s[i].Sum < s[j].Sum)
+	}
 }
 
 type SortReqs []uint64
@@ -432,17 +442,12 @@ func genSeqStrExt(seq []qlog.LogOutput, wildcardMask []bool) string {
 	rtn := ""
 	for n := 0; n < len(seq); n++ {
 		if n < len(wildcardMask) && wildcardMask[n] {
-			// This is a wildcard in the sequence, but skip consecutive
-			// wildcards
-			if rtn[len(rtn)-1:] == wildcardStr {
-				continue
-			}
-
+			// This is a wildcard in the sequence, but ensure that we
+			// include consecutive wildcards
 			rtn += wildcardStr
-			continue
+		} else {
+			rtn += seq[n].Format
 		}
-
-		rtn += seq[n].Format
 	}
 
 	return rtn
@@ -456,7 +461,7 @@ func genSeqRegex(seq []qlog.LogOutput, wildcards []bool) string {
 		if n < len(wildcards) && wildcards[n] {
 			rtn += ".*"
 		} else {
-			rtn += seq[n].Format
+			rtn += regexp.QuoteMeta(seq[n].Format)
 		}
 	}
 
@@ -466,6 +471,20 @@ func genSeqRegex(seq []qlog.LogOutput, wildcards []bool) string {
 type wildcardedSequence struct {
 	sequence	[]qlog.LogOutput
 	wildcards	[]bool
+	regex		*regexp.Regexp
+}
+
+func newWildcardedSeq(seq []qlog.LogOutput, wc []bool,
+	r *regexp.Regexp) wildcardedSequence {
+
+	var rtn wildcardedSequence
+	rtn.sequence = make([]qlog.LogOutput, len(seq), len(seq))
+	rtn.wildcards = make([]bool, len(wc), len(wc))
+	rtn.regex = r
+	copy(rtn.sequence, seq)
+	copy(rtn.wildcards, wc)
+
+	return rtn
 }
 
 type ConcurrentMap struct {
@@ -488,36 +507,69 @@ func (l *ConcurrentMap) Set(newKey string, newData wildcardedSequence) {
 	l.data[newKey] = newData
 }
 
+func recurseGenPatterns(seq []qlog.LogOutput, sequences []SequenceData,
+	out *ConcurrentMap /*out*/) {
+
+	// Start with all wildcards
+	wildcardMask := make([]bool, len(seq), len(seq))
+	for j := 1; j < len(wildcardMask)-1; j++ {
+		wildcardMask[j] = true
+	}
+
+	recurseGenPatterns_(wildcardMask, 1, seq, sequences, out)
+}
+
 // curMask is a map of indices into sequences which should be ignored when gathering
-// data (wildcards). The base cases of this function are when its called with zero
-// remaining in wildcardNum - that's how it knows to use curMask and collect the
-// data
-func recurseGenPatterns(curMask []bool, wildcardNum int, wildcardStartIdx int,
+// data (wildcards). We check how many sequences match with the current wildcard mask
+// and if only one sequence matches then we know that no others will (since as we
+// recurse deeper, we remove wildcards and only become more specific) and escape
+func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	seq []qlog.LogOutput, sequences []SequenceData, out *ConcurrentMap /*out*/) {
 
-	if wildcardNum > 0 {
-		// we need to place a new wildcard. Note: we don't allow the first /
+	seqStr := genSeqStrExt(seq, curMask)
+
+	// If we've already got a result for this sequence, then this has
+	// been generated and we can skip it. This would not be safe if we didn't
+	// include multiple consecutive wildcards because small sequences would
+	// occlude longer versions.
+	if out.Exists(seqStr) {
+		return
+	}
+
+	// Count how many unique sequences match this sequence (with wildcards)
+	matches := 0
+	regex := regexp.MustCompile(genSeqRegex(seq, curMask))
+	for i := 0; i < len(sequences); i++ {
+		if idx := regex.FindStringIndex(sequences[i].SeqStr); idx != nil {
+			matches++
+		}
+	}
+
+	if matches <= 1 {
+		// There are no interesting sequence / wildcard combos deeper
+		return
+	}
+
+	// There are at least two matches for this combo. This qualifies as a result
+	out.Set(seqStr, newWildcardedSeq(seq, curMask, regex))
+
+	// If there are exactly two matches, then we don't need to recurse because
+	// we've already accounted for the most wildcarded version of this sequence
+	// and getting more specific with the same number of wildcards isn't useful
+	if matches > 2 {
+		// we need to remove a new wildcard. Note: we don't allow the first /
 		// last logs to be wildcarded since we *know* they're functions and
 		// they define the function we're trying to analyze across variants
 		for i := wildcardStartIdx; i < len(seq)-1; i++ {
-			if !curMask[i] {
-				// This spot doesn't have a wildcard yet.
-				curMask[i] = true
-				recurseGenPatterns(curMask, wildcardNum-1, i+1, seq,
-					sequences, out)
-				// Make sure to remove the entry for the next loop
+			if curMask[i] {
+				// This spot hasn't lost its wildcard yet.
 				curMask[i] = false
+				recurseGenPatterns_(curMask, i+1, seq, sequences,
+					out)
+				// Make sure to fix the entry for the next loop
+				curMask[i] = true
 			}
 		}
-	} else {
-		seqStr := genSeqStrExt(seq, curMask)
-
-		var newPattern wildcardedSequence
-		newPattern.sequence = make([]qlog.LogOutput, len(seq), len(seq))
-		newPattern.wildcards = make([]bool, len(curMask), len(curMask))
-		copy(newPattern.sequence, seq)
-		copy(newPattern.wildcards, curMask)
-		out.Set(seqStr, newPattern)
 	}
 }
 
@@ -532,8 +584,12 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 
 	status := qlog.NewLogStatus(50)
 
-	// Now generate all combinations of the sequences with wildcards in them,
-	// and collect stats for each generated sequence
+	// Now generate all combinations of the sequences with wildcards in them, but
+	// start with an almost completely wildcarded sequence and recurse towards
+	// a less-so one. We only care about subsequences that match more than one
+	// other sequence, because they are uninteresting if they only belong to one.
+	// By starting at the most wildcarded sequence, we can disregard entire
+	// branches as we recurse to save time!
 	fmt.Println("Generating all log sequence patterns...")
 	patterns := ConcurrentMap {
 		data:	make(map[string]wildcardedSequence),
@@ -542,30 +598,14 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 		// Update the status bar
 		status.Process(float32(i) / float32(len(sequences)))
 
-		curSeq := sequences[i].Seq
+		recurseGenPatterns(sequences[i].Seq, sequences, &patterns /*out*/)
 
-		// If we've already got a result for this sequence, then this has
-		// been generated and we can skip it.
-		if patterns.Exists(genSeqStr(curSeq)) {
-			continue
-		}
-
-		maxWildcards := len(curSeq) - 2
-		if maxWildcards >= longCombinationsStart {
-			wildcardsSupported, exists := maxCombinations[maxWildcards]
-			if exists {
-				maxWildcards = wildcardsSupported
-			} else {
-				// if the sequence is too long, then do no wildcards
-				maxWildcards = 0
-			}
-		}
-
-		for wildcards := 0; wildcards < maxWildcards; wildcards++ {
-			wildcardMask := make([]bool, len(curSeq), len(curSeq))
-			recurseGenPatterns(wildcardMask, wildcards, 1, curSeq,
-				sequences, &patterns /*out*/)
-		}
+		// recurseGenPatterns will overlook the "no wildcards" sequence,
+		// so we must add that ourselves
+		patterns.Set(genSeqStr(sequences[i].Seq),
+			newWildcardedSeq(sequences[i].Seq, []bool{},
+				regexp.MustCompile(genSeqRegex(sequences[i].Seq,
+					[]bool{}))))
 	}
 	status.Process(1)
 
@@ -581,6 +621,7 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 		mapIdx++
 
 		var newResult PatternData
+		newResult.SeqStrRaw = genSeqStr(wcseq.sequence)
 		newResult.Wildcards = wcseq.wildcards
 		newResult.Data = collectData(wcseq.wildcards, wcseq.sequence,
 			sequences)
@@ -601,7 +642,7 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 			deviation := newResult.Data.Times[i] - newResult.Avg
 			deviationSum += float64(deviation * deviation)
 		}
-		newResult.Stddev = math.Sqrt(deviationSum)
+		newResult.Stddev = int64(math.Sqrt(deviationSum))
 
 		rawResults = append(rawResults, newResult)
 	}
@@ -624,11 +665,9 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 			result = rawResults[i]
 		}
 
-		seqStr := genSeqStr(result.Data.Seq)
-
 		// If the sequences are the same, but have different stats then
 		// they should be considered different
-		if seqStr != currentSeq || result.Sum != currentData.Sum ||
+		if result.SeqStrRaw != currentSeq || result.Sum != currentData.Sum ||
 			result.Stddev != currentData.Stddev {
 
 			// We've finished going through a group of duplicates, so
@@ -637,7 +676,7 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 				filteredResults = append(filteredResults,
 					currentData)
 			}
-			currentSeq = seqStr
+			currentSeq = result.SeqStrRaw
 			currentData = result
 		} else {
 			// We have a duplicate
@@ -657,8 +696,8 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 func showTopTotalStats(patterns []PatternData, minStdDev float64, maxStdDev float64,
 	minWildcards int, maxWildcards int) {
 
-	minStdDevNano := minStdDev * 1000
-	maxStdDevNano := maxStdDev * 1000
+	minStdDevNano := int64(minStdDev * 1000)
+	maxStdDevNano := int64(maxStdDev * 1000)
 
 	funcResults := make([]PatternData, 0)
 	// Go through all the patterns and collect ones within stddev
@@ -697,7 +736,7 @@ func showTopTotalStats(patterns []PatternData, minStdDev float64, maxStdDev floa
 		fmt.Printf("Average sequence time: %12s\n",
 			time.Duration(result.Avg).String())
 		fmt.Printf("Standard Deviation: %12s\n",
-			time.Duration(int64(result.Stddev)).String())
+			time.Duration(result.Stddev).String())
 		fmt.Println("")
 		count++
 
