@@ -92,18 +92,17 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	}
 }
 
-func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
-	out *fuse.OpenOut) fuse.Status {
+func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
+	children := wsr.Directory.getChildSnapshot(c)
 
-	status := wsr.Directory.OpenDir(c, flags, mode, out)
-	if status == fuse.OK {
-		handleId := FileHandleId(out.Fh)
-		inode := c.qfs.fileHandle(c, handleId)
-		ds := inode.(*directorySnapshot)
-		ds.appendApi()
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
 	}
+	fillApiAttr(&api.attr)
+	children = append(children, api)
 
-	return status
+	return children
 }
 
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,

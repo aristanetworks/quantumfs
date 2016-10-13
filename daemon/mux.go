@@ -802,10 +802,11 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.flog("Mux::ReadDir").exit()
+	c.vlog("ReadDir Enter Fh: %d offset %d", input.Fh, input.Offset)
 
 	result = fuse.EIO
 
-	c.vlog("Enter Fh %d", input.Fh)
+	c := qfs.c.req(&input.InHeader)
 
 	c.elog("Unhandled request ReadDir")
 	return fuse.ENOSYS
@@ -817,10 +818,11 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.flog("Mux::ReadDirPlus").exit()
+	c.vlog("ReadDirPlus Enter Fh: %d offset %d", input.Fh,
+		input.Offset)
 
 	result = fuse.EIO
 
-	c.vlog("Enter Fh %d", input.Fh)
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
