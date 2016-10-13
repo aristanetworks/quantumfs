@@ -26,6 +26,14 @@ func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	symlink.self = &symlink
 	symlink.setParent(parent)
 	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
+
+	if dirRecord != nil {
+		buf := c.dataStore.Get(&(c.Ctx), key)
+		pointedTo := buf.Get()
+		size := len(pointedTo)
+		dirRecord.SetSize(uint64(size))
+		dirRecord.SetPermissions(modeToPermissions(0777, 0))
+	}
 	return &symlink
 }
 
@@ -139,31 +147,24 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
-
-	c.elog("Invalid GetXAttrSize on Symlink")
-	return 0, fuse.ENODATA
+	return link.parent().getChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
-
-	c.elog("Invalid GetXAttrData on Symlink")
-	return nil, fuse.ENODATA
+	return link.parent().getChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on Symlink")
-	return []byte{}, fuse.OK
+	return link.parent().listChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on Symlink")
-	return fuse.Status(syscall.ENOSPC)
+	return link.parent().setChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on Symlink")
-	return fuse.ENODATA
+	return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,

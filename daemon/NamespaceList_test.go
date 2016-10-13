@@ -46,10 +46,12 @@ func TestNullWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
-		path := test.nullWorkspace()
+		path := test.newWorkspace()
+
 		entries, err := ioutil.ReadDir(path)
 		test.assert(err == nil, "Couldn't read workspace listing")
-		test.assert(len(entries) == 0,
+		// The only file existing in nullworkspace is the api file
+		test.assert(len(entries) == 1,
 			"Incorrect number of entries in null workspace: %d",
 			len(entries))
 	})

@@ -87,3 +87,23 @@ func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 			orig, path)
 	})
 }
+
+func TestSymlinkSize(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		link := workspace + "/symlink"
+		orig := "/usr/bin/arch"
+		err := syscall.Symlink(orig, link)
+		test.assert(err == nil, "Error creating symlink: %v", err)
+
+		stat, err := os.Lstat(link)
+		test.assert(err == nil,
+			"Lstat symlink error%v,%v", err, stat)
+		stat_t := stat.Sys().(*syscall.Stat_t)
+		test.assert(stat_t.Size == int64(len(orig)),
+			"Wrong size of symlink:%d, should be:%d",
+			stat_t.Size, len(orig))
+	})
+}

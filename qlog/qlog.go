@@ -201,14 +201,14 @@ func PrintToStdout(format string, args ...interface{}) error {
 }
 
 func NewQlogTiny() *Qlog {
-	return NewQlogExt("", uint32(DefaultMmapSize), PrintToStdout)
+	return NewQlogExt("", uint64(DefaultMmapSize), PrintToStdout)
 }
 
 func NewQlog(ramfsPath string) *Qlog {
-	return NewQlogExt(ramfsPath, uint32(DefaultMmapSize), PrintToStdout)
+	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), PrintToStdout)
 }
 
-func NewQlogExt(ramfsPath string, sharedMemLen uint32, outLog func(format string,
+func NewQlogExt(ramfsPath string, sharedMemLen uint64, outLog func(format string,
 	args ...interface{}) error) *Qlog {
 
 	if sharedMemLen == 0 {

@@ -380,15 +380,18 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer dir.RLock().RUnlock()
-
 	defer c.flog("Directory::GetAttr").exit()
 
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, dir.InodeCommon.id,
-		uint32(dir.dirChildren.countChildDirs()))
-	out.Attr.Mode = 0777 | fuse.S_IFDIR
+	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", dir.id)
+		return fuse.EIO
+	}
+
+	fillAttrOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id,
+		c.fuseCtx.Owner, &record)
+
 	return fuse.OK
 }
 
@@ -744,19 +747,32 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 	// directories exist
 	var parent *Directory
 	var child *Directory
-	if a.parent() != nil &&
-		a.parent().inodeNum() == b.inodeNum() {
 
-		// a is a child of b
-		parent = b
-		child = a
-	} else if b.parent() != nil &&
-		b.parent().inodeNum() == a.inodeNum() {
+	upwardsParent := a.parent()
+	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+		if upwardsParent.inodeNum() == b.inodeNum() {
 
-		// b is a child of a
-		parent = a
-		child = b
-	} else {
+			// a is a (grand-)child of b
+			parent = b
+			child = a
+			break
+		}
+	}
+
+	if upwardsParent == nil {
+		upwardsParent = b.parent()
+		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+			if upwardsParent.inodeNum() == a.inodeNum() {
+
+				// b is a (grand-)child of a
+				parent = a
+				child = b
+				break
+			}
+		}
+	}
+
+	if upwardsParent == nil {
 		// No relationship, choose arbitrarily
 		parent = a
 		child = b
@@ -767,6 +783,11 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
+
+	// moving any file into _null/null is not permitted
+	if _, ok := dstInode.(*NullWorkspaceRoot); ok {
+		return fuse.EPERM
+	}
 
 	defer c.flog("Directory::MvChild").exit()
 	c.vlog("MvChild Enter %s -> %s", oldName, newName)
@@ -1262,4 +1283,17 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
+}
+
+func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
+	return fuse.OK
+}
+
+func (ds *directorySnapshot) appendApi() {
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
+	}
+	fillApiAttr(&api.attr)
+	ds.children = append(ds.children, api)
 }
