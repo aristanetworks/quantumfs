@@ -807,7 +807,7 @@ func TestChownUserAsRoot(t *testing.T) {
 		syscall.Close(fd)
 		test.assert(err == nil, "Error creating file: %v", err)
 
-		err = os.Chown(testFilename, 10000, 10000)
+		err = os.Chown(testFilename, 22222, 22222)
 		test.assert(err == nil, "Failed to chown: %v", err)
 
 		var stat syscall.Stat_t
