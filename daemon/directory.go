@@ -371,6 +371,9 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	c.vlog("Directory::GetAttr Enter")
+	defer c.vlog("Directory::GetAttr Exit")
+
 	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)

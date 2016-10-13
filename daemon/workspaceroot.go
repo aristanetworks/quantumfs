@@ -127,6 +127,8 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	c.vlog("WorkspaceRoot::GetAttr Enter")
+	defer c.vlog("WorkspaceRoot::GetAttr Exit")
 	defer wsr.RLock().RUnlock()
 
 	out.AttrValid = c.config.CacheTimeSeconds
