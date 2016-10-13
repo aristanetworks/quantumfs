@@ -125,3 +125,14 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	defer c.vlog("WorkspaceRoot::syncChild Exit")
 	wsr.publish(c)
 }
+
+func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer wsr.RLock().RUnlock()
+
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
+	fillAttr(&out.Attr, wsr.InodeCommon.id,
+		uint32(wsr.dirChildren.countChildDirs()))
+	out.Attr.Mode = 0777 | fuse.S_IFDIR
+	return fuse.OK
+}
