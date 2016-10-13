@@ -345,12 +345,15 @@ func TestLargeDirectory(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
+		testdir := workspace + "/testlargedir"
+		err := syscall.Mkdir(testdir, 0777)
+		test.assert(err == nil, "Error creating directory:%v", err)
 		numToCreate := quantumfs.MaxDirectoryRecords +
 			quantumfs.MaxDirectoryRecords/4
 
 		// Create enough children to overflow a single block
 		for i := 0; i < numToCreate; i++ {
-			testFile := fmt.Sprintf("%s/testfile%d", workspace, i)
+			testFile := fmt.Sprintf("%s/testfile%d", testdir, i)
 			fd, err := os.Create(testFile)
 			test.assert(err == nil, "Error creating file: %v", err)
 			fd.Close()
@@ -358,7 +361,7 @@ func TestLargeDirectory(t *testing.T) {
 
 		// Confirm all the children are accounted for in the original
 		// workspace
-		files, err := ioutil.ReadDir(workspace)
+		files, err := ioutil.ReadDir(testdir)
 		test.assert(err == nil, "Error reading directory %v", err)
 		attendance := make(map[string]bool, numToCreate)
 
@@ -377,7 +380,8 @@ func TestLargeDirectory(t *testing.T) {
 		// Confirm all the children are accounted for in a branched
 		// workspace
 		workspace = test.absPath(test.branchWorkspace(workspace))
-		files, err = ioutil.ReadDir(workspace)
+		testdir = workspace + "/testlargedir"
+		files, err = ioutil.ReadDir(testdir)
 		test.assert(err == nil, "Error reading directory %v", err)
 		attendance = make(map[string]bool, numToCreate)
 
@@ -787,5 +791,82 @@ func TestInodeForget(t *testing.T) {
 		test.assert(err == nil, "Error reading from branched fileA")
 		test.assert(bytes.Equal(output, dataA),
 			"FileA not synced before forget")
+	})
+}
+
+// Change the ownership of a file to be owned by the user and then confirm that the
+// dummy user is used when viewing the permissions as root.
+func TestChownUserAsRoot(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+
+		testFilename := workspace + "/test"
+		fd, err := syscall.Creat(testFilename, 0777)
+		syscall.Close(fd)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		err = os.Chown(testFilename, 22222, 22222)
+		test.assert(err == nil, "Failed to chown: %v", err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Failed to stat file: %v", err)
+		test.assert(stat.Uid == 10000, "UID doesn't match: %d", stat.Uid)
+		test.assert(stat.Gid == 10000, "GID doesn't match: %d", stat.Gid)
+	})
+}
+
+// Ensure that when we rewind the directory entry we get new files added after the
+// directory was opened.
+func TestDirectorySnapshotRefresh(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		parent := test.newWorkspace()
+
+		for i := 0; i < 2; i++ {
+			dir, err := os.Open(parent)
+			test.assert(err == nil, "Failed to open workspace")
+			defer dir.Close()
+
+			// Create some filler to ensure we actually seek
+			for n := 0; n < 10; n++ {
+				file, _ := os.Create(fmt.Sprintf("%s/filler%d",
+					parent, n))
+				file.Close()
+			}
+
+			// Read some entries from the parent, then create a new child
+			// and seek to ensure the still open directory entry sees the
+			// new entry.
+			_, err = dir.Readdirnames(2)
+			test.assert(err == nil, "Error reading two entries: %v", err)
+
+			childName := parent + "/test"
+			err = os.Mkdir(childName, 0777)
+			test.assert(err == nil, "Error creating child directory: %v",
+				err)
+
+			_, err = dir.Seek(0, os.SEEK_SET)
+			test.assert(err == nil, "Error seeking directory to start: "+
+				"%v", err)
+
+			children, err := dir.Readdirnames(-1)
+			test.assert(err == nil, "Error reading all entries of "+
+				"directory: %v", err)
+
+			dirExists := false
+			for _, name := range children {
+				if name == "test" {
+					dirExists = true
+				}
+			}
+			test.assert(dirExists,
+				"Failed to find new directory after rewind")
+
+			// Run again with the directory instead of the workspace
+			parent = childName
+		}
 	})
 }

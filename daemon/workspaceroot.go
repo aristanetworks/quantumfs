@@ -96,6 +96,32 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	}
 }
 
+func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
+	children := wsr.Directory.getChildSnapshot(c)
+
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
+	}
+	fillApiAttr(&api.attr)
+	children = append(children, api)
+
+	return children
+}
+
+func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
+	out *fuse.EntryOut) fuse.Status {
+
+	if name == quantumfs.ApiPath {
+		out.NodeId = quantumfs.InodeIdApi
+		fillEntryOutCacheData(c, out)
+		fillApiAttr(&out.Attr)
+		return fuse.OK
+	}
+
+	return wsr.Directory.Lookup(c, name, out)
+}
+
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 

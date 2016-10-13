@@ -129,7 +129,7 @@ func processArgs() {
 		config.CacheSize = cacheSize
 	}
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
-	config.MemLogBytes = uint32(memLogMegabytes) * 1024 * 1024
+	config.MemLogBytes = uint64(memLogMegabytes) * 1024 * 1024
 
 	loadDatastore()
 	loadWorkspaceDB()

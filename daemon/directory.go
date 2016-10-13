@@ -380,13 +380,16 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer dir.RLock().RUnlock()
+	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", dir.id)
+		return fuse.EIO
+	}
 
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, dir.InodeCommon.id,
-		uint32(dir.dirChildren.countChildDirs()))
-	out.Attr.Mode = 0777 | fuse.S_IFDIR
+	fillAttrOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id,
+		c.fuseCtx.Owner, &record)
+
 	return fuse.OK
 }
 
@@ -425,6 +428,15 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	out.Fh = uint64(ds.FileHandleCommon.id)
+	out.OpenFlags = 0
+
+	return fuse.OK
+}
+
+func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.RLock().RUnlock()
 
 	dir.self.markSelfAccessed(c, false)
@@ -447,12 +459,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 		children = append(children, entryInfo)
 	}
 
-	ds := newDirectorySnapshot(c, children, dir.InodeCommon.id, dir.treeLock())
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
-	out.Fh = uint64(ds.FileHandleCommon.id)
-	out.OpenFlags = 0
-
-	return fuse.OK
+	return children
 }
 
 func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
@@ -1189,16 +1196,21 @@ type directoryContents struct {
 	attr     fuse.Attr
 }
 
-func newDirectorySnapshot(c *ctx, children []directoryContents,
-	inodeNum InodeId, treeLock *sync.RWMutex) *directorySnapshot {
+type directorySnapshotSource interface {
+	getChildSnapshot(c *ctx) []directoryContents
+	inodeNum() InodeId
+	treeLock() *sync.RWMutex
+}
+
+func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapshot {
 
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:        c.qfs.newFileHandleId(),
-			inodeNum:  inodeNum,
-			treeLock_: treeLock,
+			inodeNum:  src.inodeNum(),
+			treeLock_: src.treeLock(),
 		},
-		children: children,
+		src: src,
 	}
 
 	assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
@@ -1209,6 +1221,7 @@ func newDirectorySnapshot(c *ctx, children []directoryContents,
 type directorySnapshot struct {
 	FileHandleCommon
 	children []directoryContents
+	src      directorySnapshotSource
 }
 
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -1216,6 +1229,11 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 	c.vlog("ReadDirPlus directorySnapshot")
 	offset := input.Offset
+
+	if offset == 0 {
+		c.dlog("Refreshing child list")
+		ds.children = ds.src.getChildSnapshot(c)
+	}
 
 	// Add .
 	if offset == 0 {
@@ -1280,4 +1298,8 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
+}
+
+func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
+	return fuse.OK
 }

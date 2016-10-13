@@ -263,6 +263,12 @@ func SystemUid(uid UID, userId uint32) uint32 {
 	if uid < UIDUser {
 		return uint32(uid)
 	} else if uid == UIDUser {
+		if userId < UIDUser {
+			// If the user is running as a system account then we don't
+			// want the files to appear to be owned by that account.
+			// Instead make it appear owned by a normal user.
+			return 10000
+		}
 		return userId
 	} else {
 		panic(fmt.Sprintf("Unknown Owner %d", uid))
@@ -297,6 +303,12 @@ func SystemGid(gid GID, userId uint32) uint32 {
 	if gid < GIDUser {
 		return uint32(gid)
 	} else if gid == GIDUser {
+		if userId < GIDUser {
+			// If the user is running as a system account then we don't
+			// want the files to appear to be owned by that account.
+			// Instead make it appear owned by a normal user.
+			return 10000
+		}
 		return userId
 	} else {
 		panic(fmt.Sprintf("Unknown Group %d", gid))
@@ -738,7 +750,6 @@ type Buffer interface {
 type DataStore interface {
 	Get(c *Ctx, key ObjectKey, buf Buffer) error
 	Set(c *Ctx, key ObjectKey, buf Buffer) error
-	Exists(c *Ctx, key ObjectKey) bool
 }
 
 // A pseudo-store which contains all the constant objects
@@ -765,10 +776,6 @@ func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 
 func (store *ConstDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
-}
-
-func (store *ConstDataStore) Exists(c *Ctx, key ObjectKey) bool {
-	return false
 }
 
 var ZeroKey ObjectKey

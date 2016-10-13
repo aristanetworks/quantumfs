@@ -778,7 +778,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReadDir Enter Fh %d", input.Fh)
+	c.vlog("QuantumFs::ReadDir Enter Fh: %d offset %d", input.Fh, input.Offset)
 	defer c.vlog("QuantumFs::ReadDir Exit")
 
 	c.elog("Unhandled request ReadDir")
@@ -792,7 +792,8 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReadDirPlus Enter Fh %d", input.Fh)
+	c.vlog("QuantumFs::ReadDirPlus Enter Fh: %d offset %d", input.Fh,
+		input.Offset)
 	defer c.vlog("QuantumFs::ReadDirPlus Exit")
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
