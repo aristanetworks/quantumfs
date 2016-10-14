@@ -133,8 +133,8 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 			attr.Ctimensec))
 		c.vlog("ContentTime now %d", entry.ContentTime())
 	} else {
-		// Since we've updated the file attributes we need to update at least its
-		// ctime (unless we've explicitly set its ctime).
+		// Since we've updated the file attributes we need to update at least
+		// its ctime (unless we've explicitly set its ctime).
 		c.vlog("Updated ctime")
 		entry.SetContentTime(now)
 	}

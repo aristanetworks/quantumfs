@@ -546,7 +546,8 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	c.vlog("Directory::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
 	defer c.vlog("Directory::SetAttr Exit")
 
-	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out, false)
+	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
+		false)
 }
 
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
