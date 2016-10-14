@@ -23,6 +23,18 @@ func getTimes(path string) (mtime int64, ctime int64) {
 	return
 }
 
+func getTimeFromFile(file *os.File) (mtime int64, ctime int64) {
+	fd := int(file.Fd())
+	var stat syscall.Stat_t
+	if err := syscall.Fstat(fd, &stat); err != nil {
+		msg := fmt.Sprintf("fstat call failed: %v", err)
+		panic(msg)
+	}
+	mtime = stat.Mtim.Nano()
+	ctime = stat.Ctim.Nano()
+	return
+}
+
 func TestTimeChmod(t *testing.T) {
 	// Change metadata and confirm mtime isn't changed
 	runTest(t, func(test *testHelper) {
@@ -180,5 +192,49 @@ func TestTimeInterDirectoryRename(t *testing.T) {
 		test.assert(ctimeOrig1 < ctimeNew1, "ctime unchanged for directory")
 		test.assert(mtimeOrig2 < mtimeNew2, "mtime unchanged for directory")
 		test.assert(ctimeOrig2 < ctimeNew2, "ctime unchanged for directory")
+	})
+}
+
+func TestTimeOrphanedFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+		defer file.Close()
+
+		data := genData(100 * 1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+		err = os.Remove(testFilename)
+		test.assert(err == nil, "Error unlinking test file: %v", err)
+
+		// Confirm we can still read its times
+		mtimeOrig, ctimeOrig := getTimeFromFile(file)
+		test.assert(ctimeOrig != 0, "ctime invalid: %d", ctimeOrig)
+		test.assert(mtimeOrig != 0, "mtime invalid: %d", mtimeOrig)
+
+		// Change the attributes to ensure ctime and not mtime is changed
+		err = file.Chmod(0777)
+		test.assert(err == nil, "Error chmod'ing file: %v", err)
+		mtime, ctime := getTimeFromFile(file)
+		test.assert(mtimeOrig == mtime, "mtime changed")
+		test.assert(ctimeOrig < ctime, "ctime unchanged")
+
+		// Change the data to ensure both ctime and mtime are changed
+		mtimeOrig = mtime
+		ctimeOrig = ctime
+		data = genData(100 * 1024)
+		_, err = file.Seek(100*1024*1024, 0)
+		test.assert(err == nil, "Error rewinding file: %v", err)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+
+		mtime, ctime = getTimeFromFile(file)
+		test.assert(mtimeOrig < mtime, "mtime unchanged")
+		test.assert(ctimeOrig < ctime, "ctime unchanged")
 	})
 }
