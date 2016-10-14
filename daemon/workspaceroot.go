@@ -17,6 +17,9 @@ type WorkspaceRoot struct {
 	workspace string
 	rootId    quantumfs.ObjectKey
 
+	listLock   sync.Mutex
+	accessList map[string]bool
+
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
 	realTreeLock sync.RWMutex
@@ -45,13 +48,14 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
-	initDirectory(c, &wsr.Directory, workspaceRoot.BaseLayer(), inodeNum, nil,
-		&wsr.realTreeLock)
+	initDirectory(c, name, &wsr.Directory, workspaceRoot.BaseLayer(),
+		inodeNum, nil, &wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	wsr.accessList = make(map[string]bool)
 
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr
@@ -92,18 +96,17 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	}
 }
 
-func (wsr *WorkspaceRoot) OpenDir(c *ctx, flags uint32, mode uint32,
-	out *fuse.OpenOut) fuse.Status {
+func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
+	children := wsr.Directory.getChildSnapshot(c)
 
-	status := wsr.Directory.OpenDir(c, flags, mode, out)
-	if status == fuse.OK {
-		handleId := FileHandleId(out.Fh)
-		inode := c.qfs.fileHandle(c, handleId)
-		ds := inode.(*directorySnapshot)
-		ds.appendApi()
+	api := directoryContents{
+		filename: quantumfs.ApiPath,
+		fuseType: fuse.S_IFREG,
 	}
+	fillApiAttr(&api.attr)
+	children = append(children, api)
 
-	return status
+	return children
 }
 
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
@@ -125,4 +128,29 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	c.vlog("WorkspaceRoot::syncChild Enter")
 	defer c.vlog("WorkspaceRoot::syncChild Exit")
 	wsr.publish(c)
+}
+
+func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
+	wsr.listLock.Lock()
+	defer wsr.listLock.Unlock()
+	if wsr.accessList == nil {
+		wsr.accessList = make(map[string]bool)
+	}
+	wsr.accessList[path] = created
+}
+
+func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, created bool) {
+	return
+}
+
+func (wsr *WorkspaceRoot) getList() map[string]bool {
+	wsr.listLock.Lock()
+	defer wsr.listLock.Unlock()
+	return wsr.accessList
+}
+
+func (wsr *WorkspaceRoot) clearList() {
+	wsr.listLock.Lock()
+	defer wsr.listLock.Unlock()
+	wsr.accessList = make(map[string]bool)
 }
