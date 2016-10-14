@@ -184,10 +184,10 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	attr.Atime = entry.ModificationTime().Seconds()
 	attr.Mtime = entry.ModificationTime().Seconds()
-	attr.Ctime = entry.CreationTime().Seconds()
+	attr.Ctime = entry.ContentTime().Seconds()
 	attr.Atimensec = entry.ModificationTime().Nanoseconds()
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
-	attr.Ctimensec = entry.CreationTime().Nanoseconds()
+	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
 	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %d", fileType,
 		entry.Permissions())
@@ -484,7 +484,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	entry.SetGroup(quantumfs.ObjectGid(c.Ctx, gid, gid))
 	entry.SetSize(0)
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
-	entry.SetCreationTime(quantumfs.NewTime(now))
+	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
 
 	inodeNum := c.qfs.newInodeId()

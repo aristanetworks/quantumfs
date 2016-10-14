@@ -119,33 +119,24 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
 		entry.SetModificationTime(now)
 		c.vlog("ModificationTime now %d", entry.ModificationTime())
-	}
-
-	if BitFlagsSet(valid, fuse.FATTR_MTIME) {
+	} else if BitFlagsSet(valid, fuse.FATTR_MTIME) {
 		entry.SetModificationTime(
 			quantumfs.NewTimeSeconds(attr.Mtime, attr.Mtimensec))
 		c.vlog("ModificationTime now %d", entry.ModificationTime())
+	} else if updateMtime {
+		c.vlog("Updated mtime")
+		entry.SetModificationTime(now)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_CTIME) {
-		entry.SetCreationTime(quantumfs.NewTimeSeconds(attr.Ctime,
+		entry.SetContentTime(quantumfs.NewTimeSeconds(attr.Ctime,
 			attr.Ctimensec))
-		c.vlog("CreationTime now %d", entry.CreationTime())
-	}
-
-	// Since we've updated the file attributes we need to update at least its
-	// ctime (unless we've explicitly set its ctime).
-	if !BitAnyFlagSet(valid, fuse.FATTR_CTIME) {
+		c.vlog("ContentTime now %d", entry.ContentTime())
+	} else {
+		// Since we've updated the file attributes we need to update at least its
+		// ctime (unless we've explicitly set its ctime).
 		c.vlog("Updated ctime")
-		attr.Ctime = now.Seconds()
-		attr.Ctimensec = now.Nanoseconds()
-	}
-	if updateMtime && !BitAnyFlagSet(valid,
-		fuse.FATTR_MTIME|fuse.FATTR_MTIME_NOW) {
-
-		c.vlog("Updated mtime")
-		attr.Mtime = now.Seconds()
-		attr.Mtimensec = now.Nanoseconds()
+		entry.SetContentTime(now)
 	}
 }
 
@@ -161,7 +152,7 @@ func cloneDirectoryRecord(
 	newEntry.SetGroup(orig.Group())
 	newEntry.SetSize(orig.Size())
 	newEntry.SetExtendedAttributes(orig.ExtendedAttributes())
-	newEntry.SetCreationTime(orig.CreationTime())
+	newEntry.SetContentTime(orig.ContentTime())
 	newEntry.SetModificationTime(orig.ModificationTime())
 
 	return newEntry

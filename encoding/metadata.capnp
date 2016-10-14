@@ -42,7 +42,7 @@ struct DirectoryRecord {
         group              @5 :UInt16;
         size               @6 :UInt64;
         extendedAttributes @7 :ObjectKey;
-        creationTime       @8 :UInt64;
+        contentTime        @8 :UInt64;
         modificationTime   @9 :UInt64;
 }
 
