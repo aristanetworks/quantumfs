@@ -41,3 +41,32 @@ func TestWorkspaceBranching(t *testing.T) {
 		test.assert(err != nil, "Original workspace was modified")
 	})
 }
+
+func TestApiClearAccessList(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.startDefaultQuantumFs()
+
+		accessList := make(map[string]bool)
+		workspace := test.newWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 0666)
+		test.assert(err == nil, "Create file error:%v", err)
+		accessList[filename] = true
+		syscall.Close(fd)
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+
+		api := test.getApi()
+
+		relpath := test.relPath(workspace)
+		err = api.ClearAccessed(relpath)
+		test.assert(err == nil,
+			"Error clearing accessList with api")
+		accessList = make(map[string]bool)
+		wsrlist = test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error maps not clear")
+	})
+}

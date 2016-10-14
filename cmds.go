@@ -90,6 +90,8 @@ type CommandCommon struct {
 const (
 	CmdError         = iota
 	CmdBranchRequest = iota
+	CmdGetAccessed   = iota
+	CmdClearAccessed = iota
 	CmdSyncAll       = iota
 )
 
@@ -107,47 +109,50 @@ type ErrorResponse struct {
 	Message   string
 }
 
+type AccessListResponse struct {
+	ErrorResponse
+	AccessList map[string]bool
+}
+
 type BranchRequest struct {
 	CommandCommon
 	Src string
 	Dst string
 }
 
+type AccessedRequest struct {
+	CommandCommon
+	WorkspaceRoot string
+}
+
 type SyncAllRequest struct {
 	CommandCommon
 }
 
-func (api *Api) sendCmd(bytes []byte) (ErrorResponse, error) {
+func (api *Api) sendCmd(bytes []byte) ([]byte, error) {
 	err := writeAll(api.fd, bytes)
 	if err != nil {
-		return ErrorResponse{}, err
+		return nil, err
 	}
 
 	api.fd.Seek(0, 0)
 	buf := make([]byte, 4096)
 	n, err := api.fd.Read(buf)
 	if err != nil {
-		return ErrorResponse{}, err
+		return nil, err
 	}
 
 	buf = buf[:n]
-
-	var response ErrorResponse
-	err = json.Unmarshal(buf, &response)
-	if err != nil {
-		return ErrorResponse{}, err
-	}
-
-	return response, nil
+	return buf, nil
 }
 
 // branch the src workspace into a new workspace called dst.
 func (api *Api) Branch(src string, dst string) error {
-	if slashes := strings.Count(src, "/"); slashes != 1 {
+	if !isWorkspaceNameValid(src) {
 		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
 	}
 
-	if slashes := strings.Count(dst, "/"); slashes != 1 {
+	if !isWorkspaceNameValid(dst) {
 		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", dst)
 	}
 
@@ -162,10 +167,92 @@ func (api *Api) Branch(src string, dst string) error {
 		return err
 	}
 
-	if _, err = api.sendCmd(bytes); err != nil {
+	buf, err := api.sendCmd(bytes)
+	if err != nil {
 		return err
 	}
 
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+
+	return nil
+}
+
+// Get the list of accessed file from workspaceroot
+func (api *Api) GetAccessed(wsr string) error {
+	if !isWorkspaceNameValid(wsr) {
+		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+	}
+
+	cmd := AccessedRequest{
+		CommandCommon: CommandCommon{CommandId: CmdGetAccessed},
+		WorkspaceRoot: wsr,
+	}
+
+	bytes, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(bytes)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+
+	var accesslistResponse AccessListResponse
+	err = json.Unmarshal(buf, &accesslistResponse)
+	if err != nil {
+		return err
+	}
+
+	printAccessList(accesslistResponse.AccessList)
+	return nil
+}
+
+// clear the list of accessed files in workspaceroot
+func (api *Api) ClearAccessed(wsr string) error {
+	if !isWorkspaceNameValid(wsr) {
+		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+	}
+
+	cmd := AccessedRequest{
+		CommandCommon: CommandCommon{CommandId: CmdClearAccessed},
+		WorkspaceRoot: wsr,
+	}
+
+	bytes, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(bytes)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
 	return nil
 }
 
@@ -185,4 +272,26 @@ func (api *Api) SyncAll() error {
 	}
 
 	return nil
+}
+
+func isWorkspaceNameValid(wsr string) bool {
+	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+		return false
+	}
+	return true
+}
+
+func printAccessList(list map[string]bool) {
+	fmt.Println("------ Created Files ------")
+	for key, val := range list {
+		if val {
+			fmt.Println(key)
+		}
+	}
+	fmt.Println("------ Accessed Files ------")
+	for key, val := range list {
+		if !val {
+			fmt.Println(key)
+		}
+	}
 }

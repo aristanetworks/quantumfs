@@ -29,6 +29,10 @@ func main() {
 		fmt.Println("         - create a new workspaceN which is a copy of" +
 			" workspaceO")
 		fmt.Println("           as of this point in time")
+		fmt.Println("  accessedFiles <workspace>")
+		fmt.Println("         - get the access list of workspace")
+		fmt.Println("  clearAccessedFiles <workspace>")
+		fmt.Println("         - clear the access list of workspace")
 		os.Exit(exitBadCmd)
 	}
 
@@ -40,6 +44,10 @@ func main() {
 
 	case "branch":
 		branch()
+	case "accessedFiles":
+		getAccessed()
+	case "clearAccessedFiles":
+		clearAccessed()
 	}
 }
 
@@ -58,6 +66,44 @@ func branch() {
 	fmt.Printf("Branching workspace \"%s\" into \"%s\"\n", src, dst)
 	api := quantumfs.NewApi()
 	err := api.Branch(src, dst)
+
+	if err != nil {
+		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+// Implement the accessed command
+func getAccessed() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for getAccessed command")
+		os.Exit(exitBadArgs)
+	}
+
+	workspaceName := flag.Arg(1)
+
+	fmt.Printf("Getting the accessed list of Workspace:\"%s\"\n", workspaceName)
+	api := quantumfs.NewApi()
+	err := api.GetAccessed(workspaceName)
+
+	if err != nil {
+		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+// Implement the clearaccessed command
+func clearAccessed() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for clearAccessed command")
+		os.Exit(exitBadArgs)
+	}
+
+	wsr := flag.Arg(1)
+
+	fmt.Printf("Clearing the accessed list of WorkspaceRoot:\"%s\"\n", wsr)
+	api := quantumfs.NewApi()
+	err := api.ClearAccessed(wsr)
 
 	if err != nil {
 		fmt.Println("Operations failed:", err)

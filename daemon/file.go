@@ -15,48 +15,50 @@ import "github.com/hanwen/go-fuse/fuse"
 
 const FMODE_EXEC = 0x20 // From Linux
 
-func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newVeryLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newVeryLargeAccessor(c, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newFile_(c *ctx, inodeNum InodeId,
+func newFile_(c *ctx, name string, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
+			name_:     name,
+			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
 		accessor: accessor,
@@ -169,6 +171,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
 	}
+	fi.self.markSelfAccessed(c, false)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())

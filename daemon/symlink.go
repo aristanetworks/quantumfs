@@ -12,13 +12,15 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
+			name_:     name,
+			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
 		key: key,
@@ -45,6 +47,7 @@ type Symlink struct {
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	link.self.markSelfAccessed(c, false)
 	return fuse.OK
 }
 
@@ -116,6 +119,7 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 }
 
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
+	link.self.markSelfAccessed(c, false)
 	data := c.dataStore.Get(&c.Ctx, link.key)
 	if data == nil {
 		return nil, fuse.EIO

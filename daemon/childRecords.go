@@ -78,8 +78,8 @@ func (cr *childRecords) instantiateChild_(c *ctx, entry *quantumfs.DirectoryReco
 		constructor = newSpecial
 	}
 
-	c.qfs.setInode(c, inodeId, constructor(c, entry.ID(), entry.Size(),
-		inodeId, cr.dir, 0, 0, nil))
+	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
+		entry.Size(), inodeId, cr.dir.self, 0, 0, nil))
 }
 
 func (cr *childRecords) insertRecord(c *ctx, inode InodeId,
@@ -190,17 +190,25 @@ func (cr *childRecords) dirty(c *ctx, inodeNum InodeId) {
 
 func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 	if oldName == newName {
+		inodeId := cr.data.fileToInode[oldName]
+		child := c.qfs.inode(c, inodeId)
+		child.markSelfAccessed(c, false)
 		return
 	}
 
 	cr.loadData_(c)
 
 	oldInodeId := cr.data.fileToInode[oldName]
+	child := c.qfs.inode(c, oldInodeId)
+	child.markSelfAccessed(c, false)
+
 	// If a file already exists with newName, we need to clean it up
 	cleanupInodeId := cr.data.fileToInode[newName]
 
 	cr.entries[newName] = cr.data.records[oldInodeId]
 	cr.data.records[oldInodeId].SetFilename(newName)
+	child.setName(newName)
+	child.markSelfAccessed(c, true)
 
 	cr.data.fileToInode[newName] = oldInodeId
 	delete(cr.data.fileToInode, oldName)

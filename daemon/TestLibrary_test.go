@@ -14,6 +14,7 @@ import "io"
 import "io/ioutil"
 import "math/rand"
 import "os"
+import "reflect"
 import "runtime"
 import "runtime/debug"
 import "strings"
@@ -812,6 +813,23 @@ func (test *testHelper) fileSize(filename string) int64 {
 	err := syscall.Stat(filename, &stat)
 	test.assert(err == nil, "Error stat'ing test file: %v", err)
 	return stat.Size
+}
+
+func (test *testHelper) getAccessList(workspace string) map[string]bool {
+	relpath := test.relPath(workspace)
+	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relpath)
+	test.assert(ok,
+		"Workspace %s does not exist or is not active", workspace)
+	return wsr.getList()
+}
+
+func (test *testHelper) assertAccessList(testlist map[string]bool,
+	wsrlist map[string]bool, message string) {
+
+	eq := reflect.DeepEqual(testlist, wsrlist)
+	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
+	message = message + msg
+	test.assert(eq, message)
 }
 
 var genDataMutex sync.RWMutex
