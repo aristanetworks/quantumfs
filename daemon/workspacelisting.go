@@ -54,6 +54,16 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
+	nsl.markAccessed(c, "", created)
+	return
+}
+
+func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
+	c.elog("Invalid markAccessed on NamespaceList")
+	return
+}
+
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	fillAttr(attr, inodeNum,
 		uint32(c.workspaceDB.NumNamespaces(&c.Ctx)))
@@ -157,6 +167,15 @@ func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32,
 func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
+	ds := newDirectorySnapshot(c, nsl)
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	out.Fh = uint64(ds.FileHandleCommon.id)
+	out.OpenFlags = 0
+
+	return fuse.OK
+}
+
+func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
 		newWorkspaceList)
 	children := snapshotChildren(c, &nsl.namespaces, fillNamespaceAttr)
@@ -168,12 +187,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	fillApiAttr(&api.attr)
 	children = append(children, api)
 
-	ds := newDirectorySnapshot(c, children, nsl.InodeCommon.id, nsl.treeLock())
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
-	out.Fh = uint64(ds.FileHandleCommon.id)
-	out.OpenFlags = 0
-
-	return fuse.OK
+	return children
 }
 
 func (nsl *NamespaceList) Lookup(c *ctx, name string,
@@ -403,17 +417,21 @@ func (wsl *WorkspaceList) Open(c *ctx, flags uint32, mode uint32,
 func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
 
-	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
-		&wsl.workspaces, newWorkspaceRoot)
-	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
-
-	ds := newDirectorySnapshot(c, children, wsl.InodeCommon.id, wsl.treeLock())
+	ds := newDirectorySnapshot(c, wsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = 0
 
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
+	updateChildren(c, wsl.namespaceName,
+		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+		&wsl.workspaces, newWorkspaceRoot)
+	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
+
+	return children
 }
 
 func (wsl *WorkspaceList) Lookup(c *ctx, name string,
@@ -581,4 +599,14 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on WorkspaceList")
 	return fuse.ENODATA
+}
+
+func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
+	wsl.markAccessed(c, "", created)
+	return
+}
+
+func (wsl *WorkspaceList) markAccessed(c *ctx, path string, created bool) {
+	c.elog("Invalid markAccessed on WorkspaceList")
+	return
 }

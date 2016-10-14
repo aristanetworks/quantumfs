@@ -778,7 +778,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReadDir Enter Fh %d", input.Fh)
+	c.vlog("QuantumFs::ReadDir Enter Fh: %d offset %d", input.Fh, input.Offset)
 	defer c.vlog("QuantumFs::ReadDir Exit")
 
 	c.elog("Unhandled request ReadDir")
@@ -792,7 +792,8 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReadDirPlus Enter Fh %d", input.Fh)
+	c.vlog("QuantumFs::ReadDirPlus Enter Fh: %d offset %d", input.Fh,
+		input.Offset)
 	defer c.vlog("QuantumFs::ReadDirPlus Exit")
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
@@ -856,4 +857,15 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
 	qfs.c.elog("Unhandled request Init")
+}
+
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, name string) (*WorkspaceRoot, bool) {
+
+	c.vlog("QuantumFs::getWorkspaceRoot %s", name)
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+
+	wsr, exists := qfs.activeWorkspaces[name]
+	return wsr, exists
 }
