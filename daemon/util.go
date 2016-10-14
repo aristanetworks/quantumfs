@@ -69,7 +69,7 @@ func assert(condition bool, msg string) {
 }
 
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	entry *quantumfs.DirectoryRecord) {
+	entry *quantumfs.DirectoryRecord, updateMtime bool) {
 
 	// Update the type if needed
 	if newType != nil {
@@ -80,6 +80,13 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 	valid := uint(attr.SetAttrInCommon.Valid)
 	// We don't support file locks yet, but when we do we need
 	// FATTR_LOCKOWNER
+
+	var now quantumfs.Time
+	if BitAnyFlagSet(valid, fuse.FATTR_MTIME_NOW) ||
+		!BitFlagsSet(valid, fuse.FATTR_CTIME) || updateMtime {
+
+		now = quantumfs.NewTime(time.Now())
+	}
 
 	if BitFlagsSet(valid, fuse.FATTR_MODE) {
 		entry.SetPermissions(modeToPermissions(attr.Mode, 0))
@@ -110,7 +117,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_MTIME_NOW) {
-		entry.SetModificationTime(quantumfs.NewTime(time.Now()))
+		entry.SetModificationTime(now)
 		c.vlog("ModificationTime now %d", entry.ModificationTime())
 	}
 
@@ -124,6 +131,21 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 		entry.SetCreationTime(quantumfs.NewTimeSeconds(attr.Ctime,
 			attr.Ctimensec))
 		c.vlog("CreationTime now %d", entry.CreationTime())
+	}
+
+	// Since we've updated the file attributes we need to update at least its
+	// ctime (unless we've explicitly set its ctime).
+	if !BitAnyFlagSet(valid, fuse.FATTR_CTIME) {
+		c.vlog("Updated ctime")
+		attr.Ctime = now.Seconds()
+		attr.Ctimensec = now.Nanoseconds()
+	}
+	if updateMtime && !BitAnyFlagSet(valid,
+		fuse.FATTR_MTIME|fuse.FATTR_MTIME_NOW) {
+
+		c.vlog("Updated mtime")
+		attr.Mtime = now.Seconds()
+		attr.Mtimensec = now.Nanoseconds()
 	}
 }
 
