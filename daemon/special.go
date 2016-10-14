@@ -116,7 +116,7 @@ func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	return special.parent().setChildAttr(c, special.InodeCommon.id,
-		nil, attr, out)
+		nil, attr, out, false)
 }
 
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -205,7 +205,7 @@ func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 
 func (special *Special) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on Special")
 	return fuse.ENOSYS

@@ -97,7 +97,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = uint64(dir.dirChildren.count())
-		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil)
+		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
@@ -342,7 +342,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -352,7 +352,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			return fuse.ENOENT
 		}
 
-		modifyEntryWithAttr(c, newType, attr, entry)
+		modifyEntryWithAttr(c, newType, attr, entry, updateMtime)
 
 		if out != nil {
 			fillAttrOutCacheData(c, out)
@@ -546,7 +546,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	c.vlog("Directory::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
 	defer c.vlog("Directory::SetAttr Exit")
 
-	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out)
+	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out, false)
 }
 
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
