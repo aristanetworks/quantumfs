@@ -92,7 +92,8 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out)
+	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out,
+		false)
 }
 
 func (link *Symlink) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -179,7 +180,7 @@ func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 
 func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on Symlink")
 	return fuse.ENOSYS

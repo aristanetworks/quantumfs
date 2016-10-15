@@ -207,7 +207,7 @@ func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
 
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on ApiInode")
 	return fuse.ENOSYS
