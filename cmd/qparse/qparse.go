@@ -34,11 +34,6 @@ var maxLenWildcards *int
 var maxLen *int
 
 var wildcardStr string
-// All possible combinations of wildcards becomes exponentially large. Given a
-// sequence length, here's the number of wildcards that can be used to keep
-// nunber of iterations <= around 700k. Sequences > 30 in length won't be wildcarded.
-var maxCombinations map[int]int
-var longCombinationsStart int
 
 // -- worker structures
 
@@ -279,20 +274,6 @@ func init() {
 	// The wildcard character / string needs to be something that would never
 	// show in a log so that we can use strings as map keys
 	wildcardStr = string([]byte { 7 })
-	maxCombinations = map[int]int {
-		30:	6,
-		29:	6,
-		28:	6,
-		27:	6,
-		26:	6,
-		25:	7,
-		24:	7,
-		23:	7,
-		22:	8,
-		21:	9,
-		20:	11,
-	}
-	longCombinationsStart = 20
 
 	file = flag.String("f", "", "Specify a log file")
 	statFile = flag.String("fstat", "", "Specify a statistics file")
@@ -513,23 +494,36 @@ func newWildcardedSeq(seq []qlog.LogOutput, wc []bool) wildcardedSequence {
 }
 
 type ConcurrentMap struct {
-	mutex	sync.RWMutex
-	data	map[string]wildcardedSequence
+	mutex		sync.RWMutex
+	dataByList	map[string]*wildcardedSequence
+	strToList	map[string]string
 }
 
 func (l *ConcurrentMap) Exists(key string) bool {
 //	l.mutex.RLock()
 //	defer l.mutex.RUnlock()
 
-	_, exists := l.data[key]
+	_, exists := l.strToList[key]
 	return exists
 }
 
-func (l *ConcurrentMap) Set(newKey string, newData wildcardedSequence) {
+func (l *ConcurrentMap) Listed(listAsStr string) *wildcardedSequence {
+	entry, exists := l.dataByList[listAsStr]
+	if exists {
+		return entry
+	}
+
+	return nil
+}
+
+func (l *ConcurrentMap) Set(newKey string, newListKey string,
+	newData *wildcardedSequence) {
+
 //	l.mutex.Lock()
 //	defer l.mutex.Unlock()
 
-	l.data[newKey] = newData
+	l.dataByList[newListKey] = newData
+	l.strToList[newKey] = newListKey
 }
 
 func recurseGenPatterns(seq []qlog.LogOutput, sequences []SequenceData,
@@ -565,9 +559,11 @@ func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 
 	// Count how many unique sequences match this sequence (with wildcards)
 	matches := 0
+	matchStr := ""
 	for i := 0; i < len(sequences); i++ {
 		if qlog.PatternMatches(seq, curMask, sequences[i].Seq) {
 			matches++
+			matchStr += strconv.Itoa(i) + "|"
 		}
 	}
 
@@ -576,11 +572,24 @@ func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 		return
 	}
 
-	// we compress wildcards when adding an entry, but can't do so when recursing
-	seqStr := genSeqStrExt(seq, curMask, false)
+	// If there's already an identical mapping on ConcurrentMap, there's no point
+	// in returning both. Only choose the one with more effective wildcards
+	oldEntry := out.Listed(matchStr)
+	setEntry := false
+	if oldEntry == nil || (countWildcards(curMask, false) <
+		countWildcards(oldEntry.wildcards, false)) {
 
-	// There are at least two matches for this combo. This qualifies as a result
-	out.Set(seqStr, newWildcardedSeq(seq, curMask))
+		setEntry = true
+	}
+
+	if setEntry {
+		// we compress wildcards when adding an entry,
+		// but can't do so when recursing
+		seqStr := genSeqStrExt(seq, curMask, false)
+
+		newEntry := newWildcardedSeq(seq, curMask)
+		out.Set(seqStr, matchStr, &newEntry)
+	}
 
 	// If there are exactly two matches, then we don't need to recurse because
 	// we've already accounted for the most wildcarded version of this sequence
@@ -622,7 +631,8 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 	fmt.Printf("Generating all log patterns from %d unique sequences...\n",
 		len(sequences))
 	patterns := ConcurrentMap {
-		data:	make(map[string]wildcardedSequence),
+		dataByList:	make(map[string]*wildcardedSequence),
+		strToList:	make(map[string]string),
 	}
 	for i := 0; i < len(sequences); i++ {
 		// Update the status bar
@@ -630,22 +640,23 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 
 		recurseGenPatterns(sequences[i].Seq, sequences, &patterns /*out*/)
 
+		matchStr := strconv.Itoa(i)
 		// recurseGenPatterns will overlook the "no wildcards" sequence,
 		// so we must add that ourselves
-		patterns.Set(genSeqStr(sequences[i].Seq),
-			newWildcardedSeq(sequences[i].Seq, []bool{}))
+		newEntry := newWildcardedSeq(sequences[i].Seq, []bool{})
+		patterns.Set(genSeqStr(sequences[i].Seq), matchStr, &newEntry)
 	}
 	status.Process(1)
 
-	rawResults := make([]PatternData, len(patterns.data))
+	rawResults := make([]PatternData, len(patterns.dataByList))
 
 	// Now collect all the data for the sequences, allowing wildcards
 	fmt.Printf("Collecting data for each of %d wildcard-ed subsequences...\n",
-		len(patterns.data))
+		len(patterns.dataByList))
 	status = qlog.NewLogStatus(50)
 	mapIdx := 0
-	for _, wcseq := range patterns.data {
-		status.Process(float32(mapIdx) / float32(len(patterns.data)))
+	for _, wcseq := range patterns.dataByList {
+		status.Process(float32(mapIdx) / float32(len(patterns.dataByList)))
 		mapIdx++
 
 		var newResult PatternData
@@ -678,11 +689,10 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 
 	// Now sort by total time usage
 	sort.Sort(SortResultsTotal(rawResults))
-
+if false {
 	fmt.Println("Filtering out duplicate entries...")
 	status = qlog.NewLogStatus(50)
 	// Filter out any duplicates (resulting from ineffectual wildcards)
-	currentSeq := ""
 	currentData := PatternData{}
 	filteredResults := make([]PatternData, 0)
 	for i := 0; i <= len(rawResults); i++ {
@@ -695,8 +705,16 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 
 		// If the sequences are the same, but have different stats then
 		// they should be considered different
-		if result.SeqStrRaw != currentSeq || result.Sum != currentData.Sum ||
-			result.Stddev != currentData.Stddev {
+		matchingSeqWildcarded := (qlog.PatternMatches(result.Data.Seq,
+			result.Wildcards, currentData.Data.Seq) ||
+			qlog.PatternMatches(currentData.Data.Seq,
+			currentData.Wildcards, result.Data.Seq))
+
+		if i == 0 ||
+			result.Sum != currentData.Sum ||
+			result.Avg != currentData.Avg ||
+			result.Stddev != currentData.Stddev ||
+			!matchingSeqWildcarded {
 
 			// We've finished going through a group of duplicates, so
 			// add their most wildcarded member
@@ -704,7 +722,6 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 				filteredResults = append(filteredResults,
 					currentData)
 			}
-			currentSeq = result.SeqStrRaw
 			currentData = result
 		} else {
 			// We have a duplicate
@@ -716,8 +733,8 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 		}
 	}
 	fmt.Printf("Number of results now: %d\n", len(filteredResults))
-
-	return filteredResults
+}
+	return rawResults
 }
 
 // stddev units are microseconds
