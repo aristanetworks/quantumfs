@@ -229,11 +229,6 @@ func chroot() {
 		}
 	}
 
-	// have it hard coded because we still don't have
-	// proper workspaces under quantumfs
-	cmdChroot := make([]string, 0)
-	cmdChroot = append(cmdChroot, bash)
-
 	prechrootCmd := fmt.Sprintf("%s %s -n --rbind %s %s;",
 		sudo, mount, rootdir, rootdir)
 
@@ -268,7 +263,8 @@ func chroot() {
 			continue
 		}
 
-		dstdevCmd = fmt.Sprintf("%s %s -n --bind %s %s;", sudo, mount, src, dst)
+		dstdevCmd = fmt.Sprintf("%s %s -n --bind %s %s;",
+			sudo, mount, src, dst)
 		prechrootCmd = prechrootCmd + dstdevCmd
 	}
 	fmt.Println(prechrootCmd)
@@ -279,9 +275,9 @@ func chroot() {
 		return
 	}
 
-	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd, "-d", "--no-netns-env",
-		"-f", "m", "--chroot="+rootdir, "--pre-chroot-cmd="+prechrootCmd,
-		svrName)
+	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd,
+		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
+		"--pre-chroot-cmd="+prechrootCmd, svrName)
 	var cmdNetnsdError bytes.Buffer
 	cmdNetnsd.Stderr = &cmdNetnsdError
 	err = cmdNetnsd.Run()
