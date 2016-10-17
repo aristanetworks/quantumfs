@@ -689,51 +689,7 @@ func getStatPatterns(logs []qlog.LogOutput) []PatternData {
 
 	// Now sort by total time usage
 	sort.Sort(SortResultsTotal(rawResults))
-if false {
-	fmt.Println("Filtering out duplicate entries...")
-	status = qlog.NewLogStatus(50)
-	// Filter out any duplicates (resulting from ineffectual wildcards)
-	currentData := PatternData{}
-	filteredResults := make([]PatternData, 0)
-	for i := 0; i <= len(rawResults); i++ {
-		status.Process(float32(i) / float32(len(rawResults)))
 
-		var result PatternData
-		if i < len(rawResults) {
-			result = rawResults[i]
-		}
-
-		// If the sequences are the same, but have different stats then
-		// they should be considered different
-		matchingSeqWildcarded := (qlog.PatternMatches(result.Data.Seq,
-			result.Wildcards, currentData.Data.Seq) ||
-			qlog.PatternMatches(currentData.Data.Seq,
-			currentData.Wildcards, result.Data.Seq))
-
-		if i == 0 ||
-			result.Sum != currentData.Sum ||
-			result.Avg != currentData.Avg ||
-			result.Stddev != currentData.Stddev ||
-			!matchingSeqWildcarded {
-
-			// We've finished going through a group of duplicates, so
-			// add their most wildcarded member
-			if i > 0 {
-				filteredResults = append(filteredResults,
-					currentData)
-			}
-			currentData = result
-		} else {
-			// We have a duplicate
-			if countWildcards(result.Wildcards, true) >
-				countWildcards(currentData.Wildcards, true) {
-
-				currentData = result
-			}
-		}
-	}
-	fmt.Printf("Number of results now: %d\n", len(filteredResults))
-}
 	return rawResults
 }
 
