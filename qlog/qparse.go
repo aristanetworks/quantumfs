@@ -29,6 +29,75 @@ type LogOutput struct {
 	Args		[]interface{}
 }
 
+// What the current patternIdx we're looking for is, and whether we can ignore
+// mismatched strings while looking for it
+type matchState struct {
+	patternIdx	int
+	matchAnyStr	bool
+}
+
+func newMatchState(p int, m bool) matchState {
+	return matchState {
+		patternIdx:	p,
+		matchAnyStr:	m,
+	}
+}
+
+// Determine whether pattern, using wildcards, exists within data. We do this instead
+// of regex because we have a simple enough case and regex is super slow
+func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) bool {
+	stateStack := make([]matchState, 0, len(pattern))
+	stateStack = append(stateStack, newMatchState(0, true))
+
+	for i := 0; i < len(data); i++ {
+		curState := stateStack[len(stateStack)-1]
+
+		if pattern[curState.patternIdx].Format != data[i].Format {
+			if !curState.matchAnyStr {
+				// We saw a mismatch and weren't allowed to, so this
+				// can't be the right subsequence and we must go back
+				// to the last valid state that allowed wildcards
+				for j := len(stateStack)-1; j > 0; j-- {
+					stateStack = stateStack[:j]
+					if stateStack[j-1].matchAnyStr {
+						break
+					}
+				}
+			}
+			// otherwise there's no issue just continue on
+		} else {
+			// The pattern matches, so we need to advance the patternIdx
+			matchAnyStr := false
+			patternIdx := curState.patternIdx
+			for {
+				patternIdx++
+				if patternIdx >= len(pattern) {
+					// we've reached the end of the pattern,
+					// meaning we have a match
+					return true
+				}
+
+				if patternIdx < len(wildcards) &&
+					wildcards[patternIdx] {
+
+					matchAnyStr = true
+				} else {
+					// we've found a new pattern token that isn't
+					// a wildcard. We're done advancing.
+					break
+				}
+			}
+			// Add the new state
+			stateStack = append(stateStack, newMatchState(patternIdx,
+				matchAnyStr))
+		}
+	}
+
+	// We reached the end of the data and never reached the end of the pattern,
+	// so there's no match
+	return false
+}
+
 func newLog(s LogSubsystem, r uint64, t int64, f string,
 	args []interface{}) LogOutput {
 
