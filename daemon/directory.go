@@ -97,7 +97,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = uint64(dir.dirChildren.count())
-		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil)
+		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
@@ -184,10 +184,10 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	attr.Atime = entry.ModificationTime().Seconds()
 	attr.Mtime = entry.ModificationTime().Seconds()
-	attr.Ctime = entry.CreationTime().Seconds()
+	attr.Ctime = entry.ContentTime().Seconds()
 	attr.Atimensec = entry.ModificationTime().Nanoseconds()
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
-	attr.Ctimensec = entry.CreationTime().Nanoseconds()
+	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
 	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %d", fileType,
 		entry.Permissions())
@@ -342,7 +342,7 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -352,7 +352,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			return fuse.ENOENT
 		}
 
-		modifyEntryWithAttr(c, newType, attr, entry)
+		modifyEntryWithAttr(c, newType, attr, entry, updateMtime)
 
 		if out != nil {
 			fillAttrOutCacheData(c, out)
@@ -380,6 +380,9 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	c.vlog("Directory::GetAttr Enter")
+	defer c.vlog("Directory::GetAttr Exit")
+
 	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)
@@ -484,7 +487,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	entry.SetGroup(quantumfs.ObjectGid(c.Ctx, gid, gid))
 	entry.SetSize(0)
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
-	entry.SetCreationTime(quantumfs.NewTime(now))
+	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
 
 	inodeNum := c.qfs.newInodeId()
@@ -546,7 +549,8 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	c.vlog("Directory::SetAttr Enter valid %x size %d", attr.Valid, attr.Size)
 	defer c.vlog("Directory::SetAttr Exit")
 
-	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out)
+	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
+		false)
 }
 
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,

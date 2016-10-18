@@ -70,7 +70,8 @@ type Inode interface {
 
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
+		attr *fuse.SetAttrIn, out *fuse.AttrOut,
+		updateMtime bool) fuse.Status
 
 	getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord, error)
 
