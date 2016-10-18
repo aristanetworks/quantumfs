@@ -326,10 +326,6 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 func (th *testHelper) startDefaultQuantumFs() {
 	config := th.defaultConfig()
 
-	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
-		th.t.Fatalf("Unable to setup test ramfs path")
-	}
-
 	th.startQuantumFs(config)
 }
 
@@ -401,7 +397,11 @@ func serveSafely(th *testHelper) {
 }
 
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
-	th.log("Intantiating quantumfs instance...")
+	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
+		th.t.Fatalf("Unable to setup test ramfs path")
+	}
+
+	th.log("Instantiating quantumfs instance...")
 	quantumfs := NewQuantumFsLogs(config, th.logger)
 	th.qfs = quantumfs
 	// Keep all inodes to allow us to check the inode structure
