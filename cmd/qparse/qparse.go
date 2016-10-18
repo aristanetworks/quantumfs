@@ -19,8 +19,8 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-var file *string
-var statFile *string
+var inFile *string
+var outFile *string
 var tabSpaces *int
 var logOut *bool
 var stats *bool
@@ -275,14 +275,15 @@ func init() {
 	// show in a log so that we can use strings as map keys
 	wildcardStr = string([]byte { 7 })
 
-	file = flag.String("f", "", "Specify a log file")
-	statFile = flag.String("fstat", "", "Specify a statistics file")
+	inFile = flag.String("in", "", "Specify an input file")
+	outFile = flag.String("out", "", "Specify an output file")
 	tabSpaces = flag.Int("tab", 0,
 		"Indent function logs with n spaces, when using -log")
-	logOut = flag.Bool("log", false, "Parse a log file (-f) and print to stdout")
-	stats = flag.Bool("stat", false, "Parse a log file (-f) and output to a "+
-		"stats file (-fstat). Default stats filename is logfile.stats")
-	topTotal = flag.Bool("bytotal", false, "Parse a stat file (-fstat) and "+
+	logOut = flag.Bool("log", false,
+		"Parse a log file (-in) and print to stdout")
+	stats = flag.Bool("stat", false, "Parse a log file (-in) and output to a "+
+		"stats file (-out). Default stats filename is logfile.stats")
+	topTotal = flag.Bool("bytotal", false, "Parse a stat file (-in) and "+
 		"print top functions by total time usage in logs")
 	stdDevMin = flag.Float64("smin", 0, "Filter results, requiring minimum "+
 		"standard deviation of <stdmin>. Float units of microseconds")
@@ -297,7 +298,7 @@ func init() {
 		"Max sequence length to return in results")
 
 	flag.Usage = func() {
-		fmt.Printf("Usage: %s -f <filepath> [flags]\n\n", os.Args[0])
+		fmt.Printf("Usage: %s -in <filepath> [flags]\n\n", os.Args[0])
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 	}
@@ -372,39 +373,39 @@ func main() {
 	}
 
 	if *logOut {
-		if *file == "" {
-			fmt.Println("To -log, you must specify a log file with -f")
+		if *inFile == "" {
+			fmt.Println("To -log, you must specify a log file with -in")
 			os.Exit(1)
 		}
 
 		// Log parse mode only
-		fmt.Println(qlog.ParseLogsExt(*file, *tabSpaces,
+		fmt.Println(qlog.ParseLogsExt(*inFile, *tabSpaces,
 			*maxThreads))
 	} else if *stats {
-		if *file == "" {
-			fmt.Println("To -stat, you must specify a log file with -f")
+		if *inFile == "" {
+			fmt.Println("To -stat, you must specify a log file with -in")
 			os.Exit(1)
 		}
-		outFile := *file + ".stats"
-		if *statFile != "" {
-			outFile = *statFile
+		outFilename := *inFile + ".stats"
+		if *outFile != "" {
+			outFilename = *outFile
 		}
 
-		pastEndIdx, dataArray, strMap := qlog.ExtractFields(*file)
+		pastEndIdx, dataArray, strMap := qlog.ExtractFields(*inFile)
 		logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
 			*maxThreads, true)
 
 		patterns := getStatPatterns(logs)
-		saveToStat(outFile, patterns)
-		fmt.Printf("Stats file created: %s\n", outFile)
+		saveToStat(outFilename, patterns)
+		fmt.Printf("Stats file created: %s\n", outFilename)
 	} else if *topTotal {
-		if *statFile == "" {
+		if *inFile == "" {
 			fmt.Println("To -topTotal, you must specify a stat file "+
-				"with -fstat")
+				"with -in")
 			os.Exit(1)
 		}
 
-		patterns := loadFromStat(*statFile)
+		patterns := loadFromStat(*inFile)
 		showTopTotalStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
 			*wildMax, *maxLen)
 	} else {
@@ -749,6 +750,7 @@ func showTopTotalStats(patterns []PatternData, minStdDev float64, maxStdDev floa
 		fmt.Printf("Average sequence time: %12s\n",
 			time.Duration(result.Avg).String())
 		fmt.Printf("Number of samples: %d\n", len(result.Data.Times))
+		fmt.Printf("Sequence Index: %d\n", i)
 		fmt.Printf("Standard Deviation: %12s\n",
 			time.Duration(result.Stddev).String())
 		fmt.Println("")
