@@ -1,8 +1,8 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// chroot implements the quantumfs chroot tool as one option in
-// qfs tools
+// chroot runs a shell in the current workspace tree, in which
+// the current workspace root becomes the filesystem root
 package main
 
 import "bytes"
@@ -11,78 +11,26 @@ import "io/ioutil"
 import "os"
 import "os/exec"
 import "os/user"
-import "runtime"
-import "strconv"
 import "strings"
 import "syscall"
 
 const (
-	sudo    = "/usr/bin/sudo"
-	mount   = "/bin/mount"
-	netns   = "/usr/bin/netns"
-	netnsd  = "/usr/bin/netnsd"
-	setarch = "/usr/bin/setarch"
-	cp      = "/bin/cp"
-	sh      = "/bin/sh"
-	bash    = "/bin/bash"
+	sudo       = "/usr/bin/sudo"
+	mount      = "/bin/mount"
+	netns      = "/usr/bin/netns"
+	netnsd     = "/usr/bin/netnsd"
+	setarch    = "/usr/bin/setarch"
+	cp         = "/bin/cp"
+	sh         = "/bin/sh"
+	bash       = "/bin/bash"
+	ArtoolsDir = "/usr/share/Artools"
 )
-
-var ArtoolsDir string
-
-func init() {
-	if runtime.GOOS == "darwin" {
-		ArtoolsDir = "/usr/local/share/Artools"
-	} else {
-		ArtoolsDir = "/usr/share/Artools"
-	}
-}
-
-// this function checks all parent directories of current directory
-// to find the workspaceroot, that is the directory whose grandparent
-// is the mountpoint of quantumfsd
-// BUT: so far we still cannot make a quantumfs workspace into a proper
-// workspace with "a4 newtree", so although this method should be adequate
-// to find the root directory to chroot into, it is still not used
-func findLegitimateChrootPoint() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	cmdMountstats := exec.Command("cat", "/proc/self/mountstats")
-	var outputMountstats bytes.Buffer
-	cmdMountstats.Stdout = &outputMountstats
-	err = cmdMountstats.Run()
-	if err != nil {
-		fmt.Println("cmdMountstats run error")
-		return "", err
-	}
-
-	dirs := strings.Split(wd, "/")
-	for len(dirs) >= 3 {
-		mountpoint := strings.Join(dirs[0:len(dirs)-2], "/")
-		wsr := strings.Join(dirs[len(dirs)-2:len(dirs)], "/")
-
-		grepArg := "mounted on " + mountpoint + " with fstype fuse.quantumfs"
-		cmdGrep := exec.Command("grep", grepArg)
-		var outputGrep bytes.Buffer
-		cmdGrep.Stdin = strings.NewReader(outputMountstats.String())
-		cmdGrep.Stdout = &outputGrep
-		err = cmdGrep.Run()
-		if err == nil {
-			return mountpoint + "/" + wsr, nil
-		}
-		dirs = dirs[0 : len(dirs)-1]
-	}
-
-	return "", fmt.Errorf("Invalid path for chroot")
-}
 
 // This function comes from the implementation of chroot in Artools,
 // but we are going to get rid of the dependency on Artools so it will
 // become deprecated when we can make a quantumfs workspace into a proper
 // workspace with "a4 newtree"
-func findContainerRoot() (string, error) {
+func findWorkspaceRoot() (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -104,7 +52,7 @@ func findContainerRoot() (string, error) {
 	return "", fmt.Errorf("Invalid path for chroot")
 }
 
-// this function makes dst given the type of src if dst does not exist
+// this function creates dst given the type of src if dst does not exist
 func makedest(src, dst string) bool {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
@@ -135,7 +83,7 @@ func makedest(src, dst string) bool {
 	}
 }
 
-// get all the necessary homedirectories
+// get all the necessary home directories
 func homedirs() []string {
 	homes := make([]string, 0)
 
@@ -156,16 +104,10 @@ func homedirs() []string {
 func processArchitecture(arch string) (string, error) {
 	archs := strings.Split(arch, "_")
 	archStr := strings.Join(archs[:len(archs)-1], "_")
-	osVersion, err := strconv.Atoi(archs[len(archs)-1])
-	if err != nil {
-		return "", fmt.Errorf("Invalid OS version")
-	}
 
 	switch archStr {
 	case "i386":
-		if osVersion >= 12 {
-			return "i686", nil
-		}
+		return "i686", nil
 	case "x86_64":
 		return "x86_64", nil
 	}
@@ -194,66 +136,46 @@ func serverRunning(svrName string) bool {
 	}
 }
 
-// login the netns server and open a new login shell
+// login the netns server and open a new login shell, which is not
+// expected to return
 func netnsLogin(rootdir string, svrName string, root bool) error {
 	var err error
 	env := os.Environ()
 	env = append(env, "A4_CHROOT="+rootdir)
 	if root {
-		err = syscall.Exec(sudo,
-			[]string{sudo, netns, svrName, sh, "-l", "-c",
-				"\"$@\"", bash, bash},
-			env)
+		args := []string{sudo, netns, svrName, sh, "-l", "-c",
+			"\"$@\"", bash, bash}
+		err = syscall.Exec(sudo, args, env)
 	} else {
-		err = syscall.Exec(netns,
-			[]string{netns, svrName, sh, "-l", "-c",
-				"\"$@\"", bash, bash},
-			env)
+		args := []string{netns, svrName, sh, "-l", "-c",
+			"\"$@\"", bash, bash}
+		err = syscall.Exec(netns, args, env)
 	}
 
 	return err
 }
 
-func chroot() {
-	rootdir, err := findContainerRoot()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	svrName := rootdir + "/chroot"
-	if serverRunning(svrName) {
-		err = netnsLogin(rootdir, svrName, false)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	}
-
-	prechrootCmd := fmt.Sprintf("%s %s -n --rbind %s %s;",
+func chrootInNsd(rootdir string, svrName string) error {
+	cmdBindMountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;",
 		sudo, mount, rootdir, rootdir)
 
-	dstdev := rootdir + "/dev"
-	makedest("/dev", dstdev)
-	dstdevCmd := fmt.Sprintf("%s %s -n -t rmpfs none %s;", sudo, mount, dstdev)
-	prechrootCmd = prechrootCmd + dstdevCmd
+	dstDev := rootdir + "/dev"
+	makedest("/dev", dstDev)
+	cmdMountDev := fmt.Sprintf("%s %s -n -t tmpfs none %s;",
+		sudo, mount, dstDev)
+	cmdCopyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
 
-	dstdevCmd = fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstdev)
-	prechrootCmd = prechrootCmd + dstdevCmd
-
-	dstdev = rootdir + "/var/run/netns"
-	_, err = os.Stat(dstdev)
-	if err != nil && os.IsNotExist(err) {
-		err = os.Mkdir(dstdev, 0666)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
+	dstVar := rootdir + "/var/run/netns"
+	err := os.MkdirAll(dstVar, 0666)
+	if err != nil {
+		return err
 	}
-	dstdevCmd = fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;", sudo, mount, dstdev)
-	prechrootCmd = prechrootCmd + dstdevCmd
+	cmdMountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;",
+		sudo, mount, dstVar)
 
-	paths := []string{"/proc", "/selinux", "/sys",
-		"/dev/pts", "/tmp/.X11-unix", "/tmp/ArosTest.SimulatedDut"}
+	var otherBindMounts string
+	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
+		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
 	homes := homedirs()
 	paths = append(paths, homes...)
 	for i := 0; i < len(paths); i++ {
@@ -262,17 +184,15 @@ func chroot() {
 		if !makedest(src, dst) {
 			continue
 		}
-
-		dstdevCmd = fmt.Sprintf("%s %s -n --bind %s %s;",
-			sudo, mount, src, dst)
-		prechrootCmd = prechrootCmd + dstdevCmd
+		otherBindMounts = otherBindMounts +
+			fmt.Sprintf("%s %s -n --bind %s %s;", sudo, mount, src, dst)
 	}
-	fmt.Println(prechrootCmd)
+	prechrootCmd := cmdBindMountRoot + cmdMountDev +
+		cmdCopyDev + cmdMountVar + otherBindMounts
 
 	archString, err := getArchitecture(rootdir)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		return err
 	}
 
 	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd,
@@ -282,12 +202,29 @@ func chroot() {
 	cmdNetnsd.Stderr = &cmdNetnsdError
 	err = cmdNetnsd.Run()
 	if err != nil {
-		fmt.Println(cmdNetnsdError.String())
+		return err
+	}
+
+	return nil
+}
+
+func chroot() {
+	rootdir, err := findWorkspaceRoot()
+	if err != nil {
+		fmt.Println(err.Error())
 		return
+	}
+	svrName := rootdir + "/chroot"
+
+	if !serverRunning(svrName) {
+		err = chrootInNsd(rootdir, svrName)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 	}
 
 	err = netnsLogin(rootdir, svrName, false)
-
 	if err != nil {
 		fmt.Println(err.Error())
 		return
