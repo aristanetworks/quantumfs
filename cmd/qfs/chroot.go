@@ -156,8 +156,6 @@ func netnsLogin(rootdir string, svrName string, root bool) error {
 }
 
 func chrootInNsd(rootdir string, svrName string) error {
-
-	// make the rootdir path available after chroot
 	cmdBindMountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;",
 		sudo, mount, rootdir, rootdir)
 
