@@ -11,7 +11,6 @@ import "io/ioutil"
 import "os"
 import "os/exec"
 import "os/user"
-import "strconv"
 import "strings"
 import "syscall"
 
@@ -105,16 +104,10 @@ func homedirs() []string {
 func processArchitecture(arch string) (string, error) {
 	archs := strings.Split(arch, "_")
 	archStr := strings.Join(archs[:len(archs)-1], "_")
-	osVersion, err := strconv.Atoi(archs[len(archs)-1])
-	if err != nil {
-		return "", fmt.Errorf("Invalid OS version")
-	}
 
 	switch archStr {
 	case "i386":
-		if osVersion >= 12 {
-			return "i686", nil
-		}
+		return "i686", nil
 	case "x86_64":
 		return "x86_64", nil
 	}
