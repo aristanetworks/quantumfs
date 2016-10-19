@@ -31,7 +31,7 @@ const (
 // but we are going to get rid of the dependency on Artools so it will
 // become deprecated when we can make a quantumfs workspace into a proper
 // workspace with "a4 newtree"
-func findContainerRoot() (string, error) {
+func findWorkspaceRoot() (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -218,7 +218,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 }
 
 func chroot() {
-	rootdir, err := findContainerRoot()
+	rootdir, err := findWorkspaceRoot()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
