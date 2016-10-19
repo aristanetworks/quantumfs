@@ -170,7 +170,8 @@ func chrootInNsd(rootdir string, svrName string) error {
 
 	dstDev := rootdir + "/dev"
 	makedest("/dev", dstDev)
-	cmdMountDev := fmt.Sprintf("%s %s -n -t tmpfs none %s;", sudo, mount, dstDev)
+	cmdMountDev := fmt.Sprintf("%s %s -n -t tmpfs none %s;",
+		sudo, mount, dstDev)
 	cmdCopyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
 
 	dstVar := rootdir + "/var/run/netns"
@@ -178,7 +179,8 @@ func chrootInNsd(rootdir string, svrName string) error {
 	if err != nil {
 		return err
 	}
-	cmdMountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;", sudo, mount, dstVar)
+	cmdMountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;",
+		sudo, mount, dstVar)
 
 	var otherBindMounts string
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
