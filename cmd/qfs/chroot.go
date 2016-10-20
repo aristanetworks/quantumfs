@@ -41,7 +41,9 @@ func findWorkspaceRoot() (string, error) {
 		rootdir := strings.Join(dirs, "/")
 		toolDir := rootdir + ArtoolsDir
 
-		if toolInfo, err := os.Stat(toolDir); err == nil && toolInfo.IsDir() {
+		if toolInfo, err := os.Stat(toolDir); err == nil &&
+			toolInfo.IsDir() {
+
 			return rootdir, nil
 		}
 
