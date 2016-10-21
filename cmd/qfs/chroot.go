@@ -63,7 +63,7 @@ func makedest(src, dst string) bool {
 	}
 
 	dstInfo, err := os.Stat(dst)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return false
 	}
 
