@@ -317,6 +317,11 @@ func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
 }
 
+func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild on File")
+	return nil
+}
+
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }

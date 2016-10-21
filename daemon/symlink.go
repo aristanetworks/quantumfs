@@ -221,6 +221,11 @@ func (link *Symlink) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild on Symlink")
+	return nil
+}
+
 func (link *Symlink) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 

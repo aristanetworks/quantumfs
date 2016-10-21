@@ -246,6 +246,11 @@ func (special *Special) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+func (special *Special) instantiateChild(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild on Special")
+	return nil
+}
+
 func (special *Special) getChildRecord(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 

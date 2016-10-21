@@ -1244,6 +1244,11 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
+func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild on Directory")
+	return nil
+}
+
 type directoryContents struct {
 	// All immutable after creation
 	filename string
