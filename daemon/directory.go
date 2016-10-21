@@ -40,14 +40,11 @@ func initDirectory(c *ctx, name string, dir *Directory,
 		baseLayerId.String())
 	defer c.vlog("initDirectory Exit")
 
-	// Set directory data before processing the children incase the children
+	// Set directory data before processing the children in case the children
 	// access the parent.
-	dir.InodeCommon = InodeCommon{
-		id:        inodeNum,
-		name_:     name,
-		accessed_: 0,
-		self:      dir,
-	}
+	dir.InodeCommon.id = inodeNum
+	dir.InodeCommon.name_ = name
+	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
 	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
@@ -127,6 +124,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	defer c.vlog("Directory::newDirectory Exit")
 
 	var dir Directory
+	dir.self = &dir
 
 	initDirectory(c, name, &dir, baseLayerId, inodeNum,
 		parent, parent.treeLock())
