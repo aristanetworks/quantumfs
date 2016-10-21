@@ -129,15 +129,40 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
-	qfs.mapMutex.RLock()
-	inode, instantiated := qfs.inodes[id]
-	if !instantiated {
-		parent := qfs.uninstantiatedInodes[id]
-		inode = parent.instantiateChild(c, id)
-		delete(qfs.uninstantiatedInodes, id)
-		qfs.inodes[id] = inode
+	inode, needsInstantiation := func() (Inode, bool) {
+		qfs.mapMutex.RLock()
+		defer qfs.mapMutex.RUnlock()
+		inode, instantiated := qfs.inodes[id]
+		if instantiated {
+			return inode, false
+		}
+
+		_, uninstantiated := qfs.uninstantiatedInodes[id]
+		return nil, uninstantiated
+	}()
+
+	if !needsInstantiation {
+		return inode
 	}
-	qfs.mapMutex.RUnlock()
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+	// Recheck in case things changes while we didn't have the lock
+	inode, instantiated := qfs.inodes[id]
+	if instantiated {
+		return inode
+	}
+
+	parent, uninstantiated := qfs.uninstantiatedInodes[id]
+	if !uninstantiated {
+		// We don't know anything about this Inode
+		return nil
+	}
+
+	inode = parent.instantiateChild(c, id)
+	delete(qfs.uninstantiatedInodes, id)
+	qfs.inodes[id] = inode
+
 	return inode
 }
 
