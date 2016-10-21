@@ -19,13 +19,14 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
-		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
-		config:           config,
-		inodes:           make(map[InodeId]Inode),
-		fileHandles:      make(map[FileHandleId]FileHandle),
-		inodeNum:         quantumfs.InodeIdReservedEnd,
-		fileHandleNum:    quantumfs.InodeIdReservedEnd,
-		activeWorkspaces: make(map[string]*WorkspaceRoot),
+		RawFileSystem:        fuse.NewDefaultRawFileSystem(),
+		config:               config,
+		inodes:               make(map[InodeId]Inode),
+		fileHandles:          make(map[FileHandleId]FileHandle),
+		inodeNum:             quantumfs.InodeIdReservedEnd,
+		fileHandleNum:        quantumfs.InodeIdReservedEnd,
+		activeWorkspaces:     make(map[string]*WorkspaceRoot),
+		uninstantiatedInodes: make(map[InodeId]Inode),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -68,6 +69,12 @@ type QuantumFs struct {
 	inodes           map[InodeId]Inode
 	fileHandles      map[FileHandleId]FileHandle
 	activeWorkspaces map[string]*WorkspaceRoot
+
+	// Uninstantiated Inodes are inode numbers which have been reserved for a
+	// particular inode, but the corresponding Inode has not yet been
+	// instantiated. The Inode this map points to is the parent Inode which
+	// should be called to instantiate the uninstantiated inode when necessary.
+	uninstantiatedInodes map[InodeId]Inode
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -123,7 +130,13 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	qfs.mapMutex.RLock()
-	inode := qfs.inodes[id]
+	inode, instantiated := qfs.inodes[id]
+	if !instantiated {
+		parent := qfs.uninstantiatedInodes[id]
+		inode = parent.instantiateChild(c, id)
+		delete(qfs.uninstantiatedInodes, id)
+		qfs.inodes[id] = inode
+	}
 	qfs.mapMutex.RUnlock()
 	return inode
 }
