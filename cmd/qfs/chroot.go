@@ -210,7 +210,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
 		"--pre-chroot-cmd="+prechrootCmd, svrName)
-	if err = cmdNetnsd.Run(); err != nil {
+	if err := cmdNetnsd.Run(); err != nil {
 		return err
 	}
 
@@ -227,13 +227,13 @@ func chroot() {
 	svrName := rootdir + "/chroot"
 
 	if !serverRunning(svrName) {
-		if err = chrootInNsd(rootdir, svrName); err != nil {
+		if err := chrootInNsd(rootdir, svrName); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 	}
 
-	if err = netnsLogin(rootdir, svrName, false); err != nil {
+	if err := netnsLogin(rootdir, svrName, false); err != nil {
 		fmt.Println(err.Error())
 		return
 	}
