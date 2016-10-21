@@ -67,7 +67,7 @@ func makedest(src, dst string) bool {
 		return false
 	}
 
-	if srcInfo.IsDir() == dstInfo.IsDir() {
+	if !os.IsNotExist(err) && srcInfo.IsDir() == dstInfo.IsDir() {
 		return true
 	}
 
