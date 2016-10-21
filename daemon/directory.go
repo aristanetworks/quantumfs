@@ -87,6 +87,38 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
+// The directory must be exclusively locked (or unlisted)
+func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord) InodeId {
+	inodeId := c.qfs.newInodeId()
+	dir.children[entry.Filename()] = inodeId
+	dir.childrenRecords[inodeId] = &entry
+	var constructor InodeConstructor
+	switch entry.Type() {
+	default:
+		c.elog("Unknown InodeConstructor type: %d", entry.Type())
+		panic("Unknown InodeConstructor type")
+	case quantumfs.ObjectTypeDirectoryEntry:
+		constructor = newDirectory
+	case quantumfs.ObjectTypeSmallFile:
+		constructor = newSmallFile
+	case quantumfs.ObjectTypeMediumFile:
+		constructor = newMediumFile
+	case quantumfs.ObjectTypeLargeFile:
+		constructor = newLargeFile
+	case quantumfs.ObjectTypeVeryLargeFile:
+		constructor = newVeryLargeFile
+	case quantumfs.ObjectTypeSymlink:
+		constructor = newSymlink
+	case quantumfs.ObjectTypeSpecial:
+		constructor = newSpecial
+	}
+
+	c.qfs.setInode(c, inodeId, constructor(c, entry.FileName(), entry.ID(),
+		entry.Size(), inodeId, dir.self, 0, 0, nil))
+
+	return inodeId
+}
+
 func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
@@ -108,35 +140,30 @@ func (dir *Directory) updateSize_(c *ctx) {
 	if dir.parent() != nil {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
-		attr.Size = uint64(dir.dirChildren.count())
+		attr.Size = uint64(len(dir.childrenRecords))
 		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
 // Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, inode InodeId,
+func (dir *Directory) addChild_(c *ctx, name string, inode InodeId,
 	child *quantumfs.DirectoryRecord) {
 
-	dir.dirChildren.setLoadedRecord(c, inode, child)
+	dir.children[name] = inodeNum
+	dir.childrenRecords[inodeNum] = child
 	dir.updateSize_(c)
 }
 
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
-	inodeNum, exists := dir.dirChildren.getInode(c, name)
-	if !exists {
-		panic("Unexpected missing child inode")
-	}
+	inodeNum := dir.children[name]
 	c.dlog("Unlinking inode %d", inodeNum)
-
-	// If this is a file we need to reparent it to itself
-	record, exists := dir.dirChildren.getRecord(c, inodeNum)
-	if !exists {
-		panic("Unexpected missing child inode")
-	}
 
 	child := c.qfs.inode(c, inodeNum)
 	child.markSelfAccessed(c, false)
+
+	// If this is a file we need to reparent it to itself
+	record := dir.childrenRecords[inodeNum]
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
 		record.Type() == quantumfs.ObjectTypeMediumFile ||
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -325,11 +352,11 @@ func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
 
 	newBaseLayerId := quantumfs.EmptyDirKey
 
-	// childIdx indexes into childrenRecords, entryIdx indexes into the
+	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
 	// metadata block
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
-	for _, child := range dir.dirChildren.getRecords() {
+	for _, child := range dir.childrenRecords {
 		if entryIdx == quantumfs.MaxDirectoryRecords {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
@@ -499,7 +526,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	inodeNum := c.qfs.newInodeId()
 	newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
 		mode, rdev, entry)
-	dir.addChild_(c, inodeNum, entry)
+	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
 
 	fillEntryOutCacheData(c, out)
