@@ -71,9 +71,8 @@ func branch() {
 
 	fmt.Printf("Branching workspace \"%s\" into \"%s\"\n", src, dst)
 	api := quantumfs.NewApi()
-	err := api.Branch(src, dst)
 
-	if err != nil {
+	if err := api.Branch(src, dst); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
@@ -90,9 +89,8 @@ func getAccessed() {
 
 	fmt.Printf("Getting the accessed list of Workspace:\"%s\"\n", workspaceName)
 	api := quantumfs.NewApi()
-	err := api.GetAccessed(workspaceName)
 
-	if err != nil {
+	if err := api.GetAccessed(workspaceName); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
@@ -109,9 +107,8 @@ func clearAccessed() {
 
 	fmt.Printf("Clearing the accessed list of WorkspaceRoot:\"%s\"\n", wsr)
 	api := quantumfs.NewApi()
-	err := api.ClearAccessed(wsr)
 
-	if err != nil {
+	if err := api.ClearAccessed(wsr); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
