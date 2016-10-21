@@ -113,7 +113,7 @@ func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord) InodeI
 		constructor = newSpecial
 	}
 
-	c.qfs.setInode(c, inodeId, constructor(c, entry.FileName(), entry.ID(),
+	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
 		entry.Size(), inodeId, dir.self, 0, 0, nil))
 
 	return inodeId
@@ -149,8 +149,8 @@ func (dir *Directory) updateSize_(c *ctx) {
 func (dir *Directory) addChild_(c *ctx, name string, inode InodeId,
 	child *quantumfs.DirectoryRecord) {
 
-	dir.children[name] = inodeNum
-	dir.childrenRecords[inodeNum] = child
+	dir.children[name] = inode
+	dir.childrenRecords[inode] = child
 	dir.updateSize_(c)
 }
 
@@ -913,13 +913,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			child.setParent(dst.self)
 
 			// delete the target InodeId, before (possibly) overwrite it
-			dst.deleteEntry(newName)
+			dst.deleteEntry_(newName)
 
 			// set entry in new directory
-			dst.insertEntry(c, oldInodeId, newEntry, child)
+			dst.insertEntry_(oldInodeId, newEntry, child)
 
 			// Remove entry in old directory
-			dir.deleteEntry(oldName)
+			dir.deleteEntry_(oldName)
 
 			child.setName(newName)
 			child.markSelfAccessed(c, true)

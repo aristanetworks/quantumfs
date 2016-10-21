@@ -135,10 +135,16 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.vlog("WorkspaceRoot::GetAttr Exit")
 	defer wsr.RLock().RUnlock()
 
+	var numChildDirectories uint32
+	for _, entry := range wsr.childrenRecords {
+		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
+			numChildDirectories++
+		}
+	}
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, wsr.InodeCommon.id,
-		uint32(wsr.dirChildren.countChildDirs()))
+	fillAttr(&out.Attr, wsr.InodeCommon.id, numChildDirectories)
+
 	out.Attr.Mode = 0777 | fuse.S_IFDIR
 	return fuse.OK
 }
