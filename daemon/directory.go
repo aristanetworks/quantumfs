@@ -770,14 +770,30 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		}
 
 		oldInodeId := dir.children[oldName]
-		newInodeId := dir.children[newName]
+		child := c.qfs.inode(c, oldInodeId)
+		child.markSelfAccessed(c, false)
 
+		if oldName == newName {
+			// Nothing more to be done other than marking the file
+			// accessed above.
+			return fuse.OK
+		}
+
+		// If a file already exists with newName, we need to clean it up
+		// later
+		cleanupInodeId := dir.children[newName]
+
+		// Set the name of the old entry to the newName
 		dir.childrenRecords[oldInodeId].SetFilename(newName)
+		child.setName(newName)
+		child.markSelfAccessed(c, true)
 
 		dir.children[newName] = oldInodeId
 		delete(dir.children, oldName)
-		delete(dir.childrenRecords, newInodeId)
-		delete(dir.dirtyChildren_, newInodeId)
+
+		// cleanup / remove any existing inode with that name
+		delete(dir.childrenRecords, cleanupInodeId)
+		delete(dir.dirtyChildren_, cleanupInodeId)
 
 		dir.updateSize_(c)
 		dir.self.dirty(c)
@@ -881,22 +897,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// we need to unlock the parent early
 			defer parent.lock.Unlock()
 
-			if _, exists := dir.dirChildren.getInode(c,
-				oldName); !exists {
-
-				return fuse.ENOENT
-			}
-
-			oldInodeId, exists := dir.dirChildren.getInode(c, oldName)
-			if !exists {
+			if _, exists := dir.children[oldName]; !exists {
 				return fuse.ENOENT
 			}
 
 			// copy the record
-			oldEntry, exists := dir.dirChildren.getRecord(c, oldInodeId)
-			if !exists {
-				return fuse.ENOENT
-			}
+			oldInodeId := dir.children[oldName]
+			oldEntry := dir.childrenRecords[oldInodeId]
 			newEntry := cloneDirectoryRecord(oldEntry)
 			newEntry.SetFilename(newName)
 
@@ -905,14 +912,14 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			child.markSelfAccessed(c, false)
 			child.setParent(dst.self)
 
-			//delete the target InodeId
-			dst.dirChildren.delete(newName)
+			// delete the target InodeId, before (possibly) overwrite it
+			dst.deleteEntry(newName)
 
 			// set entry in new directory
-			dst.dirChildren.insertRecord(c, oldInodeId, newEntry)
+			dst.insertEntry(c, oldInodeId, newEntry, child)
 
 			// Remove entry in old directory
-			dir.dirChildren.delete(oldName)
+			dir.deleteEntry(oldName)
 
 			child.setName(newName)
 			child.markSelfAccessed(c, true)
@@ -930,6 +937,22 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	}()
 
 	return result
+}
+
+func (dir *Directory) deleteEntry_(name string) {
+	inodeNum := dir.children[name]
+	delete(dir.children, name)
+	delete(dir.childrenRecords, inodeNum)
+	delete(dir.dirtyChildren_, inodeNum)
+}
+
+func (dir *Directory) insertEntry_(inodeNum InodeId,
+	entry *quantumfs.DirectoryRecord, inode Inode) {
+
+	dir.children[entry.Filename()] = inodeNum
+	dir.childrenRecords[inodeNum] = entry
+	// being inserted means you're dirty and need to be synced
+	dir.dirtyChildren_[inodeNum] = inode
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
