@@ -159,7 +159,8 @@ func (inode *InodeCommon) isDirty() bool {
 	}
 }
 
-func (inode *InodeCommon) setDirty(dirty bool) {
+// Returns if this Inode was already dirty or not
+func (inode *InodeCommon) setDirty(dirty bool) bool {
 	var val uint32
 	if dirty {
 		val = 1
@@ -167,7 +168,12 @@ func (inode *InodeCommon) setDirty(dirty bool) {
 		val = 0
 	}
 
-	atomic.StoreUint32(&inode.dirty_, val)
+	old := atomic.SwapUint32(&inode.dirty_, val)
+	if old == 1 {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
