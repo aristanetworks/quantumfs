@@ -129,14 +129,14 @@ type SyncAllRequest struct {
 	CommandCommon
 }
 
-func (api *Api) sendCmd(bytes []byte) ([]byte, error) {
-	err := writeAll(api.fd, bytes)
+func (api *Api) sendCmd(buf []byte) ([]byte, error) {
+	err := writeAll(api.fd, buf)
 	if err != nil {
 		return nil, err
 	}
 
 	api.fd.Seek(0, 0)
-	buf := make([]byte, 4096)
+	buf = make([]byte, 4096)
 	n, err := api.fd.Read(buf)
 	if err != nil {
 		return nil, err
@@ -162,12 +162,12 @@ func (api *Api) Branch(src string, dst string) error {
 		Dst:           dst,
 	}
 
-	bytes, err := json.Marshal(cmd)
+	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	buf, err := api.sendCmd(bytes)
+	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
 		return err
 	}
@@ -195,12 +195,12 @@ func (api *Api) GetAccessed(wsr string) error {
 		WorkspaceRoot: wsr,
 	}
 
-	bytes, err := json.Marshal(cmd)
+	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	buf, err := api.sendCmd(bytes)
+	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
 		return err
 	}
@@ -235,12 +235,12 @@ func (api *Api) ClearAccessed(wsr string) error {
 		WorkspaceRoot: wsr,
 	}
 
-	bytes, err := json.Marshal(cmd)
+	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	buf, err := api.sendCmd(bytes)
+	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
 		return err
 	}
@@ -262,12 +262,12 @@ func (api *Api) SyncAll() error {
 		CommandCommon: CommandCommon{CommandId: CmdSyncAll},
 	}
 
-	bytes, err := json.Marshal(cmd)
+	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	if _, err := api.sendCmd(bytes); err != nil {
+	if _, err := api.sendCmd(cmdBuf); err != nil {
 		return err
 	}
 

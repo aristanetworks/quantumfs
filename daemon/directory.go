@@ -143,8 +143,10 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 }
 
 func (dir *Directory) dirty(c *ctx) {
-	dir.setDirty(true)
-	dir.parent().dirtyChild(c, dir)
+	if !dir.setDirty(true) {
+		// Only go recursive if we aren't already dirty
+		dir.parent().dirtyChild(c, dir)
+	}
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
