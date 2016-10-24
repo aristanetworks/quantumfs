@@ -145,8 +145,6 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		return inode
 	}
 
-	c.vlog("Inode %d needs to be instantiated", id)
-
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 	// Recheck in case things changes while we didn't have the lock
@@ -154,6 +152,8 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	if instantiated {
 		return inode
 	}
+
+	c.vlog("Inode %d needs to be instantiated", id)
 
 	parent, uninstantiated := qfs.uninstantiatedInodes[id]
 	if !uninstantiated {
