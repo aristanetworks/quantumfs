@@ -123,8 +123,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 		panic("Unexpected missing child inode")
 	}
 
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.markAccessed(c, name, false)
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
 		record.Type() == quantumfs.ObjectTypeMediumFile ||
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -414,8 +413,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	}
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.markAccessed(c, name, false)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
