@@ -17,38 +17,38 @@ const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newVeryLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newFile_(c *ctx, name string, inodeNum InodeId,
@@ -317,9 +317,9 @@ func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
 }
 
-func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) Inode {
+func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 	c.elog("Invalid instantiateChild on File")
-	return nil
+	return nil, nil
 }
 
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {

@@ -141,9 +141,12 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		return nil, uninstantiated
 	}()
 
+	c.vlog("Inode %d: %t %t", id, needsInstantiation, inode != nil)
 	if !needsInstantiation {
 		return inode
 	}
+
+	c.vlog("Inode %d needs to be instantiated", id)
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
@@ -159,9 +162,13 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	inode = parent.instantiateChild(c, id)
+	inode, newUninstantiated := parent.instantiateChild(c, id)
 	delete(qfs.uninstantiatedInodes, id)
 	qfs.inodes[id] = inode
+	for _, id := range newUninstantiated {
+		c.vlog("Adding uninstantiated %v", id)
+		qfs.uninstantiatedInodes[id] = inode
+	}
 
 	return inode
 }
@@ -175,6 +182,29 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 		delete(qfs.inodes, id)
 	}
 	qfs.mapMutex.Unlock()
+}
+
+// Set a list of inode numbers to be uninstantiated with the given parent
+func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
+	parent Inode) {
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+
+	for _, inodeNum := range uninstantiated {
+		c.vlog("Adding uninstantiated %v", inodeNum)
+		qfs.uninstantiatedInodes[inodeNum] = parent
+	}
+}
+
+// Remove a list of inode numbers from the uninstantiatedInodes list
+func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+
+	for _, inodeNum := range uninstantiated {
+		delete(qfs.uninstantiatedInodes, inodeNum)
+	}
 }
 
 // Get a file handle in a thread safe way

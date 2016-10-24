@@ -14,9 +14,13 @@ import "github.com/hanwen/go-fuse/fuse"
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
 // coming from a DirRecord and not passed in from create_.
+//
+// The return value is the newly instantiated Inode, and a list of InodeIds which
+// should be added to the mux's uninstantiatedInodes collection with this new inode
+// as their parent.
 type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 	size uint64, inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId)
 
 // This file contains the normal directory Inode type for a workspace
 type Directory struct {
@@ -34,7 +38,7 @@ type Directory struct {
 
 func initDirectory(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode, treeLock *sync.RWMutex) {
+	parent Inode, treeLock *sync.RWMutex) []InodeId {
 
 	c.vlog("initDirectory Enter Fetching directory baselayer from %s",
 		baseLayerId.String())
@@ -49,6 +53,8 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.treeLock_ = treeLock
 	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 	dir.baseLayerId = baseLayerId
+
+	uninstantiated := make([]InodeId, 0)
 
 	key := baseLayerId
 	for {
@@ -69,7 +75,8 @@ func initDirectory(c *ctx, name string, dir *Directory,
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			dir.loadChild_(c, baseLayer.Entry(i))
+			childInodeNum := dir.loadChild_(c, baseLayer.Entry(i))
+			uninstantiated = append(uninstantiated, childInodeNum)
 		}
 
 		if baseLayer.Next() == quantumfs.EmptyDirKey ||
@@ -82,6 +89,8 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	}
 
 	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
+
+	return uninstantiated
 }
 
 // The directory must be exclusively locked (or unlisted)
@@ -89,36 +98,13 @@ func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord) InodeI
 	inodeId := c.qfs.newInodeId()
 	dir.children[entry.Filename()] = inodeId
 	dir.childrenRecords[inodeId] = &entry
-	var constructor InodeConstructor
-	switch entry.Type() {
-	default:
-		c.elog("Unknown InodeConstructor type: %d", entry.Type())
-		panic("Unknown InodeConstructor type")
-	case quantumfs.ObjectTypeDirectoryEntry:
-		constructor = newDirectory
-	case quantumfs.ObjectTypeSmallFile:
-		constructor = newSmallFile
-	case quantumfs.ObjectTypeMediumFile:
-		constructor = newMediumFile
-	case quantumfs.ObjectTypeLargeFile:
-		constructor = newLargeFile
-	case quantumfs.ObjectTypeVeryLargeFile:
-		constructor = newVeryLargeFile
-	case quantumfs.ObjectTypeSymlink:
-		constructor = newSymlink
-	case quantumfs.ObjectTypeSpecial:
-		constructor = newSpecial
-	}
-
-	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
-		entry.Size(), inodeId, dir.self, 0, 0, nil))
 
 	return inodeId
 }
 
 func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	c.vlog("Directory::newDirectory Enter")
 	defer c.vlog("Directory::newDirectory Exit")
@@ -126,9 +112,9 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	var dir Directory
 	dir.self = &dir
 
-	initDirectory(c, name, &dir, baseLayerId, inodeNum,
+	uninstantiated := initDirectory(c, name, &dir, baseLayerId, inodeNum,
 		parent, parent.treeLock())
-	return &dir
+	return &dir, uninstantiated
 }
 
 // Needs inode lock for read
@@ -520,10 +506,11 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	entry.SetModificationTime(quantumfs.NewTime(now))
 
 	inodeNum := c.qfs.newInodeId()
-	newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
+	newEntity, uninstantiated := constructor(c, name, key, 0, inodeNum, dir.self,
 		mode, rdev, entry)
 	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
+	c.qfs.addUninstantiated(c, uninstantiated, newEntity)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1242,9 +1229,36 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	c.elog("Invalid instantiateChild on Directory")
-	return nil
+func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
+	defer c.vlog("Directory::instantiateChild Exit")
+
+	// TODO Locking
+	entry := dir.childrenRecords[inodeNum]
+
+	var constructor InodeConstructor
+	switch entry.Type() {
+	default:
+		c.elog("Unknown InodeConstructor type: %d", entry.Type())
+		panic("Unknown InodeConstructor type")
+	case quantumfs.ObjectTypeDirectoryEntry:
+		constructor = newDirectory
+	case quantumfs.ObjectTypeSmallFile:
+		constructor = newSmallFile
+	case quantumfs.ObjectTypeMediumFile:
+		constructor = newMediumFile
+	case quantumfs.ObjectTypeLargeFile:
+		constructor = newLargeFile
+	case quantumfs.ObjectTypeVeryLargeFile:
+		constructor = newVeryLargeFile
+	case quantumfs.ObjectTypeSymlink:
+		constructor = newSymlink
+	case quantumfs.ObjectTypeSpecial:
+		constructor = newSpecial
+	}
+
+	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
+		dir.self, 0, 0, nil)
 }
 
 type directoryContents struct {
