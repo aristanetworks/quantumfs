@@ -141,7 +141,6 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		return nil, uninstantiated
 	}()
 
-	c.vlog("Inode %d: %t %t", id, needsInstantiation, inode != nil)
 	if !needsInstantiation {
 		return inode
 	}
