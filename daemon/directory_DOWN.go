@@ -29,8 +29,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	defer dir.Lock().Unlock()
 
 	inodeNum := dir.loadChild_(c, *newRecord)
-	newInode := c.qfs.inode(c, inodeNum)
-	newInode.markSelfAccessed(c, true)
+	dir.self.markAccessed(c, newName, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
 		inodeNum)

@@ -157,8 +157,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 	inodeNum := dir.children[name]
 	c.dlog("Unlinking inode %d", inodeNum)
 
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.self.markAccessed(c, name, false)
 
 	// If this is a file we need to reparent it to itself
 	record := dir.childrenRecords[inodeNum]
@@ -446,8 +445,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	}
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.self.markAccessed(c, name, false)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
