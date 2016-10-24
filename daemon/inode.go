@@ -255,7 +255,11 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 		panic("Orphaned file")
 	}
 
-	path = "/" + inode.name() + path
+	if path == "" {
+		path = inode.name()
+	} else {
+		path = inode.name() + "/" + path
+	}
 	parent := inode.parent()
 	parent.markAccessed(c, path, created)
 }
