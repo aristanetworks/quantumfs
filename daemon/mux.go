@@ -806,8 +806,6 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 
 	result = fuse.EIO
 
-	c := qfs.c.req(&input.InHeader)
-
 	c.elog("Unhandled request ReadDir")
 	return fuse.ENOSYS
 }
