@@ -269,8 +269,8 @@ func (s DirectoryRecord) ExtendedAttributes() ObjectKey {
 	return ObjectKey(C.Struct(s).GetObject(2).ToStruct())
 }
 func (s DirectoryRecord) SetExtendedAttributes(v ObjectKey) { C.Struct(s).SetObject(2, C.Object(v)) }
-func (s DirectoryRecord) CreationTime() uint64              { return C.Struct(s).Get64(24) }
-func (s DirectoryRecord) SetCreationTime(v uint64)          { C.Struct(s).Set64(24, v) }
+func (s DirectoryRecord) ContentTime() uint64               { return C.Struct(s).Get64(24) }
+func (s DirectoryRecord) SetContentTime(v uint64)           { C.Struct(s).Set64(24, v) }
 func (s DirectoryRecord) ModificationTime() uint64          { return C.Struct(s).Get64(32) }
 func (s DirectoryRecord) SetModificationTime(v uint64)      { C.Struct(s).Set64(32, v) }
 func (s DirectoryRecord) WriteJSON(w io.Writer) error {
@@ -426,12 +426,12 @@ func (s DirectoryRecord) WriteJSON(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.WriteString("\"creationTime\":")
+	_, err = b.WriteString("\"contentTime\":")
 	if err != nil {
 		return err
 	}
 	{
-		s := s.CreationTime()
+		s := s.ContentTime()
 		buf, err = json.Marshal(s)
 		if err != nil {
 			return err
@@ -625,12 +625,12 @@ func (s DirectoryRecord) WriteCapLit(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.WriteString("creationTime = ")
+	_, err = b.WriteString("contentTime = ")
 	if err != nil {
 		return err
 	}
 	{
-		s := s.CreationTime()
+		s := s.ContentTime()
 		buf, err = json.Marshal(s)
 		if err != nil {
 			return err

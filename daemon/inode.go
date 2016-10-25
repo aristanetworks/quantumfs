@@ -70,7 +70,8 @@ type Inode interface {
 
 	// Methods called by children
 	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-		attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status
+		attr *fuse.SetAttrIn, out *fuse.AttrOut,
+		updateMtime bool) fuse.Status
 
 	getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord, error)
 
@@ -90,6 +91,13 @@ type Inode interface {
 	setChildXAttr(c *ctx, inodeNum InodeId, attr string, data []byte) fuse.Status
 
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
+
+	name() string
+	setName(name string)
+
+	accessed() bool
+	markAccessed(c *ctx, path string, created bool)
+	markSelfAccessed(c *ctx, created bool)
 
 	parent() Inode
 	setParent(newParent Inode)
@@ -119,6 +127,11 @@ type InodeCommon struct {
 	self Inode // Leaf subclass instance
 	id   InodeId
 
+	nameLock sync.Mutex
+	name_    string // '/' if WorkspaceRoot
+
+	accessed_ uint32
+
 	parentLock sync.Mutex // Protects parent_
 	parent_    Inode      // nil if WorkspaceRoot
 
@@ -146,7 +159,8 @@ func (inode *InodeCommon) isDirty() bool {
 	}
 }
 
-func (inode *InodeCommon) setDirty(dirty bool) {
+// Returns if this Inode was already dirty or not
+func (inode *InodeCommon) setDirty(dirty bool) bool {
 	var val uint32
 	if dirty {
 		val = 1
@@ -154,7 +168,12 @@ func (inode *InodeCommon) setDirty(dirty bool) {
 		val = 0
 	}
 
-	atomic.StoreUint32(&inode.dirty_, val)
+	old := atomic.SwapUint32(&inode.dirty_, val)
+	if old == 1 {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
@@ -162,6 +181,28 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
 	msg := fmt.Sprintf("Unsupported dirtyChild() call on leaf Inode: %v %v",
 		inodeType, inode)
 	panic(msg)
+}
+
+func (inode *InodeCommon) name() string {
+	inode.nameLock.Lock()
+	defer inode.nameLock.Unlock()
+	return inode.name_
+}
+
+func (inode *InodeCommon) setName(name string) {
+	inode.nameLock.Lock()
+	defer inode.nameLock.Unlock()
+	inode.name_ = name
+}
+
+func (inode *InodeCommon) accessed() bool {
+	old := atomic.SwapUint32(&(inode.accessed_), 1)
+
+	if old == 1 {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (inode *InodeCommon) parent() Inode {
@@ -200,6 +241,28 @@ func (inode *InodeCommon) Lock() *sync.RWMutex {
 func (inode *InodeCommon) RLock() *sync.RWMutex {
 	inode.lock.RLock()
 	return &inode.lock
+}
+
+func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
+	if inode.parent() == nil {
+		panic("Non-workspaceroot inode has no parent")
+	}
+
+	if inode.parent().inodeNum() == inode.inodeNum() {
+		panic("Orphaned file")
+	}
+
+	path = "/" + inode.name() + path
+	parent := inode.parent()
+	parent.markAccessed(c, path, created)
+}
+
+func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
+	ac := inode.accessed()
+	if !created && ac {
+		return
+	}
+	inode.self.markAccessed(c, "", created)
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
