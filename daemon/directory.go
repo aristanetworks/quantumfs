@@ -752,9 +752,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			return fuse.ENOENT
 		}
 
-		oldInodeId := dir.children[oldName]
-		child := c.qfs.inode(c, oldInodeId)
-		child.markSelfAccessed(c, false)
+		dir.self.markAccessed(c, oldName, false)
 
 		if oldName == newName {
 			// Nothing more to be done other than marking the file
@@ -767,9 +765,12 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		cleanupInodeId := dir.children[newName]
 
 		// Set the name of the old entry to the newName
+		oldInodeId := dir.children[oldName]
 		dir.childrenRecords[oldInodeId].SetFilename(newName)
-		child.setName(newName)
-		child.markSelfAccessed(c, true)
+		dir.self.markAccessed(c, newName, true)
+		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
+			child.setName(newName)
+		}
 
 		dir.children[newName] = oldInodeId
 		delete(dir.children, oldName)
