@@ -152,7 +152,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
 		record.Type() == quantumfs.ObjectTypeVeryLargeFile {
 
-		if inode := c.qfs.inode(c, inodeNum); inode != nil {
+		if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 			if file, isFile := inode.(*File); isFile {
 				file.setChildRecord(c, record)
 				file.setParent(file)
