@@ -9,7 +9,6 @@ import "fmt"
 import "math"
 import "os"
 import "sort"
-import "sync"
 import "strconv"
 import "strings"
 import "time"
@@ -317,25 +316,21 @@ func newWildcardedSeq(seq []qlog.LogOutput, wc []bool) wildcardedSequence {
 	return rtn
 }
 
-type ConcurrentMap struct {
-	mutex		sync.RWMutex
+type PatternMap struct {
 	dataByList	map[string]*wildcardedSequence
 	strToList	map[string]string
 }
 
-func (l *ConcurrentMap) StrExists(key string) bool {
-//	l.mutex.RLock()
-//	defer l.mutex.RUnlock()
-
+func (l *PatternMap) StrExists(key string) bool {
 	_, exists := l.strToList[key]
 	return exists
 }
 
-func (l *ConcurrentMap) SetStr(key string, listKey string) {
+func (l *PatternMap) SetStr(key string, listKey string) {
 	l.strToList[key] = listKey
 }
 
-func (l *ConcurrentMap) Listed(listAsStr string) *wildcardedSequence {
+func (l *PatternMap) Listed(listAsStr string) *wildcardedSequence {
 	entry, exists := l.dataByList[listAsStr]
 	if exists {
 		return entry
@@ -344,18 +339,15 @@ func (l *ConcurrentMap) Listed(listAsStr string) *wildcardedSequence {
 	return nil
 }
 
-func (l *ConcurrentMap) Set(newKey string, newListKey string,
+func (l *PatternMap) Set(newKey string, newListKey string,
 	newData *wildcardedSequence) {
-
-//	l.mutex.Lock()
-//	defer l.mutex.Unlock()
 
 	l.dataByList[newListKey] = newData
 	l.strToList[newKey] = newListKey
 }
 
 func recurseGenPatterns(seq []qlog.LogOutput, sequences []qlog.SequenceData,
-	out *ConcurrentMap /*out*/) {
+	out *PatternMap /*out*/) {
 
 	if len(seq) > *maxLenWildcards {
 		return
@@ -375,7 +367,7 @@ func recurseGenPatterns(seq []qlog.LogOutput, sequences []qlog.SequenceData,
 // and if only one sequence matches then we know that no others will (since as we
 // recurse deeper, we remove wildcards and only become more specific) and escape
 func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
-	seq []qlog.LogOutput, sequences []qlog.SequenceData, out *ConcurrentMap /*out*/) {
+	seq []qlog.LogOutput, sequences []qlog.SequenceData, out *PatternMap /*out*/) {
 
 	// If we've already got a result for this sequence, then this has
 	// been generated and we can skip it. This would not be safe if we didn't
@@ -409,7 +401,7 @@ func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	// Make sure that we mark that we've visited this expanded sequence
 	out.SetStr(expandedStr, matchStr)
 
-	// If there's already an identical mapping on ConcurrentMap, there's no point
+	// If there's already an identical mapping on PatternMap, there's no point
 	// in returning both. Only choose the one with more effective wildcards
 	oldEntry := out.Listed(matchStr)
 
@@ -470,7 +462,7 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 	// branches as we recurse to save time!
 	fmt.Printf("Generating all log patterns from %d unique sequences...\n",
 		len(sequences))
-	patterns := ConcurrentMap {
+	patterns := PatternMap {
 		dataByList:	make(map[string]*wildcardedSequence),
 		strToList:	make(map[string]string),
 	}
