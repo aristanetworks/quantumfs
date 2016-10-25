@@ -900,7 +900,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dst.deleteEntry_(newName)
 
 			// set entry in new directory
-			dst.insertEntry_(oldInodeId, newEntry, child)
+			dst.insertEntry_(c, oldInodeId, newEntry, child)
 
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
@@ -930,13 +930,17 @@ func (dir *Directory) deleteEntry_(name string) {
 	delete(dir.dirtyChildren_, inodeNum)
 }
 
-func (dir *Directory) insertEntry_(inodeNum InodeId,
+func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 	entry *quantumfs.DirectoryRecord, inode Inode) {
 
 	dir.children[entry.Filename()] = inodeNum
 	dir.childrenRecords[inodeNum] = entry
 	// being inserted means you're dirty and need to be synced
-	dir.dirtyChildren_[inodeNum] = inode
+	if inode != nil {
+		dir.dirtyChildren_[inodeNum] = inode
+	} else {
+		dir.self.dirty(c)
+	}
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
