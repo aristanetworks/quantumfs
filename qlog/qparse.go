@@ -6,8 +6,10 @@ package qlog
 
 import "bytes"
 import "encoding/binary"
+import "encoding/gob"
 import "errors"
 import "fmt"
+import "io"
 import "io/ioutil"
 import "math"
 import "os"
@@ -20,6 +22,7 @@ import "unsafe"
 
 // consts
 const defaultParseThreads = 30
+const defaultChunkSize = 4
 
 type LogOutput struct {
 	Subsystem	LogSubsystem
@@ -34,12 +37,14 @@ type LogOutput struct {
 type matchState struct {
 	patternIdx	int
 	matchAnyStr	bool
+	endIdx		int
 }
 
 func newMatchState(p int, m bool) matchState {
 	return matchState {
 		patternIdx:	p,
 		matchAnyStr:	m,
+		endIdx:		-1,
 	}
 }
 
@@ -47,22 +52,15 @@ func newMatchState(p int, m bool) matchState {
 // of regex because we have a simple enough case and regex is super slow
 func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) bool {
 	stateStack := make([]matchState, 0, len(pattern))
-	stateStack = append(stateStack, newMatchState(0, true))
+	stateStack = append(stateStack, newMatchState(0, false))
 
 	for i := 0; i < len(data); i++ {
 		curState := stateStack[len(stateStack)-1]
+		rewindPatternIdx := false
 
 		if pattern[curState.patternIdx].Format != data[i].Format {
 			if !curState.matchAnyStr {
-				// We saw a mismatch and weren't allowed to, so this
-				// can't be the right subsequence and we must go back
-				// to the last valid state that allowed wildcards
-				for j := len(stateStack)-1; j > 0; j-- {
-					stateStack = stateStack[:j]
-					if stateStack[j-1].matchAnyStr {
-						break
-					}
-				}
+				rewindPatternIdx = true
 			}
 			// otherwise there's no issue just continue on
 		} else {
@@ -70,11 +68,19 @@ func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) boo
 			matchAnyStr := false
 			patternIdx := curState.patternIdx
 			for {
+				pushState := false
 				patternIdx++
+
 				if patternIdx >= len(pattern) {
-					// we've reached the end of the pattern,
-					// meaning we have a match
-					return true
+					// we've reached the end of the pattern at
+					// the right time, so we have a match
+					if i == len(data)-1 {
+						return true
+					} else {
+						//it's too early, so this mismatches
+						rewindPatternIdx = true
+						pushState = true
+					}
 				}
 
 				if patternIdx < len(wildcards) &&
@@ -82,14 +88,45 @@ func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) boo
 
 					matchAnyStr = true
 				} else {
+					pushState = true
+				}
+
+				if pushState {
+					// record where we ended in data
+					curState.endIdx = i
+					stateStack[len(stateStack)-1] = curState
+
 					// we've found a new pattern token that isn't
 					// a wildcard. We're done advancing.
+					stateStack = append(stateStack,
+						newMatchState(patternIdx,
+							matchAnyStr))
 					break
 				}
 			}
-			// Add the new state
-			stateStack = append(stateStack, newMatchState(patternIdx,
-				matchAnyStr))
+		}
+
+		if rewindPatternIdx {
+			// We saw a mismatch and weren't allowed to, so this can't be
+			// the right subsequence and we must go back to the last
+			// valid state that allowed wildcards
+			for j := len(stateStack)-1; j >= 0; j-- {
+				stateStack = stateStack[:j]
+
+				if len(stateStack) == 0 {
+					return false
+				}
+
+				if stateStack[j-1].matchAnyStr {
+					if stateStack[j-1].endIdx == -1 {
+						panic("Unset endIdx used")
+					}
+					// we have to rewind our search in data also
+					i = stateStack[j-1].endIdx
+					stateStack[j-1].endIdx = -1
+					break
+				}
+			}
 		}
 	}
 
@@ -136,6 +173,285 @@ func (s SortByTime) Swap(i, j int) {
 
 func (s SortByTime) Less(i, j int) bool {
 	return s[i].T < s[j].T
+}
+
+type TimeData struct {
+	// how long the sequence took
+	Delta		int64
+	// when it started in Unix time
+	StartTime	int64
+	// where it started in the logs
+	LogIdxLoc	int
+}
+
+type SequenceData struct {
+	Times	[]TimeData
+	Seq	[]LogOutput
+}
+
+type PatternData struct {
+	SeqStrRaw	string	// No wildcards in this string, just seq
+	Data		SequenceData
+	Wildcards	[]bool
+	Avg		int64
+	Sum		int64
+	Stddev		int64
+}
+
+type logStack []LogOutput
+
+func newLogStack() logStack {
+	return make([]LogOutput, 0)
+}
+
+func (s *logStack) Push(n LogOutput) {
+	*s = append(*s, n)
+}
+
+func (s *logStack) Pop() {
+	if len(*s) > 0 {
+		*s = (*s)[:len(*s)-1]
+	}
+}
+
+func (s *logStack) Peek() (LogOutput, error) {
+	if len(*s) == 0 {
+		return LogOutput{},
+			errors.New("Cannot peek on an empty logStack")
+	}
+
+	return (*s)[len(*s)-1], nil
+}
+
+type sequenceTracker struct {
+	stack		logStack
+
+	ready		bool
+	seq		[]LogOutput
+	startLogIdx	int
+}
+
+func newSequenceTracker(startIdx int) sequenceTracker {
+	return sequenceTracker {
+		stack:	newLogStack(),
+		ready:	false,
+		seq:	make([]LogOutput, 0),
+		startLogIdx: startIdx,
+	}
+}
+
+func (s *sequenceTracker) Process(log LogOutput) error {
+	// Nothing more to do
+	if s.ready {
+		return nil
+	}
+
+	top, err := s.stack.Peek()
+	if len(s.stack) == 1 && IsLogFnPair(top.Format, log.Format) {
+		// We've found our pair, and have our sequence. Finalize
+		s.ready = true
+	} else if IsFnIn(log.Format) {
+		s.stack.Push(log)
+	} else if IsFnOut(log.Format) {
+		if err != nil || !IsLogFnPair(top.Format, log.Format) {
+			return errors.New(fmt.Sprintf("Error: Mismatched '%s' in "+
+				"requestId %d log\n",
+				FnExitStr, log.ReqId))
+		}
+		s.stack.Pop()
+	}
+
+	// Add to the sequence we're tracking
+	s.seq = append(s.seq, log)
+	return nil
+}
+
+func genSeqStr(seq []LogOutput) string {
+	return genSeqStrExt(seq, []bool{}, false)
+}
+
+// consecutiveWc specifies whether the output should contain more than one wildcard
+// in sequence when they are back to back in wildcardMsdk
+func genSeqStrExt(seq []LogOutput, wildcardMask []bool,
+	consecutiveWc bool) string {
+
+	rtn := ""
+	outputWildcard := false
+	for n := 0; n < len(seq); n++ {
+		if n < len(wildcardMask) && wildcardMask[n] {
+			// This is a wildcard in the sequence, but ensure that we
+			// include consecutive wildcards if we need to
+			if consecutiveWc || !outputWildcard {
+				rtn += string([]byte { 7 })
+				outputWildcard = true
+			}
+		} else {
+			rtn += seq[n].Format
+			outputWildcard = false
+		}
+	}
+
+	return rtn
+}
+
+// Because Golang is a horrible language and doesn't support maps with slice keys,
+// we need to construct long string keys and save the slices in the value for later
+func ExtractSequences(logs []LogOutput) map[string]SequenceData {
+	trackerMap := make(map[uint64][]sequenceTracker)
+	trackerCount := 0
+
+	fmt.Printf("Extracting sub-sequences from %d logs...\n", len(logs))
+	status := NewLogStatus(50)
+
+	// Go through all the logs in one pass, constructing all subsequences
+	for i := 0; i < len(logs); i++ {
+		status.Process(float32(i) / float32(len(logs)))
+
+		reqId := logs[i].ReqId
+
+		// Skip it if its a special id since they're not self contained
+		if reqId >= MinSpecialReqId {
+			continue
+		}
+
+		// Grab the sequenceTracker list for this request
+		trackers, exists := trackerMap[reqId]
+		if len(trackers) == 0 && exists {
+			// If there's an empty entry that already exists, that means
+			// this request had an error and was aborted. Leave it alone.
+			continue
+		}
+
+		// Start a new subsequence if we need to
+		if IsFnIn(logs[i].Format) {
+			trackers = append(trackers, newSequenceTracker(i))
+		}
+
+		abortRequest := false
+		// Inform all the trackers of the new token
+		for k := 0; k < len(trackers); k++ {
+			err := trackers[k].Process(logs[i])
+			if err != nil {
+				fmt.Println(err)
+				abortRequest = true
+				break
+			}
+		}
+
+		if abortRequest {
+			// Mark the request as bad
+			trackerMap[reqId] = make([]sequenceTracker, 0)
+			continue
+		}
+
+		// Only update entry if it won't be empty
+		if exists || len(trackers) > 0 {
+			if len(trackers) != len(trackerMap[reqId]) {
+				trackerCount++
+			}
+			trackerMap[reqId] = trackers
+		}
+	}
+	status.Process(1)
+
+	fmt.Printf("Collating subsequence time data into map with %d entries...\n",
+		trackerCount)
+	status = NewLogStatus(50)
+
+	// After going through the logs, add all our sequences to the rtn map
+	rtn := make(map[string]SequenceData)
+	trackerIdx := 0
+	for reqId, trackers := range trackerMap {
+		// Skip any requests marked as bad
+		if len(trackers) == 0 {
+			continue
+		}
+
+		// Go through each tracker
+		for k := 0; k < len(trackers); k++ {
+			status.Process(float32(trackerIdx) / float32(trackerCount))
+			trackerIdx++
+
+			// If the tracker isn't ready, that means there was a fnIn
+			// that missed its fnOut. That's an error
+			if trackers[k].ready == false {
+				fmt.Printf("Error: Mismatched '%s' in requestId %d"+
+					" log\n", FnEnterStr, reqId)
+				break
+			}
+
+			rawSeq := trackers[k].seq
+			seq := genSeqStr(rawSeq)
+			data := rtn[seq]
+			// For this sequence, append the time it took
+			if data.Seq == nil {
+				data.Seq = rawSeq
+			}
+			data.Times = append(data.Times,
+				TimeData {
+					Delta: rawSeq[len(rawSeq)-1].T-rawSeq[0].T,
+					StartTime: rawSeq[0].T,
+					LogIdxLoc: trackers[k].startLogIdx,
+				})
+			rtn[seq] = data
+		}
+	}
+	status.Process(1)
+
+	return rtn
+}
+
+func SaveToStat(file *os.File, patterns []PatternData) {
+	encoder := gob.NewEncoder(file)
+
+	// The gob package has an annoying and poorly thought out const cap on
+	// Encode data max length. So, we have to encode in chunks we a new encoder
+	// each time
+	status := NewLogStatus(50)
+	for i := 0; i < len(patterns); {
+		// if a chunk is too large, Encode() will take disproportionally long
+		for chunkSize := defaultChunkSize; chunkSize >= 1; chunkSize /= 2 {
+			chunkPastEnd := i + chunkSize
+			if chunkPastEnd > len(patterns) {
+				chunkPastEnd = len(patterns)
+			}
+
+			err := encoder.Encode(patterns[i:chunkPastEnd])
+			if err == nil {
+				i = chunkPastEnd
+				break
+			}
+			
+			if chunkSize <= 1 {
+				fmt.Printf("Unable to encode stat data into file: "+
+					"%s\n", err)
+				os.Exit(1)
+			}
+		}
+
+		status.Process(float32(i) / float32(len(patterns)))
+	}
+}
+
+func LoadFromStat(file *os.File) []PatternData {
+	decoder := gob.NewDecoder(file)
+	var rtn []PatternData
+
+	// We have to encode in chunks, so keep going until we're out of data
+	for {
+		var chunk []PatternData
+		err := decoder.Decode(&chunk)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			fmt.Printf("Unable to decode stat contents: %s\n", err)
+			os.Exit(1)
+		}
+		rtn = append(rtn, chunk...)
+	}
+
+	fmt.Printf("Loaded %d pattern results\n", len(rtn))
+	return rtn
 }
 
 // Returns true if the log file string map given failed the logscan
