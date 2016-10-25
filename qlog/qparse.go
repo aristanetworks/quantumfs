@@ -404,6 +404,10 @@ func ExtractSequences(logs []LogOutput) map[string]SequenceData {
 func SaveToStat(file *os.File, patterns []PatternData) {
 	encoder := gob.NewEncoder(file)
 
+	// Encode the length so we can have a progress bar on load
+	patternLen := int(len(patterns))
+	encoder.Encode(patternLen)
+
 	// The gob package has an annoying and poorly thought out const cap on
 	// Encode data max length. So, we have to encode in chunks we a new encoder
 	// each time
@@ -437,6 +441,11 @@ func LoadFromStat(file *os.File) []PatternData {
 	decoder := gob.NewDecoder(file)
 	var rtn []PatternData
 
+	var patternLen int
+	decoder.Decode(&patternLen)
+	totalDecoded := 0
+
+	status := NewLogStatus(50)
 	// We have to encode in chunks, so keep going until we're out of data
 	for {
 		var chunk []PatternData
@@ -448,6 +457,14 @@ func LoadFromStat(file *os.File) []PatternData {
 			os.Exit(1)
 		}
 		rtn = append(rtn, chunk...)
+
+		totalDecoded += len(chunk)
+		status.Process(float32(totalDecoded) / float32(patternLen))
+	}
+	status.Process(1)
+	if totalDecoded != patternLen {
+		panic(fmt.Sprintf("Statistics length mismatch in file: %d vs %d\n",
+			totalDecoded, patternLen))
 	}
 
 	fmt.Printf("Loaded %d pattern results\n", len(rtn))
