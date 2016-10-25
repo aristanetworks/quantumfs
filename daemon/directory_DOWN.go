@@ -18,6 +18,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
 		return fuse.EIO
 	}
+	srcInode.markSelfAccessed(c, false)
+
 	newRecord := cloneDirectoryRecord(&origRecord)
 	newRecord.SetFilename(newName)
 	newRecord.SetID(srcInode.flush_DOWN(c))
@@ -30,6 +32,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	if !exists {
 		panic("Failure to set record in children")
 	}
+	newInode := c.qfs.inode(c, inodeNum)
+	newInode.markSelfAccessed(c, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
 		inodeNum)

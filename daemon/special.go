@@ -24,8 +24,8 @@ func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
 	return filetype, device
 }
 
-func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	var filetype uint32
@@ -44,6 +44,8 @@ func newSpecial(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
 	special := Special{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
+			name_:     name,
+			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
 		filetype: filetype,
@@ -68,6 +70,7 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	special.self.markSelfAccessed(c, false)
 	return fuse.OK
 }
 
@@ -113,7 +116,7 @@ func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	return special.parent().setChildAttr(c, special.InodeCommon.id,
-		nil, attr, out)
+		nil, attr, out, false)
 }
 
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -202,7 +205,7 @@ func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 
 func (special *Special) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on Special")
 	return fuse.ENOSYS

@@ -12,13 +12,15 @@ import "github.com/aristanetworks/quantumfs"
 
 import "github.com/hanwen/go-fuse/fuse"
 
-func newSymlink(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
+			name_:     name,
+			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
 		key: key,
@@ -45,6 +47,7 @@ type Symlink struct {
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	link.self.markSelfAccessed(c, false)
 	return fuse.OK
 }
 
@@ -89,7 +92,8 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out)
+	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out,
+		false)
 }
 
 func (link *Symlink) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -116,6 +120,7 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 }
 
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
+	link.self.markSelfAccessed(c, false)
 	data := c.dataStore.Get(&c.Ctx, link.key)
 	if data == nil {
 		return nil, fuse.EIO
@@ -175,7 +180,7 @@ func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 
 func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut) fuse.Status {
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on Symlink")
 	return fuse.ENOSYS

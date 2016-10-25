@@ -535,12 +535,12 @@ func (record *DirectoryRecord) SetModificationTime(t Time) {
 	record.record.SetModificationTime(uint64(t))
 }
 
-func (record *DirectoryRecord) CreationTime() Time {
-	return Time(record.record.CreationTime())
+func (record *DirectoryRecord) ContentTime() Time {
+	return Time(record.record.ContentTime())
 }
 
-func (record *DirectoryRecord) SetCreationTime(t Time) {
-	record.record.SetCreationTime(uint64(t))
+func (record *DirectoryRecord) SetContentTime(t Time) {
+	record.record.SetContentTime(uint64(t))
 }
 
 func (record *DirectoryRecord) Permissions() uint32 {

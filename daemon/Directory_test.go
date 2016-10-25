@@ -11,6 +11,7 @@ import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
+import "time"
 import "github.com/aristanetworks/quantumfs"
 
 func TestDirectoryCreation(t *testing.T) {
@@ -868,5 +869,41 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 			// Run again with the directory instead of the workspace
 			parent = childName
 		}
+	})
+}
+
+// Trigger GetAttr on a directory in order to confirm that it works correctly
+func TestDirectoryGetAttr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		workspace := test.newWorkspace()
+		dirName := workspace + "/dir"
+
+		err := syscall.Mkdir(dirName, 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		wsr, err := os.Open(workspace)
+		test.assert(err == nil, "Error opening workspace: %v", err)
+		defer wsr.Close()
+
+		dir, err := os.Open(dirName)
+		test.assert(err == nil, "Error opening dir: %v", err)
+		defer dir.Close()
+
+		time.Sleep(500 * time.Millisecond)
+
+		fileInfo, err := wsr.Stat()
+		test.assert(err == nil, "Error stat'ing workspace: %v", err)
+		test.assert(fileInfo.Mode()&os.ModePerm == 0777,
+			"Workspace permissions incorrect: %d", fileInfo.Mode())
+
+		fileInfo, err = dir.Stat()
+		test.assert(err == nil, "Error stat'ing directory: %v", err)
+		test.assert(fileInfo.Mode()&os.ModePerm == 0124,
+			"Directory permissions incorrect: %d", fileInfo.Mode())
 	})
 }

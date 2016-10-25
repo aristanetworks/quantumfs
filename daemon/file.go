@@ -15,48 +15,50 @@ import "github.com/hanwen/go-fuse/fuse"
 
 const FMODE_EXEC = 0x20 // From Linux
 
-func newSmallFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newMediumFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newVeryLargeFile(c *ctx, key quantumfs.ObjectKey, size uint64, inodeNum InodeId,
-	parent Inode, mode uint32, rdev uint32,
+func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
+	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord *quantumfs.DirectoryRecord) Inode {
 
 	accessor := newVeryLargeAccessor(c, key)
 
-	return newFile_(c, inodeNum, key, parent, accessor)
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
-func newFile_(c *ctx, inodeNum InodeId,
+func newFile_(c *ctx, name string, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	file := File{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
+			name_:     name,
+			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
 		accessor: accessor,
@@ -174,6 +176,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
 	}
+	fi.self.markSelfAccessed(c, false)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
@@ -203,12 +206,18 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	defer c.flog("File::SetAttr").exit()
 	c.vlog("SetAttr valid %x size %d", attr.Valid, attr.Size)
 
+	var updateMtime bool
+
 	result := func() fuse.Status {
 		defer fi.Lock().Unlock()
 
 		c.vlog("Got file lock")
 
 		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+			if attr.Size != fi.accessor.fileLength() {
+				updateMtime = true
+			}
+
 			if attr.Size == 0 {
 				fi.accessor.truncate(c, 0)
 				return fuse.OK
@@ -237,7 +246,8 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent().setChildAttr(c, fi.InodeCommon.id, nil, attr, out)
+	return fi.parent().setChildAttr(c, fi.InodeCommon.id, nil, attr, out,
+		updateMtime)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -334,7 +344,7 @@ func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) 
 // Sometimes a File will access its own parent with or without its lock held. To
 // protect the internal DirectoryRecord we'll abuse the InodeCommon.parentLock.
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.flog("File::setChildAttr").exit()
 
@@ -352,7 +362,7 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 		panic("setChildAttr on self file before unlinking")
 	}
 
-	modifyEntryWithAttr(c, newType, attr, fi.unlinkRecord)
+	modifyEntryWithAttr(c, newType, attr, fi.unlinkRecord, updateMtime)
 
 	if out != nil {
 		fillAttrOutCacheData(c, out)
@@ -501,7 +511,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		fi.parent().setChildAttr(c, fi.id, &neededType, &attr, nil)
+		fi.parent().setChildAttr(c, fi.id, &neededType, &attr, nil, false)
 	}
 	return nil
 }
@@ -642,7 +652,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent().setChildAttr(c, fi.id, nil, &attr, nil)
+	fi.parent().setChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
 
 	return writeCount, fuse.OK
