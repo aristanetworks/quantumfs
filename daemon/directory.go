@@ -891,10 +891,15 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			newEntry := cloneDirectoryRecord(oldEntry)
 			newEntry.SetFilename(newName)
 
-			// update the inode
-			child := c.qfs.inode(c, oldInodeId)
-			child.markSelfAccessed(c, false)
-			child.setParent(dst.self)
+			// update the inode to point to the new name and mark as
+			// accessed in both parents
+			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
+			if child != nil {
+				child.setParent(dst.self)
+				child.setName(newName)
+			}
+			dir.self.markAccessed(c, oldName, false)
+			dst.self.markAccessed(c, newName, true)
 
 			// delete the target InodeId, before (possibly) overwrite it
 			dst.deleteEntry_(newName)
@@ -905,8 +910,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
 
-			child.setName(newName)
-			child.markSelfAccessed(c, true)
 			parent.updateSize_(c)
 			parent.self.dirty(c)
 
