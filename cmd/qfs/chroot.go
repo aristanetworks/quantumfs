@@ -313,7 +313,9 @@ func chrootOutOfNsd(rootdir string) error {
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
 		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
-		chroot_args := []string{qfs, "chroot", "--nonpersistent", "--setup-namespaces"}
+
+		chroot_args := []string{qfs, "chroot", "--nonpersistent",
+			"--setup-namespaces"}
 
 		if asRoot {
 			chroot_args = append(chroot_args, "-r")
@@ -321,7 +323,9 @@ func chrootOutOfNsd(rootdir string) error {
 
 		chns_args = append(chns_args, chroot_args...)
 		chns_env := os.Environ()
-		if err := syscall.Exec(chns_args[0], chns_args, chns_env); err != nil {
+		if err := syscall.Exec(chns_args[0], chns_args,
+			chns_env); err != nil {
+
 			return err
 		}
 	}
