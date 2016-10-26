@@ -594,6 +594,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 	minStdDevNano := int64(minStdDev * 1000)
 	maxStdDevNano := int64(maxStdDev * 1000)
 
+	var lastTimes []qlog.TimeData
 	funcResults := make([]qlog.PatternData, 0)
 	for i := 0; i < len(patterns); i++ {
 		wildcards := countWildcards(patterns[i].Wildcards, false)
@@ -607,12 +608,22 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			continue
 		}
 
+		if !(*showClose) {
+			// If this dataset is a subset of the last, then we've
+			// already output the most wildcarded version of this
+			// sequence so let's not print redundant information
+			if superset(lastTimes, patterns[i].Data.Times) {
+				continue
+			}
+		}
+
 		// time package's units are nanoseconds. So we need to convert our
 		// microsecond stddev bounds to nanoseconds so we can compare
 		if minStdDevNano <= patterns[i].Stddev &&
 			patterns[i].Stddev <= maxStdDevNano {
 
 			funcResults = append(funcResults, patterns[i])
+			lastTimes = patterns[i].Data.Times
 		}
 
 		if len(funcResults) >= maxResults {
@@ -631,20 +642,9 @@ func showStats(patterns []qlog.PatternData, minStdDev float64,
 	funcResults := filterPatterns(patterns, minStdDev, maxStdDev, minWildcards,
 		maxWildcards, maxLen, maxResults)
 
-	var lastTimes []qlog.TimeData
 	count := 0
 	for i := 0; i < len(funcResults); i++ {
 		result := funcResults[i]
-
-		if !(*showClose) {
-			// If this dataset is a subset of the last, then we've
-			// already output the most wildcarded version of this
-			// sequence so let's not print redundant information
-			if superset(lastTimes, result.Data.Times) {
-				continue
-			}
-		}
-		lastTimes = result.Data.Times
 
 		printIndexedLogExt(count+1, result.Data.Seq, result.Wildcards, true)
 		fmt.Println("--------------------------------------")
