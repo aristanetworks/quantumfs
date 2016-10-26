@@ -577,6 +577,7 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 			deviationSum += float64(deviation * deviation)
 		}
 		newResult.Stddev = int64(math.Sqrt(deviationSum))
+		newResult.Id = mapIdx
 
 		rawResults[mapIdx] = newResult
 		mapIdx++
@@ -652,7 +653,7 @@ func showStats(patterns []qlog.PatternData, minStdDev float64,
 		fmt.Printf("Average sequence time: %12s\n",
 			time.Duration(result.Avg).String())
 		fmt.Printf("Number of samples: %d\n", len(result.Data.Times))
-		fmt.Printf("Sequence Index: %d\n", i)
+		fmt.Printf("Sequence Id: %d\n", result.Id)
 		fmt.Printf("Standard Deviation: %12s\n",
 			time.Duration(result.Stddev).String())
 		fmt.Println("")

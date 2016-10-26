@@ -196,6 +196,7 @@ type PatternData struct {
 	Avg		int64
 	Sum		int64
 	Stddev		int64
+	Id		int
 }
 
 type logStack []LogOutput
