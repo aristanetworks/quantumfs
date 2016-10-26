@@ -330,7 +330,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
 
-	inode := qfs.inode(&qfs.c, InodeId(nodeID))
+	inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID))
 	if inode == nil {
 		// Nothing to do
 		return
