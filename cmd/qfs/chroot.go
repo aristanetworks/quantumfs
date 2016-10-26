@@ -12,6 +12,7 @@ import "io/ioutil"
 import "os"
 import "os/exec"
 import "os/user"
+import "strconv"
 import "strings"
 import "syscall"
 
@@ -23,12 +24,23 @@ const (
 	netnsd     = "/usr/bin/netnsd"
 	setarch    = "/usr/bin/setarch"
 	cp         = "/bin/cp"
+	chns       = "/usr/bin/chns"
 	sh         = "/bin/sh"
 	bash       = "/bin/bash"
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
 	pivot_root = "/sbin/pivot_root"
 )
+
+var qfs string
+var asRoot bool = false
+var nonPersistent bool = false
+var setupNamespaces bool = false
+
+func init() {
+	gopath := os.Getenv("GOPATH")
+	qfs = gopath + "/bin/qfs"
+}
 
 // This function comes from the implementation of chroot in Artools,
 // but we are going to get rid of the dependency on Artools so it will
@@ -75,6 +87,7 @@ func makedest(src, dst string) bool {
 			fmt.Println("Error creating directory ", dst)
 			return false
 		}
+		fmt.Println("+ ", dst)
 		return true
 	} else {
 		fd, create_err := os.Create(dst)
@@ -83,6 +96,7 @@ func makedest(src, dst string) bool {
 			return false
 		}
 		fd.Close()
+		fmt.Println("+ ", dst)
 		return true
 	}
 }
@@ -90,6 +104,9 @@ func makedest(src, dst string) bool {
 // get all the necessary home directories
 func homedirs() []string {
 	homes := make([]string, 0)
+
+	envHome := os.Getenv("HOME")
+	homes = append(homes, envHome)
 
 	arastra, err := user.Lookup("arastra")
 	if err == nil {
@@ -164,6 +181,7 @@ func setupBindMounts(rootdir string) {
 		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
 	homes := homedirs()
 	paths = append(paths, homes...)
+
 	for i := 0; i < len(paths); i++ {
 		src := paths[i]
 		dst := rootdir + paths[i]
@@ -172,10 +190,7 @@ func setupBindMounts(rootdir string) {
 		}
 
 		cmdBindMount := exec.Command(sudo, mount, "-n", "--bind", src, dst)
-		err := cmdBindMount.Run()
-		if err != nil {
-			fmt.Println("Error bind mounting ", src, " on ", dst)
-		}
+		cmdBindMount.Run()
 	}
 }
 
@@ -241,12 +256,83 @@ func printHelp() {
 		" chroot environment.")
 }
 
-func chrootOutOfNsd(rootdir string) error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return error
+func switchUserMode(asRoot bool) error {
+	if asRoot {
+		return nil
 	}
 
+	cmdLogname := exec.Command("logname")
+	var lognameBuf bytes.Buffer
+	cmdLogname.Stdout = &lognameBuf
+	if err := cmdLogname.Run(); err != nil {
+		return err
+	}
+
+	lognameStr := lognameBuf.String()
+	lognameStr = strings.TrimSuffix(lognameStr, "\n")
+
+	logUser, err := user.Lookup(lognameStr)
+	if err != nil {
+		return err
+	}
+
+	if gid, err := strconv.Atoi(logUser.Gid); err != nil {
+		return err
+	} else if err = syscall.Setregid(gid, gid); err != nil {
+		return err
+	}
+
+	if logGroupIds, err := logUser.GroupIds(); err != nil {
+		return err
+	} else {
+		groupIds := make([]int, 0)
+		for i := 0; i < len(logGroupIds); i++ {
+			if groupId, err := strconv.Atoi(logGroupIds[i]); err == nil {
+				groupIds = append(groupIds, groupId)
+			}
+		}
+
+		if err = syscall.Setgroups(groupIds); err != nil {
+			return err
+		}
+	}
+
+	if uid, err := strconv.Atoi(logUser.Uid); err == nil {
+		if err = syscall.Setreuid(uid, uid); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
+
+	return nil
+}
+
+func chrootOutOfNsd(rootdir string) error {
+
+	// create a new namespace and run qfs chroot tool in the new namespace
+	if !setupNamespaces {
+		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
+		chroot_args := []string{qfs, "chroot", "--nonpersistent", "--setup-namespaces"}
+
+		if asRoot {
+			chroot_args = append(chroot_args, "-r")
+		}
+
+		chns_args = append(chns_args, chroot_args...)
+		chns_env := os.Environ()
+		if err := syscall.Exec(chns_args[0], chns_args, chns_env); err != nil {
+			return err
+		}
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// modify current working directory into a relative path to
+	// the workspaceroot we are chrooting in
 	if cwd == rootdir {
 		cwd = "/"
 	} else if strings.HasPrefix(cwd, rootdir) {
@@ -257,86 +343,153 @@ func chrootOutOfNsd(rootdir string) error {
 		return err
 	}
 
-	cmd := exec.Command(sudo, mount, "-n", "--rbind", rootdir, rootdir)
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	dst := rootdir + "/dev"
-	makedest("/dev", dst)
-	cmd = exec.Command(sudo, mount, "-n", "-t", "tmpfs", "none", dst)
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	cmd = exec.Command(sudo, cp, "-ax", "/dev/.", dst)
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	dst = rootdir + "/var/run/netns"
-	if err := os.MkdirAll(dst, 0666); err != nil {
-		return err
-	}
-	cmd = exec.Command(sudo, mount, "-n", "-t", "tmpfs", "tmpfs", dst)
-
-	setupBindMounts(rootdir)
-
-	rootfd, err := os.Open(rootdir)
+	rootdirInfo, err := os.Stat(rootdir)
 	if err != nil {
 		return err
 	}
 
-	if err := syscall.Chroot(oldroot); err != nil {
+	fsrootInfo, err := os.Stat("/")
+	if err != nil {
 		return err
 	}
 
-	for {
-		fileInfo1, err := os.Stat(".")
+	if !os.SameFile(rootdirInfo, fsrootInfo) {
+		cmd := exec.Command(sudo, mount, "-n", "--rbind", rootdir, rootdir)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+
+		dst := rootdir + "/dev"
+		makedest("/dev", dst)
+		cmd = exec.Command(sudo, mount, "-n", "-t", "tmpfs", "none", dst)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+
+		cmd = exec.Command(sudo, cp, "-ax", "/dev/.", dst)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+
+		dst = rootdir + "/var/run/netns"
+		if err := os.MkdirAll(dst, 0666); err != nil {
+			return err
+		}
+
+		cmd = exec.Command(sudo, mount, "-n", "-t", "tmpfs", "tmpfs", dst)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+
+		setupBindMounts(rootdir)
+
+		// Remember the current directory so that we can restore it later
+		rootfd, err := os.Open(rootdir)
 		if err != nil {
 			return err
 		}
 
-		fileInfo2, err := os.Stat("..")
-		if err != nil {
+		// In a chroot escape so pivot_root will work
+		if err := syscall.Chroot(oldroot); err != nil {
 			return err
 		}
 
-		if os.SameFile(fileInfo1, fileInfo2) {
-			break
+		for {
+			fileInfo1, err := os.Stat(".")
+			if err != nil {
+				return err
+			}
+
+			fileInfo2, err := os.Stat("..")
+			if err != nil {
+				return err
+			}
+
+			if os.SameFile(fileInfo1, fileInfo2) {
+				break
+			}
+
+			if err := os.Chdir(".."); err != nil {
+				return err
+			}
 		}
 
-		os.Chdir("..")
+		if err := syscall.Chroot("."); err != nil {
+			return err
+		}
+
+		// pivot_root to the root that we want to keep
+		if err := rootfd.Chdir(); err != nil {
+			return err
+		}
+
+		cmd = exec.Command(sudo, pivot_root, ".", "."+oldroot)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+
+		if err := rootfd.Close(); err != nil {
+			return err
+		}
+
+		// unmount the old file system
+		cmd = exec.Command(sudo, umount, "-n", "-l", oldroot)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
 	}
 
-	os.Chdir(".")
-
-	syscall.Chdir(rootfd)
-	cmd = exec.Command(sudo, pivot_root, ".", "."+oldroot)
-	if err := cmd.Run(); err != nil {
+	// change the current directory
+	cwdInfo, err := os.Stat(cwd)
+	if err != nil {
 		return err
 	}
-	os.Close(rootfd)
 
-	cmd = exec.Command(sudo, umount, "-n", "-l", oldroot)
-	if err := cmd.Run(); err != nil {
+	if !cwdInfo.IsDir() {
+		cwd = "/"
+	}
+
+	if err := os.Chdir(cwd); err != nil {
 		return err
 	}
 
+	archStr, err := getArchitecture("/")
+	if err != nil {
+		return err
+	}
+
+	// switch to non-root user if not specified to run as root
+	if err := switchUserMode(asRoot); err != nil {
+		return err
+	}
+
+	setarch_cmd := []string{setarch, archStr}
+	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", bash, bash}
+
+	setarch_cmd = append(setarch_cmd, shell_cmd...)
+
+	setarch_env := os.Environ()
+	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
+
+	if err := syscall.Exec(setarch_cmd[0],
+		setarch_cmd, setarch_env); err != nil {
+
+		return err
+	}
+
+	return nil
 }
 
 func chroot() {
-
-	asRoot := false
-	nonPersistent := false
-
 	args := flag.Args()[1:]
-
 	for len(args) > 0 {
 		switch args[0] {
 		case "-r":
 			asRoot = true
 		case "--nonpersistent":
 			nonPersistent = true
+		case "--setup-namespaces":
+			setupNamespaces = true
 		default:
 			printHelp()
 			return
@@ -351,7 +504,9 @@ func chroot() {
 	}
 
 	if nonPersistent {
-		fmt.Println("nonPersistent")
+		if err := chrootOutOfNsd(rootdir); err != nil {
+			fmt.Println(err.Error())
+		}
 		return
 	}
 
