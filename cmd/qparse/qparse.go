@@ -21,6 +21,7 @@ var tabSpaces *int
 var logOut *bool
 var stats *bool
 var topTotal *int
+var topAvg *int
 var showClose *bool
 var stdDevMin *float64
 var stdDevMax *float64
@@ -48,6 +49,24 @@ func collectData(wildcards []bool, seq []qlog.LogOutput,
 	}
 
 	return rtn
+}
+
+type SortResultsAverage []qlog.PatternData
+
+func (s SortResultsAverage) Len() int {
+	return len(s)
+}
+
+func (s SortResultsAverage) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortResultsAverage) Less(i, j int) bool {
+	if s[i].Avg == s[j].Avg {
+		return (s[i].SeqStrRaw > s[j].SeqStrRaw)
+	} else {
+		return (s[i].Avg > s[j].Avg)
+	}
 }
 
 type SortResultsTotal []qlog.PatternData
@@ -101,8 +120,10 @@ func init() {
 		"stats file (-out). Default stats filename is logfile.stats")
 	topTotal = flag.Int("bytotal", 0, "Parse a stat file (-in) and "+
 		"print top <bytotal> functions by total time usage in logs")
+	topAvg = flag.Int("byavg", 0, "Parse a stat file (-in) and "+
+		"print top <byavg> functions by total time usage in logs")
 	showClose = flag.Bool("sims", false,
-		"Don't hide similar sequences when using -bytotal")
+		"Don't hide similar sequences when using -bytotal or -byavg")
 	stdDevMin = flag.Float64("smin", 0, "Filter results, requiring minimum "+
 		"standard deviation of <stdmin>. Float units of microseconds")
 	stdDevMax = flag.Float64("smax", 1000000000,
@@ -220,7 +241,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Println("Loading file...")
+		fmt.Println("Loading file for -bytotal...")
 		file, err := os.Open(*inFile)
 		if err != nil {
 			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
@@ -228,8 +249,37 @@ func main() {
 		}
 		defer file.Close()
 		patterns := qlog.LoadFromStat(file)
-		showTopTotalStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
-			*wildMax, *maxLen)
+
+		// Now sort by total time usage
+		fmt.Println("Sorting data by total time usage...")
+		sort.Sort(SortResultsTotal(patterns))
+
+		fmt.Println("Top function patterns by total time used:")
+		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
+			*wildMax, *maxLen, *topTotal)
+	} else if *topAvg != 0 {
+		if *inFile == "" {
+			fmt.Println("To -topAvg, you must specify a stat file "+
+				"with -in")
+			os.Exit(1)
+		}
+
+		fmt.Println("Loading file for -byavg...")
+		file, err := os.Open(*inFile)
+		if err != nil {
+			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
+			os.Exit(1)
+		}
+		defer file.Close()
+		patterns := qlog.LoadFromStat(file)
+
+		// Now sort by average time usage
+		fmt.Println("Sorting data by average time usage...")
+		sort.Sort(SortResultsAverage(patterns))
+
+		fmt.Println("Top function patterns by average time used:")
+		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
+			*wildMax, *maxLen, *topAvg)
 	} else {
 		fmt.Println("No action flags (-log, -stat) specified.")
 		os.Exit(1)
@@ -536,19 +586,14 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 	return rawResults
 }
 
-// stddev units are microseconds
-func showTopTotalStats(patterns []qlog.PatternData, minStdDev float64, maxStdDev float64,
-	minWildcards int, maxWildcards int, maxLen int) {
-
-	// Now sort by total time usage
-	fmt.Println("Sorting data by total time usage...")
-	sort.Sort(SortResultsTotal(patterns))
+func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
+	maxStdDev float64, minWildcards int, maxWildcards int,
+	maxLen int, maxResults int) []qlog.PatternData {
 
 	minStdDevNano := int64(minStdDev * 1000)
 	maxStdDevNano := int64(maxStdDev * 1000)
 
 	funcResults := make([]qlog.PatternData, 0)
-	// Go through all the patterns and collect ones within stddev
 	for i := 0; i < len(patterns); i++ {
 		wildcards := countWildcards(patterns[i].Wildcards, false)
 		if wildcards > maxWildcards || wildcards < minWildcards {
@@ -569,12 +614,22 @@ func showTopTotalStats(patterns []qlog.PatternData, minStdDev float64, maxStdDev
 			funcResults = append(funcResults, patterns[i])
 		}
 
-		if len(funcResults) >= *topTotal {
+		if len(funcResults) >= maxResults {
 			break
 		}
 	}
 
-	fmt.Println("Top function patterns by total time used:")
+	return funcResults
+}
+
+// stddev units are microseconds
+func showStats(patterns []qlog.PatternData, minStdDev float64,
+	maxStdDev float64, minWildcards int, maxWildcards int, maxLen int,
+	maxResults int) {
+
+	funcResults := filterPatterns(patterns, minStdDev, maxStdDev, minWildcards,
+		maxWildcards, maxLen, maxResults)
+
 	var lastTimes []qlog.TimeData
 	count := 0
 	for i := 0; i < len(funcResults); i++ {
