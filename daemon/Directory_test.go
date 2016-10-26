@@ -5,6 +5,7 @@ package daemon
 
 // Test the various operations on directories, such as creation and traversing
 
+import "bytes"
 import "fmt"
 import "io/ioutil"
 import "os"
@@ -648,7 +649,6 @@ func TestSUIDPerms(t *testing.T) {
 	})
 }
 
-/*
 func TestLoadOnDemand(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
@@ -673,58 +673,57 @@ func TestLoadOnDemand(t *testing.T) {
 		err = printToFile(workspace+fileC, string(dataC))
 		test.assert(err == nil, "Error creating file: %v", err)
 
-		newspace := test.branchWorkspace(workspace)
+		newspace := test.absPath(test.branchWorkspace(workspace))
+		fileA = newspace + "/layerA/fileA"
+		dirB := newspace + "/layerA/layerB"
+		fileB = dirB + "/fileB"
+		dirC := dirB + "/layerC"
+		fileC = dirC + "/fileC"
 
-		// Grab the inode of fileA
+		getInode := func(path string) Inode {
+			var stat syscall.Stat_t
+			err = syscall.Stat(path, &stat)
+			test.assert(err == nil, "Error grabbing file inode: %v", err)
+			inode := test.qfs.inodeNoInstantiate(&test.qfs.c,
+				InodeId(stat.Ino))
+			return inode
+		}
+
+		// Confirm the inode for fileA isn't instantiated. Getting the stat
+		// attributes of an inode shouldn't instantiate it.
+		fileNode := getInode(fileA)
+		test.assert(fileNode == nil, "File inode unexpectedly instantiated")
+
+		// Stat'ing a file should instantiate its parents
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.absPath(newspace+fileA), &stat)
-		test.assert(err == nil, "Error grabbing file inode: %v", err)
+		err = syscall.Stat(fileB, &stat)
+		test.assert(err == nil, "Error stat'ing FileB: %v", err)
 
-		// Now grab the File for it
-		fileNode := test.qfs.inode(&test.qfs.c, InodeId(stat.Ino))
-		test.assert(fileNode != nil, "File inode for fileA is nil")
-		filePtr, ok := fileNode.(*File)
-		test.assert(ok, "Inode for fileA is not a File")
+		dirNode := getInode(dirB)
+		test.assert(dirNode != nil,
+			"Intermediate directory unexpectedly nil")
 
-		// Now grab its parent so we can check to make sure B/C are shallow
-		layerA := filePtr.parent()
-		test.assert(layerA != nil, "Directory inode for layerA is nil")
-		dirAPtr, ok := layerA.(*Directory)
-		test.assert(ok, "Inode for layerA is not a Directory")
-		test.assert(dirAPtr.dirChildren.data != nil,
-			"Touched directory hasn't loaded children")
+		// But siblings shouldn't have been instantiated
+		dirNode = getInode(dirC)
+		test.assert(dirNode == nil, "dirC unexpectedly instantiated")
 
-		layerBInode := dirAPtr.dirChildren.data.fileToInode["layerB"]
-		layerB := test.qfs.inode(&test.qfs.c, InodeId(layerBInode))
-		test.assert(layerB != nil, "Directory inode for layerB is nil")
-
-		dirBPtr, ok := layerB.(*Directory)
-		test.assert(ok, "Inode for layerB is not a Directory")
-		test.assert(dirBPtr.dirChildren.data == nil,
-			"Nested directory's children loaded unecessarily")
-
-		// Now read layer B to trigger layer C to be shallow loaded
-		layerBData, err := ioutil.ReadFile(test.absPath(newspace + fileB))
+		// Reading FileB shouldn't make any difference
+		layerBData, err := ioutil.ReadFile(fileB)
 		test.assert(err == nil, "Unable to read fileB file contents %v", err)
 		test.assert(bytes.Equal(layerBData, dataB),
 			"dynamically loaded inode data mismatch")
+		dirNode = getInode(dirC)
+		test.assert(dirNode == nil, "dirC unexpectedly instantiated")
 
-		layerCInode := dirBPtr.dirChildren.data.fileToInode["layerC"]
-		layerC := test.qfs.inode(&test.qfs.c, InodeId(layerCInode))
-		test.assert(layerC != nil, "Directory inode for layerC is nil")
-
-		dirCPtr, ok := layerC.(*Directory)
-		test.assert(ok, "Inode for layerC is not a Directory")
-		test.assert(dirCPtr.dirChildren.data == nil,
-			"Nested directory's children loaded unecessarily")
-
-		layerCData, err := ioutil.ReadFile(test.absPath(newspace + fileC))
+		// Ensure we can read without stat'ing first
+		layerCData, err := ioutil.ReadFile(fileC)
 		test.assert(err == nil, "Unable to read fileC contents %v", err)
 		test.assert(bytes.Equal(layerCData, dataC),
 			"dynamically loaded inode data mismatch")
 	})
 }
 
+/*
 func TestInodeForget(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
