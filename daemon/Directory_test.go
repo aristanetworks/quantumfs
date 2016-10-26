@@ -680,18 +680,9 @@ func TestLoadOnDemand(t *testing.T) {
 		dirC := dirB + "/layerC"
 		fileC = dirC + "/fileC"
 
-		getInode := func(path string) Inode {
-			var stat syscall.Stat_t
-			err = syscall.Stat(path, &stat)
-			test.assert(err == nil, "Error grabbing file inode: %v", err)
-			inode := test.qfs.inodeNoInstantiate(&test.qfs.c,
-				InodeId(stat.Ino))
-			return inode
-		}
-
 		// Confirm the inode for fileA isn't instantiated. Getting the stat
 		// attributes of an inode shouldn't instantiate it.
-		fileNode := getInode(fileA)
+		fileNode := test.getInode(fileA)
 		test.assert(fileNode == nil, "File inode unexpectedly instantiated")
 
 		// Stat'ing a file should instantiate its parents
@@ -699,12 +690,12 @@ func TestLoadOnDemand(t *testing.T) {
 		err = syscall.Stat(fileB, &stat)
 		test.assert(err == nil, "Error stat'ing FileB: %v", err)
 
-		dirNode := getInode(dirB)
+		dirNode := test.getInode(dirB)
 		test.assert(dirNode != nil,
 			"Intermediate directory unexpectedly nil")
 
 		// But siblings shouldn't have been instantiated
-		dirNode = getInode(dirC)
+		dirNode = test.getInode(dirC)
 		test.assert(dirNode == nil, "dirC unexpectedly instantiated")
 
 		// Reading FileB shouldn't make any difference
@@ -712,7 +703,7 @@ func TestLoadOnDemand(t *testing.T) {
 		test.assert(err == nil, "Unable to read fileB file contents %v", err)
 		test.assert(bytes.Equal(layerBData, dataB),
 			"dynamically loaded inode data mismatch")
-		dirNode = getInode(dirC)
+		dirNode = test.getInode(dirC)
 		test.assert(dirNode == nil, "dirC unexpectedly instantiated")
 
 		// Ensure we can read without stat'ing first

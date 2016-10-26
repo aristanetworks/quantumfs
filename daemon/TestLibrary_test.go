@@ -546,6 +546,16 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 	return handles
 }
 
+// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
+func (th *testHelper) getInode(path string) Inode {
+	var stat syscall.Stat_t
+	err := syscall.Stat(path, &stat)
+	th.assert(err == nil, "Error grabbing file inode: %v", err)
+	inode := th.qfs.inodeNoInstantiate(&th.qfs.c,
+		InodeId(stat.Ino))
+	return inode
+}
+
 // Retrieve the rootId of the given workspace
 func (th *testHelper) workspaceRootId(namespace string,
 	workspace string) quantumfs.ObjectKey {
