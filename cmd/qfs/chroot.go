@@ -257,7 +257,6 @@ func printHelp() {
 
 func switchUserMode() error {
 	lognameStr := os.Getenv("SUDO_USER")
-	fmt.Println(lognameStr)
 
 	logUser, err := user.Lookup(lognameStr)
 	if err != nil {
