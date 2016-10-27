@@ -250,7 +250,8 @@ func printHelp() {
 	fmt.Println("                 workspace tree. The chroot environment")
 	fmt.Println("                 can be specified to be nonpersistent,")
 	fmt.Println("                 or by default it is persistent.\n")
-	fmt.Println("   qfs chroot [--nonpersistent] <DIR> <CMD>\n")
+	fmt.Println("   qfs chroot")
+	fmt.Println("   qfs chroot --nonpersistent <DIR> <CMD>\n")
 	fmt.Println("   Options:")
 	fmt.Println("      --nonpersistent <DIR> <CMD>      Create a non-persistent",
 		" chroot environment.")
