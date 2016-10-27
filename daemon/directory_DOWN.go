@@ -58,13 +58,16 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	}
 
 	defer dir.Lock().Unlock()
+	defer dir.childRecordLock.Lock().Unlock()
 
 	dir.updateRecords_DOWN_(c)
-	return dir.publish(c)
+	return dir.publish_(c)
 }
 
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
+//
+// Requires the Inode lock and dir.childRecordLock
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	for _, child := range dir.dirtyChildren_ {
 		newKey := child.flush_DOWN(c)
