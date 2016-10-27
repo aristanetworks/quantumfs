@@ -6,7 +6,6 @@
 package main
 
 import "bytes"
-import "flag"
 import "fmt"
 import "io/ioutil"
 import "os"
@@ -15,6 +14,8 @@ import "os/user"
 import "strconv"
 import "strings"
 import "syscall"
+
+import "github.com/kardianos/osext"
 
 const (
 	sudo       = "/usr/bin/sudo"
@@ -33,13 +34,16 @@ const (
 )
 
 var qfs string
-var asRoot bool = false
-var nonPersistent bool = false
+var persistent bool = true
 var setupNamespaces bool = false
 
 func init() {
-	gopath := os.Getenv("GOPATH")
-	qfs = gopath + "/bin/qfs"
+	if qfspath, err := osext.Executable(); err != nil {
+		fmt.Println("Unable to locate qfs directory")
+		qfs = "./qfs"
+	} else {
+		qfs = qfspath
+	}
 }
 
 // This function comes from the implementation of chroot in Artools,
@@ -87,7 +91,6 @@ func makedest(src, dst string) bool {
 			fmt.Println("Error creating directory ", dst)
 			return false
 		}
-		fmt.Println("+ ", dst)
 		return true
 	} else {
 		fd, create_err := os.Create(dst)
@@ -96,7 +99,6 @@ func makedest(src, dst string) bool {
 			return false
 		}
 		fd.Close()
-		fmt.Println("+ ", dst)
 		return true
 	}
 }
@@ -159,19 +161,14 @@ func serverRunning(svrName string) bool {
 
 // login the netns server and open a new login shell, which is not
 // expected to return
-func netnsLogin(rootdir string, svrName string, root bool) error {
+func netnsLogin(rootdir string, svrName string) error {
 	var err error
 	env := os.Environ()
 	env = append(env, "A4_CHROOT="+rootdir)
-	if root {
-		args := []string{sudo, netns, svrName, sh, "-l", "-c",
-			"\"$@\"", bash, bash}
-		err = syscall.Exec(sudo, args, env)
-	} else {
-		args := []string{netns, svrName, sh, "-l", "-c",
-			"\"$@\"", bash, bash}
-		err = syscall.Exec(netns, args, env)
-	}
+
+	args := []string{netns, svrName, sh, "-l", "-c",
+		"\"$@\"", bash, bash}
+	err = syscall.Exec(netns, args, env)
 
 	return err
 }
@@ -248,19 +245,16 @@ func chrootInNsd(rootdir string, svrName string) error {
 }
 
 func printHelp() {
-	fmt.Println("   qfs chroot -- Run a shell in the current workspace tree\n")
-	fmt.Println("   qfs chroot [-r] [--nonpersistent]\n")
+	fmt.Println("   qfs chroot -- Run a command or shell in the current workspace tree.")
+	fmt.Println("                 The chroot environment can be specified to be nonpersistent,")
+	fmt.Println("                 or by default it is persistent.\n")
+	fmt.Println("   qfs chroot [--nonpersistent] [DIR] [CMD]\n")
 	fmt.Println("   Options:")
-	fmt.Println("      -r                   Run the shell as root.")
-	fmt.Println("      --nonpersistent      Create a non-persistent",
+	fmt.Println("      --nonpersistent <DIR> <CMD>      Create a non-persistent",
 		" chroot environment.")
 }
 
-func switchUserMode(asRoot bool) error {
-	if asRoot {
-		return nil
-	}
-
+func switchUserMode() error {
 	cmdLogname := exec.Command("logname")
 	var lognameBuf bytes.Buffer
 	cmdLogname.Stdout = &lognameBuf
@@ -282,26 +276,25 @@ func switchUserMode(asRoot bool) error {
 		return err
 	}
 
-	if logGroupIds, err := logUser.GroupIds(); err != nil {
+	logGroupIds, err := logUser.GroupIds()
+	if err != nil {
 		return err
-	} else {
-		groupIds := make([]int, 0)
-		for i := 0; i < len(logGroupIds); i++ {
-			if groupId, err := strconv.Atoi(logGroupIds[i]); err == nil {
-				groupIds = append(groupIds, groupId)
-			}
-		}
+	}
 
-		if err = syscall.Setgroups(groupIds); err != nil {
-			return err
+	groupIds := make([]int, 0)
+	for i := 0; i < len(logGroupIds); i++ {
+		if groupId, err := strconv.Atoi(logGroupIds[i]); err == nil {
+			groupIds = append(groupIds, groupId)
 		}
 	}
 
-	if uid, err := strconv.Atoi(logUser.Uid); err == nil {
-		if err = syscall.Setreuid(uid, uid); err != nil {
-			return err
-		}
-	} else {
+	if err = syscall.Setgroups(groupIds); err != nil {
+		return err
+	}
+
+	if uid, err := strconv.Atoi(logUser.Uid); err != nil {
+		return err
+	} else if err = syscall.Setreuid(uid, uid); err != nil {
 		return err
 	}
 
@@ -309,17 +302,12 @@ func switchUserMode(asRoot bool) error {
 }
 
 func chrootOutOfNsd(rootdir string) error {
-
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
 		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
 
 		chroot_args := []string{qfs, "chroot", "--nonpersistent",
 			"--setup-namespaces"}
-
-		if asRoot {
-			chroot_args = append(chroot_args, "-r")
-		}
 
 		chns_args = append(chns_args, chroot_args...)
 		chns_env := os.Environ()
@@ -398,6 +386,7 @@ func chrootOutOfNsd(rootdir string) error {
 			return err
 		}
 
+		// Keep changing to parent directory up to the root
 		for {
 			fileInfo1, err := os.Stat(".")
 			if err != nil {
@@ -463,7 +452,7 @@ func chrootOutOfNsd(rootdir string) error {
 	}
 
 	// switch to non-root user if not specified to run as root
-	if err := switchUserMode(asRoot); err != nil {
+	if err := switchUserMode(); err != nil {
 		return err
 	}
 
@@ -485,13 +474,11 @@ func chrootOutOfNsd(rootdir string) error {
 }
 
 func chroot() {
-	args := flag.Args()[1:]
+	args := os.Args[2:]
 	for len(args) > 0 {
 		switch args[0] {
-		case "-r":
-			asRoot = true
 		case "--nonpersistent":
-			nonPersistent = true
+			persistent = false
 		case "--setup-namespaces":
 			setupNamespaces = true
 		default:
@@ -507,7 +494,7 @@ func chroot() {
 		return
 	}
 
-	if nonPersistent {
+	if !persistent {
 		if err := chrootOutOfNsd(rootdir); err != nil {
 			fmt.Println(err.Error())
 		}
@@ -523,7 +510,7 @@ func chroot() {
 		}
 	}
 
-	err = netnsLogin(rootdir, svrName, asRoot)
+	err = netnsLogin(rootdir, svrName)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
