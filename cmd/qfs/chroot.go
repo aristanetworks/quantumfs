@@ -256,15 +256,8 @@ func printHelp() {
 }
 
 func switchUserMode() error {
-	cmdLogname := exec.Command("logname")
-	var lognameBuf bytes.Buffer
-	cmdLogname.Stdout = &lognameBuf
-	if err := cmdLogname.Run(); err != nil {
-		return err
-	}
-
-	lognameStr := lognameBuf.String()
-	lognameStr = strings.TrimSuffix(lognameStr, "\n")
+	lognameStr := os.Getenv("SUDO_USER")
+	fmt.Println(lognameStr)
 
 	logUser, err := user.Lookup(lognameStr)
 	if err != nil {
