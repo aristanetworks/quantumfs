@@ -289,7 +289,7 @@ func switchUserMode() error {
 		}
 	}
 
-	if err = syscall.Setgroups(groupIds); err != nil {
+	if err := syscall.Setgroups(groupIds); err != nil {
 		return err
 	}
 
@@ -452,7 +452,7 @@ func chrootOutOfNsd(rootdir string) error {
 		return err
 	}
 
-	// switch to non-root user if not specified to run as root
+	// switch to non-root user
 	if err := switchUserMode(); err != nil {
 		return err
 	}
