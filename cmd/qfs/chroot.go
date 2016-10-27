@@ -490,7 +490,7 @@ func chroot() {
 			persistent = false
 			args = args[1:]
 			if len(args) < 2 {
-				fmt.Println("Not enough arguments for nonpersistent chroot.")
+				fmt.Println("Not enough arguments.")
 				printHelp()
 				os.Exit(1)
 			}
