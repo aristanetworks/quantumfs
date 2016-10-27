@@ -326,10 +326,12 @@ func chrootOutOfNsd(rootdir string) error {
 
 	// modify current working directory into a relative path to
 	// the workspaceroot we are chrooting in
-	if cwd == rootdir {
-		cwd = "/"
-	} else if strings.HasPrefix(cwd, rootdir) {
+	if strings.HasPrefix(cwd, rootdir) {
 		cwd = cwd[len(rootdir):]
+	}
+
+	if len(cwd) == 0 {
+		cwd = "/"
 	}
 
 	if err := syscall.Chdir("/"); err != nil {
