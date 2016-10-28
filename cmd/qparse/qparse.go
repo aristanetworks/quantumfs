@@ -40,6 +40,7 @@ var stats *bool
 var topTotal *int
 var topAvg *int
 var coverCsv intslice
+var coverage *int
 var bucketWidthMs *int
 var bucketWidthNs int64
 var showClose *bool
@@ -142,10 +143,11 @@ func init() {
 		"print top <bytotal> functions by total time usage in logs")
 	topAvg = flag.Int("byavg", 0, "Parse a stat file (-in) and "+
 		"print top <byavg> functions by total time usage in logs")
-	flag.Var(&coverCsv, "cover", "Output csv wall time consumed in bucket t" +
-		" for given Sequence Id. Multiple -cover flags supported")
-	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for csv output in" +
-		"Ms (default 1000)")
+	coverage = flag.Int("cover", -1, "Output csv wall time consumed in bucket t" +
+		" for each Sequence Id. To be output needs X/100 in any bucket.")
+	flag.Var(&coverCsv, "fcsv", "Filter csv output to include only given " +
+		"Sequence Id. Multiple -fcsv flags are supported.")
+	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for -csv in Ms")
 	showClose = flag.Bool("sims", false,
 		"Don't hide similar sequences when using -bytotal or -byavg")
 	stdDevMin = flag.Float64("smin", 0, "Filter results, requiring minimum "+
@@ -155,9 +157,9 @@ func init() {
 	wildMin = flag.Int("wmin", 0, "Filter results, requiring minimum number "+
 		"of wildcards in function pattern.")
 	wildMax = flag.Int("wmax", 100, "Same as wmin, but setting a maximum")
-	maxThreads = flag.Int("threads", 30, "Max threads to use (default 30)")
+	maxThreads = flag.Int("threads", 30, "Max threads to use")
 	maxLenWildcards = flag.Int("maxwc", 16,
-		"Max sequence length to wildcard during -stat (default 16)")
+		"Max sequence length to wildcard during -stat")
 	maxLen = flag.Int("maxlen", 10000,
 		"Max sequence length to return in results")
 
@@ -204,18 +206,23 @@ func main() {
 		return
 	}
 
-	if len(coverCsv) != 0 {
+	if *coverage != -1 {
 		if *inFile == "" {
-			fmt.Println("To -coverCsv, you must specify a stat file "+
+			fmt.Println("To -cover, you must specify a stat file "+
 				"with -in")
 			os.Exit(1)
 		}
 		if *outFile == "" {
-			fmt.Println("To -coverCsv, you must specify an output filename")
+			fmt.Println("To -cover, you must specify an output filename")
+			os.Exit(1)
+		}
+		if *coverage < 0 || *coverage > 100 {
+			fmt.Println("To -cover, you must specify a threshold "+
+				"[0, 100]")
 			os.Exit(1)
 		}
 
-		fmt.Println("Loading file for -coverCsv...")
+		fmt.Println("Loading file for -cover...")
 		file, err := os.Open(*inFile)
 		if err != nil {
 			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
@@ -327,7 +334,7 @@ func main() {
 		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
 			*wildMax, *maxLen, *topAvg)
 	} else {
-		fmt.Println("No action flags (-log, -stat, -coverCsv) specified.")
+		fmt.Println("No action flags (-log, -stat, -csv) specified.")
 		os.Exit(1)
 	}
 }
