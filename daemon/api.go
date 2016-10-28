@@ -5,6 +5,7 @@ package daemon
 
 // This file contains all the interaction with the quantumfs API file.
 
+import "encoding/binary"
 import "encoding/json"
 import "errors"
 import "fmt"
@@ -377,7 +378,10 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdSyncAll:
 		c.vlog("Received all workspace sync request")
 		api.syncAll(c)
-
+	// create an object with a given ObjectKey and path
+	case quantumfs.CmdDuplicateObject:
+		c.vlog("Recieved Duplicate Object request")
+		api.duplicateObject(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -447,4 +451,68 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 func (api *ApiHandle) syncAll(c *ctx) {
 	c.qfs.syncAll(c)
 	api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
+}
+
+func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
+	c.vlog("Api::duplicateObject Enter")
+	defer c.vlog("Api::duplicateObject Exit")
+
+	var cmd quantumfs.DuplicateObject
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	dst := strings.Split(cmd.Dst, "/")
+	keyInByte := cmd.ObjectKey
+	mode := binary.LittleEndian.Uint32(cmd.Attribute[0:4])
+	umask := binary.LittleEndian.Uint32(cmd.Attribute[4:8])
+	rdev := binary.LittleEndian.Uint32(cmd.Attribute[8:12])
+	uid := binary.LittleEndian.Uint16(cmd.Attribute[12:14])
+	gid := binary.LittleEndian.Uint16(cmd.Attribute[14:16])
+
+	wsr := dst[0] + "/" + dst[1]
+	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	if !ok {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"WorkspaceRoot "+wsr+" does not exist or is not active")
+		return
+	}
+
+	// Duplicate the ObjectKey in the target node
+	key := quantumfs.NewObjectKeyFromBytes(keyInByte[:TypeKeyLength-9])
+	objectType := quantumfs.ObjectType(keyInByte[TypeKeyLength-9])
+	size := binary.LittleEndian.Uint64(keyInByte[TypeKeyLength-8:])
+
+	if len(dst) == 2 { // only have userspace and workspace
+		// duplicate the entire workspace root is illegal
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"WorkspaceRoot should not be duplicated")
+		return
+	}
+
+	// get immediate parent of the target node
+	p, err := (&workspace.Directory).followPath(c, dst, 2)
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Path "+cmd.Dst+" does not exist")
+		return
+	}
+
+	parent := p.(*Directory)
+	target := dst[len(dst)-1]
+	_, exist := parent.dirChildren.getInode(c, target)
+	if exist {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Inode "+target+" should not exist")
+		return
+	}
+
+	c.vlog("Api::duplicateObject put key %v into node %d - %s",
+		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
+
+	parent.localCreate_(c, target, mode, umask, rdev, size, quantumfs.UID(uid),
+		quantumfs.GID(gid), objectType, key)
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Duplicate Object Succeeded")
 }
