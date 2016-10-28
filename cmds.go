@@ -4,6 +4,7 @@
 package quantumfs
 
 import "fmt"
+import "encoding/binary"
 import "encoding/json"
 import "os"
 import "strings"
@@ -88,11 +89,12 @@ type CommandCommon struct {
 
 // The various command ID constants
 const (
-	CmdError         = iota
-	CmdBranchRequest = iota
-	CmdGetAccessed   = iota
-	CmdClearAccessed = iota
-	CmdSyncAll       = iota
+	CmdError           = iota
+	CmdBranchRequest   = iota
+	CmdGetAccessed     = iota
+	CmdClearAccessed   = iota
+	CmdSyncAll         = iota
+	CmdDuplicateObject = iota
 )
 
 // The various error codes
@@ -127,6 +129,14 @@ type AccessedRequest struct {
 
 type SyncAllRequest struct {
 	CommandCommon
+}
+
+type DuplicateObject struct {
+	CommandCommon
+	Dst       string
+	ObjectKey []byte
+	Attribute []byte
+	Size      uint64
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -274,8 +284,69 @@ func (api *Api) SyncAll() error {
 	return nil
 }
 
+// duplicate an object with a given ObjectKey and path
+func (api *Api) DuplicateObject(dst string, objectKey []byte, mode uint32,
+	umask uint32, rdev uint32, uid uint16, gid uint16) error {
+
+	if !isWorkspacePathValid(dst) {
+		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
+	}
+
+	if !isObjectKeyValid(objectKey) {
+		return fmt.Errorf("\"%s\" must be 22 bytes", objectKey)
+	}
+
+	attr := make([]byte, 16)
+	binary.LittleEndian.PutUint32(attr[0:4], mode)
+	binary.LittleEndian.PutUint32(attr[4:8], umask)
+	binary.LittleEndian.PutUint32(attr[8:12], rdev)
+	binary.LittleEndian.PutUint16(attr[12:14], uid)
+	binary.LittleEndian.PutUint16(attr[14:16], gid)
+
+	cmd := DuplicateObject{
+		CommandCommon: CommandCommon{CommandId: CmdDuplicateObject},
+		Dst:           dst,
+		ObjectKey:     objectKey,
+		Attribute:     attr,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
 func isWorkspaceNameValid(wsr string) bool {
 	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+		return false
+	}
+	return true
+}
+
+func isWorkspacePathValid(dst string) bool {
+	if slashes := strings.Count(dst, "/"); slashes < 1 {
+		return false
+	}
+	return true
+}
+
+func isObjectKeyValid(objectKey []byte) bool {
+	if length := len(objectKey); length != 30 {
 		return false
 	}
 	return true

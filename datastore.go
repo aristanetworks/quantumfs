@@ -242,6 +242,7 @@ const (
 	ObjectTypeLargeFile         = iota
 	ObjectTypeVeryLargeFile     = iota
 	ObjectTypeSpecial           = iota
+	ObjectTypeAny               = iota
 )
 
 // One of the ObjectType* values
