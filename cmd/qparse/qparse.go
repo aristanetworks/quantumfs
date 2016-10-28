@@ -39,10 +39,9 @@ var logOut *bool
 var stats *bool
 var topTotal *int
 var topAvg *int
-var csv intslice
+var coverCsv intslice
 var bucketWidthMs *int
 var bucketWidthNs int64
-var coverage *bool
 var showClose *bool
 var stdDevMin *float64
 var stdDevMax *float64
@@ -143,12 +142,10 @@ func init() {
 		"print top <bytotal> functions by total time usage in logs")
 	topAvg = flag.Int("byavg", 0, "Parse a stat file (-in) and "+
 		"print top <byavg> functions by total time usage in logs")
-	flag.Var(&csv, "csv", "Output statistic in csv format for given Sequence " +
-		"Id. Multiple -csv flags supported")
-	coverage = flag.Bool("coverage", false, "Use with -csv. Output into bucket" +
-		" t every call instance's duration in t")
-	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for -csv in Ms " +
-		"(default 1000)")
+	flag.Var(&coverCsv, "cover", "Output csv wall time consumed in bucket t" +
+		" for given Sequence Id. Multiple -cover flags supported")
+	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for csv output in" +
+		"Ms (default 1000)")
 	showClose = flag.Bool("sims", false,
 		"Don't hide similar sequences when using -bytotal or -byavg")
 	stdDevMin = flag.Float64("smin", 0, "Filter results, requiring minimum "+
@@ -207,22 +204,18 @@ func main() {
 		return
 	}
 
-	if len(csv) != 0 {
+	if len(coverCsv) != 0 {
 		if *inFile == "" {
-			fmt.Println("To -csv, you must specify a stat file "+
+			fmt.Println("To -coverCsv, you must specify a stat file "+
 				"with -in")
 			os.Exit(1)
 		}
 		if *outFile == "" {
-			fmt.Println("To -csv, you must specify an output filename")
-			os.Exit(1)
-		}
-		if *coverage == false {
-			fmt.Println("Must specify a statistic to output as csv.")
+			fmt.Println("To -coverCsv, you must specify an output filename")
 			os.Exit(1)
 		}
 
-		fmt.Println("Loading file for -csv...")
+		fmt.Println("Loading file for -coverCsv...")
 		file, err := os.Open(*inFile)
 		if err != nil {
 			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
@@ -231,9 +224,7 @@ func main() {
 		defer file.Close()
 		patterns := qlog.LoadFromStat(file)
 
-		if *coverage == true {
-			outputCsvCover(patterns)
-		}
+		outputCsvCover(patterns)
 	} else if *logOut {
 		if *inFile == "" {
 			fmt.Println("To -log, you must specify a log file with -in")
@@ -336,7 +327,7 @@ func main() {
 		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
 			*wildMax, *maxLen, *topAvg)
 	} else {
-		fmt.Println("No action flags (-log, -stat, -csv) specified.")
+		fmt.Println("No action flags (-log, -stat, -coverCsv) specified.")
 		os.Exit(1)
 	}
 }
@@ -663,8 +654,8 @@ func fillTimeline(out map[int64]bucket, csvIdx int,
 		for n := bucketIdx; n <= endBucketIdx; n++ {
 			bucketIt := out[n]
 			if len(bucketIt.timeSum) == 0 {
-				bucketIt.timeSum = make([]float64, len(csv),
-					len(csv))
+				bucketIt.timeSum = make([]float64, len(coverCsv),
+					len(coverCsv))
 			}
 
 			timeDeltaStart := n * bucketWidthNs
@@ -701,8 +692,8 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	status := qlog.NewLogStatus(50)
 	for i := 0; i < len(patterns); i++ {
 		status.Process(float32(i) / float32(len(patterns)))
-		for j := 0; j < len(csv); j++ {
-			if patterns[i].Id == csv[j] {
+		for j := 0; j < len(coverCsv); j++ {
+			if patterns[i].Id == coverCsv[j] {
 				minStart := fillTimeline(timeline, j, patterns[i])
 				if !minSet || minStart < minTime {
 					minTime = minStart
@@ -715,8 +706,8 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	status.Process(1)
 
 	file.WriteString(fmt.Sprintf("t,"))
-	for i := 0; i < len(csv); i++ {
-		file.WriteString(fmt.Sprintf("%d,", csv[i]))
+	for i := 0; i < len(coverCsv); i++ {
+		file.WriteString(fmt.Sprintf("%d,", coverCsv[i]))
 	}
 	file.WriteString("\n")
 
@@ -731,9 +722,9 @@ func outputCsvCover(patterns []qlog.PatternData) {
 		unixTime := minTime + (row * bucketWidthNs)
 		file.WriteString(fmt.Sprintf("%s,", time.Unix(0,
 			unixTime).Format("15:04:05.0000000000")))
-		for i := 0; i < len(csv); i++ {
+		for i := 0; i < len(coverCsv); i++ {
 			if exists {
-				if len(mapBucket.timeSum) != len(csv) {
+				if len(mapBucket.timeSum) != len(coverCsv) {
 					panic("bucket csv length mismatch")
 				}
 
