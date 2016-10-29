@@ -75,14 +75,14 @@ func TestApiDuplicateObject(t *testing.T) {
         runTest(t, func(test *testHelper) {
                 test.startDefaultQuantumFs()
                 api := test.getApi()
- 
+
                 // First branch the source workspace
 		workspace := test.newWorkspace()
                 src := test.relPath(workspace)
 		dst := "apitest/duplicate"
 		err := api.Branch(src, dst)
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
- 
+
                 dirName := workspace + "/test/a"
                 dirName1 := dirName +"/b"
                 testFilename := dirName1 + "/test"
@@ -94,7 +94,7 @@ func TestApiDuplicateObject(t *testing.T) {
                 fd, err := syscall.Creat(testFilename, 0777)
                 syscall.Close(fd)
                 test.assert(err == nil, "Error creating a small file: %v", err)
- 
+
                 err = syscall.Symlink(testFilename, linkFilename)
                 test.assert(err == nil, "Error creating a symlink: %v", err)
 
@@ -130,7 +130,7 @@ func TestApiDuplicateObject(t *testing.T) {
                 // Ensure the non-existing intermediate Inode not be created
                 err = api.DuplicateObject(dst + "/nonExist/b", keyF,
                                                 0124, 0022, 0, 0, 0)
-                test.assert(err != nil, 
+                test.assert(err != nil,
                         "Error creating non-existing Inode")
 
                 // Ensure the target node does not exist
@@ -138,7 +138,7 @@ func TestApiDuplicateObject(t *testing.T) {
                                                 0124, 0022, 0, 0, 0)
                 test.assert(err != nil,
                         "Error having the target node already")
- 
+
                 // Duplicate the file in the given path
                 err = api.DuplicateObject(dst + "/test/a/file", keyF,
                                                 0124, 0022, 0, 0, 0)
@@ -148,7 +148,7 @@ func TestApiDuplicateObject(t *testing.T) {
                 var stat syscall.Stat_t
                 err = syscall.Stat(test.absPath(dst + "/test/a/file"), &stat)
                 test.assert(err == nil, "Error get status of a file: %v", err)
- 
+
                 // check the mode of file
                 var expectedPermissions uint32
                 expectedPermissions |= syscall.S_IFREG
