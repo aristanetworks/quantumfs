@@ -293,7 +293,7 @@ func (api *Api) DuplicateObject(dst string, objectKey []byte, mode uint32,
 	}
 
 	if !isObjectKeyValid(objectKey) {
-		return fmt.Errorf("\"%s\" must be 22 bytes", objectKey)
+		return fmt.Errorf("\"%s\" must be 30 bytes", objectKey)
 	}
 
 	attr := make([]byte, 16)
