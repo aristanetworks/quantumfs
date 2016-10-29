@@ -20,7 +20,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
-                testFilename := workspace + "/" + "test"
+		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating test file: %v", err)
 		fd.Close()
