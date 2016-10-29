@@ -98,19 +98,19 @@ func TestExtendedAttrList(t *testing.T) {
 		test.assert(size > 0, "Expected XAttr, but didn't find any")
 		test.assert(size <= len(data), "XAttr names overflowed buffer")
 
-		// Remove all the cases of the virtual extended attribute:
-		// typeKey
+                // Remove all the cases of the virtual extended attribute:
+                // typeKey
 		data = data[:size]
 		names := bytes.Split(data, []byte("\x00"))
 		names = names[:len(names)-1] // Remove empty last element
 		test.assert(len(names) == N+1, "Fewer XAttr than expected: %d != %d",
-			len(names), N+1)
+			len(names),  N+1)
 
 		for _, nameBytes := range names {
 			name := string(nameBytes)
-			if name == XAttrTypeKey {
-				continue
-			}
+                        if name == XAttrTypeKey {
+                                continue
+                        }
 			test.assert(strings.HasPrefix(name, "user.attr"),
 				"Incorrect XAttr name %s", name)
 		}
@@ -157,21 +157,21 @@ func TestExtendedAttrRemove(t *testing.T) {
 			test.assert(size > 0, "Expected XAttr, but didn't find any")
 			test.assert(size <= len(data),
 				"XAttr names overflowed buffer")
-
-			// Remove all the cases of the virtual extended attribute:
-			// typeKey
+                        
+                        // Remove all the cases of the virtual extended attribute:
+                        // typeKey
 			data = data[:size]
 			names := bytes.Split(data, []byte("\x00"))
 			names = names[:len(names)-1] // Remove empty last element
 			test.assert(len(names) == N+1,
-				"Fewer XAttr than expected: %d != %d", len(names), N+1)
+			"Fewer XAttr than expected: %d != %d", len(names), N+1)
 
 			nameSet := make(map[string]bool)
 			for _, nameBytes := range names {
 				name := string(nameBytes)
-				if name == XAttrTypeKey {
-					continue
-				}
+                                if name == XAttrTypeKey {
+                                        continue
+                                }
 				test.assert(strings.HasPrefix(name, "user.attr"),
 					"Incorrect XAttr name %s", name)
 				nameSet[name] = true
@@ -214,159 +214,164 @@ func TestExtendedAttrRemove(t *testing.T) {
 
 // Verify the get XAttr function for the self-defined Extended Attributes: typeKey
 func TestXAttrTypeKeyGet(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
+        runTest(t, func(test *testHelper) {
+                test.startDefaultQuantumFs()
 
-		workspace := test.newWorkspace()
+                workspace := test.newWorkspace()
 
-		testFilename := workspace + "/test"
-		fd, err := syscall.Creat(testFilename, 0777)
-		syscall.Close(fd)
-		test.assert(err == nil, "Error creating a small file: %v", err)
+                testFilename := workspace + "/test"
+                fd, err := syscall.Creat(testFilename, 0777)
+                syscall.Close(fd)
+                test.assert(err == nil, "Error creating a small file: %v", err)
+               
+                dirName := workspace + "/dir"
+                err = syscall.Mkdir(dirName, 0124)
+                test.assert(err == nil, "Error creating a directory: %v", err)
 
-		dirName := workspace + "/dir"
-		err = syscall.Mkdir(dirName, 0124)
-		test.assert(err == nil, "Error creating a directory: %v", err)
+                linkName := workspace + "/link"
+                err = syscall.Symlink(testFilename, linkName)
+                test.assert(err == nil, "Error creating a symlink: %v", err)
 
-		linkName := workspace + "/link"
-		err = syscall.Symlink(testFilename, linkName)
-		test.assert(err == nil, "Error creating a symlink: %v", err)
+                // sync the workspace
+                test.syncAllWorkspaces()
 
-		// sync the workspace
-		test.syncAllWorkspaces()
+                dst := make([]byte, TypeKeyLength)
 
-		dst := make([]byte, TypeKeyLength)
+                // check the non-existing file
+                nonExist := workspace + "/noExist"
+                sz, err := syscall.Getxattr(nonExist, XAttrTypeKey, dst)
+                test.assert(err != nil, 
+                        "Error getting XAttr from a non-existing file")
+                
+                // check the file
+                sz, err = syscall.Getxattr(testFilename, XAttrTypeKey, dst)
+                test.assert(err == nil && sz == TypeKeyLength,
+                "Error getting the file typeKey: %v with a size of %d",
+                err, sz)
 
-		// check the non-existing file
-		nonExist := workspace + "/noExist"
-		sz, err := syscall.Getxattr(nonExist, XAttrTypeKey, dst)
-		test.assert(err != nil,
-			"Error getting XAttr from a non-existing file")
+                type_ := dst[TypeKeyLength-9]
+                key := dst[:TypeKeyLength-9]
+                size := binary.LittleEndian.Uint64(dst[TypeKeyLength-8:])
+                
+                // Extract the internal ObjectKey from QuantumFS
+                var stat syscall.Stat_t
+                err = syscall.Stat(testFilename, &stat)
+                test.assert(err == nil, "Error stat'ind test file: %v", err)
+                var id InodeId
+                id = InodeId(stat.Ino)
+                inode := test.qfs.inodes[id]
+                record, err := inode.parent().getChildRecord(&test.qfs.c, id)
+                
+                // Verify the type and key matching
+                test.assert(type_ == quantumfs.ObjectTypeSmallFile && 
+                        size == record.Size() && 
+                        bytes.Equal(key, record.ID().Value()),
+                "Error getting the file typeKey: %v with %d, keys of %v-%v",
+                err, type_, key, record.ID().Value())
 
-		// check the file
-		sz, err = syscall.Getxattr(testFilename, XAttrTypeKey, dst)
-		test.assert(err == nil && sz == TypeKeyLength,
-			"Error getting the file typeKey: %v with a size of %d", err, sz)
+                // check the directory
+                sz, err = syscall.Getxattr(dirName, XAttrTypeKey, dst)
+                test.assert(err == nil && sz == TypeKeyLength,
+                "Error getting the directory typeKey: %v with a size of %d",
+                err, sz)
+                
+                type_ = dst[TypeKeyLength-9]
+                key = dst[:TypeKeyLength-9]
+                size = binary.LittleEndian.Uint64(dst[TypeKeyLength-8:])
 
-		type_ := dst[TypeKeyLength-9]
-		key := dst[:TypeKeyLength-9]
-		size := binary.LittleEndian.Uint64(dst[TypeKeyLength-8:])
+                // Extract the internal ObjectKey from QuantumFS
+                err = syscall.Stat(dirName, &stat)
+                test.assert(err == nil, "Error stat'ind directory: %v", err)
+                id = InodeId(stat.Ino)
+                inode = test.qfs.inodes[id]
+                record, err = inode.parent().getChildRecord(&test.qfs.c, id)
+                
+                // Verify the type and key matching
+                test.assert(type_ == quantumfs.ObjectTypeDirectoryEntry && 
+                size == record.Size() && 
+                bytes.Equal(key, record.ID().Value()),
+                "Error getting the dir typeKey: %v with %d, keys of %v-%v",
+                err, key, type_, record.ID().Value())
+                
+                // check the symlink 
+                sz, err, dst = lGetXattr(linkName, XAttrTypeKey, TypeKeyLength)
+                test.assert(err == nil && sz == TypeKeyLength,
+                "Error getting the directory typeKey: %v with a size of %d",
+                err, sz)
 
-		// Extract the internal ObjectKey from QuantumFS
-		var stat syscall.Stat_t
-		err = syscall.Stat(testFilename, &stat)
-		test.assert(err == nil, "Error stat'ind test file: %v", err)
-		var id InodeId
-		id = InodeId(stat.Ino)
-		inode := test.qfs.inodes[id]
-		record, err := inode.parent().getChildRecord(&test.qfs.c, id)
+                type_ = dst[TypeKeyLength-9]
+                key = dst[:TypeKeyLength-9]
+                size = binary.LittleEndian.Uint64(dst[TypeKeyLength-8:])
 
-		// Verify the type and key matching
-		test.assert(type_ == quantumfs.ObjectTypeSmallFile &&
-			size == record.Size() && bytes.Equal(key, record.ID().Value()),
-			"Error getting the matching file typeKey: %v with %d, keys of %v-%v",
-			err, type_, key, record.ID().Value())
+                // Extract the internal ObjectKey from QuantumFS
+                err = syscall.Lstat(linkName, &stat)
+                test.assert(err == nil, "Error stat'ind symlink: %v", err)
+                id = InodeId(stat.Ino)
+                inode = test.qfs.inodes[id]
+                record, err = inode.parent().getChildRecord(&test.qfs.c, id)
+                
+                // Verify the type and key matching
+                test.assert(type_ == quantumfs.ObjectTypeSymlink && 
+                size == record.Size() && bytes.Equal(key, record.ID().Value()),
+                "Error getting the link typeKey: %v with %d, keys of %v-%v",
+                err, type_, key, record.ID().Value(), size, record.Size())
 
-		// check the directory
-		sz, err = syscall.Getxattr(dirName, XAttrTypeKey, dst)
-		test.assert(err == nil && sz == TypeKeyLength,
-			"Error getting the directory typeKey: %v with a size of %d", err, sz)
-
-		type_ = dst[TypeKeyLength-9]
-		key = dst[:TypeKeyLength-9]
-		size = binary.LittleEndian.Uint64(dst[TypeKeyLength-8:])
-
-		// Extract the internal ObjectKey from QuantumFS
-		err = syscall.Stat(dirName, &stat)
-		test.assert(err == nil, "Error stat'ind directory: %v", err)
-		id = InodeId(stat.Ino)
-		inode = test.qfs.inodes[id]
-		record, err = inode.parent().getChildRecord(&test.qfs.c, id)
-
-		// Verify the type and key matching
-		test.assert(type_ == quantumfs.ObjectTypeDirectoryEntry &&
-			size == record.Size() && bytes.Equal(key, record.ID().Value()),
-			"Error getting the matching dir typeKey: %v with %d, keys of %v-%v",
-			err, key, type_, record.ID().Value())
-
-		// check the symlink
-		sz, err, dst = lGetXattr(linkName, XAttrTypeKey, TypeKeyLength)
-		test.assert(err == nil && sz == TypeKeyLength,
-			"Error getting the directory typeKey: %v with a size of %d", err, sz)
-
-		type_ = dst[TypeKeyLength-9]
-		key = dst[:TypeKeyLength-9]
-		size = binary.LittleEndian.Uint64(dst[TypeKeyLength-8:])
-
-		// Extract the internal ObjectKey from QuantumFS
-		err = syscall.Lstat(linkName, &stat)
-		test.assert(err == nil, "Error stat'ind symlink: %v", err)
-		id = InodeId(stat.Ino)
-		inode = test.qfs.inodes[id]
-		record, err = inode.parent().getChildRecord(&test.qfs.c, id)
-
-		// Verify the type and key matching
-		test.assert(type_ == quantumfs.ObjectTypeSymlink &&
-			size == record.Size() && bytes.Equal(key, record.ID().Value()),
-			"Error getting the matching link typeKey: %v with %d, keys of %v-%v, %d %d",
-			err, type_, key, record.ID().Value(), size, record.Size())
-
-	})
+        })
 }
 
 // Verify the set/remove XAttr function for typeKey is illegal
 func TestXAttrTypeKeySetRemove(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
+        runTest(t, func(test *testHelper) {
+                test.startDefaultQuantumFs()
 
-		workspace := test.newWorkspace()
+                workspace := test.newWorkspace()
+               
+                testFilename := workspace + "/test"
+                fd, err := syscall.Creat(testFilename, 0777)
+                syscall.Close(fd)
+                test.assert(err == nil, "Error creating a small file: %v", err)
+               
+                // Reset the typeKey
+                data := []byte("1234567890abcdefghijk700000008")
+                err = syscall.Setxattr(testFilename, XAttrTypeKey, data, 0)
+                test.assert(err != nil, 
+                        "Error finishing illegal SetXAttr: %v", err)
 
-		testFilename := workspace + "/test"
-		fd, err := syscall.Creat(testFilename, 0777)
-		syscall.Close(fd)
-		test.assert(err == nil, "Error creating a small file: %v", err)
-
-		// Reset the typeKey
-		data := []byte("1234567890abcdefghijk700000008")
-		err = syscall.Setxattr(testFilename, XAttrTypeKey, data, 0)
-		test.assert(err != nil,
-			"Error finishing illegal SetXAttr: %v", err)
-
-		// Remove the typeKey
-		err = syscall.Removexattr(testFilename, XAttrTypeKey)
-		test.assert(err != nil,
-			"Error finishing illegal RemoveXAttr: %v", err)
-	})
+                // Remove the typeKey
+                err = syscall.Removexattr(testFilename, XAttrTypeKey)
+                test.assert(err != nil, 
+                        "Error finishing illegal RemoveXAttr: %v", err)
+        })
 }
 
 // Verify list XAttr function will attach typeKey behind the real extended attributes
 func TestXAttrTypeKeyList(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
+        runTest(t, func(test *testHelper) {
+                test.startDefaultQuantumFs()
 
-		workspace := test.newWorkspace()
+                workspace := test.newWorkspace()
 
-		testFilename := workspace + "/test"
-		fd, err := syscall.Creat(testFilename, 0777)
-		syscall.Close(fd)
-		test.assert(err == nil, "Error creating a small file: %v", err)
+                testFilename := workspace + "/test"
+                fd, err := syscall.Creat(testFilename, 0777)
+                syscall.Close(fd)
+                test.assert(err == nil, "Error creating a small file: %v", err)
+                
+                data := []byte("TestOne")
+                data2 := []byte("TestTwo")
+                
+                err = syscall.Setxattr(testFilename, "security.one", data, 0)
+                test.assert(err == nil, "Error setting XAttr: %v", err)
 
-		data := []byte("TestOne")
-		data2 := []byte("TestTwo")
+                err = syscall.Setxattr(testFilename, "security.two", data2, 0)
+                test.assert(err == nil, "Error setting XAttr: %v", err)
 
-		err = syscall.Setxattr(testFilename, "security.one", data, 0)
-		test.assert(err == nil, "Error setting XAttr: %v", err)
-
-		err = syscall.Setxattr(testFilename, "security.two", data2, 0)
-		test.assert(err == nil, "Error setting XAttr: %v", err)
-
-		dst := make([]byte, 64)
-		_, err = syscall.Listxattr(testFilename, dst)
-		test.assert(err == nil &&
-			bytes.Contains(dst, []byte("security.one")) &&
-			bytes.Contains(dst, []byte("security.two")) &&
-			bytes.Contains(dst, []byte(XAttrTypeKey)),
-			"Error listing XAttr: %v with content of %s",
-			err, dst)
-	})
+                dst := make([]byte, 64)
+                _, err = syscall.Listxattr(testFilename, dst)
+                test.assert(err == nil && 
+                        bytes.Contains(dst,[]byte("security.one")) &&
+                        bytes.Contains(dst,[]byte("security.two")) &&
+                        bytes.Contains(dst,[]byte(XAttrTypeKey)), 
+                        "Error listing XAttr: %v with content of %s",
+                        err, dst)
+        })
 }
