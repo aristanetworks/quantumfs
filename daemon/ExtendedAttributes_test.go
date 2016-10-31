@@ -20,7 +20,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
-		testFilename := workspace + "/" + "test"
+                testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating test file: %v", err)
 		fd.Close()
@@ -98,8 +98,7 @@ func TestExtendedAttrList(t *testing.T) {
 		test.assert(size > 0, "Expected XAttr, but didn't find any")
 		test.assert(size <= len(data), "XAttr names overflowed buffer")
 
-		// Remove all the cases of the virtual extended attribute:
-		// typeKey
+		// Remove the case of the virtual extended attribute: typeKey
 		data = data[:size]
 		names := bytes.Split(data, []byte("\x00"))
 		names = names[:len(names)-1] // Remove empty last element
@@ -222,8 +221,8 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
-		syscall.Close(fd)
 		test.assert(err == nil, "Error creating a small file: %v", err)
+                syscall.Close(fd)
 
 		dirName := workspace + "/dir"
 		err = syscall.Mkdir(dirName, 0124)
@@ -257,7 +256,7 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		// Extract the internal ObjectKey from QuantumFS
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
-		test.assert(err == nil, "Error stat'ind test file: %v", err)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		var id InodeId
 		id = InodeId(stat.Ino)
 		inode := test.qfs.inodes[id]
@@ -282,7 +281,7 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		// Extract the internal ObjectKey from QuantumFS
 		err = syscall.Stat(dirName, &stat)
-		test.assert(err == nil, "Error stat'ind directory: %v", err)
+		test.assert(err == nil, "Error stat'ing directory: %v", err)
 		id = InodeId(stat.Ino)
 		inode = test.qfs.inodes[id]
 		record, err = inode.parent().getChildRecord(&test.qfs.c, id)
@@ -306,7 +305,7 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		// Extract the internal ObjectKey from QuantumFS
 		err = syscall.Lstat(linkName, &stat)
-		test.assert(err == nil, "Error stat'ind symlink: %v", err)
+		test.assert(err == nil, "Error stat'ing symlink: %v", err)
 		id = InodeId(stat.Ino)
 		inode = test.qfs.inodes[id]
 		record, err = inode.parent().getChildRecord(&test.qfs.c, id)
@@ -330,8 +329,8 @@ func TestXAttrTypeKeySetRemove(t *testing.T) {
 
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
-		syscall.Close(fd)
 		test.assert(err == nil, "Error creating a small file: %v", err)
+                syscall.Close(fd)
 
 		// Reset the typeKey
 		data := []byte("1234567890abcdefghijk700000008")

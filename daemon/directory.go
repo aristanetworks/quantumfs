@@ -1305,7 +1305,6 @@ func (dir *Directory) localCreate_(c *ctx, name string, mode uint32, umask uint3
 	case quantumfs.ObjectTypeVeryLargeFile:
 		constructor = newVeryLargeFile
 	case quantumfs.ObjectTypeSymlink:
-		c.vlog("generate Symlink")
 		constructor = newSymlink
 	case quantumfs.ObjectTypeSpecial:
 		constructor = newSpecial
