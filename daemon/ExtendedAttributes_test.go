@@ -20,7 +20,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
-                testFilename := workspace + "/" + "test"
+		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating test file: %v", err)
 		fd.Close()
@@ -222,7 +222,7 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.assert(err == nil, "Error creating a small file: %v", err)
-                syscall.Close(fd)
+		syscall.Close(fd)
 
 		dirName := workspace + "/dir"
 		err = syscall.Mkdir(dirName, 0124)
@@ -330,7 +330,7 @@ func TestXAttrTypeKeySetRemove(t *testing.T) {
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.assert(err == nil, "Error creating a small file: %v", err)
-                syscall.Close(fd)
+		syscall.Close(fd)
 
 		// Reset the typeKey
 		data := []byte("1234567890abcdefghijk700000008")

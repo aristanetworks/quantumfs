@@ -93,7 +93,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.assert(err == nil, "Error creating a small file: %v", err)
-                syscall.Close(fd)
+		syscall.Close(fd)
 
 		err = syscall.Symlink(testFilename, linkFilename)
 		test.assert(err == nil, "Error creating a symlink: %v", err)
@@ -140,7 +140,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Duplicate the file in the given path
 		err = api.DuplicateObject(dst+"/test/a/file",
-                        keyF, 0124, 0022, 0, 0, 0)
+			keyF, 0124, 0022, 0, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a file to workspaceT: %v", err)
 
@@ -158,7 +158,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		//Duplicate the directory in the given path
 		err = api.DuplicateObject(dst+"/test/a/dirtest",
-                        keyD, 0124, 0022, 0, 0, 0)
+			keyD, 0124, 0022, 0, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a directory to workspaceT: %v", err)
 
