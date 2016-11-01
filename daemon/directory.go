@@ -591,6 +591,26 @@ func (dir *Directory) getChildRecord(c *ctx,
 		errors.New("Inode given is not a child of this directory")
 }
 
+// Helper to check whether the permission along a single branch of the workspace
+func (dir *Directory) getBranchPermissions(c *ctx, permission uint32) bool {
+        parent := dir.parent()
+        if parent == nil {      // hit the workspace root
+                return true
+        } 
+        
+        record, exists := parent.getChildRecord(c, dir.InodeCommon.id)
+
+        if exists != nil {
+                panic("There is no record for the current inode\n")
+        }
+
+        if BitFlagsSet(uint(record.Permissions()),uint(permission)) {
+                return parent.(*Directory).getBranchPermissions(c, permission)
+        }
+        
+        return false
+}
+
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	c.vlog("Directory::Unlink Enter %s", name)
 	defer c.vlog("Directory::Unlink Exit")
@@ -606,6 +626,57 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		if type_ == fuse.S_IFDIR {
 			return fuse.Status(syscall.EISDIR)
 		}
+                
+                owner := c.fuseCtx.Owner 
+                usr := quantumfs.SystemUid(record.Owner(), owner.Uid)
+
+                // Verify the permission of the directory in order to delete a child
+                // If the sticky bit of the directory is set, the action can only be 
+                // performed by file's owner, directory's owner, or root user
+                fileOwner := record.Owner()
+                dirRecord, exist := dir.parent().getChildRecord(c, dir.InodeCommon.id)
+                if exist != nil {
+                        return fuse.ENOENT
+                }
+                dirOwner := dirRecord.Owner()
+                dirGroup := dirRecord.Group()
+
+                permission := dirRecord.Permissions()
+                stickyBit := permission & 0x1000
+                if stickyBit != 0 {
+                        if usr != fileOwner {
+                                // Check if it's the directory owner
+                                usr = quantumfs.SystemUid(dirRecord.Owner(), 
+                                        owner.Uid)
+                                if usr != dirOwner {
+                                        // No root permission, return false
+                                        return fuse.EACCES
+                                }
+                        }
+                } 
+
+                grp := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
+
+                // Get whether current user in OWNER/GRP/OTHER
+                var permissionW, permissionX uint32
+                if usr == dirOwner {
+                        permissionW = syscall.S_IWUSR 
+                        permissionX = syscall.S_IXUSR
+                } else if grp == dirGroup {
+                        permissionW = syscall.S_IWGRP
+                        permissionX = syscall.S_IXGRP
+                } else {
+                        permissionW = syscall.S_IWOTH
+                        permissionX = syscall.S_IXOTH
+                }
+        
+                // Check the current directory having x and w permissions
+                // All of its ancestor dirctories have x permission
+                if permission != (permissionW | permissionX) ||
+                !dir.parent().(*Directory).getBranchPermissions(c, permissionX) {
+                        return fuse.EACCES
+                }
+                
 
 		dir.delChild_(c, name)
 		return fuse.OK
