@@ -214,6 +214,23 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	})
 }
 
+func TestUnlinkPermission(t *testing.T) {
+        runTest(t, func(test *testHelper) {
+                test.startDefaultQuantumFs()
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/" + "test"
+		fd, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating file: %v", err)
+		fd.Close()
+
+                err = os.Chmod(testFilename, 0124)
+
+                err = syscall.Unlink(testFilename)
+		test.assert(err == nil, "Error unlinking file: %v", err)
+        })
+}
+
 func TestDirectoryUnlinkDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
