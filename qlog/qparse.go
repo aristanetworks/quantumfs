@@ -390,7 +390,7 @@ func ExtractSequences(logs []LogOutput) map[string]SequenceData {
 			}
 			data.Times = append(data.Times,
 				TimeData{
-					Delta:     rawSeq[len(rawSeq)-1].T -
+					Delta: rawSeq[len(rawSeq)-1].T -
 						rawSeq[0].T,
 					StartTime: rawSeq[0].T,
 					LogIdxLoc: trackers[k].startLogIdx,
