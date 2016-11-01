@@ -323,18 +323,14 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 		}
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
+	if err := syscall.Chdir(rootdir); err != nil {
+		return fmt.Errorf("Changing directory to %s error: %s",
+			rootdir, err.Error())
 	}
 
-	// modify current working directory into a relative path to
-	// the workspaceroot we are chrooting in
-	if cwd == rootdir {
-		cwd = "/"
-	} else if strings.HasPrefix(cwd, rootdir) {
-		cwd = cwd[len(rootdir):]
-	}
+	// As we have changed directory to rootdir, the relative path of
+	// current working directory to rootdir is "/"
+	cwd := "/"
 
 	if err := syscall.Chdir("/"); err != nil {
 		return err
@@ -485,6 +481,7 @@ func chroot() {
 	var dir string
 	cmd := make([]string, 0)
 
+ForLoop:
 	for len(args) > 0 {
 		switch args[0] {
 		case "--nonpersistent":
@@ -497,25 +494,26 @@ func chroot() {
 			}
 
 			if absdir, err := filepath.Abs(args[0]); err != nil {
-				fmt.Println("Invalid <DIR> argument:", args[0])
+				fmt.Println("Error converting path %s to absolute"+
+					" path: %s\n", args[0], err.Error())
 				os.Exit(1)
 			} else {
 				dir = absdir
 			}
 
 			cmd = append(cmd, args[1:]...)
+			break ForLoop
 
 		case "--setup-namespaces":
 			setupNamespaces = true
+
 		default:
 			fmt.Println("unknown argument:", args[0], "\n")
 			printHelp()
 			os.Exit(1)
+
 		}
 
-		if !persistent {
-			break
-		}
 		args = args[1:]
 	}
 
