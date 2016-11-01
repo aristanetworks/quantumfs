@@ -275,8 +275,6 @@ func switchUserMode() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("uid:", logUser.Uid)
-	fmt.Println("gid:", logUser.Gid)
 
 	if gid, err := strconv.Atoi(logUser.Gid); err != nil {
 		return err
@@ -310,8 +308,6 @@ func switchUserMode() error {
 }
 
 func chrootOutOfNsd(rootdir string, cmd []string) error {
-	fmt.Println(cmd)
-	fmt.Println(rootdir)
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
 		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
