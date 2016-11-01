@@ -123,8 +123,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 		panic("Unexpected missing child inode")
 	}
 
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.self.markAccessed(c, name, false)
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
 		record.Type() == quantumfs.ObjectTypeMediumFile ||
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -143,8 +142,10 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 }
 
 func (dir *Directory) dirty(c *ctx) {
-	dir.setDirty(true)
-	dir.parent().dirtyChild(c, dir)
+	if !dir.setDirty(true) {
+		// Only go recursive if we aren't already dirty
+		dir.parent().dirtyChild(c, dir)
+	}
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
@@ -412,8 +413,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	}
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.self.markAccessed(c, name, false)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
