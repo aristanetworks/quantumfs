@@ -190,25 +190,21 @@ func (cr *childRecords) dirty(c *ctx, inodeNum InodeId) {
 
 func (cr *childRecords) rename(c *ctx, oldName string, newName string) {
 	if oldName == newName {
-		inodeId := cr.data.fileToInode[oldName]
-		child := c.qfs.inode(c, inodeId)
-		child.markSelfAccessed(c, false)
+		cr.dir.self.markAccessed(c, oldName, false)
 		return
 	}
 
 	cr.loadData_(c)
 
-	oldInodeId := cr.data.fileToInode[oldName]
-	child := c.qfs.inode(c, oldInodeId)
-	child.markSelfAccessed(c, false)
+	cr.dir.self.markAccessed(c, oldName, false)
 
 	// If a file already exists with newName, we need to clean it up
 	cleanupInodeId := cr.data.fileToInode[newName]
 
+	oldInodeId := cr.data.fileToInode[oldName]
 	cr.entries[newName] = cr.data.records[oldInodeId]
 	cr.data.records[oldInodeId].SetFilename(newName)
-	child.setName(newName)
-	child.markSelfAccessed(c, true)
+	cr.dir.self.markAccessed(c, newName, true)
 
 	cr.data.fileToInode[newName] = oldInodeId
 	delete(cr.data.fileToInode, oldName)
