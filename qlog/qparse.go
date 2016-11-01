@@ -25,26 +25,26 @@ const defaultParseThreads = 30
 const defaultChunkSize = 4
 
 type LogOutput struct {
-	Subsystem	LogSubsystem
-	ReqId		uint64
-	T		int64
-	Format		string
-	Args		[]interface{}
+	Subsystem LogSubsystem
+	ReqId     uint64
+	T         int64
+	Format    string
+	Args      []interface{}
 }
 
 // What the current patternIdx we're looking for is, and whether we can ignore
 // mismatched strings while looking for it
 type matchState struct {
-	patternIdx	int
-	matchAnyStr	bool
-	endIdx		int
+	patternIdx  int
+	matchAnyStr bool
+	endIdx      int
 }
 
 func newMatchState(p int, m bool) matchState {
-	return matchState {
-		patternIdx:	p,
-		matchAnyStr:	m,
-		endIdx:		-1,
+	return matchState{
+		patternIdx:  p,
+		matchAnyStr: m,
+		endIdx:      -1,
 	}
 }
 
@@ -110,7 +110,7 @@ func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) boo
 			// We saw a mismatch and weren't allowed to, so this can't be
 			// the right subsequence and we must go back to the last
 			// valid state that allowed wildcards
-			for j := len(stateStack)-1; j >= 0; j-- {
+			for j := len(stateStack) - 1; j >= 0; j-- {
 				stateStack = stateStack[:j]
 
 				if len(stateStack) == 0 {
@@ -138,12 +138,12 @@ func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) boo
 func newLog(s LogSubsystem, r uint64, t int64, f string,
 	args []interface{}) LogOutput {
 
-	return LogOutput {
+	return LogOutput{
 		Subsystem: s,
-		ReqId: r,
-		T: t,
-		Format: f,
-		Args: args,
+		ReqId:     r,
+		T:         t,
+		Format:    f,
+		Args:      args,
 	}
 }
 
@@ -177,26 +177,26 @@ func (s SortByTime) Less(i, j int) bool {
 
 type TimeData struct {
 	// how long the sequence took
-	Delta		int64
+	Delta int64
 	// when it started in Unix time
-	StartTime	int64
+	StartTime int64
 	// where it started in the logs
-	LogIdxLoc	int
+	LogIdxLoc int
 }
 
 type SequenceData struct {
-	Times	[]TimeData
-	Seq	[]LogOutput
+	Times []TimeData
+	Seq   []LogOutput
 }
 
 type PatternData struct {
-	SeqStrRaw	string	// No wildcards in this string, just seq
-	Data		SequenceData
-	Wildcards	[]bool
-	Avg		int64
-	Sum		int64
-	Stddev		int64
-	Id		int
+	SeqStrRaw string // No wildcards in this string, just seq
+	Data      SequenceData
+	Wildcards []bool
+	Avg       int64
+	Sum       int64
+	Stddev    int64
+	Id        int
 }
 
 type logStack []LogOutput
@@ -225,18 +225,18 @@ func (s *logStack) Peek() (LogOutput, error) {
 }
 
 type sequenceTracker struct {
-	stack		logStack
+	stack logStack
 
-	ready		bool
-	seq		[]LogOutput
-	startLogIdx	int
+	ready       bool
+	seq         []LogOutput
+	startLogIdx int
 }
 
 func newSequenceTracker(startIdx int) sequenceTracker {
-	return sequenceTracker {
-		stack:	newLogStack(),
-		ready:	false,
-		seq:	make([]LogOutput, 0),
+	return sequenceTracker{
+		stack:       newLogStack(),
+		ready:       false,
+		seq:         make([]LogOutput, 0),
 		startLogIdx: startIdx,
 	}
 }
@@ -283,7 +283,7 @@ func genSeqStrExt(seq []LogOutput, wildcardMask []bool,
 			// This is a wildcard in the sequence, but ensure that we
 			// include consecutive wildcards if we need to
 			if consecutiveWc || !outputWildcard {
-				rtn += string([]byte { 7 })
+				rtn += string([]byte{7})
 				outputWildcard = true
 			}
 		} else {
@@ -389,8 +389,9 @@ func ExtractSequences(logs []LogOutput) map[string]SequenceData {
 				data.Seq = rawSeq
 			}
 			data.Times = append(data.Times,
-				TimeData {
-					Delta: rawSeq[len(rawSeq)-1].T-rawSeq[0].T,
+				TimeData{
+					Delta:     rawSeq[len(rawSeq)-1].T -
+						rawSeq[0].T,
 					StartTime: rawSeq[0].T,
 					LogIdxLoc: trackers[k].startLogIdx,
 				})
@@ -426,7 +427,7 @@ func SaveToStat(file *os.File, patterns []PatternData) {
 				i = chunkPastEnd
 				break
 			}
-			
+
 			if chunkSize <= 1 {
 				fmt.Printf("Unable to encode stat data into file: "+
 					"%s\n", err)
@@ -512,7 +513,7 @@ func FormatLogs(logs []LogOutput, tabSpaces int) string {
 
 			// Add the spaces we need
 			spaceStr := ""
-			for i := 0; i < indents * tabSpaces; i++ {
+			for i := 0; i < indents*tabSpaces; i++ {
 				spaceStr += " "
 			}
 
@@ -790,15 +791,15 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 }
 
 type LogStatus struct {
-	shownHeader	bool
-	pixWidth	int
-	lastPixShown	int
+	shownHeader  bool
+	pixWidth     int
+	lastPixShown int
 }
 
 func NewLogStatus(displayWidth int) LogStatus {
-	return LogStatus {
-		shownHeader:	false,
-		pixWidth: displayWidth,
+	return LogStatus{
+		shownHeader:  false,
+		pixWidth:     displayWidth,
 		lastPixShown: 0,
 	}
 }
@@ -818,7 +819,7 @@ func (l *LogStatus) Process(newPct float32) {
 
 	// Calculate the amount of pixels to output
 	pixDone := int(float32(l.pixWidth) * newPct)
-	for i := l.lastPixShown+1; i <= pixDone; i++ {
+	for i := l.lastPixShown + 1; i <= pixDone; i++ {
 		fmt.Printf(".")
 	}
 
@@ -873,8 +874,8 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 			*out = newLog(LogQlog, QlogReqId, 0,
 				"ERROR: Packet read error (%s). i"+
 					"Dump of %d bytes:\n%x\n",
-					[]interface{} { err, len(packetData),
-						packetData })
+				[]interface{}{err, len(packetData),
+					packetData})
 			continue
 		}
 
@@ -883,8 +884,8 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 			*out = newLog(LogQlog, QlogReqId, 0,
 				"Not enough entries in "+
 					"string map (%d %d)\n",
-					[]interface{} { strMapId,
-						len(strMap)/LogStrSize })
+				[]interface{}{strMapId,
+					len(strMap) / LogStrSize})
 			continue
 		}
 		mapEntry := strMap[strMapId]
@@ -904,9 +905,9 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 }
 
 type logJob struct {
-	packetData	[]byte
-	strMap		[]LogStr
-	out		*LogOutput
+	packetData []byte
+	strMap     []LogStr
+	out        *LogOutput
 }
 
 func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers int,
@@ -977,10 +978,10 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 		packetData := wrapRead(pastEndIdx, uint32(packetLen), data)
 
 		logPtrs = append(logPtrs, new(LogOutput))
-		jobs <- logJob {
+		jobs <- logJob{
 			packetData: packetData,
-			strMap: strMap,
-			out: logPtrs[len(logPtrs)-1],
+			strMap:     strMap,
+			out:        logPtrs[len(logPtrs)-1],
 		}
 	}
 	close(jobs)
@@ -1009,7 +1010,7 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 	}
 
 	sort.Sort(SortByTime(rtn))
-	
+
 	if printStatus {
 		fmt.Printf("done\n")
 	}

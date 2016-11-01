@@ -59,16 +59,16 @@ func (c *ctx) vlog(format string, args ...interface{}) {
 }
 
 type exitLog struct {
-	c *ctx
+	c        *ctx
 	funcName string
 }
 
 func (c *ctx) flog(funcName string) exitLog {
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+
 		funcName)
-	
-	return exitLog {
-		c: c,
+
+	return exitLog{
+		c:        c,
 		funcName: funcName,
 	}
 }

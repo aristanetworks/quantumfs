@@ -234,7 +234,7 @@ func TestFileReload(t *testing.T) {
 	for i := 0; i < len(data); i++ {
 		data[i].SeqStrRaw = "Pattern" + strconv.Itoa(i)
 		data[i].Wildcards = make([]bool, seqLen, seqLen)
-		for j := i; j < i + seqLen; j++ {
+		for j := i; j < i+seqLen; j++ {
 			var newTimeData TimeData
 			newTimeData.Delta = int64(12345 + j)
 			newTimeData.StartTime = int64(j)
@@ -245,9 +245,9 @@ func TestFileReload(t *testing.T) {
 			newLog.ReqId = uint64(i)
 			newLog.T = int64(i * j)
 			newLog.Format = strconv.Itoa(j)
-			newLog.Args = []interface{}{ i, j }
+			newLog.Args = []interface{}{i, j}
 			data[i].Data.Seq = append(data[i].Data.Seq, newLog)
-			if j % 2 == 0 {
+			if j%2 == 0 {
 				data[i].Wildcards[j-i] = true
 			}
 		}
@@ -277,7 +277,7 @@ func TestFileReload(t *testing.T) {
 				return false
 
 			}
-			
+
 			if len(data[i].Data.Times) != len(loaded[i].Data.Times) ||
 				len(data[i].Data.Seq) != len(loaded[i].Data.Seq) ||
 				len(data[i].Wildcards) != len(loaded[i].Wildcards) {
