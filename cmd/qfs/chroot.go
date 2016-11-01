@@ -87,7 +87,7 @@ func makedest(src, dst string) bool {
 		}
 	}
 	if srcInfo.IsDir() {
-		mkdir_err := os.Mkdir(dst, 0666)
+		mkdir_err := os.MkdirAll(dst, 0777)
 		if mkdir_err != nil {
 			fmt.Println("Error creating directory ", dst)
 			return false
@@ -170,6 +170,9 @@ func netnsLogin(rootdir string, svrName string) error {
 	args := []string{netns, svrName, sh, "-l", "-c",
 		"\"$@\"", bash, bash}
 	err = syscall.Exec(netns, args, env)
+	if err != nil {
+		fmt.Println("Exec error")
+	}
 
 	return err
 }
@@ -203,7 +206,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 	cmdCopyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
 
 	dstVar := rootdir + "/var/run/netns"
-	err := os.MkdirAll(dstVar, 0666)
+	err := os.MkdirAll(dstVar, 0777)
 	if err != nil {
 		return err
 	}
@@ -272,6 +275,8 @@ func switchUserMode() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("uid:", logUser.Uid)
+	fmt.Println("gid:", logUser.Gid)
 
 	if gid, err := strconv.Atoi(logUser.Gid); err != nil {
 		return err
@@ -305,6 +310,8 @@ func switchUserMode() error {
 }
 
 func chrootOutOfNsd(rootdir string, cmd []string) error {
+	fmt.Println(cmd)
+	fmt.Println(rootdir)
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
 		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
@@ -369,7 +376,7 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 		}
 
 		dst = rootdir + "/var/run/netns"
-		if err := os.MkdirAll(dst, 0666); err != nil {
+		if err := os.MkdirAll(dst, 0777); err != nil {
 			return err
 		}
 
