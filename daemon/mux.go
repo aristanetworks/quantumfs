@@ -821,7 +821,6 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	result = fuse.EIO
 
-
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("ReadDirPlus failed", fileHandle)

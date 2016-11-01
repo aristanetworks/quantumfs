@@ -16,6 +16,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 type intslice []int
+
 func (i *intslice) String() string {
 	return fmt.Sprintf("%d", *i)
 }
@@ -127,7 +128,7 @@ func (s SortReqs) Less(i, j int) bool {
 func init() {
 	// The wildcard character / string needs to be something that would never
 	// show in a log so that we can use strings as map keys
-	wildcardStr = string([]byte { 7 })
+	wildcardStr = string([]byte{7})
 
 	inFile = flag.String("in", "", "Specify an input file")
 	outFile = flag.String("out", "", "Specify an output file")
@@ -145,7 +146,7 @@ func init() {
 		"print top <byavg> functions by total time usage in logs")
 	coverage = flag.Int("cover", -1, "Output csv wall time consumed in bucket t"+
 		" per SequenceId. To be output needs X/100 in any bucket or -id")
-	flag.Var(&filterId, "id", "Filter certain output to include only given " +
+	flag.Var(&filterId, "id", "Filter certain output to include only given "+
 		"Sequence Id. Multiple -id flags are supported.")
 	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for -csv in Ms")
 	showClose = flag.Bool("sims", false,
@@ -208,7 +209,7 @@ func main() {
 
 	if *coverage != -1 {
 		if *inFile == "" {
-			fmt.Println("To -cover, you must specify a stat file "+
+			fmt.Println("To -cover, you must specify a stat file " +
 				"with -in")
 			os.Exit(1)
 		}
@@ -217,7 +218,7 @@ func main() {
 			os.Exit(1)
 		}
 		if *coverage < 0 || *coverage > 100 {
-			fmt.Println("To -cover, you must specify a threshold "+
+			fmt.Println("To -cover, you must specify a threshold " +
 				"[0, 100]")
 			os.Exit(1)
 		}
@@ -305,7 +306,7 @@ func main() {
 		fmt.Printf("Stats file created: %s\n", outFilename)
 	} else if *topTotal != 0 {
 		if *inFile == "" {
-			fmt.Println("To -topTotal, you must specify a stat file "+
+			fmt.Println("To -topTotal, you must specify a stat file " +
 				"with -in")
 			os.Exit(1)
 		}
@@ -328,7 +329,7 @@ func main() {
 			*wildMax, *maxLen, *topTotal)
 	} else if *topAvg != 0 {
 		if *inFile == "" {
-			fmt.Println("To -topAvg, you must specify a stat file "+
+			fmt.Println("To -topAvg, you must specify a stat file " +
 				"with -in")
 			os.Exit(1)
 		}
@@ -420,8 +421,8 @@ func superset(a []qlog.TimeData, b []qlog.TimeData) bool {
 }
 
 type wildcardedSequence struct {
-	sequence	[]qlog.LogOutput
-	wildcards	[]bool
+	sequence  []qlog.LogOutput
+	wildcards []bool
 }
 
 func newWildcardedSeq(seq []qlog.LogOutput, wc []bool) wildcardedSequence {
@@ -436,8 +437,8 @@ func newWildcardedSeq(seq []qlog.LogOutput, wc []bool) wildcardedSequence {
 }
 
 type PatternMap struct {
-	dataByList	map[string]*wildcardedSequence
-	strToList	map[string]string
+	dataByList map[string]*wildcardedSequence
+	strToList  map[string]string
 }
 
 func (l *PatternMap) StrExists(key string) bool {
@@ -582,9 +583,9 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 	// branches as we recurse to save time!
 	fmt.Printf("Generating all log patterns from %d unique sequences...\n",
 		len(sequences))
-	patterns := PatternMap {
-		dataByList:	make(map[string]*wildcardedSequence),
-		strToList:	make(map[string]string),
+	patterns := PatternMap{
+		dataByList: make(map[string]*wildcardedSequence),
+		strToList:  make(map[string]string),
 	}
 
 	for i := 0; i < len(sequences); i++ {
@@ -658,8 +659,8 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 }
 
 type bucket struct {
-	timeSums	map[int]float64
-	totalSum	float64
+	timeSums map[int]float64
+	totalSum float64
 }
 
 func fillTimeline(out map[int64]bucket, seqId int,
@@ -686,7 +687,7 @@ func fillTimeline(out map[int64]bucket, seqId int,
 			if n == bucketIdx {
 				timeDeltaStart = times[k].StartTime
 			}
-			timeDeltaEnd := (n+1) * bucketWidthNs
+			timeDeltaEnd := (n + 1) * bucketWidthNs
 			if n == endBucketIdx {
 				timeDeltaEnd = times[k].StartTime + times[k].Delta
 			}
@@ -746,7 +747,6 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	}
 	status.Process(1)
 
-
 	bucketThreshold := float64(*coverage) / float64(100)
 	outputIndices := make([]int, 0)
 	if len(filterId) != 0 {
@@ -771,7 +771,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 			// Add any sequence ids that consume enough of the bucket
 			for k, v := range mapBucket.timeSums {
 				_, exists := outputIdxMap[k]
-				if !exists && (v / mapBucket.totalSum) >
+				if !exists && (v/mapBucket.totalSum) >
 					bucketThreshold {
 
 					outputIdxMap[k] = true
@@ -811,7 +811,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 			}
 
 			seqVal, _ := mapBucket.timeSums[outputIndices[i]]
-				file.WriteString(fmt.Sprintf("%f,", seqVal))
+			file.WriteString(fmt.Sprintf("%f,", seqVal))
 		}
 
 		if exists {
@@ -839,8 +839,8 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			continue
 		}
 
-		if len(patterns[i].Data.Seq) - (countWildcards(patterns[i].Wildcards,
-			true) - wildcards) > maxLen {
+		if len(patterns[i].Data.Seq)-(countWildcards(patterns[i].Wildcards,
+			true)-wildcards) > maxLen {
 
 			continue
 		}
@@ -928,7 +928,7 @@ func showRequestIds(logs []qlog.LogOutput) {
 	fmt.Println("Request IDs in log:")
 	counter := 0
 	for i := 0; i < len(keys); i++ {
-		fmt.Printf("%" + padLen + "d ", keys[i])
+		fmt.Printf("%"+padLen+"d ", keys[i])
 
 		counter++
 		if counter == 5 {
