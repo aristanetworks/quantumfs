@@ -869,8 +869,8 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 		}
 
 		if err != nil {
-			// If the timestamp is zero, we will fill it in later with the
-			// previous log's timestamp
+			// If the timestamp is zero, we will fill it in later with
+			// the previous log's timestamp
 			*out = newLog(LogQlog, QlogReqId, 0,
 				"ERROR: Packet read error (%s). i"+
 					"Dump of %d bytes:\n%x\n",
