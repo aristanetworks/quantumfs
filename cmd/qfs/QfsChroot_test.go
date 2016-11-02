@@ -20,8 +20,8 @@ var libsToCopy = []string{
 	"/usr/lib64/libstdc++.so.6", "/usr/lib64/libm.so.6",
 	"/usr/lib64/libgcc_s.so.1", "/usr/lib64/libpcre.so.1",
 	"/usr/lib64/ld-linux-x86-64.so.2", "/usr/lib64/libpthread.so.0",
-	"/usr/lib64/libcap.so.2", "/usr/lib64/libacl.so.1", "/usr/lib64/libattr.so.1",
-	"/usr/lib64/libselinux.so.1"}
+	"/usr/lib64/libcap.so.2", "/usr/lib64/libacl.so.1",
+	"/usr/lib64/libattr.so.1", "/usr/lib64/libselinux.so.1"}
 
 func runCommand(t *testing.T, name string, args ...string) {
 	cmd := exec.Command(name, args...)
