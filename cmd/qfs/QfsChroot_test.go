@@ -57,20 +57,17 @@ func setupWorkspace(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirTest,
 			err.Error())
-		return ""
 	}
 
 	if err := os.Chmod(dirTest, 0666); err != nil {
 		t.Fatalf("Changing mode of directory %s error: %s",
 			dirTest, err.Error())
-		return ""
 	}
 
 	dirUsrBin := dirTest + "/usr/bin"
 	if err := os.MkdirAll(dirUsrBin, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrBin,
 			err.Error())
-		return ""
 	}
 
 	for _, command := range commandsInUsrBin {
@@ -112,7 +109,6 @@ func setupWorkspace(t *testing.T) string {
 	if err := os.MkdirAll(dirUsrShare, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrShare,
 			err.Error())
-		return ""
 	}
 
 	dirUsrShareArtools := dirUsrShare + "/Artools"
@@ -122,7 +118,6 @@ func setupWorkspace(t *testing.T) string {
 	if err := os.Mkdir(dirUsrMnt, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrMnt,
 			err.Error())
-		return ""
 	}
 
 	dirEtc := dirTest + "/etc"
@@ -132,14 +127,12 @@ func setupWorkspace(t *testing.T) string {
 	if err := os.Mkdir(dirTmp, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirTmp,
 			err.Error())
-		return ""
 	}
 
 	dirCurrent := dirTest + dirTest
 	if err := os.MkdirAll(dirCurrent, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s",
 			dirCurrent, err.Error())
-		return ""
 	}
 
 	return dirTest
