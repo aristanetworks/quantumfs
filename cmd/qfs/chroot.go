@@ -20,18 +20,18 @@ import "github.com/kardianos/osext"
 
 const (
 	sudo       = "/usr/bin/sudo"
-	mount      = "/bin/mount"
-	umount     = "/bin/umount"
+	mount      = "/usr/bin/mount"
+	umount     = "/usr/bin/umount"
 	netns      = "/usr/bin/netns"
 	netnsd     = "/usr/bin/netnsd"
 	setarch    = "/usr/bin/setarch"
-	cp         = "/bin/cp"
+	cp         = "/usr/bin/cp"
 	chns       = "/usr/bin/chns"
-	sh         = "/bin/sh"
-	bash       = "/bin/bash"
+	sh         = "/usr/bin/sh"
+	bash       = "/usr/bin/bash"
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
-	pivot_root = "/sbin/pivot_root"
+	pivot_root = "/usr/sbin/pivot_root"
 )
 
 var qfs string
@@ -87,7 +87,7 @@ func makedest(src, dst string) bool {
 		}
 	}
 	if srcInfo.IsDir() {
-		mkdir_err := os.MkdirAll(dst, 0777)
+		mkdir_err := os.MkdirAll(dst, 0666)
 		if mkdir_err != nil {
 			fmt.Println("Error creating directory ", dst)
 			return false
@@ -206,7 +206,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 	cmdCopyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
 
 	dstVar := rootdir + "/var/run/netns"
-	err := os.MkdirAll(dstVar, 0777)
+	err := os.MkdirAll(dstVar, 0666)
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 		}
 
 		dst = rootdir + "/var/run/netns"
-		if err := os.MkdirAll(dst, 0777); err != nil {
+		if err := os.MkdirAll(dst, 0666); err != nil {
 			return err
 		}
 

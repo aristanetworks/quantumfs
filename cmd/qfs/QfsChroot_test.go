@@ -4,269 +4,285 @@
 // tests of qfs chroot tool
 package main
 
-import "fmt"
 import "io/ioutil"
 import "os"
 import "os/exec"
 import "testing"
 
-// setup a minimal workspace
-func setupWorkspace() (string, error) {
-	dirTest, err := ioutil.TempDir("/tmp", "TestChrootT")
+var commandsInUsrBin = []string{sudo, mount, umount, netns, netnsd, setarch,
+	cp, chns, sh, bash, "/usr/bin/mkdir", "/usr/bin/ls"}
+
+var commandsInUsrSbin = []string{pivot_root}
+
+func runCommand(t *testing.T, name string, args ...string) {
+	cmd := exec.Command(name, args...)
+
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return "", fmt.Errorf("Creating directory %s error: %s", dirTest,
-			err.Error())
+		t.Fatalf("Error getting stderr pipe of runCommand: %s\n"+
+			"Command: %s %v",
+			err.Error(), name, args)
 	}
 
-	if err := os.Chmod(dirTest, 0777); err != nil {
-		return "", fmt.Errorf("Changing mode of directory %s error: %s",
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Error starting process in runCommand: %s\nCommand: %s %v",
+			err.Error(), name, args)
+	}
+
+	buf, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		t.Fatalf("Error reading stderr in runCommand: %s\nCommand: %s %v",
+			err.Error(), name, args)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("Error waiting process in runCommand: %s\n"+
+			"Command: %s %v\nStderr: %s",
+			err.Error(), name, args, string(buf))
+	}
+}
+
+// setup a minimal workspace
+func setupWorkspace(t *testing.T) string {
+	dirTest, err := ioutil.TempDir("/tmp", "TestChrootH")
+	if err != nil {
+		t.Fatalf("Creating directory %s error: %s", dirTest,
+			err.Error())
+		return ""
+	}
+
+	if err := os.Chmod(dirTest, 0666); err != nil {
+		t.Fatalf("Changing mode of directory %s error: %s",
 			dirTest, err.Error())
+		return ""
 	}
 
-	dirUsr := dirTest + "/usr"
-	if err := os.Mkdir(dirUsr, 0777); err != nil {
-		return "", fmt.Errorf("Creating directory %s error: %s", dirUsr,
+	dirUsrBin := dirTest + "/usr/bin"
+	if err := os.MkdirAll(dirUsrBin, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s", dirUsrBin,
 			err.Error())
+		return ""
 	}
 
-	dirUsrBin := dirUsr + "/bin"
-	cmdCopyUsrBin := exec.Command("cp", "-ax", "/usr/bin/.", dirUsrBin)
-	if err := cmdCopyUsrBin.Run(); err != nil {
-		return "", fmt.Errorf("Copying contents of directory %s error: %s",
-			dirUsrBin, err.Error())
+	for _, command := range commandsInUsrBin {
+		runCommand(t, "cp", command, dirUsrBin)
+
 	}
 
-	dirUsrSbin := dirUsr + "/sbin"
-	cmdCopyUsrSbin := exec.Command("cp", "-ax", "/usr/sbin/.", dirUsrSbin)
-	if err := cmdCopyUsrSbin.Run(); err != nil {
-		return "", fmt.Errorf("Copying contents of directory %s error: %s",
+	dirUsrSbin := dirTest + "/usr/sbin"
+	if err := os.MkdirAll(dirUsrSbin, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s",
 			dirUsrSbin, err.Error())
+		return ""
 	}
 
-	dirUsrLib := dirUsr + "/lib"
-	cmdCopyUsrLib := exec.Command("cp", "-ax", "/usr/lib/.", dirUsrLib)
-	if err := cmdCopyUsrLib.Run(); err != nil {
-		return "", fmt.Errorf("Copying contents of directory %s error: %s",
-			dirUsrLib, err.Error())
+	for _, command := range commandsInUsrSbin {
+		runCommand(t, "cp", command, dirUsrSbin)
 	}
 
-	dirUsrLib64 := dirUsr + "/lib64"
-	cmdCopyUsrLib64 := exec.Command("cp", "-ax", "/usr/lib64/.", dirUsrLib64)
-	if err := cmdCopyUsrLib64.Run(); err != nil {
-		return "", fmt.Errorf("Copying contents of directory %s error: %s",
-			dirUsrLib64, err.Error())
-	}
+	dirUsrLib64 := dirTest + "/usr/lib64"
+	runCommand(t, "cp", "-ax", "/usr/lib64", dirUsrLib64)
 
 	dirBin := dirTest + "/bin"
-	cmdSymlinkBin := exec.Command("ln", "-s", "usr/bin", dirBin)
-	if err := cmdSymlinkBin.Run(); err != nil {
-		return "", fmt.Errorf("Creating symlink %s error: %s", dirBin,
-			err.Error())
-	}
+	runCommand(t, "ln", "-s", "usr/bin", dirBin)
 
 	dirSbin := dirTest + "/sbin"
-	cmdSymlinkSbin := exec.Command("ln", "-s", "usr/sbin", dirSbin)
-	if err := cmdSymlinkSbin.Run(); err != nil {
-		return "", fmt.Errorf("Creating symlink %s error: %s", dirSbin,
-			err.Error())
-	}
-
-	dirLib := dirTest + "/lib"
-	cmdSymlinkLib := exec.Command("ln", "-s", "usr/lib", dirLib)
-	if err := cmdSymlinkLib.Run(); err != nil {
-		return "", fmt.Errorf("Creating symlink %s error: %s", dirLib,
-			err.Error())
-	}
+	runCommand(t, "ln", "-s", "usr/sbin", dirSbin)
 
 	dirLib64 := dirTest + "/lib64"
-	cmdSymlinkLib64 := exec.Command("ln", "-s", "usr/lib64", dirLib64)
-	if err := cmdSymlinkLib64.Run(); err != nil {
-		return "", fmt.Errorf("Creating symlink %s error: %s", dirLib64,
-			err.Error())
-	}
+	runCommand(t, "ln", "-s", "usr/lib64", dirLib64)
 
-	dirUsrShare := dirUsr + "/share"
-	if err := os.MkdirAll(dirUsrShare, 0777); err != nil {
-		return "", fmt.Errorf("Creat directory %s error: %s", dirUsrShare,
+	dirUsrShare := dirTest + "/usr/share"
+	if err := os.MkdirAll(dirUsrShare, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s", dirUsrShare,
 			err.Error())
+		return ""
 	}
 
 	dirUsrShareArtools := dirUsrShare + "/Artools"
-	cmdCopyArtools := exec.Command("cp", "-ax", "/usr/share/Artools/.",
-		dirUsrShareArtools)
-	if err := cmdCopyArtools.Run(); err != nil {
-		return "", fmt.Errorf("Copying contents of directory %s error: %s",
-			dirUsrShareArtools, err.Error())
-	}
+	runCommand(t, "cp", "-ax", ArtoolsDir, dirUsrShareArtools)
 
 	dirUsrMnt := dirTest + "/mnt"
-	if err := os.Mkdir(dirUsrMnt, 0777); err != nil {
-		return "", fmt.Errorf("Creating directory %s error: %s", dirUsrMnt,
+	if err := os.Mkdir(dirUsrMnt, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s", dirUsrMnt,
 			err.Error())
+		return ""
 	}
 
 	dirEtc := dirTest + "/etc"
-	cmdCopyEtc := exec.Command("cp", "-ax", "/etc/.", dirEtc)
-	if err := cmdCopyEtc.Run(); err != nil {
-		return "", fmt.Errorf("Copying contents of directory %s error: %s",
-			dirEtc, err.Error())
-	}
+	runCommand(t, "cp", "-ax", "/etc", dirEtc)
 
 	dirTmp := dirTest + "/tmp"
-	if err := os.Mkdir(dirTmp, 0777); err != nil {
-		return "", fmt.Errorf("Creating directory %s error: %s", dirTmp,
+	if err := os.Mkdir(dirTmp, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s", dirTmp,
 			err.Error())
+		return ""
 	}
 
 	dirCurrent := dirTest + dirTest
-	if err := os.MkdirAll(dirCurrent, 0777); err != nil {
-		return "", fmt.Errorf("Creating directory %s error: %s",
+	if err := os.MkdirAll(dirCurrent, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s",
 			dirCurrent, err.Error())
+		return ""
 	}
 
-	return dirTest, nil
+	return dirTest
 }
 
 func cleanupWorkspace(workspace string, t *testing.T) {
 	if err := os.RemoveAll(workspace); err != nil {
-		t.Error("Error cleanning up testing workspace: %s", err.Error())
+		t.Fatalf("Error cleanning up testing workspace: %s", err.Error())
 	}
 }
 
+func terminateNetnsdServer(rootdir string, t *testing.T) {
+	svrName := rootdir + "/chroot"
+
+	runCommand(t, sudo, netns, "-k", svrName)
+}
+
 func TestPersistentChroot(t *testing.T) {
-	dirTest, err := setupWorkspace()
-	if err != nil {
-		t.Error(err.Error())
-	}
+	dirTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(dirTest, t)
-
-	if err := os.Chdir(dirTest); err != nil {
-		t.Errorf("Changing to directory %s error: %s", dirTest, err.Error())
-	}
+	defer terminateNetnsdServer(dirTest, t)
 
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
-		t.Errorf("Creating test file error: %s", err.Error())
+		t.Fatalf("Creating test file error: %s", err.Error())
 	} else {
 		fileTest = fd.Name()[len(dirTest):]
 		fd.Close()
+	}
+
+	if err := os.Chdir(dirTest); err != nil {
+		t.Fatal("Changing to directory %s error: %s", dirTest, err.Error())
 	}
 
 	cmdChroot := exec.Command("qfs", "chroot")
 
 	stdin, err := cmdChroot.StdinPipe()
 	if err != nil {
-		t.Errorf("Error getting stdin: %s", err.Error())
+		t.Fatalf("Error getting stdin: %s", err.Error())
 	}
 
-	stdout, err := cmdChroot.StdoutPipe()
+	stderr, err := cmdChroot.StderrPipe()
 	if err != nil {
-		t.Errorf("Error getting stdout: %s", err.Error())
+		t.Fatalf("Error getting stderr: %s", err.Error())
+	}
+
+	if err := cmdChroot.Start(); err != nil {
+		t.Fatalf("Executing error:%s", err.Error())
 	}
 
 	cmdFileTest := "cd /;cd ..;ls -l " + fileTest
 	if _, err := stdin.Write([]byte(cmdFileTest)); err != nil {
-		t.Errorf("Error writing command: %s", err.Error())
-	}
-
-	if err := cmdChroot.Start(); err != nil {
-		t.Errorf("Executing error:%s", err.Error())
+		t.Fatalf("Error writing command: %s", err.Error())
 	}
 
 	if err := stdin.Close(); err != nil {
-		t.Errorf("Error closing standard input: %s", err.Error())
+		t.Fatalf("Error closing command writer: %s",
+			err.Error())
 	}
 
-	if _, err := ioutil.ReadAll(stdout); err != nil {
-		t.Errorf("Error reading standard output: %s", err.Error())
+	errInfo, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		t.Fatalf("Error reading standard error: %s", err.Error())
 	}
 
 	if err := cmdChroot.Wait(); err != nil {
-		t.Errorf("%s\n", err.Error())
+		t.Fatalf("Error waiting chroot command: %s \n"+
+			"Error info: %s", err.Error(), string(errInfo))
 	}
 }
 
 func TestNetnsPersistency(t *testing.T) {
-	dirTest, err := setupWorkspace()
-	if err != nil {
-		t.Error(err.Error())
-	}
+	dirTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(dirTest, t)
-
-	if err := os.Chdir(dirTest); err != nil {
-		t.Errorf("Changing to directory %s error: %s", dirTest, err.Error())
-	}
+	defer terminateNetnsdServer(dirTest, t)
 
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
-		t.Errorf("Creating test file error: %s", err.Error())
+		t.Fatalf("Creating test file error: %s", err.Error())
 	} else {
 		fileTest = fd.Name()[len(dirTest):]
 		fd.Close()
+	}
+
+	if err := os.Chdir(dirTest); err != nil {
+		t.Fatal("Changing directory to %s error", dirTest)
 	}
 
 	cmdChroot := exec.Command("qfs", "chroot")
 
 	stdin, err := cmdChroot.StdinPipe()
 	if err != nil {
-		t.Errorf("Error getting stdin: %s", err.Error())
+		t.Fatalf("Error getting stdin: %s", err.Error())
+	}
+
+	stderr, err := cmdChroot.StderrPipe()
+	if err != nil {
+		t.Fatalf("Error getting stderr: %s", err.Error())
+	}
+
+	if err := cmdChroot.Start(); err != nil {
+		t.Fatalf("Executing error:%s", err.Error())
 	}
 
 	cmdExit := "exit"
 	if _, err := stdin.Write([]byte(cmdExit)); err != nil {
-		t.Errorf("Error writing command: %s", err.Error())
-	}
-
-	if err := cmdChroot.Start(); err != nil {
-		t.Errorf("Executing error:%s", err.Error())
+		t.Fatalf("Error writing command %s\nError Info: %s",
+			cmdExit, err.Error())
 	}
 
 	if err := stdin.Close(); err != nil {
-		t.Errorf("Error closing standard input: %s", err.Error())
+		t.Fatalf("Error closing standard input: %s", err.Error())
+	}
+
+	errInfo, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		t.Fatalf("Error reading standard error: %s", err.Error())
 	}
 
 	if err := cmdChroot.Wait(); err != nil {
-		t.Errorf("Error waiting chroot command: %s\n", err.Error())
+		t.Fatalf("Error waiting chroot command: %s \n"+
+			"Error info: %s", err.Error(), string(errInfo))
 	}
 
 	cmdNetnsLogin := exec.Command(netns, dirTest+"/chroot",
 		sh, "-l", "-c", "$@", bash, bash)
-	stdin, err = cmdNetnsLogin.StdinPipe()
+	stdinNetnsLogin, err := cmdNetnsLogin.StdinPipe()
 	if err != nil {
-		t.Errorf("Error getting stdin: %s", err.Error())
-	}
-
-	cmdFileTest := "cd /; cd ..; ls -l " + fileTest
-	if _, err := stdin.Write([]byte(cmdFileTest)); err != nil {
-		t.Errorf("Error writting command: %s", err.Error())
+		t.Fatalf("Error getting stdinNetnsLogin: %s", err.Error())
 	}
 
 	if err := cmdNetnsLogin.Start(); err != nil {
-		t.Errorf("Error starting netnsLogin command: %s", err.Error())
+		t.Fatalf("Error starting netnsLogin command: %s", err.Error())
 	}
 
-	if err := stdin.Close(); err != nil {
-		t.Errorf("Error closing standarded input: %s", err.Error())
+	cmdFileTest := "cd /; cd ..; ls -l " + fileTest
+	if _, err := stdinNetnsLogin.Write([]byte(cmdFileTest)); err != nil {
+		t.Fatalf("Error writting command: %s", err.Error())
+	}
+
+	if err := stdinNetnsLogin.Close(); err != nil {
+		t.Fatalf("Error closing standarded input: %s", err.Error())
 	}
 
 	if err := cmdNetnsLogin.Wait(); err != nil {
-		t.Errorf("Error waiting netnsLogin command: %s", err.Error())
+		t.Fatalf("Error waiting netnsLogin command: %s", err.Error())
 	}
 }
 
 func TestNonPersistentChroot(t *testing.T) {
-	dirTest, err := setupWorkspace()
-	if err != nil {
-		t.Error(err.Error())
-	}
+	dirTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(dirTest, t)
 
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
-		t.Errorf("Creating test file error: %s", err.Error())
+		t.Fatalf("Creating test file error: %s", err.Error())
 	} else {
 		fileTest = fd.Name()[len(dirTest):]
 		fd.Close()
@@ -275,21 +291,7 @@ func TestNonPersistentChroot(t *testing.T) {
 	cmdChroot := exec.Command("qfs", "chroot", "--nonpersistent", dirTest,
 		"ls", fileTest)
 
-	stdout, err := cmdChroot.StdoutPipe()
-	if err != nil {
-		t.Errorf("Error getting stdout: %s", err.Error())
+	if err := cmdChroot.Run(); err != nil {
+		t.Fatalf("Chroot running error:%s", err.Error())
 	}
-
-	if err := cmdChroot.Start(); err != nil {
-		t.Errorf("Chroot starting error:%s", err.Error())
-	}
-
-	if _, err := ioutil.ReadAll(stdout); err != nil {
-		t.Errorf("Error reading standard output: %s", err.Error())
-	}
-
-	if err := cmdChroot.Wait(); err != nil {
-		t.Errorf("Chroot waiting error:%s", err.Error())
-	}
-
 }
