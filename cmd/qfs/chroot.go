@@ -323,14 +323,18 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 		}
 	}
 
-	if err := syscall.Chdir(rootdir); err != nil {
-		return fmt.Errorf("Changing directory to %s error: %s",
-			rootdir, err.Error())
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
 	}
 
-	// As we have changed directory to rootdir, the relative path of
-	// current working directory to rootdir is "/"
-	cwd := "/"
+	// modify current working directory into a relative path to
+	// the workspaceroot we are chrooting in
+	if cwd == rootdir {
+		cwd = "/"
+	} else if strings.HasPrefix(cwd, rootdir) {
+		cwd = cwd[len(rootdir):]
+	}
 
 	if err := syscall.Chdir("/"); err != nil {
 		return err
@@ -481,7 +485,7 @@ func chroot() {
 	var dir string
 	cmd := make([]string, 0)
 
-ForLoop:
+ArgumentProcessingLoop:
 	for len(args) > 0 {
 		switch args[0] {
 		case "--nonpersistent":
@@ -502,7 +506,7 @@ ForLoop:
 			}
 
 			cmd = append(cmd, args[1:]...)
-			break ForLoop
+			break ArgumentProcessingLoop
 
 		case "--setup-namespaces":
 			setupNamespaces = true
