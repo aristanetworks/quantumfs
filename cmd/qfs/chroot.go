@@ -10,6 +10,7 @@ import "io/ioutil"
 import "os"
 import "os/exec"
 import "os/user"
+import "path/filepath"
 import "strconv"
 import "strings"
 import "syscall"
@@ -255,7 +256,8 @@ func printHelp() {
 	fmt.Println("                 workspace tree. The chroot environment")
 	fmt.Println("                 can be specified to be nonpersistent,")
 	fmt.Println("                 or by default it is persistent.\n")
-	fmt.Println("   qfs chroot [--nonpersistent] [DIR] [CMD]\n")
+	fmt.Println("   qfs chroot")
+	fmt.Println("   qfs chroot --nonpersistent <DIR> <CMD>\n")
 	fmt.Println("   Options:")
 	fmt.Println("      --nonpersistent <DIR> <CMD>      Create a non-persistent",
 		" chroot environment.")
@@ -300,16 +302,18 @@ func switchUserMode() error {
 	return nil
 }
 
-func chrootOutOfNsd(rootdir string) error {
+func chrootOutOfNsd(rootdir string, cmd []string) error {
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
+		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
+			"--nonpersistent", rootdir}
+		chroot_args = append(chroot_args, cmd...)
+
 		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
-
-		chroot_args := []string{qfs, "chroot", "--nonpersistent",
-			"--setup-namespaces"}
-
 		chns_args = append(chns_args, chroot_args...)
+
 		chns_env := os.Environ()
+
 		if err := syscall.Exec(chns_args[0], chns_args,
 			chns_env); err != nil {
 
@@ -457,9 +461,10 @@ func chrootOutOfNsd(rootdir string) error {
 		return err
 	}
 
-	setarch_cmd := []string{setarch, archStr}
-	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", bash, bash}
+	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
+	shell_cmd = append(shell_cmd, cmd...)
 
+	setarch_cmd := []string{setarch, archStr}
 	setarch_cmd = append(setarch_cmd, shell_cmd...)
 
 	setarch_env := os.Environ()
@@ -476,29 +481,56 @@ func chrootOutOfNsd(rootdir string) error {
 
 func chroot() {
 	args := os.Args[2:]
+
+	var dir string
+	cmd := make([]string, 0)
+
+ArgumentProcessingLoop:
 	for len(args) > 0 {
 		switch args[0] {
 		case "--nonpersistent":
 			persistent = false
+			args = args[1:]
+			if len(args) < 2 {
+				fmt.Println("Not enough arguments.")
+				printHelp()
+				os.Exit(1)
+			}
+
+			if absdir, err := filepath.Abs(args[0]); err != nil {
+				fmt.Println("Error converting path %s to absolute"+
+					" path: %s\n", args[0], err.Error())
+				os.Exit(1)
+			} else {
+				dir = absdir
+			}
+
+			cmd = append(cmd, args[1:]...)
+			break ArgumentProcessingLoop
+
 		case "--setup-namespaces":
 			setupNamespaces = true
+
 		default:
+			fmt.Println("unknown argument:", args[0], "\n")
 			printHelp()
-			return
+			os.Exit(1)
+
 		}
+
 		args = args[1:]
+	}
+
+	if !persistent {
+		if err := chrootOutOfNsd(dir, cmd); err != nil {
+			fmt.Println(err.Error())
+		}
+		return
 	}
 
 	rootdir, err := findWorkspaceRoot()
 	if err != nil {
 		fmt.Println(err.Error())
-		return
-	}
-
-	if !persistent {
-		if err := chrootOutOfNsd(rootdir); err != nil {
-			fmt.Println(err.Error())
-		}
 		return
 	}
 
