@@ -14,6 +14,15 @@ var commandsInUsrBin = []string{sudo, mount, umount, netns, netnsd, setarch,
 
 var commandsInUsrSbin = []string{pivot_root}
 
+var libsToCopy = []string{
+	"/usr/lib64/libSysPreloadUtils.so", "/usr/lib64/libtinfo.so.5",
+	"/usr/lib64/libdl.so.2", "/usr/lib64/libc.so.6", "/usr/lib64/librt.so.1",
+	"/usr/lib64/libstdc++.so.6", "/usr/lib64/libm.so.6",
+	"/usr/lib64/libgcc_s.so.1", "/usr/lib64/libpcre.so.1",
+	"/usr/lib64/ld-linux-x86-64.so.2", "/usr/lib64/libpthread.so.0",
+	"/usr/lib64/libcap.so.2", "/usr/lib64/libacl.so.1", "/usr/lib64/libattr.so.1",
+	"/usr/lib64/libselinux.so.1"}
+
 func runCommand(t *testing.T, name string, args ...string) {
 	cmd := exec.Command(name, args...)
 
@@ -73,7 +82,6 @@ func setupWorkspace(t *testing.T) string {
 	if err := os.MkdirAll(dirUsrSbin, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s",
 			dirUsrSbin, err.Error())
-		return ""
 	}
 
 	for _, command := range commandsInUsrSbin {
@@ -81,7 +89,15 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrLib64 := dirTest + "/usr/lib64"
-	runCommand(t, "cp", "-ax", "/usr/lib64", dirUsrLib64)
+	if err := os.MkdirAll(dirUsrLib64, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s",
+			dirUsrLib64, err.Error())
+
+	}
+
+	for _, lib := range libsToCopy {
+		runCommand(t, "cp", lib, dirUsrLib64)
+	}
 
 	dirBin := dirTest + "/bin"
 	runCommand(t, "ln", "-s", "usr/bin", dirBin)
