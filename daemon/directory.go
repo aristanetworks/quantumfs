@@ -1021,7 +1021,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.vlog("Directory::syncChild Enter")
+	c.vlog("Directory::syncChild Enter %s", newKey.String())
 	defer c.vlog("Directory::syncChild Exit")
 
 	ok, key := func() (bool, quantumfs.ObjectKey) {
@@ -1322,6 +1322,8 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	case quantumfs.ObjectTypeSpecial:
 		constructor = newSpecial
 	}
+
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
