@@ -7,6 +7,7 @@ package daemon
 
 import "bytes"
 import "io/ioutil"
+import "os"
 import "os/exec"
 import "strconv"
 import "strings"
@@ -14,17 +15,18 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-func TestForget(t *testing.T) {
+func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
+		os.MkdirAll(workspace+"/dir", 0777)
 
 		numFiles := 10
 		data := genData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
-			err := printToFile(workspace+"/file"+strconv.Itoa(i),
+			err := printToFile(workspace+"/dir/file"+strconv.Itoa(i),
 				string(data))
 			test.assert(err == nil, "Error creating small file")
 		}
@@ -44,7 +46,7 @@ func TestForget(t *testing.T) {
 		// Now read all the files back to make sure we still can
 		for i := 0; i < numFiles; i++ {
 			var readBack []byte
-			readBack, err := ioutil.ReadFile(workspace + "/file" +
+			readBack, err := ioutil.ReadFile(workspace + "/dir/file" +
 				strconv.Itoa(i))
 			test.assert(bytes.Equal(readBack, data),
 				"File contents not preserved after Forget")
