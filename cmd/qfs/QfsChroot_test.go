@@ -53,7 +53,7 @@ func runCommand(t *testing.T, name string, args ...string) {
 
 // setup a minimal workspace
 func setupWorkspace(t *testing.T) string {
-	dirTest, err := ioutil.TempDir("", "TestChrootH")
+	dirTest, err := ioutil.TempDir("", "TestChroot")
 	if err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirTest,
 			err.Error())
