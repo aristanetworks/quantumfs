@@ -501,22 +501,24 @@ ArgumentProcessingLoop:
 			fmt.Println(args)
 			fmt.Println(len(args))
 			if len(args) < 3 {
-				fmt.Println("Not enough arguments.")
+				fmt.Fprintln(os.Stderr, "Not enough arguments.")
 				printHelp()
 				os.Exit(1)
 			}
 
 			if absdir, err := filepath.Abs(args[0]); err != nil {
-				fmt.Println("Error converting path %s to absolute"+
-					" path: %s\n", args[0], err.Error())
+				fmt.Fprintf(os.Stderr, "Error converting path %s"+
+					" to absolute path: %s\n",
+					args[0], err.Error())
 				os.Exit(1)
 			} else {
 				wsr = absdir
 			}
 
 			if absdir, err := filepath.Abs(args[1]); err != nil {
-				fmt.Println("Error converting path %s to absolute"+
-					" path: %s\n", args[1], err.Error())
+				fmt.Fprintf(os.Stderr, "Error converting path %s"+
+					" to absolute path: %s\n",
+					args[1], err.Error())
 				os.Exit(1)
 			} else {
 				dir = absdir
@@ -529,7 +531,7 @@ ArgumentProcessingLoop:
 			setupNamespaces = true
 
 		default:
-			fmt.Println("unknown argument:", args[0], "\n")
+			fmt.Fprintln(os.Stderr, "unknown argument:", args[0], "\n")
 			printHelp()
 			os.Exit(1)
 
@@ -543,8 +545,9 @@ ArgumentProcessingLoop:
 
 	if !persistent {
 		if !isLegitimateWorkspaceRoot(wsr) {
-			fmt.Println("Invalid workspaceroot: %s, <WSR> must be a"+
-				" legitimate workspaceroot", wsr)
+			fmt.Fprintf(os.Stderr,
+				"Invalid workspaceroot: %s, <WSR> must be a"+
+					" legitimate workspaceroot\n", wsr)
 			printHelp()
 			os.Exit(1)
 		}
