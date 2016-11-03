@@ -5,7 +5,6 @@
 // the current workspace root becomes the filesystem root
 package main
 
-import "bytes"
 import "fmt"
 import "io/ioutil"
 import "os"
@@ -58,12 +57,14 @@ func findWorkspaceRoot() (string, error) {
 	}
 
 	dirs := strings.Split(wd, "/")
+
 	for len(dirs) > 1 {
 		rootdir := strings.Join(dirs, "/")
 		toolDir := rootdir + ArtoolsDir
 
-		toolInfo, err := os.Stat(toolDir)
-		if err == nil && toolInfo.IsDir() {
+		if toolInfo, err := os.Stat(toolDir); err == nil &&
+			toolInfo.IsDir() {
+
 			return rootdir, nil
 		}
 
@@ -73,7 +74,9 @@ func findWorkspaceRoot() (string, error) {
 	return "", fmt.Errorf("Invalid path for chroot")
 }
 
-// this function creates dst given the type of src if dst does not exist
+// This function creates dst given the type of src if dst does not exist.
+// It returns true if dst exists and is the same type as src, or dst is
+// successfully created, otherwise returns false.
 func makedest(src, dst string) bool {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
@@ -81,26 +84,27 @@ func makedest(src, dst string) bool {
 	}
 
 	dstInfo, err := os.Stat(dst)
-	if err == nil {
-		if srcInfo.IsDir() == dstInfo.IsDir() {
+	if err != nil && !os.IsNotExist(err) {
+		return false
+	}
+
+	if err == nil && srcInfo.IsDir() == dstInfo.IsDir() {
+		return true
+	}
+
+	if srcInfo.IsDir() {
+		if err := os.Mkdir(dst, 0666); err != nil {
+			return false
+		} else {
 			return true
 		}
-	}
-	if srcInfo.IsDir() {
-		mkdir_err := os.MkdirAll(dst, 0666)
-		if mkdir_err != nil {
-			fmt.Println("Error creating directory ", dst)
-			return false
-		}
-		return true
 	} else {
-		fd, create_err := os.Create(dst)
-		if create_err != nil {
-			fmt.Println("Error creating file ", dst)
+		if fd, err := os.Create(dst); err != nil {
 			return false
+		} else {
+			fd.Close()
+			return true
 		}
-		fd.Close()
-		return true
 	}
 }
 
@@ -111,13 +115,11 @@ func homedirs() []string {
 	envHome := os.Getenv("HOME")
 	homes = append(homes, envHome)
 
-	arastra, err := user.Lookup("arastra")
-	if err == nil {
+	if arastra, err := user.Lookup("arastra"); err == nil {
 		homes = append(homes, arastra.HomeDir)
 	}
 
-	current, err := user.Current()
-	if err == nil && current.Username != "root" {
+	if current, err := user.Current(); err == nil && current.Username != "root" {
 		homes = append(homes, current.HomeDir)
 	}
 
@@ -135,6 +137,7 @@ func processArchitecture(arch string) (string, error) {
 	case "x86_64":
 		return "x86_64", nil
 	}
+
 	return "", fmt.Errorf("Unrecognized architecture")
 }
 
@@ -146,24 +149,26 @@ func getArchitecture(rootdir string) (string, error) {
 	}
 
 	platStr := string(platform[:len(platform)-1])
+
 	return processArchitecture(platStr)
 }
 
 // test whether the netns server is already running
 func serverRunning(svrName string) bool {
 	cmdServerRun := exec.Command("netns", "-q", svrName)
-	err := cmdServerRun.Run()
-	if err == nil {
+
+	if err := cmdServerRun.Run(); err == nil {
 		return true
-	} else {
-		return false
 	}
+
+	return false
 }
 
 // login the netns server and open a new login shell, which is not
 // expected to return
 func netnsLogin(rootdir string, svrName string) error {
 	var err error
+
 	env := os.Environ()
 	env = append(env, "A4_CHROOT="+rootdir)
 
@@ -196,39 +201,43 @@ func setupBindMounts(rootdir string) {
 }
 
 func chrootInNsd(rootdir string, svrName string) error {
-	cmdBindMountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;",
-		sudo, mount, rootdir, rootdir)
+	bindmountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;", sudo, mount,
+		rootdir, rootdir)
 
 	dstDev := rootdir + "/dev"
 	makedest("/dev", dstDev)
-	cmdMountDev := fmt.Sprintf("%s %s -n -t tmpfs none %s;",
+
+	mountDev := fmt.Sprintf("%s %s -n -t tmpfs none %s;",
 		sudo, mount, dstDev)
-	cmdCopyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
+
+	copyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
 
 	dstVar := rootdir + "/var/run/netns"
-	err := os.MkdirAll(dstVar, 0666)
-	if err != nil {
+	if err := os.MkdirAll(dstVar, 0666); err != nil {
 		return err
 	}
-	cmdMountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;",
-		sudo, mount, dstVar)
 
-	var otherBindMounts string
+	mountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;", sudo, mount, dstVar)
+
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
 		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
 	homes := homedirs()
 	paths = append(paths, homes...)
+
+	var bindmountOther string
 	for i := 0; i < len(paths); i++ {
 		src := paths[i]
 		dst := rootdir + paths[i]
 		if !makedest(src, dst) {
 			continue
 		}
-		otherBindMounts = otherBindMounts +
+
+		bindmountOther = bindmountOther +
 			fmt.Sprintf("%s %s -n --bind %s %s;", sudo, mount, src, dst)
 	}
-	prechrootCmd := cmdBindMountRoot + cmdMountDev +
-		cmdCopyDev + cmdMountVar + otherBindMounts
+
+	prechrootCmd := bindmountRoot + mountDev + copyDev +
+		mountVar + bindmountOther
 
 	archString, err := getArchitecture(rootdir)
 	if err != nil {
@@ -238,10 +247,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
 		"--pre-chroot-cmd="+prechrootCmd, svrName)
-	var cmdNetnsdError bytes.Buffer
-	cmdNetnsd.Stderr = &cmdNetnsdError
-	err = cmdNetnsd.Run()
-	if err != nil {
+	if err := cmdNetnsd.Run(); err != nil {
 		return err
 	}
 
@@ -261,15 +267,7 @@ func printHelp() {
 }
 
 func switchUserMode() error {
-	cmdLogname := exec.Command("logname")
-	var lognameBuf bytes.Buffer
-	cmdLogname.Stdout = &lognameBuf
-	if err := cmdLogname.Run(); err != nil {
-		return err
-	}
-
-	lognameStr := lognameBuf.String()
-	lognameStr = strings.TrimSuffix(lognameStr, "\n")
+	lognameStr := os.Getenv("SUDO_USER")
 
 	logUser, err := user.Lookup(lognameStr)
 	if err != nil {
@@ -333,10 +331,12 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 
 	// modify current working directory into a relative path to
 	// the workspaceroot we are chrooting in
-	if cwd == rootdir {
-		cwd = "/"
-	} else if strings.HasPrefix(cwd, rootdir) {
+	if strings.HasPrefix(cwd, rootdir) {
 		cwd = cwd[len(rootdir):]
+	}
+
+	if len(cwd) == 0 {
+		cwd = "/"
 	}
 
 	if err := syscall.Chdir("/"); err != nil {
@@ -488,6 +488,7 @@ func chroot() {
 	var dir string
 	cmd := make([]string, 0)
 
+ArgumentProcessingLoop:
 	for len(args) > 0 {
 		switch args[0] {
 		case "--nonpersistent":
@@ -500,25 +501,26 @@ func chroot() {
 			}
 
 			if absdir, err := filepath.Abs(args[0]); err != nil {
-				fmt.Println("Invalid <DIR> argument:", args[0])
+				fmt.Println("Error converting path %s to absolute"+
+					" path: %s\n", args[0], err.Error())
 				os.Exit(1)
 			} else {
 				dir = absdir
 			}
 
 			cmd = append(cmd, args[1:]...)
+			break ArgumentProcessingLoop
 
 		case "--setup-namespaces":
 			setupNamespaces = true
+
 		default:
 			fmt.Println("unknown argument:", args[0], "\n")
 			printHelp()
 			os.Exit(1)
+
 		}
 
-		if !persistent {
-			break
-		}
 		args = args[1:]
 	}
 
@@ -537,8 +539,7 @@ func chroot() {
 
 	svrName := rootdir + "/chroot"
 	if !serverRunning(svrName) {
-		err = chrootInNsd(rootdir, svrName)
-		if err != nil {
+		if err := chrootInNsd(rootdir, svrName); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
@@ -549,5 +550,6 @@ func chroot() {
 		fmt.Println(err.Error())
 		return
 	}
+
 	return
 }
