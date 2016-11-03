@@ -19,18 +19,18 @@ import "github.com/kardianos/osext"
 
 const (
 	sudo       = "/usr/bin/sudo"
-	mount      = "/bin/mount"
-	umount     = "/bin/umount"
+	mount      = "/usr/bin/mount"
+	umount     = "/usr/bin/umount"
 	netns      = "/usr/bin/netns"
 	netnsd     = "/usr/bin/netnsd"
 	setarch    = "/usr/bin/setarch"
-	cp         = "/bin/cp"
+	cp         = "/usr/bin/cp"
 	chns       = "/usr/bin/chns"
-	sh         = "/bin/sh"
-	bash       = "/bin/bash"
+	sh         = "/usr/bin/sh"
+	bash       = "/usr/bin/bash"
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
-	pivot_root = "/sbin/pivot_root"
+	pivot_root = "/usr/sbin/pivot_root"
 )
 
 var qfs string
@@ -175,6 +175,9 @@ func netnsLogin(rootdir string, svrName string) error {
 	args := []string{netns, svrName, sh, "-l", "-c",
 		"\"$@\"", bash, bash}
 	err = syscall.Exec(netns, args, env)
+	if err != nil {
+		fmt.Println("Exec error")
+	}
 
 	return err
 }
