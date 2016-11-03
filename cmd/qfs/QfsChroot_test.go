@@ -147,7 +147,9 @@ func cleanupWorkspace(workspace string, t *testing.T) {
 func terminateNetnsdServer(rootdir string, t *testing.T) {
 	svrName := rootdir + "/chroot"
 
-	runCommand(t, sudo, netns, "-k", svrName)
+	if serverRunning(svrName) {
+		runCommand(t, sudo, netns, "-k", svrName)
+	}
 }
 
 func TestPersistentChroot(t *testing.T) {
