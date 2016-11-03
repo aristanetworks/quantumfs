@@ -46,6 +46,16 @@ func init() {
 	}
 }
 
+// A helper function to test whether a path is a legitimate workspaceroot
+// by checking whether /usr/share/Artools directory is present
+func isLegitimateWorkspaceRoot(wsr string) bool {
+	toolDir := wsr + ArtoolsDir
+	if toolInfo, err := os.Stat(toolDir); err == nil && toolInfo.IsDir() {
+		return true
+	}
+	return false
+}
+
 // This function comes from the implementation of chroot in Artools,
 // but we are going to get rid of the dependency on Artools so it will
 // become deprecated when we can make a quantumfs workspace into a proper
@@ -60,11 +70,8 @@ func findWorkspaceRoot() (string, error) {
 
 	for len(dirs) > 1 {
 		rootdir := strings.Join(dirs, "/")
-		toolDir := rootdir + ArtoolsDir
 
-		if toolInfo, err := os.Stat(toolDir); err == nil &&
-			toolInfo.IsDir() {
-
+		if isLegitimateWorkspaceRoot(rootdir) {
 			return rootdir, nil
 		}
 
@@ -260,10 +267,11 @@ func printHelp() {
 	fmt.Println("                 can be specified to be nonpersistent,")
 	fmt.Println("                 or by default it is persistent.\n")
 	fmt.Println("   qfs chroot")
-	fmt.Println("   qfs chroot --nonpersistent <DIR> <CMD>\n")
+	fmt.Println("   qfs chroot --nonpersistent <WSR> <DIR> <CMD>\n")
 	fmt.Println("   Options:")
-	fmt.Println("      --nonpersistent <DIR> <CMD>      Create a non-persistent",
-		" chroot environment.")
+	fmt.Println("      --nonpersistent <WSR> <DIR> <CMD>  Change <WSR> as",
+		" the filesystem root,")
+	fmt.Println("        enter working directory <DIR> and run command <CMD>")
 }
 
 func switchUserMode() error {
@@ -305,11 +313,11 @@ func switchUserMode() error {
 	return nil
 }
 
-func chrootOutOfNsd(rootdir string, cmd []string) error {
+func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
 		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
-			"--nonpersistent", rootdir}
+			"--nonpersistent", rootdir, workingdir}
 		chroot_args = append(chroot_args, cmd...)
 
 		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
@@ -324,19 +332,14 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 		}
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	// modify current working directory into a relative path to
+	// modify working directory into a relative path to
 	// the workspaceroot we are chrooting in
-	if strings.HasPrefix(cwd, rootdir) {
-		cwd = cwd[len(rootdir):]
+	if strings.HasPrefix(workingdir, rootdir) {
+		workingdir = workingdir[len(rootdir):]
 	}
 
-	if len(cwd) == 0 {
-		cwd = "/"
+	if len(workingdir) == 0 {
+		workingdir = "/"
 	}
 
 	if err := syscall.Chdir("/"); err != nil {
@@ -441,16 +444,16 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 	}
 
 	// change the current directory
-	cwdInfo, err := os.Stat(cwd)
+	wdInfo, err := os.Stat(workingdir)
 	if err != nil {
 		return err
 	}
 
-	if !cwdInfo.IsDir() {
-		cwd = "/"
+	if !wdInfo.IsDir() {
+		workingdir = "/"
 	}
 
-	if err := os.Chdir(cwd); err != nil {
+	if err := os.Chdir(workingdir); err != nil {
 		return err
 	}
 
@@ -485,6 +488,7 @@ func chrootOutOfNsd(rootdir string, cmd []string) error {
 func chroot() {
 	args := os.Args[2:]
 
+	var wsr string
 	var dir string
 	cmd := make([]string, 0)
 
@@ -494,7 +498,9 @@ ArgumentProcessingLoop:
 		case "--nonpersistent":
 			persistent = false
 			args = args[1:]
-			if len(args) < 2 {
+			fmt.Println(args)
+			fmt.Println(len(args))
+			if len(args) < 3 {
 				fmt.Println("Not enough arguments.")
 				printHelp()
 				os.Exit(1)
@@ -505,10 +511,18 @@ ArgumentProcessingLoop:
 					" path: %s\n", args[0], err.Error())
 				os.Exit(1)
 			} else {
+				wsr = absdir
+			}
+
+			if absdir, err := filepath.Abs(args[1]); err != nil {
+				fmt.Println("Error converting path %s to absolute"+
+					" path: %s\n", args[1], err.Error())
+				os.Exit(1)
+			} else {
 				dir = absdir
 			}
 
-			cmd = append(cmd, args[1:]...)
+			cmd = append(cmd, args[2:]...)
 			break ArgumentProcessingLoop
 
 		case "--setup-namespaces":
@@ -523,11 +537,22 @@ ArgumentProcessingLoop:
 
 		args = args[1:]
 	}
+	fmt.Println(wsr)
+	fmt.Println(dir)
+	fmt.Println(cmd)
 
 	if !persistent {
-		if err := chrootOutOfNsd(dir, cmd); err != nil {
+		if !isLegitimateWorkspaceRoot(wsr) {
+			fmt.Println("Invalid workspaceroot: %s, <WSR> must be a"+
+				" legitimate workspaceroot", wsr)
+			printHelp()
+			os.Exit(1)
+		}
+
+		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
 			fmt.Println(err.Error())
 		}
+
 		return
 	}
 

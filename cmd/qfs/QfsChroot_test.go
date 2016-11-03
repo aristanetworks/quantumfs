@@ -304,7 +304,7 @@ func TestNonPersistentChroot(t *testing.T) {
 	}
 
 	cmdChroot := exec.Command("qfs", "chroot", "--nonpersistent", dirTest,
-		"ls", fileTest)
+		dirTest, "ls", fileTest)
 
 	if err := cmdChroot.Run(); err != nil {
 		t.Fatalf("Chroot running error:%s", err.Error())
