@@ -121,7 +121,11 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirEtc := dirTest + "/etc"
-	runCommand(t, "cp", "-ax", "/etc", dirEtc)
+	if err := os.Mkdir(dirEtc, 0666); err != nil {
+		t.Fatalf("Creating directory %s error: %s", dirEtc, err.Error())
+	}
+
+	runCommand(t, "cp", "/etc/passwd", dirEtc+"/")
 
 	dirTmp := dirTest + "/tmp"
 	if err := os.Mkdir(dirTmp, 0666); err != nil {
