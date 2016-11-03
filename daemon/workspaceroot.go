@@ -130,6 +130,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	c.vlog("WorkspaceRoot::syncChild Enter")
 	defer c.vlog("WorkspaceRoot::syncChild Exit")
+	wsr.Directory.syncChild(c, inodeNum, newKey)
 	wsr.publish(c)
 }
 
