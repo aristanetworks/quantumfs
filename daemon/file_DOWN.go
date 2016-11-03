@@ -23,7 +23,11 @@ func (fi *File) forget_DOWN(c *ctx) {
 	fi.setDirty(false)
 	fi.parent().syncChild(c, fi.InodeCommon.id, key)
 
-	// Remove the inode from the map, ready to be garbage collected
+	// Remove the inode from the map, ready to be garbage collected. We also
+	// re-register ourselves in the uninstantiated inode collection.
+	if parent := fi.parent(); parent != fi {
+		c.qfs.addUninstantiated(c, []InodeId{fi.InodeCommon.id}, fi.parent())
+	}
 	c.qfs.setInode(c, fi.id, nil)
 }
 
