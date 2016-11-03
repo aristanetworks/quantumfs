@@ -498,8 +498,6 @@ ArgumentProcessingLoop:
 		case "--nonpersistent":
 			persistent = false
 			args = args[1:]
-			fmt.Println(args)
-			fmt.Println(len(args))
 			if len(args) < 3 {
 				fmt.Fprintln(os.Stderr, "Not enough arguments.")
 				printHelp()
@@ -539,9 +537,6 @@ ArgumentProcessingLoop:
 
 		args = args[1:]
 	}
-	fmt.Println(wsr)
-	fmt.Println(dir)
-	fmt.Println(cmd)
 
 	if !persistent {
 		if !isLegitimateWorkspaceRoot(wsr) {
