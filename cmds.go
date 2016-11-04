@@ -136,11 +136,11 @@ type DuplicateObject struct {
 	ObjectKey []byte
 	Uid       uint16
 	Gid       uint16
-        Mode      uint32
+	Mode      uint32
 	Umask     uint32
 	Rdev      uint32
-	Size      uint64  // The size of a file, the number of children of 
-                          // a directory, or of a symplink
+	Size      uint64 // The size of a file, the number of children of
+	// a directory, or of a symplink
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -298,19 +298,19 @@ func (api *Api) DuplicateObject(dst string, objectKey []byte, mode uint32,
 
 	if !isObjectKeyValid(objectKey) {
 		return fmt.Errorf("\"%s\" should be %d bytes",
-                                objectKey, EncodedLength)
+			objectKey, EncodedLength)
 	}
 
-	cmd := DuplicateObject {
+	cmd := DuplicateObject{
 		CommandCommon: CommandCommon{CommandId: CmdDuplicateObject},
 		DstPath:       dst,
 		ObjectKey:     objectKey,
-	        Uid:           uid,
-                Gid:           gid,
-                Mode:          mode,
-                Umask:         umask,
-                Rdev:          rdev,
-        }
+		Uid:           uid,
+		Gid:           gid,
+		Mode:          mode,
+		Umask:         umask,
+		Rdev:          rdev,
+	}
 
 	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {

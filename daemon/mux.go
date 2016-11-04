@@ -534,32 +534,32 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	if inode == nil {
 		return 0, fuse.ENOENT
 	}
-        if attr == quantumfs.XAttrTypeKey {
-                msg, status := getSpecialXAttrDataHelper(c, inode)
-                if len(msg) != quantumfs.EncodedLength {
-                        return 0, fuse.EIO
-                }
-                return len(msg), status
-        } 
+	if attr == quantumfs.XAttrTypeKey {
+		msg, status := getSpecialXAttrDataHelper(c, inode)
+		if len(msg) != quantumfs.EncodedLength {
+			return 0, fuse.EIO
+		}
+		return len(msg), status
+	}
 	defer inode.RLockTree().RUnlock()
 	return inode.GetXAttrSize(c, attr)
 }
 
-func getSpecialXAttrDataHelper (c *ctx, inode Inode) ([]byte, fuse.Status) {
-        parent := inode.parent()
-        if parent == nil {
-                return nil, fuse.ENOENT
-        }
+func getSpecialXAttrDataHelper(c *ctx, inode Inode) ([]byte, fuse.Status) {
+	parent := inode.parent()
+	if parent == nil {
+		return nil, fuse.ENOENT
+	}
 
-        var dir *Directory
-        if parent.parent() == nil {
-                dir = &parent.(*WorkspaceRoot).Directory
-        } else {
-                dir = parent.(*Directory)
-        }
-        defer parent.LockTree().Unlock()
-        msg, status := dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
-        return msg, status
+	var dir *Directory
+	if parent.parent() == nil {
+		dir = &parent.(*WorkspaceRoot).Directory
+	} else {
+		dir = parent.(*Directory)
+	}
+	defer parent.LockTree().Unlock()
+	msg, status := dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
+	return msg, status
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
@@ -578,9 +578,9 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 		return nil, fuse.ENOENT
 	}
 
-        if attr == quantumfs.XAttrTypeKey {
-               return getSpecialXAttrDataHelper(c, inode) 
-        }
+	if attr == quantumfs.XAttrTypeKey {
+		return getSpecialXAttrDataHelper(c, inode)
+	}
 
 	defer inode.RLockTree().RUnlock()
 	return inode.GetXAttrData(c, attr)

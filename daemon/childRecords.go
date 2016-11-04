@@ -58,34 +58,34 @@ func (cr *childRecords) instantiateChild_(c *ctx, entry *quantumfs.DirectoryReco
 	cr.data.fileToInode[entry.Filename()] = inodeId
 	cr.data.records[inodeId] = entry
 
-        constructor := selectConstructor(c, entry.Type())
+	constructor := selectConstructor(c, entry.Type())
 	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
 		entry.Size(), inodeId, cr.dir.self, 0, 0, nil))
 }
 
 func selectConstructor(c *ctx, type_ quantumfs.ObjectType) InodeConstructor {
-        var constructor InodeConstructor
+	var constructor InodeConstructor
 	switch type_ {
-                default:
-		        c.elog("Unknown InodeConstructor type: %d", type_)
-		        panic("Unknown InodeConstructor type")
-	        case quantumfs.ObjectTypeDirectoryEntry:
-		        constructor = newDirectory
-        	case quantumfs.ObjectTypeSmallFile:
-	        	constructor = newSmallFile
-        	case quantumfs.ObjectTypeMediumFile:
-	        	constructor = newMediumFile
-        	case quantumfs.ObjectTypeLargeFile:
-	        	constructor = newLargeFile
-        	case quantumfs.ObjectTypeVeryLargeFile:
-	        	constructor = newVeryLargeFile
-        	case quantumfs.ObjectTypeSymlink:
-	        	constructor = newSymlink
-        	case quantumfs.ObjectTypeSpecial:
-	        	constructor = newSpecial
+	default:
+		c.elog("Unknown InodeConstructor type: %d", type_)
+		panic("Unknown InodeConstructor type")
+	case quantumfs.ObjectTypeDirectoryEntry:
+		constructor = newDirectory
+	case quantumfs.ObjectTypeSmallFile:
+		constructor = newSmallFile
+	case quantumfs.ObjectTypeMediumFile:
+		constructor = newMediumFile
+	case quantumfs.ObjectTypeLargeFile:
+		constructor = newLargeFile
+	case quantumfs.ObjectTypeVeryLargeFile:
+		constructor = newVeryLargeFile
+	case quantumfs.ObjectTypeSymlink:
+		constructor = newSymlink
+	case quantumfs.ObjectTypeSpecial:
+		constructor = newSpecial
 	}
 
-        return constructor
+	return constructor
 }
 
 func (cr *childRecords) insertRecord(c *ctx, inode InodeId,

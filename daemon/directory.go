@@ -31,9 +31,9 @@ type Directory struct {
 
 // Define a structure containing ObjectKey, Inode Type, and Inode Size
 type DuplicateData struct {
-        Key     []byte
-        Type    quantumfs.ObjectType
-        Size    uint64
+	Key  []byte
+	Type quantumfs.ObjectType
+	Size uint64
 }
 
 func initDirectory(c *ctx, name string, dir *Directory,
@@ -410,15 +410,15 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	c.vlog("Directory::Lookup Enter")
 	defer c.vlog("Directory::Lookup Exit")
 
-        inodeNum, record, err := dir.lookupHelper(c, name)
-        if err != nil {
-                return fuse.ENOENT 
-        }
+	inodeNum, record, err := dir.lookupHelper(c, name)
+	if err != nil {
+		return fuse.ENOENT
+	}
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
 	dir.self.markAccessed(c, name, false)
-        child := c.qfs.inode(c, inodeNum)
-        child.markSelfAccessed(c, false)
+	child := c.qfs.inode(c, inodeNum)
+	child.markSelfAccessed(c, false)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, record)
@@ -478,15 +478,15 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	uid := c.fuseCtx.Owner.Uid
 	gid := c.fuseCtx.Owner.Gid
-        UID := quantumfs.ObjectUid(c.Ctx, uid, uid)
-        GID := quantumfs.ObjectGid(c.Ctx, gid, gid)
-        entry := dir.createNewEntry(c, name, mode, umask, rdev,
-                                0, UID, GID, type_, key)
-        inodeNum := c.qfs.newInodeId()
-        newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
-                        mode, rdev, entry)
-        dir.addChild_(c, inodeNum, entry)
-        c.qfs.setInode(c, inodeNum, newEntity)
+	UID := quantumfs.ObjectUid(c.Ctx, uid, uid)
+	GID := quantumfs.ObjectGid(c.Ctx, gid, gid)
+	entry := dir.createNewEntry(c, name, mode, umask, rdev,
+		0, UID, GID, type_, key)
+	inodeNum := c.qfs.newInodeId()
+	newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
+		mode, rdev, entry)
+	dir.addChild_(c, inodeNum, entry)
+	c.qfs.setInode(c, inodeNum, newEntity)
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
@@ -1203,43 +1203,43 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func compressData(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
-        size uint64) []byte {
-        
-        append_ := make([]byte, 9)
-        append_[0] = uint8(type_)
-        binary.LittleEndian.PutUint64(append_[1:], size)
+	size uint64) []byte {
 
-        data := append(key.Value(), append_...)
-        sEnc := base64.StdEncoding.EncodeToString(data)
-        return []byte(sEnc)
+	append_ := make([]byte, 9)
+	append_[0] = uint8(type_)
+	binary.LittleEndian.PutUint64(append_[1:], size)
+
+	data := append(key.Value(), append_...)
+	sEnc := base64.StdEncoding.EncodeToString(data)
+	return []byte(sEnc)
 }
 
 func decompressData(packet []byte) (quantumfs.ObjectKey, quantumfs.ObjectType,
-        uint64, error) {
+	uint64, error) {
 
-        typeKeyLength := quantumfs.TypeKeyLength
-        bDec, err := base64.StdEncoding.DecodeString(string(packet))
-        if err != nil {
-                return quantumfs.ZeroKey, 0, 0, err
-        }
+	typeKeyLength := quantumfs.TypeKeyLength
+	bDec, err := base64.StdEncoding.DecodeString(string(packet))
+	if err != nil {
+		return quantumfs.ZeroKey, 0, 0, err
+	}
 
-        key := quantumfs.NewObjectKeyFromBytes(bDec[:typeKeyLength-9])
-        type_ := quantumfs.ObjectType(bDec[typeKeyLength-9])
-        size := binary.LittleEndian.Uint64(bDec[typeKeyLength-8:])
-        return key, type_, size, nil
+	key := quantumfs.NewObjectKeyFromBytes(bDec[:typeKeyLength-9])
+	type_ := quantumfs.ObjectType(bDec[typeKeyLength-9])
+	size := binary.LittleEndian.Uint64(bDec[typeKeyLength-8:])
+	return key, type_, size, nil
 }
 
 // Attaching the inode type in front of the Object-key
 func (dir *Directory) generateChildTypeKey(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
 
-        record, err := dir.getChildRecord(c, inodeNum)
+	record, err := dir.getChildRecord(c, inodeNum)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
 		return []byte{}, fuse.EIO
 	}
-        
-        typeKey := compressData(record.ID(), record.Type(), record.Size())
+
+	typeKey := compressData(record.ID(), record.Type(), record.Size())
 	return typeKey, fuse.OK
 }
 
@@ -1250,8 +1250,8 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 
 	c.vlog("Directory::LookupInternal Enter")
 	defer c.vlog("Directory::LookupInternal Exit")
-	
-        inodeNum, record, err := dir.lookupHelper(c, name)
+
+	inodeNum, record, err := dir.lookupHelper(c, name)
 	if err != nil {
 		return nil, err
 	}
@@ -1267,29 +1267,28 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 }
 
 func (dir *Directory) lookupHelper(c *ctx, name string) (InodeId,
-        *quantumfs.DirectoryRecord, error) {
+	*quantumfs.DirectoryRecord, error) {
 
-        c.vlog("Directory::lookupHelper Enter")
-        defer c.vlog("Directory::LookupHelper Exit")
-        defer dir.RLock().RUnlock()
+	c.vlog("Directory::lookupHelper Enter")
+	defer c.vlog("Directory::LookupHelper Exit")
+	defer dir.RLock().RUnlock()
 
-        inodeNum, exists := dir.dirChildren.getInode(c, name)
-        if !exists {
-                return inodeNum, nil, errors.New("Non-existing Inode")
-        }
+	inodeNum, exists := dir.dirChildren.getInode(c, name)
+	if !exists {
+		return inodeNum, nil, errors.New("Non-existing Inode")
+	}
 
-        record, exists := dir.dirChildren.getRecord(c, inodeNum)
-        if !exists {
-                return inodeNum, nil, errors.New("Non-existing Inode Record")
-        }
+	record, exists := dir.dirChildren.getRecord(c, inodeNum)
+	if !exists {
+		return inodeNum, nil, errors.New("Non-existing Inode Record")
+	}
 
-        return inodeNum, record, nil 
+	return inodeNum, record, nil
 }
 
 func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32, umask uint32,
-        rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
-        type_ quantumfs.ObjectType, key quantumfs.ObjectKey) ( 
-        *quantumfs.DirectoryRecord) {
+	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
+	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) *quantumfs.DirectoryRecord {
 
 	// set up the Inode record
 	now := time.Now()
@@ -1307,7 +1306,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32, umask uin
 	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
 
-        return entry
+	return entry
 }
 
 // Use an inode exclusive mutex to protect the inode from accessing by any other
@@ -1316,11 +1315,11 @@ func (dir *Directory) duplicateInode(c *ctx, name string, mode uint32, umask uin
 	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
 	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
 
-        defer dir.Lock().Unlock()
+	defer dir.Lock().Unlock()
 	entry := dir.createNewEntry(c, name, mode, umask, rdev, size,
-                                uid, gid, type_, key)
+		uid, gid, type_, key)
 
-        dir.dirChildren.instantiateChild_(c, entry)
+	dir.dirChildren.instantiateChild_(c, entry)
 }
 
 type directoryContents struct {
