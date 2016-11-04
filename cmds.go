@@ -4,7 +4,6 @@
 package quantumfs
 
 import "fmt"
-import "encoding/binary"
 import "encoding/json"
 import "os"
 import "strings"
@@ -133,10 +132,15 @@ type SyncAllRequest struct {
 
 type DuplicateObject struct {
 	CommandCommon
-	Dst       string
+	DstPath   string
 	ObjectKey []byte
-	Attribute []byte
-	Size      uint64
+	Uid       uint16
+	Gid       uint16
+        Mode      uint32
+	Umask     uint32
+	Rdev      uint32
+	Size      uint64  // The size of a file, the number of children of 
+                          // a directory, or of a symplink
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -293,22 +297,20 @@ func (api *Api) DuplicateObject(dst string, objectKey []byte, mode uint32,
 	}
 
 	if !isObjectKeyValid(objectKey) {
-		return fmt.Errorf("\"%s\" must be 30 bytes", objectKey)
+		return fmt.Errorf("\"%s\" should be %d bytes",
+                                objectKey, EncodedLength)
 	}
 
-	attr := make([]byte, 16)
-	binary.LittleEndian.PutUint32(attr[0:4], mode)
-	binary.LittleEndian.PutUint32(attr[4:8], umask)
-	binary.LittleEndian.PutUint32(attr[8:12], rdev)
-	binary.LittleEndian.PutUint16(attr[12:14], uid)
-	binary.LittleEndian.PutUint16(attr[14:16], gid)
-
-	cmd := DuplicateObject{
+	cmd := DuplicateObject {
 		CommandCommon: CommandCommon{CommandId: CmdDuplicateObject},
-		Dst:           dst,
+		DstPath:       dst,
 		ObjectKey:     objectKey,
-		Attribute:     attr,
-	}
+	        Uid:           uid,
+                Gid:           gid,
+                Mode:          mode,
+                Umask:         umask,
+                Rdev:          rdev,
+        }
 
 	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
@@ -346,7 +348,7 @@ func isWorkspacePathValid(dst string) bool {
 }
 
 func isObjectKeyValid(objectKey []byte) bool {
-	if length := len(objectKey); length != 30 {
+	if length := len(objectKey); length != EncodedLength {
 		return false
 	}
 	return true

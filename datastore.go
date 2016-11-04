@@ -94,6 +94,11 @@ func (v KeyType) Primitive() interface{} {
 // additional byte used for routing.
 const ObjectKeyLength = 1 + sha1.Size
 
+// The size of the key attached by inode type is determined by the Json Compression
+const TypeKeyLength = 30 // 21 + 1 + 8
+const EncodedLength = 40 // base64 consume more memory 30 * 4 / 3
+const XAttrTypeKey = "quantumfs.typeKey"
+
 type ObjectKey struct {
 	key encoding.ObjectKey
 }
@@ -242,7 +247,6 @@ const (
 	ObjectTypeLargeFile         = iota
 	ObjectTypeVeryLargeFile     = iota
 	ObjectTypeSpecial           = iota
-	ObjectTypeAny               = iota
 )
 
 // One of the ObjectType* values
