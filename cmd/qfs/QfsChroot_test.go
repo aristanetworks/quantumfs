@@ -291,6 +291,9 @@ func TestNetnsPersistency(t *testing.T) {
 // <WSR>:
 // AbsWsr: Absolute path of workspaceroot in the filesystem before chroot
 // RelWsr: Workspaceroot relative to the directory where chroot is run
+// <DIR>:
+// AbsDir: Absolute path of working directory in filesystem after chroot
+// RelDir: Working directory path relative to workspaceroot
 // <CMD>:
 // AbsCmd: Command with absolute path in the filesystem after chroot
 // RelCmd: Command with path relative to working directory
@@ -315,7 +318,7 @@ func setupNonPersistentChrootTest(t *testing.T, rootTest string) (string, string
 	return dirTest, fileTest
 }
 
-func TestNonPersistentChrootAbsWsrAbsCmd(t *testing.T) {
+func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -334,7 +337,7 @@ func TestNonPersistentChrootAbsWsrAbsCmd(t *testing.T) {
 		dirTest, "ls", fileTest)
 }
 
-func TestNonPersistentChrootAbsWsrRelCmd(t *testing.T) {
+func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -348,7 +351,7 @@ func TestNonPersistentChrootAbsWsrRelCmd(t *testing.T) {
 		dirTest, "ls", fileTest)
 }
 
-func TestNonPersistentChrootRelWsrrAbsCmd(t *testing.T) {
+func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -368,7 +371,7 @@ func TestNonPersistentChrootRelWsrrAbsCmd(t *testing.T) {
 		dirTest, "ls", fileTest)
 }
 
-func TestNonPersistentChrootRelWsrRelCmd(t *testing.T) {
+func TestNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -382,6 +385,79 @@ func TestNonPersistentChrootRelWsrRelCmd(t *testing.T) {
 
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest):]
+	rootTest = "." + rootTest
+
+	runCommand(t, "qfs", "chroot", "--nonpersistent", rootTest,
+		dirTest, "ls", fileTest)
+}
+
+func TestNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T) {
+	rootTest := setupWorkspace(t)
+
+	defer cleanupWorkspace(rootTest, t)
+
+	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
+
+	if err := os.Chdir("/"); err != nil {
+		t.Fatalf("Changing to directory / error: %s",
+			err.Error())
+	}
+
+	fileTest = fileTest[len(rootTest):]
+	dirTest = dirTest[len(rootTest)+1:]
+
+	runCommand(t, "qfs", "chroot", "--nonpersistent", rootTest,
+		dirTest, "ls", fileTest)
+}
+
+func TestNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T) {
+	rootTest := setupWorkspace(t)
+
+	defer cleanupWorkspace(rootTest, t)
+
+	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
+
+	fileTest = "." + fileTest[len(dirTest):]
+	dirTest = dirTest[len(rootTest)+1:]
+
+	runCommand(t, "qfs", "chroot", "--nonpersistent", rootTest,
+		dirTest, "ls", fileTest)
+}
+
+func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
+	rootTest := setupWorkspace(t)
+
+	defer cleanupWorkspace(rootTest, t)
+
+	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
+
+	if err := os.Chdir("/"); err != nil {
+		t.Fatalf("Changing to directory / error: %s",
+			err.Error())
+	}
+
+	fileTest = fileTest[len(rootTest):]
+	dirTest = dirTest[len(rootTest)+1:]
+	rootTest = "." + rootTest
+
+	runCommand(t, "qfs", "chroot", "--nonpersistent", rootTest,
+		dirTest, "ls", fileTest)
+}
+
+func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
+	rootTest := setupWorkspace(t)
+
+	defer cleanupWorkspace(rootTest, t)
+
+	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
+
+	if err := os.Chdir("/"); err != nil {
+		t.Fatalf("Changing to directory / error: %s",
+			err.Error())
+	}
+
+	fileTest = "." + fileTest[len(dirTest):]
+	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
 	runCommand(t, "qfs", "chroot", "--nonpersistent", rootTest,
