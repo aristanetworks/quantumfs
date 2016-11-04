@@ -24,11 +24,11 @@ func (v LogSubsystem) Primitive() interface{} {
 const FnEnterStr = "---In "
 const FnExitStr = "Out-- "
 
-func IsFnIn(test string) bool {
+func IsFunctionIn(test string) bool {
 	return strings.Index(test, FnEnterStr) == 0
 }
 
-func IsFnOut(test string) bool {
+func IsFunctionOut(test string) bool {
 	return strings.Index(test, FnExitStr) == 0
 }
 
