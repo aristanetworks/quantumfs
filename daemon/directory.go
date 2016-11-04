@@ -1287,9 +1287,9 @@ func (dir *Directory) lookupHelper(c *ctx, name string) (InodeId,
 }
 
 func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
-        umask uint32, rdev uint32, size uint64, uid quantumfs.UID,
-        gid quantumfs.GID, type_ quantumfs.ObjectType,
-        key quantumfs.ObjectKey) *quantumfs.DirectoryRecord {
+	umask uint32, rdev uint32, size uint64, uid quantumfs.UID,
+	gid quantumfs.GID, type_ quantumfs.ObjectType,
+	key quantumfs.ObjectKey) *quantumfs.DirectoryRecord {
 
 	// set up the Inode record
 	now := time.Now()
