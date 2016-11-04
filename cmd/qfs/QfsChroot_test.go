@@ -67,14 +67,6 @@ func setupWorkspace(t *testing.T) string {
 			dirTest, err.Error())
 	}
 
-	dirUsrLibexec := dirTest + "/usr/libexec"
-	if err := os.MkdirAll(dirUsrLibexec, 0666); err != nil {
-		t.Fatalf("Creating directory %s error: %s",
-			dirUsrLibexec, err.Error())
-	}
-
-	runCommand(t, "cp", "/usr/libexec/sudoers.so", dirUsrLibexec)
-
 	dirUsrBin := dirTest + "/usr/bin"
 	if err := os.MkdirAll(dirUsrBin, 0666); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrBin,
@@ -136,7 +128,7 @@ func setupWorkspace(t *testing.T) string {
 		t.Fatalf("Creating directory %s error: %s", dirEtc, err.Error())
 	}
 
-	runCommand(t, "cp", "/etc/passwd", dirEtc+"/passwd")
+	runCommand(t, "cp", "/etc/passwd", dirEtc)
 
 	dirTmp := dirTest + "/tmp"
 	if err := os.Mkdir(dirTmp, 0666); err != nil {
@@ -323,7 +315,7 @@ func setupNonPersistentChrootTest(t *testing.T, rootTest string) (string, string
 	return dirTest, fileTest
 }
 
-func TestNonPersistentChrootAbsWsrAbsDirAfterAbsCmd(t *testing.T) {
+func TestNonPersistentChrootAbsWsrAbsCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -342,7 +334,7 @@ func TestNonPersistentChrootAbsWsrAbsDirAfterAbsCmd(t *testing.T) {
 		dirTest, "ls", fileTest)
 }
 
-func TestNonPersistentChrootAbsWsrAbsDirAfterRelCmd(t *testing.T) {
+func TestNonPersistentChrootAbsWsrRelCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -356,7 +348,7 @@ func TestNonPersistentChrootAbsWsrAbsDirAfterRelCmd(t *testing.T) {
 		dirTest, "ls", fileTest)
 }
 
-func TestNonPersistentChrootRelWsrAbsDirAfterAbsCmd(t *testing.T) {
+func TestNonPersistentChrootRelWsrrAbsCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
@@ -376,7 +368,7 @@ func TestNonPersistentChrootRelWsrAbsDirAfterAbsCmd(t *testing.T) {
 		dirTest, "ls", fileTest)
 }
 
-func TestNonPersistentChrootRelWsrAbsDirAfterRelCmd(t *testing.T) {
+func TestNonPersistentChrootRelWsrRelCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
