@@ -136,7 +136,7 @@ func init() {
 		"Indent function logs with n spaces, when using -log")
 	logOut = flag.Bool("log", false,
 		"Parse a log file (-in) and print to stdout")
-	patternsOut = flag.Bool("patt", false,
+	patternsOut = flag.Bool("pattern", false,
 		"Show patterns given in a stat file. Works with -id.")
 	stats = flag.Bool("stat", false, "Parse a log file (-in) and output to a "+
 		"stats file (-out). Default stats filename is logfile.stats")
@@ -144,17 +144,19 @@ func init() {
 		"print top <bytotal> functions by total time usage in logs")
 	topAvg = flag.Int("byavg", 0, "Parse a stat file (-in) and "+
 		"print top <byavg> functions by total time usage in logs")
-	coverage = flag.Int("cover", -1, "Output csv wall time consumed in bucket t"+
-		" per SequenceId. To be output needs X/100 in any bucket or -id")
+	coverage = flag.Int("coverage", -1, "Output csv wall time consumed in "+
+		" bucket t per SequenceId. To be output needs <coverage>/100 in "+
+		"any bucket or -id")
 	flag.Var(&filterId, "id", "Filter certain output to include only given "+
 		"Sequence Id. Multiple -id flags are supported.")
 	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for -csv in Ms")
-	showClose = flag.Bool("sims", false,
+	showClose = flag.Bool("similars", false,
 		"Don't hide similar sequences when using -bytotal or -byavg")
-	stdDevMin = flag.Float64("smin", 0, "Filter results, requiring minimum "+
-		"standard deviation of <stdmin>. Float units of microseconds")
-	stdDevMax = flag.Float64("smax", 1000000000,
-		"Like smin, but setting a maximum")
+	stdDevMin = flag.Float64("stddevmin", 0, "Filter results, requiring "+
+		"a standard deviation of at least <stddevmin>. Float units of "+
+		"microseconds")
+	stdDevMax = flag.Float64("stddevmax", 1000000000,
+		"Like stddevmin, but setting a maximum")
 	wildMin = flag.Int("wmin", 0, "Filter results, requiring minimum number "+
 		"of wildcards in function pattern.")
 	wildMax = flag.Int("wmax", 100, "Same as wmin, but setting a maximum")
@@ -207,7 +209,8 @@ func main() {
 		return
 	}
 
-	if *coverage != -1 {
+	switch {
+	case *coverage != -1:
 		if *inFile == "" {
 			fmt.Println("To -cover, you must specify a stat file " +
 				"with -in")
@@ -233,7 +236,7 @@ func main() {
 		patterns := qlog.LoadFromStat(file)
 
 		outputCsvCover(patterns)
-	} else if *logOut {
+	case *logOut:
 		if *inFile == "" {
 			fmt.Println("To -log, you must specify a log file with -in")
 			os.Exit(1)
@@ -242,7 +245,7 @@ func main() {
 		// Log parse mode only
 		fmt.Println(qlog.ParseLogsExt(*inFile, *tabSpaces,
 			*maxThreads))
-	} else if *patternsOut {
+	case *patternsOut:
 		if *inFile == "" {
 			fmt.Println("To -patt, you must specify a stat " +
 				"file with -in")
@@ -278,7 +281,7 @@ func main() {
 			printPatternData(patterns[i])
 			count++
 		}
-	} else if *stats {
+	case *stats:
 		if *inFile == "" {
 			fmt.Println("To -stat, you must specify a log file with -in")
 			os.Exit(1)
@@ -304,7 +307,7 @@ func main() {
 		defer file.Close()
 		qlog.SaveToStat(file, patterns)
 		fmt.Printf("Stats file created: %s\n", outFilename)
-	} else if *topTotal != 0 {
+	case *topTotal != 0:
 		if *inFile == "" {
 			fmt.Println("To -topTotal, you must specify a stat file " +
 				"with -in")
@@ -327,7 +330,7 @@ func main() {
 		fmt.Println("Top function patterns by total time used:")
 		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
 			*wildMax, *maxLen, *topTotal)
-	} else if *topAvg != 0 {
+	case *topAvg != 0:
 		if *inFile == "" {
 			fmt.Println("To -topAvg, you must specify a stat file " +
 				"with -in")
@@ -350,7 +353,7 @@ func main() {
 		fmt.Println("Top function patterns by average time used:")
 		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
 			*wildMax, *maxLen, *topAvg)
-	} else {
+	default:
 		fmt.Println("No action flags (-log, -stat, -csv) specified.")
 		os.Exit(1)
 	}
