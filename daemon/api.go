@@ -4,8 +4,6 @@
 package daemon
 
 // This file contains all the interaction with the quantumfs API file.
-
-import "encoding/binary"
 import "encoding/json"
 import "errors"
 import "fmt"
@@ -316,7 +314,10 @@ func makeErrorResponse(code uint32, message string) []byte {
 	return bytes
 }
 
-func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
+func (api *ApiHandle) queueErrorResponse(code uint32, format string,
+        a ...interface{}) {
+
+        message := fmt.Sprintf(format, a)
 	bytes := makeErrorResponse(code, message)
 	api.responses <- fuse.ReadResultData(bytes)
 }
@@ -358,13 +359,13 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	switch cmd.CommandId {
 	default:
-		message := fmt.Sprintf("Unknown command number %d", cmd.CommandId)
-		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId, 
+                                        "Unknown command number %d", cmd.CommandId)
 
 	case quantumfs.CmdError:
-		message := fmt.Sprintf("Invalid message %d to send to quantumfsd",
-			cmd.CommandId)
-		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+                                        "Invalid message %d to send to quantumfsd",
+                                        cmd.CommandId)
 
 	case quantumfs.CmdBranchRequest:
 		c.vlog("Received branch request")
@@ -421,7 +422,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"WorkspaceRoot "+wsr+" does not exist or is not active")
+			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
 
@@ -440,7 +441,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"WorkspaceRoot "+wsr+" does not exist or is not active")
+			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
 
@@ -463,39 +464,45 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 		return
 	}
 
-	dst := strings.Split(cmd.Dst, "/")
-	keyInByte := cmd.ObjectKey
-	mode := binary.LittleEndian.Uint32(cmd.Attribute[0:4])
-	umask := binary.LittleEndian.Uint32(cmd.Attribute[4:8])
-	rdev := binary.LittleEndian.Uint32(cmd.Attribute[8:12])
-	uid := binary.LittleEndian.Uint16(cmd.Attribute[12:14])
-	gid := binary.LittleEndian.Uint16(cmd.Attribute[14:16])
+	dst := strings.Split(cmd.DstPath, "/")
+        key, type_, size, err := decompressData(cmd.ObjectKey)
+	mode := cmd.Mode 
+	umask := cmd.Umask
+        rdev := cmd.Rdev
+	uid := cmd.Uid
+	gid := cmd.Gid
 
 	wsr := dst[0] + "/" + dst[1]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"WorkspaceRoot "+wsr+" does not exist or is not active")
+			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
-
-	// Duplicate the ObjectKey in the target node
-	key := quantumfs.NewObjectKeyFromBytes(keyInByte[:TypeKeyLength-9])
-	objectType := quantumfs.ObjectType(keyInByte[TypeKeyLength-9])
-	size := binary.LittleEndian.Uint64(keyInByte[TypeKeyLength-8:])
 
 	if len(dst) == 2 { // only have userspace and workspace
 		// duplicate the entire workspace root is illegal
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"WorkspaceRoot should not be duplicated")
+			"WorkspaceRoot can not be duplicated")
 		return
 	}
 
+        if key.Type() != quantumfs.KeyTypeEmbedded {
+                if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
+                        api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+                                "Key does not exist in the datastore")
+                        return
+                }
+        }
+
 	// get immediate parent of the target node
-	p, err := (&workspace.Directory).followPath(c, dst, 2)
+	p, err := func() (Inode, error){
+                defer (&workspace.Directory).LockTree().Unlock()
+                return (&workspace.Directory).followPath_DOWN(c, dst, 2)
+        }()
 	if err != nil {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"Path "+cmd.Dst+" does not exist")
+			"Path %s does not exist", cmd.DstPath)
 		return
 	}
 
@@ -504,15 +511,16 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 	_, exist := parent.dirChildren.getInode(c, target)
 	if exist {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"Inode "+target+" should not exist")
+			"Inode %s should not exist", target)
 		return
 	}
 
 	c.vlog("Api::duplicateObject put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	parent.localCreate_(c, target, mode, umask, rdev, size, quantumfs.UID(uid),
-		quantumfs.GID(gid), objectType, key)
+	parent.duplicateInode(c, target, mode, umask, rdev, size,
+                                quantumfs.UID(uid), quantumfs.GID(gid),
+                                type_, key)
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Duplicate Object Succeeded")
 }
