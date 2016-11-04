@@ -3,6 +3,7 @@
 
 package daemon
 
+import "fmt"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
@@ -90,7 +91,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
-			panic("Unexpected workspace rootID update failure")
+			msg := fmt.Sprintf("Unexpected workspace rootID update "+
+				"failure: %s", err.Error())
+			panic(msg)
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
