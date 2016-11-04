@@ -315,9 +315,9 @@ func makeErrorResponse(code uint32, message string) []byte {
 }
 
 func (api *ApiHandle) queueErrorResponse(code uint32, format string,
-        a ...interface{}) {
+	a ...interface{}) {
 
-        message := fmt.Sprintf(format, a)
+	message := fmt.Sprintf(format, a)
 	bytes := makeErrorResponse(code, message)
 	api.responses <- fuse.ReadResultData(bytes)
 }
@@ -359,13 +359,13 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	switch cmd.CommandId {
 	default:
-		api.queueErrorResponse(quantumfs.ErrorBadCommandId, 
-                                        "Unknown command number %d", cmd.CommandId)
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+			"Unknown command number %d", cmd.CommandId)
 
 	case quantumfs.CmdError:
 		api.queueErrorResponse(quantumfs.ErrorBadCommandId,
-                                        "Invalid message %d to send to quantumfsd",
-                                        cmd.CommandId)
+			"Invalid message %d to send to quantumfsd",
+			cmd.CommandId)
 
 	case quantumfs.CmdBranchRequest:
 		c.vlog("Received branch request")
@@ -465,10 +465,10 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 	}
 
 	dst := strings.Split(cmd.DstPath, "/")
-        key, type_, size, err := decompressData(cmd.ObjectKey)
-	mode := cmd.Mode 
+	key, type_, size, err := decompressData(cmd.ObjectKey)
+	mode := cmd.Mode
 	umask := cmd.Umask
-        rdev := cmd.Rdev
+	rdev := cmd.Rdev
 	uid := cmd.Uid
 	gid := cmd.Gid
 
@@ -487,19 +487,19 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 		return
 	}
 
-        if key.Type() != quantumfs.KeyTypeEmbedded {
-                if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
-                        api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-                                "Key does not exist in the datastore")
-                        return
-                }
-        }
+	if key.Type() != quantumfs.KeyTypeEmbedded {
+		if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
+			api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+				"Key does not exist in the datastore")
+			return
+		}
+	}
 
 	// get immediate parent of the target node
-	p, err := func() (Inode, error){
-                defer (&workspace.Directory).LockTree().Unlock()
-                return (&workspace.Directory).followPath_DOWN(c, dst, 2)
-        }()
+	p, err := func() (Inode, error) {
+		defer (&workspace.Directory).LockTree().Unlock()
+		return (&workspace.Directory).followPath_DOWN(c, dst, 2)
+	}()
 	if err != nil {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"Path %s does not exist", cmd.DstPath)
@@ -519,8 +519,8 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
 	parent.duplicateInode(c, target, mode, umask, rdev, size,
-                                quantumfs.UID(uid), quantumfs.GID(gid),
-                                type_, key)
+		quantumfs.UID(uid), quantumfs.GID(gid),
+		type_, key)
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Duplicate Object Succeeded")
 }

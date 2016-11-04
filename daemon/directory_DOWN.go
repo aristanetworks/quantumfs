@@ -95,34 +95,34 @@ func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
 }
 
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
-        fuse.Status) {
-        // Update the Hash value before generate the key
-        dir.flush_DOWN(c)
-        buffer, status := dir.generateChildTypeKey(c, inodeNum)
-        if status != fuse.OK {
-                return nil, status
-        }
-        return buffer, status
+	fuse.Status) {
+	// Update the Hash value before generate the key
+	dir.flush_DOWN(c)
+	buffer, status := dir.generateChildTypeKey(c, inodeNum)
+	if status != fuse.OK {
+		return nil, status
+	}
+	return buffer, status
 }
 
 // go along the given path to the destination
 // The path is stored in a string slice, each cell index contains an inode
 func (dir *Directory) followPath_DOWN(c *ctx, path []string,
-        startPoint int) (Inode, error) {
+	startPoint int) (Inode, error) {
 
-        // traverse through the workspace, reach the target inode
-        length := len(path) - 1 // leave the target node at the end
-        currDir := dir
-        for num := startPoint; num < length; num++ {
-                // all preceding nodes have to be directories
-                child, err := currDir.lookupInternal(c, path[num],
-                        quantumfs.ObjectTypeDirectoryEntry)
-                if err != nil {
-                        return child, err
-                }
-                currDir = child.(*Directory)
-        }
+	// traverse through the workspace, reach the target inode
+	length := len(path) - 1 // leave the target node at the end
+	currDir := dir
+	for num := startPoint; num < length; num++ {
+		// all preceding nodes have to be directories
+		child, err := currDir.lookupInternal(c, path[num],
+			quantumfs.ObjectTypeDirectoryEntry)
+		if err != nil {
+			return child, err
+		}
+		currDir = child.(*Directory)
+	}
 
-        // Run the parent node of the target node, it can be any type
-        return currDir, nil
+	// Run the parent node of the target node, it can be any type
+	return currDir, nil
 }

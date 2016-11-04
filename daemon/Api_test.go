@@ -80,14 +80,14 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Create the source and the target workspace
 		workspaceSrc := test.newWorkspace()
-                workspaceDst := test.newWorkspace()
+		workspaceDst := test.newWorkspace()
 		dst := test.relPath(workspaceDst)
 
 		dirName := workspaceSrc + "/test/a"
 		dirName1 := dirName + "/b"
 		testFilename := dirName1 + "/test"
 		linkFilename := workspaceSrc + "/link"
-                spFilename := workspaceSrc + "/specail"
+		spFilename := workspaceSrc + "/specail"
 
 		err := os.MkdirAll(dirName1, 0124)
 		test.assert(err == nil, "Error creating directories: %v", err)
@@ -99,14 +99,14 @@ func TestApiDuplicateObject(t *testing.T) {
 		err = syscall.Symlink(testFilename, linkFilename)
 		test.assert(err == nil, "Error creating a symlink: %v", err)
 
-                err = syscall.Mknod(spFilename, syscall.S_IFIFO|syscall.S_IRWXU,
-                        0x12345678)
-                test.assert(err == nil, "Error creating pipe")
-		
-                // get the key from a file
+		err = syscall.Mknod(spFilename, syscall.S_IFIFO|syscall.S_IRWXU,
+			0x12345678)
+		test.assert(err == nil, "Error creating pipe")
+
+		// get the key from a file
 		keyF := make([]byte, quantumfs.EncodedLength)
 		sz, err := syscall.Getxattr(testFilename,
-                                        quantumfs.XAttrTypeKey, keyF)
+			quantumfs.XAttrTypeKey, keyF)
 		test.assert(err == nil && sz == quantumfs.EncodedLength,
 			"Error getting the typeKeyF: %v with a size of %d", err, sz)
 
@@ -119,15 +119,15 @@ func TestApiDuplicateObject(t *testing.T) {
 		// get the key from a Symlink
 		keyS := make([]byte, quantumfs.EncodedLength)
 		sz, err, keyS = lGetXattr(linkFilename, quantumfs.XAttrTypeKey,
-                                                quantumfs.EncodedLength)
+			quantumfs.EncodedLength)
 		test.assert(err == nil && sz == quantumfs.EncodedLength,
 			"Error getting the typeKeyS: %v with a size of %d", err, sz)
 
-                // get the key from a pipe
-                keyP := make([]byte, quantumfs.EncodedLength)
-                sz, err = syscall.Getxattr(spFilename, quantumfs.XAttrTypeKey, keyP)
-                test.assert(err == nil && sz == quantumfs.EncodedLength,
-                        "Error getting the typeKeyP: %v with a size of %d", err, sz)
+		// get the key from a pipe
+		keyP := make([]byte, quantumfs.EncodedLength)
+		sz, err = syscall.Getxattr(spFilename, quantumfs.XAttrTypeKey, keyP)
+		test.assert(err == nil && sz == quantumfs.EncodedLength,
+			"Error getting the typeKeyP: %v with a size of %d", err, sz)
 
 		dirNameD := test.absPath(dst + "/test/a")
 		err = os.MkdirAll(dirNameD, 0124)
@@ -142,8 +142,8 @@ func TestApiDuplicateObject(t *testing.T) {
 		err = api.DuplicateObject(dst+"/nonExist/b", keyF,
 			0124, 0022, 0, 0, 0)
 		test.assert(err != nil,
-			"Unexpected success creating non-existing intermediate" +
-                        " Inode")
+			"Unexpected success creating non-existing intermediate"+
+				" Inode")
 
 		// Ensure the target node does not exist
 		err = api.DuplicateObject(dst+"/test/a", keyF, 0124, 0022, 0, 0, 0)
@@ -173,7 +173,7 @@ func TestApiDuplicateObject(t *testing.T) {
 			keyD, 0124, 0022, 0, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a directory to target workspace: %v",
-                        err)
+			err)
 
 		err = syscall.Stat(workspaceDst+"/test/a/dirtest", &stat)
 		test.assert(err == nil, "Error getting status of directory: %v",
@@ -211,19 +211,19 @@ func TestApiDuplicateObject(t *testing.T) {
 			"Symlink permissions incorrect. Expected %x got %x %d",
 			expectedPermissions, stat.Mode, stat.Size)
 
-                // Ensure the special file in the given path
-                err = api.DuplicateObject(dst+"/Special", keyP, 0777, 077,
-                                        0x12345678, 0, 0)
-                test.assert(err == nil,
-                        "Error duplicating a specail file to workspace: %v", err)
+		// Ensure the special file in the given path
+		err = api.DuplicateObject(dst+"/Special", keyP, 0777, 077,
+			0x12345678, 0, 0)
+		test.assert(err == nil,
+			"Error duplicating a specail file to workspace: %v", err)
 
-                err = syscall.Stat(workspaceDst+"/Special", &stat)
-                test.assert(err == nil,
-                        "Error getting status of Special file: %v", err)
- 
-                expectedPermissions = syscall.S_IFIFO
-                test.assert(stat.Mode&expectedPermissions != 0,
-                        "Special file permissions incorrect. Expected %o got %o %d",
-                        expectedPermissions, stat.Mode, stat.Size) 
+		err = syscall.Stat(workspaceDst+"/Special", &stat)
+		test.assert(err == nil,
+			"Error getting status of Special file: %v", err)
+
+		expectedPermissions = syscall.S_IFIFO
+		test.assert(stat.Mode&expectedPermissions != 0,
+			"Special file permissions incorrect. Expected %o got %o %d",
+			expectedPermissions, stat.Mode, stat.Size)
 	})
 }
