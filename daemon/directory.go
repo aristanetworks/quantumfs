@@ -132,8 +132,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 		panic("Unexpected missing child inode")
 	}
 
-	child := c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
+	dir.self.markAccessed(c, name, false)
 	if record.Type() == quantumfs.ObjectTypeSmallFile ||
 		record.Type() == quantumfs.ObjectTypeMediumFile ||
 		record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -416,7 +415,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
                 return fuse.ENOENT 
         }
 
-        c.vlog("Directory::Lookup found inode %d Name %s", inodeNum, name)
+	c.vlog("Directory::Lookup found inode %d", inodeNum)
+	dir.self.markAccessed(c, name, false)
         child := c.qfs.inode(c, inodeNum)
         child.markSelfAccessed(c, false)
 	out.NodeId = uint64(inodeNum)
@@ -1238,18 +1238,7 @@ func (dir *Directory) generateChildTypeKey(c *ctx, inodeNum InodeId) ([]byte,
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
 		return []byte{}, fuse.EIO
 	}
-/*
-        msg := DuplicateData {
-                Key:     record.ID().Value(),
-                Type:    record.Type(),
-                Size:    record.Size(),
-        }
         
-        typeKey, err := json.Marshal(msg)
-        if err != nil {
-                c.elog("Unable to compress data into a Json file")
-                return []byte{}, fuse.EIO
-        }*/
         typeKey := compressData(record.ID(), record.Type(), record.Size())
 	return typeKey, fuse.OK
 }

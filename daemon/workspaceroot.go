@@ -149,7 +149,11 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
 	if wsr.accessList == nil {
 		wsr.accessList = make(map[string]bool)
 	}
-	wsr.accessList[path] = created
+	path = "/" + path
+	previouslyCreated, exists := wsr.accessList[path]
+	if !exists || (!previouslyCreated && created) {
+		wsr.accessList[path] = created
+	}
 }
 
 func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, created bool) {
