@@ -140,10 +140,10 @@ func init() {
 		"Show patterns given in a stat file. Works with -id.")
 	stats = flag.Bool("stat", false, "Parse a log file (-in) and output to a "+
 		"stats file (-out). Default stats filename is logfile.stats")
-	topTotal = flag.Int("bytotal", 0, "Parse a stat file (-in) and "+
-		"print top <bytotal> functions by total time usage in logs")
-	topAvg = flag.Int("byavg", 0, "Parse a stat file (-in) and "+
-		"print top <byavg> functions by total time usage in logs")
+	topTotal = flag.Int("byTotal", 0, "Parse a stat file (-in) and "+
+		"print top <byTotal> functions by total time usage in logs")
+	topAvg = flag.Int("byAvg", 0, "Parse a stat file (-in) and "+
+		"print top <byAvg> functions by total time usage in logs")
 	coverage = flag.Int("coverage", -1, "Output csv wall time consumed in "+
 		" bucket t per SequenceId. To be output needs <coverage>/100 in "+
 		"any bucket or -id")
@@ -152,18 +152,18 @@ func init() {
 	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for -csv in Ms")
 	showClose = flag.Bool("similars", false,
 		"Don't hide similar sequences when using -bytotal or -byavg")
-	stdDevMin = flag.Float64("stddevmin", 0, "Filter results, requiring "+
-		"a standard deviation of at least <stddevmin>. Float units of "+
+	stdDevMin = flag.Float64("stdDevMin", 0, "Filter results, requiring "+
+		"a standard deviation of at least <stdDevMin>. Float units of "+
 		"microseconds")
-	stdDevMax = flag.Float64("stddevmax", 1000000000,
-		"Like stddevmin, but setting a maximum")
-	wildMin = flag.Int("wmin", 0, "Filter results, requiring minimum number "+
+	stdDevMax = flag.Float64("stdDevMax", 1000000000,
+		"Like stdDevMin, but setting a maximum")
+	wildMin = flag.Int("wcMin", 0, "Filter results, requiring minimum number "+
 		"of wildcards in function pattern.")
-	wildMax = flag.Int("wmax", 100, "Same as wmin, but setting a maximum")
+	wildMax = flag.Int("wcMax", 100, "Same as wmin, but setting a maximum")
 	maxThreads = flag.Int("threads", 30, "Max threads to use")
-	maxLenWildcards = flag.Int("maxwc", 16,
+	maxLenWildcards = flag.Int("maxWc", 16,
 		"Max sequence length to wildcard during -stat")
-	maxLen = flag.Int("maxlen", 10000,
+	maxLen = flag.Int("maxLen", 10000,
 		"Max sequence length to return in results")
 
 	flag.Usage = func() {
@@ -469,8 +469,8 @@ func (l *PatternMap) Set(newKey string, newListKey string,
 	l.strToList[newKey] = newListKey
 }
 
-func recurseGenPatterns(seq []qlog.LogOutput, sequences []qlog.SequenceData,
-	out *PatternMap /*out*/) {
+func (l *PatternMap) recurseGenPatterns(seq []qlog.LogOutput,
+	sequences []qlog.SequenceData) {
 
 	if len(seq) > *maxLenWildcards {
 		return
@@ -482,23 +482,22 @@ func recurseGenPatterns(seq []qlog.LogOutput, sequences []qlog.SequenceData,
 		wildcardMask[j] = true
 	}
 
-	recurseGenPatterns_(wildcardMask, 1, seq, sequences, out)
+	l.recurseGenPatterns_(wildcardMask, 1, seq, sequences)
 }
 
 // curMask is a map of indices into sequences which should be ignored when gathering
 // data (wildcards). We check how many sequences match with the current wildcard mask
 // and if only one sequence matches then we know that no others will (since as we
 // recurse deeper, we remove wildcards and only become more specific) and escape
-func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
-	seq []qlog.LogOutput, sequences []qlog.SequenceData,
-	out *PatternMap /*out*/) {
+func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
+	seq []qlog.LogOutput, sequences []qlog.SequenceData) {
 
 	// If we've already got a result for this sequence, then this has
 	// been generated and we can skip it. This would not be safe if we didn't
 	// include multiple consecutive wildcards because small sequences would
 	// occlude longer versions.
 	expandedStr := genSeqStrExt(seq, curMask, true)
-	if out.StrExists(expandedStr) {
+	if l.StrExists(expandedStr) {
 		return
 	}
 
@@ -523,11 +522,11 @@ func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	}
 
 	// Make sure that we mark that we've visited this expanded sequence
-	out.SetStr(expandedStr, matchStr)
+	l.SetStr(expandedStr, matchStr)
 
 	// If there's already an identical mapping on PatternMap, there's no point
 	// in returning both. Only choose the one with more effective wildcards
-	oldEntry := out.Listed(matchStr)
+	oldEntry := l.Listed(matchStr)
 
 	if matches <= 1 && oldEntry != nil {
 		// There are no interesting sequence / wildcard combos deeper and
@@ -544,7 +543,7 @@ func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 
 	if setEntry {
 		newEntry := newWildcardedSeq(seq, curMask)
-		out.Set(expandedStr, matchStr, &newEntry)
+		l.Set(expandedStr, matchStr, &newEntry)
 	}
 
 	// If there are exactly two matches, then we don't need to recurse because
@@ -558,8 +557,7 @@ func recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 			if curMask[i] {
 				// This spot hasn't lost its wildcard yet.
 				curMask[i] = false
-				recurseGenPatterns_(curMask, i+1, seq, sequences,
-					out)
+				l.recurseGenPatterns_(curMask, i+1, seq, sequences)
 				// Make sure to fix the entry for the next loop
 				curMask[i] = true
 			}
@@ -597,7 +595,7 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 
 		seq := sequences[i].Seq
 
-		recurseGenPatterns(seq, sequences, &patterns /*out*/)
+		patterns.recurseGenPatterns(seq, sequences)
 
 		matchStr := strconv.Itoa(i)
 		// recurseGenPatterns will overlook the "no wildcards" sequence,
@@ -610,8 +608,8 @@ func getStatPatterns(logs []qlog.LogOutput) []qlog.PatternData {
 		for j := 1; j < len(seq)-1; j++ {
 			wildcardFilled[j] = true
 		}
-		recurseGenPatterns_(wildcardFilled, len(seq)-1, seq, sequences,
-			&patterns)
+		patterns.recurseGenPatterns_(wildcardFilled, len(seq)-1, seq,
+			sequences)
 	}
 	status.Process(1)
 

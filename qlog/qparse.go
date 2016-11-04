@@ -251,9 +251,9 @@ func (s *sequenceTracker) Process(log LogOutput) error {
 	if len(s.stack) == 1 && IsLogFnPair(top.Format, log.Format) {
 		// We've found our pair, and have our sequence. Finalize
 		s.ready = true
-	} else if IsFnIn(log.Format) {
+	} else if IsFunctionIn(log.Format) {
 		s.stack.Push(log)
-	} else if IsFnOut(log.Format) {
+	} else if IsFunctionOut(log.Format) {
 		if err != nil || !IsLogFnPair(top.Format, log.Format) {
 			return errors.New(fmt.Sprintf("Error: Mismatched '%s' in "+
 				"requestId %d log\n",
@@ -324,7 +324,7 @@ func ExtractSequences(logs []LogOutput) map[string]SequenceData {
 		}
 
 		// Start a new subsequence if we need to
-		if IsFnIn(logs[i].Format) {
+		if IsFunctionIn(logs[i].Format) {
 			trackers = append(trackers, newSequenceTracker(i))
 		}
 
