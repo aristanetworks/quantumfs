@@ -174,19 +174,16 @@ func serverRunning(svrName string) bool {
 // login the netns server and open a new login shell, which is not
 // expected to return
 func netnsLogin(rootdir string, svrName string) error {
-	var err error
-
 	env := os.Environ()
 	env = append(env, "A4_CHROOT="+rootdir)
 
 	args := []string{netns, svrName, sh, "-l", "-c",
 		"\"$@\"", bash, bash}
-	err = syscall.Exec(netns, args, env)
-	if err != nil {
-		fmt.Println("Exec error")
+	if err := syscall.Exec(netns, args, env); err != nil {
+		return fmt.Errorf("netnsLogin Exec error: %s", err.Error())
 	}
 
-	return err
+	return nil
 }
 
 func setupBindMounts(rootdir string) {
@@ -202,7 +199,7 @@ func setupBindMounts(rootdir string) {
 			continue
 		}
 
-		cmdBindMount := exec.Command(sudo, mount, "-n", "--bind", src, dst)
+		cmdBindMount := exec.Command(mount, "-n", "--bind", src, dst)
 		cmdBindMount.Run()
 	}
 }
@@ -221,7 +218,8 @@ func chrootInNsd(rootdir string, svrName string) error {
 
 	dstVar := rootdir + "/var/run/netns"
 	if err := os.MkdirAll(dstVar, 0666); err != nil {
-		return err
+		return fmt.Errorf("Creating directory %s error: %s",
+			dstVar, err.Error())
 	}
 
 	mountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;", sudo, mount, dstVar)
@@ -248,14 +246,16 @@ func chrootInNsd(rootdir string, svrName string) error {
 
 	archString, err := getArchitecture(rootdir)
 	if err != nil {
-		return err
+		return fmt.Errorf("Getting architecture of workspaceroot"+
+			" %s error: %s",
+			rootdir, err.Error())
 	}
 
 	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
 		"--pre-chroot-cmd="+prechrootCmd, svrName)
 	if err := cmdNetnsd.Run(); err != nil {
-		return err
+		return fmt.Errorf("cmdNetnsd running error:%s", err.Error())
 	}
 
 	return nil
@@ -328,60 +328,53 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		if err := syscall.Exec(chns_args[0], chns_args,
 			chns_env); err != nil {
 
-			return err
+			return fmt.Errorf("Execing chns error: %s", err.Error())
 		}
 	}
 
-	// modify working directory into a relative path to
-	// the workspaceroot we are chrooting in
-	if strings.HasPrefix(workingdir, rootdir) {
-		workingdir = workingdir[len(rootdir):]
-	}
-
-	if len(workingdir) == 0 {
-		workingdir = "/"
-	}
-
 	if err := syscall.Chdir("/"); err != nil {
-		return err
+		return fmt.Errorf("Changing directory to / error: %s", err.Error())
 	}
 
 	rootdirInfo, err := os.Stat(rootdir)
 	if err != nil {
-		return err
+		return fmt.Errorf("Stating %s error: %s", rootdir, err.Error())
 	}
 
 	fsrootInfo, err := os.Stat("/")
 	if err != nil {
-		return err
+		return fmt.Errorf("Stating / error: %s", err.Error())
 	}
 
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
-		cmd := exec.Command(sudo, mount, "-n", "--rbind", rootdir, rootdir)
+		cmd := exec.Command(mount, "-n", "--rbind", rootdir, rootdir)
 		if err := cmd.Run(); err != nil {
-			return err
+			return fmt.Errorf("rbind mounting %s to %s error %s",
+				rootdir, rootdir, err.Error())
 		}
 
 		dst := rootdir + "/dev"
 		makedest("/dev", dst)
-		cmd = exec.Command(sudo, mount, "-n", "-t", "tmpfs", "none", dst)
+		cmd = exec.Command(mount, "-n", "-t", "tmpfs", "none", dst)
 		if err := cmd.Run(); err != nil {
-			return err
+			return fmt.Errorf("mounting %s error: %s",
+				dst, err.Error())
 		}
 
-		cmd = exec.Command(sudo, cp, "-ax", "/dev/.", dst)
+		cmd = exec.Command(cp, "-ax", "/dev/.", dst)
 		if err := cmd.Run(); err != nil {
-			return err
+			return fmt.Errorf("copying %s error: %s", dst, err.Error())
 		}
 
 		dst = rootdir + "/var/run/netns"
 		if err := os.MkdirAll(dst, 0666); err != nil {
-			return err
+			return fmt.Errorf("Creating directory %s error: %s",
+				dst, err.Error())
 		}
 
-		cmd = exec.Command(sudo, mount, "-n", "-t", "tmpfs", "tmpfs", dst)
+		cmd = exec.Command(mount, "-n", "-t", "tmpfs", "tmpfs", dst)
 		if err := cmd.Run(); err != nil {
-			return err
+			return fmt.Errorf("mounting %s error: %s", dst, err.Error())
 		}
 
 		setupBindMounts(rootdir)
@@ -389,24 +382,28 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		// Remember the current directory so that we can restore it later
 		rootfd, err := os.Open(rootdir)
 		if err != nil {
-			return err
+			return fmt.Errorf("opening %s error: %s",
+				rootdir, err.Error())
 		}
 
 		// In a chroot escape so pivot_root will work
 		if err := syscall.Chroot(oldroot); err != nil {
-			return err
+			return fmt.Errorf("chrooting into %s error: %s",
+				oldroot, err.Error())
 		}
 
 		// Keep changing to parent directory up to the root
 		for {
 			fileInfo1, err := os.Stat(".")
 			if err != nil {
-				return err
+				return fmt.Errorf("stating . error: %s",
+					err.Error())
 			}
 
 			fileInfo2, err := os.Stat("..")
 			if err != nil {
-				return err
+				return fmt.Errorf("stating .. error: %s",
+					err.Error())
 			}
 
 			if os.SameFile(fileInfo1, fileInfo2) {
@@ -414,57 +411,79 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			}
 
 			if err := os.Chdir(".."); err != nil {
-				return err
+				return fmt.Errorf("Changing directory .. error: %s",
+					err.Error())
 			}
 		}
 
 		if err := syscall.Chroot("."); err != nil {
-			return err
+			return fmt.Errorf("Chrooting into . error: %s",
+				err.Error())
 		}
 
 		// pivot_root to the root that we want to keep
 		if err := rootfd.Chdir(); err != nil {
-			return err
+			return fmt.Errorf("Retoring %s error: %s",
+				rootdir, err.Error())
 		}
 
-		cmd = exec.Command(sudo, pivot_root, ".", "."+oldroot)
+		cmd = exec.Command(pivot_root, ".", "."+oldroot)
 		if err := cmd.Run(); err != nil {
-			return err
+			return fmt.Errorf("Pivoting root error: %s", err.Error())
 		}
 
 		if err := rootfd.Close(); err != nil {
-			return err
+			return fmt.Errorf("Closing rootfd error: %s", err.Error())
 		}
 
 		// unmount the old file system
-		cmd = exec.Command(sudo, umount, "-n", "-l", oldroot)
-		if err := cmd.Run(); err != nil {
-			return err
+		cmd = exec.Command(umount, "-n", "-l", oldroot)
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return fmt.Errorf("getting stderr pipe error: %s",
+				err.Error())
+		}
+
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("Starting umount cmd error: %s",
+				err.Error())
+		}
+
+		buf, err := ioutil.ReadAll(stderr)
+		if err != nil {
+			return fmt.Errorf("Reading stderr error: %s", err.Error())
+		}
+
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("Unmounting %s error: %s\n, stderr: %s",
+				oldroot, err.Error(), string(buf))
 		}
 	}
 
 	// change the current directory
 	wdInfo, err := os.Stat(workingdir)
 	if err != nil {
-		return err
+		return fmt.Errorf("Stating %s error: %s", workingdir, err.Error())
 	}
 
 	if !wdInfo.IsDir() {
-		workingdir = "/"
+		return fmt.Errorf("Invalid working directory %s", workingdir)
 	}
 
 	if err := os.Chdir(workingdir); err != nil {
-		return err
+		return fmt.Errorf("Changing directory to %s error: %s",
+			workingdir, err.Error())
 	}
 
 	archStr, err := getArchitecture("/")
 	if err != nil {
-		return err
+		return fmt.Errorf("Getting architecture string error: %s",
+			err.Error())
 	}
 
 	// switch to non-root user
 	if err := switchUserMode(); err != nil {
-		return err
+		return fmt.Errorf("Switching usermode error: %s", err.Error())
 	}
 
 	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
@@ -479,7 +498,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
-		return err
+		return fmt.Errorf("Exec'ing setarch command error:%s", err.Error())
 	}
 
 	return nil
@@ -513,14 +532,7 @@ ArgumentProcessingLoop:
 				wsr = absdir
 			}
 
-			if absdir, err := filepath.Abs(args[1]); err != nil {
-				fmt.Fprintf(os.Stderr, "Error converting path %s"+
-					" to absolute path: %s\n",
-					args[1], err.Error())
-				os.Exit(1)
-			} else {
-				dir = absdir
-			}
+			dir = args[1]
 
 			cmd = append(cmd, args[2:]...)
 			break ArgumentProcessingLoop
@@ -529,7 +541,7 @@ ArgumentProcessingLoop:
 			setupNamespaces = true
 
 		default:
-			fmt.Fprintln(os.Stderr, "unknown argument:", args[0], "\n")
+			fmt.Fprintln(os.Stderr, "unknown argument:", args[0])
 			printHelp()
 			os.Exit(1)
 
@@ -548,7 +560,9 @@ ArgumentProcessingLoop:
 		}
 
 		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
-			fmt.Println(err.Error())
+			fmt.Fprintln(os.Stderr,
+				"chrootOutOfNsd Error: ", err.Error())
+			os.Exit(1)
 		}
 
 		return
@@ -556,22 +570,25 @@ ArgumentProcessingLoop:
 
 	rootdir, err := findWorkspaceRoot()
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		fmt.Fprintln(os.Stderr,
+			"findWorkspaceRoot Error: ", err.Error())
+		os.Exit(1)
 	}
 
 	svrName := rootdir + "/chroot"
 	if !serverRunning(svrName) {
 		if err := chrootInNsd(rootdir, svrName); err != nil {
-			fmt.Println(err.Error())
-			return
+			fmt.Fprintln(os.Stderr,
+				"chrootInNsd Error:", err.Error())
+			os.Exit(1)
 		}
 	}
 
 	err = netnsLogin(rootdir, svrName)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		fmt.Fprintln(os.Stderr,
+			"netnsLogin Error:", err.Error())
+		os.Exit(1)
 	}
 
 	return
