@@ -114,7 +114,6 @@ type Inode interface {
 	// itself to the datastore
 	flush_DOWN(c *ctx) quantumfs.ObjectKey
 	Sync_DOWN(c *ctx) fuse.Status
-	forget_DOWN(c *ctx)
 	link_DOWN(c *ctx, srcInode Inode, newName string,
 		out *fuse.EntryOut) fuse.Status
 

@@ -45,10 +45,6 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.OK
 }
 
-func (dir *Directory) forget_DOWN(c *ctx) {
-	c.vlog("Directory::forget_DOWN not yet supported")
-}
-
 func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory::sync Enter")
 	defer c.vlog("Directory::sync Exit")
