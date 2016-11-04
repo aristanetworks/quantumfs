@@ -46,6 +46,39 @@ func init() {
 	}
 }
 
+// A helper function to run command which gives better error information
+func runCommand(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("Error getting stderr pipe of runCommand: %s\n"+
+			"Command: %s %v",
+			err.Error(), name, args)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("Error starting process in runCommand: %s\n"+
+			"Command: %s %v",
+			err.Error(), name, args)
+	}
+
+	buf, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		return fmt.Errorf("Error reading stderr in runCommand: %s\n"+
+			"Command: %s %v",
+			err.Error(), name, args)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("Error waiting process in runCommand: %s\n"+
+			"Command: %s %v\nStderr: %s",
+			err.Error(), name, args, string(buf))
+	}
+
+	return nil
+}
+
 // A helper function to test whether a path is a legitimate workspaceroot
 // by checking whether /usr/share/Artools directory is present
 func isLegitimateWorkspaceRoot(wsr string) bool {
@@ -162,7 +195,7 @@ func getArchitecture(rootdir string) (string, error) {
 
 // test whether the netns server is already running
 func serverRunning(svrName string) bool {
-	cmdServerRun := exec.Command("netns", "-q", svrName)
+	cmdServerRun := exec.Command(netns, "-q", svrName)
 
 	if err := cmdServerRun.Run(); err == nil {
 		return true
@@ -186,7 +219,7 @@ func netnsLogin(rootdir string, svrName string) error {
 	return nil
 }
 
-func setupBindMounts(rootdir string) {
+func setupBindMounts(rootdir string) error {
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
 		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
 	homes := homedirs()
@@ -199,9 +232,12 @@ func setupBindMounts(rootdir string) {
 			continue
 		}
 
-		cmdBindMount := exec.Command(mount, "-n", "--bind", src, dst)
-		cmdBindMount.Run()
+		if err := runCommand(mount, "-n", "--bind", src, dst); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func chrootInNsd(rootdir string, svrName string) error {
@@ -251,11 +287,11 @@ func chrootInNsd(rootdir string, svrName string) error {
 			rootdir, err.Error())
 	}
 
-	cmdNetnsd := exec.Command(sudo, setarch, archString, netnsd,
+	if err := runCommand(sudo, setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
-		"--pre-chroot-cmd="+prechrootCmd, svrName)
-	if err := cmdNetnsd.Run(); err != nil {
-		return fmt.Errorf("cmdNetnsd running error:%s", err.Error())
+		"--pre-chroot-cmd="+prechrootCmd, svrName); err != nil {
+		return err
+
 	}
 
 	return nil
@@ -347,23 +383,22 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	}
 
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
-		cmd := exec.Command(mount, "-n", "--rbind", rootdir, rootdir)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("rbind mounting %s to %s error %s",
-				rootdir, rootdir, err.Error())
+		if err := runCommand(mount, "-n", "--rbind", rootdir,
+			rootdir); err != nil {
+
+			return err
 		}
 
 		dst := rootdir + "/dev"
 		makedest("/dev", dst)
-		cmd = exec.Command(mount, "-n", "-t", "tmpfs", "none", dst)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("mounting %s error: %s",
-				dst, err.Error())
+		if err := runCommand(mount, "-n", "-t", "tmpfs", "none",
+			dst); err != nil {
+
+			return err
 		}
 
-		cmd = exec.Command(cp, "-ax", "/dev/.", dst)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("copying %s error: %s", dst, err.Error())
+		if err := runCommand(cp, "-ax", "/dev/.", dst); err != nil {
+			return err
 		}
 
 		dst = rootdir + "/var/run/netns"
@@ -372,12 +407,15 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 				dst, err.Error())
 		}
 
-		cmd = exec.Command(mount, "-n", "-t", "tmpfs", "tmpfs", dst)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("mounting %s error: %s", dst, err.Error())
+		if err := runCommand(mount, "-n", "-t", "tmpfs", "tmpfs",
+			dst); err != nil {
+
+			return err
 		}
 
-		setupBindMounts(rootdir)
+		if err := setupBindMounts(rootdir); err != nil {
+			return err
+		}
 
 		// Remember the current directory so that we can restore it later
 		rootfd, err := os.Open(rootdir)
@@ -427,9 +465,8 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 				rootdir, err.Error())
 		}
 
-		cmd = exec.Command(pivot_root, ".", "."+oldroot)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("Pivoting root error: %s", err.Error())
+		if err := runCommand(pivot_root, ".", "."+oldroot); err != nil {
+			return err
 		}
 
 		if err := rootfd.Close(); err != nil {
@@ -437,26 +474,8 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		// unmount the old file system
-		cmd = exec.Command(umount, "-n", "-l", oldroot)
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			return fmt.Errorf("getting stderr pipe error: %s",
-				err.Error())
-		}
-
-		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("Starting umount cmd error: %s",
-				err.Error())
-		}
-
-		buf, err := ioutil.ReadAll(stderr)
-		if err != nil {
-			return fmt.Errorf("Reading stderr error: %s", err.Error())
-		}
-
-		if err := cmd.Wait(); err != nil {
-			return fmt.Errorf("Unmounting %s error: %s\n, stderr: %s",
-				oldroot, err.Error(), string(buf))
+		if err := runCommand(umount, "-n", "-l", oldroot); err != nil {
+			return err
 		}
 	}
 
