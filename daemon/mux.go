@@ -336,12 +336,21 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	// We currently only support file / special forgetting
-	switch inode.(type) {
-	case *File, *Special:
-		defer inode.LockTree().Unlock()
-		inode.forget_DOWN(&qfs.c)
+	defer inode.LockTree().Unlock()
+	key := inode.flush_DOWN(&qfs.c)
+	parent := inode.parent()
+	if parent != nil {
+		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
 	}
+
+	// Remove the inode from the map, ready to be garbage collected. We also
+	// re-register ourselves in the uninstantiated inode collection. If the
+	// parent is the inode then it's an ophaned File which can never be
+	// instantiated again.
+	if parent != inode {
+		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()}, parent)
+	}
+	qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
