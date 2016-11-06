@@ -14,6 +14,7 @@ import "path/filepath"
 import "strconv"
 import "strings"
 import "syscall"
+import "time"
 
 import "github.com/kardianos/osext"
 
@@ -349,7 +350,15 @@ func switchUserMode() error {
 	return nil
 }
 
+func profileLog(info string) {
+	t := time.Now()
+	timestamp := t.Format("00:00:00.000000000")
+
+	fmt.Printf("[%s] %s\n", timestamp, info)
+}
+
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
+	profileLog("Enter chrootOutOfNsd")
 	// create a new namespace and run qfs chroot tool in the new namespace
 	if !setupNamespaces {
 		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
@@ -361,6 +370,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 
 		chns_env := os.Environ()
 
+		profileLog("Run chns")
 		if err := syscall.Exec(chns_args[0], chns_args,
 			chns_env); err != nil {
 
@@ -368,54 +378,65 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 	}
 
+	profileLog(" cp 1")
 	if err := syscall.Chdir("/"); err != nil {
 		return fmt.Errorf("Changing directory to / error: %s", err.Error())
 	}
 
+	profileLog(" cp 2")
 	rootdirInfo, err := os.Stat(rootdir)
 	if err != nil {
 		return fmt.Errorf("Stating %s error: %s", rootdir, err.Error())
 	}
 
+	profileLog(" cp 3")
 	fsrootInfo, err := os.Stat("/")
 	if err != nil {
 		return fmt.Errorf("Stating / error: %s", err.Error())
 	}
 
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
+		profileLog(" cp 4")
 		if err := runCommand(mount, "-n", "--rbind", rootdir,
 			rootdir); err != nil {
 
 			return err
 		}
 
+		profileLog(" cp 5")
 		dst := rootdir + "/dev"
 		makedest("/dev", dst)
+		profileLog(" cp 6")
 		if err := runCommand(mount, "-n", "-t", "tmpfs", "none",
 			dst); err != nil {
 
 			return err
 		}
+		profileLog(" cp 7")
 
 		if err := runCommand(cp, "-ax", "/dev/.", dst); err != nil {
 			return err
 		}
+		profileLog(" cp 8")
 
 		dst = rootdir + "/var/run/netns"
 		if err := os.MkdirAll(dst, 0666); err != nil {
 			return fmt.Errorf("Creating directory %s error: %s",
 				dst, err.Error())
 		}
+		profileLog(" cp 9")
 
 		if err := runCommand(mount, "-n", "-t", "tmpfs", "tmpfs",
 			dst); err != nil {
 
 			return err
 		}
+		profileLog(" cp 10")
 
 		if err := setupBindMounts(rootdir); err != nil {
 			return err
 		}
+		profileLog(" cp 11")
 
 		// Remember the current directory so that we can restore it later
 		rootfd, err := os.Open(rootdir)
@@ -423,12 +444,14 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("opening %s error: %s",
 				rootdir, err.Error())
 		}
+		profileLog(" cp 12")
 
 		// In a chroot escape so pivot_root will work
 		if err := syscall.Chroot(oldroot); err != nil {
 			return fmt.Errorf("chrooting into %s error: %s",
 				oldroot, err.Error())
 		}
+		profileLog(" cp 13")
 
 		// Keep changing to parent directory up to the root
 		for {
@@ -437,46 +460,57 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 				return fmt.Errorf("stating . error: %s",
 					err.Error())
 			}
+			profileLog(" cp 14")
 
 			fileInfo2, err := os.Stat("..")
 			if err != nil {
 				return fmt.Errorf("stating .. error: %s",
 					err.Error())
 			}
+			profileLog(" cp 15")
 
 			if os.SameFile(fileInfo1, fileInfo2) {
 				break
 			}
+			profileLog(" cp 16")
 
 			if err := os.Chdir(".."); err != nil {
 				return fmt.Errorf("Changing directory .. error: %s",
 					err.Error())
 			}
+			profileLog(" cp 17")
+
 		}
 
 		if err := syscall.Chroot("."); err != nil {
 			return fmt.Errorf("Chrooting into . error: %s",
 				err.Error())
 		}
+		profileLog(" cp 18")
 
 		// pivot_root to the root that we want to keep
 		if err := rootfd.Chdir(); err != nil {
 			return fmt.Errorf("Retoring %s error: %s",
 				rootdir, err.Error())
 		}
+		profileLog(" cp 19")
 
 		if err := runCommand(pivot_root, ".", "."+oldroot); err != nil {
 			return err
 		}
+		profileLog(" cp 20")
 
 		if err := rootfd.Close(); err != nil {
 			return fmt.Errorf("Closing rootfd error: %s", err.Error())
 		}
+		profileLog(" cp 21")
 
 		// unmount the old file system
 		if err := runCommand(umount, "-n", "-l", oldroot); err != nil {
 			return err
 		}
+		profileLog(" cp 22")
+
 	}
 
 	// change the current directory
@@ -484,26 +518,31 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	if err != nil {
 		return fmt.Errorf("Stating %s error: %s", workingdir, err.Error())
 	}
+	profileLog(" cp 23")
 
 	if !wdInfo.IsDir() {
 		return fmt.Errorf("Invalid working directory %s", workingdir)
 	}
+	profileLog(" cp 24")
 
 	if err := os.Chdir(workingdir); err != nil {
 		return fmt.Errorf("Changing directory to %s error: %s",
 			workingdir, err.Error())
 	}
+	profileLog(" cp 25")
 
 	archStr, err := getArchitecture("/")
 	if err != nil {
 		return fmt.Errorf("Getting architecture string error: %s",
 			err.Error())
 	}
+	profileLog(" cp 26")
 
 	// switch to non-root user
 	if err := switchUserMode(); err != nil {
 		return fmt.Errorf("Switching usermode error: %s", err.Error())
 	}
+	profileLog(" cp 27")
 
 	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
 	shell_cmd = append(shell_cmd, cmd...)
@@ -514,6 +553,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	setarch_env := os.Environ()
 	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
 
+	profileLog(" cp 28")
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
@@ -524,6 +564,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
+	profileLog("Enter chroot")
 	args := os.Args[2:]
 
 	var wsr string
@@ -569,7 +610,9 @@ ArgumentProcessingLoop:
 		args = args[1:]
 	}
 
+	profileLog("Parsing arguments done")
 	if !persistent {
+		profileLog("Enter test legitimate wsr")
 		if !isLegitimateWorkspaceRoot(wsr) {
 			fmt.Fprintf(os.Stderr,
 				"Invalid workspaceroot: %s, <WSR> must be a"+
@@ -577,6 +620,7 @@ ArgumentProcessingLoop:
 			printHelp()
 			os.Exit(1)
 		}
+		profileLog("Test legitimate wsr done")
 
 		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
 			fmt.Fprintln(os.Stderr,
