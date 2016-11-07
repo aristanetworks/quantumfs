@@ -41,7 +41,7 @@ var patternsOut bool
 var stats bool
 var topTotal int
 var topAvg int
-var coverage int
+var minTimeslicePct int
 var filterId intslice
 var bucketWidthMs int
 var bucketWidthNs int64
@@ -144,9 +144,9 @@ func init() {
 		"print top <byTotal> functions by total time usage in logs")
 	flag.IntVar(&topAvg, "byAvg", 0, "Parse a stat file (-in) and "+
 		"print top <byAvg> functions by total time usage in logs")
-	flag.IntVar(&coverage, "coverage", -1, "Output csv wall time consumed in "+
-		" bucket t per SequenceId. To be output needs <coverage>/100 in "+
-		"any bucket or -id")
+	flag.IntVar(&minTimeslicePct, "minTimeslicePct", -1, "Output csv wall time "+
+		"consumed in bucket t per SequenceId. To be output needs "+
+		"<minTimeslicePct>/100 in any bucket or -id")
 	flag.Var(&filterId, "id", "Filter certain output to include only given "+
 		"Sequence Id. Multiple -id flags are supported.")
 	flag.IntVar(&bucketWidthMs, "bucketMs", 1000, "Bucket width for -csv in Ms")
@@ -210,7 +210,7 @@ func main() {
 	}
 
 	switch {
-	case coverage != -1:
+	case minTimeslicePct != -1:
 		if inFile == "" {
 			fmt.Println("To -cover, you must specify a stat file " +
 				"with -in")
@@ -220,7 +220,7 @@ func main() {
 			fmt.Println("To -cover, you must specify an output filename")
 			os.Exit(1)
 		}
-		if coverage < 0 || coverage > 100 {
+		if minTimeslicePct < 0 || minTimeslicePct > 100 {
 			fmt.Println("To -cover, you must specify a threshold " +
 				"[0, 100]")
 			os.Exit(1)
@@ -748,7 +748,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	}
 	status.Process(1)
 
-	bucketThreshold := float64(coverage) / float64(100)
+	bucketThreshold := float64(minTimeslicePct) / float64(100)
 	outputIndices := make([]int, 0)
 	if len(filterId) != 0 {
 		for i := 0; i < len(filterId); i++ {

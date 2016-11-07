@@ -817,9 +817,10 @@ func (l *LogStatus) Process(newPct float32) {
 		l.shownHeader = true
 	}
 
-	// Calculate the amount of pixels to output
+	// Calculate the amount of pixels to output in the loading bar
 	pixDone := int(float32(l.pixWidth) * newPct)
 	for i := l.lastPixShown + 1; i <= pixDone; i++ {
+		// Each pixel in the bar is a period
 		fmt.Printf(".")
 	}
 
