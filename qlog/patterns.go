@@ -10,7 +10,6 @@ import "strconv"
 
 var wildcardStr string
 
-
 func init() {
 	// The wildcard character / string needs to be something that would never
 	// show in a log so that we can use strings as map keys

@@ -519,7 +519,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 
 		if len(patterns[i].Data.Seq)-
 			(qlog.CountWildcards(patterns[i].Wildcards, true)-
-			wildcards) > maxLen {
+				wildcards) > maxLen {
 
 			continue
 		}
