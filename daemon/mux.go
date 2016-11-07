@@ -192,6 +192,10 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
 	parent Inode) {
 
+	if parent == nil {
+		panic("addUninstantiated with nil parent")
+	}
+
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
