@@ -33,26 +33,26 @@ func (i *intslice) Set(value string) error {
 	return nil
 }
 
-var inFile *string
-var outFile *string
-var tabSpaces *int
-var logOut *bool
-var stats *bool
-var topTotal *int
-var topAvg *int
+var inFile string
+var outFile string
+var tabSpaces int
+var logOut bool
+var patternsOut bool
+var stats bool
+var topTotal int
+var topAvg int
+var coverage int
 var filterId intslice
-var coverage *int
-var bucketWidthMs *int
+var bucketWidthMs int
 var bucketWidthNs int64
-var showClose *bool
-var stdDevMin *float64
-var stdDevMax *float64
-var wildMin *int
-var wildMax *int
-var maxThreads *int
-var maxLenWildcards *int
-var maxLen *int
-var patternsOut *bool
+var showClose bool
+var stdDevMin float64
+var stdDevMax float64
+var wildMin int
+var wildMax int
+var maxThreads int
+var maxLenWildcards int
+var maxLen int
 
 var wildcardStr string
 
@@ -130,40 +130,40 @@ func init() {
 	// show in a log so that we can use strings as map keys
 	wildcardStr = string([]byte{7})
 
-	inFile = flag.String("in", "", "Specify an input file")
-	outFile = flag.String("out", "", "Specify an output file")
-	tabSpaces = flag.Int("tab", 0,
+	flag.StringVar(&inFile, "in", "", "Specify an input file")
+	flag.StringVar(&outFile, "out", "", "Specify an output file")
+	flag.IntVar(&tabSpaces, "tab", 0,
 		"Indent function logs with n spaces, when using -log")
-	logOut = flag.Bool("log", false,
+	flag.BoolVar(&logOut, "log", false,
 		"Parse a log file (-in) and print to stdout")
-	patternsOut = flag.Bool("pattern", false,
+	flag.BoolVar(&patternsOut, "pattern", false,
 		"Show patterns given in a stat file. Works with -id.")
-	stats = flag.Bool("stat", false, "Parse a log file (-in) and output to a "+
-		"stats file (-out). Default stats filename is logfile.stats")
-	topTotal = flag.Int("byTotal", 0, "Parse a stat file (-in) and "+
+	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
+		"a stats file (-out). Default stats filename is logfile.stats")
+	flag.IntVar(&topTotal, "byTotal", 0, "Parse a stat file (-in) and "+
 		"print top <byTotal> functions by total time usage in logs")
-	topAvg = flag.Int("byAvg", 0, "Parse a stat file (-in) and "+
+	flag.IntVar(&topAvg, "byAvg", 0, "Parse a stat file (-in) and "+
 		"print top <byAvg> functions by total time usage in logs")
-	coverage = flag.Int("coverage", -1, "Output csv wall time consumed in "+
+	flag.IntVar(&coverage, "coverage", -1, "Output csv wall time consumed in "+
 		" bucket t per SequenceId. To be output needs <coverage>/100 in "+
 		"any bucket or -id")
 	flag.Var(&filterId, "id", "Filter certain output to include only given "+
 		"Sequence Id. Multiple -id flags are supported.")
-	bucketWidthMs = flag.Int("bucketMs", 1000, "Bucket width for -csv in Ms")
-	showClose = flag.Bool("similars", false,
+	flag.IntVar(&bucketWidthMs, "bucketMs", 1000, "Bucket width for -csv in Ms")
+	flag.BoolVar(&showClose, "similars", false,
 		"Don't hide similar sequences when using -bytotal or -byavg")
-	stdDevMin = flag.Float64("stdDevMin", 0, "Filter results, requiring "+
+	flag.Float64Var(&stdDevMin, "stdDevMin", 0, "Filter results, requiring "+
 		"a standard deviation of at least <stdDevMin>. Float units of "+
 		"microseconds")
-	stdDevMax = flag.Float64("stdDevMax", 1000000000,
+	flag.Float64Var(&stdDevMax, "stdDevMax", 1000000000,
 		"Like stdDevMin, but setting a maximum")
-	wildMin = flag.Int("wcMin", 0, "Filter results, requiring minimum number "+
-		"of wildcards in function pattern.")
-	wildMax = flag.Int("wcMax", 100, "Same as wmin, but setting a maximum")
-	maxThreads = flag.Int("threads", 30, "Max threads to use")
-	maxLenWildcards = flag.Int("maxWc", 16,
+	flag.IntVar(&wildMin, "wcMin", 0, "Filter results, requiring minimum "+
+		"number of wildcards in function pattern.")
+	flag.IntVar(&wildMax, "wcMax", 100, "Same as wmin, but setting a maximum")
+	flag.IntVar(&maxThreads, "threads", 30, "Max threads to use")
+	flag.IntVar(&maxLenWildcards, "maxWc", 16,
 		"Max sequence length to wildcard during -stat")
-	maxLen = flag.Int("maxLen", 10000,
+	flag.IntVar(&maxLen, "maxLen", 10000,
 		"Max sequence length to return in results")
 
 	flag.Usage = func() {
@@ -202,7 +202,7 @@ func printIndexedLogExt(idx int, sequence []qlog.LogOutput, wildcards []bool,
 
 func main() {
 	flag.Parse()
-	bucketWidthNs = 1000000 * int64(*bucketWidthMs)
+	bucketWidthNs = 1000000 * int64(bucketWidthMs)
 
 	if len(os.Args) == 1 {
 		flag.Usage()
@@ -210,43 +210,43 @@ func main() {
 	}
 
 	switch {
-	case *coverage != -1:
-		if *inFile == "" {
+	case coverage != -1:
+		if inFile == "" {
 			fmt.Println("To -cover, you must specify a stat file " +
 				"with -in")
 			os.Exit(1)
 		}
-		if *outFile == "" {
+		if outFile == "" {
 			fmt.Println("To -cover, you must specify an output filename")
 			os.Exit(1)
 		}
-		if *coverage < 0 || *coverage > 100 {
+		if coverage < 0 || coverage > 100 {
 			fmt.Println("To -cover, you must specify a threshold " +
 				"[0, 100]")
 			os.Exit(1)
 		}
 
 		fmt.Println("Loading file for -cover...")
-		file, err := os.Open(*inFile)
+		file, err := os.Open(inFile)
 		if err != nil {
-			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
+			fmt.Printf("Unable to open stat file %s: %s\n", inFile, err)
 			os.Exit(1)
 		}
 		defer file.Close()
 		patterns := qlog.LoadFromStat(file)
 
 		outputCsvCover(patterns)
-	case *logOut:
-		if *inFile == "" {
+	case logOut:
+		if inFile == "" {
 			fmt.Println("To -log, you must specify a log file with -in")
 			os.Exit(1)
 		}
 
 		// Log parse mode only
-		fmt.Println(qlog.ParseLogsExt(*inFile, *tabSpaces,
-			*maxThreads))
-	case *patternsOut:
-		if *inFile == "" {
+		fmt.Println(qlog.ParseLogsExt(inFile, tabSpaces,
+			maxThreads))
+	case patternsOut:
+		if inFile == "" {
 			fmt.Println("To -patt, you must specify a stat " +
 				"file with -in")
 			os.Exit(1)
@@ -254,9 +254,9 @@ func main() {
 
 		fmt.Println("Loading file...")
 
-		file, err := os.Open(*inFile)
+		file, err := os.Open(inFile)
 		if err != nil {
-			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
+			fmt.Printf("Unable to open stat file %s: %s\n", inFile, err)
 			os.Exit(1)
 		}
 		defer file.Close()
@@ -281,19 +281,19 @@ func main() {
 			printPatternData(patterns[i])
 			count++
 		}
-	case *stats:
-		if *inFile == "" {
+	case stats:
+		if inFile == "" {
 			fmt.Println("To -stat, you must specify a log file with -in")
 			os.Exit(1)
 		}
-		outFilename := *inFile + ".stats"
-		if *outFile != "" {
-			outFilename = *outFile
+		outFilename := inFile + ".stats"
+		if outFile != "" {
+			outFilename = outFile
 		}
 
-		pastEndIdx, dataArray, strMap := qlog.ExtractFields(*inFile)
+		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
 		logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
-			*maxThreads, true)
+			maxThreads, true)
 
 		patterns := getStatPatterns(logs)
 
@@ -307,17 +307,17 @@ func main() {
 		defer file.Close()
 		qlog.SaveToStat(file, patterns)
 		fmt.Printf("Stats file created: %s\n", outFilename)
-	case *topTotal != 0:
-		if *inFile == "" {
+	case topTotal != 0:
+		if inFile == "" {
 			fmt.Println("To -topTotal, you must specify a stat file " +
 				"with -in")
 			os.Exit(1)
 		}
 
 		fmt.Println("Loading file for -bytotal...")
-		file, err := os.Open(*inFile)
+		file, err := os.Open(inFile)
 		if err != nil {
-			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
+			fmt.Printf("Unable to open stat file %s: %s\n", inFile, err)
 			os.Exit(1)
 		}
 		defer file.Close()
@@ -328,19 +328,19 @@ func main() {
 		sort.Sort(SortResultsTotal(patterns))
 
 		fmt.Println("Top function patterns by total time used:")
-		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
-			*wildMax, *maxLen, *topTotal)
-	case *topAvg != 0:
-		if *inFile == "" {
+		showStats(patterns, stdDevMin, stdDevMax, wildMin,
+			wildMax, maxLen, topTotal)
+	case topAvg != 0:
+		if inFile == "" {
 			fmt.Println("To -topAvg, you must specify a stat file " +
 				"with -in")
 			os.Exit(1)
 		}
 
 		fmt.Println("Loading file for -byavg...")
-		file, err := os.Open(*inFile)
+		file, err := os.Open(inFile)
 		if err != nil {
-			fmt.Printf("Unable to open stat file %s: %s\n", *inFile, err)
+			fmt.Printf("Unable to open stat file %s: %s\n", inFile, err)
 			os.Exit(1)
 		}
 		defer file.Close()
@@ -351,8 +351,8 @@ func main() {
 		sort.Sort(SortResultsAverage(patterns))
 
 		fmt.Println("Top function patterns by average time used:")
-		showStats(patterns, *stdDevMin, *stdDevMax, *wildMin,
-			*wildMax, *maxLen, *topAvg)
+		showStats(patterns, stdDevMin, stdDevMax, wildMin,
+			wildMax, maxLen, topAvg)
 	default:
 		fmt.Println("No action flags (-log, -stat, -csv) specified.")
 		os.Exit(1)
@@ -472,7 +472,7 @@ func (l *PatternMap) Set(newKey string, newListKey string,
 func (l *PatternMap) recurseGenPatterns(seq []qlog.LogOutput,
 	sequences []qlog.SequenceData) {
 
-	if len(seq) > *maxLenWildcards {
+	if len(seq) > maxLenWildcards {
 		return
 	}
 
@@ -706,9 +706,9 @@ func fillTimeline(out map[int64]bucket, seqId int,
 }
 
 func outputCsvCover(patterns []qlog.PatternData) {
-	file, err := os.Create(*outFile)
+	file, err := os.Create(outFile)
 	if err != nil {
-		fmt.Printf("Unable to create %s for new data: %s\n", *outFile, err)
+		fmt.Printf("Unable to create %s for new data: %s\n", outFile, err)
 		os.Exit(1)
 	}
 	defer file.Close()
@@ -748,7 +748,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	}
 	status.Process(1)
 
-	bucketThreshold := float64(*coverage) / float64(100)
+	bucketThreshold := float64(coverage) / float64(100)
 	outputIndices := make([]int, 0)
 	if len(filterId) != 0 {
 		for i := 0; i < len(filterId); i++ {
@@ -846,7 +846,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			continue
 		}
 
-		if !(*showClose) {
+		if !(showClose) {
 			// If this dataset is a subset of the last, then we've
 			// already output the most wildcarded version of this
 			// sequence so let's not print redundant information
@@ -959,5 +959,5 @@ func showLogs(reqId uint64, logs []qlog.LogOutput) {
 		return
 	}
 
-	fmt.Println(qlog.FormatLogs(filteredLogs, *tabSpaces))
+	fmt.Println(qlog.FormatLogs(filteredLogs, tabSpaces))
 }
