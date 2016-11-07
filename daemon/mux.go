@@ -351,7 +351,10 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	// re-register ourselves in the uninstantiated inode collection. If the
 	// parent is the inode then it's an ophaned File which can never be
 	// instantiated again.
-	if parent != inode {
+	//
+	// If parent == nil, then this is a workspace which we cannot instantiate via
+	// its parent, the workspacelist, directly.
+	if parent != inode && parent != nil {
 		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()}, parent)
 	}
 	qfs.setInode(&qfs.c, inode.inodeNum(), nil)
