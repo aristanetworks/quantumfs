@@ -3,6 +3,7 @@
 
 package daemon
 
+import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 // NullWorkspaceRoot is specially designed for _null/null workspaceroot,
@@ -51,4 +52,16 @@ func (nwsr *NullWorkspaceRoot) Link(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
 	return fuse.EPERM
+}
+
+func (nwsr *NullWorkspaceRoot) publish(c *ctx) {
+	c.vlog("NullWorkspaceRoot::publish")
+}
+
+func (nwsr *NullWorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
+	newKey quantumfs.ObjectKey) {
+
+	c.vlog("NullWorkspaceRoot::syncChild Enter")
+	defer c.vlog("NullWorkspaceRoot::syncChild Exit")
+	nwsr.Directory.syncChild(c, inodeNum, newKey)
 }
