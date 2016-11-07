@@ -523,7 +523,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 				earliestLog = t.StartTime
 			}
 
-			if t.StartTime + t.Delta > latestLog {
+			if t.StartTime+t.Delta > latestLog {
 				latestLog = t.StartTime + t.Delta
 			}
 		}
@@ -574,7 +574,7 @@ func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int
 	fmt.Printf("Total sequence time: %.12s (%.4f%% of %.10s total in logs)\n",
 		time.Duration(pattern.Sum).String(), 100*logPct,
 		time.Duration(logTime).String())
-	
+
 	printPatternCommon(pattern)
 	fmt.Println("")
 }
@@ -583,7 +583,7 @@ func printPatternData(pattern qlog.PatternData) {
 	fmt.Println("--------------------------------------")
 	fmt.Printf("Total sequence time: %12s\n",
 		time.Duration(pattern.Sum).String())
-	
+
 	printPatternCommon(pattern)
 	fmt.Println("")
 }
