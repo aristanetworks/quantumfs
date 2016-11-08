@@ -42,8 +42,14 @@ func IsLogFnPair(formatIn string, formatOut string) bool {
 		return false
 	}
 
-	if strings.Compare(formatIn[len(FnEnterStr):],
-		formatOut[len(FnExitStr):]) != 0 {
+	minLength := len(formatIn)-len(FnEnterStr)
+	outLength := len(formatOut)-len(FnExitStr)
+	if outLength < minLength {
+		minLength = outLength
+	}
+
+	if strings.Compare(formatIn[len(FnEnterStr):len(FnEnterStr)+minLength],
+		formatOut[len(FnExitStr):len(FnExitStr)+minLength]) != 0 {
 
 		return false
 	}

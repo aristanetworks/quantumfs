@@ -223,6 +223,36 @@ func TestPatternSubSeq(t *testing.T) {
 	}
 }
 
+func TestLogFnPair(t *testing.T) {
+	if !IsLogFnPair(FnEnterStr+"String A1234", FnExitStr+"String A1234") {
+		t.Fatalf("Easy string match doesn't match")
+	}
+
+	if !IsLogFnPair(FnEnterStr+"String A1234Extra1234",
+		FnExitStr+"String A1234") {
+
+		t.Fatal("Extra suffix on first string breaks matching")
+	}
+
+	if !IsLogFnPair(FnEnterStr+"String A1234",
+		FnExitStr+"String A1234Extra4321") {
+
+		t.Fatal("Extra suffix on second string breaks matching")
+	}
+
+	if IsLogFnPair(FnEnterStr+"String A1234", FnEnterStr+"String A1234") {
+		t.Fatal("Two enter functions matching")
+	}
+
+	if IsLogFnPair(FnExitStr+"String A1234", FnExitStr+"String A1234") {
+		t.Fatal("Two exit functions matching")
+	}
+
+	if IsLogFnPair(FnEnterStr+"asdlkj234", FnExitStr+"kjl23") {
+		t.Fatal("Obvious mismatch matches")
+	}
+}
+
 func TestFileReload(t *testing.T) {
 	file, err := ioutil.TempFile("", "reload")
 	if err != nil {
