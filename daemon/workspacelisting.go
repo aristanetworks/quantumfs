@@ -15,8 +15,9 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewNamespaceList() Inode {
 	nsl := NamespaceList{
-		InodeCommon: InodeCommon{id: quantumfs.InodeIdRoot},
-		namespaces:  make(map[string]InodeId),
+		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
+		namespacesByName: make(map[string]InodeId),
+		namespacesById:   make(map[InodeId]string),
 	}
 	nsl.self = &nsl
 	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock
@@ -28,7 +29,8 @@ type NamespaceList struct {
 	InodeCommon
 
 	// Map from child name to Inode ID
-	namespaces map[string]InodeId
+	namespacesByName map[string]InodeId
+	namespacesById   map[InodeId]string
 
 	realTreeLock sync.RWMutex
 }
@@ -111,8 +113,9 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 
 // Update the internal namespaces list with the most recent available listing
 func updateChildren(c *ctx, parentName string, names []string,
-	inodeMap *map[string]InodeId, parent Inode, newInode func(c *ctx,
-		parentName string, name string, parent Inode, inodeId InodeId) Inode) {
+	inodeMap *map[string]InodeId, nameMap *map[InodeId]string, parent Inode,
+	newInode func(c *ctx, parentName string, name string, parent Inode,
+		inodeId InodeId) Inode) {
 
 	touched := make(map[string]bool)
 
@@ -121,6 +124,7 @@ func updateChildren(c *ctx, parentName string, names []string,
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
+			(*nameMap)[inodeId] = name
 			if parentName == "_null" && name == "null" {
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
 					parentName, name, parent, inodeId))
@@ -135,8 +139,10 @@ func updateChildren(c *ctx, parentName string, names []string,
 	// Then delete entries which no longer exist
 	for name, _ := range *inodeMap {
 		if _, exists := touched[name]; !exists {
-			c.qfs.setInode(c, (*inodeMap)[name], nil)
+			inodeNum := (*inodeMap)[name]
+			c.qfs.setInode(c, inodeNum, nil)
 			delete(*inodeMap, name)
+			delete(*nameMap, inodeNum)
 		}
 	}
 }
@@ -176,9 +182,9 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
-		nsl, newWorkspaceList)
-	children := snapshotChildren(c, &nsl.namespaces, fillNamespaceAttr)
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx),
+		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
+	children := snapshotChildren(c, &nsl.namespacesByName, fillNamespaceAttr)
 
 	api := directoryContents{
 		filename: quantumfs.ApiPath,
@@ -204,10 +210,10 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 		return fuse.ENOENT
 	}
 
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
-		nsl, newWorkspaceList)
+	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx),
+		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
 
-	inodeNum := nsl.namespaces[name]
+	inodeNum := nsl.namespacesByName[name]
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillNamespaceAttr(c, &out.Attr, inodeNum, name)
@@ -366,17 +372,31 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (nsl *NamespaceList) instantiateChild(c *ctx,
 	inodeNum InodeId) (Inode, []InodeId) {
 
-	c.elog("Invalid instantiateChild on NamespaceList")
-	return nil, nil
+	c.vlog("NamespaceList::instantiateChild Enter")
+	defer c.vlog("NamespaceList::instantiateChild Exit")
+
+	// The api file will never be truly forgotten (see QuantumFs.Forget()) and so
+	// doesn't need to ever be re-instantiated.
+
+	name, exists := nsl.namespacesById[inodeNum]
+	if exists {
+		c.vlog("Instantiating %d -> %s", inodeNum, name)
+	} else {
+		c.vlog("inode %d doesn't exist", inodeNum)
+	}
+
+	return newWorkspaceList(c, "/", nsl.namespacesById[inodeNum], nsl, inodeNum),
+		nil
 }
 
 func newWorkspaceList(c *ctx, parentName string, name string, parent Inode,
 	inodeNum InodeId) Inode {
 
 	wsl := WorkspaceList{
-		InodeCommon:   InodeCommon{id: inodeNum},
-		namespaceName: name,
-		workspaces:    make(map[string]InodeId),
+		InodeCommon:      InodeCommon{id: inodeNum},
+		namespaceName:    name,
+		workspacesByName: make(map[string]InodeId),
+		workspacesById:   make(map[InodeId]string),
 	}
 	wsl.self = &wsl
 	wsl.setParent(parent)
@@ -390,7 +410,8 @@ type WorkspaceList struct {
 	namespaceName string
 
 	// Map from child name to Inode ID
-	workspaces map[string]InodeId
+	workspacesByName map[string]InodeId
+	workspacesById   map[InodeId]string
 
 	realTreeLock sync.RWMutex
 }
@@ -436,8 +457,8 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	updateChildren(c, wsl.namespaceName,
 		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
-		&wsl.workspaces, wsl, newWorkspaceRoot)
-	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
+		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
+	children := snapshotChildren(c, &wsl.workspacesByName, fillWorkspaceAttrFake)
 
 	return children
 }
@@ -451,9 +472,9 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	updateChildren(c, wsl.namespaceName,
 		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
-		&wsl.workspaces, wsl, newWorkspaceRoot)
+		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
 
-	inodeNum := wsl.workspaces[name]
+	inodeNum := wsl.workspacesByName[name]
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, name)
@@ -612,8 +633,24 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (wsl *WorkspaceList) instantiateChild(c *ctx,
 	inodeNum InodeId) (Inode, []InodeId) {
 
-	c.elog("Invalid instantiateChild on WorkspaceList")
-	return nil, nil
+	c.vlog("WorkspaceList::instantiateChild Enter")
+	defer c.vlog("WorkspaceList::instantiateChild Exit")
+
+	name, exists := wsl.workspacesById[inodeNum]
+	if exists {
+		c.vlog("Instantiating %d -> %s/%s", inodeNum, wsl.namespaceName,
+			name)
+	} else {
+		c.vlog("inode %d doesn't exist", inodeNum)
+	}
+
+	if wsl.namespaceName == "_null" && wsl.workspacesById[inodeNum] == "null" {
+		return newNullWorkspaceRoot(c, wsl.namespaceName,
+			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
+	} else {
+		return newWorkspaceRoot(c, wsl.namespaceName,
+			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
+	}
 }
 
 func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
