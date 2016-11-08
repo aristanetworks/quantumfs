@@ -56,10 +56,11 @@ func NewWorkspaceDbErr(code WsdbErrCode) error {
 }
 
 const (
-	WSDB_WORKSPACE_NOT_FOUND WsdbErrCode = iota + 1 // The workspace didn't exist
+	WSDB_RESERVED            WsdbErrCode = iota
+	WSDB_WORKSPACE_NOT_FOUND             = iota // The workspace didn't exist
 
 	// The operation was based off out of date information
-	WSDB_OUT_OF_DATE
+	WSDB_OUT_OF_DATE = iota
 )
 
 func (err *WorkspaceDbErr) Error() string {
