@@ -133,14 +133,10 @@ type SyncAllRequest struct {
 type DuplicateObject struct {
 	CommandCommon
 	DstPath   string
-	ObjectKey []byte
+	Key []byte
 	Uid       uint16
 	Gid       uint16
-	Mode      uint32
-	Umask     uint32
-	Rdev      uint32
-	Size      uint64 // The size of a file, the number of children of
-	// a directory, or of a symplink
+	Permissions      uint32
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -288,28 +284,26 @@ func (api *Api) SyncAll() error {
 	return nil
 }
 
-// duplicate an object with a given ObjectKey and path
-func (api *Api) DuplicateObject(dst string, objectKey []byte, mode uint32,
-	umask uint32, rdev uint32, uid uint16, gid uint16) error {
+// duplicate an object with a given key and path
+func (api *Api) DuplicateObject(dst string, key []byte, permissions uint32,
+        uid uint16, gid uint16) error {
 
 	if !isWorkspacePathValid(dst) {
 		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
 	}
 
-	if !isObjectKeyValid(objectKey) {
+	if !isKeyValid(key) {
 		return fmt.Errorf("\"%s\" should be %d bytes",
-			objectKey, EncodedLength)
+			key, ExtendedKeyLength)
 	}
 
 	cmd := DuplicateObject{
 		CommandCommon: CommandCommon{CommandId: CmdDuplicateObject},
 		DstPath:       dst,
-		ObjectKey:     objectKey,
+		Key:           key,
 		Uid:           uid,
 		Gid:           gid,
-		Mode:          mode,
-		Umask:         umask,
-		Rdev:          rdev,
+		Permissions:   permissions,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)
@@ -347,8 +341,8 @@ func isWorkspacePathValid(dst string) bool {
 	return true
 }
 
-func isObjectKeyValid(objectKey []byte) bool {
-	if length := len(objectKey); length != EncodedLength {
+func isKeyValid(key []byte) bool {
+	if length := len(key); length != ExtendedKeyLength {
 		return false
 	}
 	return true

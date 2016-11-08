@@ -94,26 +94,34 @@ func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+// Attaching the inode type in front of the Object-key
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
-	// Update the Hash value before generate the key
+
+        // Update the Hash value before generate the key
 	dir.flush_DOWN(c)
-	buffer, status := dir.generateChildTypeKey(c, inodeNum)
-	if status != fuse.OK {
-		return nil, status
-	}
-	return buffer, status
+
+        // flush_DOWN already requires a Write lock
+        defer dir.RLock().RUnlock()
+        record, err := dir.getChildRecord(c, inodeNum)
+        if err != nil {
+                c.elog("Unable to get record from parent for inode %s", inodeNum)
+                return nil, fuse.EIO
+        }
+        typeKey := encodeExtendedKey(record.ID(), record.Type(), record.Size())
+
+        return typeKey, fuse.OK
 }
 
 // go along the given path to the destination
 // The path is stored in a string slice, each cell index contains an inode
-func (dir *Directory) followPath_DOWN(c *ctx, path []string,
-	startPoint int) (Inode, error) {
+func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	for num := startPoint; num < length; num++ {
+        // skip the first two Inodes: namespace / workspace
+	for num := 2; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, err := currDir.lookupInternal(c, path[num],
 			quantumfs.ObjectTypeDirectoryEntry)

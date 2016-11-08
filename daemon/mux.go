@@ -535,17 +535,17 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 		return 0, fuse.ENOENT
 	}
 	if attr == quantumfs.XAttrTypeKey {
-		msg, status := getSpecialXAttrDataHelper(c, inode)
-		if len(msg) != quantumfs.EncodedLength {
+		msg, status := getQuantumfsXAttrDataHelper(c, inode)
+		if len(msg) != quantumfs.ExtendedKeyLength {
 			return 0, fuse.EIO
 		}
-		return len(msg), status
+		return quantumfs.ExtendedKeyLength, status
 	}
 	defer inode.RLockTree().RUnlock()
 	return inode.GetXAttrSize(c, attr)
 }
 
-func getSpecialXAttrDataHelper(c *ctx, inode Inode) ([]byte, fuse.Status) {
+func getQuantumfsXAttrDataHelper(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	parent := inode.parent()
 	if parent == nil {
 		return nil, fuse.ENOENT
@@ -579,7 +579,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	}
 
 	if attr == quantumfs.XAttrTypeKey {
-		return getSpecialXAttrDataHelper(c, inode)
+		return getQuantumfsXAttrDataHelper(c, inode)
 	}
 
 	defer inode.RLockTree().RUnlock()

@@ -236,7 +236,7 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 			0x12345678)
 		test.assert(err == nil, "Error creating a special file: %v", err)
 
-		dst := make([]byte, quantumfs.EncodedLength)
+		dst := make([]byte, quantumfs.ExtendedKeyLength)
 
 		// check the non-existing file
 		nonExist := workspace + "/noExist"
@@ -246,11 +246,11 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		// check the file
 		sz, err = syscall.Getxattr(testFilename, quantumfs.XAttrTypeKey, dst)
-		test.assert(err == nil && sz == quantumfs.EncodedLength,
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the file typeKey: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err := decompressData(dst)
+		key, type_, size, err := decodeExtendedKey(dst)
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -271,11 +271,11 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		// check the directory
 		sz, err = syscall.Getxattr(dirName, quantumfs.XAttrTypeKey, dst)
-		test.assert(err == nil && sz == quantumfs.EncodedLength,
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the directory typeKey: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err = decompressData(dst)
+		key, type_, size, err = decodeExtendedKey(dst)
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -294,12 +294,12 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		// check the symlink
 		sz, err, dst = lGetXattr(linkName, quantumfs.XAttrTypeKey,
-			quantumfs.EncodedLength)
-		test.assert(err == nil && sz == quantumfs.EncodedLength,
+			quantumfs.ExtendedKeyLength)
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the symlink typeKey: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err = decompressData(dst)
+		key, type_, size, err = decodeExtendedKey(dst)
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -318,11 +318,11 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 
 		// check the specail
 		sz, err = syscall.Getxattr(spName, quantumfs.XAttrTypeKey, dst)
-		test.assert(err == nil && sz == quantumfs.EncodedLength,
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the special typeKey: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err = decompressData(dst)
+		key, type_, size, err = decodeExtendedKey(dst)
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
