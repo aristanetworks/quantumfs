@@ -319,8 +319,17 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.dlog("QuantumFs::Lookup Inode %d Name %s", header.NodeId, name)
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	c.dlog("QuantumFs::Lookup Enter")
+	return qfs.lookupCommon(c, InodeId(header.NodeId), name, out)
+}
+
+func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.vlog("QuantumFs::lookupCommon Enter Inode %d Name %s", inodeId, name)
+	defer c.vlog("QuantumFs::lookupCommon Exit")
+
+	inode := qfs.inode(c, inodeId)
 	if inode == nil {
 		c.elog("Lookup failed", name)
 		return fuse.ENOENT
@@ -945,13 +954,29 @@ func (qfs *QuantumFs) Init(*fuse.Server) {
 	qfs.c.elog("Unhandled request Init")
 }
 
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, name string) (*WorkspaceRoot, bool) {
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, namespace string,
+	workspace string) (*WorkspaceRoot, bool) {
 
-	c.vlog("QuantumFs::getWorkspaceRoot %s", name)
+	c.vlog("QuantumFs::getWorkspaceRoot %s/%s", namespace, workspace)
 
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
+	// Get the WorkspaceList Inode number
+	var namespaceAttr fuse.EntryOut
+	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, namespace,
+		&namespaceAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
 
-	wsr, exists := qfs.activeWorkspaces[name]
-	return wsr, exists
+	// Get the WorkspaceRoot Inode number
+	var workspaceRootAttr fuse.EntryOut
+	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
+		&workspaceRootAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
+
+	// Fetch the WorkspaceRoot object itelf
+	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
+
+	return wsr.(*WorkspaceRoot), wsr != nil
 }

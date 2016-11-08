@@ -823,12 +823,18 @@ func (test *testHelper) fileSize(filename string) int64 {
 	return stat.Size
 }
 
+// Convert an absolute workspace path to the matching WorkspaceRoot object
+func (test *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
+	parts := strings.Split(test.relPath(workspace), "/")
+	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, parts[0], parts[1])
+
+	test.assert(ok, "WorkspaceRoot object for %s not found", workspace)
+
+	return wsr
+}
+
 func (test *testHelper) getAccessList(workspace string) map[string]bool {
-	relpath := test.relPath(workspace)
-	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relpath)
-	test.assert(ok,
-		"Workspace %s does not exist or is not active", workspace)
-	return wsr.getList()
+	return test.getWorkspaceRoot(workspace).getList()
 }
 
 func (test *testHelper) assertAccessList(testlist map[string]bool,
