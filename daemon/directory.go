@@ -36,6 +36,10 @@ type DuplicateData struct {
 	Size uint64
 }
 
+// The size of the ObjectKey: 21 + 1 + 8
+// The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
+const sourceDataLength = 30
+
 func initDirectory(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent Inode, treeLock *sync.RWMutex) {
@@ -410,7 +414,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	c.vlog("Directory::Lookup Enter")
 	defer c.vlog("Directory::Lookup Exit")
 
-	inodeNum, record, err := dir.lookupHelper(c, name)
+        defer dir.RLock().RUnlock()
+	inodeNum, record, err := dir.lookupChildRecord_(c, name)
 	if err != nil {
 		return fuse.ENOENT
 	}
@@ -1202,7 +1207,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func compressData(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
+func encodeExtendedKey(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
 	size uint64) []byte {
 
 	append_ := make([]byte, 9)
@@ -1214,36 +1219,21 @@ func compressData(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
 	return []byte(sEnc)
 }
 
-func decompressData(packet []byte) (quantumfs.ObjectKey, quantumfs.ObjectType,
+func decodeExtendedKey(packet []byte) (quantumfs.ObjectKey, quantumfs.ObjectType,
 	uint64, error) {
 
-	typeKeyLength := quantumfs.TypeKeyLength
 	bDec, err := base64.StdEncoding.DecodeString(string(packet))
 	if err != nil {
 		return quantumfs.ZeroKey, 0, 0, err
 	}
 
-	key := quantumfs.NewObjectKeyFromBytes(bDec[:typeKeyLength-9])
-	type_ := quantumfs.ObjectType(bDec[typeKeyLength-9])
-	size := binary.LittleEndian.Uint64(bDec[typeKeyLength-8:])
+	key := quantumfs.NewObjectKeyFromBytes(bDec[:sourceDataLength-9])
+	type_ := quantumfs.ObjectType(bDec[sourceDataLength-9])
+	size := binary.LittleEndian.Uint64(bDec[sourceDataLength-8:])
 	return key, type_, size, nil
 }
 
-// Attaching the inode type in front of the Object-key
-func (dir *Directory) generateChildTypeKey(c *ctx, inodeNum InodeId) ([]byte,
-	fuse.Status) {
-
-	record, err := dir.getChildRecord(c, inodeNum)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %s", inodeNum)
-		return []byte{}, fuse.EIO
-	}
-
-	typeKey := compressData(record.ID(), record.Type(), record.Size())
-	return typeKey, fuse.OK
-}
-
-// do the same as Lookup(), but it does not interact with fuse, only return the child
+// Do the same as Lookup(), but it does not interact with fuse, only return the child
 // node to the caller
 func (dir *Directory) lookupInternal(c *ctx, name string,
 	entryType quantumfs.ObjectType) (Inode, error) {
@@ -1251,7 +1241,8 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	c.vlog("Directory::LookupInternal Enter")
 	defer c.vlog("Directory::LookupInternal Exit")
 
-	inodeNum, record, err := dir.lookupHelper(c, name)
+        defer dir.RLock().RUnlock() 
+	inodeNum, record, err := dir.lookupChildRecord_(c, name)
 	if err != nil {
 		return nil, err
 	}
@@ -1266,12 +1257,12 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	return child, nil
 }
 
-func (dir *Directory) lookupHelper(c *ctx, name string) (InodeId,
+// Require a Read lock append ahead of the function
+func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
 	*quantumfs.DirectoryRecord, error) {
 
-	c.vlog("Directory::lookupHelper Enter")
-	defer c.vlog("Directory::LookupHelper Exit")
-	defer dir.RLock().RUnlock()
+	c.vlog("Directory::LookupChildRecord_ Enter")
+	defer c.vlog("Directory::LookupChildRecord_ Exit")
 
 	inodeNum, exists := dir.dirChildren.getInode(c, name)
 	if !exists {
@@ -1310,12 +1301,12 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	return entry
 }
 
-// Use an inode exclusive mutex to protect the inode from accessing by any other
-// thread when it is creating a new child entry
 func (dir *Directory) duplicateInode(c *ctx, name string, mode uint32, umask uint32,
 	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
 	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
 
+        // Must hold an inode lock to protect the inode from accessing by any other
+        // thread when it is creating a new child entry
 	defer dir.Lock().Unlock()
 	entry := dir.createNewEntry(c, name, mode, umask, rdev, size,
 		uid, gid, type_, key)

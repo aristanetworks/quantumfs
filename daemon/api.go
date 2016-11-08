@@ -465,10 +465,8 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 	}
 
 	dst := strings.Split(cmd.DstPath, "/")
-	key, type_, size, err := decompressData(cmd.ObjectKey)
-	mode := cmd.Mode
-	umask := cmd.Umask
-	rdev := cmd.Rdev
+	key, type_, size, err := decodeExtendedKey(cmd.Key)
+	permissions := cmd.Permissions
 	uid := cmd.Uid
 	gid := cmd.Gid
 
@@ -480,7 +478,7 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 		return
 	}
 
-	if len(dst) == 2 { // only have userspace and workspace
+	if len(dst) == 2 { // only have namespace and workspace
 		// duplicate the entire workspace root is illegal
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot can not be duplicated")
@@ -497,8 +495,9 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 
 	// get immediate parent of the target node
 	p, err := func() (Inode, error) {
-		defer (&workspace.Directory).LockTree().Unlock()
-		return (&workspace.Directory).followPath_DOWN(c, dst, 2)
+	        // Uses tree lock of NamespaceList but not any real workspace 
+                defer (&workspace.Directory).LockTree().Unlock()
+		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()
 	if err != nil {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
@@ -518,7 +517,7 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 	c.vlog("Api::duplicateObject put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	parent.duplicateInode(c, target, mode, umask, rdev, size,
+	parent.duplicateInode(c, target, permissions, 0, 0, size,
 		quantumfs.UID(uid), quantumfs.GID(gid),
 		type_, key)
 
