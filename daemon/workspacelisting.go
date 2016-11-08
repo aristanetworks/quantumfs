@@ -111,8 +111,8 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 
 // Update the internal namespaces list with the most recent available listing
 func updateChildren(c *ctx, parentName string, names []string,
-	inodeMap *map[string]InodeId, newInode func(c *ctx, parentName string,
-		name string, inodeId InodeId) Inode) {
+	inodeMap *map[string]InodeId, parent Inode, newInode func(c *ctx,
+		parentName string, name string, parent Inode, inodeId InodeId) Inode) {
 
 	touched := make(map[string]bool)
 
@@ -123,10 +123,10 @@ func updateChildren(c *ctx, parentName string, names []string,
 			(*inodeMap)[name] = inodeId
 			if parentName == "_null" && name == "null" {
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
-					parentName, name, inodeId))
+					parentName, name, parent, inodeId))
 			} else {
 				c.qfs.setInode(c, inodeId, newInode(c, parentName,
-					name, inodeId))
+					name, parent, inodeId))
 			}
 		}
 		touched[name] = true
@@ -177,7 +177,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
-		newWorkspaceList)
+		nsl, newWorkspaceList)
 	children := snapshotChildren(c, &nsl.namespaces, fillNamespaceAttr)
 
 	api := directoryContents{
@@ -205,7 +205,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	}
 
 	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx), &nsl.namespaces,
-		newWorkspaceList)
+		nsl, newWorkspaceList)
 
 	inodeNum := nsl.namespaces[name]
 	out.NodeId = uint64(inodeNum)
@@ -370,7 +370,7 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 	return nil, nil
 }
 
-func newWorkspaceList(c *ctx, parentName string, name string,
+func newWorkspaceList(c *ctx, parentName string, name string, parent Inode,
 	inodeNum InodeId) Inode {
 
 	wsl := WorkspaceList{
@@ -379,6 +379,7 @@ func newWorkspaceList(c *ctx, parentName string, name string,
 		workspaces:    make(map[string]InodeId),
 	}
 	wsl.self = &wsl
+	wsl.setParent(parent)
 	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
 	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl
@@ -435,7 +436,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	updateChildren(c, wsl.namespaceName,
 		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
-		&wsl.workspaces, newWorkspaceRoot)
+		&wsl.workspaces, wsl, newWorkspaceRoot)
 	children := snapshotChildren(c, &wsl.workspaces, fillWorkspaceAttrFake)
 
 	return children
@@ -450,7 +451,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	updateChildren(c, wsl.namespaceName,
 		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
-		&wsl.workspaces, newWorkspaceRoot)
+		&wsl.workspaces, wsl, newWorkspaceRoot)
 
 	inodeNum := wsl.workspaces[name]
 	out.NodeId = uint64(inodeNum)

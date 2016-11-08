@@ -15,11 +15,11 @@ type NullWorkspaceRoot struct {
 }
 
 func newNullWorkspaceRoot(c *ctx, parentName string, name string,
-	inodeNum InodeId) Inode {
+	parent Inode, inodeNum InodeId) Inode {
 
 	nwsr := NullWorkspaceRoot{
-		WorkspaceRoot: *(newWorkspaceRoot(c,
-			parentName, name, inodeNum).(*WorkspaceRoot)),
+		WorkspaceRoot: *(newWorkspaceRoot(c, parentName, name, parent,
+			inodeNum).(*WorkspaceRoot)),
 	}
 	return &nwsr
 }

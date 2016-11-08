@@ -37,7 +37,7 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 }
 
 func newWorkspaceRoot(c *ctx, parentName string, name string,
-	inodeNum InodeId) Inode {
+	parent Inode, inodeNum InodeId) Inode {
 
 	c.vlog("WorkspaceRoot::newWorkspaceRoot Enter")
 	defer c.vlog("WorkspaceRoot::newWorkspaceRoot Exit")
@@ -57,7 +57,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	uninstantiated := initDirectory(c, name, &wsr.Directory,
-		workspaceRoot.BaseLayer(), inodeNum, nil, &wsr.realTreeLock)
+		workspaceRoot.BaseLayer(), inodeNum, parent, &wsr.realTreeLock)
 
 	c.qfs.addUninstantiated(c, uninstantiated, &wsr)
 
@@ -184,4 +184,8 @@ func (wsr *WorkspaceRoot) clearList() {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	wsr.accessList = make(map[string]bool)
+}
+
+func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
+	return true
 }

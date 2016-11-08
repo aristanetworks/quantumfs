@@ -122,6 +122,8 @@ type Inode interface {
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
 	RLockTree() *sync.RWMutex
+
+	isWorkspaceRoot() bool
 }
 
 type InodeCommon struct {
@@ -246,11 +248,8 @@ func (inode *InodeCommon) RLock() *sync.RWMutex {
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
-	if inode.parent() == nil {
-		inodeType := reflect.TypeOf(inode)
-		msg := fmt.Sprintf("Non-workspaceroot inode has no parent: %s of %s",
-			inode.name(), inodeType)
-		panic(msg)
+	if inode.isWorkspaceRoot() {
+		panic("Workspaceroot didn't call .self")
 	}
 
 	if inode.parent().inodeNum() == inode.inodeNum() {
@@ -272,6 +271,10 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
 		return
 	}
 	inode.self.markAccessed(c, "", created)
+}
+
+func (inode *InodeCommon) isWorkspaceRoot() bool {
+	return false
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {

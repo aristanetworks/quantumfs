@@ -42,7 +42,8 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	namespaceList := NewNamespaceList()
 	qfs.inodes[quantumfs.InodeIdRoot] = namespaceList
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock())
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock(),
+		namespaceList)
 	return qfs
 }
 
@@ -335,15 +336,14 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
 
 	inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID))
-	if inode == nil {
+	if inode == nil || nodeID == quantumfs.InodeIdRoot {
 		// Nothing to do
 		return
 	}
 
 	defer inode.LockTree().Unlock()
 	key := inode.flush_DOWN(&qfs.c)
-	parent := inode.parent()
-	if parent != nil {
+	if !inode.isWorkspaceRoot() {
 		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
 	}
 
@@ -354,7 +354,8 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	//
 	// If parent == nil, then this is a workspace which we cannot instantiate via
 	// its parent, the workspacelist, directly.
-	if parent != inode && parent != nil {
+	parent := inode.parent()
+	if parent != inode && !inode.isWorkspaceRoot() {
 		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()}, parent)
 	}
 	qfs.setInode(&qfs.c, inode.inodeNum(), nil)
