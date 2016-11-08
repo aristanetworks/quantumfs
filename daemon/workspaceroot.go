@@ -61,13 +61,14 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	c.qfs.addUninstantiated(c, uninstantiated, &wsr)
 
-	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr
 }
 
 // Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	wsr.setDirty(true)
+	if !wsr.setDirty(true) {
+		c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
+	}
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) {
@@ -101,6 +102,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			rootId.String())
 		wsr.rootId = rootId
 	}
+	c.qfs.deactivateWorkspace(c, wsr.namespace+"/"+wsr.workspace)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
