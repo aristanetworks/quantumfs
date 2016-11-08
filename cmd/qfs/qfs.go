@@ -36,10 +36,10 @@ func main() {
 		fmt.Println("         - get the access list of workspace")
 		fmt.Println("  clearAccessedFiles <workspace>")
 		fmt.Println("         - clear the access list of workspace")
-                fmt.Println("  duplicate <dstPath> <key> <uid> <gid> <permission>")
-                fmt.Println("         - copy an inode correponding to a extended" +
-                        " key under the location of dstPath with specifications of" +
-                        " user <uid>, group <gid>, and RWX permission <permission>")
+		fmt.Println("  duplicate <dstPath> <key> <uid> <gid> <permission>")
+		fmt.Println("         - copy an inode correponding to a extended" +
+			" key under the location of dstPath with specifications of" +
+			" user <uid>, group <gid>, and RWX permission <permission>")
 		os.Exit(exitBadCmd)
 	}
 
@@ -57,8 +57,8 @@ func main() {
 		getAccessed()
 	case "clearAccessedFiles":
 		clearAccessed()
-        case "duplicate":
-                duplicate()
+	case "duplicate":
+		duplicate()
 	}
 }
 
@@ -121,39 +121,39 @@ func clearAccessed() {
 
 // Implement the duplicate command
 func duplicate() {
-        if flag.NArg() != 6 {
-                fmt.Println("Too few arguments for duplicate command")
+	if flag.NArg() != 6 {
+		fmt.Println("Too few arguments for duplicate command")
 		os.Exit(exitBadArgs)
-        }
+	}
 
-        dst := flag.Arg(1)
-        key := []byte(flag.Arg(2))
-        Uid, err := strconv.ParseUint(flag.Arg(3), 10, 16)
-        if err != nil {
-                fmt.Println("Invalid Uid:", err)
-                os.Exit(exitBadArgs)
-        }
-        uid := uint16(Uid)
+	dst := flag.Arg(1)
+	key := []byte(flag.Arg(2))
+	Uid, err := strconv.ParseUint(flag.Arg(3), 10, 16)
+	if err != nil {
+		fmt.Println("Invalid Uid:", err)
+		os.Exit(exitBadArgs)
+	}
+	uid := uint16(Uid)
 
-        Gid, err := strconv.ParseUint(flag.Arg(4), 10, 16)
-        if err != nil {
-                fmt.Println("Invalid Gid:", err)
-                os.Exit(exitBadArgs)
-        }
-        gid := uint16(Gid)
+	Gid, err := strconv.ParseUint(flag.Arg(4), 10, 16)
+	if err != nil {
+		fmt.Println("Invalid Gid:", err)
+		os.Exit(exitBadArgs)
+	}
+	gid := uint16(Gid)
 
-        Permission, err := strconv.ParseUint(flag.Arg(5), 10, 32)
-        if err != nil {
-                fmt.Println("Invalid Permission:", err)
-                os.Exit(exitBadArgs)
-        }
-        permission := uint32(Permission)
+	Permission, err := strconv.ParseUint(flag.Arg(5), 10, 32)
+	if err != nil {
+		fmt.Println("Invalid Permission:", err)
+		os.Exit(exitBadArgs)
+	}
+	permission := uint32(Permission)
 
-        fmt.Printf("Duplicate inode \"%v\" into \"%s\" with %d, %d and 0%o\n",
-                key, dst, uid, gid, permission)
-        api := quantumfs.NewApi()
+	fmt.Printf("Duplicate inode \"%v\" into \"%s\" with %d, %d and 0%o\n",
+		key, dst, uid, gid, permission)
+	api := quantumfs.NewApi()
 
-        if err := api.DuplicateObject(dst, key, permission, uid, gid); err != nil {
+	if err := api.DuplicateObject(dst, key, permission, uid, gid); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}

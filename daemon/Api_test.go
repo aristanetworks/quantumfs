@@ -89,9 +89,9 @@ func TestApiDuplicateObject(t *testing.T) {
 		linkFilename := workspaceSrc + "/link"
 		spFilename := workspaceSrc + "/pipe"
 
-                var PermissionA, PermissionB, expectedMode uint32
-		PermissionA = syscall.S_IXUSR | syscall.S_IWGRP |syscall.S_IROTH
-                PermissionB = syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO
+		var PermissionA, PermissionB, expectedMode uint32
+		PermissionA = syscall.S_IXUSR | syscall.S_IWGRP | syscall.S_IROTH
+		PermissionB = syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO
 
 		err := os.MkdirAll(dirName1, os.FileMode(PermissionA))
 		test.assert(err == nil, "Error creating directories: %v", err)
@@ -103,7 +103,7 @@ func TestApiDuplicateObject(t *testing.T) {
 		err = syscall.Symlink(testFilename, linkFilename)
 		test.assert(err == nil, "Error creating a symlink: %v", err)
 
-                expectedMode = syscall.S_IFIFO | syscall.S_IRWXU
+		expectedMode = syscall.S_IFIFO | syscall.S_IRWXU
 		err = syscall.Mknod(spFilename, expectedMode,
 			0x12345678)
 		test.assert(err == nil, "Error creating pipe")
@@ -156,7 +156,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Duplicate the file in the given path
 		err = api.DuplicateObject(dst+"/test/a/file", keyF,
-                                                PermissionA, 0, 0)
+			PermissionA, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a file to target workspace: %v", err)
 
@@ -165,14 +165,14 @@ func TestApiDuplicateObject(t *testing.T) {
 		test.assert(err == nil, "Error get status of a file: %v", err)
 
 		// check the mode of file
-                expectedMode = syscall.S_IFREG | PermissionA
+		expectedMode = syscall.S_IFREG | PermissionA
 		test.assert(stat.Mode == expectedMode,
 			"File mode incorrect. Expected %x got %x",
 			expectedMode, stat.Mode)
 
 		//Duplicate the directory in the given path
 		err = api.DuplicateObject(dst+"/test/a/dirtest",
-                                                keyD, PermissionA, 0, 0)
+			keyD, PermissionA, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a directory to target workspace: %v",
 			err)
@@ -192,9 +192,9 @@ func TestApiDuplicateObject(t *testing.T) {
 		test.assert(err == nil, "Error getting status of child file: %v",
 			err)
 
-                // Ensure the no intermediate inode is a file
+		// Ensure the no intermediate inode is a file
 		err = api.DuplicateObject(dst+"/test/a/dirtest/test", keyF,
-                                        PermissionA, 0, 0)
+			PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Unexpected success creating a file inside of a file")
 

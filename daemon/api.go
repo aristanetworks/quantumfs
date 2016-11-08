@@ -495,8 +495,8 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 
 	// get immediate parent of the target node
 	p, err := func() (Inode, error) {
-	        // Uses tree lock of NamespaceList but not any real workspace 
-                defer (&workspace.Directory).LockTree().Unlock()
+		// Uses tree lock of NamespaceList but not any real workspace
+		defer (&workspace.Directory).LockTree().Unlock()
 		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()
 	if err != nil {

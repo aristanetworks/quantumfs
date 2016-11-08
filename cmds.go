@@ -132,11 +132,11 @@ type SyncAllRequest struct {
 
 type DuplicateObject struct {
 	CommandCommon
-	DstPath   string
-	Key []byte
-	Uid       uint16
-	Gid       uint16
-	Permissions      uint32
+	DstPath     string
+	Key         []byte
+	Uid         uint16
+	Gid         uint16
+	Permissions uint32
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -286,7 +286,7 @@ func (api *Api) SyncAll() error {
 
 // duplicate an object with a given key and path
 func (api *Api) DuplicateObject(dst string, key []byte, permissions uint32,
-        uid uint16, gid uint16) error {
+	uid uint16, gid uint16) error {
 
 	if !isWorkspacePathValid(dst) {
 		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
