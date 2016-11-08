@@ -64,8 +64,20 @@ type exitLog struct {
 }
 
 func (c *ctx) flog(funcName string) exitLog {
+
+	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+funcName)
+
+	return exitLog{
+		c:        c,
+		funcName: funcName,
+	}
+}
+
+func (c *ctx) Flog(funcName string, extraFmtStr string,
+	args ...interface{}) exitLog {
+
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+
-		funcName)
+		funcName+extraFmtStr, args...)
 
 	return exitLog{
 		c:        c,
