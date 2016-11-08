@@ -46,17 +46,18 @@ type WorkspaceDB interface {
 		currentRootId ObjectKey, newRootId ObjectKey) (ObjectKey, error)
 }
 
-func NewWorkspaceDbErr(code int) error {
+type WsdbErrCode int
+type WorkspaceDbErr struct {
+	code WsdbErrCode
+}
+
+func NewWorkspaceDbErr(code WsdbErrCode) error {
 	return &WorkspaceDbErr{code: code}
 }
 
-type WorkspaceDbErr struct {
-	code int
-}
-
 const (
-	WSDB_OK                  = iota // Success
-	WSDB_WORKSPACE_NOT_FOUND = iota // The workspace didn't exist
+	WSDB_RESERVED            WsdbErrCode = iota
+	WSDB_WORKSPACE_NOT_FOUND             = iota // The workspace didn't exist
 
 	// The operation was based off out of date information
 	WSDB_OUT_OF_DATE = iota
@@ -66,8 +67,6 @@ func (err *WorkspaceDbErr) Error() string {
 	switch err.code {
 	default:
 		return "Unknown wsdb error"
-	case WSDB_OK:
-		return "No error"
 	case WSDB_WORKSPACE_NOT_FOUND:
 		return "Workspace not found"
 	case WSDB_OUT_OF_DATE:
