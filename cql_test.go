@@ -12,7 +12,7 @@ import (
 )
 
 func TestSetupStubbedCustomCqlStore(t *testing.T) {
-	var config cqlConfig
+	var config CqlConfig
 	var name string
 
 	config.StubCQL = true
@@ -24,7 +24,7 @@ func TestSetupStubbedCustomCqlStore(t *testing.T) {
 	file.Close()
 	defer os.Remove(name)
 
-	err = writeCqlConfig(name, &config)
+	err = WriteCqlConfig(name, &config)
 	require.NoError(t, err, "CQL config file write failed")
 
 	initCqlStore(name)

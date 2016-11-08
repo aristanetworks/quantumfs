@@ -12,7 +12,8 @@ import (
 	"github.com/gocql/gocql"
 )
 
-type cqlConfig struct {
+// CqlConfig struct holds the info needed to connect to a cql cluster
+type CqlConfig struct {
 	Nodes      []string `json:"nodes"`
 	NumConns   int      `json:"numConnections"`
 	NumRetries int      `json:"numRetries"`
@@ -20,7 +21,7 @@ type cqlConfig struct {
 }
 
 type cqlStore struct {
-	config    cqlConfig
+	config    CqlConfig
 	initOnce  sync.Once
 	resetOnce sync.Once
 	cluster   *gocql.ClusterConfig
@@ -29,7 +30,8 @@ type cqlStore struct {
 
 var globalCqlStore cqlStore
 
-func writeCqlConfig(fileName string, config *cqlConfig) error {
+// WriteCqlConfig convert the CqlConfig struct to a file
+func WriteCqlConfig(fileName string, config *CqlConfig) error {
 
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -46,8 +48,8 @@ func writeCqlConfig(fileName string, config *cqlConfig) error {
 	return err
 }
 
-func readCqlConfig(fileName string) (*cqlConfig, error) {
-	var config cqlConfig
+func readCqlConfig(fileName string) (*CqlConfig, error) {
+	var config CqlConfig
 
 	file, err := os.Open(fileName)
 	if err != nil {
@@ -74,7 +76,7 @@ func readCqlConfig(fileName string) (*cqlConfig, error) {
 func initCqlStore(confName string) {
 	globalCqlStore.initOnce.Do(func() {
 		var err error
-		var cfg *cqlConfig
+		var cfg *CqlConfig
 
 		cfg, err = readCqlConfig(confName)
 		if err != nil {
@@ -112,7 +114,7 @@ func resetCqlStore() {
 		}
 		// we cannot do globalCqlStore = cqlStore{}
 		// since we are inside resetOnce
-		globalCqlStore.config = cqlConfig{}
+		globalCqlStore.config = CqlConfig{}
 		globalCqlStore.cluster = nil
 		globalCqlStore.session = nil
 		globalCqlStore.initOnce = sync.Once{}
