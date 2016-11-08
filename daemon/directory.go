@@ -414,7 +414,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	c.vlog("Directory::Lookup Enter")
 	defer c.vlog("Directory::Lookup Exit")
 
-        defer dir.RLock().RUnlock()
+	defer dir.RLock().RUnlock()
 	inodeNum, record, err := dir.lookupChildRecord_(c, name)
 	if err != nil {
 		return fuse.ENOENT
@@ -1241,7 +1241,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	c.vlog("Directory::LookupInternal Enter")
 	defer c.vlog("Directory::LookupInternal Exit")
 
-        defer dir.RLock().RUnlock() 
+	defer dir.RLock().RUnlock()
 	inodeNum, record, err := dir.lookupChildRecord_(c, name)
 	if err != nil {
 		return nil, err
@@ -1305,8 +1305,8 @@ func (dir *Directory) duplicateInode(c *ctx, name string, mode uint32, umask uin
 	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
 	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
 
-        // Must hold an inode lock to protect the inode from accessing by any other
-        // thread when it is creating a new child entry
+	// Must hold an inode lock to protect the inode from accessing by any other
+	// thread when it is creating a new child entry
 	defer dir.Lock().Unlock()
 	entry := dir.createNewEntry(c, name, mode, umask, rdev, size,
 		uid, gid, type_, key)

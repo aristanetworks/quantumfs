@@ -98,19 +98,19 @@ func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
 
-        // Update the Hash value before generate the key
+	// Update the Hash value before generate the key
 	dir.flush_DOWN(c)
 
-        // flush_DOWN already requires a Write lock
-        defer dir.RLock().RUnlock()
-        record, err := dir.getChildRecord(c, inodeNum)
-        if err != nil {
-                c.elog("Unable to get record from parent for inode %s", inodeNum)
-                return nil, fuse.EIO
-        }
-        typeKey := encodeExtendedKey(record.ID(), record.Type(), record.Size())
+	// flush_DOWN already requires a Write lock
+	defer dir.RLock().RUnlock()
+	record, err := dir.getChildRecord(c, inodeNum)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %s", inodeNum)
+		return nil, fuse.EIO
+	}
+	typeKey := encodeExtendedKey(record.ID(), record.Type(), record.Size())
 
-        return typeKey, fuse.OK
+	return typeKey, fuse.OK
 }
 
 // go along the given path to the destination
@@ -120,7 +120,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-        // skip the first two Inodes: namespace / workspace
+	// skip the first two Inodes: namespace / workspace
 	for num := 2; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, err := currDir.lookupInternal(c, path[num],
