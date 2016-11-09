@@ -97,7 +97,7 @@ func TestExtendedAttrList(t *testing.T) {
 		test.assert(size > 0, "Expected XAttr, but didn't find any")
 		test.assert(size <= len(data), "XAttr names overflowed buffer")
 
-		// Remove the case of the virtual extended attribute: typeKey
+		// Remove the case of the virtual extended attribute: key
 		data = data[:size]
 		names := bytes.Split(data, []byte("\x00"))
 		names = names[:len(names)-1] // Remove empty last element
@@ -157,7 +157,7 @@ func TestExtendedAttrRemove(t *testing.T) {
 				"XAttr names overflowed buffer")
 
 			// Remove all the cases of the virtual extended attribute:
-			// typeKey
+			// key
 			data = data[:size]
 			names := bytes.Split(data, []byte("\x00"))
 			names = names[:len(names)-1] // Remove empty last element
@@ -211,7 +211,7 @@ func TestExtendedAttrRemove(t *testing.T) {
 	})
 }
 
-// Verify the get XAttr function for the self-defined Extended Attributes: typeKey
+// Verify the get XAttr function for the self-defined XAttrTypeKey: quantumfs.key
 func TestXAttrTypeKeyGet(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
@@ -247,10 +247,10 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		// check the file
 		sz, err = syscall.Getxattr(testFilename, quantumfs.XAttrTypeKey, dst)
 		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
-			"Error getting the file typeKey: %v with a size of %d",
+			"Error getting the file key: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err := decodeExtendedKey(dst)
+		key, type_, size, err := decodeExtendedKey(string(dst))
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -266,16 +266,16 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		test.assert(type_ == quantumfs.ObjectTypeSmallFile &&
 			size == record.Size() &&
 			bytes.Equal(key.Value(), record.ID().Value()),
-			"Error getting the file typeKey: %v with %d, keys of %v-%v",
+			"Error getting the file key: %v with %d, keys of %v-%v",
 			err, type_, key.Value(), record.ID().Value())
 
 		// check the directory
 		sz, err = syscall.Getxattr(dirName, quantumfs.XAttrTypeKey, dst)
 		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
-			"Error getting the directory typeKey: %v with a size of %d",
+			"Error getting the directory key: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err = decodeExtendedKey(dst)
+		key, type_, size, err = decodeExtendedKey(string(dst))
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -289,17 +289,17 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		test.assert(type_ == quantumfs.ObjectTypeDirectoryEntry &&
 			size == record.Size() &&
 			bytes.Equal(key.Value(), record.ID().Value()),
-			"Error getting the dir typeKey: %v with %d, keys of %v-%v",
+			"Error getting the dir key: %v with %d, keys of %v-%v",
 			err, type_, key.Value(), record.ID().Value())
 
 		// check the symlink
 		sz, err, dst = lGetXattr(linkName, quantumfs.XAttrTypeKey,
 			quantumfs.ExtendedKeyLength)
 		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
-			"Error getting the symlink typeKey: %v with a size of %d",
+			"Error getting the symlink key: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err = decodeExtendedKey(dst)
+		key, type_, size, err = decodeExtendedKey(string(dst))
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -313,16 +313,16 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		test.assert(type_ == quantumfs.ObjectTypeSymlink &&
 			size == record.Size() &&
 			bytes.Equal(key.Value(), record.ID().Value()),
-			"Error getting the link typeKey: %v with %d, keys of %v-%v",
+			"Error getting the link key: %v with %d, keys of %v-%v",
 			err, type_, key.Value(), record.ID().Value())
 
-		// check the specail
+		// check the special
 		sz, err = syscall.Getxattr(spName, quantumfs.XAttrTypeKey, dst)
 		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
-			"Error getting the special typeKey: %v with a size of %d",
+			"Error getting the special key: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err = decodeExtendedKey(dst)
+		key, type_, size, err = decodeExtendedKey(string(dst))
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
@@ -336,12 +336,12 @@ func TestXAttrTypeKeyGet(t *testing.T) {
 		test.assert(type_ == quantumfs.ObjectTypeSpecial &&
 			size == record.Size() &&
 			bytes.Equal(key.Value(), record.ID().Value()),
-			"Error getting specail typeKey: %v with %d, keys of %v-%v",
+			"Error getting special key: %v with %d, keys of %v-%v",
 			err, type_, key.Value(), record.ID().Value())
 	})
 }
 
-// Verify the set/remove XAttr function for typeKey is illegal
+// Verify the set/remove XAttr function for key is illegal
 func TestXAttrTypeKeySetRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
@@ -353,20 +353,20 @@ func TestXAttrTypeKeySetRemove(t *testing.T) {
 		test.assert(err == nil, "Error creating a small file: %v", err)
 		syscall.Close(fd)
 
-		// Reset the typeKey
+		// Reset the key
 		data := []byte("1234567890abcdefghijk700000008")
 		err = syscall.Setxattr(testFilename, quantumfs.XAttrTypeKey, data, 0)
 		test.assert(err == syscall.EPERM,
 			"Error finishing illegal SetXAttr: %v", err)
 
-		// Remove the typeKey
+		// Remove the key
 		err = syscall.Removexattr(testFilename, quantumfs.XAttrTypeKey)
 		test.assert(err == syscall.EPERM,
 			"Error finishing illegal RemoveXAttr: %v", err)
 	})
 }
 
-// Verify list XAttr function will attach typeKey behind the real extended attributes
+// Verify list XAttr function will attach key behind the real extended attributes
 func TestXAttrTypeKeyList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()

@@ -1215,14 +1215,13 @@ func encodeExtendedKey(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
 	binary.LittleEndian.PutUint64(append_[1:], size)
 
 	data := append(key.Value(), append_...)
-	sEnc := base64.StdEncoding.EncodeToString(data)
-	return []byte(sEnc)
+	return []byte(base64.StdEncoding.EncodeToString(data))
 }
 
-func decodeExtendedKey(packet []byte) (quantumfs.ObjectKey, quantumfs.ObjectType,
+func decodeExtendedKey(packet string) (quantumfs.ObjectKey, quantumfs.ObjectType,
 	uint64, error) {
 
-	bDec, err := base64.StdEncoding.DecodeString(string(packet))
+	bDec, err := base64.StdEncoding.DecodeString(packet)
 	if err != nil {
 		return quantumfs.ZeroKey, 0, 0, err
 	}

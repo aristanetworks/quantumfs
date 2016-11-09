@@ -380,7 +380,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		c.vlog("Received all workspace sync request")
 		api.syncAll(c)
 	// create an object with a given ObjectKey and path
-	case quantumfs.CmdDuplicateObject:
+	case quantumfs.CmdInsertInode:
 		c.vlog("Recieved Duplicate Object request")
 		api.duplicateObject(c, buf)
 	}
