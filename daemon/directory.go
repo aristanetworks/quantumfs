@@ -591,29 +591,28 @@ func (dir *Directory) getChildRecord(c *ctx,
 
 // Helper to check whether the permission along a single branch of the workspace
 // The function is protected by RLock in case of change on parent
-func (dir *Directory) getAncestorPermissions(c *ctx, permission uint32) bool {
-        parent := dir.parent()
+func getAncestorPermissions(c *ctx, inode Inode,permission uint32) bool {
+        parent := inode.parent()
         if parent == nil {      // hit the workspace root
                 return true
         } 
-        
-        dirP := parent.(*Directory)
-        defer dirP.RLock().RUnlock()
+ 
+        defer parent.(*Directory).RLock().RUnlock()
 
-        record, exists := parent.getChildRecord(c, dir.InodeCommon.id)
+        record, exists := parent.getChildRecord(c, inode.inodeNum())
         if exists != nil {
                 panic("There is no record for the current inode\n")
         }
 
         if BitFlagsSet(uint(record.Permissions()),uint(permission)) {
-                return dirP.getAncestorPermissions(c, permission)
+                return getAncestorPermissions(c, parent, permission)
         }
         
         return false
 }
 
-func getPermissions(c *ctx, permission uint32, uid uint32, gid uint32,
-        fileOwner uint32, dirOwner uint32, dirGroup uint32) fuse.Status {
+func (dir *Directory) getPermissions(c *ctx, permission uint32, uid uint32,
+        gid uint32, fileOwner uint32, dirOwner uint32, dirGroup uint32) fuse.Status {
 
         stickyBit := permission & syscall.S_ISVTX
         if stickyBit != 0 {
@@ -621,38 +620,46 @@ func getPermissions(c *ctx, permission uint32, uid uint32, gid uint32,
                         // Check if it's the directory owner
                         if uid != dirOwner {
                                 // No root permission, return false
-                                c.vlog("Directory::Unlink No Permit 1")
+                                c.vlog("Directory::GetPermissions fail with the" +
+                                " sticky bit")
                                 return fuse.EACCES
                         }
                 }
         }
 
         // Get whether current user in OWNER/GRP/OTHER
-        var permissionW, permissionX uint32
+        var permX, permW uint32
         if uid == dirOwner {
-                permissionW = syscall.S_IWUSR
-                permissionX = syscall.S_IXUSR
+                permW = syscall.S_IWUSR
+                permX = syscall.S_IXUSR
         } else if gid == dirGroup {
-                permissionW = syscall.S_IWGRP
-                permissionX = syscall.S_IXGRP
+                permW = syscall.S_IWGRP
+                permX = syscall.S_IXGRP
         } else { // other
-                permissionW = syscall.S_IWOTH
-                permissionX = syscall.S_IXOTH
+                permW = syscall.S_IWOTH
+                permX = syscall.S_IXOTH
         }
 
         // Check the current directory having x and w permissions
-        if permission != (permissionW | permissionX) {
-                c.vlog("Directory::Unlink No Permit 1")
+        // As well as the ancestor directories having x permissions
+        if (permission & (permW | permX)) != (permW | permX) {
+                c.vlog("Directory::GetPermissions fail with permission: %o %o",
+                        permission, permX|permW)
+                return fuse.EACCES 
+        }
+        
+        if !getAncestorPermissions(c, dir.parent(), permX) {
+                c.vlog("Directory::GetPermissions fail with ancestor")
                 return fuse.EACCES
         }
-
+       
         return fuse.OK
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	c.vlog("Directory::Unlink Enter %s", name)
 	defer c.vlog("Directory::Unlink Exit")
-	result := func() fuse.Status {
+	result := func() (status fuse.Status) {
 		defer dir.Lock().Unlock()
 
 		record, exists := dir.dirChildren.getNameRecord(c, name)
@@ -671,42 +678,38 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
                 // Verify the permission of the directory in order to delete a child
                 // If the sticky bit of the directory is set, the action can only be 
                 // performed by file's owner, directory's owner, or root user
-                fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
+                
+                
                 parent := dir.parent()
 
-                var status fuse.Status
                 if parent == nil { // the directory is a root
-                        panic("Current node is root")
-                        status = fuse.OK
+                        // The root is always albe to unlink any inodes because of 
+                        // its permission 0777, which is hardcoded in the file 
+                        // daemon/workspaceroot.go
+		        dir.delChild_(c, name)
+                        status = fuse.OK 
                 } else {
                         dirRecord, exist := parent.getChildRecord(c,
                                                         dir.InodeCommon.id)
-                        if exist != nil {
-                                c.vlog("Directory::Unlink No file")
-                                return fuse.ENOENT
-                        }
                         dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
                         dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
                         permission := dirRecord.Permissions()
+                        fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
+                        if exist != nil {
+                                c.vlog("Directory::Unlink no directory")
+                                return fuse.ENOENT
+                        }
 
-                        status = getPermissions(c, permission, owner.Uid, owner.Gid,
-                                        fileOwner, dirOwner, dirGroup)
+                        status = dir.getPermissions(c, permission, owner.Uid,
+                                        owner.Gid, fileOwner, dirOwner, dirGroup)
+                        if status == fuse.OK {
+		                dir.delChild_(c, name)
+                        }
                 }
-                
-                if status != fuse.OK {
-                        return status
-                } 
-                // All of its ancestor dirctories have x permission
-                //if permission != (permissionW | permissionX) ||
-                //!dir.parent().(*Directory).getAncestorPermissions(c, permissionX) {
-                //        return fuse.EACCES
-                //}
-                
 
-		dir.delChild_(c, name)
-		return fuse.OK
+                return status
 	}()
-        c.vlog("Directory::Unlink Status %v", result)
+        
 	if result == fuse.OK {
 		dir.self.dirty(c)
 	}
