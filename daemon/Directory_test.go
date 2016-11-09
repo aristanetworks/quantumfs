@@ -342,7 +342,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 }
 
 func TestLargeDirectory(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		test.startDefaultQuantumFs()
 
 		workspace := test.newWorkspace()
