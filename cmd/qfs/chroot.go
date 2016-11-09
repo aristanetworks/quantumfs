@@ -365,18 +365,18 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			"--nonpersistent", rootdir, workingdir}
 		chroot_args = append(chroot_args, cmd...)
 
-		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
-		chns_args = append(chns_args, chroot_args...)
+		chroot_cmd := exec.Command(chroot_args[0], chroot_args[1:]...)
+		chroot_cmd.Env = os.Environ()
+		chroot_cmd.SysProcAttr = &syscall.SysProcAttr{}
 
-		chns_env := os.Environ()
-
-		profileLog("Run chns")
-		if err := syscall.Exec(chns_args[0], chns_args,
-			chns_env); err != nil {
-
-			return fmt.Errorf("Execing chns error: %s", err.Error())
+		if chroot_output, err := chroot_cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("Running qfs chroot --"+
+				"setup-namespaces error: %s, stderr: %s",
+				err.Error(), chroot_output)
 		}
 	}
+
+	return fmt.Errorf("Test point")
 
 	profileLog(" cp 1")
 	if err := syscall.Chdir("/"); err != nil {
