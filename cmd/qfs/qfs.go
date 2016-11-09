@@ -127,7 +127,7 @@ func duplicate() {
 	}
 
 	dst := flag.Arg(1)
-	key := []byte(flag.Arg(2))
+	key := flag.Arg(2)
 	Uid, err := strconv.ParseUint(flag.Arg(3), 10, 16)
 	if err != nil {
 		fmt.Println("Invalid Uid:", err)

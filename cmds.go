@@ -93,7 +93,7 @@ const (
 	CmdGetAccessed     = iota
 	CmdClearAccessed   = iota
 	CmdSyncAll         = iota
-	CmdDuplicateObject = iota
+	CmdInsertInode = iota
 )
 
 // The various error codes
@@ -133,7 +133,7 @@ type SyncAllRequest struct {
 type DuplicateObject struct {
 	CommandCommon
 	DstPath     string
-	Key         []byte
+	Key         string
 	Uid         uint16
 	Gid         uint16
 	Permissions uint32
@@ -285,7 +285,7 @@ func (api *Api) SyncAll() error {
 }
 
 // duplicate an object with a given key and path
-func (api *Api) DuplicateObject(dst string, key []byte, permissions uint32,
+func (api *Api) DuplicateObject(dst string, key string, permissions uint32,
 	uid uint16, gid uint16) error {
 
 	if !isWorkspacePathValid(dst) {
@@ -298,7 +298,7 @@ func (api *Api) DuplicateObject(dst string, key []byte, permissions uint32,
 	}
 
 	cmd := DuplicateObject{
-		CommandCommon: CommandCommon{CommandId: CmdDuplicateObject},
+		CommandCommon: CommandCommon{CommandId: CmdInsertInode},
 		DstPath:       dst,
 		Key:           key,
 		Uid:           uid,
@@ -341,7 +341,7 @@ func isWorkspacePathValid(dst string) bool {
 	return true
 }
 
-func isKeyValid(key []byte) bool {
+func isKeyValid(key string) bool {
 	if length := len(key); length != ExtendedKeyLength {
 		return false
 	}
