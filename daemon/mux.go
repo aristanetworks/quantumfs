@@ -382,7 +382,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	// Remove the inode from the map, ready to be garbage collected. We also
 	// re-register ourselves in the uninstantiated inode collection. If the
-	// parent is the inode then it's an ophaned File which can never be
+	// parent is the inode then it's an orphaned File which can never be
 	// instantiated again.
 	//
 	// If parent == nil, then this is a workspace which we cannot instantiate via

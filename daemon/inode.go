@@ -247,8 +247,8 @@ func (inode *InodeCommon) LockTreeWaitAtMost(wait time.Duration) *sync.RWMutex {
 	select {
 	case <-time.After(wait):
 		// Since we've timed out we need to launch a receiver for the lock.
-		// Should the lock ever eventually acquired if we don't have
-		// something waiting to release it we'll definitely deadlock that
+		// Should the lock ever eventually be acquired if we don't have
+		// something waiting to release it we'll indefinitely block that
 		// tree.
 		go func() {
 			lock := <-waitForTreeLock
