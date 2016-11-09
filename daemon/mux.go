@@ -352,7 +352,19 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	defer inode.LockTree().Unlock()
+	// We must timeout if we cannot grab the tree lock. Forget is called on the
+	// unmount path and if we are trying to forcefully unmount due to some
+	// internal error or hang, if we don't timeout we can deadlock against that
+	// other broken operation.
+	lock := inode.LockTreeWaitAtMost(100 * time.Millisecond)
+	if lock == nil {
+		qfs.c.wlog("Timed out locking tree in Forget. Inode %d, %d times",
+			nodeID, nlookup)
+		return
+	} else {
+		defer lock.Unlock()
+	}
+
 	key := inode.flush_DOWN(&qfs.c)
 	if !inode.isWorkspaceRoot() {
 		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
