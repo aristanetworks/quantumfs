@@ -77,7 +77,7 @@ func (c *ctx) Flog(funcName string, extraFmtStr string,
 	args ...interface{}) exitLog {
 
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+
-		funcName+extraFmtStr, args...)
+		funcName+" "+extraFmtStr, args...)
 
 	return exitLog{
 		c:        c,

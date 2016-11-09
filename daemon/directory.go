@@ -602,7 +602,7 @@ func (dir *Directory) getChildRecord(c *ctx,
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
-	defer c.Flog("Directory::Unlink", " %s", name).exit()
+	defer c.Flog("Directory::Unlink", "%s", name).exit()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -629,7 +629,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 }
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
-	defer c.Flog("Directory::Rmdir", " %s", name).exit()
+	defer c.Flog("Directory::Rmdir", "%s", name).exit()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -739,7 +739,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 func (dir *Directory) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
-	defer c.Flog("Directory::RenameChild", " %s -> %s", oldName, newName).exit()
+	defer c.Flog("Directory::RenameChild", "%s -> %s", oldName, newName).exit()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -808,7 +808,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		return fuse.EPERM
 	}
 
-	defer c.Flog("Directory::MvChild", " Enter %s -> %s", oldName,
+	defer c.Flog("Directory::MvChild", "Enter %s -> %s", oldName,
 		newName).exit()
 
 	result := func() fuse.Status {
@@ -983,7 +983,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 	attr string) (quantumfs.Buffer, fuse.Status) {
 
-	defer c.Flog("Directory::getChildXAttrBuffer", " %d %s", inodeNum,
+	defer c.Flog("Directory::getChildXAttrBuffer", "%d %s", inodeNum,
 		attr).exit()
 
 	defer dir.RLock().RUnlock()
@@ -1046,7 +1046,7 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 func (dir *Directory) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
-	defer c.Flog("Directory::listChildXAttr", " %d", inodeNum).exit()
+	defer c.Flog("Directory::listChildXAttr", "%d", inodeNum).exit()
 
 	defer dir.RLock().RUnlock()
 
@@ -1075,7 +1075,7 @@ func (dir *Directory) listChildXAttr(c *ctx,
 func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	defer c.Flog("Directory::listChildXAttr", " %d, %s", inodeNum, attr).exit()
+	defer c.Flog("Directory::listChildXAttr", "%d, %s", inodeNum, attr).exit()
 
 	defer dir.Lock().Unlock()
 
@@ -1144,7 +1144,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	defer c.Flog("Directory::removeChildXAttr", " %d, %s", inodeNum, attr).exit()
+	defer c.Flog("Directory::removeChildXAttr", "%d, %s", inodeNum, attr).exit()
 
 	defer dir.Lock().Unlock()
 
