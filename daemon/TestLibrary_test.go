@@ -49,11 +49,30 @@ func noStdOut(format string, args ...interface{}) error {
 	return nil
 }
 
-// startTest is a helper which configures the testing environment
+// This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
+	runTestCommon(t, test)
+}
 
-	testPc, _, _, _ := runtime.Caller(1)
+// If you have a test which is expensive in terms of CPU time, then use
+// runExpensiveTest() which will not run it at the same time as other tests. This is
+// to prevent multiple expensive tests from running concurrently and causing each
+// other to time out due to CPU starvation.
+func runExpensiveTest(t *testing.T, test quantumFsTest) {
+	runTestCommon(t, test)
+}
+
+func runTestCommon(t *testing.T, test quantumFsTest) {
+	// Since we grab the test name from the backtrace, it must always be an
+	// identical number of frames back to the name of the test. Otherwise
+	// multiple tests will end up using the same temporary directory and nothing
+	// will work.
+	//
+	// 2 <testname>
+	// 1 runTest/runExpensiveTest
+	// 0 runTestCommon
+	testPc, _, _, _ := runtime.Caller(2)
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
