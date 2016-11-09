@@ -251,6 +251,12 @@ func TestLogFnPair(t *testing.T) {
 	if IsLogFnPair(FnEnterStr+"asdlkj234", FnExitStr+"kjl23") {
 		t.Fatal("Obvious mismatch matches")
 	}
+
+	if !IsLogFnPair("---In Mux::ReleaseDirEnter Fh: %d\n",
+		"Out-- Mux::ReleaseDir\n") {
+
+		t.Fatal("Real example mismatch")
+	}
 }
 
 func TestFileReload(t *testing.T) {
