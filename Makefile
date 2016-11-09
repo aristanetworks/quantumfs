@@ -21,7 +21,9 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
 
 $(COMMANDS): encoding/metadata.capnp.go
-	go build github.com/aristanetworks/quantumfs/cmd/$@
+	go build github.com/aristanetworks/quantumfs/cmd/$@; \
+        sudo cp ./$@ /usr/bin/$@; \
+	sudo go test github.com/aristanetworks/quantumfs/cmd/$@;
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go
 	sudo go test github.com/aristanetworks/quantumfs/$@
