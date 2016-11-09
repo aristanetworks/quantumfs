@@ -270,7 +270,7 @@ func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
-		err := os.Mkdir(testDir, 0124)
+		err := os.Mkdir(testDir, 0324)
 		test.assert(err == nil, "Error creating directory: %v", err)
 
 		testFile := testDir + "/file"
@@ -924,3 +924,16 @@ func TestDirectoryGetAttr(t *testing.T) {
 			"Directory permissions incorrect: %d", fileInfo.Mode())
 	})
 }
+
+// Compare the Unlink function with different permissions
+/*
+func TestUnlinkPermission(t *testing.T) {
+        runTest(t, func(test *testHelper) {
+                testFile := testDir + "/file"
+		fd, err := os.Create(testFile)
+                // The permission is 0666, file does not have Excute permission
+                // It should not achieve an Unlinking permission
+		test.assert(err == nil, "Error creating file: %v", err)
+		fd.Close()        
+        })
+}*/
