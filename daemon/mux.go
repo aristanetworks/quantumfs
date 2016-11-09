@@ -367,7 +367,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	// other broken operation.
 	lock := inode.LockTreeWaitAtMost(200 * time.Millisecond)
 	if lock == nil {
-		qfs.c.wlog("Timed out locking tree in Forget. Inode %d, %d times",
+		qfs.c.elog("Timed out locking tree in Forget. Inode %d, %d times",
 			nodeID, nlookup)
 		qfs.giveUpOnForget = true
 		return
