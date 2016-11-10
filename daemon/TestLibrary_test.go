@@ -52,7 +52,14 @@ func noStdOut(format string, args ...interface{}) error {
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test)
+	runTestCommon(t, test, true)
+}
+
+// If you need to initialize the QuantumFS instance in some special way, then use
+// this variant.
+func runTestNoQfs(t *testing.T, test quantumFsTest) {
+	t.Parallel()
+	runTestCommon(t, test, false)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -60,10 +67,10 @@ func runTest(t *testing.T, test quantumFsTest) {
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
 func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test)
+	runTestCommon(t, test, true)
 }
 
-func runTestCommon(t *testing.T, test quantumFsTest) {
+func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
 	// Since we grab the test name from the backtrace, it must always be an
 	// identical number of frames back to the name of the test. Otherwise
 	// multiple tests will end up using the same temporary directory and nothing
@@ -90,7 +97,15 @@ func runTestCommon(t *testing.T, test quantumFsTest) {
 
 	defer th.endTest()
 
-	// Allow tests to run for up to 1 seconds before considering them timed out
+	// Allow tests to run for up to 1 seconds before considering them timed out.
+	// If we are going to start a standard QuantumFS instance we can start the
+	// timer before the test proper and therefore avoid false positive test
+	// failures due to timeouts caused by system slowness as we try to mount
+	// dozens of FUSE filesystems at once.
+	if startDefaultQfs {
+		th.startDefaultQuantumFs()
+	}
+
 	th.log("Finished test preamble, starting test proper")
 	go th.execute(test)
 
@@ -485,7 +500,7 @@ func randomNamespaceName(size int) string {
 }
 
 func TestRandomNamespaceName(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		name1 := randomNamespaceName(8)
 		name2 := randomNamespaceName(8)
 		name3 := randomNamespaceName(10)
@@ -683,7 +698,7 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		test.shouldFailLogscan = true
 
 		test.startDefaultQuantumFs()
@@ -705,8 +720,6 @@ func TestPanicFilesystemAbort(t *testing.T) {
 // should timeout and cleanup after itself.
 func TestTimeout(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		test.shouldFail = true
 		time.Sleep(60 * time.Second)
 
@@ -875,7 +888,7 @@ func genData(maxLen int) []byte {
 }
 
 func TestGenData(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		hardcoded := "012345678910111213141516171819202122232425262"
 		data := genData(len(hardcoded))
 
