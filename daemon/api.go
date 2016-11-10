@@ -495,11 +495,11 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 
 	// get immediate parent of the target node
 	p, err := func() (Inode, error) {
-		// The ApiInode uses tree lock of NamespaceList and not any 
-                // particular workspace. Thus at this point in the code, we don't
-                // have the tree lock on the WorkspaceRoot. Hence, It is safe and
-                // necessary to get the tree lock of the WorkspaceRoot exclusively
-                // here.
+		// The ApiInode uses tree lock of NamespaceList and not any
+		// particular workspace. Thus at this point in the code, we don't
+		// have the tree lock on the WorkspaceRoot. Hence, It is safe and
+		// necessary to get the tree lock of the WorkspaceRoot exclusively
+		// here.
 		defer (&workspace.Directory).LockTree().Unlock()
 		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()

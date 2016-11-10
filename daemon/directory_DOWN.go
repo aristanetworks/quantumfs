@@ -102,10 +102,10 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	dir.flush_DOWN(c)
 
 	// flush_DOWN already acquired an Inode lock exclusively. In case of the
-        // dead lock, the Inode lock for reading should be required after releasing
-        // its exclusive lock. The gap between two locks, other threads cannot come
-        // in because the function holds the exclusive tree lock, so it is the only
-        // thread accessing this Inode. Also, recursive lock requiring won't occur.
+	// dead lock, the Inode lock for reading should be required after releasing
+	// its exclusive lock. The gap between two locks, other threads cannot come
+	// in because the function holds the exclusive tree lock, so it is the only
+	// thread accessing this Inode. Also, recursive lock requiring won't occur.
 	defer dir.RLock().RUnlock()
 	record, err := dir.getChildRecord(c, inodeNum)
 	if err != nil {
