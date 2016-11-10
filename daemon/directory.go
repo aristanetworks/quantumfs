@@ -589,28 +589,6 @@ func (dir *Directory) getChildRecord(c *ctx,
 		errors.New("Inode given is not a child of this directory")
 }
 
-// Helper to check whether the permission along a single branch of the workspace
-// The function is protected by RLock in case of change on parent
-func getAncestorPermissions(c *ctx, inode Inode,permission uint32) bool {
-        parent := inode.parent()
-        if parent == nil {      // hit the workspace root
-                return true
-        } 
- 
-        defer parent.(*Directory).RLock().RUnlock()
-
-        record, exists := parent.getChildRecord(c, inode.inodeNum())
-        if exists != nil {
-                panic("There is no record for the current inode\n")
-        }
-
-        if BitFlagsSet(uint(record.Permissions()),uint(permission)) {
-                return getAncestorPermissions(c, parent, permission)
-        }
-        
-        return false
-}
-
 func (dir *Directory) getPermissions(c *ctx, permission uint32, uid uint32,
         gid uint32, fileOwner uint32, dirOwner uint32, dirGroup uint32) fuse.Status {
 
@@ -648,11 +626,6 @@ func (dir *Directory) getPermissions(c *ctx, permission uint32, uid uint32,
                 return fuse.EACCES 
         }
         
-        if !getAncestorPermissions(c, dir.parent(), permX) {
-                c.vlog("Directory::GetPermissions fail with ancestor")
-                return fuse.EACCES
-        }
-       
         return fuse.OK
 }
 
