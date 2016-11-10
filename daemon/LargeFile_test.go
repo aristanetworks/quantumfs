@@ -13,8 +13,6 @@ import "syscall"
 
 func TestLargeFileRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -50,8 +48,6 @@ func TestLargeFileRead(t *testing.T) {
 
 func TestLargeFileExpansion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -114,8 +110,6 @@ func TestLargeFileExpansion(t *testing.T) {
 
 func TestLargeFileAttr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -173,8 +167,6 @@ func TestLargeFileAttr(t *testing.T) {
 
 func TestLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"

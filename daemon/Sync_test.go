@@ -38,7 +38,6 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 // and confirm some writes happened.
 func TestNoImplicitSync(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		dataStore := setCountingDataStore{
 			DataStore: test.qfs.c.dataStore.durableStore,
 		}
