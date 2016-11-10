@@ -606,27 +606,35 @@ func (dir *Directory) getPermissions(c *ctx, permission uint32, uid uint32,
         }
 
         // Get whether current user in OWNER/GRP/OTHER
-        var permX, permW uint32
+        var permWX uint32
         if uid == dirOwner {
-                permW = syscall.S_IWUSR
-                permX = syscall.S_IXUSR
-        } else if gid == dirGroup {
-                permW = syscall.S_IWGRP
-                permX = syscall.S_IXGRP
-        } else { // other
-                permW = syscall.S_IWOTH
-                permX = syscall.S_IXOTH
-        }
-
-        // Check the current directory having x and w permissions
-        // As well as the ancestor directories having x permissions
-        if (permission & (permW | permX)) != (permW | permX) {
-                c.vlog("Directory::GetPermissions fail with permission: %o %o",
-                        permission, permX|permW)
-                return fuse.EACCES 
+                permWX = syscall.S_IWUSR | syscall.S_IXUSR
+                // Check the current directory having x and w permissions
+                if (permission & permWX) == permWX {
+                        c.vlog("Directory::GetPermissions fail at owner: %o - %o",
+                                permission, permWX)
+                        return fuse.OK
+                }
+        } 
+        
+        if gid == dirGroup {
+                permWX = syscall.S_IWGRP | syscall.S_IXGRP
+                if (permission & permWX) == permWX {
+                        c.vlog("Directory::GetPermissions fail at group: %o - %o",
+                                permission, permWX)
+                        return fuse.OK
+                }
         }
         
-        return fuse.OK
+        // all the other
+        permWX = syscall.S_IWOTH | syscall.S_IXOTH
+        if (permission & permWX) == permWX {
+                c.vlog("Directory::GetPermissions fail at other: %o - %o",
+                        permission, permWX)
+                return fuse.OK
+        }
+        
+        return fuse.EACCES
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
@@ -655,13 +663,11 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
                 
                 parent := dir.parent()
 
-                if parent == nil { // the directory is a root
-                        // The root is always albe to unlink any inodes because of 
-                        // its permission 0777, which is hardcoded in the file 
-                        // daemon/workspaceroot.go
-		        dir.delChild_(c, name)
-                        status = fuse.OK 
-                } else {
+                // When parent is a nil, the directory is a root. Therefore, it can
+                // always be albe to unlink any inodes because of its permission 777,
+                // which is hardcoded in the file daemon/workspaceroot.go. In this
+                // case, only no WorkspaceRoot needs a permission check.
+                if parent != nil{
                         dirRecord, exist := parent.getChildRecord(c,
                                                         dir.InodeCommon.id)
                         dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
@@ -675,12 +681,13 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
                         status = dir.getPermissions(c, permission, owner.Uid,
                                         owner.Gid, fileOwner, dirOwner, dirGroup)
-                        if status == fuse.OK {
-		                dir.delChild_(c, name)
+                        if status != fuse.OK {
+                                return status
                         }
                 }
 
-                return status
+		dir.delChild_(c, name)
+                return fuse.OK
 	}()
         
 	if result == fuse.OK {
