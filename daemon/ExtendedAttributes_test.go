@@ -228,8 +228,8 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 // Verify the get XAttr function for the self-defined extended key
 func TestXAttrExtendedKeyGet(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		
-                workspace := test.newWorkspace()
+
+		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.assert(err == nil, "Error creating a small file: %v", err)
@@ -319,8 +319,8 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 // Verify the set/remove XAttr function for extended key is illegal
 func TestXAttrTypeKeySetRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		
-                workspace := test.newWorkspace()
+
+		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.assert(err == nil, "Error creating a small file: %v", err)
