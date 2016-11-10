@@ -153,8 +153,8 @@ func (s *sequenceTracker) Process(log LogOutput) error {
 	} else if IsFunctionOut(log.Format) {
 		if err != nil || !IsLogFnPair(top.Format, log.Format) {
 			return errors.New(fmt.Sprintf("Error: Mismatched '%s' in "+
-				"requestId %d log\n",
-				FnExitStr, log.ReqId))
+				"requestId %d log. ||%s|||%s||%s\n",
+				FnExitStr, log.ReqId, top.Format, log.Format, err))
 		}
 		s.stack.Pop()
 	}
