@@ -500,7 +500,7 @@ func randomNamespaceName(size int) string {
 }
 
 func TestRandomNamespaceName(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		name1 := randomNamespaceName(8)
 		name2 := randomNamespaceName(8)
 		name3 := randomNamespaceName(10)
@@ -698,7 +698,7 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		test.shouldFailLogscan = true
 
 		test.startDefaultQuantumFs()
@@ -720,8 +720,6 @@ func TestPanicFilesystemAbort(t *testing.T) {
 // should timeout and cleanup after itself.
 func TestTimeout(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		test.shouldFail = true
 		time.Sleep(60 * time.Second)
 
@@ -890,7 +888,7 @@ func genData(maxLen int) []byte {
 }
 
 func TestGenData(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		hardcoded := "012345678910111213141516171819202122232425262"
 		data := genData(len(hardcoded))
 
