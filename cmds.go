@@ -287,7 +287,7 @@ func (api *Api) SyncAll() error {
 }
 
 // duplicate an object with a given key and path
-func (api *Api) DuplicateObject(dst string, key string, permissions uint32,
+func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	uid uint16, gid uint16) error {
 
 	if !isWorkspacePathValid(dst) {
