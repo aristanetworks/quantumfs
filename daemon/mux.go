@@ -535,9 +535,9 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 		return 0, fuse.ENOENT
 	}
 	if attr == quantumfs.XAttrTypeKey {
-		msg, status := getQuantumfsXAttrDataHelper(c, inode)
-		if len(msg) != quantumfs.ExtendedKeyLength {
-			return 0, fuse.EIO
+		_, status := getQuantumfsExtendedKey(c, inode)
+		if status != fuse.OK {
+			return 0, status
 		}
 		return quantumfs.ExtendedKeyLength, status
 	}
@@ -545,10 +545,11 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	return inode.GetXAttrSize(c, attr)
 }
 
-func getQuantumfsXAttrDataHelper(c *ctx, inode Inode) ([]byte, fuse.Status) {
-	parent := inode.parent()
+func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
+        defer inode.LockTree().Unlock()
+        parent := inode.parent()
 	if parent == nil {
-		return nil, fuse.ENOENT
+		return nil, fuse.ENOATTR
 	}
 
 	var dir *Directory
@@ -557,7 +558,6 @@ func getQuantumfsXAttrDataHelper(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	} else {
 		dir = parent.(*Directory)
 	}
-	defer parent.LockTree().Unlock()
 	msg, status := dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
 	return msg, status
 }
@@ -579,7 +579,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	}
 
 	if attr == quantumfs.XAttrTypeKey {
-		return getQuantumfsXAttrDataHelper(c, inode)
+		return getQuantumfsExtendedKey(c, inode)
 	}
 
 	defer inode.RLockTree().RUnlock()

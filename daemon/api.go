@@ -473,21 +473,21 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 	wsr := dst[0] + "/" + dst[1]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
 
 	if len(dst) == 2 { // only have namespace and workspace
 		// duplicate the entire workspace root is illegal
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"WorkspaceRoot can not be duplicated")
 		return
 	}
 
 	if key.Type() != quantumfs.KeyTypeEmbedded {
 		if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
-			api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
 				"Key does not exist in the datastore")
 			return
 		}
@@ -495,12 +495,16 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 
 	// get immediate parent of the target node
 	p, err := func() (Inode, error) {
-		// Uses tree lock of NamespaceList but not any real workspace
+		// The ApiInode uses tree lock of NamespaceList and not any 
+                // particular workspace. Thus at this point in the code, we don't
+                // have the tree lock on the WorkspaceRoot. Hence, It is safe and
+                // necessary to get the tree lock of the WorkspaceRoot exclusively
+                // here.
 		defer (&workspace.Directory).LockTree().Unlock()
 		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()
 	if err != nil {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Path %s does not exist", cmd.DstPath)
 		return
 	}
@@ -509,7 +513,7 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 	target := dst[len(dst)-1]
 	_, exist := parent.dirChildren.getInode(c, target)
 	if exist {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist", target)
 		return
 	}
