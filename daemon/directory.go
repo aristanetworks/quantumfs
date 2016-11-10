@@ -125,7 +125,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 func (dir *Directory) updateSize_(c *ctx) {
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
-	if !dir.isWorkspaceRoot() {
+	if !dir.self.isWorkspaceRoot() {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = func() uint64 {
@@ -1041,7 +1041,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 		return true, dir.publish_(c)
 	}()
 
-	if ok && !dir.isWorkspaceRoot() {
+	if ok && !dir.self.isWorkspaceRoot() {
 		dir.parent().syncChild(c, dir.InodeCommon.id, key)
 	}
 }
