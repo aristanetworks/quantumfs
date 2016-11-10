@@ -31,7 +31,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 }
 
 func TestSmokeTestEtherFilesystem(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		test.startQuantumFs(test.etherFilesystemConfig())
 		interDirectoryRename(test)
 	})

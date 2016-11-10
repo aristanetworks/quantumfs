@@ -14,8 +14,6 @@ import "testing"
 
 func TestExtendedAttrReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -65,8 +63,6 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 
 func TestExtendedAttrList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -111,8 +107,6 @@ func TestExtendedAttrList(t *testing.T) {
 
 func TestExtendedAttrReadNonExist(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -133,8 +127,6 @@ func TestExtendedAttrReadNonExist(t *testing.T) {
 
 func TestExtendedAttrRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
