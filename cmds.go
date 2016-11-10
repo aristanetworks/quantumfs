@@ -88,22 +88,22 @@ type CommandCommon struct {
 
 // The various command ID constants
 const (
-	CmdError           = iota
-	CmdBranchRequest   = iota
-	CmdGetAccessed     = iota
-	CmdClearAccessed   = iota
-	CmdSyncAll         = iota
-	CmdInsertInode = iota
+	CmdError         = iota
+	CmdBranchRequest = iota
+	CmdGetAccessed   = iota
+	CmdClearAccessed = iota
+	CmdSyncAll       = iota
+	CmdInsertInode   = iota
 )
 
 // The various error codes
 const (
 	ErrorOK            = iota // Command Successful
-        ErrorBadArgs       = iota // The argument is wrong
+	ErrorBadArgs       = iota // The argument is wrong
 	ErrorBadJson       = iota // Failed to parse command
 	ErrorBadCommandId  = iota // Unknown command ID
 	ErrorCommandFailed = iota // The Command failed, see the error for more info
-        ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
+	ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
 )
 
 type ErrorResponse struct {

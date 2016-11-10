@@ -546,8 +546,8 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 }
 
 func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
-        defer inode.LockTree().Unlock()
-        parent := inode.parent()
+	defer inode.LockTree().Unlock()
+	parent := inode.parent()
 	if parent == nil {
 		return nil, fuse.ENOATTR
 	}

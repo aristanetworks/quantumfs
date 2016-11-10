@@ -40,7 +40,7 @@ func main() {
 		fmt.Println("         - copy an inode correponding to a extended" +
 			" key under the location of dstPath with specifications of" +
 			" user <uid>, group <gid>, and RWX permission <permission>" +
-                        " in octal format")
+			" in octal format")
 		os.Exit(exitBadCmd)
 	}
 

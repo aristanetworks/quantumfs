@@ -73,12 +73,12 @@ func TestApiClearAccessList(t *testing.T) {
 	})
 }
 
-func getExtendedKeyHelper(test *testHelper, dst string, type_ string) []byte{
-        key := make([]byte, quantumfs.ExtendedKeyLength)
-        sz, err := syscall.Getxattr(dst, quantumfs.XAttrTypeKey, key)
-        test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
-                "Error getting the key of %s: %v with a size of %d", type_, err, sz)
-        return key
+func getExtendedKeyHelper(test *testHelper, dst string, type_ string) []byte {
+	key := make([]byte, quantumfs.ExtendedKeyLength)
+	sz, err := syscall.Getxattr(dst, quantumfs.XAttrTypeKey, key)
+	test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
+		"Error getting the key of %s: %v with a size of %d", type_, err, sz)
+	return key
 }
 
 func TestApiDuplicateObject(t *testing.T) {
@@ -128,7 +128,7 @@ func TestApiDuplicateObject(t *testing.T) {
 			quantumfs.ExtendedKeyLength)
 		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the Key of symlink: %v with a size of %d",
-                        err, sz)
+			err, sz)
 
 		// get the key from a pipe
 		keyP := getExtendedKeyHelper(test, spFilename, "pipe")
@@ -144,14 +144,14 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Ensure the non-existing intermediate Inode not be created
 		err = api.DuplicateObject(dst+"/nonExist/b", string(keyF),
-                                        PermissionA, 0, 0)
+			PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Unexpected success creating non-existing intermediate"+
 				" Inode")
 
 		// Ensure the target node does not exist
 		err = api.DuplicateObject(dst+"/test/a", string(keyF),
-                                        PermissionA, 0, 0)
+			PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Error having the target node already")
 
@@ -173,7 +173,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Duplicate the directory in the given path
 		err = api.DuplicateObject(dst+"/test/a/dirtest", string(keyD),
-                                        PermissionA, 0, 0)
+			PermissionA, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a directory to target workspace: %v",
 			err)
@@ -207,7 +207,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Ensure the symlink in the given path
 		err = api.DuplicateObject(dst+"/symlink", string(keyS),
-                                        PermissionB, 0, 0)
+			PermissionB, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a symlink to workspace: %v", err)
 
@@ -222,7 +222,7 @@ func TestApiDuplicateObject(t *testing.T) {
 
 		// Ensure the pipe file in the given path
 		err = api.DuplicateObject(dst+"/Pipe", string(keyP),
-                                        PermissionB, 0, 0)
+			PermissionB, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a pipe file to workspace: %v", err)
 
