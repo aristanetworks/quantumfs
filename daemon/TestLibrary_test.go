@@ -52,7 +52,14 @@ func noStdOut(format string, args ...interface{}) error {
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test)
+	runTestCommon(t, test, true)
+}
+
+// If you need to initialize the QuantumFS instance in some special way, then use
+// this variant.
+func runTestNoQfs(t *testing.T, test quantumFsTest) {
+	t.Parallel()
+	runTestCommon(t, test, false)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -60,7 +67,7 @@ func runTest(t *testing.T, test quantumFsTest) {
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
 func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test)
+	runTestCommon(t, test, true)
 }
 
 func runTestCommon(t *testing.T, test quantumFsTest) {
@@ -90,7 +97,15 @@ func runTestCommon(t *testing.T, test quantumFsTest) {
 
 	defer th.endTest()
 
-	// Allow tests to run for up to 1 seconds before considering them timed out
+	// Allow tests to run for up to 1 seconds before considering them timed out.
+	// If we are going to start a standard QuantumFS instance we can start the
+	// timer before the test proper and therefore avoid false positive test
+	// failures due to timeouts caused by system slowness as we try to mount
+	// dozens of FUSE filesystems at once.
+	if startDefaultQfs {
+		th.startDefaultQuantumFs()
+	}
+
 	th.log("Finished test preamble, starting test proper")
 	go th.execute(test)
 
