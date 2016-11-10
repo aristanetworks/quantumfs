@@ -13,8 +13,6 @@ import "github.com/aristanetworks/quantumfs"
 
 func TestWorkspaceBranching(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		api := test.getApi()
 
 		// First branch the null workspace
@@ -46,8 +44,6 @@ func TestWorkspaceBranching(t *testing.T) {
 
 func TestApiClearAccessList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 		filename := "/test"
