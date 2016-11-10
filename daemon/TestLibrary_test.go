@@ -70,7 +70,7 @@ func runExpensiveTest(t *testing.T, test quantumFsTest) {
 	runTestCommon(t, test, true)
 }
 
-func runTestCommon(t *testing.T, test quantumFsTest) {
+func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
 	// Since we grab the test name from the backtrace, it must always be an
 	// identical number of frames back to the name of the test. Otherwise
 	// multiple tests will end up using the same temporary directory and nothing
