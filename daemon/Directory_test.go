@@ -16,8 +16,6 @@ import "github.com/aristanetworks/quantumfs"
 
 func TestDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "test"
@@ -43,8 +41,6 @@ func TestDirectoryCreation(t *testing.T) {
 
 func TestRecursiveDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		dirName := workspace + "/test/a/b"
 		err := os.MkdirAll(dirName, 0124)
@@ -69,8 +65,6 @@ func TestRecursiveDirectoryCreation(t *testing.T) {
 
 func TestRecursiveDirectoryFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
@@ -102,8 +96,6 @@ func TestRecursiveDirectoryFileCreation(t *testing.T) {
 
 func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
 		wsNamespaceName, wsWorkspaceName :=
@@ -161,8 +153,6 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 // contains the changes in the update.
 func TestDirectoryUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		api := test.getApi()
 
 		src := test.newWorkspace()
@@ -190,8 +180,6 @@ func TestDirectoryUpdate(t *testing.T) {
 
 func TestDirectoryFileDeletion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -293,8 +281,6 @@ func TestUnlinkPermission(t *testing.T) {
 
 func TestDirectoryUnlinkDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testDir := workspace + "/" + "test"
 		err := os.Mkdir(testDir, 0124)
@@ -312,8 +298,6 @@ func TestDirectoryUnlinkDirectory(t *testing.T) {
 
 func TestDirectoryRmdirEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0124)
@@ -326,8 +310,6 @@ func TestDirectoryRmdirEmpty(t *testing.T) {
 
 func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0324)
@@ -348,8 +330,6 @@ func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 
 func TestDirectoryRmdirNotEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0124)
@@ -368,8 +348,6 @@ func TestDirectoryRmdirNotEmpty(t *testing.T) {
 
 func TestDirectoryRmdirFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFile := workspace + "/test"
 		fd, err := os.Create(testFile)
@@ -387,8 +365,6 @@ func TestDirectoryRmdirFile(t *testing.T) {
 // instantiates matches the type of the entry in the directory.
 func TestDirectoryChildTypes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testDir := workspace + "/testdir"
@@ -419,9 +395,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 }
 
 func TestLargeDirectory(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
+	runExpensiveTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
@@ -480,7 +454,6 @@ func TestLargeDirectory(t *testing.T) {
 
 func TestDirectoryChmod(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testDir := workspace + "/testdir"
 
@@ -504,7 +477,6 @@ func TestDirectoryChmod(t *testing.T) {
 
 func TestIntraDirectoryRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testFilename1 := workspace + "/test"
 		testFilename2 := workspace + "/test2"
@@ -530,7 +502,6 @@ func TestIntraDirectoryRename(t *testing.T) {
 
 func TestInterDirectoryRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		interDirectoryRename(test)
 	})
 }
@@ -567,7 +538,6 @@ func interDirectoryRename(test *testHelper) {
 
 func TestRenameIntoParent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/child"
@@ -600,7 +570,6 @@ func TestRenameIntoParent(t *testing.T) {
 
 func TestRenameIntoChild(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/child"
@@ -633,7 +602,6 @@ func TestRenameIntoChild(t *testing.T) {
 
 func TestRenameIntoIndirectParent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/indirect/child"
@@ -666,7 +634,6 @@ func TestRenameIntoIndirectParent(t *testing.T) {
 
 func TestRenameIntoIndirectChild(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/indirect/child"
@@ -699,7 +666,6 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -728,7 +694,6 @@ func TestSUIDPerms(t *testing.T) {
 
 func TestLoadOnDemand(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		dirName := workspace + "/layerA/layerB/layerC"
 		fileA := "/layerA/fileA"
@@ -804,7 +769,6 @@ func TestLoadOnDemand(t *testing.T) {
 
 func TestInodeForget(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 
 		dirName := workspace + "/layerA/layerB"
@@ -876,8 +840,6 @@ func TestInodeForget(t *testing.T) {
 // dummy user is used when viewing the permissions as root.
 func TestChownUserAsRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -900,7 +862,6 @@ func TestChownUserAsRoot(t *testing.T) {
 // directory was opened.
 func TestDirectorySnapshotRefresh(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		parent := test.newWorkspace()
 
 		for i := 0; i < 2; i++ {
@@ -951,7 +912,7 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 
 // Trigger GetAttr on a directory in order to confirm that it works correctly
 func TestDirectoryGetAttr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		config := test.defaultConfig()
 		config.CacheTimeSeconds = 0
 		config.CacheTimeNsecs = 100000

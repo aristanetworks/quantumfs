@@ -16,8 +16,6 @@ import "github.com/aristanetworks/quantumfs"
 
 func TestFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "test"
@@ -45,8 +43,6 @@ func TestFileCreation(t *testing.T) {
 
 func TestFileReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		//length of test Text should be 37, and not a multiple of readBuf len
 		testText := []byte("This is test data 1234567890 !@#^&*()")
 		//write the test data in two goes
@@ -152,8 +148,6 @@ func TestFileReadWrite(t *testing.T) {
 
 func TestFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testDir := workspace + "/testDir"
@@ -243,8 +237,6 @@ func TestFileDescriptorPermissions(t *testing.T) {
 
 func TestRootFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -304,8 +296,6 @@ func TestRootFileDescriptorPermissions(t *testing.T) {
 
 func TestFileSizeChanges(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "test"
@@ -371,8 +361,6 @@ func TestFileSizeChanges(t *testing.T) {
 
 func TestFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
 		wsNamespaceName, wsWorkspaceName :=
@@ -422,8 +410,6 @@ func TestFileDescriptorDirtying(t *testing.T) {
 // Test file metadata updates
 func TestFileAttrUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		api := test.getApi()
 
 		src := test.newWorkspace()
@@ -462,8 +448,6 @@ func TestFileAttrUpdate(t *testing.T) {
 
 func TestFileAttrWriteUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		api := test.getApi()
 
 		src := test.newWorkspace()
@@ -506,8 +490,6 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 
 func TestSmallFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -527,7 +509,6 @@ func TestSmallFileZero(t *testing.T) {
 
 func TestFileAccessAfterUnlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -577,7 +558,6 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 
 func TestSmallFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
