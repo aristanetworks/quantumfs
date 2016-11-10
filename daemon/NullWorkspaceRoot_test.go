@@ -13,8 +13,6 @@ import "testing"
 
 func TestNullWorkspaceDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
 
@@ -26,8 +24,6 @@ func TestNullWorkspaceDirectoryCreation(t *testing.T) {
 
 func TestNullWorkspaceFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
 
@@ -42,8 +38,6 @@ func TestNullWorkspaceFileCreation(t *testing.T) {
 // This function is implemented to facilitate the creation of different types of
 // special files
 func NullWorkspaceSpecialFile(test *testHelper, filetype uint32) {
-	test.startDefaultQuantumFs()
-
 	workspace := test.nullWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
@@ -78,8 +72,6 @@ func TestNullWorkspaceFileMknodCreation(t *testing.T) {
 
 func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.nullWorkspace()
 		link := workspace + "/symlink"
 		err := syscall.Symlink("/usr/bin/arch", link)
@@ -90,8 +82,6 @@ func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
 
 func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFileName := workspace + "/testfile"
 		fd, err := os.Create(testFileName)
@@ -108,8 +98,6 @@ func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 
 func TestNullWorkspaceRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		testFileName := workspace + "/testfile"
 		fd, err := os.Create(testFileName)
