@@ -94,14 +94,18 @@ func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
-// Attaching the inode type in front of the Object-key
+// Return extended key by combining ObjectKey, inode type, and inode size
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
 
-	// Update the Hash value before generate the key
+	// Update the Hash value before generating the key
 	dir.flush_DOWN(c)
 
-	// flush_DOWN already requires a Write lock
+	// flush_DOWN already acquired an Inode lock exclusively. In case of the
+        // dead lock, the Inode lock for reading should be required after releasing
+        // its exclusive lock. The gap between two locks, other threads cannot come
+        // in because the function holds the exclusive tree lock, so it is the only
+        // thread accessing this Inode. Also, recursive lock requiring won't occur.
 	defer dir.RLock().RUnlock()
 	record, err := dir.getChildRecord(c, inodeNum)
 	if err != nil {
@@ -131,6 +135,5 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 		currDir = child.(*Directory)
 	}
 
-	// Run the parent node of the target node, it can be any type
 	return currDir, nil
 }

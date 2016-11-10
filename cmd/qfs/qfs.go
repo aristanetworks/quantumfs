@@ -39,7 +39,8 @@ func main() {
 		fmt.Println("  duplicate <dstPath> <key> <uid> <gid> <permission>")
 		fmt.Println("         - copy an inode correponding to a extended" +
 			" key under the location of dstPath with specifications of" +
-			" user <uid>, group <gid>, and RWX permission <permission>")
+			" user <uid>, group <gid>, and RWX permission <permission>" +
+                        " in octal format")
 		os.Exit(exitBadCmd)
 	}
 
