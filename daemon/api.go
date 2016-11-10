@@ -382,7 +382,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
 		c.vlog("Recieved Duplicate Object request")
-		api.duplicateObject(c, buf)
+		api.insertInode(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -454,9 +454,9 @@ func (api *ApiHandle) syncAll(c *ctx) {
 	api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
 }
 
-func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
-	c.vlog("Api::duplicateObject Enter")
-	defer c.vlog("Api::duplicateObject Exit")
+func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
+	c.vlog("Api::insertInode Enter")
+	defer c.vlog("Api::insertInode Exit")
 
 	var cmd quantumfs.DuplicateObject
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -518,7 +518,7 @@ func (api *ApiHandle) duplicateObject(c *ctx, buf []byte) {
 		return
 	}
 
-	c.vlog("Api::duplicateObject put key %v into node %d - %s",
+	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
 	parent.duplicateInode(c, target, permissions, 0, 0, size,

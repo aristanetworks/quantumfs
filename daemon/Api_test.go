@@ -77,9 +77,8 @@ func getExtendedKeyHelper(test *testHelper, dst string, type_ string) []byte {
 	return key
 }
 
-func TestApiDuplicateObject(t *testing.T) {
+func TestApiInsertInode(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		api := test.getApi()
 
 		// Create the source and the target workspace
@@ -134,25 +133,25 @@ func TestApiDuplicateObject(t *testing.T) {
 		test.assert(err == nil, "Error creating target directories: %v", err)
 
 		// Ensure the workspace root cannot be duplicated
-		err = api.DuplicateObject(dst, string(keyF), PermissionA, 0, 0)
+		err = api.InsertInode(dst, string(keyF), PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Unexpected success duplicating workspace root")
 
 		// Ensure the non-existing intermediate Inode not be created
-		err = api.DuplicateObject(dst+"/nonExist/b", string(keyF),
+		err = api.InsertInode(dst+"/nonExist/b", string(keyF),
 			PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Unexpected success creating non-existing intermediate"+
 				" Inode")
 
 		// Ensure the target node does not exist
-		err = api.DuplicateObject(dst+"/test/a", string(keyF),
+		err = api.InsertInode(dst+"/test/a", string(keyF),
 			PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Error having the target node already")
 
 		// Duplicate the file in the given path
-		err = api.DuplicateObject(dst+"/test/a/file", string(keyF),
+		err = api.InsertInode(dst+"/test/a/file", string(keyF),
 			PermissionA, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a file to target workspace: %v", err)
@@ -168,7 +167,7 @@ func TestApiDuplicateObject(t *testing.T) {
 			expectedMode, stat.Mode)
 
 		// Duplicate the directory in the given path
-		err = api.DuplicateObject(dst+"/test/a/dirtest", string(keyD),
+		err = api.InsertInode(dst+"/test/a/dirtest", string(keyD),
 			PermissionA, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a directory to target workspace: %v",
@@ -190,7 +189,7 @@ func TestApiDuplicateObject(t *testing.T) {
 			err)
 
 		// Ensure the no intermediate inode is a file
-		err = api.DuplicateObject(dst+"/test/a/dirtest/test", string(keyF),
+		err = api.InsertInode(dst+"/test/a/dirtest/test", string(keyF),
 			PermissionA, 0, 0)
 		test.assert(err != nil,
 			"Unexpected success creating a file inside of a file")
@@ -202,7 +201,7 @@ func TestApiDuplicateObject(t *testing.T) {
 			expectedMode, stat.Mode)
 
 		// Ensure the symlink in the given path
-		err = api.DuplicateObject(dst+"/symlink", string(keyS),
+		err = api.InsertInode(dst+"/symlink", string(keyS),
 			PermissionB, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a symlink to workspace: %v", err)
@@ -217,7 +216,7 @@ func TestApiDuplicateObject(t *testing.T) {
 			expectedMode, stat.Mode, stat.Size)
 
 		// Ensure the pipe file in the given path
-		err = api.DuplicateObject(dst+"/Pipe", string(keyP),
+		err = api.InsertInode(dst+"/Pipe", string(keyP),
 			PermissionB, 0, 0)
 		test.assert(err == nil,
 			"Error duplicating a pipe file to workspace: %v", err)
