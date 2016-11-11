@@ -132,7 +132,7 @@ type SyncAllRequest struct {
 	CommandCommon
 }
 
-type DuplicateObject struct {
+type InsertInodeRequest struct {
 	CommandCommon
 	DstPath     string
 	Key         string
@@ -299,7 +299,7 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 			key, ExtendedKeyLength)
 	}
 
-	cmd := DuplicateObject{
+	cmd := InsertInodeRequest{
 		CommandCommon: CommandCommon{CommandId: CmdInsertInode},
 		DstPath:       dst,
 		Key:           key,

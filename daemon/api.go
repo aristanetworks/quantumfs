@@ -381,7 +381,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.syncAll(c)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
-		c.vlog("Recieved Duplicate Object request")
+		c.vlog("Recieved InsertInode request")
 		api.insertInode(c, buf)
 	}
 
@@ -458,7 +458,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	c.vlog("Api::insertInode Enter")
 	defer c.vlog("Api::insertInode Exit")
 
-	var cmd quantumfs.DuplicateObject
+	var cmd quantumfs.InsertInodeRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
 		return
@@ -497,7 +497,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	p, err := func() (Inode, error) {
 		// The ApiInode uses tree lock of NamespaceList and not any
 		// particular workspace. Thus at this point in the code, we don't
-		// have the tree lock on the WorkspaceRoot. Hence, It is safe and
+		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
 		// necessary to get the tree lock of the WorkspaceRoot exclusively
 		// here.
 		defer (&workspace.Directory).LockTree().Unlock()
@@ -525,5 +525,5 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 		quantumfs.UID(uid), quantumfs.GID(gid),
 		type_, key)
 
-	api.queueErrorResponse(quantumfs.ErrorOK, "Duplicate Object Succeeded")
+	api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }
