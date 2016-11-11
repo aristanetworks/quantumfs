@@ -48,6 +48,7 @@ func init() {
 	} else {
 		qfs = qfspath
 	}
+	fmt.Println(qfs)
 }
 
 // A helper function to run command which gives better error information
@@ -317,6 +318,8 @@ func printHelp() {
 func switchUserMode() error {
 	lognameStr := os.Getenv("SUDO_USER")
 
+	fmt.Println("logname:", lognameStr)
+
 	logUser, err := user.Lookup(lognameStr)
 	if err != nil {
 		return err
@@ -361,8 +364,7 @@ func profileLog(info string) {
 }
 
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
-	profileLog("Enter chrootOutOfNsd")
-
+	profileLog("unshare")
 	// isolate the namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())
@@ -633,7 +635,8 @@ ArgumentProcessingLoop:
 
 		// if we do not have root privilege, then gain it now
 		if syscall.Getuid() != 0 {
-			sudo_cmd := []string{sudo, qfs, "chroot", wsr, dir}
+			sudo_cmd := []string{sudo, qfs, "chroot",
+				"--nonpersistent", wsr, dir}
 			sudo_cmd = append(sudo_cmd, cmd...)
 			env := os.Environ()
 
