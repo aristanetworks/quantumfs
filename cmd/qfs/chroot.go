@@ -34,9 +34,12 @@ const (
 	pivot_root = "/usr/sbin/pivot_root"
 )
 
+const (
+	SYSFS_MAGIC = 0x62656572
+)
+
 var qfs string
 var persistent bool = true
-var setupNamespaces bool = false
 
 func init() {
 	if qfspath, err := osext.Executable(); err != nil {
@@ -359,24 +362,34 @@ func profileLog(info string) {
 
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	profileLog("Enter chrootOutOfNsd")
-	// create a new namespace and run qfs chroot tool in the new namespace
-	if !setupNamespaces {
-		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
-			"--nonpersistent", rootdir, workingdir}
-		chroot_args = append(chroot_args, cmd...)
 
-		chroot_cmd := exec.Command(chroot_args[0], chroot_args[1:]...)
-		chroot_cmd.Env = os.Environ()
-		chroot_cmd.SysProcAttr = &syscall.SysProcAttr{}
-
-		if chroot_output, err := chroot_cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("Running qfs chroot --"+
-				"setup-namespaces error: %s, stderr: %s",
-				err.Error(), chroot_output)
-		}
+	// isolate the namespace of this process from the rest of the machine
+	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
+		return fmt.Errorf("Unshare error: %s", err.Error())
 	}
 
-	return fmt.Errorf("Test point")
+	profileLog("statfs")
+
+	var buf syscall.Statfs_t
+	if err := syscall.Statfs("/sys", &buf); err != nil {
+		return fmt.Errorf("Getting filesystem stat of /sys error:%s",
+			err.Error())
+	}
+
+	profileLog("remount")
+
+	// unmount and remount /sys to reflect the new namespace
+	if buf.Type == SYSFS_MAGIC {
+		if err := syscall.Unmount("/sys", syscall.MNT_DETACH); err != nil {
+			return fmt.Errorf("Unmount /sys error: %s", err.Error())
+		}
+
+		if err := syscall.Mount("qfschroot", "/sys", "sysfs", 0,
+			""); err != nil {
+
+			return fmt.Errorf("Mount /sys error: %s", err.Error())
+		}
+	}
 
 	profileLog(" cp 1")
 	if err := syscall.Chdir("/"); err != nil {
@@ -596,10 +609,6 @@ ArgumentProcessingLoop:
 
 			cmd = append(cmd, args[2:]...)
 			break ArgumentProcessingLoop
-
-		case "--setup-namespaces":
-			setupNamespaces = true
-
 		default:
 			fmt.Fprintln(os.Stderr, "unknown argument:", args[0])
 			printHelp()
@@ -622,10 +631,24 @@ ArgumentProcessingLoop:
 		}
 		profileLog("Test legitimate wsr done")
 
-		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
-			fmt.Fprintln(os.Stderr,
-				"chrootOutOfNsd Error: ", err.Error())
-			os.Exit(1)
+		// if we do not have root privilege, then gain it now
+		if syscall.Getuid() != 0 {
+			sudo_cmd := []string{sudo, qfs, "chroot", wsr, dir}
+			sudo_cmd = append(sudo_cmd, cmd...)
+			env := os.Environ()
+
+			if err := syscall.Exec(sudo_cmd[0],
+				sudo_cmd, env); err != nil {
+
+				fmt.Printf("Exec'ing sudo command error: %s\n",
+					err.Error())
+				os.Exit(1)
+			}
+		} else {
+			if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
+				fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s", err.Error())
+				os.Exit(1)
+			}
 		}
 
 		return
