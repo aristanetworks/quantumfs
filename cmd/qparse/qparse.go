@@ -268,11 +268,7 @@ func main() {
 			outFilename = outFile
 		}
 
-		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
-		logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
-			maxThreads, true)
-
-		patterns := qlog.GetStatPatterns(logs, maxLenWildcards)
+		patterns := qlog.GetStatPatterns(inFile, maxThreads, maxLenWildcards)
 
 		fmt.Println("Saving to stat file...")
 		file, err := os.Create(outFilename)

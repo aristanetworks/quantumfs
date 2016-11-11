@@ -6,6 +6,7 @@ package qlog
 
 import "fmt"
 import "math"
+import "runtime"
 import "strconv"
 
 var wildcardStr string
@@ -210,8 +211,7 @@ func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	}
 }
 
-func GetStatPatterns(logs []LogOutput, maxLenWildcards int) []PatternData {
-	sequenceMap := ExtractSequences(logs)
+func SeqMapToList(sequenceMap map[string]SequenceData) []SequenceData {
 	sequences := make([]SequenceData, len(sequenceMap), len(sequenceMap))
 	idx := 0
 	for _, v := range sequenceMap {
@@ -219,6 +219,58 @@ func GetStatPatterns(logs []LogOutput, maxLenWildcards int) []PatternData {
 		idx++
 	}
 
+	return sequences
+}
+
+func GetStatPatterns(inFile string, maxThreads int,
+	maxLenWildcards int) []PatternData {
+
+	// Structures during this process can be massive. Throw them away asap
+
+	var logs []LogOutput
+	{
+		pastEndIdx, dataArray, strMap := ExtractFields(inFile)
+		logs = OutputLogsExt(pastEndIdx, dataArray, strMap,
+			maxThreads, true)
+
+		dataArray = nil
+		strMap = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	var trackerMap map[uint64][]sequenceTracker
+	var trackerCount int
+	{
+		trackerCount, trackerMap = ExtractTrackerMap(logs, maxThreads)
+		logs = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	var sequenceMap map[string]SequenceData
+	{
+		sequenceMap = ExtractSeqMap(trackerCount, trackerMap)
+		trackerMap = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	var sequences []SequenceData
+	{
+		sequences = SeqMapToList(sequenceMap)
+		sequenceMap = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	patterns := SeqToPatterns(sequences, maxLenWildcards)
+	sequences = nil
+
+	return patterns
+}
+
+func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData {
 	status := NewLogStatus(50)
 
 	// Now generate all combinations of the sequences with wildcards in them, but
