@@ -14,8 +14,6 @@ import "syscall"
 
 func TestMedBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -39,8 +37,6 @@ func TestMedBranch(t *testing.T) {
 func TestFileExpansion(t *testing.T) {
 	data := genData(4 * 1024 * 1024)
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -93,8 +89,6 @@ func TestFileExpansion(t *testing.T) {
 
 func TestMedFileAttr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -152,8 +146,6 @@ func TestMedFileAttr(t *testing.T) {
 
 func TestMedFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -175,7 +167,6 @@ func TestMedFileZero(t *testing.T) {
 
 func TestMultiBlockFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 

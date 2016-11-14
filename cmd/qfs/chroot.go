@@ -54,29 +54,9 @@ func init() {
 func runCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("Error getting stderr pipe of runCommand: %s\n"+
-			"Command: %s %v",
-			err.Error(), name, args)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("Error starting process in runCommand: %s\n"+
-			"Command: %s %v",
-			err.Error(), name, args)
-	}
-
-	buf, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		return fmt.Errorf("Error reading stderr in runCommand: %s\n"+
-			"Command: %s %v",
-			err.Error(), name, args)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("Error waiting process in runCommand: %s\n"+
-			"Command: %s %v\nStderr: %s",
+	if buf, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Error in runCommand: %s\n"+
+			"Command: %s %v\n Output: %s",
 			err.Error(), name, args, string(buf))
 	}
 
