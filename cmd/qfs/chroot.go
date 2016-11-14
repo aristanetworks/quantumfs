@@ -236,7 +236,9 @@ func setupBindMounts(rootdir string) error {
 			continue
 		}
 
-		if err := syscall.Mount(src, dst, "", syscall.MS_BIND, ""); err != nil {
+		if err := syscall.Mount(src, dst, "", syscall.MS_BIND,
+			""); err != nil {
+
 			return fmt.Errorf("Bindmounting %s to %s error: %s",
 				src, dst, err.Error())
 		}
@@ -604,7 +606,8 @@ ArgumentProcessingLoop:
 			}
 		} else {
 			if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
-				fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s", err.Error())
+				fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s",
+					err.Error())
 				os.Exit(1)
 			}
 		}
