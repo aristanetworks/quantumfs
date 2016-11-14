@@ -9,8 +9,6 @@ import "syscall"
 import "testing"
 
 func specialCreate(test *testHelper, filetype uint32) {
-	test.startDefaultQuantumFs()
-
 	workspace := test.newWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
@@ -79,8 +77,6 @@ func TestFileMknodCreation(t *testing.T) {
 }
 
 func specialCreateFail(test *testHelper, filetype uint32) {
-	test.startDefaultQuantumFs()
-
 	workspace := test.newWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,

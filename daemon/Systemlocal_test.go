@@ -34,7 +34,7 @@ func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 }
 
 func TestSmokeTestSystemlocalWorkspaceDB(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		test.startQuantumFs(test.systemlocalConfig())
 		interDirectoryRename(test)
 	})
