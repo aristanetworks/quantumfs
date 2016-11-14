@@ -14,13 +14,13 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-type intslice []int
+type intSlice []int
 
-func (i *intslice) String() string {
+func (i *intSlice) String() string {
 	return fmt.Sprintf("%d", *i)
 }
 
-func (i *intslice) Set(value string) error {
+func (i *intSlice) Set(value string) error {
 	token, err := strconv.Atoi(value)
 	if err != nil {
 		fmt.Printf("Error: %s is not a valid int\n", value)
@@ -41,7 +41,7 @@ var stats bool
 var topTotal int
 var topAvg int
 var minTimeslicePct int
-var filterId intslice
+var filterId intSlice
 var bucketWidthMs int
 var bucketWidthNs int64
 var showClose bool
