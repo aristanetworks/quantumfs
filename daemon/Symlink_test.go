@@ -140,8 +140,6 @@ func lRemoveXattr(path string, attr string) (err error) {
 // Verify the creation of symlink file
 func TestSymlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		// create a symlink file
@@ -158,8 +156,6 @@ func TestSymlinkCreation(t *testing.T) {
 // Verify the set/get XAttr function for Symlink's own Extended Attributes
 func TestSymlinkXAttrSetGet(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		symlFilename := createSymlink(workspace, test)
@@ -211,8 +207,6 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 // Verify the list/remove XAttr function for Symlink's own Extended Attributes
 func TestSymlinkXAttrListRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		symlFilename := createSymlink(workspace, test)
 
@@ -264,8 +258,6 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 
 func TestSymlinkPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		symlink := createSymlink(workspace, test)
 

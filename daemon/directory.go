@@ -4,6 +4,8 @@
 package daemon
 
 import "bytes"
+import "encoding/base64"
+import "encoding/binary"
 import "errors"
 import "syscall"
 import "sync"
@@ -31,6 +33,10 @@ type Directory struct {
 
 	dirtyChildren_ map[InodeId]Inode // set of children which are currently dirty
 }
+
+// The size of the ObjectKey: 21 + 1 + 8
+// The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
+const sourceDataLength = 30
 
 func initDirectory(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
@@ -229,7 +235,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
-	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %d", fileType,
+	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %o", fileType,
 		entry.Permissions())
 
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
@@ -437,8 +443,8 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	c.vlog("Directory::Lookup Enter")
 	defer c.vlog("Directory::Lookup Exit")
-	defer dir.RLock().RUnlock()
 
+	defer dir.RLock().RUnlock()
 	inodeNum, exists := dir.children[name]
 	if !exists {
 		return fuse.ENOENT
@@ -446,7 +452,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
 	dir.self.markAccessed(c, name, false)
-
+	child := c.qfs.inode(c, inodeNum)
+	child.markSelfAccessed(c, false)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
@@ -501,30 +508,17 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	c.vlog("Directory::create_ Enter")
 	defer c.vlog("Directory::create_ Exit")
 
-	now := time.Now()
 	uid := c.fuseCtx.Owner.Uid
 	gid := c.fuseCtx.Owner.Gid
-
-	entry := quantumfs.NewDirectoryRecord()
-	entry.SetFilename(name)
-	entry.SetID(key)
-	entry.SetType(type_)
-	entry.SetPermissions(modeToPermissions(mode, umask))
-	c.dlog("Directory::create_ mode %x umask %d permissions %d", mode, umask,
-		entry.Permissions())
-	entry.SetOwner(quantumfs.ObjectUid(c.Ctx, uid, uid))
-	entry.SetGroup(quantumfs.ObjectGid(c.Ctx, gid, gid))
-	entry.SetSize(0)
-	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
-	entry.SetContentTime(quantumfs.NewTime(now))
-	entry.SetModificationTime(quantumfs.NewTime(now))
-
+	UID := quantumfs.ObjectUid(c.Ctx, uid, uid)
+	GID := quantumfs.ObjectGid(c.Ctx, gid, gid)
+	entry := dir.createNewEntry(c, name, mode, umask, rdev,
+		0, UID, GID, type_, key)
 	inodeNum := c.qfs.newInodeId()
 	newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
 		mode, rdev, entry)
 	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
-
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
@@ -1084,7 +1078,6 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	if status != fuse.OK {
 		return []byte{}, status
 	}
-
 	return buffer.Get(), fuse.OK
 }
 
@@ -1113,6 +1106,11 @@ func (dir *Directory) listChildXAttr(c *ctx,
 		nameBuffer.WriteByte(0)
 	}
 
+	// append our self-defined extended attribute XAttrTypeKey
+	c.vlog("Appending %s", quantumfs.XAttrTypeKey)
+	nameBuffer.WriteString(quantumfs.XAttrTypeKey)
+	nameBuffer.WriteByte(0)
+
 	c.vlog("Returning %d bytes", nameBuffer.Len())
 
 	return nameBuffer.Bytes(), fuse.OK
@@ -1122,6 +1120,13 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
 	c.vlog("Directory::setChildXAttr Enter %d, %s", inodeNum, attr)
+	// The self-defined extended attribute is not able to be set
+	// it is the combination of two attributes
+	if attr == quantumfs.XAttrTypeKey {
+		c.elog("Illegal action to set extended attribute: typeKey")
+		return fuse.EPERM
+	}
+
 	defer c.vlog("Directory::setChildXAttr Exit")
 
 	defer dir.Lock().Unlock()
@@ -1187,6 +1192,13 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	c.vlog("Directory::removeChildXAttr Enter %d, %s", inodeNum, attr)
+	// The self-defined extended attribute is not able to be removed
+	// it is the combination of two attributes
+	if attr == quantumfs.XAttrTypeKey {
+		c.elog("Illegal action to remove extended attribute: typeKey")
+		return fuse.EPERM
+	}
+
 	defer c.vlog("Directory::removeChildXAttr Exit")
 
 	defer dir.Lock().Unlock()
@@ -1240,6 +1252,110 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	dir.self.dirty(c)
 
 	return fuse.OK
+}
+
+func encodeExtendedKey(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
+	size uint64) []byte {
+
+	append_ := make([]byte, 9)
+	append_[0] = uint8(type_)
+	binary.LittleEndian.PutUint64(append_[1:], size)
+
+	data := append(key.Value(), append_...)
+	return []byte(base64.StdEncoding.EncodeToString(data))
+}
+
+func decodeExtendedKey(packet string) (quantumfs.ObjectKey, quantumfs.ObjectType,
+	uint64, error) {
+
+	bDec, err := base64.StdEncoding.DecodeString(packet)
+	if err != nil {
+		return quantumfs.ZeroKey, 0, 0, err
+	}
+
+	key := quantumfs.NewObjectKeyFromBytes(bDec[:sourceDataLength-9])
+	type_ := quantumfs.ObjectType(bDec[sourceDataLength-9])
+	size := binary.LittleEndian.Uint64(bDec[sourceDataLength-8:])
+	return key, type_, size, nil
+}
+
+// Do a similar work like  Lookup(), but it does not interact with fuse, and return
+// the child node to the caller
+func (dir *Directory) lookupInternal(c *ctx, name string,
+	entryType quantumfs.ObjectType) (Inode, error) {
+
+	c.vlog("Directory::LookupInternal Enter")
+	defer c.vlog("Directory::LookupInternal Exit")
+
+	defer dir.RLock().RUnlock()
+	inodeNum, record, err := dir.lookupChildRecord_(c, name)
+	if err != nil {
+		return nil, err
+	}
+
+	c.vlog("Directory::LookupInternal found inode %d Name %s", inodeNum, name)
+	child := c.qfs.inode(c, inodeNum)
+	child.markSelfAccessed(c, false)
+
+	if record.Type() != entryType {
+		return nil, errors.New("Not Required Type")
+	}
+	return child, nil
+}
+
+// Require an Inode locked for read
+func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
+	*quantumfs.DirectoryRecord, error) {
+
+	c.vlog("Directory::LookupChildRecord_ Enter")
+	defer c.vlog("Directory::LookupChildRecord_ Exit")
+
+	inodeNum, exists := dir.children[name]
+	if !exists {
+		return inodeNum, nil, errors.New("Non-existing Inode")
+	}
+
+	record, exists := dir.childrenRecords[inodeNum]
+	if !exists {
+		return inodeNum, nil, errors.New("Non-existing Inode Record")
+	}
+
+	return inodeNum, record, nil
+}
+
+func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
+	umask uint32, rdev uint32, size uint64, uid quantumfs.UID,
+	gid quantumfs.GID, type_ quantumfs.ObjectType,
+	key quantumfs.ObjectKey) *quantumfs.DirectoryRecord {
+
+	// set up the Inode record
+	now := time.Now()
+	entry := quantumfs.NewDirectoryRecord()
+	entry.SetFilename(name)
+	entry.SetID(key)
+	entry.SetType(type_)
+	entry.SetPermissions(modeToPermissions(mode, umask))
+	c.dlog("Directory::createNewEntry mode %o umask %o permissions %o",
+		mode, umask, entry.Permissions())
+	entry.SetOwner(uid)
+	entry.SetGroup(gid)
+	entry.SetSize(size)
+	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
+	entry.SetContentTime(quantumfs.NewTime(now))
+	entry.SetModificationTime(quantumfs.NewTime(now))
+
+	return entry
+}
+
+// Needs exlusive Inode lock
+func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask uint32,
+	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
+	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
+
+	entry := dir.createNewEntry(c, name, mode, umask, rdev, size,
+		uid, gid, type_, key)
+
+	dir.loadChild_(c, *entry)
 }
 
 type directoryContents struct {
