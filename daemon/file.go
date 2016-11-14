@@ -79,7 +79,7 @@ type File struct {
 
 // Mark this file dirty and notify your paent
 func (fi *File) dirty(c *ctx) {
-	defer c.flog("File::dirty").exit()
+	defer c.funcIn("File::dirty").out()
 
 	fi.setDirty(true)
 	fi.parent().dirtyChild(c, fi)
@@ -99,7 +99,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.flog("File::GetAttr").exit()
+	defer c.funcIn("File::GetAttr").out()
 
 	record, err := fi.parent().getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
@@ -121,7 +121,7 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 }
 
 func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
-	defer c.flog("File::openPermission").exit()
+	defer c.funcIn("File::openPermission").out()
 
 	record, error := fi.parent().getChildRecord(c, fi.id)
 	if error != nil {
@@ -171,7 +171,7 @@ func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	defer c.flog("File::Open").exit()
+	defer c.funcIn("File::Open").out()
 
 	if !fi.openPermission(c, flags) {
 		return fuse.EPERM
@@ -203,7 +203,7 @@ func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	defer c.flog("File::SetAttr").exit()
+	defer c.funcIn("File::SetAttr").out()
 	c.vlog("SetAttr valid %x size %d", attr.Valid, attr.Size)
 
 	var updateMtime bool
@@ -301,7 +301,7 @@ func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
 func (fi *File) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	defer c.flog("File::GetXAttrSize").exit()
+	defer c.funcIn("File::GetXAttrSize").out()
 
 	return fi.parent().getChildXAttrSize(c, fi.inodeNum(), attr)
 }
@@ -309,25 +309,25 @@ func (fi *File) GetXAttrSize(c *ctx,
 func (fi *File) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	defer c.flog("File::GetXAttrData").exit()
+	defer c.funcIn("File::GetXAttrData").out()
 
 	return fi.parent().getChildXAttrData(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	defer c.flog("File::ListXAttr").exit()
+	defer c.funcIn("File::ListXAttr").out()
 
 	return fi.parent().listChildXAttr(c, fi.inodeNum())
 }
 
 func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	defer c.flog("File::SetXAttr").exit()
+	defer c.funcIn("File::SetXAttr").out()
 
 	return fi.parent().setChildXAttr(c, fi.inodeNum(), attr, data)
 }
 
 func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	defer c.flog("File::RemoveXAttr").exit()
+	defer c.funcIn("File::RemoveXAttr").out()
 
 	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
 }
@@ -346,7 +346,7 @@ func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) 
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer c.flog("File::setChildAttr").exit()
+	defer c.funcIn("File::setChildAttr").out()
 
 	if inodeNum != fi.inodeNum() {
 		c.elog("Invalid setChildAttr on File")
@@ -411,7 +411,7 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
 	error) {
 
-	defer c.flog("File::getChildRecord").exit()
+	defer c.funcIn("File::getChildRecord").out()
 
 	if inodeNum != fi.inodeNum() {
 		c.elog("Unsupported record fetch on file")
@@ -432,7 +432,7 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 }
 
 func (fi *File) setChildRecord(c *ctx, record *quantumfs.DirectoryRecord) {
-	defer c.flog("File::setChildRecord").exit()
+	defer c.funcIn("File::setChildRecord").out()
 
 	fi.parentLock.Lock()
 	defer fi.parentLock.Unlock()
@@ -499,7 +499,7 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 // Given the block index to write into the file, ensure that we are the
 // correct file type
 func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
-	defer c.flog("File::reconcileFileType").exit()
+	defer c.funcIn("File::reconcileFileType").out()
 
 	neededType := calcTypeGivenBlocks(blockIdx + 1)
 	c.dlog("blockIdx %d", blockIdx)
@@ -543,7 +543,7 @@ type blockAccessor interface {
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
 	error) {
 
-	defer c.flog("File::writeBlock").exit()
+	defer c.funcIn("File::writeBlock").out()
 
 	err := fi.reconcileFileType(c, blockIdx)
 	if err != nil {
@@ -566,7 +566,7 @@ type blockFn func(*ctx, int, uint64, []byte) (int, error)
 func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 	fn blockFn) (uint64, error) {
 
-	defer c.flog("File::operateOnBlocks").exit()
+	defer c.funcIn("File::operateOnBlocks").out()
 	c.vlog("operateOnBlocks offset %d size %d", offset, size)
 
 	count := uint64(0)
@@ -612,7 +612,7 @@ func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	defer c.flog("File::Read").exit()
+	defer c.funcIn("File::Read").out()
 	defer fi.Lock().Unlock()
 
 	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
@@ -628,7 +628,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	defer c.flog("File::Write").exit()
+	defer c.funcIn("File::Write").out()
 	c.vlog("offset %d size %d flags %x", offset, size, flags)
 
 	writeCount, result := func() (uint32, fuse.Status) {

@@ -11,7 +11,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	defer c.flog("Directory::link_DOWN").exit()
+	defer c.funcIn("Directory::link_DOWN").out()
 
 	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
 	if err != nil {
@@ -52,7 +52,7 @@ func (dir *Directory) forget_DOWN(c *ctx) {
 }
 
 func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.flog("Directory::flush_DOWN").exit()
+	defer c.funcIn("Directory::flush_DOWN").out()
 
 	if !dir.isDirty() {
 		c.vlog("directory not dirty")
@@ -68,7 +68,7 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
-	defer c.flog("Directory::updateRecords_DOWN_").exit()
+	defer c.funcIn("Directory::updateRecords_DOWN_").out()
 
 	dirtyChildren := dir.dirChildren.popDirtyInodes()
 	if dirtyChildren == nil {
