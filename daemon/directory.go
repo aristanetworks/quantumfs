@@ -411,7 +411,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-	c.vlog("Directory::Lookup").exit()
+	c.flog("Directory::Lookup").exit()
 
 	defer dir.RLock().RUnlock()
 	inodeNum, record, err := dir.lookupChildRecord_(c, name)
