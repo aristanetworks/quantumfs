@@ -19,8 +19,6 @@ import "github.com/aristanetworks/quantumfs/qlog"
 
 func TestQParse(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		var logOut bytes.Buffer
 		var testMutex sync.Mutex
 		test.qfs.c.Qlog.Write = func(format string,
@@ -108,8 +106,6 @@ func TestQParse(t *testing.T) {
 
 func TestQParsePartials_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		// Before we enable logs, let's cause all File logs to be
 		// partially written
 		test.qfs.c.Qlog.EnterTestMode("---In File::")
