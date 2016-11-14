@@ -13,8 +13,6 @@ import "strconv"
 import "testing"
 
 func runConvertFrom(test *testHelper, fromFileSize uint64) {
-	test.startDefaultQuantumFs()
-
 	workspace := test.newWorkspace()
 
 	testFilename := workspace + "/test"
@@ -94,8 +92,6 @@ func TestLargeConvert(t *testing.T) {
 
 func TestVeryLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -117,7 +113,6 @@ func TestVeryLargeFileZero(t *testing.T) {
 
 func TestVeryLargeFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
