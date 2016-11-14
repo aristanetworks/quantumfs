@@ -145,7 +145,7 @@ func init() {
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s -in <filepath> [flags]\n\n", os.Args[0])
-		fmt.Println("Note: If the oom killer is killing qparse, export "+
+		fmt.Println("Note: If the oom killer is killing qparse, export " +
 			"GOGC=80 should help.")
 		fmt.Println("Lower values help more, but make qparse slower.\n")
 

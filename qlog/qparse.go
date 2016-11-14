@@ -497,7 +497,7 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 
 	mmapHeaderSize := uint64(unsafe.Sizeof(MmapHeader{}))
 
-	if uint64(len(data)) != uint64(header.StrMapSize) + header.CircBuf.Size +
+	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
 		mmapHeaderSize {
 		fmt.Println("Data length inconsistent with expectations. %d",
 			len(data))
@@ -945,7 +945,7 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	// and de-pointer-ify them.
 	rtn := make([]LogOutput, len(logPtrs))
 	var lastTimestamp int64
-	
+
 	if printStatus {
 		fmt.Println("Fixing missing timestamps...")
 	}
