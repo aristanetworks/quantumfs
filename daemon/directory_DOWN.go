@@ -83,3 +83,47 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
+
+// Return extended key by combining ObjectKey, inode type, and inode size
+func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
+	fuse.Status) {
+
+	// Update the Hash value before generating the key
+	dir.flush_DOWN(c)
+
+	// flush_DOWN already acquired an Inode lock exclusively. In case of the
+	// dead lock, the Inode lock for reading should be required after releasing
+	// its exclusive lock. The gap between two locks, other threads cannot come
+	// in because the function holds the exclusive tree lock, so it is the only
+	// thread accessing this Inode. Also, recursive lock requiring won't occur.
+	defer dir.RLock().RUnlock()
+	record, err := dir.getChildRecord(c, inodeNum)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %s", inodeNum)
+		return nil, fuse.EIO
+	}
+	typeKey := encodeExtendedKey(record.ID(), record.Type(), record.Size())
+
+	return typeKey, fuse.OK
+}
+
+// go along the given path to the destination
+// The path is stored in a string slice, each cell index contains an inode
+func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
+
+	// traverse through the workspace, reach the target inode
+	length := len(path) - 1 // leave the target node at the end
+	currDir := dir
+	// skip the first two Inodes: namespace / workspace
+	for num := 2; num < length; num++ {
+		// all preceding nodes have to be directories
+		child, err := currDir.lookupInternal(c, path[num],
+			quantumfs.ObjectTypeDirectoryEntry)
+		if err != nil {
+			return child, err
+		}
+		currDir = child.(*Directory)
+	}
+
+	return currDir, nil
+}

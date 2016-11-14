@@ -12,8 +12,6 @@ import "github.com/aristanetworks/quantumfs"
 
 func TestWorkspaceRootApiAccess(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		// fix the api path as _null/null/api so that we can verify that
 		// api files in workspaceroot are really functional
 		workspace := test.nullWorkspace()
