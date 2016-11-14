@@ -57,10 +57,17 @@ func (cr *childRecords) instantiateChild_(c *ctx, entry *quantumfs.DirectoryReco
 	inodeId := c.qfs.newInodeId()
 	cr.data.fileToInode[entry.Filename()] = inodeId
 	cr.data.records[inodeId] = entry
+
+	constructor := selectConstructor(c, entry.Type())
+	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
+		entry.Size(), inodeId, cr.dir.self, 0, 0, nil))
+}
+
+func selectConstructor(c *ctx, type_ quantumfs.ObjectType) InodeConstructor {
 	var constructor InodeConstructor
-	switch entry.Type() {
+	switch type_ {
 	default:
-		c.elog("Unknown InodeConstructor type: %d", entry.Type())
+		c.elog("Unknown InodeConstructor type: %d", type_)
 		panic("Unknown InodeConstructor type")
 	case quantumfs.ObjectTypeDirectoryEntry:
 		constructor = newDirectory
@@ -78,8 +85,7 @@ func (cr *childRecords) instantiateChild_(c *ctx, entry *quantumfs.DirectoryReco
 		constructor = newSpecial
 	}
 
-	c.qfs.setInode(c, inodeId, constructor(c, entry.Filename(), entry.ID(),
-		entry.Size(), inodeId, cr.dir.self, 0, 0, nil))
+	return constructor
 }
 
 func (cr *childRecords) insertRecord(c *ctx, inode InodeId,
