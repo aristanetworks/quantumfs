@@ -34,13 +34,13 @@ func setupWorkspace(t *testing.T) string {
 			err.Error())
 	}
 
-	if err := os.Chmod(dirTest, 0666); err != nil {
+	if err := os.Chmod(dirTest, 0777); err != nil {
 		t.Fatalf("Changing mode of directory %s error: %s",
 			dirTest, err.Error())
 	}
 
 	dirUsrBin := dirTest + "/usr/bin"
-	if err := os.MkdirAll(dirUsrBin, 0666); err != nil {
+	if err := os.MkdirAll(dirUsrBin, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrBin,
 			err.Error())
 	}
@@ -52,7 +52,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrSbin := dirTest + "/usr/sbin"
-	if err := os.MkdirAll(dirUsrSbin, 0666); err != nil {
+	if err := os.MkdirAll(dirUsrSbin, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s",
 			dirUsrSbin, err.Error())
 	}
@@ -64,7 +64,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrLib64 := dirTest + "/usr/lib64"
-	if err := os.MkdirAll(dirUsrLib64, 0666); err != nil {
+	if err := os.MkdirAll(dirUsrLib64, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s",
 			dirUsrLib64, err.Error())
 
@@ -92,7 +92,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrShare := dirTest + "/usr/share"
-	if err := os.MkdirAll(dirUsrShare, 0666); err != nil {
+	if err := os.MkdirAll(dirUsrShare, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrShare,
 			err.Error())
 	}
@@ -105,13 +105,13 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrMnt := dirTest + "/mnt"
-	if err := os.Mkdir(dirUsrMnt, 0666); err != nil {
+	if err := os.Mkdir(dirUsrMnt, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrMnt,
 			err.Error())
 	}
 
 	dirEtc := dirTest + "/etc"
-	if err := os.Mkdir(dirEtc, 0666); err != nil {
+	if err := os.Mkdir(dirEtc, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirEtc, err.Error())
 	}
 
@@ -120,7 +120,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirTmp := dirTest + "/tmp"
-	if err := os.Mkdir(dirTmp, 0666); err != nil {
+	if err := os.Mkdir(dirTmp, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirTmp,
 			err.Error())
 	}
@@ -299,11 +299,20 @@ func setupNonPersistentChrootTest(t *testing.T, rootTest string) (string, string
 		dirTest = dir
 	}
 
+	if err := os.Chmod(dirTest, 0777); err != nil {
+		t.Fatalf("Changing mode of directory: %s error: %s",
+			dirTest, err.Error())
+	}
+
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
 		t.Fatalf("Creating test file error: %s", err.Error())
 	} else {
 		fileTest = fd.Name()
 		fd.Close()
+	}
+
+	if err := os.Chmod(fileTest, 0777); err != nil {
+		t.Fatalf("Changing mode of file: %s error: %s", fileTest, err.Error())
 	}
 
 	return dirTest, fileTest
