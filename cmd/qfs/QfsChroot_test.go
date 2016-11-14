@@ -312,7 +312,8 @@ func setupNonPersistentChrootTest(t *testing.T, rootTest string) (string, string
 	}
 
 	if err := os.Chmod(fileTest, 0777); err != nil {
-		t.Fatalf("Changing mode of file: %s error: %s", fileTest, err.Error())
+		t.Fatalf("Changing mode of file: %s error: %s",
+			fileTest, err.Error())
 	}
 
 	return dirTest, fileTest
