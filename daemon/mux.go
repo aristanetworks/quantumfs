@@ -27,6 +27,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		fileHandleNum:        quantumfs.InodeIdReservedEnd,
 		activeWorkspaces:     make(map[string]*WorkspaceRoot),
 		uninstantiatedInodes: make(map[InodeId]Inode),
+		lookupCounts:         make(map[InodeId]uint64),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -78,6 +79,15 @@ type QuantumFs struct {
 	// instantiated. The Inode this map points to is the parent Inode which
 	// should be called to instantiate the uninstantiated inode when necessary.
 	uninstantiatedInodes map[InodeId]Inode
+
+	// lookupCounts are used as the other side of Forget. That is, Forget
+	// specifies a certain number of lookup counts to forget, which may not be
+	// all of them. We cannot truly forget and delete an Inode until the lookup
+	// count is zero. Because our concept of uninstantiated Inode allows us to
+	// not instantiate an Inode for certain operations which the kernel increases
+	// its lookup count, we must keep an entirely separate table.
+	lookupCountLock DeferableMutex
+	lookupCounts    map[InodeId]uint64
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -220,6 +230,39 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	}
 }
 
+// Increase an Inode's lookup count. This must be called whenever a fuse.EntryOut is
+// returned.
+func (qfs *QuantumFs) increaseLookupCount(inodeId InodeId) {
+	defer qfs.lookupCountLock.Lock().Unlock()
+	prev, exists := qfs.lookupCounts[inodeId]
+	if !exists {
+		qfs.lookupCounts[inodeId] = 1
+	} else {
+		qfs.lookupCounts[inodeId] = prev + 1
+	}
+}
+
+// Returns true if the count became zero or was previously zero
+func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
+	defer qfs.lookupCountLock.Lock().Unlock()
+	lookupCount, exists := qfs.lookupCounts[inodeId]
+	if !exists {
+		return true
+	}
+
+	lookupCount -= count
+	if lookupCount < 0 {
+		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
+		panic(msg)
+	} else if lookupCount == 0 {
+		delete(qfs.lookupCounts, inodeId)
+		return true
+	} else {
+		qfs.lookupCounts[inodeId] = lookupCount
+		return false
+	}
+}
+
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 	qfs.mapMutex.RLock()
@@ -352,6 +395,12 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
+
+	if !qfs.shouldForget(InodeId(nodeID), nlookup) {
+		// The kernel hasn't completely forgotten this Inode. Keep it around
+		// a while longer.
+		return
+	}
 
 	inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID))
 	if inode == nil || nodeID == quantumfs.InodeIdRoot ||
