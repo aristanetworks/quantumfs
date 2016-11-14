@@ -4,7 +4,6 @@
 package daemon
 
 // This file contains all the interaction with the quantumfs API file.
-
 import "encoding/json"
 import "errors"
 import "fmt"
@@ -320,7 +319,10 @@ func makeErrorResponse(code uint32, message string) []byte {
 	return bytes
 }
 
-func (api *ApiHandle) queueErrorResponse(code uint32, message string) {
+func (api *ApiHandle) queueErrorResponse(code uint32, format string,
+	a ...interface{}) {
+
+	message := fmt.Sprintf(format, a)
 	bytes := makeErrorResponse(code, message)
 	api.responses <- fuse.ReadResultData(bytes)
 }
@@ -362,13 +364,13 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	switch cmd.CommandId {
 	default:
-		message := fmt.Sprintf("Unknown command number %d", cmd.CommandId)
-		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+			"Unknown command number %d", cmd.CommandId)
 
 	case quantumfs.CmdError:
-		message := fmt.Sprintf("Invalid message %d to send to quantumfsd",
+		api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+			"Invalid message %d to send to quantumfsd",
 			cmd.CommandId)
-		api.queueErrorResponse(quantumfs.ErrorBadCommandId, message)
 
 	case quantumfs.CmdBranchRequest:
 		c.vlog("Received branch request")
@@ -382,7 +384,10 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdSyncAll:
 		c.vlog("Received all workspace sync request")
 		api.syncAll(c)
-
+	// create an object with a given ObjectKey and path
+	case quantumfs.CmdInsertInode:
+		c.vlog("Recieved InsertInode request")
+		api.insertInode(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -422,7 +427,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"WorkspaceRoot "+wsr+" does not exist or is not active")
+			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
 
@@ -441,7 +446,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"WorkspaceRoot "+wsr+" does not exist or is not active")
+			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
 
@@ -452,4 +457,80 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 func (api *ApiHandle) syncAll(c *ctx) {
 	c.qfs.syncAll(c)
 	api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
+}
+
+func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
+	c.vlog("Api::insertInode Enter")
+	defer c.vlog("Api::insertInode Exit")
+
+	var cmd quantumfs.InsertInodeRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	dst := strings.Split(cmd.DstPath, "/")
+	key, type_, size, err := decodeExtendedKey(cmd.Key)
+	permissions := cmd.Permissions
+	uid := cmd.Uid
+	gid := cmd.Gid
+
+	wsr := dst[0] + "/" + dst[1]
+	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	if !ok {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"WorkspaceRoot %s does not exist or is not active", wsr)
+		return
+	}
+
+	if len(dst) == 2 { // only have namespace and workspace
+		// duplicate the entire workspace root is illegal
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"WorkspaceRoot can not be duplicated")
+		return
+	}
+
+	if key.Type() != quantumfs.KeyTypeEmbedded {
+		if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
+			api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
+				"Key does not exist in the datastore")
+			return
+		}
+	}
+
+	// get immediate parent of the target node
+	p, err := func() (Inode, error) {
+		// The ApiInode uses tree lock of NamespaceList and not any
+		// particular workspace. Thus at this point in the code, we don't
+		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
+		// necessary to get the tree lock of the WorkspaceRoot exclusively
+		// here.
+		defer (&workspace.Directory).LockTree().Unlock()
+		return (&workspace.Directory).followPath_DOWN(c, dst)
+	}()
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Path %s does not exist", cmd.DstPath)
+		return
+	}
+
+	parent := p.(*Directory)
+	target := dst[len(dst)-1]
+
+	defer parent.Lock().Unlock()
+	_, exist := parent.children[target]
+	if exist {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Inode %s should not exist", target)
+		return
+	}
+
+	c.vlog("Api::insertInode put key %v into node %d - %s",
+		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
+
+	parent.duplicateInode_(c, target, permissions, 0, 0, size,
+		quantumfs.UID(uid), quantumfs.GID(gid),
+		type_, key)
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }
