@@ -344,7 +344,7 @@ func profileLog(info string) {
 }
 
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
-	// isolate the namespace of this process from the rest of the machine
+	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())
 	}
@@ -355,7 +355,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			err.Error())
 	}
 
-	// unmount and remount /sys to reflect the new namespace
+	// remount /sys to reflect the new namespace
 	if buf.Type == SYSFS_MAGIC {
 		if err := syscall.Mount("/sys", "/sys", "sysfs", syscall.MS_REMOUNT,
 			""); err != nil {

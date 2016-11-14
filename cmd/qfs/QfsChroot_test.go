@@ -459,7 +459,7 @@ func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
 func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
-	//defer cleanupWorkspace(rootTest, t)
+	defer cleanupWorkspace(rootTest, t)
 
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
