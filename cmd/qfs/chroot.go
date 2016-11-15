@@ -480,7 +480,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			}
 			c <- true
 		}(chanUnmount)
-
 	}
 
 	// change the current directory
