@@ -15,7 +15,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewApiInode(treeLock *sync.RWMutex) Inode {
+func NewApiInode(treeLock *sync.RWMutex, parent Inode) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:        quantumfs.InodeIdApi,
@@ -24,6 +24,7 @@ func NewApiInode(treeLock *sync.RWMutex) Inode {
 		},
 	}
 	api.self = &api
+	api.setParent(parent)
 	assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
@@ -424,7 +425,8 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	parts := strings.Split(wsr, "/")
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -443,7 +445,8 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	parts := strings.Split(wsr, "/")
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -476,7 +479,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	gid := cmd.Gid
 
 	wsr := dst[0] + "/" + dst[1]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"WorkspaceRoot %s does not exist or is not active", wsr)

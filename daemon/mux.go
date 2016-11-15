@@ -36,14 +36,14 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 			workspaceDB: config.WorkspaceDB,
 			dataStore:   newDataStore(config.DurableStore),
 		},
-		allowForget: true,
 	}
 
 	qfs.c.qfs = qfs
 
 	namespaceList := NewNamespaceList()
 	qfs.inodes[quantumfs.InodeIdRoot] = namespaceList
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock())
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock(),
+		namespaceList)
 	return qfs
 }
 
@@ -63,7 +63,10 @@ type QuantumFs struct {
 	inodeNum      uint64
 	fileHandleNum uint64
 	c             ctx
-	allowForget   bool
+
+	// If we've previously failed to forget an inode due to a lock timeout, don't
+	// try any further.
+	giveUpOnForget bool
 
 	mapMutex         sync.RWMutex
 	inodes           map[InodeId]Inode
@@ -194,6 +197,10 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
 	parent Inode) {
 
+	if parent == nil {
+		panic("addUninstantiated with nil parent")
+	}
+
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
@@ -316,8 +323,17 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.dlog("QuantumFs::Lookup Inode %d Name %s", header.NodeId, name)
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	c.dlog("QuantumFs::Lookup Enter")
+	return qfs.lookupCommon(c, InodeId(header.NodeId), name, out)
+}
+
+func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.vlog("QuantumFs::lookupCommon Enter Inode %d Name %s", inodeId, name)
+	defer c.vlog("QuantumFs::lookupCommon Exit")
+
+	inode := qfs.inode(c, inodeId)
 	if inode == nil {
 		c.elog("Lookup failed", name)
 		return fuse.ENOENT
@@ -330,25 +346,52 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer logRequestPanic(&qfs.c)
 
-	// Allow tests to disable this feature
-	if !qfs.allowForget {
+	if qfs.giveUpOnForget {
+		qfs.c.dlog("Not forgetting inode %d Looked up %d Times", nodeID,
+			nlookup)
 		return
 	}
-
 	qfs.c.dlog("Forgetting inode %d Looked up %d Times", nodeID, nlookup)
 
-	inode := qfs.inode(&qfs.c, InodeId(nodeID))
-	if inode == nil {
+	inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID))
+	if inode == nil || nodeID == quantumfs.InodeIdRoot ||
+		nodeID == quantumfs.InodeIdApi {
+
 		// Nothing to do
 		return
 	}
 
-	// We currently only support file / special forgetting
-	switch inode.(type) {
-	case *File, *Special:
-		defer inode.LockTree().Unlock()
-		inode.forget_DOWN(&qfs.c)
+	// We must timeout if we cannot grab the tree lock. Forget is called on the
+	// unmount path and if we are trying to forcefully unmount due to some
+	// internal error or hang, if we don't timeout we can deadlock against that
+	// other broken operation.
+	lock := inode.LockTreeWaitAtMost(200 * time.Millisecond)
+	if lock == nil {
+		qfs.c.elog("Timed out locking tree in Forget. Inode %d, %d times",
+			nodeID, nlookup)
+		qfs.giveUpOnForget = true
+		return
+	} else {
+		defer lock.Unlock()
 	}
+
+	key := inode.flush_DOWN(&qfs.c)
+	if !inode.isWorkspaceRoot() {
+		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
+	}
+
+	// Remove the inode from the map, ready to be garbage collected. We also
+	// re-register ourselves in the uninstantiated inode collection. If the
+	// parent is the inode then it's an orphaned File which can never be
+	// instantiated again.
+	//
+	// If parent == nil, then this is a workspace which we cannot instantiate via
+	// its parent, the workspacelist, directly.
+	parent := inode.parent()
+	if parent != inode && !inode.isWorkspaceRoot() {
+		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()}, parent)
+	}
+	qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
@@ -621,13 +664,14 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 
 func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	defer inode.LockTree().Unlock()
-	parent := inode.parent()
-	if parent == nil {
+	if inode.isWorkspaceRoot() {
+		c.vlog("Parent is workspaceroot, returning")
 		return nil, fuse.ENOATTR
 	}
 
 	var dir *Directory
-	if parent.parent() == nil {
+	parent := inode.parent()
+	if parent.isWorkspaceRoot() {
 		dir = &parent.(*WorkspaceRoot).Directory
 	} else {
 		dir = parent.(*Directory)
@@ -750,7 +794,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
-		c.elog("Open failed %v", input)
+		c.elog("Open failed Inode %d", input.NodeId)
 		return fuse.ENOENT
 	}
 
@@ -960,13 +1004,29 @@ func (qfs *QuantumFs) Init(*fuse.Server) {
 	qfs.c.elog("Unhandled request Init")
 }
 
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, name string) (*WorkspaceRoot, bool) {
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, namespace string,
+	workspace string) (*WorkspaceRoot, bool) {
 
-	c.vlog("QuantumFs::getWorkspaceRoot %s", name)
+	c.vlog("QuantumFs::getWorkspaceRoot %s/%s", namespace, workspace)
 
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
+	// Get the WorkspaceList Inode number
+	var namespaceAttr fuse.EntryOut
+	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, namespace,
+		&namespaceAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
 
-	wsr, exists := qfs.activeWorkspaces[name]
-	return wsr, exists
+	// Get the WorkspaceRoot Inode number
+	var workspaceRootAttr fuse.EntryOut
+	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
+		&workspaceRootAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
+
+	// Fetch the WorkspaceRoot object itelf
+	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
+
+	return wsr.(*WorkspaceRoot), wsr != nil
 }

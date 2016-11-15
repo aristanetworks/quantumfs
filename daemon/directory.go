@@ -129,9 +129,9 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 
 // Needs inode lock for read
 func (dir *Directory) updateSize_(c *ctx) {
-	// If we do not have a parent, then the parent is a workspacelist and we have
-	// nothing to update.
-	if dir.parent() != nil {
+	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
+	// update.
+	if !dir.self.isWorkspaceRoot() {
 		var attr fuse.SetAttrIn
 		attr.Valid = fuse.FATTR_SIZE
 		attr.Size = func() uint64 {
@@ -383,7 +383,10 @@ func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 		newBaseLayerId.String())
 	dir.baseLayerId = newBaseLayerId
 
-	dir.setDirty(false)
+	if !dir.self.isWorkspaceRoot() {
+		// TODO This violates layering and is ugly
+		dir.setDirty(false)
+	}
 
 	return dir.baseLayerId
 }
@@ -600,6 +603,8 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	if result == fuse.OK {
 		dir.self.dirty(c)
 	}
+
+	c.dlog("Directory::Mkdir created inode %d", out.NodeId)
 
 	return result
 }
@@ -1015,7 +1020,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.vlog("Directory::syncChild Enter")
+	c.vlog("Directory::syncChild Enter %s", newKey.String())
 	defer c.vlog("Directory::syncChild Exit")
 
 	ok, key := func() (bool, quantumfs.ObjectKey) {
@@ -1034,7 +1039,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 		return true, dir.publish_(c)
 	}()
 
-	if ok && dir.parent() != nil {
+	if ok && !dir.self.isWorkspaceRoot() {
 		dir.parent().syncChild(c, dir.InodeCommon.id, key)
 	}
 }
@@ -1334,6 +1339,8 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	case quantumfs.ObjectTypeSpecial:
 		constructor = newSpecial
 	}
+
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
