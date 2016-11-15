@@ -1,9 +1,10 @@
-COMMANDS=quantumfsd qfs qparse
+COMMANDS_WITHOUT_TEST=quantumfsd qparse
+COMMANDS_WITH_TEST=qfs
 PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal
 
-.PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
+.PHONY: all $(COMMANDS_WITHOUT_TEST) $(PKGS_TO_TEST) $(COMMANDS_WITH_TEST)
 
-all: lockcheck $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck $(COMMANDS_WITHOUT_TEST) $(PKGS_TO_TEST) $(COMMANDS_WITH_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -20,10 +21,13 @@ lockcheck:
 encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
 
-$(COMMANDS): encoding/metadata.capnp.go
-	go build github.com/aristanetworks/quantumfs/cmd/$@; \
-        sudo cp ./$@ /usr/bin/$@; \
-	sudo go test github.com/aristanetworks/quantumfs/cmd/$@;
+$(COMMANDS_WITHOUT_TEST): encoding/metadata.capnp.go
+	go build github.com/aristanetworks/quantumfs/cmd/$@;
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go
-	sudo go test github.com/aristanetworks/quantumfs/$@
+	sudo go test github.com/aristanetworks/quantumfs/$@;
+
+$(COMMANDS_WITH_TEST): encoding/metadata.capnp.go
+	go build github.com/aristanetworks/quantumfs/cmd/$@;\
+	go install github.com/aristanetworks/quantumfs/cmd/$@;\
+	sudo go test github.com/aristanetworks/quantumfs/cmd/$@;
