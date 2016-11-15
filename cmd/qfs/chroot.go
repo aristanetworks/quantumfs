@@ -507,7 +507,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	// wait for all the goroutines to finish
 	if !<-chanUnmount {
 		return fmt.Errorf("Error unmounting %s", oldroot)
-
 	}
 
 	// switch to non-root user
