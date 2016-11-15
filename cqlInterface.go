@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// This file creates interfaces of structs from the gocql
+// Package cql creates interfaces of structs from the gocql
 // library. We have only picked up the structs and their  methods
 // that we think we will need.
 //

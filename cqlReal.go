@@ -63,7 +63,7 @@ func (s *RealSession) Query(stmt string, values ...interface{}) Query {
 	return qq
 }
 
-// Query is a wrapper around gocql.Query
+// RealQuery is a wrapper around gocql.Query
 type RealQuery struct {
 	query *gocql.Query
 }
@@ -98,39 +98,47 @@ func (q *RealQuery) Iter() Iter {
 	return ii
 }
 
-// Iter is a wrapper around gocql.Iter
+// RealIter is a wrapper around gocql.Iter
 type RealIter struct {
 	iter *gocql.Iter
 }
 
+// Close is a wrapper around gocql.Iter.Close()
 func (i *RealIter) Close() error {
 	return i.iter.Close()
 }
 
+// GetCustomPayload is a wrapper around gocql.Iter.GetCustomPayload()
 func (i *RealIter) GetCustomPayload() map[string][]byte {
 	return i.iter.GetCustomPayload()
 }
 
+// MapScan is a wrapper around gocql.Iter.MapScan()
 func (i *RealIter) MapScan(m map[string]interface{}) bool {
 	return i.iter.MapScan(m)
 }
 
+// NumRows is a wrapper around gocql.Iter.NumRows()
 func (i *RealIter) NumRows() int {
 	return i.iter.NumRows()
 }
 
+// PageState is a wrapper around gocql.Iter.PageState()
 func (i *RealIter) PageState() []byte {
 	return i.iter.PageState()
 }
 
+// Scan is a wrapper around gocql.Iter.Scan()
 func (i *RealIter) Scan(dest ...interface{}) bool {
 	return i.iter.Scan(dest...)
 }
 
+// SliceMap is a wrapper around gocql.Iter.SliceMap()
 func (i *RealIter) SliceMap() ([]map[string]interface{}, error) {
 	return i.iter.SliceMap()
 }
 
+// WillSwitchPage is a wrapper around gocql.Iter.WillSwitchPage()
 func (i *RealIter) WillSwitchPage() bool {
 	return i.iter.WillSwitchPage()
 }

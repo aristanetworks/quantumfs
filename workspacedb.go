@@ -13,6 +13,8 @@ type workspaceDB struct {
 	store *cqlStore
 }
 
+// NewWorkspaceDB returns a new quantumfs.WorkspaceDB
+// Also ensures that an active session exists with the cql cluster
 func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 
 	cfg, err := readCqlConfig(confName)
@@ -23,7 +25,7 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 		panic(err.Error())
 	}
 
-	var cluster Cluster = NewRealCluster(cfg.Nodes...)
+	cluster := NewRealCluster(cfg.Nodes...)
 	var store cqlStore
 	store, err = initCqlStore(cluster, mocking)
 	if err != nil {
@@ -78,8 +80,8 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, namespace string,
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
-	workspace string, currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+	workspace string, currentRootID quantumfs.ObjectKey,
+	newRootID quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	empty := make([]byte, 0)
 	return quantumfs.NewObjectKeyFromBytes(empty), nil

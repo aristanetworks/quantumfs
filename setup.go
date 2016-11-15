@@ -9,15 +9,15 @@ import (
 	"sync"
 )
 
-// CqlConfig struct holds the info needed to connect to a cql cluster
-type CqlConfig struct {
+// Config struct holds the info needed to connect to a cql cluster
+type Config struct {
 	Nodes      []string `json:"nodes"`
 	NumConns   int      `json:"numConnections"`
 	NumRetries int      `json:"numRetries"`
 }
 
 type cqlStoreGlobal struct {
-	config    CqlConfig
+	config    Config
 	initOnce  sync.Once
 	resetOnce sync.Once
 	cluster   Cluster
@@ -27,13 +27,13 @@ type cqlStoreGlobal struct {
 var globalCqlStore cqlStoreGlobal
 
 type cqlStore struct {
-	config  CqlConfig
+	config  Config
 	cluster Cluster
 	session Session
 }
 
-// WriteCqlConfig converts the CqlConfig struct to a JSON file
-func writeCqlConfig(fileName string, config *CqlConfig) error {
+// WriteCqlConfig converts the Config struct to a JSON file
+func writeCqlConfig(fileName string, config *Config) error {
 
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -50,8 +50,8 @@ func writeCqlConfig(fileName string, config *CqlConfig) error {
 	return err
 }
 
-func readCqlConfig(fileName string) (*CqlConfig, error) {
-	var config CqlConfig
+func readCqlConfig(fileName string) (*Config, error) {
+	var config Config
 
 	file, err := os.Open(fileName)
 	if err != nil {
@@ -104,7 +104,7 @@ func resetCqlStore() {
 		}
 		// we cannot do globalCqlStore = cqlStore{}
 		// since we are inside resetOnce
-		globalCqlStore.config = CqlConfig{}
+		globalCqlStore.config = Config{}
 		globalCqlStore.cluster = nil
 		globalCqlStore.session = nil
 		globalCqlStore.initOnce = sync.Once{}

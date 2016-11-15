@@ -31,7 +31,7 @@ func (suite *CqlStoreUnitTestSuite) SetupTest() {
 }
 
 func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePath() {
-	var config CqlConfig
+	var config Config
 
 	config.Nodes = []string{"node1", "node2"}
 
@@ -52,7 +52,7 @@ func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePath() {
 }
 
 func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePerms() {
-	var config CqlConfig
+	var config Config
 
 	config.Nodes = []string{"node1", "node2"}
 
@@ -76,7 +76,7 @@ func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePerms() {
 }
 
 func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFormat() {
-	var config CqlConfig
+	var config Config
 
 	config.Nodes = []string{"node1", "node2"}
 
@@ -94,7 +94,7 @@ func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFormat() {
 	suite.Require().NoError(err, "CQL config file open failed")
 
 	var length int
-	var garbage []byte = []byte("boo")
+	garbage := []byte("boo")
 	length, err = file.Write(garbage)
 	suite.Require().NoError(err, "CQL config file write failed")
 	suite.Require().Equal(length, len(garbage), "CQL config file write incorrect")

@@ -28,7 +28,7 @@ func NewCqlBlobStore(confName string) (ether.BlobStore, ether.ErrorResponse) {
 		return nil, etherr
 	}
 
-	var cluster Cluster = NewRealCluster(cfg.Nodes...)
+	cluster := NewRealCluster(cfg.Nodes...)
 	var store cqlStore
 	store, err = initCqlStore(cluster, mocking)
 	if err != nil {
