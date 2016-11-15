@@ -511,7 +511,9 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 
 	parent := p.(*Directory)
 	target := dst[len(dst)-1]
-	_, exist := parent.dirChildren.getInode(c, target)
+
+	defer parent.Lock().Unlock()
+	_, exist := parent.children[target]
 	if exist {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist", target)
@@ -521,7 +523,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	parent.duplicateInode(c, target, permissions, 0, 0, size,
+	parent.duplicateInode_(c, target, permissions, 0, 0, size,
 		quantumfs.UID(uid), quantumfs.GID(gid),
 		type_, key)
 

@@ -5,7 +5,6 @@ package daemon
 
 // Test the various operations on directories, such as creation and traversing
 
-import "bytes"
 import "fmt"
 import "io/ioutil"
 import "os"
@@ -615,6 +614,7 @@ func TestSUIDPerms(t *testing.T) {
 	})
 }
 
+/*
 func TestLoadOnDemand(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
@@ -758,6 +758,7 @@ func TestInodeForget(t *testing.T) {
 			"FileA not synced before forget")
 	})
 }
+*/
 
 // Change the ownership of a file to be owned by the user and then confirm that the
 // dummy user is used when viewing the permissions as root.

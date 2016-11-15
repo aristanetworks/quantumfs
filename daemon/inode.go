@@ -245,7 +245,10 @@ func (inode *InodeCommon) RLock() *sync.RWMutex {
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	if inode.parent() == nil {
-		panic("Non-workspaceroot inode has no parent")
+		inodeType := reflect.TypeOf(inode)
+		msg := fmt.Sprintf("Non-workspaceroot inode has no parent: %s of %s",
+			inode.name(), inodeType)
+		panic(msg)
 	}
 
 	if inode.parent().inodeNum() == inode.inodeNum() {
