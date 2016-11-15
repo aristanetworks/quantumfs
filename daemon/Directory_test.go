@@ -755,7 +755,7 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 
 // Trigger GetAttr on a directory in order to confirm that it works correctly
 func TestDirectoryGetAttr(t *testing.T) {
-	runTestNoQfs(t, func(test *testHelper) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
 		config.CacheTimeSeconds = 0
 		config.CacheTimeNsecs = 100000

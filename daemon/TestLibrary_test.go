@@ -62,6 +62,12 @@ func runTestNoQfs(t *testing.T, test quantumFsTest) {
 	runTestCommon(t, test, false)
 }
 
+// If you need to initialize the QuantumFS instance in some special way and the test
+// is relatively expensive, then use this variant.
+func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
+	runTestCommon(t, test, false)
+}
+
 // If you have a test which is expensive in terms of CPU time, then use
 // runExpensiveTest() which will not run it at the same time as other tests. This is
 // to prevent multiple expensive tests from running concurrently and causing each
