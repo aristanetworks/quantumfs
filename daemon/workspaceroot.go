@@ -55,8 +55,10 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
-	initDirectory(c, name, &wsr.Directory, workspaceRoot.BaseLayer(),
-		inodeNum, nil, &wsr.realTreeLock)
+	uninstantiated := initDirectory(c, name, &wsr.Directory,
+		workspaceRoot.BaseLayer(), inodeNum, nil, &wsr.realTreeLock)
+
+	c.qfs.addUninstantiated(c, uninstantiated, &wsr)
 
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr

@@ -14,7 +14,7 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
@@ -36,7 +36,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		dirRecord.SetSize(uint64(size))
 		dirRecord.SetPermissions(modeToPermissions(0777, 0))
 	}
-	return &symlink
+	return &symlink, nil
 }
 
 type Symlink struct {
@@ -219,6 +219,11 @@ func (link *Symlink) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on Symlink")
 	return fuse.ENODATA
+}
+
+func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+	c.elog("Invalid instantiateChild on Symlink")
+	return nil, nil
 }
 
 func (link *Symlink) getChildRecord(c *ctx,

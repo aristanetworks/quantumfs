@@ -363,6 +363,13 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+func (nsl *NamespaceList) instantiateChild(c *ctx,
+	inodeNum InodeId) (Inode, []InodeId) {
+
+	c.elog("Invalid instantiateChild on NamespaceList")
+	return nil, nil
+}
+
 func newWorkspaceList(c *ctx, parentName string, name string,
 	inodeNum InodeId) Inode {
 
@@ -599,6 +606,13 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on WorkspaceList")
 	return fuse.ENODATA
+}
+
+func (wsl *WorkspaceList) instantiateChild(c *ctx,
+	inodeNum InodeId) (Inode, []InodeId) {
+
+	c.elog("Invalid instantiateChild on WorkspaceList")
+	return nil, nil
 }
 
 func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
