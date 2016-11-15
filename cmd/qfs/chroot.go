@@ -40,6 +40,7 @@ const (
 
 var qfs string
 var persistent bool = true
+var chanUnmount chan bool
 
 func init() {
 	if qfspath, err := osext.Executable(); err != nil {
@@ -48,6 +49,8 @@ func init() {
 	} else {
 		qfs = qfspath
 	}
+
+	chanUnmount = make(chan bool, 1)
 }
 
 // A helper function to run command which gives better error information
@@ -469,10 +472,17 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		// unmount the old file system
-		if err := syscall.Unmount(oldroot, syscall.MNT_DETACH); err != nil {
-			return fmt.Errorf("Unmounting %s error: %s",
-				oldroot, err.Error())
-		}
+		profileLog("Start goroutine")
+		go func(c chan bool) {
+			if err := syscall.Unmount(oldroot,
+				syscall.MNT_DETACH); err != nil {
+
+				c <- false
+			}
+			c <- true
+		}(chanUnmount)
+		profileLog("Goroutine started")
+
 	}
 
 	// change the current directory
@@ -496,6 +506,14 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			err.Error())
 	}
 
+	// wait for all the goroutines to finish
+	profileLog("waiting unmount go routine")
+	if !<-chanUnmount {
+		return fmt.Errorf("Error unmounting %s", oldroot)
+
+	}
+	profileLog("unmount goroutine finished")
+
 	// switch to non-root user
 	if err := switchUserMode(); err != nil {
 		return fmt.Errorf("Switching usermode error: %s", err.Error())
@@ -510,6 +528,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	setarch_env := os.Environ()
 	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
 
+	profileLog("Exec'ing setarch")
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
@@ -520,6 +539,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
+	profileLog("Start")
 	args := os.Args[2:]
 
 	var wsr string
