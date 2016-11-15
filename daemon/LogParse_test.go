@@ -8,6 +8,7 @@ package daemon
 import "bytes"
 import "fmt"
 import "io/ioutil"
+import "math"
 import "os"
 import "sort"
 import "strings"
@@ -16,6 +17,15 @@ import "syscall"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
+
+func TestMaxString_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		longStr := string(genData(math.MaxUint16))
+
+		test.qfs.c.elog("%s", longStr)
+		test.qfs.c.elog("%s %d", longStr, 255)
+	})
+}
 
 func TestQParse(t *testing.T) {
 	runTest(t, func(test *testHelper) {
