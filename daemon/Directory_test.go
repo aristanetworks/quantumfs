@@ -203,95 +203,90 @@ func TestDirectoryFileDeletion(t *testing.T) {
 }
 
 func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
-        sticky bool) {
+	dir string) {
 
-        fd, err := os.Create(file)
+	fd, err := os.Create(file)
 	test.assert(err == nil, "Error creating file: %v", err)
 	fd.Close()
 
-        if sticky {
-                err = os.Chmod(file, 0777)
-                test.assert(err == nil, "Error change the mode of file: %v", err)
+	if len(dir) != 0 {
+		err = os.Chmod(dir, 01000)
+		test.assert(err == nil, "Error change the mode of file: %v", err)
 
-                var stat syscall.Stat_t
-                err = syscall.Stat(file, &stat)
-		test.assert(err == nil,
-                        "Error getting file stat with %v: %d, %d, %o",
-                        err, stat.Uid, stat.Gid, stat.Mode)
-        }
+		var stat syscall.Stat_t
+		err = syscall.Stat(dir, &stat)
+		test.assert(err == nil && false,
+			"Error getting file stat with %v: %d, %d, %o",
+			err, stat.Uid, stat.Gid, stat.Mode)
+	}
 
-        err = os.Chmod(file, 0)
-        test.assert(err == nil, "Error change the mode of file: %v", err)
-        err = syscall.Unlink(file)
-        if expectedErr == 0 {
-                test.assert(err == nil, "Error unlinking file %s : %v", file, err)
-        } else {
-                test.assert(err == expectedErr, 
-                                "Incorrect error unlinking file %s : %v", file, err)
-        }
+	err = os.Chmod(file, 0)
+	test.assert(err == nil, "Error change the mode of file: %v", err)
+	err = syscall.Unlink(file)
+	if expectedErr == 0 {
+		test.assert(err == nil, "Error unlinking file %s : %v", file, err)
+	} else {
+		test.assert(err == expectedErr,
+			"Incorrect error unlinking file %s : %v", file, err)
+	}
 }
 
 // Compare the Unlink function with different permissions
 func TestUnlinkPermission(t *testing.T) {
-        runTest(t, func(test *testHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-                // Check non-existing file
-                nonExist := workspace + "/" + "nonExist"
-                err := syscall.Unlink(nonExist)
-                test.assert(err == syscall.ENOENT, "Error unlinking file: %v", err)
- 
-                // The directory is the WorkspaceRoot whose permission is 777,
-                // It should be able to unlink files with any permission
+		// Check non-existing file
+		nonExist := workspace + "/" + "nonExist"
+		err := syscall.Unlink(nonExist)
+		test.assert(err == syscall.ENOENT, "Error unlinking file: %v", err)
+
+		// The directory is the WorkspaceRoot whose permission is 777,
+		// It should be able to unlink files with any permission
 		testFilename := workspace + "/" + "testFile"
-                checkUnlink(test, testFilename, 0, false)
-                
-                // Try to unlink a file under a directory without enough permission
-                testDir := workspace + "/" + "testDir"
+		checkUnlink(test, testFilename, 0, "")
+
+		// Try to unlink a file under a directory without enough permission
+		testDir := workspace + "/" + "testDir"
 		err = os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
-                
-                testFilename = testDir + "/" + "File"
-                checkUnlink(test, testFilename, syscall.EACCES, false)
 
-                // Give the parent directory enough user permission
-                err = os.Chmod(testDir, 0300)
-                test.assert(err == nil, "Error change the mode of directory: %v", err)
-                checkUnlink(test, testFilename + "Owner", 0, false)
+		testFilename = testDir + "/" + "File"
+		checkUnlink(test, testFilename, syscall.EACCES, "")
 
-                // check the group permission
-                err = os.Chmod(testDir, 030)
-                test.assert(err == nil, "Error change the mode of directory: %v", err)
-                checkUnlink(test, testFilename + "Grp", 0, false)
+		// Give the parent directory enough user permission
+		err = os.Chmod(testDir, 0300)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
+		checkUnlink(test, testFilename+"Owner", 0, "")
 
-                // check the group permission
-                err = os.Chmod(testDir, 03)
-                test.assert(err == nil, "Error change the mode of directory: %v", err)
-                checkUnlink(test, testFilename + "Other", 0, false)
+		// check the group permission
+		err = os.Chmod(testDir, 030)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
+		checkUnlink(test, testFilename+"Grp", 0, "")
 
-                err = os.Chmod(testDir, 0770)
-                test.assert(err == nil, "Error change the mode of directory: %v", err)
-                err = os.Chown(testDir, 100, 100)
-                test.assert(err == nil, "Failed to chown: %v", err)
-                var stat syscall.Stat_t
+		// check the group permission
+		err = os.Chmod(testDir, 03)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
+		checkUnlink(test, testFilename+"Other", 0, "")
+
+		err = os.Chmod(testDir, 0770)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
+		err = os.Chown(testDir, 100, 100)
+		test.assert(err == nil, "Failed to chown: %v", err)
+		var stat syscall.Stat_t
 		err = syscall.Stat(testDir, &stat)
 		test.assert(err == nil && stat.Uid == 100 && stat.Gid == 100,
-                        "Error getting directory stat with %v: %d, %d",
-                        err, stat.Uid, stat.Gid)
-                checkUnlink(test, testFilename + "NoPerm", syscall.EACCES, false)
+			"Error getting directory stat with %v: %d, %d",
+			err, stat.Uid, stat.Gid)
+		checkUnlink(test, testFilename+"NoPerm", syscall.EACCES, "")
 
-                // Set sticky bit
-                err = os.Chmod(testDir, 0777)
-                test.assert(err == nil, "Error change the mode of directory: %v", err)
-               	
-                err = syscall.Stat(testDir, &stat)
-		test.assert(err == nil && stat.Uid == 100 && stat.Gid == 100,
-                        "Error getting directory stat with %v: %d, %d, %o",
-                        err, stat.Uid, stat.Gid, stat.Mode)
-                
-
-                checkUnlink(test, testFilename+"Sticky", syscall.EACCES, true)
-        })
+		// Set sticky bit
+		checkUnlink(test, testFilename+"Sticky", syscall.EACCES, testDir)
+	})
 }
 
 func TestDirectoryUnlinkDirectory(t *testing.T) {
