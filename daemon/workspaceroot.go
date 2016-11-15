@@ -48,14 +48,15 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
-	initDirectory(c, name, &wsr.Directory, workspaceRoot.BaseLayer(),
-		inodeNum, nil, &wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
-	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.accessList = make(map[string]bool)
+	wsr.treeLock_ = &wsr.realTreeLock
+	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	initDirectory(c, name, &wsr.Directory, workspaceRoot.BaseLayer(),
+		inodeNum, nil, &wsr.realTreeLock)
 
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
 	return &wsr
@@ -135,10 +136,16 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.vlog("WorkspaceRoot::GetAttr Exit")
 	defer wsr.RLock().RUnlock()
 
+	var numChildDirectories uint32
+	for _, entry := range wsr.childrenRecords {
+		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
+			numChildDirectories++
+		}
+	}
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, wsr.InodeCommon.id,
-		uint32(wsr.dirChildren.countChildDirs()))
+	fillAttr(&out.Attr, wsr.InodeCommon.id, numChildDirectories)
+
 	out.Attr.Mode = 0777 | fuse.S_IFDIR
 	return fuse.OK
 }

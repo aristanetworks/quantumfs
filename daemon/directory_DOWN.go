@@ -28,11 +28,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	dir.dirChildren.setRecord(c, newRecord)
-	inodeNum, exists := dir.dirChildren.getInode(c, newRecord.Filename())
-	if !exists {
-		panic("Failure to set record in children")
-	}
+	inodeNum := dir.loadChild_(c, *newRecord)
 	dir.self.markAccessed(c, newName, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
@@ -69,21 +65,11 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
-	dirtyChildren := dir.dirChildren.popDirtyInodes()
-	if dirtyChildren == nil {
-		return
-	}
-
-	for _, childId := range dirtyChildren {
-		child := c.qfs.inode(c, childId)
-
+	for _, child := range dir.dirtyChildren_ {
 		newKey := child.flush_DOWN(c)
-		record, exists := dir.dirChildren.getRecord(c, childId)
-		if !exists {
-			panic("Unexpected missing child during update")
-		}
-		record.SetID(newKey)
+		dir.childrenRecords[child.inodeNum()].SetID(newKey)
 	}
+	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
