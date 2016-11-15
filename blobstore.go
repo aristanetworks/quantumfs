@@ -13,72 +13,86 @@ type cqlBlobStore struct {
 }
 
 // NewCqlBlobStore initializes a ether.BlobStore to be used with a cql cluster
+// This function is taversed only in the non-mock code path. In the mock path
+// initCqlStore is directly used.
 func NewCqlBlobStore(confName string) (ether.BlobStore, ether.ErrorResponse) {
 
-	initCqlStore(confName)
+	etherr := ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: "", Internal: nil}
+	mocking := false
+
+	cfg, err := readCqlConfig(confName)
+	if err != nil {
+		etherr.ErrorCode = ether.ErrBadArguments
+		etherr.ErrorMessage = "Error reading cql config"
+		etherr.Internal = err
+		return nil, etherr
+	}
+
+	var cluster Cluster = NewRealCluster(cfg.Nodes...)
+	var store cqlStore
+	store, err = initCqlStore(cluster, mocking)
+	if err != nil {
+		etherr.ErrorCode = ether.ErrBadArguments
+		etherr.ErrorMessage = "Error in initCqlStore"
+		etherr.Internal = err
+		return nil, etherr
+	}
 
 	cbs := &cqlBlobStore{
-		store: &globalCqlStore,
+		store: &store,
 	}
-	err := ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: ""}
-	return cbs, err
-}
-
-func formatError(e error) (err ether.ErrorResponse) {
-	err.ErrorCode = ether.ErrOperationFailed
-	err.ErrorMessage = e.Error()
-	return err
-}
-
-func (b *cqlBlobStore) Get(key string) (value []byte,
-	metadata map[string]string, err ether.ErrorResponse) {
-
-	err = ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: ""}
-
-	e := b.store.session.Query(
-		`SELECT value FROM blobStore WHERE key = ?`, key).Scan(&value)
-
-	if e != nil {
-		if e == gocql.ErrNotFound {
-			err.ErrorCode = ether.ErrKeyNotFound
-		} else {
-			err.ErrorCode = ether.ErrOperationFailed
-		}
-		err.ErrorMessage = "Select operation failed"
-		err.Err = e
-		return nil, nil, err
-	}
-
-	return value, nil, err
+	return cbs, etherr
 }
 
 func (b *cqlBlobStore) Insert(key string, value []byte,
-	metadata map[string]string) (err ether.ErrorResponse) {
-	err = ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: ""}
+	metadata map[string]string) (etherr ether.ErrorResponse) {
 
-	e := b.store.session.Query(
-		`INSERT into blobStore (key, value) VALUES (?, ?)`, key, value).Exec()
+	etherr = ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: "", Internal: nil}
 
-	if e != nil {
-		err.ErrorCode = ether.ErrOperationFailed
-		err.ErrorMessage = "Insert operation failed"
-		err.Err = e
-		return err
+	// Session.Query() does not return error
+	query := b.store.session.Query(`INSERT into blobStore (key, value) VALUES (?, ?)`, key, value)
+	err := query.Exec()
+
+	if err != nil {
+		etherr.ErrorCode = ether.ErrOperationFailed
+		etherr.ErrorMessage = "Insert operation failed"
+		etherr.Internal = err
 	}
-	return err
+	return etherr
 }
 
-func (b *cqlBlobStore) Delete(key string) (err ether.ErrorResponse) {
+func (b *cqlBlobStore) Get(key string) (value []byte,
+	metadata map[string]string, etherr ether.ErrorResponse) {
+
+	etherr = ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: "", Internal: nil}
+
+	// Session.Query() does not return error
+	query := b.store.session.Query(`SELECT value FROM blobStore WHERE key = ?`, key)
+	err := query.Scan(&value)
+
+	if err != nil {
+		if err == gocql.ErrNotFound {
+			etherr.ErrorCode = ether.ErrKeyNotFound
+		} else {
+			etherr.ErrorCode = ether.ErrOperationFailed
+		}
+		etherr.ErrorMessage = "Select operation failed"
+		etherr.Internal = err
+		value = nil
+	}
+	return value, nil, etherr
+}
+
+func (b *cqlBlobStore) Delete(key string) (etherr ether.ErrorResponse) {
 	panic("Delete not implemented")
 }
 
 func (b *cqlBlobStore) Metadata(key string) (metadata map[string]string,
-	err ether.ErrorResponse) {
+	etherr ether.ErrorResponse) {
 	panic("Metadata not implemented")
 }
 
 func (b *cqlBlobStore) Update(key string,
-	metadata map[string]string) (err ether.ErrorResponse) {
-	err = ether.ErrorResponse{ErrorCode: ether.ErrOk, ErrorMessage: ""}
+	metadata map[string]string) (etherr ether.ErrorResponse) {
 	panic("Update not implemented")
 }

@@ -5,11 +5,8 @@ package cql
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"sync"
-
-	"github.com/gocql/gocql"
 )
 
 // CqlConfig struct holds the info needed to connect to a cql cluster
@@ -17,21 +14,26 @@ type CqlConfig struct {
 	Nodes      []string `json:"nodes"`
 	NumConns   int      `json:"numConnections"`
 	NumRetries int      `json:"numRetries"`
-	StubCQL    bool     `json:"stubCQL"` // used in tests to skip connection to datastore
 }
 
-type cqlStore struct {
+type cqlStoreGlobal struct {
 	config    CqlConfig
 	initOnce  sync.Once
 	resetOnce sync.Once
-	cluster   *gocql.ClusterConfig
-	session   *gocql.Session
+	cluster   Cluster
+	session   Session
 }
 
-var globalCqlStore cqlStore
+var globalCqlStore cqlStoreGlobal
 
-// WriteCqlConfig convert the CqlConfig struct to a file
-func WriteCqlConfig(fileName string, config *CqlConfig) error {
+type cqlStore struct {
+	config  CqlConfig
+	cluster Cluster
+	session Session
+}
+
+// WriteCqlConfig converts the CqlConfig struct to a JSON file
+func writeCqlConfig(fileName string, config *CqlConfig) error {
 
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -73,37 +75,25 @@ func readCqlConfig(fileName string) (*CqlConfig, error) {
 //      and session context design
 // TBD: Need more investigation to see which parts of the
 //      config can be dynamically updated
-func initCqlStore(confName string) {
+func initCqlStore(cluster Cluster, mocking bool) (cqlStore, error) {
+
+	var err error
 	globalCqlStore.initOnce.Do(func() {
-		var err error
-		var cfg *CqlConfig
 
-		cfg, err = readCqlConfig(confName)
+		globalCqlStore.cluster = cluster
+		globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
 		if err != nil {
-			fmt.Println("Error reading CQL config: ", err)
-			panic(err.Error())
+			return
 		}
-		globalCqlStore.config = *cfg
-
-		globalCqlStore.cluster = gocql.NewCluster(globalCqlStore.config.Nodes...)
-		globalCqlStore.cluster.Keyspace = "qfs"
-		globalCqlStore.cluster.ProtoVersion = 3
-		globalCqlStore.cluster.Consistency = gocql.Quorum
-		globalCqlStore.cluster.RetryPolicy =
-			&gocql.SimpleRetryPolicy{NumRetries: globalCqlStore.config.NumRetries}
-		globalCqlStore.cluster.PoolConfig.HostSelectionPolicy =
-			gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
-
-		if !globalCqlStore.config.StubCQL {
-			globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
-			if err != nil {
-				fmt.Println("CreateSession error: ", err)
-				panic(err.Error())
-			}
-		}
-
 		globalCqlStore.resetOnce = sync.Once{}
 	})
+
+	var cStore cqlStore
+	cStore.config = globalCqlStore.config
+	cStore.cluster = globalCqlStore.cluster
+	cStore.session = globalCqlStore.session
+
+	return cStore, err
 }
 
 // mostly used by tests

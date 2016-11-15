@@ -3,7 +3,11 @@
 
 package cql
 
-import "github.com/aristanetworks/quantumfs"
+import (
+	"fmt"
+	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/quantumfs"
+)
 
 type workspaceDB struct {
 	store *cqlStore
@@ -11,11 +15,26 @@ type workspaceDB struct {
 
 func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 
-	// currently initCqlStore panics upon error
-	initCqlStore(confName)
+	cfg, err := readCqlConfig(confName)
+	var etherr ether.ErrorResponse
+	mocking := false
+	if err != nil {
+		fmt.Println("Error reading CQL config: ", err)
+		panic(err.Error())
+	}
+
+	var cluster Cluster = NewRealCluster(cfg.Nodes...)
+	var store cqlStore
+	store, err = initCqlStore(cluster, mocking)
+	if err != nil {
+		etherr.ErrorCode = ether.ErrBadArguments
+		etherr.ErrorMessage = "Error in initCqlStore"
+		etherr.Internal = err
+		panic(etherr)
+	}
 
 	wsdb := &workspaceDB{
-		store: &globalCqlStore,
+		store: &store,
 	}
 
 	return wsdb
