@@ -472,7 +472,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		// unmount the old file system
-		profileLog("Start goroutine")
 		go func(c chan bool) {
 			if err := syscall.Unmount(oldroot,
 				syscall.MNT_DETACH); err != nil {
@@ -481,7 +480,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			}
 			c <- true
 		}(chanUnmount)
-		profileLog("Goroutine started")
 
 	}
 
@@ -507,12 +505,10 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	}
 
 	// wait for all the goroutines to finish
-	profileLog("waiting unmount go routine")
 	if !<-chanUnmount {
 		return fmt.Errorf("Error unmounting %s", oldroot)
 
 	}
-	profileLog("unmount goroutine finished")
 
 	// switch to non-root user
 	if err := switchUserMode(); err != nil {
@@ -528,7 +524,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	setarch_env := os.Environ()
 	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
 
-	profileLog("Exec'ing setarch")
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
@@ -539,7 +534,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
-	profileLog("Start")
 	args := os.Args[2:]
 
 	var wsr string
