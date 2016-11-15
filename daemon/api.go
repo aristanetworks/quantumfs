@@ -247,6 +247,11 @@ func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+	c.elog("Invalid instantiateChild on ApiInode")
+	return nil, nil
+}
+
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 	c.vlog("newApiHandle Enter")
 	defer c.vlog("newApiHandle Exit")

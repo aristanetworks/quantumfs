@@ -92,6 +92,9 @@ type Inode interface {
 
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
+	// Instantiate the Inode for the given child on demand
+	instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId)
+
 	name() string
 	setName(name string)
 

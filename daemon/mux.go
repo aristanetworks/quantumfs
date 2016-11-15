@@ -19,13 +19,14 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
-		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
-		config:           config,
-		inodes:           make(map[InodeId]Inode),
-		fileHandles:      make(map[FileHandleId]FileHandle),
-		inodeNum:         quantumfs.InodeIdReservedEnd,
-		fileHandleNum:    quantumfs.InodeIdReservedEnd,
-		activeWorkspaces: make(map[string]*WorkspaceRoot),
+		RawFileSystem:        fuse.NewDefaultRawFileSystem(),
+		config:               config,
+		inodes:               make(map[InodeId]Inode),
+		fileHandles:          make(map[FileHandleId]FileHandle),
+		inodeNum:             quantumfs.InodeIdReservedEnd,
+		fileHandleNum:        quantumfs.InodeIdReservedEnd,
+		activeWorkspaces:     make(map[string]*WorkspaceRoot),
+		uninstantiatedInodes: make(map[InodeId]Inode),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -68,6 +69,12 @@ type QuantumFs struct {
 	inodes           map[InodeId]Inode
 	fileHandles      map[FileHandleId]FileHandle
 	activeWorkspaces map[string]*WorkspaceRoot
+
+	// Uninstantiated Inodes are inode numbers which have been reserved for a
+	// particular inode, but the corresponding Inode has not yet been
+	// instantiated. The Inode this map points to is the parent Inode which
+	// should be called to instantiate the uninstantiated inode when necessary.
+	uninstantiatedInodes map[InodeId]Inode
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -120,11 +127,55 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 	}
 }
 
+func (qfs *QuantumFs) getInode(c *ctx, id InodeId) (Inode, bool) {
+	qfs.mapMutex.RLock()
+	defer qfs.mapMutex.RUnlock()
+	inode, instantiated := qfs.inodes[id]
+	if instantiated {
+		return inode, false
+	}
+
+	_, uninstantiated := qfs.uninstantiatedInodes[id]
+	return nil, uninstantiated
+}
+
+func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
+	inode, _ := qfs.getInode(c, id)
+	return inode
+}
+
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
-	qfs.mapMutex.RLock()
-	inode := qfs.inodes[id]
-	qfs.mapMutex.RUnlock()
+	inode, needsInstantiation := qfs.getInode(c, id)
+
+	if !needsInstantiation {
+		return inode
+	}
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+	// Recheck in case things changes while we didn't have the lock
+	inode, instantiated := qfs.inodes[id]
+	if instantiated {
+		return inode
+	}
+
+	c.vlog("Inode %d needs to be instantiated", id)
+
+	parent, uninstantiated := qfs.uninstantiatedInodes[id]
+	if !uninstantiated {
+		// We don't know anything about this Inode
+		return nil
+	}
+
+	inode, newUninstantiated := parent.instantiateChild(c, id)
+	delete(qfs.uninstantiatedInodes, id)
+	qfs.inodes[id] = inode
+	for _, id := range newUninstantiated {
+		c.vlog("Adding uninstantiated %v", id)
+		qfs.uninstantiatedInodes[id] = inode
+	}
+
 	return inode
 }
 
@@ -137,6 +188,29 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 		delete(qfs.inodes, id)
 	}
 	qfs.mapMutex.Unlock()
+}
+
+// Set a list of inode numbers to be uninstantiated with the given parent
+func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
+	parent Inode) {
+
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+
+	for _, inodeNum := range uninstantiated {
+		c.vlog("Adding uninstantiated %v", inodeNum)
+		qfs.uninstantiatedInodes[inodeNum] = parent
+	}
+}
+
+// Remove a list of inode numbers from the uninstantiatedInodes list
+func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
+	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Unlock()
+
+	for _, inodeNum := range uninstantiated {
+		delete(qfs.uninstantiatedInodes, inodeNum)
+	}
 }
 
 // Get a file handle in a thread safe way
