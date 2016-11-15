@@ -17,8 +17,6 @@ import "github.com/aristanetworks/quantumfs/qlog"
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 		os.MkdirAll(workspace+"/dir", 0777)
 
@@ -57,8 +55,6 @@ func TestForgetOnDirectory(t *testing.T) {
 
 func TestForgetOnWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.startDefaultQuantumFs()
-
 		workspace := test.newWorkspace()
 
 		numFiles := 10

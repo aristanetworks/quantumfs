@@ -94,6 +94,10 @@ func (v KeyType) Primitive() interface{} {
 // additional byte used for routing.
 const ObjectKeyLength = 1 + sha1.Size
 
+// base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
+const ExtendedKeyLength = 40
+const XAttrTypeKey = "quantumfs.key"
+
 type ObjectKey struct {
 	key encoding.ObjectKey
 }

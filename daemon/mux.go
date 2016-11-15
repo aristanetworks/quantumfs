@@ -651,9 +651,33 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	if inode == nil {
 		return 0, fuse.ENOENT
 	}
-
+	if attr == quantumfs.XAttrTypeKey {
+		_, status := getQuantumfsExtendedKey(c, inode)
+		if status != fuse.OK {
+			return 0, status
+		}
+		return quantumfs.ExtendedKeyLength, status
+	}
 	defer inode.RLockTree().RUnlock()
 	return inode.GetXAttrSize(c, attr)
+}
+
+func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
+	defer inode.LockTree().Unlock()
+	if inode.isWorkspaceRoot() {
+		c.vlog("Parent is workspaceroot, returning")
+		return nil, fuse.ENOATTR
+	}
+
+	var dir *Directory
+	parent := inode.parent()
+	if parent.isWorkspaceRoot() {
+		dir = &parent.(*WorkspaceRoot).Directory
+	} else {
+		dir = parent.(*Directory)
+	}
+	msg, status := dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
+	return msg, status
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
@@ -670,6 +694,10 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return nil, fuse.ENOENT
+	}
+
+	if attr == quantumfs.XAttrTypeKey {
+		return getQuantumfsExtendedKey(c, inode)
 	}
 
 	defer inode.RLockTree().RUnlock()

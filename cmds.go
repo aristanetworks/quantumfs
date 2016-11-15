@@ -93,14 +93,17 @@ const (
 	CmdGetAccessed   = iota
 	CmdClearAccessed = iota
 	CmdSyncAll       = iota
+	CmdInsertInode   = iota
 )
 
 // The various error codes
 const (
 	ErrorOK            = iota // Command Successful
+	ErrorBadArgs       = iota // The argument is wrong
 	ErrorBadJson       = iota // Failed to parse command
 	ErrorBadCommandId  = iota // Unknown command ID
 	ErrorCommandFailed = iota // The Command failed, see the error for more info
+	ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
 )
 
 type ErrorResponse struct {
@@ -127,6 +130,15 @@ type AccessedRequest struct {
 
 type SyncAllRequest struct {
 	CommandCommon
+}
+
+type InsertInodeRequest struct {
+	CommandCommon
+	DstPath     string
+	Key         string
+	Uid         uint16
+	Gid         uint16
+	Permissions uint32
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -274,8 +286,65 @@ func (api *Api) SyncAll() error {
 	return nil
 }
 
+// duplicate an object with a given key and path
+func (api *Api) InsertInode(dst string, key string, permissions uint32,
+	uid uint16, gid uint16) error {
+
+	if !isWorkspacePathValid(dst) {
+		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
+	}
+
+	if !isKeyValid(key) {
+		return fmt.Errorf("\"%s\" should be %d bytes",
+			key, ExtendedKeyLength)
+	}
+
+	cmd := InsertInodeRequest{
+		CommandCommon: CommandCommon{CommandId: CmdInsertInode},
+		DstPath:       dst,
+		Key:           key,
+		Uid:           uid,
+		Gid:           gid,
+		Permissions:   permissions,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
 func isWorkspaceNameValid(wsr string) bool {
 	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+		return false
+	}
+	return true
+}
+
+func isWorkspacePathValid(dst string) bool {
+	if slashes := strings.Count(dst, "/"); slashes < 1 {
+		return false
+	}
+	return true
+}
+
+func isKeyValid(key string) bool {
+	if length := len(key); length != ExtendedKeyLength {
 		return false
 	}
 	return true
