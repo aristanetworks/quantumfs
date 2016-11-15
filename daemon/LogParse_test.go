@@ -18,6 +18,24 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
+func trimToStr(test *testHelper, logs []string, boundary string) []string {
+	boundaryCount := 0
+	var boundaryStart, boundaryEnd int
+	for i := 0; i < len(logs); i++ {
+		if strings.Contains(logs[i], boundary) {
+			if boundaryCount == 0 {
+				boundaryStart = i
+			} else if boundaryCount == 1 {
+				boundaryEnd = i
+			}
+			boundaryCount++
+		}
+	}
+	test.assert(boundaryCount == 2, "Miscount of boundary markers %d",
+		boundaryCount)
+	return logs[boundaryStart:boundaryEnd+1]
+}
+
 func TestMaxString_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		longStr := string(genData(math.MaxUint16))
@@ -43,6 +61,9 @@ func TestQParse(t *testing.T) {
 		test.qfs.c.Qlog.LogLevels = 0
 		test.qfs.c.Qlog.LogLevels--
 
+		testLogBoundary := "TestQParseComparing12345"
+		test.qfs.c.elog(testLogBoundary)
+
 		// Do some stuff that should generate some logs
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
@@ -62,6 +83,8 @@ func TestQParse(t *testing.T) {
 		_, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Unable to read file contents")
 
+		test.qfs.c.elog(testLogBoundary)
+
 		// Now grab the log file and compare against std out. Since logOut
 		// started being appended to a bit late, and we sample it first, it
 		// should be a subset of the qarsed logs
@@ -75,23 +98,17 @@ func TestQParse(t *testing.T) {
 		logOutLines := strings.Split(logOutCopy, "\n")
 		sort.Sort(qlog.SortByTime(logOutLines))
 
-		// Trim any excess empty lines
-		for logOutLines[0] == "" {
-			logOutLines = logOutLines[1:]
-		}
-
-		// Find out at what point logOut starts in testLog
-		offset := 0
-		for i := 0; i < len(testLogLines); i++ {
-			if logOutLines[0] == testLogLines[i] {
-				offset = i
-				break
-			}
-		}
+		// Trim any lines outside of our "comparison boundaries"
+		testLogLines = trimToStr(test, testLogLines, testLogBoundary)
+		logOutLines = trimToStr(test, logOutLines, testLogBoundary)
+		test.assert(len(testLogLines) == len(logOutLines),
+			"log length mismatch %d %d", len(testLogLines),
+			len(logOutLines))
+		test.assert(len(testLogLines) > 2, "trimToStr not working")
 
 		debugStr := ""
 		for i := 0; i < len(logOutLines); i++ {
-			if logOutLines[i] != testLogLines[i+offset] {
+			if logOutLines[i] != testLogLines[i] {
 				startOut := i - 5
 				endOut := i + 5
 				if startOut < 0 {
@@ -103,7 +120,7 @@ func TestQParse(t *testing.T) {
 
 				for j := startOut; j <= endOut; j++ {
 					debugStr += fmt.Sprintf("!!Q%d: %s\n",
-						j, testLogLines[j+offset])
+						j, testLogLines[j])
 					debugStr += fmt.Sprintf("!!L%d: %s\n",
 						j, logOutLines[j])
 				}
