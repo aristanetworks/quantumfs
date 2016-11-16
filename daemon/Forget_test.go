@@ -115,3 +115,30 @@ func TestMultipleLookupCount(t *testing.T) {
 			"Inode with second lookup not forgotten")
 	})
 }
+
+func TestLookupCountHardlinks(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+		linkFilename := workspace + "/link"
+
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		err = os.Link(testFilename, linkFilename)
+		test.assert(err == nil, "Error creating hardlink")
+
+		file.Close()
+
+		// Forget Inodes
+		remountFilesystem(test)
+
+		test.assertLogDoesNotContain("Looked up 2 Times",
+			"Failed to cause a second lookup")
+	})
+}
