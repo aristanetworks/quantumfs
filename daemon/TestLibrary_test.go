@@ -194,7 +194,8 @@ func (th *testHelper) endTest() {
 
 	if th.qfs != nil && th.qfs.server != nil {
 		if exception != nil {
-			th.t.Logf("Failed with exception, forcefully unmounting")
+			th.t.Logf("Failed with exception, forcefully unmounting: %v",
+				exception)
 			abortFuse(th)
 		}
 
@@ -294,6 +295,11 @@ func outputLogError(errInfo logscanError) (summary string) {
 
 		// Output a couple extra lines after an ERROR
 		if extraLines > 0 {
+			// ensure a single line isn't ridiculously long
+			if len(line) > 255 {
+				line = line[:255] + "...TRUNCATED"
+			}
+
 			errors = append(errors, line)
 			extraLines--
 		}
