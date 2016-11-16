@@ -20,10 +20,10 @@ lockcheck:
 encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
 
-$(PKGS_TO_TEST): encoding/metadata.capnp.go
-	sudo go test github.com/aristanetworks/quantumfs/$@;
-
 $(COMMANDS): encoding/metadata.capnp.go
 	go build github.com/aristanetworks/quantumfs/cmd/$@;\
 	go install github.com/aristanetworks/quantumfs/cmd/$@;\
 	sudo go test github.com/aristanetworks/quantumfs/cmd/$@;
+
+$(PKGS_TO_TEST): encoding/metadata.capnp.go
+	sudo go test github.com/aristanetworks/quantumfs/$@;
