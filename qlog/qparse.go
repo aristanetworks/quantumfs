@@ -192,11 +192,89 @@ func genSeqStrExt(seq []LogOutput, wildcardMask []bool,
 	return rtn
 }
 
+func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []LogOutput,
+	trackerMap map[uint64][]sequenceTracker, trackerCount *int,
+	mutex *sync.Mutex) {
+
+	for i := range jobs {
+		log := logs[i]
+		reqId := log.ReqId
+
+		// Grab the sequenceTracker list for this request.
+		// Note: it is safe for us to not lock the entire region only
+		// because we're guaranteed that we're the only thread for this
+		// request Id, and hence this tracker is only ours
+		var trackers []sequenceTracker
+		mutex.Lock()
+		trackers, exists := trackerMap[reqId]
+		mutex.Unlock()
+
+		// If there's an empty entry that already exists, that means
+		// this request had an error and was aborted. Leave it alone.
+		if len(trackers) == 0 && exists {
+			continue
+		}
+
+		// Start a new subsequence if we need to
+		if IsFunctionIn(log.Format) {
+			trackers = append(trackers, newSequenceTracker(i))
+		}
+
+		abortRequest := false
+		// Inform all the trackers of the new token
+		for k := 0; k < len(trackers); k++ {
+			err := trackers[k].Process(log)
+			if err != nil {
+				fmt.Println(err)
+				abortRequest = true
+				break
+			}
+		}
+
+		if abortRequest {
+			// Mark the request as bad
+			mutex.Lock()
+			trackerMap[reqId] = make([]sequenceTracker, 0)
+			mutex.Unlock()
+			continue
+		}
+
+		// Only update entry if it won't be empty
+		if exists || len(trackers) > 0 {
+			mutex.Lock()
+			if len(trackers) != len(trackerMap[reqId]) {
+				*trackerCount++
+			}
+			trackerMap[reqId] = trackers
+			mutex.Unlock()
+		}
+	}
+	wg.Done()
+}
+
 // Because Golang is a horrible language and doesn't support maps with slice keys,
 // we need to construct long string keys and save the slices in the value for later
-func ExtractSequences(logs []LogOutput) map[string]SequenceData {
+func ExtractTrackerMap(logs []LogOutput, maxThreads int) (count int,
+	rtnMap map[uint64][]sequenceTracker) {
+
 	trackerMap := make(map[uint64][]sequenceTracker)
 	trackerCount := 0
+	var outputMutex sync.Mutex
+
+	// we need one channel per thread. Each thread accepts a disjoint subset of
+	// all possible request IDs, so we can use channels to preserve log order
+	var wg sync.WaitGroup
+	wg.Add(maxThreads)
+
+	var jobChannels []chan int
+	for i := 0; i < maxThreads; i++ {
+		jobChannels = append(jobChannels, make(chan int, 2))
+	}
+
+	for i := 0; i < maxThreads; i++ {
+		go ProcessTrackers(jobChannels[i], &wg, logs, trackerMap,
+			&trackerCount, &outputMutex)
+	}
 
 	fmt.Printf("Extracting sub-sequences from %d logs...\n", len(logs))
 	status := NewLogStatus(50)
@@ -212,49 +290,24 @@ func ExtractSequences(logs []LogOutput) map[string]SequenceData {
 			continue
 		}
 
-		// Grab the sequenceTracker list for this request
-		trackers, exists := trackerMap[reqId]
-		if len(trackers) == 0 && exists {
-			// If there's an empty entry that already exists, that means
-			// this request had an error and was aborted. Leave it alone.
-			continue
-		}
-
-		// Start a new subsequence if we need to
-		if IsFunctionIn(logs[i].Format) {
-			trackers = append(trackers, newSequenceTracker(i))
-		}
-
-		abortRequest := false
-		// Inform all the trackers of the new token
-		for k := 0; k < len(trackers); k++ {
-			err := trackers[k].Process(logs[i])
-			if err != nil {
-				fmt.Println(err)
-				abortRequest = true
-				break
-			}
-		}
-
-		if abortRequest {
-			// Mark the request as bad
-			trackerMap[reqId] = make([]sequenceTracker, 0)
-			continue
-		}
-
-		// Only update entry if it won't be empty
-		if exists || len(trackers) > 0 {
-			if len(trackers) != len(trackerMap[reqId]) {
-				trackerCount++
-			}
-			trackerMap[reqId] = trackers
-		}
+		channelIdx := reqId % uint64(maxThreads)
+		jobChannels[channelIdx] <- i
 	}
+	for i := 0; i < maxThreads; i++ {
+		close(jobChannels[i])
+	}
+	wg.Wait()
 	status.Process(1)
+
+	return trackerCount, trackerMap
+}
+
+func ExtractSeqMap(trackerCount int,
+	trackerMap map[uint64][]sequenceTracker) map[string]SequenceData {
 
 	fmt.Printf("Collating subsequence time data into map with %d entries...\n",
 		trackerCount)
-	status = NewLogStatus(50)
+	status := NewLogStatus(50)
 
 	// After going through the logs, add all our sequences to the rtn map
 	rtn := make(map[string]SequenceData)
@@ -431,7 +484,7 @@ func FormatLogs(logs []LogOutput, tabSpaces int) string {
 	return rtn
 }
 
-func ExtractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
+func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 	strMapRtn []LogStr) {
 
 	data := grabMemory(filepath)
@@ -442,10 +495,10 @@ func ExtractFields(filepath string) (pastEndIdx uint32, dataArray []byte,
 			header.Version, QlogVersion))
 	}
 
-	mmapHeaderSize := uint32(unsafe.Sizeof(MmapHeader{}))
+	mmapHeaderSize := uint64(unsafe.Sizeof(MmapHeader{}))
 
-	if uint32(len(data)) != (header.StrMapSize + header.CircBuf.Size +
-		mmapHeaderSize) {
+	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
+		mmapHeaderSize {
 		fmt.Println("Data length inconsistent with expectations. %d",
 			len(data))
 	}
@@ -511,7 +564,7 @@ func grabMemory(filepath string) []byte {
 	return fileData
 }
 
-func parseArg(idx *uint32, data []byte) (interface{}, error) {
+func parseArg(idx *uint64, data []byte) (interface{}, error) {
 	var byteType uint16
 	err := readPacket(idx, data, reflect.ValueOf(&byteType))
 	if err != nil {
@@ -589,7 +642,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 		}
 
 		var rtnRaw [math.MaxUint16]byte
-		err = readPacket(idx, data[:*idx+uint32(strLen)],
+		err = readPacket(idx, data[:*idx+uint64(strLen)],
 			reflect.ValueOf(&rtnRaw))
 		if err != nil {
 			return nil, err
@@ -606,11 +659,11 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 	return nil, errors.New(fmt.Sprintf("Unsupported field type %d\n", byteType))
 }
 
-func wrapRead(idx uint32, num uint32, data []byte) []byte {
+func wrapRead(idx uint64, num uint64, data []byte) []byte {
 	rtn := make([]byte, num)
 
-	if idx+num > uint32(len(data)) {
-		secondNum := (idx + num) - uint32(len(data))
+	if idx+num > uint64(len(data)) {
+		secondNum := (idx + num) - uint64(len(data))
 		num -= secondNum
 		copy(rtn[num:], data[0:secondNum])
 	}
@@ -620,9 +673,9 @@ func wrapRead(idx uint32, num uint32, data []byte) []byte {
 	return rtn
 }
 
-func wrapMinusEquals(lhs *uint32, rhs uint32, bufLen int) {
+func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen int) {
 	if *lhs < rhs {
-		*lhs += uint32(bufLen)
+		*lhs += uint64(bufLen)
 	}
 
 	*lhs -= rhs
@@ -631,10 +684,10 @@ func wrapMinusEquals(lhs *uint32, rhs uint32, bufLen int) {
 // outputType is an instance of that same type as output, output *must* be a pointer
 // to a variable of that type for the data to be placed into.
 // PastIdx is the index of the element just *past* what we want to read
-func readBack(pastIdx *uint32, data []byte, outputType interface{},
+func readBack(pastIdx *uint64, data []byte, outputType interface{},
 	output interface{}) {
 
-	dataLen := uint32(reflect.TypeOf(outputType).Size())
+	dataLen := uint64(reflect.TypeOf(outputType).Size())
 
 	wrapMinusEquals(pastIdx, dataLen, len(data))
 	rawData := wrapRead(*pastIdx, dataLen, data)
@@ -647,17 +700,17 @@ func readBack(pastIdx *uint32, data []byte, outputType interface{},
 }
 
 // Returns the number of bytes read
-func readPacket(idx *uint32, data []byte, output reflect.Value) error {
+func readPacket(idx *uint64, data []byte, output reflect.Value) error {
 
-	dataLen := uint32(output.Elem().Type().Size())
+	dataLen := uint64(output.Elem().Type().Size())
 
 	// If this is a string, then consume the rest of data provided
 	if byteArray, ok := output.Interface().(*[math.MaxUint16]byte); ok {
-		dataLen = uint32(len(data)) - *idx
+		dataLen = uint64(len(data)) - *idx
 		// Because binary.Read is dumb and can't read less than the given
 		// array without EOFing *and* needs a fixed array, we have to do this
 		var singleArray [1]byte
-		for i := uint32(0); i < dataLen; i++ {
+		for i := uint64(0); i < dataLen; i++ {
 			buf := bytes.NewReader(data[*idx+i : *idx+i+1])
 			err := binary.Read(buf, binary.LittleEndian, &singleArray)
 			if err != nil {
@@ -671,7 +724,7 @@ func readPacket(idx *uint32, data []byte, output reflect.Value) error {
 		return nil
 	}
 
-	if dataLen+*idx > uint32(len(data)) {
+	if dataLen+*idx > uint64(len(data)) {
 		return errors.New(fmt.Sprintf("Packet has been clipped. (%d %d %d)",
 			dataLen, *idx, len(data)))
 	}
@@ -728,7 +781,7 @@ func (l *LogStatus) Process(newPct float32) {
 	l.lastPixShown = pixDone
 }
 
-func OutputLogs(pastEndIdx uint32, data []byte, strMap []LogStr,
+func OutputLogs(pastEndIdx uint64, data []byte, strMap []LogStr,
 	maxWorkers int) []LogOutput {
 
 	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
@@ -740,7 +793,7 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 		strMap := j.strMap
 		out := j.out
 
-		read := uint32(0)
+		read := uint64(0)
 		var numFields uint16
 		var strMapId uint16
 		var reqId uint64
@@ -808,11 +861,11 @@ type logJob struct {
 	out        *LogOutput
 }
 
-func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers int,
+func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers int,
 	printStatus bool) []LogOutput {
 
 	var logPtrs []*LogOutput
-	readCount := uint32(0)
+	readCount := uint64(0)
 
 	jobs := make(chan logJob, 2)
 	var wg sync.WaitGroup
@@ -828,7 +881,7 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 	}
 	status := NewLogStatus(50)
 
-	for readCount < uint32(len(data)) {
+	for readCount < uint64(len(data)) {
 		var packetLen uint16
 		readBack(&pastEndIdx, data, packetLen, &packetLen)
 
@@ -846,19 +899,19 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 		packetLen &= ^(uint16(entryCompleteBit))
 
 		// Prepare the pastEndIdx and readCount variables to allow us to skip
-		wrapMinusEquals(&pastEndIdx, uint32(packetLen), len(data))
-		readCount += uint32(packetLen) + 2
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		readCount += uint64(packetLen) + 2
 
 		// Update a status bar if needed
 		if printStatus {
-			readCountClip := uint32(readCount)
-			if readCountClip > uint32(len(data)) {
-				readCountClip = uint32(len(data))
+			readCountClip := uint64(readCount)
+			if readCountClip > uint64(len(data)) {
+				readCountClip = uint64(len(data))
 			}
 			status.Process(float32(readCountClip) / float32(len(data)))
 		}
 
-		if readCount > uint32(len(data)) {
+		if readCount > uint64(len(data)) {
 			// We've read everything, and this last packet isn't valid
 			break
 		}
@@ -873,7 +926,7 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 		}
 
 		// Read the packet data into a separate buffer
-		packetData := wrapRead(pastEndIdx, uint32(packetLen), data)
+		packetData := wrapRead(pastEndIdx, uint64(packetLen), data)
 
 		logPtrs = append(logPtrs, new(LogOutput))
 		jobs <- logJob{
@@ -883,17 +936,25 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 		}
 	}
 	close(jobs)
+	wg.Wait()
 	if printStatus {
 		status.Process(1)
 	}
-
-	wg.Wait()
 
 	// Go through the logs and fix any missing timestamps. Use the last entry's,
 	// and de-pointer-ify them.
 	rtn := make([]LogOutput, len(logPtrs))
 	var lastTimestamp int64
+
+	if printStatus {
+		fmt.Println("Fixing missing timestamps...")
+	}
+	status = NewLogStatus(50)
 	for i := 0; i < len(logPtrs); i++ {
+		if printStatus {
+			status.Process(float32(i) / float32(len(logPtrs)))
+		}
+
 		if logPtrs[i].T == 0 {
 			logPtrs[i].T = lastTimestamp
 		} else {
@@ -904,6 +965,7 @@ func OutputLogsExt(pastEndIdx uint32, data []byte, strMap []LogStr, maxWorkers i
 	}
 
 	if printStatus {
+		status.Process(1)
 		fmt.Printf("Sorting parsed logs...")
 	}
 

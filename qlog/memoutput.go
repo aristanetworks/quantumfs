@@ -27,7 +27,7 @@ const mmapStrMapSize = 512 * 1024
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const QlogVersion = 2
+const QlogVersion = 3
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
 // so the max packet length is 7 bits long
@@ -40,10 +40,10 @@ type MmapHeader struct {
 }
 
 type circBufHeader struct {
-	Size uint32
+	Size uint64
 
 	// This marks one past the end of the circular buffer
-	PastEndIdx uint32
+	PastEndIdx uint64
 }
 
 type SharedMemory struct {
@@ -109,10 +109,10 @@ func (circ *CircMemLogs) Size() int {
 }
 
 // Must only be called on a section of data where nobody else is writing to it
-func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
-	numWrite := uint32(len(data))
-	if idx+numWrite > uint32(len(circ.buffer)) {
-		secondNum := (idx + numWrite) - uint32(len(circ.buffer))
+func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
+	numWrite := uint64(len(data))
+	if idx+numWrite > uint64(len(circ.buffer)) {
+		secondNum := (idx + numWrite) - uint64(len(circ.buffer))
 		numWrite -= secondNum
 		copy(circ.buffer[0:secondNum], data[numWrite:])
 	}
@@ -121,16 +121,16 @@ func (circ *CircMemLogs) wrapWrite_(idx uint32, data []byte) {
 }
 
 func (circ *CircMemLogs) reserveMem(dataLen uint16,
-	dataRaw []byte) (dataStartIdx uint32, lenStartIdx uint32) {
+	dataRaw []byte) (dataStartIdx uint64, lenStartIdx uint64) {
 
 	circ.writeMutex.Lock()
 	defer circ.writeMutex.Unlock()
 
 	dataStart := circ.header.PastEndIdx
-	circBufLen := uint32(len(circ.buffer))
+	circBufLen := uint64(len(circ.buffer))
 
-	circ.header.PastEndIdx += uint32(dataLen)
-	lenStart := uint32(circ.header.PastEndIdx) % circBufLen
+	circ.header.PastEndIdx += uint64(dataLen)
+	lenStart := uint64(circ.header.PastEndIdx) % circBufLen
 	circ.wrapWrite_(lenStart, dataRaw)
 
 	circ.header.PastEndIdx += 2
@@ -220,7 +220,7 @@ func newCircBuf(mapHeader *circBufHeader,
 		buffer: mapBuffer,
 	}
 
-	rtn.header.Size = uint32(len(mapBuffer))
+	rtn.header.Size = uint64(len(mapBuffer))
 
 	return rtn
 }
