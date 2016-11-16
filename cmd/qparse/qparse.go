@@ -145,6 +145,10 @@ func init() {
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s -in <filepath> [flags]\n\n", os.Args[0])
+		fmt.Println("Note: If the oom killer is killing qparse, export " +
+			"GOGC=80 should help.")
+		fmt.Println("Lower values help more, but make qparse slower.\n")
+
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 	}
@@ -268,11 +272,7 @@ func main() {
 			outFilename = outFile
 		}
 
-		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
-		logs := qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
-			maxThreads, true)
-
-		patterns := qlog.GetStatPatterns(logs, maxLenWildcards)
+		patterns := qlog.GetStatPatterns(inFile, maxThreads, maxLenWildcards)
 
 		fmt.Println("Saving to stat file...")
 		file, err := os.Create(outFilename)
