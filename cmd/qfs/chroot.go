@@ -389,6 +389,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 
 		dst := rootdir + "/dev"
 		makedest("/dev", dst)
+		fmt.Println(dst)
 
 		if err := syscall.Mount("none", dst, "tmpfs", 0, ""); err != nil {
 			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
