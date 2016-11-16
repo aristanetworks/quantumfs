@@ -698,6 +698,13 @@ func (th *testHelper) assert(condition bool, format string, args ...interface{})
 	}
 }
 
+// Assert the test log contains the given text
+func (th *testHelper) assertLogContains(text string, failMsg string) {
+	logFile := th.tempDir + "/ramfs/qlog"
+	logOutput := qlog.ParseLogs(logFile)
+	th.assert(strings.Contains(logOutput, text), failMsg)
+}
+
 type crashOnWrite struct {
 	FileHandle
 }

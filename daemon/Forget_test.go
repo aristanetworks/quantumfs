@@ -10,10 +10,7 @@ import "io/ioutil"
 import "os"
 import "os/exec"
 import "strconv"
-import "strings"
 import "testing"
-
-import "github.com/aristanetworks/quantumfs/qlog"
 
 func remountFilesystem(test *testHelper) {
 	test.log("Remounting filesystem")
@@ -41,9 +38,7 @@ func TestForgetOnDirectory(t *testing.T) {
 		// Now force the kernel to drop all cached inodes
 		remountFilesystem(test)
 
-		logFile := test.tempDir + "/ramfs/qlog"
-		logOutput := qlog.ParseLogs(logFile)
-		test.assert(strings.Contains(logOutput, "Forgetting"),
+		test.assertLogContains("Forgetting",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -74,9 +69,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		// Now force the kernel to drop all cached inodes
 		remountFilesystem(test)
 
-		logFile := test.tempDir + "/ramfs/qlog"
-		logOutput := qlog.ParseLogs(logFile)
-		test.assert(strings.Contains(logOutput, "Forgetting"),
+		test.assertLogContains("Forgetting",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
