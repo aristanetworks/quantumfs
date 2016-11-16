@@ -15,17 +15,6 @@ func (special *Special) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (special *Special) forget_DOWN(c *ctx) {
-	c.vlog("Special::forget_DOWN Enter")
-	defer c.vlog("Special::forget_DOWN Exit")
-
-	key := special.flush_DOWN(c)
-	special.parent().syncChild(c, special.InodeCommon.id, key)
-
-	// Remove the inode from the map, ready to be garbage collected
-	c.qfs.setInode(c, special.id, nil)
-}
-
 func (special *Special) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	special.setDirty(false)
 

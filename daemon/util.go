@@ -4,6 +4,7 @@
 package daemon
 
 import "bytes"
+import "sync"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -156,4 +157,13 @@ func cloneDirectoryRecord(
 	newEntry.SetModificationTime(orig.ModificationTime())
 
 	return newEntry
+}
+
+type DeferableMutex struct {
+	lock sync.Mutex
+}
+
+func (df *DeferableMutex) Lock() *sync.Mutex {
+	df.lock.Lock()
+	return &df.lock
 }

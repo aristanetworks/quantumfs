@@ -15,10 +15,6 @@ func (api *ApiInode) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (api *ApiInode) forget_DOWN(c *ctx) {
-	c.elog("Invalid forget_DOWN on Api")
-}
-
 func (api *ApiInode) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
