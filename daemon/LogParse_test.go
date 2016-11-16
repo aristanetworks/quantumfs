@@ -33,7 +33,7 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 	}
 	test.assert(boundaryCount == 2, "Miscount of boundary markers %d",
 		boundaryCount)
-	return logs[boundaryStart:boundaryEnd+1]
+	return logs[boundaryStart : boundaryEnd+1]
 }
 
 func TestMaxStringFail_test(t *testing.T) {
