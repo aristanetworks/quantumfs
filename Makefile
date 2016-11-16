@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qparse qfs
+COMMANDS=quantumfsd qfs qparse
 PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
