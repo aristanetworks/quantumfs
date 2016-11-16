@@ -26,7 +26,7 @@ func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
 
 func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) Inode {
+	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	var filetype uint32
 	var device uint32
@@ -58,7 +58,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	if dirRecord != nil {
 		dirRecord.SetID(special.embedDataIntoKey_(c))
 	}
-	return &special
+	return &special, nil
 }
 
 type Special struct {
@@ -244,6 +244,13 @@ func (special *Special) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	c.elog("Invalid removeChildXAttr on Special")
 	return fuse.ENODATA
+}
+
+func (special *Special) instantiateChild(c *ctx,
+	inodeNum InodeId) (Inode, []InodeId) {
+
+	c.elog("Invalid instantiateChild on Special")
+	return nil, nil
 }
 
 func (special *Special) getChildRecord(c *ctx,
