@@ -468,7 +468,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Closing rootfd error: %s", err.Error())
 		}
 
-		// start a process to unmount oldroot, and in order to same time,
+		// start a process to unmount oldroot, and in order to save time,
 		// we never wait for this process
 		cmdUnmount := exec.Command(umount, "-l", oldroot)
 		if err := cmdUnmount.Start(); err != nil {
