@@ -598,7 +598,11 @@ func (th *testHelper) getInode(path string) Inode {
 func (th *testHelper) workspaceRootId(namespace string,
 	workspace string) quantumfs.ObjectKey {
 
-	return th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx, namespace, workspace)
+	key, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
+		namespace, workspace)
+	th.assert(err == nil, "Error fetching key")
+
+	return key
 }
 
 // Global test request ID incremented for all the running tests
