@@ -230,8 +230,7 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 
 // Set a file handle in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
-	c.vlog("QuantumFs::setFileHandle Enter")
-	defer c.vlog("QuantumFs::setFileHandle Exit")
+	defer c.funcIn("Mux::setFileHandle").out()
 
 	qfs.mapMutex.Lock()
 	if fileHandle != nil {
@@ -256,7 +255,7 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
 	workspaceroot *WorkspaceRoot) {
 
-	c.vlog("QuantumFs::activateWorkspace %s", name)
+	defer c.FuncIn("Mux::activateWorkspace", "%s", name).out()
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
@@ -269,7 +268,7 @@ func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
 // Untrack a workspace as active so we won't sync it. Usually this is called when
 // the workspaceroot Inode is about to be deleted
 func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string) {
-	c.vlog("QuantumFs::deactivateWorkspace %s", name)
+	defer c.FuncIn("Mux::deactivateWorkspace", "%s", name).out()
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
@@ -278,8 +277,7 @@ func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string) {
 
 // Trigger all active workspaces to sync
 func (qfs *QuantumFs) syncAll(c *ctx) {
-	c.vlog("QuantumFs::syncAll Enter")
-	defer c.vlog("QuantumFs::syncAll Exit")
+	defer c.funcIn("Mux::syncAll").out()
 
 	var workspaces []*WorkspaceRoot
 
@@ -323,7 +321,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.dlog("QuantumFs::Lookup Enter")
+	defer c.FuncIn("Mux::Lookup", "Inode %d Name %s", header.NodeId, name).out()
 	return qfs.lookupCommon(c, InodeId(header.NodeId), name, out)
 }
 
@@ -344,6 +342,7 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
+	defer qfs.c.funcIn("Mux::Forget").out()
 	defer logRequestPanic(&qfs.c)
 
 	if qfs.giveUpOnForget {
@@ -401,8 +400,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::GetAttr Enter Inode %d", input.NodeId)
-	defer c.vlog("QuantumFs::GetAttr Exit")
+	defer c.FuncIn("Mux::GetAttr", "Enter Inode %d", input.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -420,8 +418,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::SetAttr Enter Inode %d", input.NodeId)
-	defer c.vlog("QuantumFs::SetAttr Exit")
+	defer c.FuncIn("Mux::SetAttr", "Enter Inode %d", input.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -439,8 +436,8 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Mknod Enter Inode %d Name %s", input.NodeId, name)
-	defer c.vlog("QuantumFs::Mknod Exit")
+	defer c.FuncIn("Mux::Mknod", "Enter Inode %d Name %s", input.NodeId,
+		name).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -458,8 +455,8 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Mkdir Enter Inode %d Name %s", input.NodeId, name)
-	defer c.vlog("QuantumFs::Mkdir Exit")
+	defer c.FuncIn("Mux::Mkdir", "Enter Inode %d Name %s", input.NodeId,
+		name).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -477,8 +474,8 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Unlink Enter Inode %d Name %s", header.NodeId, name)
-	defer c.vlog("QuantumFs::Unlink Exit")
+	defer c.FuncIn("Mux::Unlink", "Enter Inode %d Name %s", header.NodeId,
+		name).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -496,8 +493,8 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Rmdir Enter Inode %d Name %s", header.NodeId, name)
-	defer c.vlog("QuantumFs::Rmdir Exit")
+	defer c.FuncIn("Mux::Rmdir", "Enter Inode %d Name %s", header.NodeId,
+		name).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -515,9 +512,8 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Rename Enter Inode %d newdir %d %s -> %s", input.NodeId,
-		input.Newdir, oldName, newName)
-	defer c.vlog("QuantumFs::Rename Exit")
+	defer c.FuncIn("Mux::Rename", "Enter Inode %d newdir %d %s -> %s",
+		input.NodeId, input.Newdir, oldName, newName).out()
 
 	if input.NodeId == input.Newdir {
 		inode := qfs.inode(c, InodeId(input.NodeId))
@@ -552,9 +548,8 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Link Enter inode %d to name %s in dstDir %d",
-		input.NodeId, filename, input.Oldnodeid)
-	defer c.vlog("QuantumFs::Link Exit")
+	defer c.FuncIn("Mux::Link", "Enter inode %d to name %s in dstDir %d",
+		input.NodeId, filename, input.Oldnodeid).out()
 
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
 	if srcInode == nil {
@@ -587,8 +582,8 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Symlink Enter Inode %d Name %s", header.NodeId, linkName)
-	defer c.vlog("QuantumFs::Symlink Exit")
+	defer c.FuncIn("Mux::Symlink", "Enter Inode %d Name %s", header.NodeId,
+		linkName).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -607,8 +602,7 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Readlink Enter Inode %d", header.NodeId)
-	defer c.vlog("QuantumFs::Readlink Exit")
+	defer c.FuncIn("Mux::Readlink", "Enter Inode %d", header.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -624,8 +618,7 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Access Enter Inode %d", input.NodeId)
-	defer c.vlog("QuantumFs::Access Exit")
+	defer c.FuncIn("Mux::Access", "Enter Inode %d", input.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -644,8 +637,7 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::GetXAttrSize Enter Inode %d", header.NodeId)
-	defer c.vlog("QuantumFs::GetXAttrSize Exit")
+	defer c.FuncIn("Mux::GetXAttrSize", "Enter Inode %d", header.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -688,8 +680,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::GetXAttrData Enter Inode %d", header.NodeId)
-	defer c.vlog("QuantumFs::GetXAttrData Exit")
+	defer c.FuncIn("Mux::GetXAttrData", "Enter Inode %d", header.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -712,8 +703,7 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ListXAttr Enter Inode %d", header.NodeId)
-	defer c.vlog("QuantumFs::ListXAttr Exit")
+	defer c.FuncIn("Mux::ListXAttr", "Enter Inode %d", header.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -731,8 +721,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::SetXAttr Enter Inode %d", input.NodeId)
-	defer c.vlog("QuantumFs::SetXAttr Exit")
+	defer c.FuncIn("Mux::SetXAttr", "Enter Inode %d", input.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -750,8 +739,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::RemoveXAttr Enter Inode %d", header.NodeId)
-	defer c.vlog("QuantumFs::RemoveXAttr Exit")
+	defer c.FuncIn("Mux::RemoveXAttr", "Enter Inode %d", header.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
@@ -769,8 +757,8 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Create Enter Inode %d Name %s", input.NodeId, name)
-	defer c.vlog("QuantumFs::Create Exit")
+	defer c.FuncIn("Mux::Create", "Enter Inode %d Name %s", input.NodeId,
+		name).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -789,8 +777,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Open Enter Inode %d", input.NodeId)
-	defer c.vlog("QuantumFs::Open Exit")
+	defer c.FuncIn("Mux::Open", "Enter Inode %d", input.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -810,8 +797,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Read Enter Fh: %d", input.Fh)
-	defer c.vlog("QuantumFs::Read Exit")
+	defer c.FuncIn("Mux::Read", "Enter Fh: %d", input.Fh).out()
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
@@ -827,8 +813,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Release Enter Fh: %v", input.Fh)
-	defer c.vlog("QuantumFs::Release Exit")
+	defer c.FuncIn("Mux::Release", "Fh: %v", input.Fh).out()
 
 	qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
 }
@@ -841,8 +826,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Write Enter Fh: %d", input.Fh)
-	defer c.vlog("QuantumFs::Write Exit")
+	defer c.FuncIn("Mux::Write", "Enter Fh: %d", input.Fh).out()
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
@@ -860,9 +844,8 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Flush Enter Fh: %v Context %d %d %d", input.Fh,
-		input.Context.Uid, input.Context.Gid, input.Context.Pid)
-	defer c.vlog("QuantumFs::Flush Exit")
+	defer c.FuncIn("Mux::Flush", "Enter Fh: %v Context %d %d %d", input.Fh,
+		input.Context.Uid, input.Context.Gid, input.Context.Pid).out()
 
 	return fuse.OK
 }
@@ -872,8 +855,7 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Fsync Enter Fh %d", input.Fh)
-	defer c.vlog("QuantumFs::Fsync Exit")
+	defer c.FuncIn("Mux::Fsync", "Enter Fh %d", input.Fh).out()
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
@@ -887,10 +869,10 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 
 func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
 	result = fuse.EIO
+
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::Fallocate Enter")
-	defer c.vlog("QuantumFs::Fallocate Exit")
+	defer c.funcIn("Mux::Fallocate").out()
 
 	c.elog("Unhandled request Fallocate")
 	return fuse.ENOSYS
@@ -903,8 +885,7 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::OpenDir Enter Inode %d", input.NodeId)
-	defer c.vlog("QuantumFs::OpenDir Exit")
+	defer c.FuncIn("Mux::OpenDir", "Enter Inode %d", input.NodeId).out()
 
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
@@ -923,8 +904,8 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReadDir Enter Fh: %d offset %d", input.Fh, input.Offset)
-	defer c.vlog("QuantumFs::ReadDir Exit")
+	defer c.FuncIn("Mux::ReadDir", "ReadDir Enter Fh: %d offset %d", input.Fh,
+		input.Offset).out()
 
 	c.elog("Unhandled request ReadDir")
 	return fuse.ENOSYS
@@ -937,9 +918,8 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReadDirPlus Enter Fh: %d offset %d", input.Fh,
-		input.Offset)
-	defer c.vlog("QuantumFs::ReadDirPlus Exit")
+	defer c.FuncIn("Mux::ReadDirPlus", "ReadDirPlus Enter Fh: %d offset %d",
+		input.Fh, input.Offset).out()
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
@@ -954,8 +934,7 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::ReleaseDir Enter Fh: %d", input.Fh)
-	defer c.vlog("QuantumFs::ReleaseDir Exit")
+	defer c.FuncIn("Mux::ReleaseDir", "Enter Fh: %d", input.Fh).out()
 
 	qfs.setFileHandle(&qfs.c, FileHandleId(input.Fh), nil)
 }
@@ -965,8 +944,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::FsyncDir Enter Fh %d", input.Fh)
-	defer c.vlog("QuantumFs::FsyncDir Exit")
+	defer c.FuncIn("Mux::FsyncDir", "Enter Fh %d", input.Fh).out()
 
 	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
@@ -985,8 +963,7 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 
 	c := qfs.c.req(input)
 	defer logRequestPanic(c)
-	c.vlog("QuantumFs::StatFs Enter")
-	defer c.vlog("QuantumFs::StatFs Exit")
+	defer c.funcIn("Mux::StatFs").out()
 
 	out.Blocks = 2684354560 // 10TB
 	out.Bfree = out.Blocks / 2
