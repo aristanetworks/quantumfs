@@ -11,6 +11,7 @@ import "os"
 import "os/exec"
 import "strconv"
 import "testing"
+import "time"
 
 func remountFilesystem(test *testHelper) {
 	test.log("Remounting filesystem")
@@ -81,5 +82,36 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 				"File contents not preserved after Forget")
 			test.assert(err == nil, "Unable to read file after Forget")
 		}
+	})
+}
+
+func TestMultipleLookupCount(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		time.Sleep(300 * time.Millisecond)
+
+		file2, err := os.Open(testFilename)
+		test.assert(err == nil, "Error opening file readonly")
+
+		file.Close()
+		file2.Close()
+
+		// Forget Inodes
+		remountFilesystem(test)
+
+		test.assertLogContains("Looked up 2 Times",
+			"Failed to cause a second lookup")
+		test.assertLogContains("Forgetting inode with lookupCount of 2",
+			"Inode with second lookup not forgotten")
 	})
 }
