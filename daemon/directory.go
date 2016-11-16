@@ -159,16 +159,9 @@ func (dir *Directory) addChild_(c *ctx, name string, inode InodeId,
 
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx, name string) {
-<<<<<<< HEAD
 	defer c.funcIn("Directory::delChild_").out()
 
-	inodeNum, exists := dir.dirChildren.getInode(c, name)
-	if !exists {
-		panic("Unexpected missing child inode")
-	}
-=======
 	inodeNum := dir.children[name]
->>>>>>> master
 	c.dlog("Unlinking inode %d", inodeNum)
 
 	dir.self.markAccessed(c, name, false)
@@ -361,15 +354,9 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	return newKey
 }
 
-<<<<<<< HEAD
-func (dir *Directory) publish(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("Directory::publish").out()
-=======
 // Must hold the dir.childRecordsLock
 func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
-	c.vlog("Directory::publish Enter")
-	defer c.vlog("Directory::publish Exit")
->>>>>>> master
+	defer c.funcIn("Directory::publish").out()
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
@@ -1044,12 +1031,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-<<<<<<< HEAD
-	defer c.funcIn("Directory::syncChild").out()
-=======
-	c.vlog("Directory::syncChild Enter %s", newKey.String())
-	defer c.vlog("Directory::syncChild Exit")
->>>>>>> master
+	defer c.FuncIn("Directory::syncChild", "%s", newKey.String()).out()
 
 	ok, key := func() (bool, quantumfs.ObjectKey) {
 		defer dir.Lock().Unlock()
@@ -1077,13 +1059,8 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 func (dir *Directory) getExtendedAttributes_(c *ctx,
 	inodeNum InodeId) (*quantumfs.ExtendedAttributes, fuse.Status) {
 
-<<<<<<< HEAD
 	defer c.funcIn("Directory::getExtendedAttributes_").out()
-=======
 	defer dir.childRecordLock.Lock().Unlock()
-
-	c.vlog("Directory::getExtendedAttributes_ Enter")
->>>>>>> master
 
 	record, ok := dir.childrenRecords[inodeNum]
 	if !ok {
