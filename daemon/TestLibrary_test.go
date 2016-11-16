@@ -700,9 +700,19 @@ func (th *testHelper) assert(condition bool, format string, args ...interface{})
 
 // Assert the test log contains the given text
 func (th *testHelper) assertLogContains(text string, failMsg string) {
+	th.assertTestLogHas(text, failMsg, true)
+}
+
+// Assert the test log doesn't contain the given text
+func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
+	th.assertTestLogHas(text, failMsg, false)
+}
+
+func (th *testHelper) assertTestLogHas(text string, failMsg string, requires bool) {
 	logFile := th.tempDir + "/ramfs/qlog"
 	logOutput := qlog.ParseLogs(logFile)
-	th.assert(strings.Contains(logOutput, text), failMsg)
+	exists := strings.Contains(logOutput, text)
+	th.assert(exists == requires, failMsg)
 }
 
 type crashOnWrite struct {
