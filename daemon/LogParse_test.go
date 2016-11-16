@@ -113,7 +113,7 @@ func TestQParse(t *testing.T) {
 		// There's nothing ensuring the order is the same, so we have to sort
 		testLogLines := strings.Split(testLogs, "\n")
 		logOutLines := strings.Split(logOutCopy, "\n")
-		sort.Sort(qlog.SortByTime(logOutLines))
+		sort.Sort(qlog.SortString(logOutLines))
 
 		// Trim any lines outside of our "comparison boundaries"
 		testLogLines = trimToStr(test, testLogLines, testLogBoundary)
@@ -160,7 +160,7 @@ func TestQParsePartials_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Before we enable logs, let's cause all File logs to be
 		// partially written
-		test.qfs.c.Qlog.EnterTestMode("File::")
+		test.qfs.c.Qlog.EnterTestMode("---In File::")
 
 		// Enable *all* logs
 		test.qfs.c.Qlog.LogLevels = 0
@@ -206,7 +206,7 @@ func TestQParsePartials_test(t *testing.T) {
 			droppedEntry = isPartial
 		}
 
-		test.assert(count >= 10,
+		test.assert(count >= 5,
 			"Unable to confidently prove partial packet reading")
 	})
 }

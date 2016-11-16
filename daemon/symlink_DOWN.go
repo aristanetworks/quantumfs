@@ -15,10 +15,6 @@ func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (link *Symlink) forget_DOWN(c *ctx) {
-	c.elog("Invalid forget_DOWN call on Symlink")
-}
-
 func (link *Symlink) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	link.setDirty(false)
 	return link.key
