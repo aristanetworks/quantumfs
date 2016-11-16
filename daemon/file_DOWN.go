@@ -15,19 +15,8 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (fi *File) forget_DOWN(c *ctx) {
-	defer c.flog("File::forget_DOWN").exit()
-
-	key := fi.accessor.sync(c)
-	fi.setDirty(false)
-	fi.parent().syncChild(c, fi.InodeCommon.id, key)
-
-	// Remove the inode from the map, ready to be garbage collected
-	c.qfs.setInode(c, fi.id, nil)
-}
-
 func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.flog("File::flush_DOWN").exit()
+	defer c.funcIn("File::flush_DOWN").out()
 
 	key := fi.accessor.sync(c)
 	fi.setDirty(false)
@@ -39,7 +28,7 @@ func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
 }
 
 func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
-	defer c.flog("File::Sync_DOWN").exit()
+	defer c.funcIn("File::Sync_DOWN").out()
 
 	defer fd.file.Lock().Unlock()
 	if fd.file.isDirty() {

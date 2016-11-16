@@ -14,13 +14,13 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-type intslice []int
+type intSlice []int
 
-func (i *intslice) String() string {
+func (i *intSlice) String() string {
 	return fmt.Sprintf("%d", *i)
 }
 
-func (i *intslice) Set(value string) error {
+func (i *intSlice) Set(value string) error {
 	token, err := strconv.Atoi(value)
 	if err != nil {
 		fmt.Printf("Error: %s is not a valid int\n", value)
@@ -41,7 +41,7 @@ var stats bool
 var topTotal int
 var topAvg int
 var minTimeslicePct int
-var filterId intslice
+var filterId intSlice
 var bucketWidthMs int
 var bucketWidthNs int64
 var showClose bool
@@ -128,7 +128,7 @@ func init() {
 		"Sequence Id. Multiple -id flags are supported.")
 	flag.IntVar(&bucketWidthMs, "bucketMs", 1000, "Bucket width for -csv in Ms")
 	flag.BoolVar(&showClose, "similars", false,
-		"Don't hide similar sequences when using -bytotal or -byavg")
+		"Don't hide similar sequences when using -byTotal or -byAvg")
 	flag.Float64Var(&stdDevMin, "stdDevMin", 0, "Filter results, requiring "+
 		"a standard deviation of at least <stdDevMin>. Float units of "+
 		"microseconds")
@@ -291,7 +291,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Println("Loading file for -bytotal...")
+		fmt.Println("Loading file for -byTotal...")
 		file, err := os.Open(inFile)
 		if err != nil {
 			fmt.Printf("Unable to open stat file %s: %s\n", inFile, err)
@@ -314,7 +314,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Println("Loading file for -byavg...")
+		fmt.Println("Loading file for -byAvg...")
 		file, err := os.Open(inFile)
 		if err != nil {
 			fmt.Printf("Unable to open stat file %s: %s\n", inFile, err)
