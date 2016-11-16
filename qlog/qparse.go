@@ -212,7 +212,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 		// check to see if the string is all there
 		stringData := data
 
-		stringPastEnd := *idx+uint32(strLen)
+		stringPastEnd := *idx + uint32(strLen)
 		if uint32(len(data)) >= stringPastEnd {
 			stringData = data[:stringPastEnd]
 		}
