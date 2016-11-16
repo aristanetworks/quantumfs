@@ -371,7 +371,6 @@ func TestAccessSpecialFiles(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
-		relworkspace := test.relPath(workspace)
 
 		path := workspace + "/test1"
 		err := syscall.Mknod(path, syscall.S_IFBLK|syscall.S_IRWXU,
@@ -400,9 +399,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 
 		accessList["/test4"] = true
 
-		wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relworkspace)
-		test.assert(ok,
-			"WorkspaceRoot "+relworkspace+" doesn't exist")
+		wsr := test.getWorkspaceRoot(workspace)
 
 		eq := reflect.DeepEqual(accessList, wsr.accessList)
 		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
@@ -504,9 +501,7 @@ func TestAccessListClear(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		relpath := test.relPath(workspace)
-		wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relpath)
-		test.assert(ok, "Error getting WorkspaceRoot:%s", relpath)
+		wsr := test.getWorkspaceRoot(workspace)
 		wsr.clearList()
 		accessList = make(map[string]bool)
 		wsrlist = test.getAccessList(workspace)
