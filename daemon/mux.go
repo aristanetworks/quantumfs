@@ -256,6 +256,9 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 		panic(msg)
 	} else if lookupCount == 0 {
 		delete(qfs.lookupCounts, inodeId)
+		if count > 1 {
+			qfs.c.dlog("Forgetting inode with lookupCount of %d", count)
+		}
 		return true
 	} else {
 		qfs.lookupCounts[inodeId] = lookupCount
