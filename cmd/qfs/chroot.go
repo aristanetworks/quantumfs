@@ -11,10 +11,8 @@ import "os"
 import "os/exec"
 import "os/user"
 import "path/filepath"
-import "runtime"
 import "strconv"
 import "strings"
-import "sync"
 import "syscall"
 import "time"
 
@@ -42,11 +40,8 @@ const (
 
 var qfs string
 var persistent bool = true
-var waitUnmount sync.WaitGroup
 
 func init() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	if qfspath, err := osext.Executable(); err != nil {
 		fmt.Println("Unable to locate qfs directory")
 		qfs = "./qfs"
@@ -473,15 +468,13 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Closing rootfd error: %s", err.Error())
 		}
 
-		// unmount the old file system
-		profileLog("Start goroutine")
-		waitUnmount.Add(1)
-		go func() {
-			defer waitUnmount.Done()
-
-			syscall.Unmount(oldroot, syscall.MNT_DETACH)
-		}()
-		profileLog("Started goroutine")
+		// start a process to unmount oldroot, and in order to same time,
+		// we never wait for this process
+		cmdUnmount := exec.Command(umount, "-l", oldroot)
+		if err := cmdUnmount.Start(); err != nil {
+			return fmt.Errorf("Error starting unmounting process: %s",
+				err.Error())
+		}
 	}
 
 	// change the current directory
@@ -505,10 +498,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			err.Error())
 	}
 
-	profileLog("Wait for goroutine")
-	waitUnmount.Wait()
-	profileLog("goroutine terminated")
-
 	// switch to non-root user
 	if err := switchUserMode(); err != nil {
 		return fmt.Errorf("Switching usermode error: %s", err.Error())
@@ -523,7 +512,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	setarch_env := os.Environ()
 	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
 
-	profileLog("Exec'ing setarch")
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
@@ -534,7 +522,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
-	profileLog("Enter")
 	args := os.Args[2:]
 
 	var wsr string
