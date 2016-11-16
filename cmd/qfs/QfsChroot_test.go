@@ -9,22 +9,29 @@ import "os"
 import "os/exec"
 import "testing"
 
-var commandsInUsrBin = []string{sudo, mount, umount, netns, netnsd, setarch,
-	cp, chns, sh, bash, "/usr/bin/mkdir", "/usr/bin/ls"}
+var commandsInUsrBin = []string{
+	umount,
+	setarch,
+	sh,
+	bash,
+	"/usr/bin/ls",
+}
 
 var commandsInUsrSbin = []string{pivot_root}
 
 var libsToCopy = []string{
-	"/usr/lib64/libSysPreloadUtils.so", "/usr/lib64/libtinfo.so.5",
-	"/usr/lib64/libdl.so.2", "/usr/lib64/libc.so.6", "/usr/lib64/librt.so.1",
-	"/usr/lib64/libstdc++.so.6", "/usr/lib64/libm.so.6",
-	"/usr/lib64/libgcc_s.so.1", "/usr/lib64/libpcre.so.1",
-	"/usr/lib64/ld-linux-x86-64.so.2", "/usr/lib64/libpthread.so.0",
-	"/usr/lib64/libcap.so.2", "/usr/lib64/libacl.so.1",
-	"/usr/lib64/libattr.so.1", "/usr/lib64/libselinux.so.1",
-	"/usr/lib64/libaudit.so.1", "/usr/lib64/libmount.so.1",
-	"/usr/lib64/libblkid.so.1", "/usr/lib64/libuuid.so.1",
-	"/usr/lib64/libsepol.so.1"}
+	"/usr/lib64/libtinfo.so.5",
+	"/usr/lib64/libdl.so.2",
+	"/usr/lib64/libc.so.6",
+	"/usr/lib64/librt.so.1",
+	"/usr/lib64/libpcre.so.1",
+	"/usr/lib64/ld-linux-x86-64.so.2",
+	"/usr/lib64/libpthread.so.0",
+	"/usr/lib64/libcap.so.2",
+	"/usr/lib64/libacl.so.1",
+	"/usr/lib64/libattr.so.1",
+	"/usr/lib64/libselinux.so.1",
+}
 
 // setup a minimal workspace
 func setupWorkspace(t *testing.T) string {
