@@ -15,6 +15,15 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
+func remountFilesystem(test *testHelper) {
+	test.log("Remounting filesystem")
+	cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
+		"/mnt")
+	errorStr, err := cmd.CombinedOutput()
+	test.assert(err == nil, "Unable to force vfs to drop dentry cache")
+	test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+}
+
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
@@ -30,11 +39,7 @@ func TestForgetOnDirectory(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
-			"/mnt")
-		errorStr, err := cmd.CombinedOutput()
-		test.assert(err == nil, "Unable to force vfs to drop dentry cache")
-		test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+		remountFilesystem(test)
 
 		logFile := test.tempDir + "/ramfs/qlog"
 		logOutput := qlog.ParseLogs(logFile)
@@ -67,11 +72,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
-			"/mnt")
-		errorStr, err := cmd.CombinedOutput()
-		test.assert(err == nil, "Unable to force vfs to drop dentry cache")
-		test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+		remountFilesystem(test)
 
 		logFile := test.tempDir + "/ramfs/qlog"
 		logOutput := qlog.ParseLogs(logFile)
