@@ -255,7 +255,7 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
 	workspaceroot *WorkspaceRoot) {
 
-	defer c.FuncIn("Mux::activateWorkspace %s", name).out()
+	defer c.FuncIn("Mux::activateWorkspace", "%s", name).out()
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
@@ -268,7 +268,7 @@ func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
 // Untrack a workspace as active so we won't sync it. Usually this is called when
 // the workspaceroot Inode is about to be deleted
 func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string) {
-	defer c.FuncIn("Mux::deactivateWorkspace %s", name).out()
+	defer c.FuncIn("Mux::deactivateWorkspace", "%s", name).out()
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
