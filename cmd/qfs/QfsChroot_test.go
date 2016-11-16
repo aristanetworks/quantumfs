@@ -11,6 +11,7 @@ import "syscall"
 import "testing"
 
 var commandsInUsrBin = []string{
+	umount,
 	setarch,
 	sh,
 	bash,

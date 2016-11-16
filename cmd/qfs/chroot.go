@@ -468,10 +468,12 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Closing rootfd error: %s", err.Error())
 		}
 
-		// unmount the old file system
-		if err := syscall.Unmount(oldroot, syscall.MNT_DETACH); err != nil {
-			return fmt.Errorf("Unmounting %s error: %s",
-				oldroot, err.Error())
+		// start a process to unmount oldroot, and in order to save time,
+		// we never wait for this process
+		cmdUnmount := exec.Command(umount, "-l", oldroot)
+		if err := cmdUnmount.Start(); err != nil {
+			return fmt.Errorf("Error starting unmounting process: %s",
+				err.Error())
 		}
 	}
 
