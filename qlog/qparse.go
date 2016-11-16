@@ -216,6 +216,7 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 		if uint32(len(data)) >= stringPastEnd {
 			stringData = data[:stringPastEnd]
 		}
+		strLen = uint16(uint32(len(stringData)) - *idx)
 
 		err = readPacket(idx, stringData, reflect.ValueOf(&rtnRaw))
 		if err != nil {
@@ -223,11 +224,11 @@ func parseArg(idx *uint32, data []byte) (interface{}, error) {
 		}
 
 		if byteType == TypeString {
-			return string(rtnRaw[:len(stringData)]), nil
+			return string(rtnRaw[:strLen]), nil
 		}
 
 		// Otherwise, return []byte if type is TypeByteArray
-		return rtnRaw[:len(stringData)], nil
+		return rtnRaw[:strLen], nil
 	}
 
 	return nil, errors.New(fmt.Sprintf("Unsupported field type %d\n", byteType))
