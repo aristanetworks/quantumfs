@@ -11,8 +11,10 @@ import "os"
 import "os/exec"
 import "os/user"
 import "path/filepath"
+import "runtime"
 import "strconv"
 import "strings"
+import "sync"
 import "syscall"
 import "time"
 
@@ -40,17 +42,17 @@ const (
 
 var qfs string
 var persistent bool = true
-var chanUnmount chan bool
+var waitUnmount sync.WaitGroup
 
 func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	if qfspath, err := osext.Executable(); err != nil {
 		fmt.Println("Unable to locate qfs directory")
 		qfs = "./qfs"
 	} else {
 		qfs = qfspath
 	}
-
-	chanUnmount = make(chan bool, 1)
 }
 
 // A helper function to run command which gives better error information
@@ -472,14 +474,14 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		// unmount the old file system
-		go func(c chan bool) {
-			if err := syscall.Unmount(oldroot,
-				syscall.MNT_DETACH); err != nil {
+		profileLog("Start goroutine")
+		waitUnmount.Add(1)
+		go func() {
+			defer waitUnmount.Done()
 
-				c <- false
-			}
-			c <- true
-		}(chanUnmount)
+			syscall.Unmount(oldroot, syscall.MNT_DETACH)
+		}()
+		profileLog("Started goroutine")
 	}
 
 	// change the current directory
@@ -503,10 +505,9 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			err.Error())
 	}
 
-	// wait for all the goroutines to finish
-	if !<-chanUnmount {
-		return fmt.Errorf("Error unmounting %s", oldroot)
-	}
+	profileLog("Wait for goroutine")
+	waitUnmount.Wait()
+	profileLog("goroutine terminated")
 
 	// switch to non-root user
 	if err := switchUserMode(); err != nil {
@@ -522,6 +523,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	setarch_env := os.Environ()
 	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
 
+	profileLog("Exec'ing setarch")
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
@@ -532,6 +534,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
+	profileLog("Enter")
 	args := os.Args[2:]
 
 	var wsr string
