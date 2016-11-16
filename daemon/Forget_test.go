@@ -116,6 +116,11 @@ func TestMultipleLookupCount(t *testing.T) {
 	})
 }
 
+// QuantumFS doesn't currently implement hardlinks correctly. Instead of returning
+// the original inode in the Link() call, it returns a new inode. This doesn't seem
+// to bother the kernel and it distributes the lookup counts between those two inodes
+// as one would expect. However, this may change and this test should start failing
+// if that happens.
 func TestLookupCountHardlinks(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
