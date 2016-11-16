@@ -11,6 +11,7 @@ import "syscall"
 import "testing"
 
 var commandsInUsrBin = []string{
+	umount,
 	setarch,
 	sh,
 	bash,
@@ -29,6 +30,12 @@ var libsToCopy = []string{
 	"/usr/lib64/libacl.so.1",
 	"/usr/lib64/libattr.so.1",
 	"/usr/lib64/libselinux.so.1",
+}
+
+var testqfs string
+
+func init() {
+	testqfs = os.Getenv("GOPATH") + "/bin/qfs"
 }
 
 // setup a minimal workspace
@@ -161,7 +168,7 @@ func TestPersistentChroot(t *testing.T) {
 		t.Fatal("Changing to directory %s error: %s", dirTest, err.Error())
 	}
 
-	cmdChroot := exec.Command("qfs", "chroot")
+	cmdChroot := exec.Command(testqfs, "chroot")
 
 	stdin, err := cmdChroot.StdinPipe()
 	if err != nil {
@@ -216,7 +223,7 @@ func TestNetnsPersistency(t *testing.T) {
 		t.Fatal("Changing directory to %s error", dirTest)
 	}
 
-	cmdChroot := exec.Command("qfs", "chroot")
+	cmdChroot := exec.Command(testqfs, "chroot")
 
 	stdin, err := cmdChroot.StdinPipe()
 	if err != nil {
@@ -328,7 +335,7 @@ func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
 	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest):]
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -345,7 +352,7 @@ func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest):]
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -368,7 +375,7 @@ func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -391,7 +398,7 @@ func TestNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T) {
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -408,7 +415,7 @@ func TestNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T) {
 	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -425,7 +432,7 @@ func TestNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T) {
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -448,7 +455,7 @@ func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
@@ -471,7 +478,7 @@ func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
-	if err := runCommand("qfs", "chroot", "--nonpersistent", rootTest,
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
 
 		t.Fatal(err.Error())
