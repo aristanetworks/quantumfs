@@ -8,8 +8,8 @@ package daemon
 import "github.com/aristanetworks/quantumfs"
 
 func (wsr *WorkspaceRoot) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	c.vlog("WorkspaceRoot::sync Enter")
-	defer c.vlog("WorkspaceRoot::sync Exit")
+	c.vlog("WorkspaceRoot::flush_DOWN Enter")
+	defer c.vlog("WorkspaceRoot::flush_DOWN Exit")
 
 	wsr.Directory.flush_DOWN(c)
 	wsr.publish(c)
