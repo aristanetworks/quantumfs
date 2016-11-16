@@ -638,124 +638,44 @@ func TestLoadOnDemand(t *testing.T) {
 		err = printToFile(workspace+fileC, string(dataC))
 		test.assert(err == nil, "Error creating file: %v", err)
 
-		newspace := test.branchWorkspace(workspace)
+		newspace := test.absPath(test.branchWorkspace(workspace))
+		fileA = newspace + "/layerA/fileA"
+		dirB := newspace + "/layerA/layerB"
+		fileB = dirB + "/fileB"
+		dirC := dirB + "/layerC"
+		fileC = dirC + "/fileC"
 
-		// Grab the inode of fileA
+		// Confirm the inode for fileA isn't instantiated. Getting the stat
+		// attributes of an inode shouldn't instantiate it.
+		fileNode := test.getInode(fileA)
+		test.assert(fileNode == nil, "File inode unexpectedly instantiated")
+
+		// Stat'ing a file should instantiate its parents
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.absPath(newspace+fileA), &stat)
-		test.assert(err == nil, "Error grabbing file inode: %v", err)
+		err = syscall.Stat(fileB, &stat)
+		test.assert(err == nil, "Error stat'ing FileB: %v", err)
 
-		// Now grab the File for it
-		fileNode := test.qfs.inode(&test.qfs.c, InodeId(stat.Ino))
-		test.assert(fileNode != nil, "File inode for fileA is nil")
-		filePtr, ok := fileNode.(*File)
-		test.assert(ok, "Inode for fileA is not a File")
+		dirNode := test.getInode(dirB)
+		test.assert(dirNode != nil,
+			"Intermediate directory unexpectedly nil")
 
-		// Now grab its parent so we can check to make sure B/C are shallow
-		layerA := filePtr.parent()
-		test.assert(layerA != nil, "Directory inode for layerA is nil")
-		dirAPtr, ok := layerA.(*Directory)
-		test.assert(ok, "Inode for layerA is not a Directory")
-		test.assert(dirAPtr.dirChildren.data != nil,
-			"Touched directory hasn't loaded children")
+		// But siblings shouldn't have been instantiated
+		dirNode = test.getInode(dirC)
+		test.assert(dirNode == nil, "dirC unexpectedly instantiated")
 
-		layerBInode := dirAPtr.dirChildren.data.fileToInode["layerB"]
-		layerB := test.qfs.inode(&test.qfs.c, InodeId(layerBInode))
-		test.assert(layerB != nil, "Directory inode for layerB is nil")
-
-		dirBPtr, ok := layerB.(*Directory)
-		test.assert(ok, "Inode for layerB is not a Directory")
-		test.assert(dirBPtr.dirChildren.data == nil,
-			"Nested directory's children loaded unecessarily")
-
-		// Now read layer B to trigger layer C to be shallow loaded
-		layerBData, err := ioutil.ReadFile(test.absPath(newspace + fileB))
+		// Reading FileB shouldn't make any difference
+		layerBData, err := ioutil.ReadFile(fileB)
 		test.assert(err == nil, "Unable to read fileB file contents %v", err)
 		test.assert(bytes.Equal(layerBData, dataB),
 			"dynamically loaded inode data mismatch")
+		dirNode = test.getInode(dirC)
+		test.assert(dirNode == nil, "dirC unexpectedly instantiated")
 
-		layerCInode := dirBPtr.dirChildren.data.fileToInode["layerC"]
-		layerC := test.qfs.inode(&test.qfs.c, InodeId(layerCInode))
-		test.assert(layerC != nil, "Directory inode for layerC is nil")
-
-		dirCPtr, ok := layerC.(*Directory)
-		test.assert(ok, "Inode for layerC is not a Directory")
-		test.assert(dirCPtr.dirChildren.data == nil,
-			"Nested directory's children loaded unecessarily")
-
-		layerCData, err := ioutil.ReadFile(test.absPath(newspace + fileC))
+		// Ensure we can read without stat'ing first
+		layerCData, err := ioutil.ReadFile(fileC)
 		test.assert(err == nil, "Unable to read fileC contents %v", err)
 		test.assert(bytes.Equal(layerCData, dataC),
 			"dynamically loaded inode data mismatch")
-	})
-}
-
-func TestInodeForget(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-
-		dirName := workspace + "/layerA/layerB"
-		fileA := "/layerA/fileA"
-		fileB := "/layerA/layerB/fileB"
-
-		data := genData(2400)
-		dataA := data[0:800]
-		dataB := data[800:1600]
-
-		err := os.MkdirAll(dirName, 0124)
-		test.assert(err == nil, "Error creating directories: %v", err)
-
-		err = printToFile(workspace+fileA, string(dataA))
-		test.assert(err == nil, "Error creating file: %v", err)
-		err = printToFile(workspace+fileB, string(dataB))
-		test.assert(err == nil, "Error creating file: %v", err)
-
-		// Grab the inode of fileA
-		var stat syscall.Stat_t
-		err = syscall.Stat(workspace+fileA, &stat)
-		test.assert(err == nil, "Error grabbing file inode: %v", err)
-
-		// Grab layerA from fileA
-		fileNode := test.qfs.inode(&test.qfs.c, InodeId(stat.Ino))
-		test.assert(fileNode != nil, "File inode for fileA is nil")
-		layerA := fileNode.parent()
-		test.assert(layerA != nil, "FileA has no parent")
-
-		// Now lets forget fileA
-		test.qfs.allowForget = true
-		test.qfs.Forget(stat.Ino, 1)
-
-		// Make sure nothing else gets forgotten
-		test.qfs.allowForget = false
-		test.assert(test.qfs.inode(&test.qfs.c, layerA.inodeNum()) != nil,
-			"Parent of forgotten node also forgotten")
-		layerAPtr := layerA.(*Directory)
-		layerBId, exists := layerAPtr.dirChildren.getInode(&test.qfs.c,
-			"layerB")
-		test.assert(exists, "layerB missing from inode structure")
-		layerB := test.qfs.inode(&test.qfs.c, layerBId)
-		test.assert(layerB != nil,
-			"Sibling of forgotten node also forgotten")
-
-		layerBPtr := layerB.(*Directory)
-		fileBId, exists := layerBPtr.dirChildren.getInode(&test.qfs.c,
-			"fileB")
-		test.assert(exists, "fileB missing from inode structure")
-		test.assert(test.qfs.inode(&test.qfs.c, fileBId) != nil,
-			"Cousin of forgotten node also forgotten")
-
-		// Make sure that fileA actually was forgotten
-		test.assert(test.qfs.inode(&test.qfs.c, InodeId(stat.Ino)) == nil,
-			"Forgotten inode not forgotten")
-
-		// Now branch the workspace and check that fileA was synced
-		newspace := test.branchWorkspace(workspace)
-
-		var output []byte
-		output, err = ioutil.ReadFile(test.absPath(newspace + fileA))
-		test.assert(err == nil, "Error reading from branched fileA")
-		test.assert(bytes.Equal(output, dataA),
-			"FileA not synced before forget")
 	})
 }
 
@@ -835,7 +755,7 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 
 // Trigger GetAttr on a directory in order to confirm that it works correctly
 func TestDirectoryGetAttr(t *testing.T) {
-	runTestNoQfs(t, func(test *testHelper) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
 		config.CacheTimeSeconds = 0
 		config.CacheTimeNsecs = 100000
