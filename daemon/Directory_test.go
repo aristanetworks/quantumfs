@@ -203,7 +203,7 @@ func TestDirectoryFileDeletion(t *testing.T) {
 }
 
 func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
-	dir string) {
+	dir string, notOwn bool) {
 
 	fd, err := os.Create(file)
 	test.assert(err == nil, "Error creating file: %v", err)
@@ -218,8 +218,9 @@ func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
 		test.assert(err == nil && stat.Mode&syscall.S_ISVTX != 0,
 			"Error getting file stat with %v: %d, %d, %o",
 			err, stat.Uid, stat.Gid, stat.Mode)
-
-		err = syscall.Chown(file, 100, 100)
+		if notOwn {
+			err = syscall.Chown(file, 100, 100)
+		}
 		test.assert(err == nil,
 			"Error change the ownership of file: %v", err)
 	}
@@ -248,7 +249,7 @@ func TestUnlinkPermission(t *testing.T) {
 		// The directory is the WorkspaceRoot whose permission is 777,
 		// It should be able to unlink files with any permission
 		testFilename := workspace + "/" + "testFile"
-		checkUnlink(test, testFilename, 0, "")
+		checkUnlink(test, testFilename, 0, "", false)
 
 		// Try to unlink a file under a directory without enough permission
 		testDir := workspace + "/" + "testDir"
@@ -256,22 +257,22 @@ func TestUnlinkPermission(t *testing.T) {
 		test.assert(err == nil, "Error creating directory: %v", err)
 
 		testFilename = testDir + "/" + "File"
-		checkUnlink(test, testFilename, syscall.EACCES, "")
+		checkUnlink(test, testFilename, syscall.EACCES, "", false)
 
 		// Give the parent directory enough user permission
 		err = os.Chmod(testDir, 0300)
 		test.assert(err == nil, "Error change the mode of directory: %v",
 			err)
-		checkUnlink(test, testFilename+"Owner", 0, "")
+		checkUnlink(test, testFilename+"Owner", 0, "", false)
 
 		// check the group permission
 		err = os.Chmod(testDir, 077)
 		test.assert(err == nil, "Error change the mode of directory: %v",
 			err)
-		checkUnlink(test, testFilename+"Grp", syscall.EACCES, "")
+		checkUnlink(test, testFilename+"Grp", syscall.EACCES, "", false)
 
 		// check the other permission
-		checkUnlink(test, testFilename+"Other", syscall.EACCES, "")
+		checkUnlink(test, testFilename+"Other", syscall.EACCES, "", false)
 
 		err = os.Chmod(testDir, 0770)
 		test.assert(err == nil, "Error change the mode of directory: %v",
@@ -292,7 +293,7 @@ func TestUnlinkPermission(t *testing.T) {
 		err = os.Chmod(testDir, 030)
 		test.assert(err == nil, "Error change the mode of directory: %v",
 			err)
-		checkUnlink(test, testFilename+"Grp-Perm", 0, "")
+		checkUnlink(test, testFilename+"Grp-Perm", 0, "", false)
 
 		// check the other permission after change Uid and Gid
 		err = os.Chown(testDir, 100, 100)
@@ -301,7 +302,7 @@ func TestUnlinkPermission(t *testing.T) {
 		err = os.Chmod(testDir, 03)
 		test.assert(err == nil, "Error change the mode of directory: %v",
 			err)
-		checkUnlink(test, testFilename+"Other-Perm", 0, "")
+		checkUnlink(test, testFilename+"Other-Perm", 0, "", false)
 
 		err = syscall.Stat(testDir, &stat)
 		test.assert(err == nil && stat.Uid == 100 && stat.Gid == 100,
@@ -309,12 +310,16 @@ func TestUnlinkPermission(t *testing.T) {
 			err, stat.Uid, stat.Gid)
 
 		// Set sticky bit
-		checkUnlink(test, testFilename+"Sticky-NoPerm", syscall.EACCES, testDir)
+		checkUnlink(test, testFilename+"Sticky-NoPerm", syscall.EACCES, testDir, true)
+
+		// Give back ownership of file
+		test.assert(err == nil, "Failed to chown: %v", err)
+		checkUnlink(test, testFilename+"Sticky-filePerm", 0, testDir, false)
 
 		// Give back ownership of directory
 		err = os.Chown(testDir, uid, 100)
 		test.assert(err == nil, "Failed to chown: %v", err)
-		checkUnlink(test, testFilename+"Sticky-DirPerm", 0, testDir)
+		checkUnlink(test, testFilename+"Sticky-DirPerm", 0, testDir, true)
 	})
 }
 
