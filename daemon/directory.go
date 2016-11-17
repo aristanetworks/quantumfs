@@ -646,9 +646,6 @@ func (dir *Directory) getPermissions(c *ctx, permission uint32, uid uint32,
 		if uid != fileOwner {
 			// Check if it's the directory owner
 			if uid != dirOwner {
-				// No root permission, return false
-				c.vlog("Directory::GetPermissions fail with the" +
-					" sticky bit")
 				return fuse.EACCES
 			}
 		}
@@ -660,28 +657,20 @@ func (dir *Directory) getPermissions(c *ctx, permission uint32, uid uint32,
 		permWX = syscall.S_IWUSR | syscall.S_IXUSR
 		// Check the current directory having x and w permissions
 		if (permission & permWX) == permWX {
-			c.vlog("Directory::GetPermissions passes at owner: %o - %o",
-				permission&permWX, permWX)
 			return fuse.OK
 		}
 	} else if gid == dirGroup {
 		permWX = syscall.S_IWGRP | syscall.S_IXGRP
 		if (permission & permWX) == permWX {
-			c.vlog("Directory::GetPermissions passes at group: %o - %o",
-				permission&permWX, permWX)
 			return fuse.OK
 		}
 	} else { // all the other
 		permWX = syscall.S_IWOTH | syscall.S_IXOTH
 		if (permission & permWX) == permWX {
-			c.vlog("Directory::GetPermissions passes at other: %o - %o",
-				permission&permWX, permWX)
 			return fuse.OK
 		}
 	}
 
-	c.vlog("Directory::GetPermissions fails permission: %o - %o",
-		permission, permWX)
 	return fuse.EACCES
 }
 
@@ -720,7 +709,6 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			permission := dirRecord.Permissions()
 			fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
 			if exist != nil {
-				c.vlog("Directory::Unlink no directory")
 				return fuse.ENOENT
 			}
 
