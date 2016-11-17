@@ -187,6 +187,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 		delete(dir.childrenRecords, inodeNum)
 	}()
+	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
 	dir.updateSize_(c)
