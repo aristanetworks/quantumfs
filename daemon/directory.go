@@ -533,7 +533,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 		mode, rdev, entry)
 	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
-	c.qfs.addUninstantiated(c, uninstantiated, newEntity)
+	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1462,7 +1462,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	inodeNum := dir.loadChild_(c, *entry)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir)
+	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }
 
 type directoryContents struct {
