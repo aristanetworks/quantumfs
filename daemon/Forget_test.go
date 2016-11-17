@@ -8,18 +8,15 @@ package daemon
 import "bytes"
 import "io/ioutil"
 import "os"
-import "os/exec"
 import "strconv"
+import "syscall"
 import "testing"
 import "time"
 
 func remountFilesystem(test *testHelper) {
 	test.log("Remounting filesystem")
-	cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
-		"/mnt")
-	errorStr, err := cmd.CombinedOutput()
-	test.assert(err == nil, "Unable to force vfs to drop dentry cache")
-	test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
+	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
 }
 
 func TestForgetOnDirectory(t *testing.T) {
@@ -105,6 +102,8 @@ func TestMultipleLookupCount(t *testing.T) {
 
 		file.Close()
 		file2.Close()
+		// Wait for the closes to bubble up to QuantumFS
+		time.Sleep(10 * time.Millisecond)
 
 		// Forget Inodes
 		remountFilesystem(test)
