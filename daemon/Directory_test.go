@@ -310,7 +310,8 @@ func TestUnlinkPermission(t *testing.T) {
 			err, stat.Uid, stat.Gid)
 
 		// Set sticky bit
-		checkUnlink(test, testFilename+"Sticky-NoPerm", syscall.EACCES, testDir, true)
+		checkUnlink(test, testFilename+"Sticky-NoPerm",
+			syscall.EACCES, testDir, true)
 
 		// Give back ownership of file
 		test.assert(err == nil, "Failed to chown: %v", err)
