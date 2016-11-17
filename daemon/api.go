@@ -15,7 +15,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewApiInode(treeLock *sync.RWMutex) Inode {
+func NewApiInode(treeLock *sync.RWMutex, parent Inode) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:        quantumfs.InodeIdApi,
@@ -24,6 +24,7 @@ func NewApiInode(treeLock *sync.RWMutex) Inode {
 		},
 	}
 	api.self = &api
+	api.setParent(parent)
 	assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
@@ -247,6 +248,11 @@ func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+	c.elog("Invalid instantiateChild on ApiInode")
+	return nil, nil
+}
+
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 	c.vlog("newApiHandle Enter")
 	defer c.vlog("newApiHandle Exit")
@@ -419,7 +425,8 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	parts := strings.Split(wsr, "/")
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -438,7 +445,8 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	parts := strings.Split(wsr, "/")
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -471,7 +479,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	gid := cmd.Gid
 
 	wsr := dst[0] + "/" + dst[1]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, wsr)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -511,7 +519,9 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 
 	parent := p.(*Directory)
 	target := dst[len(dst)-1]
-	_, exist := parent.dirChildren.getInode(c, target)
+
+	defer parent.Lock().Unlock()
+	_, exist := parent.children[target]
 	if exist {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist", target)
@@ -521,7 +531,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	parent.duplicateInode(c, target, permissions, 0, 0, size,
+	parent.duplicateInode_(c, target, permissions, 0, 0, size,
 		quantumfs.UID(uid), quantumfs.GID(gid),
 		type_, key)
 

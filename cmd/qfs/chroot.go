@@ -14,6 +14,7 @@ import "path/filepath"
 import "strconv"
 import "strings"
 import "syscall"
+import "time"
 
 import "github.com/kardianos/osext"
 
@@ -33,9 +34,12 @@ const (
 	pivot_root = "/usr/sbin/pivot_root"
 )
 
+const (
+	SYSFS_MAGIC = 0x62656572
+)
+
 var qfs string
 var persistent bool = true
-var setupNamespaces bool = false
 
 func init() {
 	if qfspath, err := osext.Executable(); err != nil {
@@ -212,8 +216,11 @@ func setupBindMounts(rootdir string) error {
 			continue
 		}
 
-		if err := runCommand(mount, "-n", "--bind", src, dst); err != nil {
-			return err
+		if err := syscall.Mount(src, dst, "", syscall.MS_BIND,
+			""); err != nil {
+
+			return fmt.Errorf("Bindmounting %s to %s error: %s",
+				src, dst, err.Error())
 		}
 	}
 
@@ -329,22 +336,31 @@ func switchUserMode() error {
 	return nil
 }
 
+func profileLog(info string) {
+	t := time.Now()
+	timestamp := t.Format("00:00:00.000000000")
+
+	fmt.Printf("[%s] %s\n", timestamp, info)
+}
+
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
-	// create a new namespace and run qfs chroot tool in the new namespace
-	if !setupNamespaces {
-		chroot_args := []string{qfs, "chroot", "--setup-namespaces",
-			"--nonpersistent", rootdir, workingdir}
-		chroot_args = append(chroot_args, cmd...)
+	// isolate the mount namespace of this process from the rest of the machine
+	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
+		return fmt.Errorf("Unshare error: %s", err.Error())
+	}
 
-		chns_args := []string{sudo, chns, "-m", "-l", "qfschroot"}
-		chns_args = append(chns_args, chroot_args...)
+	var buf syscall.Statfs_t
+	if err := syscall.Statfs("/sys", &buf); err != nil {
+		return fmt.Errorf("Getting filesystem stat of /sys error:%s",
+			err.Error())
+	}
 
-		chns_env := os.Environ()
+	// remount /sys to reflect the new namespace
+	if buf.Type == SYSFS_MAGIC {
+		if err := syscall.Mount("/sys", "/sys", "sysfs", syscall.MS_REMOUNT,
+			""); err != nil {
 
-		if err := syscall.Exec(chns_args[0], chns_args,
-			chns_env); err != nil {
-
-			return fmt.Errorf("Execing chns error: %s", err.Error())
+			return fmt.Errorf("Remount /sys error: %s", err.Error())
 		}
 	}
 
@@ -363,18 +379,19 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	}
 
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
-		if err := runCommand(mount, "-n", "--rbind", rootdir,
-			rootdir); err != nil {
+		// pivot_root will only work when root directory is a mountpoint
+		if err := syscall.Mount(rootdir, rootdir, "",
+			syscall.MS_BIND|syscall.MS_REC, ""); err != nil {
 
-			return err
+			return fmt.Errorf("Recursively bindmounting %s error: %s",
+				rootdir, err.Error())
 		}
 
 		dst := rootdir + "/dev"
 		makedest("/dev", dst)
-		if err := runCommand(mount, "-n", "-t", "tmpfs", "none",
-			dst); err != nil {
 
-			return err
+		if err := syscall.Mount("none", dst, "tmpfs", 0, ""); err != nil {
+			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
 		}
 
 		if err := runCommand(cp, "-ax", "/dev/.", dst); err != nil {
@@ -387,10 +404,8 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 				dst, err.Error())
 		}
 
-		if err := runCommand(mount, "-n", "-t", "tmpfs", "tmpfs",
-			dst); err != nil {
-
-			return err
+		if err := syscall.Mount("tmpfs", dst, "tmpfs", 0, ""); err != nil {
+			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
 		}
 
 		if err := setupBindMounts(rootdir); err != nil {
@@ -445,17 +460,20 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 				rootdir, err.Error())
 		}
 
-		if err := runCommand(pivot_root, ".", "."+oldroot); err != nil {
-			return err
+		if err := syscall.PivotRoot(".", "."+oldroot); err != nil {
+			return fmt.Errorf("PivotRoot error: %s", err.Error())
 		}
 
 		if err := rootfd.Close(); err != nil {
 			return fmt.Errorf("Closing rootfd error: %s", err.Error())
 		}
 
-		// unmount the old file system
-		if err := runCommand(umount, "-n", "-l", oldroot); err != nil {
-			return err
+		// start a process to unmount oldroot, and in order to save time,
+		// we never wait for this process
+		cmdUnmount := exec.Command(umount, "-l", oldroot)
+		if err := cmdUnmount.Start(); err != nil {
+			return fmt.Errorf("Error starting unmounting process: %s",
+				err.Error())
 		}
 	}
 
@@ -535,10 +553,6 @@ ArgumentProcessingLoop:
 
 			cmd = append(cmd, args[2:]...)
 			break ArgumentProcessingLoop
-
-		case "--setup-namespaces":
-			setupNamespaces = true
-
 		default:
 			fmt.Fprintln(os.Stderr, "unknown argument:", args[0])
 			printHelp()
@@ -558,10 +572,26 @@ ArgumentProcessingLoop:
 			os.Exit(1)
 		}
 
-		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
-			fmt.Fprintln(os.Stderr,
-				"chrootOutOfNsd Error: ", err.Error())
-			os.Exit(1)
+		// if we do not have root privilege, then gain it now
+		if syscall.Getuid() != 0 {
+			sudo_cmd := []string{sudo, qfs, "chroot",
+				"--nonpersistent", wsr, dir}
+			sudo_cmd = append(sudo_cmd, cmd...)
+			env := os.Environ()
+
+			if err := syscall.Exec(sudo_cmd[0],
+				sudo_cmd, env); err != nil {
+
+				fmt.Printf("Exec'ing sudo command error: %s\n",
+					err.Error())
+				os.Exit(1)
+			}
+		} else {
+			if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
+				fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s",
+					err.Error())
+				os.Exit(1)
+			}
 		}
 
 		return
