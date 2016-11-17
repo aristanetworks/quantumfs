@@ -130,9 +130,8 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 	}
 }
 
-func (qfs *QuantumFs) getInode(c *ctx, id InodeId) (Inode, bool) {
-	qfs.mapMutex.RLock()
-	defer qfs.mapMutex.RUnlock()
+// Must hold the mapMutex
+func (qfs *QuantumFs) getInode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, instantiated := qfs.inodes[id]
 	if instantiated {
 		return inode, false
@@ -143,23 +142,43 @@ func (qfs *QuantumFs) getInode(c *ctx, id InodeId) (Inode, bool) {
 }
 
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
-	inode, _ := qfs.getInode(c, id)
+	qfs.mapMutex.RLock()
+	defer qfs.mapMutex.RUnlock()
+	inode, _ := qfs.getInode_(c, id)
 	return inode
 }
 
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
-	inode, needsInstantiation := qfs.getInode(c, id)
+	// First find the Inode under a cheaper lock
+	inode := func() Inode {
+		qfs.mapMutex.RLock()
+		defer qfs.mapMutex.RUnlock()
+		inode, needsInstantiation := qfs.getInode_(c, id)
 
-	if !needsInstantiation {
+		if !needsInstantiation {
+			return inode
+		} else {
+			return nil
+		}
+	}()
+
+	if inode != nil {
 		return inode
 	}
 
+	// If we didn't find it, get the more expensive lock and check again. This
+	// will instantiate the Inode if necessary and possible.
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
-	// Recheck in case things changes while we didn't have the lock
-	inode, instantiated := qfs.inodes[id]
-	if instantiated {
+
+	return qfs.inode_(c, id)
+}
+
+// Must hold the mapMutex for write
+func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
+	inode, needsInstantiation := qfs.getInode_(c, id)
+	if !needsInstantiation {
 		return inode
 	}
 
@@ -171,7 +190,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	inode, newUninstantiated := qfs.inodes[parentId].instantiateChild(c, id)
+	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
 	delete(qfs.uninstantiatedInodes, id)
 	qfs.inodes[id] = inode
 	for _, id := range newUninstantiated {
