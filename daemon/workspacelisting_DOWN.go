@@ -15,10 +15,6 @@ func (wsl *WorkspaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (wsl *WorkspaceList) forget_DOWN(c *ctx) {
-	c.elog("Invalid forget_DOWN on WorkspaceList")
-}
-
 func (wsl *WorkspaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
@@ -32,10 +28,6 @@ func (nsl *NamespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.elog("Invalid Link on NamespaceList")
 	return fuse.ENOTDIR
-}
-
-func (nsl *NamespaceList) forget_DOWN(c *ctx) {
-	c.elog("Invalid forget_DOWN on NamespaceList")
 }
 
 func (nsl *NamespaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {

@@ -62,6 +62,12 @@ func runTestNoQfs(t *testing.T, test quantumFsTest) {
 	runTestCommon(t, test, false)
 }
 
+// If you need to initialize the QuantumFS instance in some special way and the test
+// is relatively expensive, then use this variant.
+func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
+	runTestCommon(t, test, false)
+}
+
 // If you have a test which is expensive in terms of CPU time, then use
 // runExpensiveTest() which will not run it at the same time as other tests. This is
 // to prevent multiple expensive tests from running concurrently and causing each
@@ -438,8 +444,6 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.log("Instantiating quantumfs instance...")
 	quantumfs := NewQuantumFsLogs(config, th.logger)
 	th.qfs = quantumfs
-	// Keep all inodes to allow us to check the inode structure
-	th.qfs.allowForget = false
 
 	th.log("Waiting for QuantumFs instance to start...")
 
@@ -578,6 +582,16 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 	th.qfs.mapMutex.Unlock()
 
 	return handles
+}
+
+// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
+func (th *testHelper) getInode(path string) Inode {
+	var stat syscall.Stat_t
+	err := syscall.Stat(path, &stat)
+	th.assert(err == nil, "Error grabbing file inode: %v", err)
+	inode := th.qfs.inodeNoInstantiate(&th.qfs.c,
+		InodeId(stat.Ino))
+	return inode
 }
 
 // Retrieve the rootId of the given workspace
@@ -847,12 +861,18 @@ func (test *testHelper) fileSize(filename string) int64 {
 	return stat.Size
 }
 
+// Convert an absolute workspace path to the matching WorkspaceRoot object
+func (test *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
+	parts := strings.Split(test.relPath(workspace), "/")
+	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, parts[0], parts[1])
+
+	test.assert(ok, "WorkspaceRoot object for %s not found", workspace)
+
+	return wsr
+}
+
 func (test *testHelper) getAccessList(workspace string) map[string]bool {
-	relpath := test.relPath(workspace)
-	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, relpath)
-	test.assert(ok,
-		"Workspace %s does not exist or is not active", workspace)
-	return wsr.getList()
+	return test.getWorkspaceRoot(workspace).getList()
 }
 
 func (test *testHelper) assertAccessList(testlist map[string]bool,

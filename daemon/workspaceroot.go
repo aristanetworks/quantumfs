@@ -3,6 +3,7 @@
 
 package daemon
 
+import "fmt"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
@@ -36,7 +37,7 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 }
 
 func newWorkspaceRoot(c *ctx, parentName string, name string,
-	inodeNum InodeId) Inode {
+	parent Inode, inodeNum InodeId) Inode {
 
 	c.vlog("WorkspaceRoot::newWorkspaceRoot Enter")
 	defer c.vlog("WorkspaceRoot::newWorkspaceRoot Exit")
@@ -48,22 +49,26 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
-	initDirectory(c, name, &wsr.Directory, workspaceRoot.BaseLayer(),
-		inodeNum, nil, &wsr.realTreeLock)
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
 	wsr.rootId = rootId
-	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.accessList = make(map[string]bool)
+	wsr.treeLock_ = &wsr.realTreeLock
+	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	uninstantiated := initDirectory(c, name, &wsr.Directory,
+		workspaceRoot.BaseLayer(), inodeNum, parent, &wsr.realTreeLock)
 
-	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, &wsr)
+	c.qfs.addUninstantiated(c, uninstantiated, &wsr)
+
 	return &wsr
 }
 
 // Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	wsr.setDirty(true)
+	if !wsr.setDirty(true) {
+		c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
+	}
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) {
@@ -87,13 +92,17 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
-			panic("Unexpected workspace rootID update failure")
+			msg := fmt.Sprintf("Unexpected workspace rootID update "+
+				"failure, current %s: %s", rootId.String(),
+				err.Error())
+			panic(msg)
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
 			rootId.String())
 		wsr.rootId = rootId
 	}
+	c.qfs.deactivateWorkspace(c, wsr.namespace+"/"+wsr.workspace)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
@@ -127,6 +136,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	c.vlog("WorkspaceRoot::syncChild Enter")
 	defer c.vlog("WorkspaceRoot::syncChild Exit")
+	wsr.Directory.syncChild(c, inodeNum, newKey)
 	wsr.publish(c)
 }
 
@@ -135,10 +145,16 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.vlog("WorkspaceRoot::GetAttr Exit")
 	defer wsr.RLock().RUnlock()
 
+	var numChildDirectories uint32
+	for _, entry := range wsr.childrenRecords {
+		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
+			numChildDirectories++
+		}
+	}
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, wsr.InodeCommon.id,
-		uint32(wsr.dirChildren.countChildDirs()))
+	fillAttr(&out.Attr, wsr.InodeCommon.id, numChildDirectories)
+
 	out.Attr.Mode = 0777 | fuse.S_IFDIR
 	return fuse.OK
 }
@@ -170,4 +186,8 @@ func (wsr *WorkspaceRoot) clearList() {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	wsr.accessList = make(map[string]bool)
+}
+
+func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
+	return true
 }
