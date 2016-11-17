@@ -448,6 +448,7 @@ func ParseLogs(filepath string) string {
 }
 
 type writeFn func(string, ...interface{}) (int, error)
+
 func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	statusBar bool, fn writeFn) {
 
