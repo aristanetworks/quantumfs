@@ -642,8 +642,17 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 		}
 
 		var rtnRaw [math.MaxUint16]byte
-		err = readPacket(idx, data[:*idx+uint64(strLen)],
-			reflect.ValueOf(&rtnRaw))
+
+		// check to see if the string is all there
+		stringData := data
+
+		stringPastEnd := *idx + uint64(strLen)
+		if uint64(len(data)) >= stringPastEnd {
+			stringData = data[:stringPastEnd]
+		}
+		strLen = uint16(uint64(len(stringData)) - *idx)
+
+		err = readPacket(idx, stringData, reflect.ValueOf(&rtnRaw))
 		if err != nil {
 			return nil, err
 		}
