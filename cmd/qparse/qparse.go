@@ -239,8 +239,7 @@ func main() {
 				true, func(format string, args ...interface{}) (int,
 					error) {
 
-					return outFh.Write([]byte(fmt.Sprintf(format,
-						args...)))
+					return fmt.Fprintf(outFh, format, args...)
 				})
 		}
 	case patternsOut:
