@@ -112,7 +112,7 @@ func init() {
 	flag.IntVar(&tabSpaces, "tab", 0,
 		"Indent function logs with n spaces, when using -log")
 	flag.BoolVar(&logOut, "log", false,
-		"Parse a log file (-in) and print to stdout")
+		"Parse a log file (-in) and print to stdout or a file with -out")
 	flag.BoolVar(&patternsOut, "pattern", false,
 		"Show patterns given in a stat file. Works with -id.")
 	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
