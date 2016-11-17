@@ -499,8 +499,8 @@ func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
 		t := time.Unix(0, logs[i].T)
 
 		outStr := formatString(logs[i].Subsystem, logs[i].ReqId, t,
-			fmt.Sprintf(logs[i].Format, logs[i].Args...))
-		fn(outStr)
+			logs[i].Format)
+		fn(outStr, logs[i].Args...)
 	}
 	if statusBar {
 		status.Process(1)
