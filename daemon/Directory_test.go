@@ -258,11 +258,6 @@ func unlinkPermissionNormal(test *testHelper, workspace string, testDir string) 
 	test.assert(err == nil, "Error change the mode of directory: %v", err)
 	checkUnlink(test, testDir+"/"+"Grp", syscall.EACCES, "", false)
 	checkUnlink(test, testDir+"/"+"Other", syscall.EACCES, "", false)
-
-	// Add a search permission-denied intermediate directory
-	targetDir := testDir + "/" + "targetDir"
-	err = os.Mkdir(targetDir, 0677)
-	checkUnlink(test, targetDir+"/"+"Intermediate", syscall.EACCES, "", false)
 }
 
 func unlinkPermissionDiffOwner(test *testHelper, testDir string, gid int) {
