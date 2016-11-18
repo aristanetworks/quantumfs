@@ -221,9 +221,10 @@ func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
 			err, stat.Uid, stat.Gid, stat.Mode)
 		if notOwn {
 			err = syscall.Chown(file, 100, 100)
+			test.assert(err == nil,
+				"Error change the ownership of file: %v", err)
 		}
-		test.assert(err == nil,
-			"Error change the ownership of file: %v", err)
+
 	}
 
 	err = syscall.Unlink(file)

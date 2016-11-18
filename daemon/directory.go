@@ -652,7 +652,7 @@ func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
 		return false
 	}
 
-	// Get whether current user in OWNER/GRP/OTHER
+	// Get whether current user is OWNER/GRP/OTHER
 	var permWX uint32
 	if uid == dirOwner {
 		permWX = syscall.S_IWUSR | syscall.S_IXUSR
@@ -703,15 +703,15 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		// needs a permission check.
 		if !dir.self.isWorkspaceRoot() {
 			owner := c.fuseCtx.Owner
-			dirRecord, exist := dir.parent().getChildRecord(c,
+			dirRecord, err := dir.parent().getChildRecord(c,
 				dir.InodeCommon.id)
+			if err != nil {
+				return fuse.ENOENT
+			}
 			dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
 			dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
 			permission := dirRecord.Permissions()
 			fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
-			if exist != nil {
-				return fuse.ENOENT
-			}
 
 			perm := dir.checkPermissions(c, permission, owner.Uid,
 				owner.Gid, fileOwner, dirOwner, dirGroup)
