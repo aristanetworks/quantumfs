@@ -390,8 +390,8 @@ func copyDirStayOnFs(src string, dst string) error {
 		} else if (finfo.Mode() & os.ModeSymlink) != 0 {
 			oldPath, errOldPath := os.Readlink(name)
 			if errOldPath != nil {
-				return fmt.Errorf("Readlink %s error: %s", name,
-					errOldPath.Error())
+				return fmt.Errorf("Readlink %s error: %s",
+					name, errOldPath.Error())
 			}
 
 			nameDst := filepath.Join(dst, name[len(src):])
@@ -473,11 +473,10 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 
 		dst := rootdir + "/dev"
 		if makedest("/dev", dst) {
-			if err := syscall.Mount("none", dst, "tmpfs", 0,
-				""); err != nil {
-
+			errMnt := syscall.Mount("none", dst, "tmpfs", 0, "")
+			if errMnt != nil {
 				return fmt.Errorf("Mounting %s error: %s",
-					dst, err.Error())
+					dst, errMnt.Error())
 			}
 
 			if err := copyDirStayOnFs("/dev", dst); err != nil {
