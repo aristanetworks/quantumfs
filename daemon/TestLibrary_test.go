@@ -633,6 +633,10 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 
+	if os.Getuid() != 0 {
+		panic("quantumfs.daemon tests must be run as root")
+	}
+
 	// Disable Garbage Collection. Because the tests provide both the filesystem
 	// and the code accessing that filesystem the program is reentrant in ways
 	// opaque to the golang scheduler. Thus we can end up in a deadlock situation
