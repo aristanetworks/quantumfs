@@ -638,7 +638,8 @@ func (dir *Directory) getChildRecord(c *ctx,
 func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
 	gid uint32, fileOwner uint32, dirOwner uint32, dirGroup uint32) bool {
 
-	// Root permission can bypass the permission, and the root is only verified by uid
+	// Root permission can bypass the permission, and the root is only verified
+	// by uid
 	if uid == 0 {
 		return true
 	}
