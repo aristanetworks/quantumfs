@@ -148,8 +148,9 @@ func TestQParse(t *testing.T) {
 					}
 				}
 
-				test.assert(false, "Qparse/stdout mismatch,"+
-					" |%v| |%v|", []byte(logOutLines[i]),
+				test.assert(false, "Qparse/stdout mismatch:\n%s\n"+
+					" |%v| |%v|", debugStr,
+					[]byte(logOutLines[i]),
 					[]byte(testLogLines[i]))
 			}
 		}
