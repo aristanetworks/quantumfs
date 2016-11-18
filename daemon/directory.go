@@ -828,6 +828,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			delete(dir.childrenRecords, cleanupInodeId)
 		}()
 		delete(dir.dirtyChildren_, cleanupInodeId)
+		c.qfs.removeUninstantiated(c, []InodeId{cleanupInodeId})
 
 		dir.updateSize_(c)
 		dir.self.dirty(c)
