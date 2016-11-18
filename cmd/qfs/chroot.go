@@ -117,7 +117,7 @@ func makedest(src, dst string) bool {
 	}
 
 	if srcInfo.IsDir() {
-		if err := os.Mkdir(dst, 0666); err != nil {
+		if err := os.Mkdir(dst, srcInfo.Mode()); err != nil {
 			return false
 		} else {
 			return true
@@ -343,6 +343,101 @@ func profileLog(info string) {
 	fmt.Printf("[%s] %s\n", timestamp, info)
 }
 
+func copyDirStayOnFs(src string, dst string) error {
+	var srcfs syscall.Statfs_t
+	if err := syscall.Statfs(src, &srcfs); err != nil {
+		return fmt.Errorf("Statfs directory %s error: %s",
+			src, err.Error())
+	}
+
+	if err := filepath.Walk(src, func(name string, finfo os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("Walking file/directory %s error: %s",
+				name, err.Error())
+		}
+
+		if finfo.IsDir() {
+			var dirfs syscall.Statfs_t
+			if errDirfs := syscall.Statfs(name, &dirfs); errDirfs != nil {
+				return fmt.Errorf("Statfs directory %s error: %s",
+					name, errDirfs.Error())
+			}
+
+			// if filesystem types are different, then this sub-directory
+			// is a mountpoint, we shouldn't copy the device accross
+			// filesystemt boundary
+			if srcfs.Type != dirfs.Type {
+				return filepath.SkipDir
+			}
+
+			nameDst := filepath.Join(dst, name[len(src):])
+			if errMkdir := os.MkdirAll(nameDst,
+				finfo.Mode()); errMkdir != nil {
+
+				return fmt.Errorf("Create directory %s error: %s",
+					nameDst, errMkdir.Error())
+			}
+		} else if finfo.Mode().IsRegular() {
+			// if it is a regular file, just copy with io read/write
+			fmt.Println("Ordinary file, not created")
+			return nil
+		} else if (finfo.Mode() & os.ModeSymlink) != 0 {
+			oldPath, errOldPath := os.Readlink(name)
+			if errOldPath != nil {
+
+				return fmt.Errorf("Read symlink %s error: %s",
+					name, errOldPath.Error())
+			}
+
+			nameDst := filepath.Join(dst, name[len(src):])
+			if errSymlink := syscall.Symlink(oldPath,
+				nameDst); errSymlink != nil {
+
+				return fmt.Errorf("Create symlink %s ->"+
+					" %s error: %s",
+					nameDst, oldPath, errSymlink.Error())
+			}
+		} else {
+			// if it is a device, mknod
+			if fstat, ok := finfo.Sys().(*syscall.Stat_t); ok {
+				nameDst := filepath.Join(dst, name[len(src):])
+				if errMknod := syscall.Mknod(nameDst,
+					fstat.Mode,
+					int(fstat.Rdev)); errMknod != nil {
+
+					return fmt.Errorf("Creating device %s"+
+						" error: %s",
+						nameDst, errMknod.Error())
+				}
+				// change the uid and gid as it was before copying
+				if errChown := syscall.Chown(nameDst,
+					int(fstat.Uid),
+					int(fstat.Gid)); errChown != nil {
+
+					return fmt.Errorf("Changing ownersip"+
+						" of device %s error: %s",
+						nameDst, errChown.Error())
+				}
+
+				// after changing uid and gid change the file mode
+				// again so that we have correct mode
+				if errChmod := syscall.Chmod(nameDst,
+					fstat.Mode); errChmod != nil {
+
+					return fmt.Errorf("Changing mode of"+
+						" file: %s error: %s",
+						nameDst, errChmod.Error())
+
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("Walking directory %s error: %s", src, err.Error())
+	}
+	return nil
+}
+
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
@@ -388,15 +483,18 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		dst := rootdir + "/dev"
-		makedest("/dev", dst)
-		fmt.Println(dst)
+		if makedest("/dev", dst) {
 
-		if err := syscall.Mount("none", dst, "tmpfs", 0, ""); err != nil {
-			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
-		}
+			if err := syscall.Mount("none", dst, "tmpfs", 0, ""); err != nil {
+				return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
+			}
 
-		if err := runCommand(cp, "-ax", "/dev/.", dst); err != nil {
-			return err
+			if err := copyDirStayOnFs("/dev", dst); err != nil {
+				return fmt.Errorf("Copying /dev error: %s", err.Error())
+			}
+			//		if err := runCommand(cp, "-ax", "/dev/.", dst); err != nil {
+			//			return err
+			//		}
 		}
 
 		dst = rootdir + "/var/run/netns"
@@ -513,6 +611,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 	setarch_env := os.Environ()
 	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
 
+	profileLog("End")
 	if err := syscall.Exec(setarch_cmd[0],
 		setarch_cmd, setarch_env); err != nil {
 
@@ -523,6 +622,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
+	profileLog("Start")
 	args := os.Args[2:]
 
 	var wsr string
