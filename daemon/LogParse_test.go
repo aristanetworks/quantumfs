@@ -8,6 +8,7 @@ package daemon
 import "bytes"
 import "fmt"
 import "io/ioutil"
+import "math"
 import "os"
 import "sort"
 import "strings"
@@ -33,6 +34,32 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 	test.assert(boundaryCount == 2, "Miscount of boundary markers %d",
 		boundaryCount)
 	return logs[boundaryStart : boundaryEnd+1]
+}
+
+func TestMaxStringFail_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		longStr := string(genData(math.MaxUint16))
+
+		test.qfs.c.elog("%s %d", longStr, 255)
+
+		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+		test.assert(strings.Contains(testLogs,
+			"Packet has been clipped"),
+			"Over length string doesn't cause last parameter to drop")
+	})
+}
+
+func TestMaxStringLast_test(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		longStr := string(genData(math.MaxUint16))
+
+		test.qfs.c.elog("%s", longStr)
+
+		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+		test.assert(strings.Contains(testLogs,
+			"Log data exceeds allowable length"),
+			"Over length string doesn't trigger warning")
+	})
 }
 
 func TestQParse(t *testing.T) {
@@ -109,13 +136,22 @@ func TestQParse(t *testing.T) {
 				}
 
 				for j := startOut; j <= endOut; j++ {
+					if j == i {
+						debugStr += ("!!!!!!!!!!!!!!!!!!!\n")
+					}
 					debugStr += fmt.Sprintf("!!Q%d: %s\n",
 						j, testLogLines[j])
 					debugStr += fmt.Sprintf("!!L%d: %s\n",
 						j, logOutLines[j])
+					if j == i {
+						debugStr += ("!!!!!!!!!!!!!!!!!!!\n")
+					}
 				}
-				test.assert(false, "Qparse/stdout mismatch:\n"+
-					debugStr)
+
+				test.assert(false, "Qparse/stdout mismatch:\n%s\n"+
+					" |%v| |%v|", debugStr,
+					[]byte(logOutLines[i]),
+					[]byte(testLogLines[i]))
 			}
 		}
 	})
