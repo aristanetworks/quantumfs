@@ -236,73 +236,20 @@ func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
 	}
 }
 
-func unlinkPermissionNormal(test *testHelper, workspace string, testDir string) {
-	// Check non-existing file
-	nonExist := workspace + "/" + "nonExist"
-	err := syscall.Unlink(nonExist)
-	test.assert(err == syscall.ENOENT, "Error unlinking file: %v", err)
-
-	// The directory is the WorkspaceRoot whose permission is 777,
-	// It should be able to unlink files with any permission
-	testFilename := workspace + "/" + "testFile"
-	checkUnlink(test, testFilename, 0, "", false)
-
-	checkUnlink(test, testDir+"/"+"File", syscall.EACCES, "", false)
-
-	// Give the parent directory enough user permission
-	err = os.Chmod(testDir, 0300)
-	test.assert(err == nil, "Error change the mode of directory: %v", err)
-	checkUnlink(test, testDir+"/"+"Owner", 0, "", false)
-
-	// check the group/other permission
-	err = os.Chmod(testDir, 0077)
-	test.assert(err == nil, "Error change the mode of directory: %v", err)
-	checkUnlink(test, testDir+"/"+"Grp", syscall.EACCES, "", false)
-	checkUnlink(test, testDir+"/"+"Other", syscall.EACCES, "", false)
-}
-
-func unlinkPermissionDiffOwner(test *testHelper, testDir string, gid int) {
-	// check the group permission after change Uid
-	err := os.Chown(testDir, 100, 0)
+func modifyVerifyChown(test *testHelper, dir string, uid int, gid int) {
+	// Try to change the ownership of the rootDir to uid, gid
+	err := os.Chown(dir, uid, gid)
 	test.assert(err == nil, "Failed to chown: %v", err)
 
-	err = os.Chmod(testDir, 0030)
-	test.assert(err == nil, "Error change the mode of directory: %v", err)
-	checkUnlink(test, testDir+"/"+"Grp-Perm", 0, "", false)
-
-	// check the other permission after change Uid and Gid
-	err = os.Chown(testDir, 100, 100)
-	test.assert(err == nil, "Failed to chown: %v", err)
-
-	err = os.Chmod(testDir, 0003)
-	test.assert(err == nil, "Error change the mode of directory: %v", err)
-	checkUnlink(test, testDir+"/"+"Other-Perm", 0, "", false)
-
-	// prove the ownership is correct
+	// Verify the file's uid is 99 and uid is 0
 	var stat syscall.Stat_t
-	err = syscall.Stat(testDir, &stat)
-	test.assert(err == nil && stat.Uid == 100 && stat.Gid == 100,
+	err = syscall.Stat(dir, &stat)
+	test.assert(err == nil && int(stat.Uid) == uid && int(stat.Gid) == gid,
 		"Error getting directory stat with %v: %d, %d",
 		err, stat.Uid, stat.Gid)
 }
 
-func unlinkPermissionSticky(test *testHelper, testDir string, uid int) {
-	// Set sticky bit
-	checkUnlink(test, testDir+"/"+"Sticky-NoPerm",
-		syscall.EACCES, testDir, true)
-
-	// Give back ownership of file
-	checkUnlink(test, testDir+"/"+"Sticky-filePerm", 0, testDir, false)
-
-	// Give back ownership of directory
-	err := os.Chown(testDir, uid, 100)
-	test.assert(err == nil, "Failed to chown: %v", err)
-	checkUnlink(test, testDir+"/"+"Sticky-DirPerm", 0, testDir, true)
-
-}
-
-// Compare the Unlink function with different permissions
-func TestUnlinkPermission(t *testing.T) {
+func TestUnlinkPermissionNormal(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
@@ -313,8 +260,8 @@ func TestUnlinkPermission(t *testing.T) {
 
 		// The quantumfs tests are run as root because some tests require
 		// root privileges. However, root can read or write any file
-		// irrespective of the file permissions. Obviously if we want to test
-		// permissions then we cannot run as root.
+		// irrespective of the file permissions. Obviously if we want to
+		// test permissions then we cannot run as root.
 		//
 		// To accomplish this we lock this goroutine to a particular OS
 		// thread, then we change the EUID of that thread to something which
@@ -333,22 +280,131 @@ func TestUnlinkPermission(t *testing.T) {
 		test.assert(err == nil, "Failed to change test EUID: %v", err)
 
 		// Repeat the same test without root permission
+		// Modify and verify the file's uid is 99 and gid is 0
+		modifyVerifyChown(test, rootDir, 99, 0)
 		checkUnlink(test, rootDir+"/"+"NoRoot", syscall.EACCES, "", false)
-		// Try to unlink a file under a directory without enough permission
+
+		// Check non-existing file
+		nonExist := workspace + "/" + "nonExist"
+		err = syscall.Unlink(nonExist)
+		test.assert(err == syscall.ENOENT, "Error unlinking file: %v", err)
+
+		// The directory is the WorkspaceRoot whose permission is 777,
+		// It should be able to unlink files with any permission
+		testFilename := workspace + "/" + "testFile"
+		checkUnlink(test, testFilename, 0, "", false)
+
 		testDir := workspace + "/" + "testDir"
 		err = os.Mkdir(testDir, 0124)
 		test.assert(err == nil, "Error creating directory: %v", err)
 
-		// Verify the file's uid is 99 and uid is 0
-		var stat syscall.Stat_t
-		err = syscall.Stat(testDir, &stat)
-		test.assert(err == nil && stat.Uid == 99 && stat.Gid == 0,
-			"Error getting directory stat with %v: %d, %d",
-			err, stat.Uid, stat.Gid)
+		// Directory without enough permission
+		checkUnlink(test, testDir+"/"+"File", syscall.EACCES, "", false)
 
-		unlinkPermissionNormal(test, workspace, testDir)
-		unlinkPermissionDiffOwner(test, testDir, 99)
-		//unlinkPermissionSticky(test, testDir, int(stat.Gid))
+		// Give the parent directory enough user permission
+		err = os.Chmod(testDir, 0300)
+		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		checkUnlink(test, testDir+"/"+"Owner", 0, "", false)
+
+		// check the group/other permission
+		err = os.Chmod(testDir, 0077)
+		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		checkUnlink(test, testDir+"/"+"Grp", syscall.EACCES, "", false)
+		checkUnlink(test, testDir+"/"+"Other", syscall.EACCES, "", false)
+	})
+}
+
+func TestUnlinkPermissionDiffOwner(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		//Check the root permission bypassing all the permission
+		rootDir := workspace + "/" + "Root"
+		err := os.Mkdir(rootDir, 0)
+		modifyVerifyChown(test, rootDir, 100, 100)
+		checkUnlink(test, rootDir+"/"+"rootByPass", 0, "", false)
+
+		runtime.LockOSThread()
+		defer func(origEuid int) {
+			syscall.Setreuid(-1, origEuid)
+			runtime.UnlockOSThread()
+		}(syscall.Geteuid())
+
+		err = syscall.Setreuid(-1, 99 /* nobody */)
+		test.assert(err == nil, "Failed to change test EUID: %v", err)
+
+		// Repeat the same test without root permission
+		err = syscall.Chmod(rootDir, 0770)
+		test.assert(err == nil, "Failed to change mode of directory: %v", err)
+		checkUnlink(test, rootDir+"/"+"NoRoot", syscall.EACCES, "", false)
+
+		testDir := workspace + "/" + "testDir"
+		err = os.Mkdir(testDir, 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		// check the group permission after change Uid
+		modifyVerifyChown(test, testDir, 100, 0)
+		err = os.Chmod(testDir, 0030)
+		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		checkUnlink(test, testDir+"/"+"Grp-Perm", 0, "", false)
+
+		err = os.Chmod(testDir, 0747)
+		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		checkUnlink(test, testDir+"/"+"Grp-NoPerm", syscall.EACCES, "", false)
+
+		// check the other permission after change Uid and Gid
+		modifyVerifyChown(test, testDir, 100, 100)
+		err = os.Chmod(testDir, 0003)
+		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		checkUnlink(test, testDir+"/"+"Other-Perm", 0, "", false)
+
+		err = os.Chmod(testDir, 0774)
+		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		checkUnlink(test, testDir+"/"+"Other-NoPerm", syscall.EACCES, "", false)
+	})
+}
+
+func TestUnlinkPermissionStickyBit(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		//Check the root permission bypassing all the permission
+		rootDir := workspace + "/" + "Root"
+		err := os.Mkdir(rootDir, 0)
+		modifyVerifyChown(test, rootDir, 100, 100)
+		checkUnlink(test, rootDir+"/"+"rootByPass", 0, rootDir, true)
+
+		runtime.LockOSThread()
+		defer func(origEuid int) {
+			syscall.Setreuid(-1, origEuid)
+			runtime.UnlockOSThread()
+		}(syscall.Geteuid())
+
+		err = syscall.Setreuid(-1, 99 /* nobody */)
+		test.assert(err == nil, "Failed to change test EUID: %v", err)
+
+		// Repeat the same test without root permission
+		err = syscall.Chmod(rootDir, 0777)
+		test.assert(err == nil, "Failed to change mode of directory: %v", err)
+		checkUnlink(test, rootDir+"/"+"NoRoot", syscall.EACCES, rootDir, true)
+
+		testDir := workspace + "/" + "testDir"
+		err = os.Mkdir(testDir, 0124)
+		test.assert(err == nil, "Error creating directory: %v", err)
+
+		// check the other permission after change Uid and Gid
+		modifyVerifyChown(test, testDir, 100, 100)
+
+		// Lose both ownership of file and directory
+		checkUnlink(test, testDir+"/"+"Sticky-NoPerm",
+			syscall.EACCES, testDir, true)
+
+		// Give back ownership of file
+		checkUnlink(test, testDir+"/"+"Sticky-filePerm", 0, testDir, false)
+
+		// Give back ownership of directory
+		modifyVerifyChown(test, testDir, 99, 100)
+		checkUnlink(test, testDir+"/"+"Sticky-DirPerm", 0, testDir, true)
 
 	})
 }
