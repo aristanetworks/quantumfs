@@ -303,12 +303,14 @@ func TestUnlinkPermissionNormal(t *testing.T) {
 
 		// Give the parent directory enough user permission
 		err = os.Chmod(testDir, 0300)
-		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
 		checkUnlink(test, testDir+"/"+"Owner", 0, "", false)
 
 		// check the group/other permission
 		err = os.Chmod(testDir, 0077)
-		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
 		checkUnlink(test, testDir+"/"+"Grp", syscall.EACCES, "", false)
 		checkUnlink(test, testDir+"/"+"Other", syscall.EACCES, "", false)
 	})
@@ -335,7 +337,8 @@ func TestUnlinkPermissionDiffOwner(t *testing.T) {
 
 		// Repeat the same test without root permission
 		err = syscall.Chmod(rootDir, 0770)
-		test.assert(err == nil, "Failed to change mode of directory: %v", err)
+		test.assert(err == nil, "Failed to change mode of directory: %v",
+			err)
 		checkUnlink(test, rootDir+"/"+"NoRoot", syscall.EACCES, "", false)
 
 		testDir := workspace + "/" + "testDir"
@@ -345,22 +348,28 @@ func TestUnlinkPermissionDiffOwner(t *testing.T) {
 		// check the group permission after change Uid
 		modifyVerifyChown(test, testDir, 100, 0)
 		err = os.Chmod(testDir, 0030)
-		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
 		checkUnlink(test, testDir+"/"+"Grp-Perm", 0, "", false)
 
 		err = os.Chmod(testDir, 0747)
-		test.assert(err == nil, "Error change the mode of directory: %v", err)
-		checkUnlink(test, testDir+"/"+"Grp-NoPerm", syscall.EACCES, "", false)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
+		checkUnlink(test, testDir+"/"+"Grp-NoPerm",
+			syscall.EACCES, "", false)
 
 		// check the other permission after change Uid and Gid
 		modifyVerifyChown(test, testDir, 100, 100)
 		err = os.Chmod(testDir, 0003)
-		test.assert(err == nil, "Error change the mode of directory: %v", err)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
 		checkUnlink(test, testDir+"/"+"Other-Perm", 0, "", false)
 
 		err = os.Chmod(testDir, 0774)
-		test.assert(err == nil, "Error change the mode of directory: %v", err)
-		checkUnlink(test, testDir+"/"+"Other-NoPerm", syscall.EACCES, "", false)
+		test.assert(err == nil, "Error change the mode of directory: %v",
+			err)
+		checkUnlink(test, testDir+"/"+"Other-NoPerm",
+			syscall.EACCES, "", false)
 	})
 }
 
