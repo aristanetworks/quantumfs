@@ -260,8 +260,8 @@ func (qfs *QuantumFs) removeUninstantiated_(c *ctx, uninstantiated []InodeId) {
 		delete(qfs.uninstantiatedInodes, inodeNum)
 
 		children := qfs.uninstantiatedChildren[inodeNum]
-		qfs.removeUninstantiated_(c, children)
 		delete(qfs.uninstantiatedChildren, inodeNum)
+		qfs.removeUninstantiated_(c, children)
 	}
 }
 
