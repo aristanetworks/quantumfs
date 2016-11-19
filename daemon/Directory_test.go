@@ -394,8 +394,10 @@ func TestUnlinkPermissionStickyBit(t *testing.T) {
 
 		// Repeat the same test without root permission
 		err = syscall.Chmod(rootDir, 0777)
-		test.assert(err == nil, "Failed to change mode of directory: %v", err)
-		checkUnlink(test, rootDir+"/"+"NoRoot", syscall.EACCES, rootDir, true)
+		test.assert(err == nil, "Failed to change mode of directory: %v",
+			err)
+		checkUnlink(test, rootDir+"/"+"NoRoot",
+			syscall.EACCES, rootDir, true)
 
 		testDir := workspace + "/" + "testDir"
 		err = os.Mkdir(testDir, 0124)
