@@ -32,7 +32,6 @@ const (
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
 	pivot_root = "/usr/sbin/pivot_root"
-	strace     = "/usr/bin/strace"
 )
 
 const (
@@ -294,7 +293,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 			rootdir, err.Error())
 	}
 
-	netnsdcmd := exec.Command(sudo, strace, setarch, archString, netnsd,
+	netnsdcmd := exec.Command(sudo, setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
 		"--pre-chroot-cmd="+prechrootCmd, svrName)
 
