@@ -81,7 +81,7 @@ type WorkspaceDB struct {
 	db *bolt.DB
 }
 
-func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx) int {
+func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx) (int, error) {
 	var num int
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
@@ -95,10 +95,10 @@ func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx) int {
 		return nil
 	})
 
-	return num
+	return num, nil
 }
 
-func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) []string {
+func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) ([]string, error) {
 	namespaceList := make([]string, 0, 100)
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
@@ -111,10 +111,12 @@ func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) []string {
 		return nil
 	})
 
-	return namespaceList
+	return namespaceList, nil
 }
 
-func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, namespace string) int {
+func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, namespace string) (int,
+	error) {
+
 	var num int
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
@@ -128,10 +130,12 @@ func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, namespace string) int {
 		return nil
 	})
 
-	return num
+	return num, nil
 }
 
-func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) []string {
+func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) ([]string,
+	error) {
+
 	workspaceList := make([]string, 0, 100)
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
@@ -145,10 +149,12 @@ func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) []str
 		return nil
 	})
 
-	return workspaceList
+	return workspaceList, nil
 }
 
-func (wsdb *WorkspaceDB) NamespaceExists(c *quantumfs.Ctx, namespace string) bool {
+func (wsdb *WorkspaceDB) NamespaceExists(c *quantumfs.Ctx, namespace string) (bool,
+	error) {
+
 	var exists bool
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
@@ -161,7 +167,7 @@ func (wsdb *WorkspaceDB) NamespaceExists(c *quantumfs.Ctx, namespace string) boo
 		return nil
 	})
 
-	return exists
+	return exists, nil
 }
 
 // Get the workspace key. This must be run inside a boltDB transaction
@@ -177,7 +183,7 @@ func getWorkspaceKey_(tx *bolt.Tx, namespace string, workspace string) []byte {
 }
 
 func (wsdb *WorkspaceDB) WorkspaceExists(c *quantumfs.Ctx, namespace string,
-	workspace string) bool {
+	workspace string) (bool, error) {
 
 	var exists bool
 
@@ -190,7 +196,7 @@ func (wsdb *WorkspaceDB) WorkspaceExists(c *quantumfs.Ctx, namespace string,
 		return nil
 	})
 
-	return exists
+	return exists, nil
 }
 
 func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
@@ -236,7 +242,7 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 }
 
 func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, namespace string,
-	workspace string) quantumfs.ObjectKey {
+	workspace string) (quantumfs.ObjectKey, error) {
 
 	var rootid quantumfs.ObjectKey
 
@@ -252,7 +258,7 @@ func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, namespace string,
 		return nil
 	})
 
-	return rootid
+	return rootid, nil
 }
 
 func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
