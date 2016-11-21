@@ -89,3 +89,58 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		}
 	})
 }
+
+func TestForgetUninstantiatedChildren(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		dirName := workspace + "/dir"
+
+		err := os.Mkdir(dirName, 0777)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		numFiles := 10
+		data := genData(255)
+		// Generate a bunch of files
+		for i := 0; i < numFiles; i++ {
+			err := printToFile(workspace+"/dir//file"+strconv.Itoa(i),
+				string(data))
+			test.assert(err == nil, "Error creating small file")
+		}
+
+		// Now branch this workspace so we have a workspace full of
+		// uninstantiated Inodes
+		workspace = test.branchWorkspace(workspace)
+		dirName = test.absPath(workspace + "/dir")
+
+		// Get the listing from the directory to instantiate that directory
+		// and add its children to the uninstantiated inode list.
+		dir, err := os.Open(dirName)
+		test.assert(err == nil, "Error opening directory: %v", err)
+		children, err := dir.Readdirnames(-1)
+		test.assert(err == nil, "Error reading directory children: %v", err)
+		test.assert(len(children) == numFiles+2,
+			"Wrong number of children: %d != %d", len(children),
+			numFiles+2)
+		dir.Close()
+
+		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
+
+		// Forgetting should now forget the Directory and thus remove all the
+		// uninstantiated children from the uninstantiatedInodes list.
+		cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
+			"/mnt")
+		errorStr, err := cmd.CombinedOutput()
+		test.assert(err == nil, "Unable to force vfs to drop dentry cache")
+		test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+
+		logFile := test.tempDir + "/ramfs/qlog"
+		logOutput := qlog.ParseLogs(logFile)
+		test.assert(strings.Contains(logOutput, "Forgetting"),
+			"No inode forget triggered during dentry drop.")
+
+		numUninstantiatedNew := len(test.qfs.uninstantiatedInodes)
+
+		test.assert(numUninstantiatedOld > numUninstantiatedNew,
+			"No uninstantiated inodes were removed")
+	})
+}
