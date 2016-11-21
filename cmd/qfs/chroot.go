@@ -41,6 +41,7 @@ const (
 
 var qfs string
 var persistent bool = true
+var personalities map[string]uintptr
 
 func init() {
 	if qfspath, err := osext.Executable(); err != nil {
@@ -49,6 +50,10 @@ func init() {
 	} else {
 		qfs = qfspath
 	}
+
+	personalities = make(map[string]uintptr, 0)
+	personalities["x86_64"] = 0x0000
+	personalities["i686"] = 0x0008
 }
 
 // A helper function to run command which gives better error information
@@ -176,6 +181,20 @@ func getArchitecture(rootdir string) (string, error) {
 	platStr := string(platform[:len(platform)-1])
 
 	return processArchitecture(platStr)
+}
+
+func setArchitecture(arch string) error {
+	archflag, ok := personalities[arch]
+	if !ok {
+		return fmt.Errorf("Unsupported architecture: %s", arch)
+	}
+
+	_, _, errno := syscall.Syscall(syscall.SYS_PERSONALITY, archflag, 0, 0)
+	if errno != 0 {
+		return fmt.Errorf("Change Personality error: %d", errno)
+	}
+
+	return nil
 }
 
 // test whether the netns server is already running
@@ -507,19 +526,20 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		return fmt.Errorf("Switching usermode error: %s", err.Error())
 	}
 
+	if err := setArchitecture(archStr); err != nil {
+		return fmt.Errorf("Set architecture error: %s", err.Error())
+	}
+
 	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
 	shell_cmd = append(shell_cmd, cmd...)
 
-	setarch_cmd := []string{setarch, archStr}
-	setarch_cmd = append(setarch_cmd, shell_cmd...)
+	shell_env := os.Environ()
+	shell_env = append(shell_env, "A4_CHROOT="+rootdir)
 
-	setarch_env := os.Environ()
-	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
+	if err := syscall.Exec(shell_cmd[0],
+		shell_cmd, shell_env); err != nil {
 
-	if err := syscall.Exec(setarch_cmd[0],
-		setarch_cmd, setarch_env); err != nil {
-
-		return fmt.Errorf("Exec'ing setarch command error:%s", err.Error())
+		return fmt.Errorf("Exec'ing shell command error:%s", err.Error())
 	}
 
 	return nil
