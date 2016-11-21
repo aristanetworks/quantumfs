@@ -271,7 +271,6 @@ func TestUnlinkPermissionRoot(t *testing.T) {
 	})
 }
 
-// Check when uid matches the directory uid
 func TestUnlinkUserPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
@@ -326,7 +325,6 @@ func TestUnlinkUserPermission(t *testing.T) {
 	})
 }
 
-// Check when gid matches the directory gid
 func TestUnlinkGroupPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
