@@ -44,7 +44,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	var wsr WorkspaceRoot
 
-	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
+	rootId, err := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
