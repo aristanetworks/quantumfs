@@ -338,7 +338,8 @@ func TestUnlinkGroupPermission(t *testing.T) {
 		test.assert(err == nil, "Error creating directory: %v", err)
 
 		modifyVerifyChown(test, testDir, 100, 0)
-		checkUnlink(test, testDir+"/"+"Grp-NoPerm", syscall.EACCES, "", false)
+		checkUnlink(test, testDir+"/"+"Grp-NoPerm",
+			syscall.EACCES, "", false)
 
 		// Have ownership of file or no owernship when sticky bit is set
 		checkUnlink(test, testDir+"/"+"Sticky-FileNoPerm",
