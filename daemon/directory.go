@@ -652,6 +652,9 @@ func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
 		return false
 	}
 
+	c.vlog("Unlink::checkPermission permission %o with uid %d, gid %d",
+		permission, uid, gid)
+
 	// Get whether current user is OWNER/GRP/OTHER
 	var permWX uint32
 	if uid == dirOwner {
