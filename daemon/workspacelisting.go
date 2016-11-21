@@ -67,15 +67,19 @@ func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
 }
 
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
-	fillAttr(attr, inodeNum,
-		uint32(c.workspaceDB.NumNamespaces(&c.Ctx)))
+	num, err := c.workspaceDB.NumNamespaces(&c.Ctx)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	fillAttr(attr, inodeNum, uint32(num))
 }
 
 type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId, name string)
 
 func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId, namespace string) {
-	fillAttr(attr, inodeNum,
-		uint32(c.workspaceDB.NumWorkspaces(&c.Ctx, namespace)))
+	num, err := c.workspaceDB.NumWorkspaces(&c.Ctx, namespace)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	fillAttr(attr, inodeNum, uint32(num))
 }
 
 func fillAttr(attr *fuse.Attr, inodeNum InodeId, numChildren uint32) {
@@ -182,8 +186,11 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx),
-		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
+	list, err := c.workspaceDB.NamespaceList(&c.Ctx)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	updateChildren(c, "/", list, &nsl.namespacesByName,
+		&nsl.namespacesById, nsl, newWorkspaceList)
 	children := snapshotChildren(c, &nsl.namespacesByName, fillNamespaceAttr)
 
 	api := directoryContents{
@@ -206,11 +213,18 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 		return fuse.OK
 	}
 
-	if !c.workspaceDB.NamespaceExists(&c.Ctx, name) {
+	exists, err := c.workspaceDB.NamespaceExists(&c.Ctx, name)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	if !exists {
 		return fuse.ENOENT
 	}
 
-	updateChildren(c, "/", c.workspaceDB.NamespaceList(&c.Ctx),
+	var list []string
+	list, err = c.workspaceDB.NamespaceList(&c.Ctx)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	updateChildren(c, "/", list,
 		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
 
 	inodeNum := nsl.namespacesByName[name]
@@ -455,8 +469,10 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
-	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	updateChildren(c, wsl.namespaceName, list,
 		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
 	children := snapshotChildren(c, &wsl.workspacesByName, fillWorkspaceAttrFake)
 
@@ -466,12 +482,18 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	if !c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.namespaceName, name) {
+	exists, err := c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.namespaceName, name)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	if !exists {
 		return fuse.ENOENT
 	}
 
-	updateChildren(c, wsl.namespaceName,
-		c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName),
+	var list []string
+	list, err = c.workspaceDB.WorkspaceList(&c.Ctx, wsl.namespaceName)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	updateChildren(c, wsl.namespaceName, list,
 		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
 
 	inodeNum := wsl.workspacesByName[name]
