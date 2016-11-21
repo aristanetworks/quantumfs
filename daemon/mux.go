@@ -375,19 +375,17 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	}
 
 	key := inode.flush_DOWN(&qfs.c)
-	if !inode.isWorkspaceRoot() {
-		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
-	}
 
 	// Remove the inode from the map, ready to be garbage collected. We also
 	// re-register ourselves in the uninstantiated inode collection. If the
 	// parent is the inode then it's an orphaned File which can never be
 	// instantiated again.
 	//
-	// If parent == nil, then this is a workspace which we cannot instantiate via
-	// its parent, the workspacelist, directly.
+	// If this is a workspace which we cannot instantiate via its parent, the
+	// workspacelist, directly.
 	parent := inode.parent()
-	if parent != inode && !inode.isWorkspaceRoot() {
+	if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
+		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
 		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()}, parent)
 	}
 	qfs.setInode(&qfs.c, inode.inodeNum(), nil)

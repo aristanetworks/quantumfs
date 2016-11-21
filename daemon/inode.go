@@ -106,6 +106,11 @@ type Inode interface {
 	parent() Inode
 	setParent(newParent Inode)
 
+	// An orphaned Inode is one which is parented to itself. That is, it is
+	// orphaned from the directory tree and cannot be accessed except directly by
+	// the inodeNum or by an already open file handle.
+	isOrphaned() bool
+
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child Inode)
@@ -225,6 +230,10 @@ func (inode *InodeCommon) setParent(newParent Inode) {
 	inode.parentLock.Unlock()
 }
 
+func (inode *InodeCommon) isOrphaned() bool {
+	return inode.inodeNum() == inode.parent().inodeNum()
+}
+
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
 	return inode.treeLock_
 }
@@ -282,7 +291,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 		panic("Workspaceroot didn't call .self")
 	}
 
-	if inode.parent().inodeNum() == inode.inodeNum() {
+	if inode.isOrphaned() {
 		panic("Orphaned file")
 	}
 
