@@ -214,7 +214,7 @@ func netnsLogin(rootdir string, svrName string) error {
 	env = append(env, "A4_CHROOT="+rootdir)
 
 	args := []string{netns, svrName, sh, "-l", "-c",
-		"\"$@\"", bash, bash}
+		"\"$@\"", "date", "+%s%N"}
 	if err := syscall.Exec(netns, args, env); err != nil {
 		return fmt.Errorf("netnsLogin Exec error: %s", err.Error())
 	}
@@ -247,6 +247,7 @@ func setupBindMounts(rootdir string) error {
 }
 
 func chrootInNsd(rootdir string, svrName string) error {
+	profileLog("chroot in nsd")
 	bindmountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;", sudo, mount,
 		rootdir, rootdir)
 
@@ -360,9 +361,9 @@ func switchUserMode() error {
 
 func profileLog(info string) {
 	t := time.Now()
-	timestamp := t.Format("00:00:00.000000000")
+	timestamp := t.UnixNano()
 
-	fmt.Printf("[%s] %s\n", timestamp, info)
+	fmt.Printf("[%d] %s\n", timestamp, info)
 }
 
 func copyDirStayOnFs(src string, dst string) error {
@@ -450,6 +451,7 @@ func copyDirStayOnFs(src string, dst string) error {
 }
 
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
+	profileLog("Chroot out of nsd")
 	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())
@@ -632,6 +634,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
+	profileLog("Entering chroot")
 	args := os.Args[2:]
 
 	var wsr string
