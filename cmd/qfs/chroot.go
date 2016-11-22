@@ -40,7 +40,6 @@ const (
 
 var qfs string
 var persistent bool = true
-var personalities map[string]uintptr
 
 func init() {
 	if qfspath, err := osext.Executable(); err != nil {
@@ -49,10 +48,6 @@ func init() {
 	} else {
 		qfs = qfspath
 	}
-
-	personalities = make(map[string]uintptr, 0)
-	personalities["x86_64"] = 0x0000
-	personalities["i686"] = 0x0008
 }
 
 // A helper function to run command which gives better error information
@@ -183,12 +178,17 @@ func getArchitecture(rootdir string) (string, error) {
 }
 
 func setArchitecture(arch string) error {
-	archflag, ok := personalities[arch]
-	if !ok {
+
+	var flag uintptr
+	if arch == "i686" {
+		flag = 0x0008
+	} else if arch == "x86_64" {
+		flag = 0x0000
+	} else {
 		return fmt.Errorf("Unsupported architecture: %s", arch)
 	}
 
-	_, _, errno := syscall.Syscall(syscall.SYS_PERSONALITY, archflag, 0, 0)
+	_, _, errno := syscall.Syscall(syscall.SYS_PERSONALITY, flag, 0, 0)
 	if errno != 0 {
 		return fmt.Errorf("Change Personality error: %d", errno)
 	}
@@ -293,16 +293,13 @@ func chrootInNsd(rootdir string, svrName string) error {
 			rootdir, err.Error())
 	}
 
-	netnsdcmd := exec.Command(sudo, setarch, archString, netnsd,
+	if err := runCommand(sudo, setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
-		"--pre-chroot-cmd="+prechrootCmd, svrName)
-
-	if output, err := netnsdcmd.CombinedOutput(); err != nil {
-		fmt.Println(string(output))
+		"--pre-chroot-cmd="+prechrootCmd, svrName); err != nil {
 		return err
-	} else {
-		fmt.Println(string(output))
+
 	}
+
 	return nil
 }
 
