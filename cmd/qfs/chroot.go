@@ -214,7 +214,7 @@ func netnsLogin(rootdir string, svrName string) error {
 	env = append(env, "A4_CHROOT="+rootdir)
 
 	args := []string{netns, svrName, sh, "-l", "-c",
-		"\"$@\"", "date", "+%s%N"}
+		"\"$@\"", bash, bash}
 	if err := syscall.Exec(netns, args, env); err != nil {
 		return fmt.Errorf("netnsLogin Exec error: %s", err.Error())
 	}
