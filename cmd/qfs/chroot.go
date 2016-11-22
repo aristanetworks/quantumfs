@@ -247,7 +247,6 @@ func setupBindMounts(rootdir string) error {
 }
 
 func chrootInNsd(rootdir string, svrName string) error {
-	profileLog("chroot in nsd")
 	bindmountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;", sudo, mount,
 		rootdir, rootdir)
 
@@ -451,7 +450,6 @@ func copyDirStayOnFs(src string, dst string) error {
 }
 
 func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
-	profileLog("Chroot out of nsd")
 	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())
@@ -634,7 +632,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
-	profileLog("Entering chroot")
 	args := os.Args[2:]
 
 	var wsr string
