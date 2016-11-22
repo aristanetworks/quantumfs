@@ -177,6 +177,25 @@ func getArchitecture(rootdir string) (string, error) {
 	return processArchitecture(platStr)
 }
 
+func setArchitecture(arch string) error {
+
+	var flag uintptr
+	if arch == "i686" {
+		flag = 0x0008
+	} else if arch == "x86_64" {
+		flag = 0x0000
+	} else {
+		return fmt.Errorf("Unsupported architecture: %s", arch)
+	}
+
+	_, _, errno := syscall.Syscall(syscall.SYS_PERSONALITY, flag, 0, 0)
+	if errno != 0 {
+		return fmt.Errorf("Change Personality error: %d", errno)
+	}
+
+	return nil
+}
+
 // test whether the netns server is already running
 func serverRunning(svrName string) bool {
 	cmdServerRun := exec.Command(netns, "-q", svrName)
@@ -338,9 +357,9 @@ func switchUserMode() error {
 
 func profileLog(info string) {
 	t := time.Now()
-	timestamp := t.Format("00:00:00.000000000")
+	timestamp := t.UnixNano()
 
-	fmt.Printf("[%s] %s\n", timestamp, info)
+	fmt.Printf("[%d] %s\n", timestamp, info)
 }
 
 func copyDirStayOnFs(src string, dst string) error {
@@ -590,19 +609,20 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		return fmt.Errorf("Switching usermode error: %s", err.Error())
 	}
 
+	if err := setArchitecture(archStr); err != nil {
+		return fmt.Errorf("Set architecture error: %s", err.Error())
+	}
+
 	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
 	shell_cmd = append(shell_cmd, cmd...)
 
-	setarch_cmd := []string{setarch, archStr}
-	setarch_cmd = append(setarch_cmd, shell_cmd...)
+	shell_env := os.Environ()
+	shell_env = append(shell_env, "A4_CHROOT="+rootdir)
 
-	setarch_env := os.Environ()
-	setarch_env = append(setarch_env, "A4_CHROOT="+rootdir)
+	if err := syscall.Exec(shell_cmd[0],
+		shell_cmd, shell_env); err != nil {
 
-	if err := syscall.Exec(setarch_cmd[0],
-		setarch_cmd, setarch_env); err != nil {
-
-		return fmt.Errorf("Exec'ing setarch command error:%s", err.Error())
+		return fmt.Errorf("Exec'ing shell command error:%s", err.Error())
 	}
 
 	return nil
