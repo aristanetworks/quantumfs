@@ -635,24 +635,89 @@ func (dir *Directory) getChildRecord(c *ctx,
 		errors.New("Inode given is not a child of this directory")
 }
 
+func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
+	gid uint32, fileOwner uint32, dirOwner uint32, dirGroup uint32) bool {
+
+	// Root permission can bypass the permission, and the root is only verified
+	// by uid
+	if uid == 0 {
+		return true
+	}
+
+	// Verify the permission of the directory in order to delete a child
+	// If the sticky bit of the directory is set, the action can only be
+	// performed by file's owner, directory's owner, or root user
+	if BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
+		uid != fileOwner && uid != dirOwner {
+		return false
+	}
+
+	// Get whether current user is OWNER/GRP/OTHER
+	var permWX uint32
+	if uid == dirOwner {
+		permWX = syscall.S_IWUSR | syscall.S_IXUSR
+		// Check the current directory having x and w permissions
+		if BitFlagsSet(uint(permission), uint(permWX)) {
+			return true
+		}
+	} else if gid == dirGroup {
+		permWX = syscall.S_IWGRP | syscall.S_IXGRP
+		if BitFlagsSet(uint(permission), uint(permWX)) {
+			return true
+		}
+	} else { // all the other
+		permWX = syscall.S_IWOTH | syscall.S_IXOTH
+		if BitFlagsSet(uint(permission), uint(permWX)) {
+			return true
+		}
+	}
+
+	c.vlog("Unlink::checkPermission permission %o vs %o", permWX, permission)
+	return false
+}
+
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Unlink", "%s", name).out()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
-
 		if _, exists := dir.children[name]; !exists {
 			return fuse.ENOENT
 		}
 
 		inode := dir.children[name]
-		type_ := func() uint32 {
-			defer dir.childRecordLock.Lock().Unlock()
-			return objectTypeToFileType(c,
-				dir.childrenRecords[inode].Type())
-		}()
+
+		// We already have an inode Mutex so we don't need Mutex for the
+		// map of its childrenRecords
+		record := dir.childrenRecords[inode]
+		type_ := objectTypeToFileType(c, record.Type())
+
 		if type_ == fuse.S_IFDIR {
+			c.vlog("Directory::Unlink directory")
 			return fuse.Status(syscall.EISDIR)
+		}
+
+		// If the directory is a root, it is always permitted to unlink any
+		// inodes because of its permission 777, which is hardcoded in the
+		// file daemon/workspaceroot.go. In this case, only no WorkspaceRoot
+		// needs a permission check.
+		if !dir.self.isWorkspaceRoot() {
+			owner := c.fuseCtx.Owner
+			dirRecord, err := dir.parent().getChildRecord(c,
+				dir.InodeCommon.id)
+			if err != nil {
+				return fuse.ENOENT
+			}
+			dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
+			dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
+			permission := dirRecord.Permissions()
+			fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
+
+			perm := dir.checkPermissions(c, permission, owner.Uid,
+				owner.Gid, fileOwner, dirOwner, dirGroup)
+			if !perm {
+				return fuse.EACCES
+			}
 		}
 
 		dir.delChild_(c, name)
