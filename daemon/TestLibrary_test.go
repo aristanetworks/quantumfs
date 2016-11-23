@@ -202,6 +202,8 @@ func (th *testHelper) endTest() {
 		if exception != nil {
 			th.t.Logf("Failed with exception, forcefully unmounting: %v",
 				exception)
+			th.log("Failed with exception, forcefully unmounting: %v",
+				exception)
 			abortFuse(th)
 		}
 
@@ -211,10 +213,10 @@ func (th *testHelper) endTest() {
 			runtime.GC()
 
 			if err := th.qfs.server.Unmount(); err != nil {
-				th.t.Fatalf("ERROR: Failed to unmount quantumfs "+
+				th.log("ERROR: Failed to unmount quantumfs "+
 					"instance after aborting: %v", err)
 			}
-			th.t.Fatalf("ERROR: Failed to unmount quantumfs instance, "+
+			th.log("ERROR: Failed to unmount quantumfs instance, "+
 				"are you leaking a file descriptor?: %v", err)
 		}
 	}
