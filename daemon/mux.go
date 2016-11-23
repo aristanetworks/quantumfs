@@ -437,6 +437,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	// its parent, the workspacelist, directly.
 	parent := inode.parent()
 	if parent != inode && !inode.isWorkspaceRoot() {
+		qfs.removeUninstantiated(&qfs.c, []InodeId{inode.inodeNum()})
 		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()},
 			parent.inodeNum())
 	}
