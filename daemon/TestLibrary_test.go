@@ -698,21 +698,30 @@ func (th *testHelper) assert(condition bool, format string, args ...interface{})
 	}
 }
 
+type TLA struct {
+	mustContain bool   // Whether the log must or must not contain the text
+	text        string // text which must or must not be in the log
+	failMsg     string // Message to fail with
+}
+
 // Assert the test log contains the given text
 func (th *testHelper) assertLogContains(text string, failMsg string) {
-	th.assertTestLogHas(text, failMsg, true)
+	th.assertTestLog([]TLA{TLA{true, text, failMsg}})
 }
 
 // Assert the test log doesn't contain the given text
 func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
-	th.assertTestLogHas(text, failMsg, false)
+	th.assertTestLog([]TLA{TLA{false, text, failMsg}})
 }
 
-func (th *testHelper) assertTestLogHas(text string, failMsg string, requires bool) {
+func (th *testHelper) assertTestLog(logs []TLA) {
 	logFile := th.tempDir + "/ramfs/qlog"
 	logOutput := qlog.ParseLogs(logFile)
-	exists := strings.Contains(logOutput, text)
-	th.assert(exists == requires, failMsg)
+
+	for _, tla := range logs {
+		exists := strings.Contains(logOutput, tla.text)
+		th.assert(exists == tla.mustContain, tla.failMsg)
+	}
 }
 
 type crashOnWrite struct {
