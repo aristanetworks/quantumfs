@@ -261,8 +261,23 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 // Requires the mapMutex exclusively
 func (qfs *QuantumFs) removeUninstantiated_(c *ctx, uninstantiated []InodeId) {
 	for _, inodeNum := range uninstantiated {
+		parent := qfs.uninstantiatedInodes[inodeNum]
 		delete(qfs.uninstantiatedInodes, inodeNum)
 
+		// Remove this child as an uninstantiated inode of its parent
+		parentChildren := qfs.uninstantiatedChildren[parent]
+		// Efficient unordered vector delete
+		for i, child := range parentChildren {
+			if child != inodeNum {
+				continue
+			}
+			parentChildren[i] = parentChildren[len(parentChildren)-1]
+			parentChildren = parentChildren[:len(parentChildren)-1]
+			break
+		}
+		qfs.uninstantiatedChildren[parent] = parentChildren
+
+		// Remove uninstantiated children of this inode
 		children := qfs.uninstantiatedChildren[inodeNum]
 		delete(qfs.uninstantiatedChildren, inodeNum)
 		qfs.removeUninstantiated_(c, children)
