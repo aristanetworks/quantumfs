@@ -118,9 +118,9 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.assert(err == nil, "Error opening directory: %v", err)
 		children, err := dir.Readdirnames(-1)
 		test.assert(err == nil, "Error reading directory children: %v", err)
-		test.assert(len(children) == numFiles+2,
+		test.assert(len(children) == numFiles,
 			"Wrong number of children: %d != %d", len(children),
-			numFiles+2)
+			numFiles)
 		dir.Close()
 
 		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
