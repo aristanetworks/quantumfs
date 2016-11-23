@@ -199,10 +199,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
 	delete(qfs.uninstantiatedInodes, id)
 	qfs.inodes[id] = inode
-	for _, id := range newUninstantiated {
-		c.vlog("Adding uninstantiated %v", id)
-		qfs.uninstantiatedInodes[id] = inode.inodeNum()
-	}
+	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
 
 	return inode
 }
@@ -228,6 +225,13 @@ func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
+
+	qfs.addUninstantiated_(c, uninstantiated, parent)
+}
+
+// Requires the mapMutex for writing
+func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
+	parent InodeId) {
 
 	children, exists := qfs.uninstantiatedChildren[parent]
 
