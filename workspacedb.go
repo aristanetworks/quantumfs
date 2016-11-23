@@ -5,7 +5,6 @@ package cql
 
 import (
 	"fmt"
-	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/quantumfs"
 )
 
@@ -18,7 +17,6 @@ type workspaceDB struct {
 func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 
 	cfg, err := readCqlConfig(confName)
-	var etherr ether.ErrorResponse
 	mocking := false
 	if err != nil {
 		fmt.Println("Error reading CQL config: ", err)
@@ -29,10 +27,7 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 	var store cqlStore
 	store, err = initCqlStore(cluster, mocking)
 	if err != nil {
-		etherr.ErrorCode = ether.ErrBadArguments
-		etherr.ErrorMessage = "Error in initCqlStore"
-		etherr.Internal = err
-		panic(etherr)
+		panic(err)
 	}
 
 	wsdb := &workspaceDB{

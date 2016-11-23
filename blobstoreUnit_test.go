@@ -8,9 +8,10 @@ package cql
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
-	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/ether/blobstore"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/suite"
 )
@@ -26,7 +27,6 @@ func (suite *BlobStoreUnitTestSuite) SetupSuite() {
 }
 
 func (suite *BlobStoreUnitTestSuite) SetupTest() {
-	var etherr ether.ErrorResponse
 
 	// Set expectations
 	mockcc := new(MockCluster)
@@ -34,18 +34,15 @@ func (suite *BlobStoreUnitTestSuite) SetupTest() {
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
 	store, err := initCqlStore(mockcc, mocking)
-	suite.Require().Equal(err, nil, "initCqlStore Failed: ", err)
+	suite.Require().NoError(err, "initCqlStore Failed: ", err)
 
 	suite.bls = &cqlBlobStore{
 		store: &store,
 	}
-	suite.Require().Equal(
-		ether.ErrorResponse{ErrorCode: 0, ErrorMessage: "", Internal: error(nil)},
-		etherr, "NewCqlStore returned an error:: "+etherr.Error())
+	suite.Require().NoError(err)
 }
 
 func (suite *BlobStoreUnitTestSuite) TestNewCqlStoreFailure() {
-	var etherr ether.ErrorResponse
 
 	// Since this is a setup Test
 	resetCqlStore()
@@ -56,11 +53,7 @@ func (suite *BlobStoreUnitTestSuite) TestNewCqlStoreFailure() {
 	mockcc.On("CreateSession").Return(mocksession, errors.New("initFailed"))
 	_, err := initCqlStore(mockcc, mocking)
 
-	suite.Require().NotEqual(err, nil, "initCqlStore should have Failed: ", err)
-
-	suite.Require().Equal(
-		ether.ErrorResponse{ErrorCode: 0, ErrorMessage: "", Internal: error(nil)},
-		etherr, "NewCqlStore returned an error:: "+etherr.Error())
+	suite.Require().Error(err, "initCqlStore should have Failed")
 }
 
 func (suite *BlobStoreUnitTestSuite) TestInsert() {
@@ -78,8 +71,7 @@ func (suite *BlobStoreUnitTestSuite) TestInsert() {
 	mocksession.On("Close").Return()
 	err := suite.bls.Insert(testKey, []byte(testValue), nil)
 
-	suite.Require().Equal(ether.ErrOk, err.ErrorCode,
-		"Insert returned an error:: "+err.Error())
+	suite.Require().NoError(err, "Insert returned an error")
 }
 
 func (suite *BlobStoreUnitTestSuite) TestInsertFailure() {
@@ -96,11 +88,14 @@ func (suite *BlobStoreUnitTestSuite) TestInsertFailure() {
 	mocksession.On("Close").Return()
 	errVal := errors.New("Some random error")
 	mockquery.On("Exec").Return(errVal)
-	err := suite.bls.Insert(testKey, []byte(testValue), nil)
-	suite.Require().Equal(ether.ErrOperationFailed, err.ErrorCode,
-		"Insert returned incorrect ErrorCode")
-	suite.Require().Equal(errVal, err.Internal, "Insert returned incorrect Err")
 
+	err := suite.bls.Insert(testKey, []byte(testValue), nil)
+	suite.Require().Error(err, "Insert returned incorrect ErrorCode")
+
+	verr, ok := err.(*blobstore.Error)
+	suite.Require().Equal(true, ok, fmt.Sprintf("Error from Insert is of type %T", err))
+	suite.Require().Equal(blobstore.ErrOperationFailed, verr.Code,
+		"Invalid Error Code from Insert")
 }
 
 func (suite *BlobStoreUnitTestSuite) TestGetNoErr() {
@@ -118,8 +113,7 @@ func (suite *BlobStoreUnitTestSuite) TestGetNoErr() {
 	mockquery.On("Scan", val).Return(nil)
 
 	_, metadata, err := suite.bls.Get(testKey)
-	suite.Require().Equal(ether.ErrOk, err.ErrorCode,
-		"Get returned an error::  "+err.Error())
+	suite.Require().NoError(err, "Get returned an error")
 	suite.Require().Equal(map[string]string(nil), metadata,
 		"Get returned incorrect metadata")
 }
@@ -140,10 +134,13 @@ func (suite *BlobStoreUnitTestSuite) TestGetFailureNoKey() {
 
 	// Verify return value for a non existent key
 	value, metadata, err := suite.bls.Get(unknownKey)
+	suite.Require().Error(err, "Get returned nil error on failure")
+	verr, ok := err.(*blobstore.Error)
+	suite.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
+	suite.Require().Equal(blobstore.ErrKeyNotFound, verr.Code, "Invalid Error Code from get")
 	suite.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	suite.Require().Nil(metadata, "value was not Nil when error is ErrKeyNotFound")
-	suite.Require().Equal(ether.ErrKeyNotFound, err.ErrorCode,
-		"Get returned incorrect error")
+
 }
 
 func (suite *BlobStoreUnitTestSuite) TestGetFailureGeneric() {
@@ -162,11 +159,13 @@ func (suite *BlobStoreUnitTestSuite) TestGetFailureGeneric() {
 
 	// Verify return value for a non existent key
 	value, metadata, err := suite.bls.Get(unknownKey)
-	suite.Require().Nil(value, "value was not Nil when error is ErrUnavailable")
-	suite.Require().Nil(metadata, "value was not Nil when error is ErrKeyUnavailable")
-	suite.Require().Equal(ether.ErrOperationFailed, err.ErrorCode,
-		"Get returned incorrect error")
-
+	suite.Require().Error(err, "Get returned nil error on failure")
+	verr, ok := err.(*blobstore.Error)
+	suite.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
+	suite.Require().Equal(blobstore.ErrOperationFailed, verr.Code,
+		"Invalid Error Code from Get")
+	suite.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
+	suite.Require().Nil(metadata, "value was not Nil when error is ErrKeyNotFound")
 }
 
 func TestBlobStoreUnitTestSuite(t *testing.T) {

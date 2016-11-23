@@ -5,6 +5,7 @@ package cql
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 )
@@ -37,17 +38,16 @@ func writeCqlConfig(fileName string, config *Config) error {
 
 	file, err := os.Create(fileName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing cql config file %q: %v", fileName, err)
 	}
 
 	err = json.NewEncoder(file).Encode(config)
+	defer file.Close()
 	if err != nil {
-		file.Close()
-		return err
+		return fmt.Errorf("error encoding cql config file %q: %v", fileName, err)
 	}
 
-	err = file.Close()
-	return err
+	return nil
 }
 
 func readCqlConfig(fileName string) (*Config, error) {
@@ -55,17 +55,17 @@ func readCqlConfig(fileName string) (*Config, error) {
 
 	file, err := os.Open(fileName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error opening cql config file %q: %v", fileName, err)
 	}
 
 	err = json.NewDecoder(file).Decode(&config)
 	if err != nil {
 		file.Close()
-		return nil, err
+		return nil, fmt.Errorf("error decoding cql config file %q: %v", fileName, err)
 	}
 
-	err = file.Close()
-	return &config, err
+	file.Close()
+	return &config, nil
 }
 
 // Note: This routine is called by Init/New APIs
@@ -83,6 +83,7 @@ func initCqlStore(cluster Cluster, mocking bool) (cqlStore, error) {
 		globalCqlStore.cluster = cluster
 		globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
 		if err != nil {
+			err = fmt.Errorf("error in initCqlStore: %v", err)
 			return
 		}
 		globalCqlStore.resetOnce = sync.Once{}

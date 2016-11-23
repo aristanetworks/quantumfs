@@ -9,10 +9,11 @@ package cql
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 
-	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/ether/blobstore"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,24 +26,20 @@ func checkSetupIntg(suite *BlobStoreIntgTestSuite) {
 
 type BlobStoreIntgTestSuite struct {
 	suite.Suite
-	bls ether.BlobStore
+	bls blobstore.BlobStore
 }
 
 // TODO:Currently the test targets a "shared" cluster
 // and expects that the keyspace and table are already setup.
 // Once the integration tests are managed using jenkins and
-// containers, the test should be modified to run against its i
+// containers, the test should be modified to run against its
 // "private" cluster instance
 func (suite *BlobStoreIntgTestSuite) SetupSuite() {
 
-	var err ether.ErrorResponse
+	var err error
 	suite.bls, err = NewCqlBlobStore(hwConfFile)
-
-	suite.Require().Equal(ether.ErrOk, err.ErrorCode,
-		"NewCqlBlobStore returned an error:: "+err.Error())
-
-	suite.Require().NotEqual(nil, suite.bls,
-		"NewCqlBlobStore returned nil")
+	suite.Require().NoError(err, "NewCqlBlobStore returned an error")
+	suite.Require().NotNil(suite.bls, "NewCqlBlobStore returned nil")
 }
 
 func (suite *BlobStoreIntgTestSuite) SetupTest() {
@@ -52,8 +49,7 @@ func (suite *BlobStoreIntgTestSuite) SetupTest() {
 func (suite *BlobStoreIntgTestSuite) TestInsert() {
 
 	err := suite.bls.Insert(testKey, []byte(testValue), nil)
-	suite.Require().Equal(ether.ErrOk, err.ErrorCode,
-		"Insert returned an error:: "+err.Error())
+	suite.Require().NoError(err, "Insert returned an error")
 }
 
 func (suite *BlobStoreIntgTestSuite) TestInsertParallel() {
@@ -65,19 +61,16 @@ func (suite *BlobStoreIntgTestSuite) TestInsertParallel() {
 		countl := count
 		Wg.Go(func() error {
 
-			err := suite.bls.Insert(testKey+strconv.Itoa(countl), []byte(testValue), nil)
-			return &err
+			return suite.bls.Insert(testKey+strconv.Itoa(countl), []byte(testValue), nil)
 		})
 	}
 	err := Wg.Wait()
-	verr, ok := err.(*ether.ErrorResponse)
-	suite.Require().Equal(true, ok, "Insert returned wrong type of error")
-	suite.Require().Equal(ether.ErrOk, verr.ErrorCode, "Insert returned an error::  "+err.Error())
+	suite.Require().NoError(err, "Insert returned an error")
 
 	// Check
 	for count := 0; count < 2; count++ {
 		value, _, err := suite.bls.Get(testKey + strconv.Itoa(count))
-		suite.Require().Equal(ether.ErrOk, err.ErrorCode, "Get returned an error::  "+err.Error())
+		suite.Require().NoError(err, "Insert returned an error")
 		suite.Require().Equal(testValue, string(value), "Get returned in correct value")
 	}
 }
@@ -85,8 +78,7 @@ func (suite *BlobStoreIntgTestSuite) TestInsertParallel() {
 func (suite *BlobStoreIntgTestSuite) TestGet() {
 
 	value, metadata, err := suite.bls.Get(testKey)
-	suite.Require().Equal(ether.ErrOk, err.ErrorCode,
-		"Get returned an error::  "+err.Error())
+	suite.Require().NoError(err, "Get returned an error")
 	suite.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	suite.Require().Equal(map[string]string(nil), metadata,
 		"Get returned incorrect metadata")
@@ -97,12 +89,13 @@ func (suite *BlobStoreIntgTestSuite) TestGetInvalidKey() {
 	value, metadata, err := suite.bls.Get(unknownKey)
 	suite.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	suite.Require().Nil(metadata, "value was not Nil when error is ErrKeyNotFound")
-	suite.Require().Equal(ether.ErrKeyNotFound, err.ErrorCode,
-		"Get returned incorrect error")
-
+	suite.Require().Error(err, "Get returned incorrect error")
+	verr, ok := err.(*blobstore.Error)
+	suite.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
+	suite.Require().Equal(blobstore.ErrKeyNotFound, verr.Code, "Invalid Error Code from Get")
 }
 
-func TestBlobStoreIntgtTestSuite(t *testing.T) {
+func TestBlobStoreIntgTestSuite(t *testing.T) {
 	suite.Run(t, new(BlobStoreIntgTestSuite))
 }
 

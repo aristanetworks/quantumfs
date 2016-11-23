@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/ether"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -46,8 +45,8 @@ func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePath() {
 
 	// Garble the config file name
 	name += strconv.Itoa(suite.r.Int())
-	bls, etherr := NewCqlBlobStore(name)
-	suite.Require().Equal(etherr.ErrorCode, ether.ErrBadArguments)
+	bls, err := NewCqlBlobStore(name)
+	suite.Require().Error(err)
 	suite.Require().Equal(bls, nil, "bls should be nil but is not")
 }
 
@@ -70,8 +69,8 @@ func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePerms() {
 	suite.Require().NoError(err, "Error in changing file perms")
 	defer os.Chmod(name, 0666) //-rw-rw-rw-
 
-	bls, etherr := NewCqlBlobStore(name)
-	suite.Require().Equal(etherr.ErrorCode, ether.ErrBadArguments)
+	bls, err := NewCqlBlobStore(name)
+	suite.Require().Error(err)
 	suite.Require().Equal(bls, nil, "bls should be nil but is not")
 }
 
@@ -99,8 +98,8 @@ func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFormat() {
 	suite.Require().NoError(err, "CQL config file write failed")
 	suite.Require().Equal(length, len(garbage), "CQL config file write incorrect")
 
-	bls, etherr := NewCqlBlobStore(name)
-	suite.Require().Equal(etherr.ErrorCode, ether.ErrBadArguments)
+	bls, err := NewCqlBlobStore(name)
+	suite.Require().Error(err)
 	suite.Require().Equal(bls, nil, "bls should be nil but is not")
 }
 
