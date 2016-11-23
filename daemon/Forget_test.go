@@ -102,7 +102,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		data := genData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
-			err := printToFile(workspace+"/dir//file"+strconv.Itoa(i),
+			err := printToFile(workspace+"/dir/file"+strconv.Itoa(i),
 				string(data))
 			test.assert(err == nil, "Error creating small file")
 		}
