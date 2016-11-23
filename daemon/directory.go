@@ -464,6 +464,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
 	dir.self.markAccessed(c, name, false)
+	c.qfs.increaseLookupCount(inodeNum)
+
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	defer dir.childRecordLock.Lock().Unlock()
@@ -533,6 +535,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.addUninstantiated(c, uninstantiated, newEntity)
+	c.qfs.increaseLookupCount(inodeNum)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
