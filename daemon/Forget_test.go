@@ -108,10 +108,12 @@ func TestMultipleLookupCount(t *testing.T) {
 		// Forget Inodes
 		remountFilesystem(test)
 
-		test.assertLogContains("Looked up 2 Times",
-			"Failed to cause a second lookup")
-		test.assertLogContains("Forgetting inode with lookupCount of 2",
-			"Inode with second lookup not forgotten")
+		test.assertTestLog([]TLA{
+			TLA{true, "Looked up 2 Times",
+				"Failed to cause a second lookup"},
+			TLA{true, "Forgetting inode with lookupCount of 2",
+				"Inode with second lookup not forgotten"},
+		})
 	})
 }
 
