@@ -106,6 +106,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// Get the listing from the directory to instantiate that directory
 		// and add its children to the uninstantiated inode list.
+		dirInodeNum := test.getInodeNum(dirName)
 		dir, err := os.Open(dirName)
 		test.assert(err == nil, "Error opening directory: %v", err)
 		children, err := dir.Readdirnames(-1)
@@ -128,6 +129,16 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed")
+
+		for _, parent := range test.qfs.uninstantiatedInodes {
+			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
+				"use forgotten directory as parent")
+		}
+
+		ids, exists := test.qfs.uninstantiatedChildren[dirInodeNum]
+		test.assert(exists, "Directory has no uninstantiated children list")
+		test.assert(len(ids) == 0,
+			"Directory has uninstantiate children: %v", ids)
 	})
 }
 
