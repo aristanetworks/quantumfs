@@ -8,12 +8,16 @@ package daemon
 import "bytes"
 import "io/ioutil"
 import "os"
-import "os/exec"
 import "strconv"
-import "strings"
+import "syscall"
 import "testing"
+import "time"
 
-import "github.com/aristanetworks/quantumfs/qlog"
+func remountFilesystem(test *testHelper) {
+	test.log("Remounting filesystem")
+	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
+	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
+}
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -30,15 +34,9 @@ func TestForgetOnDirectory(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
-			"/mnt")
-		errorStr, err := cmd.CombinedOutput()
-		test.assert(err == nil, "Unable to force vfs to drop dentry cache")
-		test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+		remountFilesystem(test)
 
-		logFile := test.tempDir + "/ramfs/qlog"
-		logOutput := qlog.ParseLogs(logFile)
-		test.assert(strings.Contains(logOutput, "Forgetting"),
+		test.assertLogContains("Forgetting",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -67,15 +65,9 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
-			"/mnt")
-		errorStr, err := cmd.CombinedOutput()
-		test.assert(err == nil, "Unable to force vfs to drop dentry cache")
-		test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+		remountFilesystem(test)
 
-		logFile := test.tempDir + "/ramfs/qlog"
-		logOutput := qlog.ParseLogs(logFile)
-		test.assert(strings.Contains(logOutput, "Forgetting"),
+		test.assertLogContains("Forgetting",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -127,20 +119,81 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the uninstantiatedInodes list.
-		cmd := exec.Command("mount", "-i", "-oremount", test.tempDir+
-			"/mnt")
-		errorStr, err := cmd.CombinedOutput()
-		test.assert(err == nil, "Unable to force vfs to drop dentry cache")
-		test.assert(len(errorStr) == 0, "Error during remount: %s", errorStr)
+		remountFilesystem(test)
 
-		logFile := test.tempDir + "/ramfs/qlog"
-		logOutput := qlog.ParseLogs(logFile)
-		test.assert(strings.Contains(logOutput, "Forgetting"),
+		test.assertLogContains("Forgetting",
 			"No inode forget triggered during dentry drop.")
 
 		numUninstantiatedNew := len(test.qfs.uninstantiatedInodes)
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed")
+	})
+}
+
+func TestMultipleLookupCount(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		time.Sleep(300 * time.Millisecond)
+
+		file2, err := os.Open(testFilename)
+		test.assert(err == nil, "Error opening file readonly")
+
+		file.Close()
+		file2.Close()
+		// Wait for the closes to bubble up to QuantumFS
+		time.Sleep(10 * time.Millisecond)
+
+		// Forget Inodes
+		remountFilesystem(test)
+
+		test.assertTestLog([]TLA{
+			TLA{true, "Looked up 2 Times",
+				"Failed to cause a second lookup"},
+			TLA{true, "Forgetting inode with lookupCount of 2",
+				"Inode with second lookup not forgotten"},
+		})
+	})
+}
+
+// QuantumFS doesn't currently implement hardlinks correctly. Instead of returning
+// the original inode in the Link() call, it returns a new inode. This doesn't seem
+// to bother the kernel and it distributes the lookup counts between those two inodes
+// as one would expect. However, this may change and this test should start failing
+// if that happens.
+func TestLookupCountHardlinks(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+		linkFilename := workspace + "/link"
+
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		err = os.Link(testFilename, linkFilename)
+		test.assert(err == nil, "Error creating hardlink")
+
+		file.Close()
+
+		// Forget Inodes
+		remountFilesystem(test)
+
+		test.assertLogDoesNotContain("Looked up 2 Times",
+			"Failed to cause a second lookup")
 	})
 }

@@ -202,6 +202,8 @@ func (th *testHelper) endTest() {
 		if exception != nil {
 			th.t.Logf("Failed with exception, forcefully unmounting: %v",
 				exception)
+			th.log("Failed with exception, forcefully unmounting: %v",
+				exception)
 			abortFuse(th)
 		}
 
@@ -211,10 +213,10 @@ func (th *testHelper) endTest() {
 			runtime.GC()
 
 			if err := th.qfs.server.Unmount(); err != nil {
-				th.t.Fatalf("ERROR: Failed to unmount quantumfs "+
+				th.log("ERROR: Failed to unmount quantumfs "+
 					"instance after aborting: %v", err)
 			}
-			th.t.Fatalf("ERROR: Failed to unmount quantumfs instance, "+
+			th.log("ERROR: Failed to unmount quantumfs instance, "+
 				"are you leaking a file descriptor?: %v", err)
 		}
 	}
@@ -604,7 +606,11 @@ func (th *testHelper) getInode(path string) Inode {
 func (th *testHelper) workspaceRootId(namespace string,
 	workspace string) quantumfs.ObjectKey {
 
-	return th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx, namespace, workspace)
+	key, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
+		namespace, workspace)
+	th.assert(err == nil, "Error fetching key")
+
+	return key
 }
 
 // Global test request ID incremented for all the running tests
@@ -632,6 +638,10 @@ func init() {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+
+	if os.Getuid() != 0 {
+		panic("quantumfs.daemon tests must be run as root")
+	}
 
 	// Disable Garbage Collection. Because the tests provide both the filesystem
 	// and the code accessing that filesystem the program is reentrant in ways
@@ -701,6 +711,32 @@ func (th *testHelper) assert(condition bool, format string, args ...interface{})
 	if !condition {
 		msg := fmt.Sprintf(format, args...)
 		panic(msg)
+	}
+}
+
+type TLA struct {
+	mustContain bool   // Whether the log must or must not contain the text
+	text        string // text which must or must not be in the log
+	failMsg     string // Message to fail with
+}
+
+// Assert the test log contains the given text
+func (th *testHelper) assertLogContains(text string, failMsg string) {
+	th.assertTestLog([]TLA{TLA{true, text, failMsg}})
+}
+
+// Assert the test log doesn't contain the given text
+func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
+	th.assertTestLog([]TLA{TLA{false, text, failMsg}})
+}
+
+func (th *testHelper) assertTestLog(logs []TLA) {
+	logFile := th.tempDir + "/ramfs/qlog"
+	logOutput := qlog.ParseLogs(logFile)
+
+	for _, tla := range logs {
+		exists := strings.Contains(logOutput, tla.text)
+		th.assert(exists == tla.mustContain, tla.failMsg)
 	}
 }
 
@@ -921,4 +957,32 @@ func TestGenData(t *testing.T) {
 		test.assert(bytes.Equal([]byte(hardcoded), data),
 			"Data gen function off: %s vs %s", hardcoded, data)
 	})
+}
+
+// Disable the root mode
+func (test *testHelper) setEuid(uid int) *testHelper {
+	// The quantumfs tests are run as root because some tests require
+	// root privileges. However, root can read or write any file
+	// irrespective of the file permissions. Obviously if we want to
+	// test permissions then we cannot run as root.
+	//
+	// To accomplish this we lock this goroutine to a particular OS
+	// thread, then we change the EUID of that thread to something which
+	// isn't root. Finally at the end we need to restore the EUID of the
+	// thread before unlocking ourselves from that thread. If we do not
+	// follow this precise cleanup order other tests or goroutines may
+	// run using the other UID incorrectly.
+	runtime.LockOSThread()
+	err := syscall.Setreuid(-1, uid)
+	test.assert(err == nil, "Failed to change test EUID: %v", err)
+
+	return test
+}
+
+// Set the Uid back to zero
+func (test *testHelper) revert() {
+	// Test always runs as root, so its euid is 0
+	err := syscall.Setreuid(-1, 0)
+	runtime.UnlockOSThread()
+	test.assert(err == nil, "Failed to set test EUID back to 0: %v", err)
 }
