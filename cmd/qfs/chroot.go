@@ -402,10 +402,9 @@ func copyDirStayOnFs(src string, dst string) error {
 			}
 		} else if finfo.Mode().IsRegular() {
 			// There should not be any ordinary files in /dev directory,
-			// if there is, we should return an error to user, and if
-			// it is something necessary, a bug should be filed.
-			return fmt.Errorf("Ordinary files should not be present" +
-				" in /dev!")
+			// though in rare cases like /dev/shm there may be. Warn, but
+			// skip the file and continue
+			fmt.Printf("Skipping ordinary file in /dev: %s\n", dst)
 		} else if (finfo.Mode() & os.ModeSymlink) != 0 {
 			oldPath, errOldPath := os.Readlink(name)
 			if errOldPath != nil {
@@ -581,7 +580,6 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Error starting unmounting process: %s",
 				err.Error())
 		}
-		REMOVE
 	}
 
 	// change the current directory
