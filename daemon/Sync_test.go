@@ -36,20 +36,15 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 
 func TestSyncToDatastore(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		configA := test.defaultConfig()
-		configB := configA
-		configB.CachePath += "B"
-		configB.MountPath += "B"
-		configA.CachePath += ""
-		configA.MountPath += ""
+		config := test.defaultConfig()
 
 		// Make an instance of QuantumFs and put things there
-		test.startQuantumFs(configA)
+		test.startQuantumFs(config)
 		workspace := test.newWorkspace()
 
 		// Generate some deterministic, pseudorandom data for a folder
 		// structure, treating each number as a command
-		data := genData(100)
+		data := genData(50)
 		folderStack := make([]string, 0)
 		for i := 0; i < len(data); i++ {
 			// and occasionally force a sync
@@ -79,7 +74,7 @@ func TestSyncToDatastore(t *testing.T) {
 		err := test.qfs.server.Unmount()
 		test.assert(err == nil, "Failed to unmount during test")
 
-		test.startQuantumFs(configA)
+		test.startQuantumFs(config)
 
 		// Iterate in the exact same way, but this time verifying instead of
 		// creating the data
