@@ -17,15 +17,15 @@ type WorkspaceDB interface {
 
 	// These methods need to be instant, but not necessarily completely up to
 	// date
-	NumNamespaces(c *Ctx) int
-	NamespaceList(c *Ctx) []string
-	NumWorkspaces(c *Ctx, namespace string) int
-	WorkspaceList(c *Ctx, namespace string) []string
+	NumNamespaces(c *Ctx) (int, error)
+	NamespaceList(c *Ctx) ([]string, error)
+	NumWorkspaces(c *Ctx, namespace string) (int, error)
+	WorkspaceList(c *Ctx, namespace string) ([]string, error)
 
 	// These methods need to be up to date
-	NamespaceExists(c *Ctx, namespace string) bool
-	WorkspaceExists(c *Ctx, namespace string, workspace string) bool
-	Workspace(c *Ctx, namespace string, workspace string) ObjectKey
+	NamespaceExists(c *Ctx, namespace string) (bool, error)
+	WorkspaceExists(c *Ctx, namespace string, workspace string) (bool, error)
+	Workspace(c *Ctx, namespace string, workspace string) (ObjectKey, error)
 
 	// These methods need to be atomic, but may retry internally
 	BranchWorkspace(c *Ctx, srcNamespace string, srcWorkspace string,
