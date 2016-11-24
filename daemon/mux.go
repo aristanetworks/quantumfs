@@ -19,15 +19,16 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
-		RawFileSystem:        fuse.NewDefaultRawFileSystem(),
-		config:               config,
-		inodes:               make(map[InodeId]Inode),
-		fileHandles:          make(map[FileHandleId]FileHandle),
-		inodeNum:             quantumfs.InodeIdReservedEnd,
-		fileHandleNum:        quantumfs.InodeIdReservedEnd,
-		activeWorkspaces:     make(map[string]*WorkspaceRoot),
-		uninstantiatedInodes: make(map[InodeId]InodeId),
-		lookupCounts:         make(map[InodeId]uint64),
+		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
+		config:                 config,
+		inodes:                 make(map[InodeId]Inode),
+		fileHandles:            make(map[FileHandleId]FileHandle),
+		inodeNum:               quantumfs.InodeIdReservedEnd,
+		fileHandleNum:          quantumfs.InodeIdReservedEnd,
+		activeWorkspaces:       make(map[string]*WorkspaceRoot),
+		uninstantiatedInodes:   make(map[InodeId]InodeId),
+		uninstantiatedChildren: make(map[InodeId][]InodeId),
+		lookupCounts:           make(map[InodeId]uint64),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -79,6 +80,11 @@ type QuantumFs struct {
 	// instantiated. The Inode this map points to is the parent Inode which
 	// should be called to instantiate the uninstantiated inode when necessary.
 	uninstantiatedInodes map[InodeId]InodeId
+
+	// This is the mapping from an inode to all the InodeIds it is the parent of
+	// so we can effeciently remove them from uninstantiatedInodes when the
+	// parent is forgotten.
+	uninstantiatedChildren map[InodeId][]InodeId
 
 	// lookupCounts are used as the other side of Forget. That is, Forget
 	// specifies a certain number of lookup counts to forget, which may not be
@@ -203,10 +209,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
 	delete(qfs.uninstantiatedInodes, id)
 	qfs.inodes[id] = inode
-	for _, id := range newUninstantiated {
-		c.vlog("Adding uninstantiated %v", id)
-		qfs.uninstantiatedInodes[id] = inode.inodeNum()
-	}
+	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
 
 	return inode
 }
@@ -233,9 +236,23 @@ func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
+	qfs.addUninstantiated_(c, uninstantiated, parent)
+}
+
+// Requires the mapMutex for writing
+func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
+	parent InodeId) {
+
 	for _, inodeNum := range uninstantiated {
 		c.vlog("Adding uninstantiated %v", inodeNum)
 		qfs.uninstantiatedInodes[inodeNum] = parent
+	}
+
+	if children, exists := qfs.uninstantiatedChildren[parent]; exists {
+		children = append(children, uninstantiated...)
+		qfs.uninstantiatedChildren[parent] = children
+	} else {
+		qfs.uninstantiatedChildren[parent] = uninstantiated
 	}
 }
 
@@ -244,8 +261,32 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
+	qfs.removeUninstantiated_(c, uninstantiated)
+}
+
+// Requires the mapMutex exclusively
+func (qfs *QuantumFs) removeUninstantiated_(c *ctx, uninstantiated []InodeId) {
 	for _, inodeNum := range uninstantiated {
+		parent := qfs.uninstantiatedInodes[inodeNum]
 		delete(qfs.uninstantiatedInodes, inodeNum)
+
+		// Remove this child as an uninstantiated inode of its parent
+		parentChildren := qfs.uninstantiatedChildren[parent]
+		// Efficient unordered vector delete
+		for i, child := range parentChildren {
+			if child != inodeNum {
+				continue
+			}
+			parentChildren[i] = parentChildren[len(parentChildren)-1]
+			parentChildren = parentChildren[:len(parentChildren)-1]
+			break
+		}
+		qfs.uninstantiatedChildren[parent] = parentChildren
+
+		// Remove uninstantiated children of this inode
+		children := qfs.uninstantiatedChildren[inodeNum]
+		delete(qfs.uninstantiatedChildren, inodeNum)
+		qfs.removeUninstantiated_(c, children)
 	}
 }
 
@@ -454,9 +495,12 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	//
 	// If this is a workspace which we cannot instantiate via its parent, the
 	// workspacelist, directly.
-	parent := inode.parent()
 	if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
-		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
+		parent := inode.parent()
+		parent.syncChild(&qfs.c, inode.inodeNum(), key)
+		// Remove all the uninstantiated children of this inode, then add
+		// this inode as uninstantiated itself.
+		qfs.removeUninstantiated(&qfs.c, []InodeId{inode.inodeNum()})
 		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()},
 			parent.inodeNum())
 	}
