@@ -43,7 +43,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 	var wsr WorkspaceRoot
 
-	rootId := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
+	rootId, err := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
 	c.vlog("Workspace Loading %s/%s %s", parentName, name, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
@@ -59,7 +60,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	uninstantiated := initDirectory(c, name, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent, &wsr.realTreeLock)
 
-	c.qfs.addUninstantiated(c, uninstantiated, &wsr)
+	c.qfs.addUninstantiated(c, uninstantiated, wsr.inodeNum())
 
 	return &wsr
 }

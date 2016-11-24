@@ -39,7 +39,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		newRecord)
 
 	dir.self.dirty(c)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir)
+	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
 	return fuse.OK
 }

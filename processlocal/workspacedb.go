@@ -28,15 +28,15 @@ type WorkspaceDB struct {
 	cache      map[string]map[string]quantumfs.ObjectKey
 }
 
-func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx) int {
+func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx) (int, error) {
 	wsdb.cacheMutex.RLock()
 	num := len(wsdb.cache)
 	wsdb.cacheMutex.RUnlock()
 
-	return num
+	return num, nil
 }
 
-func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) []string {
+func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) ([]string, error) {
 	wsdb.cacheMutex.RLock()
 	namespaces := make([]string, 0, len(wsdb.cache))
 
@@ -46,18 +46,22 @@ func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx) []string {
 
 	wsdb.cacheMutex.RUnlock()
 
-	return namespaces
+	return namespaces, nil
 }
 
-func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, namespace string) int {
+func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, namespace string) (int,
+	error) {
+
 	wsdb.cacheMutex.RLock()
 	num := len(wsdb.cache[namespace])
 	wsdb.cacheMutex.RUnlock()
 
-	return num
+	return num, nil
 }
 
-func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) []string {
+func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) ([]string,
+	error) {
+
 	wsdb.cacheMutex.RLock()
 	workspaces := make([]string, 0, len(wsdb.cache[namespace]))
 
@@ -67,15 +71,17 @@ func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, namespace string) []str
 
 	wsdb.cacheMutex.RUnlock()
 
-	return workspaces
+	return workspaces, nil
 }
 
-func (wsdb *WorkspaceDB) NamespaceExists(c *quantumfs.Ctx, namespace string) bool {
+func (wsdb *WorkspaceDB) NamespaceExists(c *quantumfs.Ctx, namespace string) (bool,
+	error) {
+
 	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.cache[namespace]
 	wsdb.cacheMutex.RUnlock()
 
-	return exists
+	return exists, nil
 }
 
 // Non-lock grabbing variant of workspace
@@ -92,13 +98,13 @@ func (wsdb *WorkspaceDB) workspace(c *quantumfs.Ctx, namespace string,
 }
 
 func (wsdb *WorkspaceDB) WorkspaceExists(c *quantumfs.Ctx, namespace string,
-	workspace string) bool {
+	workspace string) (bool, error) {
 
 	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.workspace(c, namespace, workspace)
 	wsdb.cacheMutex.RUnlock()
 
-	return exists
+	return exists, nil
 }
 
 func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
@@ -131,13 +137,13 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 }
 
 func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, namespace string,
-	workspace string) quantumfs.ObjectKey {
+	workspace string) (quantumfs.ObjectKey, error) {
 
 	wsdb.cacheMutex.RLock()
 	rootid, _ := wsdb.workspace(c, namespace, workspace)
 	wsdb.cacheMutex.RUnlock()
 
-	return rootid
+	return rootid, nil
 }
 
 func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
