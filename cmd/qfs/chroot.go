@@ -475,6 +475,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Error starting unmounting process: %s",
 				err.Error())
 		}
+		REMOVE
 	}
 
 	// change the current directory
