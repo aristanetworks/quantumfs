@@ -187,6 +187,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 		delete(dir.childrenRecords, inodeNum)
 	}()
+	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
 	dir.updateSize_(c)
@@ -464,6 +465,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
 	dir.self.markAccessed(c, name, false)
+	c.qfs.increaseLookupCount(inodeNum)
+
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	defer dir.childRecordLock.Lock().Unlock()
@@ -532,7 +535,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 		mode, rdev, entry)
 	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
-	c.qfs.addUninstantiated(c, uninstantiated, newEntity)
+	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
+	c.qfs.increaseLookupCount(inodeNum)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -635,24 +639,89 @@ func (dir *Directory) getChildRecord(c *ctx,
 		errors.New("Inode given is not a child of this directory")
 }
 
+func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
+	gid uint32, fileOwner uint32, dirOwner uint32, dirGroup uint32) bool {
+
+	// Root permission can bypass the permission, and the root is only verified
+	// by uid
+	if uid == 0 {
+		return true
+	}
+
+	// Verify the permission of the directory in order to delete a child
+	// If the sticky bit of the directory is set, the action can only be
+	// performed by file's owner, directory's owner, or root user
+	if BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
+		uid != fileOwner && uid != dirOwner {
+		return false
+	}
+
+	// Get whether current user is OWNER/GRP/OTHER
+	var permWX uint32
+	if uid == dirOwner {
+		permWX = syscall.S_IWUSR | syscall.S_IXUSR
+		// Check the current directory having x and w permissions
+		if BitFlagsSet(uint(permission), uint(permWX)) {
+			return true
+		}
+	} else if gid == dirGroup {
+		permWX = syscall.S_IWGRP | syscall.S_IXGRP
+		if BitFlagsSet(uint(permission), uint(permWX)) {
+			return true
+		}
+	} else { // all the other
+		permWX = syscall.S_IWOTH | syscall.S_IXOTH
+		if BitFlagsSet(uint(permission), uint(permWX)) {
+			return true
+		}
+	}
+
+	c.vlog("Unlink::checkPermission permission %o vs %o", permWX, permission)
+	return false
+}
+
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Unlink", "%s", name).out()
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
-
 		if _, exists := dir.children[name]; !exists {
 			return fuse.ENOENT
 		}
 
 		inode := dir.children[name]
-		type_ := func() uint32 {
-			defer dir.childRecordLock.Lock().Unlock()
-			return objectTypeToFileType(c,
-				dir.childrenRecords[inode].Type())
-		}()
+
+		// We already have an inode Mutex so we don't need Mutex for the
+		// map of its childrenRecords
+		record := dir.childrenRecords[inode]
+		type_ := objectTypeToFileType(c, record.Type())
+
 		if type_ == fuse.S_IFDIR {
+			c.vlog("Directory::Unlink directory")
 			return fuse.Status(syscall.EISDIR)
+		}
+
+		// If the directory is a root, it is always permitted to unlink any
+		// inodes because of its permission 777, which is hardcoded in the
+		// file daemon/workspaceroot.go. In this case, only no WorkspaceRoot
+		// needs a permission check.
+		if !dir.self.isWorkspaceRoot() {
+			owner := c.fuseCtx.Owner
+			dirRecord, err := dir.parent().getChildRecord(c,
+				dir.InodeCommon.id)
+			if err != nil {
+				return fuse.ENOENT
+			}
+			dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
+			dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
+			permission := dirRecord.Permissions()
+			fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
+
+			perm := dir.checkPermissions(c, permission, owner.Uid,
+				owner.Gid, fileOwner, dirOwner, dirGroup)
+			if !perm {
+				return fuse.EACCES
+			}
 		}
 
 		dir.delChild_(c, name)
@@ -827,6 +896,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			delete(dir.childrenRecords, cleanupInodeId)
 		}()
 		delete(dir.dirtyChildren_, cleanupInodeId)
+		c.qfs.removeUninstantiated(c, []InodeId{cleanupInodeId})
 
 		dir.updateSize_(c)
 		dir.self.dirty(c)
@@ -943,8 +1013,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			}()
 			newEntry.SetFilename(newName)
 
-			// update the inode to point to the new name and mark as
-			// accessed in both parents
+			// Update the inode to point to the new name and mark as
+			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
 				child.setParent(dst.self)
@@ -953,11 +1023,19 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
 
-			// delete the target InodeId, before (possibly) overwrite it
+			// Delete the target InodeId, before (possibly) overwriting
+			// it.
 			dst.deleteEntry_(newName)
+			c.qfs.removeUninstantiated(c,
+				[]InodeId{dst.children[newName]})
 
-			// set entry in new directory
+			// Set entry in new directory. If the renamed inode is
+			// uninstantiated, we swizzle the parent here.
 			dst.insertEntry_(c, oldInodeId, newEntry, child)
+			if child == nil {
+				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
+					dst.inodeNum())
+			}
 
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
@@ -1461,7 +1539,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	inodeNum := dir.loadChild_(c, *entry)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir)
+	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }
 
 type directoryContents struct {
