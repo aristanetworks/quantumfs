@@ -272,6 +272,7 @@ func (qfs *QuantumFs) removeUninstantiated_(c *ctx, uninstantiated []InodeId) {
 
 		// Remove this child as an uninstantiated inode of its parent
 		parentChildren := qfs.uninstantiatedChildren[parent]
+
 		// Efficient unordered vector delete
 		for i, child := range parentChildren {
 			if child != inodeNum {
