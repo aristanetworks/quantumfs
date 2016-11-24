@@ -187,6 +187,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 		delete(dir.childrenRecords, inodeNum)
 	}()
+	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	delete(dir.dirtyChildren_, inodeNum)
 	delete(dir.children, name)
 	dir.updateSize_(c)
@@ -534,7 +535,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 		mode, rdev, entry)
 	dir.addChild_(c, name, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
-	c.qfs.addUninstantiated(c, uninstantiated, newEntity)
+	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
 	c.qfs.increaseLookupCount(inodeNum)
 
 	fillEntryOutCacheData(c, out)
@@ -895,6 +896,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			delete(dir.childrenRecords, cleanupInodeId)
 		}()
 		delete(dir.dirtyChildren_, cleanupInodeId)
+		c.qfs.removeUninstantiated(c, []InodeId{cleanupInodeId})
 
 		dir.updateSize_(c)
 		dir.self.dirty(c)
@@ -1011,8 +1013,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			}()
 			newEntry.SetFilename(newName)
 
-			// update the inode to point to the new name and mark as
-			// accessed in both parents
+			// Update the inode to point to the new name and mark as
+			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
 				child.setParent(dst.self)
@@ -1021,11 +1023,19 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
 
-			// delete the target InodeId, before (possibly) overwrite it
+			// Delete the target InodeId, before (possibly) overwriting
+			// it.
 			dst.deleteEntry_(newName)
+			c.qfs.removeUninstantiated(c,
+				[]InodeId{dst.children[newName]})
 
-			// set entry in new directory
+			// Set entry in new directory. If the renamed inode is
+			// uninstantiated, we swizzle the parent here.
 			dst.insertEntry_(c, oldInodeId, newEntry, child)
+			if child == nil {
+				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
+					dst.inodeNum())
+			}
 
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
@@ -1529,7 +1539,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	inodeNum := dir.loadChild_(c, *entry)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir)
+	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }
 
 type directoryContents struct {

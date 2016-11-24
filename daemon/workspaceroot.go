@@ -60,7 +60,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	uninstantiated := initDirectory(c, name, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent, &wsr.realTreeLock)
 
-	c.qfs.addUninstantiated(c, uninstantiated, &wsr)
+	c.qfs.addUninstantiated(c, uninstantiated, wsr.inodeNum())
 
 	return &wsr
 }

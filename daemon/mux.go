@@ -26,7 +26,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		inodeNum:             quantumfs.InodeIdReservedEnd,
 		fileHandleNum:        quantumfs.InodeIdReservedEnd,
 		activeWorkspaces:     make(map[string]*WorkspaceRoot),
-		uninstantiatedInodes: make(map[InodeId]Inode),
+		uninstantiatedInodes: make(map[InodeId]InodeId),
 		lookupCounts:         make(map[InodeId]uint64),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
@@ -78,7 +78,7 @@ type QuantumFs struct {
 	// particular inode, but the corresponding Inode has not yet been
 	// instantiated. The Inode this map points to is the parent Inode which
 	// should be called to instantiate the uninstantiated inode when necessary.
-	uninstantiatedInodes map[InodeId]Inode
+	uninstantiatedInodes map[InodeId]InodeId
 
 	// lookupCounts are used as the other side of Forget. That is, Forget
 	// specifies a certain number of lookup counts to forget, which may not be
@@ -140,9 +140,8 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 	}
 }
 
-func (qfs *QuantumFs) getInode(c *ctx, id InodeId) (Inode, bool) {
-	qfs.mapMutex.RLock()
-	defer qfs.mapMutex.RUnlock()
+// Must hold the mapMutex
+func (qfs *QuantumFs) getInode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, instantiated := qfs.inodes[id]
 	if instantiated {
 		return inode, false
@@ -153,40 +152,60 @@ func (qfs *QuantumFs) getInode(c *ctx, id InodeId) (Inode, bool) {
 }
 
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
-	inode, _ := qfs.getInode(c, id)
+	qfs.mapMutex.RLock()
+	defer qfs.mapMutex.RUnlock()
+	inode, _ := qfs.getInode_(c, id)
 	return inode
 }
 
 // Get an inode in a thread safe way
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
-	inode, needsInstantiation := qfs.getInode(c, id)
+	// First find the Inode under a cheaper lock
+	inode := func() Inode {
+		qfs.mapMutex.RLock()
+		defer qfs.mapMutex.RUnlock()
+		inode, needsInstantiation := qfs.getInode_(c, id)
 
-	if !needsInstantiation {
+		if !needsInstantiation {
+			return inode
+		} else {
+			return nil
+		}
+	}()
+
+	if inode != nil {
 		return inode
 	}
 
+	// If we didn't find it, get the more expensive lock and check again. This
+	// will instantiate the Inode if necessary and possible.
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
-	// Recheck in case things changes while we didn't have the lock
-	inode, instantiated := qfs.inodes[id]
-	if instantiated {
+
+	return qfs.inode_(c, id)
+}
+
+// Must hold the mapMutex for write
+func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
+	inode, needsInstantiation := qfs.getInode_(c, id)
+	if !needsInstantiation {
 		return inode
 	}
 
 	c.vlog("Inode %d needs to be instantiated", id)
 
-	parent, uninstantiated := qfs.uninstantiatedInodes[id]
+	parentId, uninstantiated := qfs.uninstantiatedInodes[id]
 	if !uninstantiated {
 		// We don't know anything about this Inode
 		return nil
 	}
 
-	inode, newUninstantiated := parent.instantiateChild(c, id)
+	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
 	delete(qfs.uninstantiatedInodes, id)
 	qfs.inodes[id] = inode
 	for _, id := range newUninstantiated {
 		c.vlog("Adding uninstantiated %v", id)
-		qfs.uninstantiatedInodes[id] = inode
+		qfs.uninstantiatedInodes[id] = inode.inodeNum()
 	}
 
 	return inode
@@ -205,10 +224,10 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 
 // Set a list of inode numbers to be uninstantiated with the given parent
 func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
-	parent Inode) {
+	parent InodeId) {
 
-	if parent == nil {
-		panic("addUninstantiated with nil parent")
+	if parent == 0 {
+		panic("Invalid parentId in addUninstantiated")
 	}
 
 	qfs.mapMutex.Lock()
@@ -438,7 +457,8 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	parent := inode.parent()
 	if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
 		inode.parent().syncChild(&qfs.c, inode.inodeNum(), key)
-		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()}, parent)
+		qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()},
+			parent.inodeNum())
 	}
 	qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 }
