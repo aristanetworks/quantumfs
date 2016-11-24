@@ -233,17 +233,13 @@ func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
 func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
 	parent InodeId) {
 
-	children, exists := qfs.uninstantiatedChildren[parent]
-
 	for _, inodeNum := range uninstantiated {
 		c.vlog("Adding uninstantiated %v", inodeNum)
 		qfs.uninstantiatedInodes[inodeNum] = parent
-		if exists {
-			children = append(children, inodeNum)
-		}
 	}
 
-	if exists {
+	if children, exists := qfs.uninstantiatedChildren[parent]; exists {
+		children = append(children, uninstantiated...)
 		qfs.uninstantiatedChildren[parent] = children
 	} else {
 		qfs.uninstantiatedChildren[parent] = uninstantiated
