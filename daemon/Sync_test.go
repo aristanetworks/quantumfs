@@ -55,12 +55,12 @@ func TestSyncToDatastore(t *testing.T) {
 			if data[i] < '3' {
 				folderStack = append(folderStack, "/folder")
 				folderStr := strings.Join(folderStack, "")
-				os.MkdirAll(workspace + folderStr, 0777)
+				os.MkdirAll(workspace+folderStr, 0777)
 			} else if data[i] < '5' && len(folderStack) > 0 {
 				folderStack = folderStack[:len(folderStack)-1]
 			} else {
 				folderStr := strings.Join(folderStack, "")
-				ioutil.WriteFile(workspace + folderStr + "/file" +
+				ioutil.WriteFile(workspace+folderStr+"/file"+
 					strconv.Itoa(i), []byte(data), os.ModePerm)
 			}
 		}
@@ -86,7 +86,7 @@ func TestSyncToDatastore(t *testing.T) {
 
 				_, err := os.Stat(workspace + folderStr)
 				test.assert(err == nil, "Folder lost (%s): %v",
-					workspace + folderStr, err)
+					workspace+folderStr, err)
 			} else if data[i] < '5' && len(folderStack) > 0 {
 				folderStack = folderStack[:len(folderStack)-1]
 			} else {
