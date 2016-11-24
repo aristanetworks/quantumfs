@@ -10,6 +10,8 @@ import "bytes"
 import "io"
 import "io/ioutil"
 import "os"
+import "strings"
+import "strconv"
 import "sync/atomic"
 import "syscall"
 import "testing"
@@ -30,6 +32,82 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 	c.Dlog(qlog.LogDatastore, "setCountingDataStore::Set()")
 	atomic.AddUint64(&store.setCount, 1)
 	return store.DataStore.Set(c, key, buffer)
+}
+
+func TestSyncToDatastore(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		configA := test.defaultConfig()
+		configB := configA
+		configB.CachePath += "B"
+		configB.MountPath += "B"
+		configA.CachePath += ""
+		configA.MountPath += ""
+
+		// Make an instance of QuantumFs and put things there
+		test.startQuantumFs(configA)
+		workspace := test.newWorkspace()
+
+		// Generate some deterministic, pseudorandom data for a folder
+		// structure, treating each number as a command
+		data := genData(100)
+		folderStack := make([]string, 0)
+		for i := 0; i < len(data); i++ {
+			// and occasionally force a sync
+			if data[i] == '0' {
+				test.syncAllWorkspaces()
+			}
+
+			if data[i] < '3' {
+				folderStack = append(folderStack, "/folder")
+				folderStr := strings.Join(folderStack, "")
+				os.MkdirAll(workspace + folderStr, 0777)
+			} else if data[i] < '5' && len(folderStack) > 0 {
+				folderStack = folderStack[:len(folderStack)-1]
+			} else {
+				folderStr := strings.Join(folderStack, "")
+				ioutil.WriteFile(workspace + folderStr + "/file" +
+					strconv.Itoa(i), []byte(data), os.ModePerm)
+			}
+		}
+
+		// Sync all of the data we've written
+		test.syncAllWorkspaces()
+
+		// Now end quantumfs A, and start B with the same datastore so we
+		// can verify that the data was preserved via the datastore
+		test.api.Close()
+		err := test.qfs.server.Unmount()
+		test.assert(err == nil, "Failed to unmount during test")
+
+		test.startQuantumFs(configA)
+
+		// Iterate in the exact same way, but this time verifying instead of
+		// creating the data
+		folderStack = make([]string, 0)
+		for i := 0; i < len(data); i++ {
+			if data[i] < '3' {
+				folderStack = append(folderStack, "/folder")
+				folderStr := strings.Join(folderStack, "")
+
+				_, err := os.Stat(workspace + folderStr)
+				test.assert(err == nil, "Folder lost (%s): %v",
+					workspace + folderStr, err)
+			} else if data[i] < '5' && len(folderStack) > 0 {
+				folderStack = folderStack[:len(folderStack)-1]
+			} else {
+				folderStr := strings.Join(folderStack, "")
+				fileName := workspace + folderStr + "/file" +
+					strconv.Itoa(i)
+
+				fileData, err := ioutil.ReadFile(fileName)
+
+				test.assert(err == nil, "File lost (%s): %s",
+					fileName, err)
+				test.assert(bytes.Equal(fileData, data),
+					"File data doesn't match in %s", fileName)
+			}
+		}
+	})
 }
 
 // Put in place a proxy dataStore which counts the stores we make, then create a few
