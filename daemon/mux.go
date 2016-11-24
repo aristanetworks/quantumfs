@@ -188,7 +188,12 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
-	return qfs.inode_(c, id)
+	inode = qfs.inode_(c, id)
+	if inode == nil {
+		msg := fmt.Sprintf("Unknown inodeId %d", id)
+		panic(msg)
+	}
+	return inode
 }
 
 // Must hold the mapMutex for write
