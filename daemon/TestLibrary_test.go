@@ -592,13 +592,19 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 	return handles
 }
 
-// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
-func (th *testHelper) getInode(path string) Inode {
+// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
+func (th *testHelper) getInodeNum(path string) InodeId {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
 	th.assert(err == nil, "Error grabbing file inode: %v", err)
-	inode := th.qfs.inodeNoInstantiate(&th.qfs.c,
-		InodeId(stat.Ino))
+
+	return InodeId(stat.Ino)
+}
+
+// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
+func (th *testHelper) getInode(path string) Inode {
+	inodeNum := th.getInodeNum(path)
+	inode := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 	return inode
 }
 
