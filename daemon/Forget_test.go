@@ -90,9 +90,9 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		err := os.Mkdir(dirName, 0777)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
+		// Generate a bunch of files
 		numFiles := 10
 		data := genData(255)
-		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
 			err := printToFile(workspace+"/dir/file"+strconv.Itoa(i),
 				string(data))
