@@ -274,6 +274,12 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
 				quantumfs.WSDB_OUT_OF_DATE)
 		}
 
+		if c != nil {
+			c.Qlog.Log(qlog.LogWorkspaceDb, uint64(c.RequestId), 3,
+				"WorkspaceDB::AdvanceWorkspace %s/%s %s", namespace,
+				workspace, newRootId.String())
+		}
+
 		// The workspace exists and the caller has the uptodate rootid, so
 		// advance the rootid in the DB.
 		namespaces := tx.Bucket(namespacesBucket)

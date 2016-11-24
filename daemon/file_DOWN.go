@@ -16,7 +16,7 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("File::flush_DOWN").out()
+	defer c.FuncIn("File::flush_DOWN", "%s", fi.name_).out()
 
 	key := fi.accessor.sync(c)
 	fi.setDirty(false)
