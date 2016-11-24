@@ -436,23 +436,43 @@ func LogscanSkim(filepath string) bool {
 }
 
 func ParseLogs(filepath string) string {
-	return ParseLogsExt(filepath, 0, defaultParseThreads)
+	rtn := ""
+
+	ParseLogsExt(filepath, 0, defaultParseThreads, false,
+		func(format string, args ...interface{}) (int, error) {
+			rtn += fmt.Sprintf(format, args...)
+			return len(format), nil
+		})
+
+	return rtn
 }
 
-func ParseLogsExt(filepath string, tabSpaces int, maxThreads int) string {
+type writeFn func(string, ...interface{}) (int, error)
+
+func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
+	statusBar bool, fn writeFn) {
 
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
 
-	logs := OutputLogs(pastEndIdx, dataArray, strMap, maxThreads)
+	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
 
-	return FormatLogs(logs, tabSpaces)
+	FormatLogs(logs, tabSpaces, statusBar, fn)
 }
 
-func FormatLogs(logs []LogOutput, tabSpaces int) string {
+func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
 	indentMap := make(map[uint64]int)
-	var rtn string
 	// Now that we have the logs in correct order, we can indent them
+
+	var status LogStatus
+	if statusBar {
+		fmt.Println("Formatting log output...")
+		status = NewLogStatus(50)
+	}
 	for i := 0; i < len(logs); i++ {
+		if statusBar {
+			status.Process(float32(i) / float32(len(logs)))
+		}
+
 		// Add any indents necessary
 		if tabSpaces > 0 {
 			indents := indentMap[logs[i].ReqId]
@@ -463,7 +483,7 @@ func FormatLogs(logs []LogOutput, tabSpaces int) string {
 
 			// Add the spaces we need
 			spaceStr := ""
-			for i := 0; i < indents*tabSpaces; i++ {
+			for j := 0; j < indents*tabSpaces; j++ {
 				spaceStr += " "
 			}
 
@@ -478,10 +498,13 @@ func FormatLogs(logs []LogOutput, tabSpaces int) string {
 		// Convert timestamp back into something useful
 		t := time.Unix(0, logs[i].T)
 
-		rtn += formatString(logs[i].Subsystem, logs[i].ReqId, t,
-			fmt.Sprintf(logs[i].Format, logs[i].Args...))
+		outStr := formatString(logs[i].Subsystem, logs[i].ReqId, t,
+			logs[i].Format)
+		fn(outStr, logs[i].Args...)
 	}
-	return rtn
+	if statusBar {
+		status.Process(1)
+	}
 }
 
 func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
