@@ -256,6 +256,23 @@ func (th *testHelper) waitToBeUnmounted() {
 	panic("Filesystem didn't unmount in time")
 }
 
+// Repeatedly check the condition by calling the function until that function returns
+// true.
+//
+// No timeout is provided beyond the normal test timeout.
+func (th *testHelper) waitFor(description string, condition func() bool) {
+	th.log("Started waiting for %s", description)
+	for {
+		if condition() {
+			th.log("Finished waiting for %s", description)
+			return
+		} else {
+			th.log("Condition not satisfied")
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+}
+
 // Check the test output for errors
 func (th *testHelper) logscan() (foundErrors bool) {
 	// Check the format string map for the log first to speed this up
