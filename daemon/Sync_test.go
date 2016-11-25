@@ -6,6 +6,7 @@ package daemon
 // Test Inode syncing to ensure it happens correctly and only happens when it
 // supposed to.
 
+import "bufio"
 import "bytes"
 import "io"
 import "io/ioutil"
@@ -34,7 +35,7 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 	return store.DataStore.Set(c, key, buffer)
 }
 
-func TestSyncFileOverwrite(t *testing.T){
+func TestSyncFileOverwrite(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
 
@@ -45,21 +46,26 @@ func TestSyncFileOverwrite(t *testing.T){
 		// Generate some deterministic, pseudorandom data for a folder
 		// structure, treating each number as a command
 		data := genData(500)
+		totalWritten := 0
 		dataWidth := 50
-		for i := 0; i < len(data)-dataWidth; i++ {
-			fd, err := os.OpenFile(workspace + "/testFile",
+		for i := 0; i < len(data)/dataWidth; i++ {
+			fd, err := os.OpenFile(workspace+"/testFile",
 				os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 			test.assert(err == nil, "Unable to open testFile %s", err)
 
-			_, err = fd.WriteString(string(data[i*dataWidth:(i+
-				1)*dataWidth]))
+			toWrite := data[i*dataWidth:(i+1)*dataWidth]
+			bufferedWriter := bufio.NewWriter(fd)
+			wrote, err := bufferedWriter.Write(toWrite)
+			totalWritten += wrote
 			test.assert(err == nil, "Unable to write to testFile")
 
+			bufferedWriter.Flush()
 			fd.Close()
 
 			test.syncAllWorkspaces()
 		}
-if false{
+		test.assert(totalWritten == len(data), "Written mismatch")
+
 		test.api.Close()
 		err := test.qfs.server.Unmount()
 		test.assert(err == nil, "Failed to unmount during test")
@@ -70,8 +76,8 @@ if false{
 		test.assert(err == nil, "Unable to read file after qfs reload: %s",
 			err)
 		test.assert(bytes.Equal(data, fileRestored),
-			"File contents not completely synced / restored")
-		}
+			"File contents not completely synced / restored %d %d",
+			len(data), len(fileRestored))
 	})
 }
 
