@@ -115,6 +115,9 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 			numFiles)
 		dir.Close()
 
+		// we need to sync to ensure that all changes take effect
+		test.syncAllWorkspaces()
+
 		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
 
 		// Forgetting should now forget the Directory and thus remove all the
