@@ -90,9 +90,9 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		err := os.Mkdir(dirName, 0777)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
+		// Generate a bunch of files
 		numFiles := 10
 		data := genData(255)
-		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
 			err := printToFile(workspace+"/dir/file"+strconv.Itoa(i),
 				string(data))
@@ -106,6 +106,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// Get the listing from the directory to instantiate that directory
 		// and add its children to the uninstantiated inode list.
+		dirInodeNum := test.getInodeNum(dirName)
 		dir, err := os.Open(dirName)
 		test.assert(err == nil, "Error opening directory: %v", err)
 		children, err := dir.Readdirnames(-1)
@@ -136,6 +137,16 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed %d <= %d",
 			numUninstantiatedOld, numUninstantiatedNew)
+
+		for _, parent := range test.qfs.uninstantiatedInodes {
+			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
+				"use forgotten directory as parent")
+		}
+
+		ids, exists := test.qfs.uninstantiatedChildren[dirInodeNum]
+		test.assert(exists, "Directory has no uninstantiated children list")
+		test.assert(len(ids) == 0,
+			"Directory has uninstantiate children: %v", ids)
 	})
 }
 
