@@ -9,6 +9,7 @@ import "bytes"
 import "io/ioutil"
 import "os"
 import "strconv"
+import "sync"
 import "syscall"
 import "testing"
 import "time"
@@ -115,22 +116,36 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 			numFiles)
 		dir.Close()
 
-		// we need to sync to ensure that all changes take effect
 		test.syncAllWorkspaces()
 
+		var treeLock *sync.RWMutex
+		for _, v := range test.qfs.inodes {
+			treeLock = v.treeLock()
+			break
+		}
+		// we need to lock to do this without racing
+		treeLock.Lock()
 		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
+		oldUnin := make(map[InodeId]InodeId, 0)
+		for k, v := range test.qfs.uninstantiatedInodes {
+			oldUnin[k] = v
+		}
+		treeLock.Unlock()
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the uninstantiatedInodes list.
 		remountFilesystem(test)
 
-		test.assertLogContains("Forgetting",
+		test.assertLogContains("Forgetting inode",
 			"No inode forget triggered during dentry drop.")
 
+		treeLock.Lock()
 		numUninstantiatedNew := len(test.qfs.uninstantiatedInodes)
+		treeLock.Unlock()
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
-			"No uninstantiated inodes were removed")
+			"No uninstantiated inodes were removed %d <= %d, %v ||| %v",
+			numUninstantiatedOld, numUninstantiatedNew, oldUnin, test.qfs.uninstantiatedInodes)
 	})
 }
 
