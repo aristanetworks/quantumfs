@@ -34,7 +34,7 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 	return store.DataStore.Set(c, key, buffer)
 }
 
-func TestSyncToDatastore(t *testing.T) {
+func TestSyncFileOverwrite(t *testing.T){
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
 
@@ -44,6 +44,49 @@ func TestSyncToDatastore(t *testing.T) {
 
 		// Generate some deterministic, pseudorandom data for a folder
 		// structure, treating each number as a command
+		data := genData(500)
+		dataWidth := 50
+		for i := 0; i < len(data)-dataWidth; i++ {
+			fd, err := os.OpenFile(workspace + "/testFile",
+				os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+			test.assert(err == nil, "Unable to open testFile %s", err)
+
+			_, err = fd.WriteString(string(data[i*dataWidth:(i+
+				1)*dataWidth]))
+			test.assert(err == nil, "Unable to write to testFile")
+
+			fd.Close()
+
+			test.syncAllWorkspaces()
+		}
+if false{
+		test.api.Close()
+		err := test.qfs.server.Unmount()
+		test.assert(err == nil, "Failed to unmount during test")
+
+		test.startQuantumFs(config)
+
+		fileRestored, err := ioutil.ReadFile(workspace + "/testFile")
+		test.assert(err == nil, "Unable to read file after qfs reload: %s",
+			err)
+		test.assert(bytes.Equal(data, fileRestored),
+			"File contents not completely synced / restored")
+		}
+	})
+}
+
+func TestSyncToDatastore(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+
+		// Make an instance of QuantumFs and put things there
+		test.startQuantumFs(config)
+		workspace := test.newWorkspace()
+
+		// Generate some deterministic, pseudorandom data for a folder
+		// structure, treating each number as a command. Ensure genData
+		// generates a long enough string of natural numbers to ensure at
+		// least a few sync commands occur.
 		data := genData(50)
 		folderStack := make([]string, 0)
 		for i := 0; i < len(data); i++ {

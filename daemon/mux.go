@@ -409,7 +409,7 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 		}
 	}()
 
-	c.vlog("Num active workspaces: %d", len(workspaces))
+	c.dlog("Num active workspaces: %d", len(workspaces))
 
 	for _, workspace := range workspaces {
 		func() {
