@@ -126,10 +126,6 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// we need to lock to do this without racing
 		treeLock.Lock()
 		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
-		oldUnin := make(map[InodeId]InodeId, 0)
-		for k, v := range test.qfs.uninstantiatedInodes {
-			oldUnin[k] = v
-		}
 		treeLock.Unlock()
 
 		// Forgetting should now forget the Directory and thus remove all the
@@ -144,8 +140,8 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		treeLock.Unlock()
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
-			"No uninstantiated inodes were removed %d <= %d, %v ||| %v",
-			numUninstantiatedOld, numUninstantiatedNew, oldUnin, test.qfs.uninstantiatedInodes)
+			"No uninstantiated inodes were removed %d <= %d",
+			numUninstantiatedOld, numUninstantiatedNew)
 	})
 }
 
