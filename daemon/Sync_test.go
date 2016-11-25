@@ -53,7 +53,7 @@ func TestSyncFileOverwrite(t *testing.T) {
 				os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 			test.assert(err == nil, "Unable to open testFile %s", err)
 
-			toWrite := data[i*dataWidth:(i+1)*dataWidth]
+			toWrite := data[i*dataWidth : (i+1)*dataWidth]
 			bufferedWriter := bufio.NewWriter(fd)
 			wrote, err := bufferedWriter.Write(toWrite)
 			totalWritten += wrote
