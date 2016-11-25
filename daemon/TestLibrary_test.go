@@ -5,7 +5,6 @@ package daemon
 
 // Test library
 
-import "bufio"
 import "bytes"
 import "errors"
 import "flag"
@@ -257,6 +256,23 @@ func (th *testHelper) waitToBeUnmounted() {
 	panic("Filesystem didn't unmount in time")
 }
 
+// Repeatedly check the condition by calling the function until that function returns
+// true.
+//
+// No timeout is provided beyond the normal test timeout.
+func (th *testHelper) waitFor(description string, condition func() bool) {
+	th.log("Started waiting for %s", description)
+	for {
+		if condition() {
+			th.log("Finished waiting for %s", description)
+			return
+		} else {
+			th.log("Condition not satisfied")
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+}
+
 // Check the test output for errors
 func (th *testHelper) logscan() (foundErrors bool) {
 	// Check the format string map for the log first to speed this up
@@ -377,46 +393,6 @@ func (th *testHelper) startDefaultQuantumFs() {
 	th.startQuantumFs(config)
 }
 
-// Return the fuse connection id for the filesystem mounted at the given path
-func (th *testHelper) findFuseConnection(mountPath string) int {
-	th.log("Finding FUSE Connection ID...")
-	for i := 0; i < 100; i++ {
-		th.log("Waiting for mount try %d...", i)
-		file, err := os.Open("/proc/self/mountinfo")
-		if err != nil {
-			th.log("Failed opening mountinfo: %v", err)
-			return -1
-		}
-		defer file.Close()
-
-		mountinfo := bufio.NewReader(file)
-
-		for {
-			bline, _, err := mountinfo.ReadLine()
-			if err != nil {
-				break
-			}
-
-			line := string(bline)
-
-			if strings.Contains(line, mountPath) {
-				fields := strings.SplitN(line, " ", 5)
-				dev := strings.Split(fields[2], ":")[1]
-				devInt, err := strconv.Atoi(dev)
-				if err != nil {
-					th.log("Failed to convert dev to integer")
-					return -1
-				}
-				return devInt
-			}
-		}
-
-		time.Sleep(50 * time.Millisecond)
-	}
-	th.log("Mount not found")
-	return -1
-}
-
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
 // hanging.
 func serveSafely(th *testHelper) {
@@ -457,7 +433,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 
 	go serveSafely(th)
 
-	th.fuseConnection = th.findFuseConnection(config.MountPath)
+	th.fuseConnection = findFuseConnection(th.testCtx(), config.MountPath)
 	th.assert(th.fuseConnection != -1, "Failed to find mount")
 	th.log("QuantumFs instance started")
 }
@@ -693,6 +669,12 @@ func (th *testHelper) newCtx() *ctx {
 	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
 		th.testName)
 	return c
+}
+
+// Produce a test infrastructure ctx variable for use with QuantumFS utility
+// functions.
+func (th *testHelper) testCtx() *ctx {
+	return th.qfs.c.dummyReq(qlog.TestReqId)
 }
 
 //only to be used for some testing - not all functions will work with this
