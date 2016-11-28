@@ -45,10 +45,11 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("Directory::flush_DOWN").out()
+	defer c.FuncIn("Directory::flush_DOWN", "%d %s", dir.inodeNum(),
+		dir.name_).out()
 
 	if !dir.isDirty() {
-		c.vlog("directory not dirty")
+		c.vlog("directory %s not dirty", dir.name_)
 		return dir.baseLayerId
 	}
 
