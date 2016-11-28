@@ -250,7 +250,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
-	attr.Blksize = qfsBlockSize
+	attr.Blksize = uint32(qfsBlockSize)
 }
 
 func permissionsToMode(permissions uint32) uint32 {
