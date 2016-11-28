@@ -6,6 +6,7 @@
 package daemon
 
 import "fmt"
+import "io/ioutil"
 import "math"
 import "runtime/debug"
 import "syscall"
@@ -107,6 +108,7 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	flushTimerStopped := make(chan bool)
 
 	go qfs.flushTimer(stopFlushTimer, flushTimerStopped)
+	go qfs.adjustKernelKnobs()
 
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
@@ -143,6 +145,53 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 			finished <- true
 			return
 		}
+	}
+}
+
+// There are several configuration knobs in the kernel which can affect FUSE
+// performance. Don't depend on the system being configured correctly for QuantumFS,
+// instead try to change the settings ourselves.
+func (qfs *QuantumFs) adjustKernelKnobs() {
+	qfs.c.funcIn("adjustKernelKnobs").out()
+
+	mountId := findFuseConnection(&qfs.c, qfs.config.MountPath)
+	if mountId == -1 {
+		// We don't know where we are mounted, give up
+		return
+	}
+
+	adjustBdi(&qfs.c, mountId)
+}
+
+func adjustBdi(c *ctx, mountId int) {
+	c.funcIn("adjustBdi").out()
+
+	// /sys/class/bdi/<mount>/read_ahead_kb indicates how much data, up to the
+	// end of the file, should be speculatively read by the kernel. Setting this
+	// to the block size should improve the correlation between the what the
+	// kernel reads and what QuantumFS can provide most effeciently. Since this
+	// is the amount in addition to the original read the kernel will read the
+	// entire block containing the user's read and then some portion of the next
+	// block. Thus QuantumFS will have time to fetch the next block in advance of
+	// it being required.
+	filename := fmt.Sprintf("/sys/class/bdi/0:%d/read_ahead_kb", mountId)
+	value := fmt.Sprintf("%d", quantumfs.MaxBlockSize/1024)
+	err := ioutil.WriteFile(filename, []byte(value), 000)
+	if err != nil {
+		c.wlog("Unable to set read_ahead_kb: %v", err)
+	}
+
+	// /sys/class/bdi/<mount>/max_ratio indicates the percentage of the
+	// write-back cache this filesystem is allowed to use. Thus it is a maximum
+	// of <system memory size>*<vm.dirty_bytes_ratio>*<max_ratio>. On a 256G
+	// system with defaults and no memory pressure that amounts to ~540MB. Since
+	// QuantumFS is a trusted filesystem and on most systems nearly all the IO
+	// will be through QuantumFS, treat QuantumFS like any other kernel file
+	// system and allow it to use the full write-back cache if necessary.
+	filename = fmt.Sprintf("/sys/class/bdi/0:%d/max_ratio", mountId)
+	err = ioutil.WriteFile(filename, []byte("100"), 000)
+	if err != nil {
+		c.wlog("Unable to set bdi max_ratio: %v", err)
 	}
 }
 

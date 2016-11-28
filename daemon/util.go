@@ -3,7 +3,11 @@
 
 package daemon
 
+import "bufio"
 import "bytes"
+import "os"
+import "strconv"
+import "strings"
 import "sync"
 import "time"
 
@@ -166,4 +170,45 @@ type DeferableMutex struct {
 func (df *DeferableMutex) Lock() *sync.Mutex {
 	df.lock.Lock()
 	return &df.lock
+}
+
+// Return the fuse connection id for the filesystem mounted at the given path
+func findFuseConnection(c *ctx, mountPath string) int {
+	c.dlog("Finding FUSE Connection ID...")
+	for i := 0; i < 100; i++ {
+		c.dlog("Waiting for mount try %d...", i)
+		file, err := os.Open("/proc/self/mountinfo")
+		if err != nil {
+			c.dlog("Failed opening mountinfo: %v", err)
+			return -1
+		}
+		defer file.Close()
+
+		mountinfo := bufio.NewReader(file)
+
+		for {
+			bline, _, err := mountinfo.ReadLine()
+			if err != nil {
+				break
+			}
+
+			line := string(bline)
+
+			if strings.Contains(line, mountPath) {
+				fields := strings.SplitN(line, " ", 5)
+				dev := strings.Split(fields[2], ":")[1]
+				devInt, err := strconv.Atoi(dev)
+				if err != nil {
+					c.elog("Failed to convert dev to integer")
+					return -1
+				}
+				c.vlog("Found mountId %d", devInt)
+				return devInt
+			}
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+	c.elog("FUSE mount not found in time")
+	return -1
 }
