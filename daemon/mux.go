@@ -420,6 +420,13 @@ func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
+
+	// we need the lock to check Dirty to avoid active / dirty races
+	if workspaceroot.setDirty(true) {
+		// if the wsr is already dirty, then its already active so skip
+		return
+	}
+
 	if _, exists := qfs.activeWorkspaces[name]; exists {
 		panic("Workspace registered twice")
 	}
@@ -428,11 +435,15 @@ func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
 
 // Untrack a workspace as active so we won't sync it. Usually this is called when
 // the workspaceroot Inode is about to be deleted
-func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string) {
+func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string,
+	workspaceroot *WorkspaceRoot) {
+
 	defer c.FuncIn("Mux::deactivateWorkspace", "%s", name).out()
 
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
+
+	workspaceroot.setDirty(false)
 	delete(qfs.activeWorkspaces, name)
 }
 
@@ -452,6 +463,8 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 			workspaces = append(workspaces, workspace)
 		}
 	}()
+
+	c.dlog("Num active workspaces: %d", len(workspaces))
 
 	for _, workspace := range workspaces {
 		func() {

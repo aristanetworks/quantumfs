@@ -116,19 +116,27 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 			numFiles)
 		dir.Close()
 
+		test.syncAllWorkspaces()
+
+		// we need to lock to do this without racing
+		test.qfs.mapMutex.Lock()
 		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
+		test.qfs.mapMutex.Unlock()
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the uninstantiatedInodes list.
 		remountFilesystem(test)
 
-		test.assertLogContains("Forgetting",
+		test.assertLogContains("Forgetting inode",
 			"No inode forget triggered during dentry drop.")
 
+		test.qfs.mapMutex.Lock()
 		numUninstantiatedNew := len(test.qfs.uninstantiatedInodes)
+		test.qfs.mapMutex.Unlock()
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
-			"No uninstantiated inodes were removed")
+			"No uninstantiated inodes were removed %d <= %d",
+			numUninstantiatedOld, numUninstantiatedNew)
 
 		for _, parent := range test.qfs.uninstantiatedInodes {
 			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
