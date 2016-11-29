@@ -6,10 +6,13 @@ package daemon
 // Test Inode syncing to ensure it happens correctly and only happens when it
 // supposed to.
 
+import "bufio"
 import "bytes"
 import "io"
 import "io/ioutil"
 import "os"
+import "strings"
+import "strconv"
 import "sync/atomic"
 import "syscall"
 import "testing"
@@ -30,6 +33,125 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 	c.Dlog(qlog.LogDatastore, "setCountingDataStore::Set()")
 	atomic.AddUint64(&store.setCount, 1)
 	return store.DataStore.Set(c, key, buffer)
+}
+
+func TestSyncFileOverwrite(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+
+		// Make an instance of QuantumFs and put things there
+		test.startQuantumFs(config)
+		workspace := test.newWorkspace()
+
+		// Generate some deterministic, pseudorandom data for a folder
+		// structure, treating each number as a command
+		data := genData(500)
+		totalWritten := 0
+		dataWidth := 50
+		for i := 0; i < len(data)/dataWidth; i++ {
+			fd, err := os.OpenFile(workspace+"/testFile",
+				os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+			test.assert(err == nil, "Unable to open testFile %s", err)
+
+			toWrite := data[i*dataWidth : (i+1)*dataWidth]
+			bufferedWriter := bufio.NewWriter(fd)
+			wrote, err := bufferedWriter.Write(toWrite)
+			totalWritten += wrote
+			test.assert(err == nil, "Unable to write to testFile")
+
+			bufferedWriter.Flush()
+			fd.Close()
+
+			test.syncAllWorkspaces()
+		}
+		test.assert(totalWritten == len(data), "Written mismatch")
+
+		test.api.Close()
+		err := test.qfs.server.Unmount()
+		test.assert(err == nil, "Failed to unmount during test")
+
+		test.startQuantumFs(config)
+
+		fileRestored, err := ioutil.ReadFile(workspace + "/testFile")
+		test.assert(err == nil, "Unable to read file after qfs reload: %s",
+			err)
+		test.assert(bytes.Equal(data, fileRestored),
+			"File contents not completely synced / restored %d %d",
+			len(data), len(fileRestored))
+	})
+}
+
+func TestSyncToDatastore(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+
+		// Make an instance of QuantumFs and put things there
+		test.startQuantumFs(config)
+		workspace := test.newWorkspace()
+
+		// Generate some deterministic, pseudorandom data for a folder
+		// structure, treating each number as a command. Ensure genData
+		// generates a long enough string of natural numbers to ensure at
+		// least a few sync commands occur.
+		data := genData(50)
+		folderStack := make([]string, 0)
+		for i := 0; i < len(data); i++ {
+			// and occasionally force a sync
+			if data[i] == '0' {
+				test.syncAllWorkspaces()
+			}
+
+			if data[i] < '3' {
+				folderStack = append(folderStack, "/folder")
+				folderStr := strings.Join(folderStack, "")
+				os.MkdirAll(workspace+folderStr, 0777)
+			} else if data[i] < '5' && len(folderStack) > 0 {
+				folderStack = folderStack[:len(folderStack)-1]
+			} else {
+				folderStr := strings.Join(folderStack, "")
+				ioutil.WriteFile(workspace+folderStr+"/file"+
+					strconv.Itoa(i), []byte(data), os.ModePerm)
+			}
+		}
+
+		// Sync all of the data we've written
+		test.syncAllWorkspaces()
+
+		// Now end quantumfs A, and start B with the same datastore so we
+		// can verify that the data was preserved via the datastore
+		test.api.Close()
+		err := test.qfs.server.Unmount()
+		test.assert(err == nil, "Failed to unmount during test")
+
+		test.startQuantumFs(config)
+
+		// Iterate in the exact same way, but this time verifying instead of
+		// creating the data
+		folderStack = make([]string, 0)
+		for i := 0; i < len(data); i++ {
+			if data[i] < '3' {
+				folderStack = append(folderStack, "/folder")
+				folderStr := strings.Join(folderStack, "")
+
+				_, err := os.Stat(workspace + folderStr)
+				test.assert(err == nil, "Folder lost (%s): %v",
+					workspace+folderStr, err)
+			} else if data[i] < '5' && len(folderStack) > 0 {
+				folderStack = folderStack[:len(folderStack)-1]
+			} else {
+				folderStr := strings.Join(folderStack, "")
+				fileName := workspace + folderStr + "/file" +
+					strconv.Itoa(i)
+
+				fileData, err := ioutil.ReadFile(fileName)
+
+				test.assert(err == nil, "File lost (%s): %s",
+					fileName, err)
+				test.assert(bytes.Equal(fileData, data),
+					"File data doesn't match in %s", fileName)
+			}
+		}
+	})
 }
 
 // Put in place a proxy dataStore which counts the stores we make, then create a few

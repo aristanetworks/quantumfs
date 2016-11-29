@@ -39,13 +39,13 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 func newWorkspaceRoot(c *ctx, parentName string, name string,
 	parent Inode, inodeNum InodeId) Inode {
 
-	c.vlog("WorkspaceRoot::newWorkspaceRoot Enter")
-	defer c.vlog("WorkspaceRoot::newWorkspaceRoot Exit")
+	defer c.funcIn("WorkspaceRoot::newWorkspaceRoot").out()
 
 	var wsr WorkspaceRoot
 
 	rootId, err := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	c.vlog("Workspace Loading %s/%s %s", parentName, name, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -67,9 +67,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 // Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	if !wsr.setDirty(true) {
-		c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
-	}
+	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) {
@@ -103,7 +101,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			rootId.String())
 		wsr.rootId = rootId
 	}
-	c.qfs.deactivateWorkspace(c, wsr.namespace+"/"+wsr.workspace)
+	c.qfs.deactivateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
