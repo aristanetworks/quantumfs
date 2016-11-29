@@ -60,6 +60,8 @@ func main() {
 		clearAccessed()
 	case "insertInode":
 		insertInode()
+	case "sync":
+		sync()
 	}
 }
 
@@ -158,4 +160,11 @@ func insertInode() {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
+}
+
+func sync() {
+	api := quantumfs.NewApi()
+
+	api.SyncAll()
+	fmt.Println("Synced.")
 }

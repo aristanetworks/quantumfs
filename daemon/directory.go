@@ -357,7 +357,7 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 
 // Must hold the dir.childRecordsLock
 func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("Directory::publish").out()
+	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
@@ -1109,7 +1109,8 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.FuncIn("Directory::syncChild", "%s", newKey.String()).out()
+	defer c.FuncIn("Directory::syncChild", "(%d %d) %s", dir.inodeNum(),
+		inodeNum, newKey.String()).out()
 
 	ok, key := func() (bool, quantumfs.ObjectKey) {
 		defer dir.Lock().Unlock()
