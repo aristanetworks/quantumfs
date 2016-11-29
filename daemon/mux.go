@@ -1152,7 +1152,7 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 	out.Bavail = out.Bfree
 	out.Files = 0
 	out.Ffree = math.MaxUint64
-	out.Bsize = qfsBlockSize
+	out.Bsize = uint32(qfsBlockSize)
 	out.NameLen = uint32(quantumfs.MaxFilenameLength)
 	out.Frsize = 0
 
