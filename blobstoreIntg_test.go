@@ -8,10 +8,13 @@
 package cql
 
 import (
+	"context"
+	"strconv"
 	"testing"
 
 	"github.com/aristanetworks/ether"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/sync/errgroup"
 )
 
 func checkSetupIntg(suite *BlobStoreIntgTestSuite) {
@@ -51,6 +54,32 @@ func (suite *BlobStoreIntgTestSuite) TestInsert() {
 	err := suite.bls.Insert(testKey, []byte(testValue), nil)
 	suite.Require().Equal(ether.ErrOk, err.ErrorCode,
 		"Insert returned an error:: "+err.Error())
+}
+
+func (suite *BlobStoreIntgTestSuite) TestInsertParallel() {
+
+	ctx := context.Background()
+	Wg, _ := errgroup.WithContext(ctx)
+
+	for count := 0; count < 2; count++ {
+		countl := count
+		Wg.Go(func() error {
+
+			err := suite.bls.Insert(testKey+strconv.Itoa(countl), []byte(testValue), nil)
+			return &err
+		})
+	}
+	err := Wg.Wait()
+	verr, ok := err.(*ether.ErrorResponse)
+	suite.Require().Equal(true, ok, "Insert returned wrong type of error")
+	suite.Require().Equal(ether.ErrOk, verr.ErrorCode, "Insert returned an error::  "+err.Error())
+
+	// Check
+	for count := 0; count < 2; count++ {
+		value, _, err := suite.bls.Get(testKey + strconv.Itoa(count))
+		suite.Require().Equal(ether.ErrOk, err.ErrorCode, "Get returned an error::  "+err.Error())
+		suite.Require().Equal(testValue, string(value), "Get returned in correct value")
+	}
 }
 
 func (suite *BlobStoreIntgTestSuite) TestGet() {
