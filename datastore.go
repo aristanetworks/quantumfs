@@ -216,12 +216,12 @@ func (dir *DirectoryEntry) SetNumEntries(n int) {
 	dir.dir.SetNumEntries(uint32(n))
 }
 
-func (dir *DirectoryEntry) Entry(i int) DirectoryRecord {
+func (dir *DirectoryEntry) Entry(i int) *DirectoryRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
 }
 
-func (dir *DirectoryEntry) SetEntry(i int, record *DirectoryRecord) {
-	dir.dir.Entries().Set(i, record.record)
+func (dir *DirectoryEntry) SetEntry(i int, record encoding.DirectoryRecord) {
+	dir.dir.Entries().Set(i, record)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
@@ -492,11 +492,15 @@ type DirectoryRecord struct {
 	record encoding.DirectoryRecord
 }
 
-func overlayDirectoryRecord(r encoding.DirectoryRecord) DirectoryRecord {
+func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
 	record := DirectoryRecord{
 		record: r,
 	}
-	return record
+	return &record
+}
+
+func (record *DirectoryRecord) Record() encoding.DirectoryRecord {
+	return record.record
 }
 
 func (record *DirectoryRecord) Filename() string {
