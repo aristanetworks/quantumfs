@@ -168,9 +168,11 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 	// If this is a file we need to reparent it to itself
 	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-
+		dir.childRecordLock.Lock()
 		record := dir.childrenRecords[inodeNum]
+		delete(dir.childrenRecords, inodeNum)
+		dir.childRecordLock.lock.Unlock()
+
 		if record.Type() == quantumfs.ObjectTypeSmallFile ||
 			record.Type() == quantumfs.ObjectTypeMediumFile ||
 			record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -185,7 +187,6 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 			}
 		}
 
-		delete(dir.childrenRecords, inodeNum)
 	}()
 	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	delete(dir.dirtyChildren_, inodeNum)
