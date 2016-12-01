@@ -168,10 +168,12 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 	// If this is a file we need to reparent it to itself
 	func() {
-		dir.childRecordLock.Lock()
-		record := dir.childrenRecords[inodeNum]
-		delete(dir.childrenRecords, inodeNum)
-		dir.childRecordLock.lock.Unlock()
+		record := func() *quantumfs.DirectoryRecord {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.childrenRecords[inodeNum]
+			delete(dir.childrenRecords, inodeNum)
+			return record
+		}()
 
 		if record.Type() == quantumfs.ObjectTypeSmallFile ||
 			record.Type() == quantumfs.ObjectTypeMediumFile ||
