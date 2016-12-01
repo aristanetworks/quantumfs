@@ -220,8 +220,8 @@ func (dir *DirectoryEntry) Entry(i int) *DirectoryRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
 }
 
-func (dir *DirectoryEntry) SetEntry(i int, record encoding.DirectoryRecord) {
-	dir.dir.Entries().Set(i, record)
+func (dir *DirectoryEntry) SetEntry(i int, record *DirectoryRecord) {
+	dir.dir.Entries().Set(i, record.record)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
@@ -410,6 +410,103 @@ func OverlayWorkspaceRoot(ewsr encoding.WorkspaceRoot) WorkspaceRoot {
 	return wsr
 }
 
+func NewHardlinkRecord() *HardlinkRecord {
+	segment := capn.NewBuffer(nil)
+	record := HardlinkRecord{
+		record: encoding.NewRootHardlinkRecord(segment),
+	}
+
+	return &record
+}
+
+type HardlinkRecord struct {
+	record encoding.HardlinkRecord
+}
+
+func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
+	record := HardlinkRecord{
+		record: r,
+	}
+	return &record
+}
+
+func (r *HardlinkRecord) hardlinkID() uint64 {
+	return r.record.HardlinkID()
+}
+
+func (r *HardlinkRecord) SetHardlinkID(v uint64) {
+	r.record.SetHardlinkID(v)
+}
+
+func (r *HardlinkRecord) Record() *DirectoryRecord {
+	return overlayDirectoryRecord(r.record.Record())
+}
+
+func (r *HardlinkRecord) SetRecord(v *DirectoryRecord) {
+	r.record.SetRecord(v.record)
+}
+
+type HardlinkEntry struct {
+	entry	encoding.HardlinkEntry
+}
+
+func NewHardlinkEntry() *HardlinkEntry {
+	segment := capn.NewBuffer(nil)
+
+	dirEntry := HardlinkEntry{
+		entry: encoding.NewRootHardlinkEntry(segment),
+	}
+	dirEntry.entry.SetNumEntries(0)
+
+	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords)
+	dirEntry.entry.SetEntries(recordList)
+
+	return &dirEntry
+}
+
+func overlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
+	dir := HardlinkEntry{
+		entry: edir,
+	}
+	return dir
+}
+
+func (dir *HardlinkEntry) Bytes() []byte {
+	return dir.entry.Segment.Data
+}
+
+func (dir *HardlinkEntry) NumEntries() int {
+	return int(dir.entry.NumEntries())
+}
+
+func (dir *HardlinkEntry) SetNumEntries(n int) {
+	dir.entry.SetNumEntries(uint32(n))
+}
+
+func (dir *HardlinkEntry) Entry(i int) *HardlinkRecord {
+	return overlayHardlinkRecord(dir.entry.Entries().At(i))
+}
+
+func (dir *HardlinkEntry) SetEntry(i int, record *HardlinkRecord) {
+	dir.entry.Entries().Set(i, record.record)
+}
+
+func (dir *HardlinkEntry) Next() ObjectKey {
+	return overlayObjectKey(dir.entry.Next())
+}
+
+func (dir *HardlinkEntry) SetNext(key ObjectKey) {
+	dir.entry.SetNext(key.key)
+}
+
+func (wsr *WorkspaceRoot) HardlinkEntry() HardlinkEntry {
+	return overlayHardlinkEntry(wsr.wsr.HardlinkEntry())
+}
+
+func (wsr *WorkspaceRoot) SetHardlinkEntry(v *HardlinkEntry) {
+	wsr.wsr.SetHardlinkEntry(v.entry)
+}
+
 func (wsr *WorkspaceRoot) Bytes() []byte {
 	return wsr.wsr.Segment.Data
 }
@@ -499,8 +596,8 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
 	return &record
 }
 
-func (record *DirectoryRecord) Record() encoding.DirectoryRecord {
-	return record.record
+func (record *DirectoryRecord) Record() *DirectoryRecord {
+	return overlayDirectoryRecord(record.record)
 }
 
 func (record *DirectoryRecord) Filename() string {
