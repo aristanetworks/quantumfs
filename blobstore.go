@@ -37,13 +37,21 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 	return cbs, nil
 }
 
+//NOTE: The Insert method has an semaphore limiting the number of
+// concurrent Inserts to 100. This limits the number of concurrent
+// insert queries to scyllaDB which is currently causing timeouts.
+// This workaround should be removed when get a fix from ScyllaDB.
+// The number 100, has been emperically determined.
 func (b *cqlBlobStore) Insert(key string, value []byte,
 	metadata map[string]string) error {
 
 	// Session.Query() does not return error
 	query := b.store.session.Query(`INSERT into blobStore (key, value) VALUES (?, ?)`, key, value)
-	err := query.Exec()
 
+	b.store.sem.P()
+	defer b.store.sem.V()
+
+	err := query.Exec()
 	if err != nil {
 		return blobstore.NewError(blobstore.ErrOperationFailed, "error in Insert %s", err.Error())
 	}

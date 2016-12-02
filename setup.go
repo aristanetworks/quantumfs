@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/aristanetworks/ether/utils"
 )
 
 // Config struct holds the info needed to connect to a cql cluster
@@ -23,6 +25,7 @@ type cqlStoreGlobal struct {
 	resetOnce sync.Once
 	cluster   Cluster
 	session   Session
+	sem       utils.Semaphore
 }
 
 var globalCqlStore cqlStoreGlobal
@@ -31,6 +34,7 @@ type cqlStore struct {
 	config  Config
 	cluster Cluster
 	session Session
+	sem     *utils.Semaphore
 }
 
 // WriteCqlConfig converts the Config struct to a JSON file
@@ -87,12 +91,14 @@ func initCqlStore(cluster Cluster, mocking bool) (cqlStore, error) {
 			return
 		}
 		globalCqlStore.resetOnce = sync.Once{}
+		globalCqlStore.sem = make(utils.Semaphore, 100)
 	})
 
 	var cStore cqlStore
 	cStore.config = globalCqlStore.config
 	cStore.cluster = globalCqlStore.cluster
 	cStore.session = globalCqlStore.session
+	cStore.sem = &globalCqlStore.sem
 
 	return cStore, err
 }
@@ -108,6 +114,7 @@ func resetCqlStore() {
 		globalCqlStore.config = Config{}
 		globalCqlStore.cluster = nil
 		globalCqlStore.session = nil
+		globalCqlStore.sem = nil
 		globalCqlStore.initOnce = sync.Once{}
 	})
 }

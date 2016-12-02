@@ -145,7 +145,7 @@ func (i *RealIter) WillSwitchPage() bool {
 
 func getRealClusterConfig(ccr *RealCluster) {
 
-	ccr.cluster.Keyspace = "qfs"
+	ccr.cluster.Keyspace = "ether"
 	ccr.cluster.ProtoVersion = 3
 	ccr.cluster.Consistency = gocql.Quorum
 	ccr.cluster.RetryPolicy =
