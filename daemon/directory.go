@@ -64,14 +64,8 @@ type Directory struct {
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId    quantumfs.ObjectKey
-	children       map[string]InodeId
-	dirtyChildren_ map[InodeId]Inode // set of children which are currently dirty
 
-	// These fields are protected by childRecordLock. This includes all the
-	// entries within childrenRecords, which must be accessed only under this
-	// lock.
-	childRecordLock DeferableMutex
-	childrenRecords map[InodeId]DirectoryRecordIf
+	children	*ChildMap
 }
 
 // The size of the ObjectKey: 21 + 1 + 8
@@ -93,7 +87,6 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
-	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 	dir.baseLayerId = baseLayerId
 
 	uninstantiated := make([]InodeId, 0)
@@ -109,11 +102,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 		baseLayer := buffer.AsDirectoryEntry()
 
 		if dir.children == nil {
-			dir.children = make(map[string]InodeId,
-				baseLayer.NumEntries())
-			dir.childrenRecords = make(
-				map[InodeId]DirectoryRecordIf,
-				baseLayer.NumEntries())
+			dir.children = newChildMap(baseLayer.NumEntries())
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
