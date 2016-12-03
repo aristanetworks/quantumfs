@@ -142,11 +142,6 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
 				"use forgotten directory as parent")
 		}
-
-		ids, exists := test.qfs.uninstantiatedChildren[dirInodeNum]
-		test.assert(exists, "Directory has no uninstantiated children list")
-		test.assert(len(ids) == 0,
-			"Directory has uninstantiate children: %v", ids)
 	})
 }
 
