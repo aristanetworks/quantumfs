@@ -231,3 +231,15 @@ func TestApiInsertInode(t *testing.T) {
 			expectedMode, stat.Mode, stat.Size)
 	})
 }
+
+func TestApiNoRequestRead(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api, err := os.Open(test.absPath(quantumfs.ApiPath))
+		test.assert(err == nil, "Error opening api file: %v", err)
+		defer api.Close()
+
+		buf := make([]byte, 0, 256)
+		n, err := api.Read(buf)
+		test.assert(n == 0, "Wrong number of bytes read: %d", n)
+	})
+}
