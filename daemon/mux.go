@@ -292,8 +292,9 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
 	parent InodeId) {
 
 	for _, inodeNum := range uninstantiated {
-		c.vlog("Adding uninstantiated %v", inodeNum)
 		qfs.uninstantiatedInodes[inodeNum] = parent
+		c.vlog("Adding uninstantiated %v (%d)", inodeNum,
+			len(qfs.uninstantiatedInodes))
 	}
 }
 
@@ -304,6 +305,8 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 
 	for _, inodeNum := range uninstantiated {
 		delete(qfs.uninstantiatedInodes, inodeNum)
+		c.vlog("Removing uninstantiated %d (%d)", inodeNum, 
+			len(qfs.uninstantiatedInodes))
 	}
 }
 
