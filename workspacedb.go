@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+
 	"github.com/aristanetworks/quantumfs"
 )
 
@@ -70,7 +71,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, namespace string,
 	workspace string) quantumfs.ObjectKey {
 	// TBD: This API should have a way to pass back invalid key or error
-	empty := make([]byte, 0)
+	var empty []byte
 	return quantumfs.NewObjectKeyFromBytes(empty)
 }
 
@@ -78,6 +79,6 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
 	workspace string, currentRootID quantumfs.ObjectKey,
 	newRootID quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	empty := make([]byte, 0)
+	var empty []byte
 	return quantumfs.NewObjectKeyFromBytes(empty), nil
 }
