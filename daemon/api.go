@@ -9,6 +9,7 @@ import "errors"
 import "fmt"
 import "strings"
 import "sync"
+import "sync/atomic"
 import "syscall"
 import "time"
 
@@ -273,7 +274,8 @@ func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 // synchronized with other api handles.
 type ApiHandle struct {
 	FileHandleCommon
-	responses chan fuse.ReadResult
+	outstandingRequests int32
+	responses           chan fuse.ReadResult
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -287,6 +289,12 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
+
+	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
+		c.vlog("No outstanding requests, returning early")
+		return nil, fuse.OK
+	}
+
 	var blocking chan struct{}
 	if !nonblocking {
 		blocking = make(chan struct{})
@@ -294,6 +302,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	select {
 	case response := <-api.responses:
+		atomic.AddInt32(&api.outstandingRequests, -1)
 		debug := make([]byte, response.Size())
 		bytes, _ := response.Bytes(debug)
 		c.vlog("API Response %s", string(bytes))
@@ -392,6 +401,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	}
 
 	c.vlog("done writing to file")
+	atomic.AddInt32(&api.outstandingRequests, 1)
 	return size, fuse.OK
 }
 
