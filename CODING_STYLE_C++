@@ -1,0 +1,18 @@
+Coding Style
+############
+
+The coding style used in QuantumFS with C++ is generally defined using the Google C++
+Style Guide[0] with the following modifications in order to be more similar to the
+golang code:
+
+1. Standard indentation is done using a single hard tab represented as eight spaces,
+   not two spaces. Member access specifiers should be indented with four spaces.
+2. The maximum recommended line length is 85 characters, not 80.
+3. Braces are mandatory for all loops and 'if' statements.
+4. Private members should not be named with a trailing underscore ("_"), as this
+   conflicts with the QuantumFS golang convention that such functions have locking
+   constraints.
+5. All access to members of the current class must be via "this->".
+
+
+[0] https://google.github.io/styleguide/cppguide.html
