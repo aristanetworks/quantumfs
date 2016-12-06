@@ -77,6 +77,9 @@ func (suite *BlobStoreIntgTestSuite) TestInsertParallel() {
 
 func (suite *BlobStoreIntgTestSuite) TestGet() {
 
+	err := suite.bls.Insert(testKey, []byte(testValue), nil)
+	suite.Require().NoError(err, "Insert returned an error")
+
 	value, metadata, err := suite.bls.Get(testKey)
 	suite.Require().NoError(err, "Get returned an error")
 	suite.Require().Equal(testValue, string(value), "Get returned incorrect value")
