@@ -532,8 +532,18 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
 			parent := inode.parent()
 			parent.syncChild(&qfs.c, inode.inodeNum(), key)
-			qfs.addUninstantiated(&qfs.c, []InodeId{inode.inodeNum()},
-				parent.inodeNum())
+
+			parentInode := qfs.inodeNoInstantiate(&qfs.c,
+				InodeId(parent.inodeNum()))
+			if parentInode != nil {
+				// If the parent is loaded, then we need to mark
+				// ourselves as uninstantiated. If it's unloaded,
+				// then we should just be forgotten
+				qfs.addUninstantiated(&qfs.c,
+					[]InodeId{inode.inodeNum()},
+					parent.inodeNum())
+			}
+
 		}
 
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)

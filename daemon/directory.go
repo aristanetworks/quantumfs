@@ -1455,6 +1455,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.childrenRecords[inodeNum]
+	c.vlog("Instantiate %s %d", entry.Filename(), inodeNum)
 
 	var constructor InodeConstructor
 	switch entry.Type() {
