@@ -74,7 +74,7 @@ func assert(condition bool, msg string) {
 }
 
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	entry *quantumfs.DirectoryRecord, updateMtime bool) {
+	entry DirectoryRecordIf, updateMtime bool) {
 
 	// Update the type if needed
 	if newType != nil {
@@ -146,7 +146,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 }
 
 func cloneDirectoryRecord(
-	orig *quantumfs.DirectoryRecord) *quantumfs.DirectoryRecord {
+	orig DirectoryRecordIf) DirectoryRecordIf {
 
 	newEntry := quantumfs.NewDirectoryRecord()
 	newEntry.SetFilename(orig.Filename())
