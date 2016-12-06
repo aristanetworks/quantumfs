@@ -20,15 +20,15 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
-		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
-		config:                 config,
-		inodes:                 make(map[InodeId]Inode),
-		fileHandles:            make(map[FileHandleId]FileHandle),
-		inodeNum:               quantumfs.InodeIdReservedEnd,
-		fileHandleNum:          quantumfs.InodeIdReservedEnd,
-		activeWorkspaces:       make(map[string]*WorkspaceRoot),
-		uninstantiatedInodes:   make(map[InodeId]InodeId),
-		lookupCounts:           make(map[InodeId]uint64),
+		RawFileSystem:        fuse.NewDefaultRawFileSystem(),
+		config:               config,
+		inodes:               make(map[InodeId]Inode),
+		fileHandles:          make(map[FileHandleId]FileHandle),
+		inodeNum:             quantumfs.InodeIdReservedEnd,
+		fileHandleNum:        quantumfs.InodeIdReservedEnd,
+		activeWorkspaces:     make(map[string]*WorkspaceRoot),
+		uninstantiatedInodes: make(map[InodeId]InodeId),
+		lookupCounts:         make(map[InodeId]uint64),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -305,7 +305,7 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 
 	for _, inodeNum := range uninstantiated {
 		delete(qfs.uninstantiatedInodes, inodeNum)
-		c.vlog("Removing uninstantiated %d (%d)", inodeNum, 
+		c.vlog("Removing uninstantiated %d (%d)", inodeNum,
 			len(qfs.uninstantiatedInodes))
 	}
 }
@@ -552,7 +552,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 			return dir.childInodes()
 		}
 		return nil
-	} ()
+	}()
 
 	if toRemove != nil {
 		// We need to remove all uninstantiated children.
