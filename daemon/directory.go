@@ -192,9 +192,13 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 	// If this is a file we need to reparent it to itself
 	func() {
-		defer dir.childRecordLock.Lock().Unlock()
+		record := func() *quantumfs.DirectoryRecord {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.childrenRecords[inodeNum]
+			delete(dir.childrenRecords, inodeNum)
+			return record
+		}()
 
-		record := dir.childrenRecords[inodeNum]
 		if record.Type() == quantumfs.ObjectTypeSmallFile ||
 			record.Type() == quantumfs.ObjectTypeMediumFile ||
 			record.Type() == quantumfs.ObjectTypeLargeFile ||
@@ -209,7 +213,6 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 			}
 		}
 
-		delete(dir.childrenRecords, inodeNum)
 	}()
 	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	delete(dir.dirtyChildren_, inodeNum)
@@ -702,6 +705,17 @@ func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
 
 	c.vlog("Unlink::checkPermission permission %o vs %o", permWX, permission)
 	return false
+}
+
+func (dir *Directory) childInodes() []InodeId {
+	defer dir.RLock().RUnlock()
+
+	rtn := make([]InodeId, len(dir.children))
+	for _, v := range dir.children {
+		rtn = append(rtn, v)
+	}
+
+	return rtn
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
@@ -1433,6 +1447,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.childrenRecords[inodeNum]
+	c.vlog("Instantiate %s %d", entry.Filename(), inodeNum)
 
 	var constructor InodeConstructor
 	switch entry.Type() {
