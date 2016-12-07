@@ -18,7 +18,6 @@ type workspaceDB struct {
 func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 
 	cfg, err := readCqlConfig(confName)
-	mocking := false
 	if err != nil {
 		fmt.Println("Error reading CQL config: ", err)
 		panic(err.Error())
@@ -26,7 +25,7 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 
 	cluster := NewRealCluster(cfg.Nodes...)
 	var store cqlStore
-	store, err = initCqlStore(cluster, mocking)
+	store, err = initCqlStore(cluster)
 	if err != nil {
 		panic(err)
 	}

@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-var mocking = true
-
 type BlobStoreUnitTestSuite struct {
 	suite.Suite
 	bls *cqlBlobStore
@@ -33,7 +31,7 @@ func (suite *BlobStoreUnitTestSuite) SetupTest() {
 	mocksession := new(MockSession)
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
-	store, err := initCqlStore(mockcc, mocking)
+	store, err := initCqlStore(mockcc)
 	suite.Require().NoError(err, "initCqlStore Failed: ", err)
 
 	suite.bls = &cqlBlobStore{
@@ -51,7 +49,7 @@ func (suite *BlobStoreUnitTestSuite) TestNewCqlStoreFailure() {
 	mocksession := new(MockSession)
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, errors.New("initFailed"))
-	_, err := initCqlStore(mockcc, mocking)
+	_, err := initCqlStore(mockcc)
 
 	suite.Require().Error(err, "initCqlStore should have Failed")
 }
@@ -109,8 +107,7 @@ func (suite *BlobStoreUnitTestSuite) TestGetNoErr() {
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	var valuef []byte
-	val := []interface{}{&valuef}
-	mockquery.On("Scan", val).Return(nil)
+	mockquery.On("Scan", &valuef).Return(nil)
 
 	_, metadata, err := suite.bls.Get(testKey)
 	suite.Require().NoError(err, "Get returned an error")
@@ -129,8 +126,7 @@ func (suite *BlobStoreUnitTestSuite) TestGetFailureNoKey() {
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	var valuef []byte
-	val := []interface{}{&valuef}
-	mockquery.On("Scan", val).Return(gocql.ErrNotFound)
+	mockquery.On("Scan", &valuef).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
 	value, metadata, err := suite.bls.Get(unknownKey)
@@ -154,8 +150,7 @@ func (suite *BlobStoreUnitTestSuite) TestGetFailureGeneric() {
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	var valuef []byte
-	val := []interface{}{&valuef}
-	mockquery.On("Scan", val).Return(gocql.ErrUnavailable)
+	mockquery.On("Scan", &valuef).Return(gocql.ErrUnavailable)
 
 	// Verify return value for a non existent key
 	value, metadata, err := suite.bls.Get(unknownKey)

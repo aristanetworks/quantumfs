@@ -115,7 +115,7 @@ func (_m *MockQuery) Iter() Iter {
 
 // Scan provides a mock function with given fields: dest
 func (_m *MockQuery) Scan(dest ...interface{}) error {
-	ret := _m.Called(dest)
+	ret := _m.Called(dest...)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(...interface{}) error); ok {

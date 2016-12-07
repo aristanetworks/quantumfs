@@ -17,8 +17,6 @@ type cqlBlobStore struct {
 // initCqlStore is directly used.
 func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 
-	mocking := false
-
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
 		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in reading cql config file %s", err.Error())
@@ -26,7 +24,7 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 
 	cluster := NewRealCluster(cfg.Nodes...)
 	var store cqlStore
-	store, err = initCqlStore(cluster, mocking)
+	store, err = initCqlStore(cluster)
 	if err != nil {
 		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in initializing cql store %s", err.Error())
 	}

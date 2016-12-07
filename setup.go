@@ -79,19 +79,19 @@ func readCqlConfig(fileName string) (*Config, error) {
 //      and session context design
 // TBD: Need more investigation to see which parts of the
 //      config can be dynamically updated
-func initCqlStore(cluster Cluster, mocking bool) (cqlStore, error) {
+func initCqlStore(cluster Cluster) (cqlStore, error) {
 
 	var err error
 	globalCqlStore.initOnce.Do(func() {
 
 		globalCqlStore.cluster = cluster
+		globalCqlStore.resetOnce = sync.Once{}
+		globalCqlStore.sem = make(utils.Semaphore, 100)
 		globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
 		if err != nil {
 			err = fmt.Errorf("error in initCqlStore: %v", err)
 			return
 		}
-		globalCqlStore.resetOnce = sync.Once{}
-		globalCqlStore.sem = make(utils.Semaphore, 100)
 	})
 
 	var cStore cqlStore
