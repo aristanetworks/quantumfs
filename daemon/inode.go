@@ -133,6 +133,10 @@ type Inode interface {
 	isWorkspaceRoot() bool
 }
 
+type HasChildren interface {
+	childInodes() []InodeId
+}
+
 type InodeCommon struct {
 	// These fields are constant once instantiated
 	self Inode // Leaf subclass instance
