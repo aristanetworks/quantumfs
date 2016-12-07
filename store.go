@@ -71,7 +71,6 @@ func initCqlStore(cluster Cluster) (cqlStore, error) {
 
 	var err error
 	globalCqlStore.initOnce.Do(func() {
-
 		globalCqlStore.cluster = cluster
 		globalCqlStore.resetOnce = sync.Once{}
 		globalCqlStore.sem = make(utils.Semaphore, 100)
