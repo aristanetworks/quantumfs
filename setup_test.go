@@ -14,103 +14,103 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type CqlStoreUnitTestSuite struct {
+type setupTests struct {
 	suite.Suite
-	s rand.Source
-	r *rand.Rand
+	src rand.Source
+	r   *rand.Rand
 }
 
-func (suite *CqlStoreUnitTestSuite) SetupSuite() {
-	suite.s = rand.NewSource(time.Now().UnixNano())
-	suite.r = rand.New(suite.s)
+func (s *setupTests) SetupSuite() {
+	s.src = rand.NewSource(time.Now().UnixNano())
+	s.r = rand.New(s.src)
 }
 
-func (suite *CqlStoreUnitTestSuite) SetupTest() {
+func (s *setupTests) SetupTest() {
 	//nop
 }
 
-func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePath() {
+func (s *setupTests) TestInvalidConfigFilePath() {
 	var config Config
 
 	config.Nodes = []string{"node1", "node2"}
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
-	suite.Require().NoError(err, "Tempfile creation failed")
+	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
 	defer os.Remove(name)
 
 	err = writeCqlConfig(name, &config)
-	suite.Require().NoError(err, "CQL config file write failed")
+	s.Require().NoError(err, "CQL config file write failed")
 
 	// Garble the config file name
-	name += strconv.Itoa(suite.r.Int())
+	name += strconv.Itoa(s.r.Int())
 	bls, err := NewCqlBlobStore(name)
-	suite.Require().Error(err)
-	suite.Require().Equal(bls, nil, "bls should be nil but is not")
+	s.Require().Error(err)
+	s.Require().Equal(bls, nil, "bls should be nil but is not")
 }
 
-func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFilePerms() {
+func (s *setupTests) TestInvalidConfigFilePerms() {
 	var config Config
 
 	config.Nodes = []string{"node1", "node2"}
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
-	suite.Require().NoError(err, "Tempfile creation failed")
+	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
 	defer os.Remove(name)
 
 	err = writeCqlConfig(name, &config)
-	suite.Require().NoError(err, "CQL config file write failed")
+	s.Require().NoError(err, "CQL config file write failed")
 
 	// Modify config file Perms
 	err = os.Chmod(name, 0000)
-	suite.Require().NoError(err, "Error in changing file perms")
+	s.Require().NoError(err, "Error in changing file perms")
 	defer os.Chmod(name, 0666) //-rw-rw-rw-
 
 	bls, err := NewCqlBlobStore(name)
-	suite.Require().Error(err)
-	suite.Require().Equal(bls, nil, "bls should be nil but is not")
+	s.Require().Error(err)
+	s.Require().Equal(bls, nil, "bls should be nil but is not")
 }
 
-func (suite *CqlStoreUnitTestSuite) TestInvalidConfigFormat() {
+func (s *setupTests) TestInvalidConfigFormat() {
 	var config Config
 
 	config.Nodes = []string{"node1", "node2"}
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
-	suite.Require().NoError(err, "Tempfile creation failed")
+	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
 	defer os.Remove(name)
 
 	err = writeCqlConfig(name, &config)
-	suite.Require().NoError(err, "CQL config file write failed")
+	s.Require().NoError(err, "CQL config file write failed")
 
 	// Write some small garbage to the file
 	file, err = os.OpenFile(name, os.O_RDWR, 0777)
-	suite.Require().NoError(err, "CQL config file open failed")
+	s.Require().NoError(err, "CQL config file open failed")
 
 	var length int
 	garbage := []byte("boo")
 	length, err = file.Write(garbage)
-	suite.Require().NoError(err, "CQL config file write failed")
-	suite.Require().Equal(length, len(garbage), "CQL config file write incorrect")
+	s.Require().NoError(err, "CQL config file write failed")
+	s.Require().Equal(length, len(garbage), "CQL config file write incorrect")
 
 	bls, err := NewCqlBlobStore(name)
-	suite.Require().Error(err)
-	suite.Require().Equal(bls, nil, "bls should be nil but is not")
+	s.Require().Error(err)
+	s.Require().Equal(bls, nil, "bls should be nil but is not")
 }
 
-func TestCqlStoreUnitTestSuite(t *testing.T) {
-	suite.Run(t, new(CqlStoreUnitTestSuite))
+func TestSetup(t *testing.T) {
+	suite.Run(t, &setupTests{})
 }
 
-func (suite *CqlStoreUnitTestSuite) TearDownTest() {
+func (s *setupTests) TearDownTest() {
 	resetCqlStore()
 }
 
-func (suite *CqlStoreUnitTestSuite) TearDownSuite() {
+func (s *setupTests) TearDownSuite() {
 	//nop
 }

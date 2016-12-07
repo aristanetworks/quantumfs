@@ -10,7 +10,8 @@ import (
 )
 
 type workspaceDB struct {
-	store *cqlStore
+	store    *cqlStore
+	keyspace string
 }
 
 // NewWorkspaceDB returns a new quantumfs.WorkspaceDB
@@ -31,7 +32,8 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 	}
 
 	wsdb := &workspaceDB{
-		store: &store,
+		store:    &store,
+		keyspace: cfg.KeySpace,
 	}
 
 	return wsdb

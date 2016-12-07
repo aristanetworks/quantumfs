@@ -15,8 +15,9 @@ import (
 // Config struct holds the info needed to connect to a cql cluster
 type Config struct {
 	Nodes      []string `json:"nodes"`
-	NumConns   int      `json:"numConnections"`
-	NumRetries int      `json:"numRetries"`
+	NumConns   int      `json:"numconnections"`
+	NumRetries int      `json:"numretries"`
+	KeySpace   string   `json:"keyspace"`
 }
 
 type cqlStoreGlobal struct {

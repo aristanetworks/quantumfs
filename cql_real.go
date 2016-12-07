@@ -27,7 +27,7 @@ func NewRealCluster(hosts ...string) Cluster {
 // and returns a session object
 func (c *RealCluster) CreateSession() (Session, error) {
 	s, err := c.cluster.CreateSession()
-	if s == nil {
+	if err != nil {
 		return nil, err
 	}
 	ss := &RealSession{
@@ -54,6 +54,7 @@ func (s *RealSession) Closed() bool {
 // Query returns a Query object for the given <stmt, values>
 func (s *RealSession) Query(stmt string, values ...interface{}) Query {
 	q := s.session.Query(stmt, values...)
+	// NOTE: Since s.session.Query() returns a struct, it's ok to compare to nil.
 	if q == nil {
 		return nil
 	}
@@ -88,6 +89,7 @@ func (q *RealQuery) String() string {
 // Iter returns iter for RealQuery
 func (q *RealQuery) Iter() Iter {
 	i := q.query.Iter()
+	// NOTE: Since q.query.Iter() returns a struct, it's ok to compare to nil.
 	if i == nil {
 		return nil
 	}
@@ -145,11 +147,13 @@ func (i *RealIter) WillSwitchPage() bool {
 
 func getRealClusterConfig(ccr *RealCluster) {
 
-	ccr.cluster.Keyspace = "ether"
 	ccr.cluster.ProtoVersion = 3
+
+	ccr.cluster.Keyspace = globalCqlStore.config.KeySpace
 	ccr.cluster.Consistency = gocql.Quorum
 	ccr.cluster.RetryPolicy =
 		&gocql.SimpleRetryPolicy{NumRetries: globalCqlStore.config.NumRetries}
 	ccr.cluster.PoolConfig.HostSelectionPolicy =
 		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+	ccr.cluster.Events.DisableSchemaEvents = true
 }

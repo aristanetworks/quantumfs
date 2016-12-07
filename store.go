@@ -4,12 +4,15 @@
 package cql
 
 import (
+	"fmt"
+
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/gocql/gocql"
 )
 
 type cqlBlobStore struct {
-	store *cqlStore
+	store    *cqlStore
+	keyspace string
 }
 
 // NewCqlBlobStore initializes a blobstore.BlobStore to be used with a cql cluster
@@ -19,23 +22,26 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in reading cql config file %s", err.Error())
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+			"error in reading cql config file %s", err.Error())
 	}
 
 	cluster := NewRealCluster(cfg.Nodes...)
 	var store cqlStore
 	store, err = initCqlStore(cluster)
 	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in initializing cql store %s", err.Error())
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+			"error in initializing cql store %s", err.Error())
 	}
 
 	cbs := &cqlBlobStore{
-		store: &store,
+		store:    &store,
+		keyspace: cfg.KeySpace,
 	}
 	return cbs, nil
 }
 
-//NOTE: The Insert method has an semaphore limiting the number of
+// Insert method has an semaphore limiting the number of
 // concurrent Inserts to 100. This limits the number of concurrent
 // insert queries to scyllaDB which is currently causing timeouts.
 // This workaround should be removed when get a fix from ScyllaDB.
@@ -43,8 +49,8 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 func (b *cqlBlobStore) Insert(key string, value []byte,
 	metadata map[string]string) error {
 
-	// Session.Query() does not return error
-	query := b.store.session.Query(`INSERT into blobStore (key, value) VALUES (?, ?)`, key, value)
+	queryStr := fmt.Sprintf("INSERT into %s.blobStore (key, value) VALUES (?, ?)", b.keyspace)
+	query := b.store.session.Query(queryStr, key, value)
 
 	b.store.sem.P()
 	defer b.store.sem.V()
@@ -56,30 +62,37 @@ func (b *cqlBlobStore) Insert(key string, value []byte,
 	return nil
 }
 
+// Get is the cql implementation of blobstore.Get()
 func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
 
 	// Session.Query() does not return error
 	var value []byte
-	query := b.store.session.Query(`SELECT value FROM blobStore WHERE key = ?`, key)
+	queryStr := fmt.Sprintf("SELECT value FROM %s.blobStore WHERE key = ?", b.keyspace)
+	query := b.store.session.Query(queryStr, key)
 	err := query.Scan(&value)
 
 	if err != nil {
 		if err == gocql.ErrNotFound {
-			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get %s", err.Error())
+			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get %s",
+				err.Error())
 		}
-		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get %s", err.Error())
+		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get %s",
+			err.Error())
 	}
 	return value, nil, nil
 }
 
+// Delete is the cql implementation of blobstore.Delete()
 func (b *cqlBlobStore) Delete(key string) error {
 	panic("Delete not implemented")
 }
 
+// Metadata is the cql implementation of blobstore.Metadata()
 func (b *cqlBlobStore) Metadata(key string) (map[string]string, error) {
 	panic("Metadata not implemented")
 }
 
+// Update is the cql implementation of blobstore.Update()
 func (b *cqlBlobStore) Update(key string, metadata map[string]string) error {
 	panic("Update not implemented")
 }
