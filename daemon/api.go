@@ -295,9 +295,9 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return nil, fuse.OK
 	}
 
-	var blocking chan struct{}
-	if !nonblocking {
-		blocking = make(chan struct{})
+	blocking := make(chan struct{})
+	if nonblocking {
+		close(blocking)
 	}
 
 	select {
