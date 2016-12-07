@@ -3,6 +3,8 @@
 
 package cql
 
+import "os"
+
 const testKey = "Hello"
 const testValue = "W0rld"
 const unknownKey = "H3llo"
@@ -12,3 +14,10 @@ const testValue2 = "Vad3r"
 var testKey2Metadata = map[string]string{}
 
 var hwConfFile = "../clusterConfigs/hwConfig"
+
+func init() {
+	config := os.Getenv("ETHER_CQL_CONFIG")
+	if len(config) > 0 {
+		hwConfFile = config
+	}
+}
