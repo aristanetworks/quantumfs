@@ -513,6 +513,17 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
 		}
 
+		dst = rootdir + "/tmp"
+		if err := os.MkdirAll(dst, os.ModeSticky|0777); err != nil {
+
+			return fmt.Errorf("Mounting /tmp as tmpfs error: %s",
+				err.Error())
+		}
+		if err := syscall.Mount("tmpfs", dst, "tmpfs", 0, ""); err != nil {
+			return fmt.Errorf("Mounting tmp as tmpfs error: %s",
+				err.Error())
+		}
+
 		if err := setupBindMounts(rootdir); err != nil {
 			return err
 		}
