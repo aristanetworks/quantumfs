@@ -548,7 +548,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 
-		if dir, isDir := inode.(HasChildren); isDir {
+		if dir, isDir := inode.(inodeHolder); isDir {
 			return dir.childInodes()
 		}
 		return nil
