@@ -677,45 +677,55 @@ func (dir *Directory) getChildRecord(c *ctx,
 		errors.New("Inode given is not a child of this directory")
 }
 
-func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
-	gid uint32, fileOwner uint32, dirOwner uint32, dirGroup uint32) bool {
+func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
+	checkStickyBit bool) fuse.Status {
+
+	owner := c.fuseCtx.Owner
+	dirRecord, err := dir.parent().getChildRecord(c,
+		dir.InodeCommon.id)
+	if err != nil {
+		return fuse.ENOENT
+	}
+	dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
+	dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
+	permission := dirRecord.Permissions()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
-	if uid == 0 {
-		return true
+	if owner.Uid == 0 {
+		return fuse.OK
 	}
 
 	// Verify the permission of the directory in order to delete a child
 	// If the sticky bit of the directory is set, the action can only be
 	// performed by file's owner, directory's owner, or root user
-	if BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
-		uid != fileOwner && uid != dirOwner {
-		return false
+	if checkStickyBit && BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
+		owner.Uid != fileOwner && owner.Uid != dirOwner {
+		return fuse.EACCES
 	}
 
 	// Get whether current user is OWNER/GRP/OTHER
 	var permWX uint32
-	if uid == dirOwner {
+	if owner.Uid == dirOwner {
 		permWX = syscall.S_IWUSR | syscall.S_IXUSR
 		// Check the current directory having x and w permissions
 		if BitFlagsSet(uint(permission), uint(permWX)) {
-			return true
+			return fuse.OK
 		}
-	} else if gid == dirGroup {
+	} else if owner.Gid == dirGroup {
 		permWX = syscall.S_IWGRP | syscall.S_IXGRP
 		if BitFlagsSet(uint(permission), uint(permWX)) {
-			return true
+			return fuse.OK
 		}
 	} else { // all the other
 		permWX = syscall.S_IWOTH | syscall.S_IXOTH
 		if BitFlagsSet(uint(permission), uint(permWX)) {
-			return true
+			return fuse.OK
 		}
 	}
 
-	c.vlog("Unlink::checkPermission permission %o vs %o", permWX, permission)
-	return false
+	c.vlog("Directory::hasWritePermission %o vs %o", permWX, permission)
+	return fuse.EACCES
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
@@ -747,21 +757,15 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		// file daemon/workspaceroot.go. In this case, only no WorkspaceRoot
 		// needs a permission check.
 		if !dir.self.isWorkspaceRoot() {
-			owner := c.fuseCtx.Owner
-			dirRecord, err := dir.parent().getChildRecord(c,
-				dir.InodeCommon.id)
-			if err != nil {
-				return fuse.ENOENT
-			}
-			dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
-			dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
-			permission := dirRecord.Permissions()
-			fileOwner := quantumfs.SystemUid(record.Owner(), owner.Uid)
-
-			perm := dir.checkPermissions(c, permission, owner.Uid,
-				owner.Gid, fileOwner, dirOwner, dirGroup)
-			if !perm {
-				return fuse.EACCES
+			err := dir.hasWritePermission(c, fileOwner, true)
+			if err == fuse.OK {
+				// Success, do nothing
+			} else if err == fuse.ENOENT || err == fuse.EACCES {
+				return err
+			} else {
+				c.wlog("Unexpected error in Directory::Unlink %d",
+					err)
+				return err
 			}
 		}
 
