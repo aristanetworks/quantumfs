@@ -129,7 +129,9 @@ func updateChildren(c *ctx, parentName string, names []string,
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
-			if parentName == "_null" && name == "null" {
+			if parentName == quantumfs.NullNamespaceName &&
+				name == quantumfs.NullWorkspaceName {
+
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
 					parentName, name, parent, inodeId))
 			} else {
@@ -666,7 +668,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	if wsl.namespaceName == "_null" && wsl.workspacesById[inodeNum] == "null" {
+	if wsl.namespaceName == quantumfs.NullNamespaceName &&
+		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
+
 		return newNullWorkspaceRoot(c, wsl.namespaceName,
 			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
 	} else {
