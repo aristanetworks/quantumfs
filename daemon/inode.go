@@ -133,7 +133,7 @@ type Inode interface {
 	isWorkspaceRoot() bool
 }
 
-type HasChildren interface {
+type inodeHolder interface {
 	childInodes() []InodeId
 }
 
