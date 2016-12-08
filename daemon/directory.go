@@ -758,13 +758,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		// needs a permission check.
 		if !dir.self.isWorkspaceRoot() {
 			err := dir.hasWritePermission(c, fileOwner, true)
-			if err == fuse.OK {
-				// Success, do nothing
-			} else if err == fuse.ENOENT || err == fuse.EACCES {
-				return err
-			} else {
-				c.wlog("Unexpected error in Directory::Unlink %d",
-					err)
+			if err != fuse.OK {
 				return err
 			}
 		}
