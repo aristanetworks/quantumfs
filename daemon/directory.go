@@ -598,6 +598,11 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 			return fuse.Status(syscall.EEXIST)
 		}
 
+		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		if err != fuse.OK {
+			return err
+		}
+
 		c.vlog("Creating file: '%s'", name)
 
 		file = dir.create_(c, name, input.Mode, input.Umask, 0, newSmallFile,
@@ -645,6 +650,11 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 		if _, exists := dir.children[name]; exists {
 			return fuse.Status(syscall.EEXIST)
+		}
+
+		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		if err != fuse.OK {
+			return err
 		}
 
 		dir.create_(c, name, input.Mode, input.Umask, 0, newDirectory,
@@ -839,6 +849,11 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return fuse.Status(syscall.EEXIST)
 		}
 
+		result := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		if result != fuse.OK {
+			return result
+		}
+
 		buf := newBuffer(c, []byte(pointedTo), quantumfs.KeyTypeMetadata)
 		key, err := buf.Key(&c.Ctx)
 		if err != nil {
@@ -874,6 +889,11 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 
 		if _, exists := dir.children[name]; exists {
 			return fuse.Status(syscall.EEXIST)
+		}
+
+		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		if err != fuse.OK {
+			return err
 		}
 
 		c.dlog("Directory::Mknod Mode %x", input.Mode)
