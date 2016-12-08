@@ -680,10 +680,22 @@ func (dir *Directory) getChildRecord(c *ctx,
 func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	checkStickyBit bool) fuse.Status {
 
+	defer c.FuncIn("Directory::hasWritePermission", "checkSticky %d",
+		checkStickyBit).out()
+
+	// If the directory is a workspace root, it is always permitted to modify the
+	// children inodes because its permission is 777 (Hardcoded in
+	// daemon/workspaceroot.go).
+	if dir.self.isWorkspaceRoot() {
+		c.vlog("Is WorkspaceRoot: OK")
+		return fuse.OK
+	}
+
 	owner := c.fuseCtx.Owner
 	dirRecord, err := dir.parent().getChildRecord(c,
 		dir.InodeCommon.id)
 	if err != nil {
+		c.wlog("Failed to find directory record in parent")
 		return fuse.ENOENT
 	}
 	dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
@@ -693,6 +705,7 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
 	if owner.Uid == 0 {
+		c.vlog("User is root: OK")
 		return fuse.OK
 	}
 
@@ -701,6 +714,8 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	// performed by file's owner, directory's owner, or root user
 	if checkStickyBit && BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
 		owner.Uid != fileOwner && owner.Uid != dirOwner {
+
+		c.vlog("Sticky owners don't match: FAIL")
 		return fuse.EACCES
 	}
 
@@ -710,16 +725,19 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 		permWX = syscall.S_IWUSR | syscall.S_IXUSR
 		// Check the current directory having x and w permissions
 		if BitFlagsSet(uint(permission), uint(permWX)) {
+			c.vlog("Has owner write: OK")
 			return fuse.OK
 		}
 	} else if owner.Gid == dirGroup {
 		permWX = syscall.S_IWGRP | syscall.S_IXGRP
 		if BitFlagsSet(uint(permission), uint(permWX)) {
+			c.vlog("Has group write: OK")
 			return fuse.OK
 		}
 	} else { // all the other
 		permWX = syscall.S_IWOTH | syscall.S_IXOTH
 		if BitFlagsSet(uint(permission), uint(permWX)) {
+			c.vlog("Has other write: OK")
 			return fuse.OK
 		}
 	}
@@ -752,15 +770,9 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return fuse.Status(syscall.EISDIR)
 		}
 
-		// If the directory is a root, it is always permitted to unlink any
-		// inodes because of its permission 777, which is hardcoded in the
-		// file daemon/workspaceroot.go. In this case, only no WorkspaceRoot
-		// needs a permission check.
-		if !dir.self.isWorkspaceRoot() {
-			err := dir.hasWritePermission(c, fileOwner, true)
-			if err != fuse.OK {
-				return err
-			}
+		err := dir.hasWritePermission(c, fileOwner, true)
+		if err != fuse.OK {
+			return err
 		}
 
 		dir.delChild_(c, name)
