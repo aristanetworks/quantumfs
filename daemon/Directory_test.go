@@ -339,7 +339,7 @@ func TestUnlinkGroupPermission(t *testing.T) {
 		checkUnlink(test, testDir+"/"+"Grp-NoPerm",
 			syscall.EACCES, "", false)
 
-		// Have ownership of file or no owernship when sticky bit is set
+		// Have ownership of file or no ownership when sticky bit is set
 		checkUnlink(test, testDir+"/"+"Sticky-FileNoPerm",
 			syscall.EACCES, testDir, false)
 		checkUnlink(test, testDir+"/"+"Sticky-NoOwnNoPerms",
@@ -371,7 +371,7 @@ func TestUnlinkOtherPermission(t *testing.T) {
 		checkUnlink(test, testDir+"/"+"Other-NoPerm",
 			syscall.EACCES, "", false)
 
-		// Have ownership of file or no owernship when sticky bit is set
+		// Have ownership of file or no ownership when sticky bit is set
 		checkUnlink(test, testDir+"/"+"Sticky-FileNoPerm",
 			syscall.EACCES, testDir, false)
 		checkUnlink(test, testDir+"/"+"Sticky-NoOwnNoPerm",
