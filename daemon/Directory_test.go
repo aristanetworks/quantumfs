@@ -288,7 +288,8 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	} else if !directoryMatchesUser {
 		if onDirectory {
 			err = os.Chown(testDir, 100, 100)
-			test.assert(err == nil, "Error chowning test directory: %v", err)
+			test.assert(err == nil, "Error chowning test directory: %v",
+				err)
 		} else {
 			// We cannot chmod on a WorkspaceRoot, just leave the owner
 			// as root.
