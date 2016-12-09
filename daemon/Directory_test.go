@@ -275,7 +275,8 @@ func TestUnlinkUserPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		defer test.setEuid(99).revert()
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
 
 		// Check non-existing file
 		nonExist := workspace + "/" + "nonExist"
@@ -329,7 +330,8 @@ func TestUnlinkGroupPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		defer test.setEuid(99).revert()
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
 
 		testDir := workspace + "/" + "testDir"
 		err := os.Mkdir(testDir, 0747)
@@ -361,7 +363,8 @@ func TestUnlinkOtherPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		defer test.setEuid(99).revert()
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
 
 		testDir := workspace + "/" + "testDir"
 		err := os.Mkdir(testDir, 0774)
