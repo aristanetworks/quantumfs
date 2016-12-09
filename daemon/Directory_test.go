@@ -979,72 +979,85 @@ func TestDirectoryGetAttr(t *testing.T) {
 	})
 }
 
-func testInodeCreatePermissions(test *testHelper, testDir string,
-	creator func(path string) error, mustSucceed bool, failMsg string) {
+func testInodeCreatePermissions(test *testHelper, testDir string, mustSucceed bool,
+	failMsg string) {
 
-	testInode := testDir + "/testInode"
-	err := creator(testInode)
-
-	if mustSucceed {
-		test.assert(err == nil, "%s: %v", failMsg, err)
-	} else {
-		test.assert(err != nil, "%s", failMsg)
+	check := func(err error) {
+		if mustSucceed {
+			test.assert(err == nil, "%s: %v", failMsg, err)
+		} else {
+			test.assert(err != nil, "%s", failMsg)
+		}
 	}
+
+	// Test Mkdir
+	err := os.Mkdir(testDir+"/testMkdir", 777)
+	check(err)
+
+	// Test Mknod
+	err = syscall.Mknod(testDir+"/testMknod",
+		syscall.S_IFSOCK|syscall.S_IRWXU, 0x12345678)
+	check(err)
+
+	// Test Create
+	fd, err := syscall.Creat(testDir+"/testCreate", 0777)
+	syscall.Close(fd)
+	check(err)
+
+	// Test Symlink
+	err = os.Symlink("arst", testDir+"/testSymlink")
+	check(err)
 }
 
-func makeDir(path string) error {
-	return os.Mkdir(path, 0777)
-}
-
-func TestMkdirPermissionsAsRootNoPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsRootNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0000)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root")
 	})
 }
 
-func TestMkdirPermissionsAsRootUserPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsRootUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0700)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root with ownership")
 	})
 }
 
-func TestMkdirPermissionsAsRootGroupPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsRootGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0070)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root with ownership")
 	})
 }
 
-func TestMkdirPermissionsAsRootOtherPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsRootOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0007)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root with ownership")
 	})
 }
 
-func TestMkdirPermissionsAsNonOwnerNoPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1053,12 +1066,12 @@ func TestMkdirPermissionsAsNonOwnerNoPerms(t *testing.T) {
 		test.setUidGid(99, 99)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsNonOwnerUserPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1067,12 +1080,12 @@ func TestMkdirPermissionsAsNonOwnerUserPerms(t *testing.T) {
 		test.setUidGid(99, 99)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsNonOwnerGroupPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1081,12 +1094,12 @@ func TestMkdirPermissionsAsNonOwnerGroupPerms(t *testing.T) {
 		test.setUidGid(99, 99)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsNonOwnerOtherPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1095,12 +1108,12 @@ func TestMkdirPermissionsAsNonOwnerOtherPerms(t *testing.T) {
 		test.setUidGid(99, 99)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root with ownership")
 	})
 }
 
-func TestMkdirPermissionsAsGroupMemberNoPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1109,12 +1122,12 @@ func TestMkdirPermissionsAsGroupMemberNoPerms(t *testing.T) {
 		test.setUidGid(99, -1)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsGroupMemberUserPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1123,12 +1136,12 @@ func TestMkdirPermissionsAsGroupMemberUserPerms(t *testing.T) {
 		test.setUidGid(99, -1)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsGroupMemberGroupPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1137,12 +1150,12 @@ func TestMkdirPermissionsAsGroupMemberGroupPerms(t *testing.T) {
 		test.setUidGid(99, -1)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Fail creating directory as group member")
 	})
 }
 
-func TestMkdirPermissionsAsGroupMemberOtherPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1151,12 +1164,12 @@ func TestMkdirPermissionsAsGroupMemberOtherPerms(t *testing.T) {
 		test.setUidGid(99, -1)
 		defer test.setUidGidToDefault()
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsUserNoPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1167,12 +1180,12 @@ func TestMkdirPermissionsAsUserNoPerms(t *testing.T) {
 		err := os.Mkdir(testDir, 0000)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsUserUserPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1183,12 +1196,12 @@ func TestMkdirPermissionsAsUserUserPerms(t *testing.T) {
 		err := os.Mkdir(testDir, 0700)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, true,
+		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory I own")
 	})
 }
 
-func TestMkdirPermissionsAsUserGroupPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1199,12 +1212,12 @@ func TestMkdirPermissionsAsUserGroupPerms(t *testing.T) {
 		err := os.Mkdir(testDir, 0070)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
 
-func TestMkdirPermissionsAsUserOtherPerms(t *testing.T) {
+func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
@@ -1215,7 +1228,7 @@ func TestMkdirPermissionsAsUserOtherPerms(t *testing.T) {
 		err := os.Mkdir(testDir, 0007)
 		test.assert(err == nil, "Failed creating directory: %v", err)
 
-		testInodeCreatePermissions(test, testDir, makeDir, false,
+		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
 }
