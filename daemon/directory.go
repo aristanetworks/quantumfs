@@ -690,8 +690,13 @@ func (dir *Directory) getChildRecord(c *ctx,
 func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	checkStickyBit bool) fuse.Status {
 
-	defer c.FuncIn("Directory::hasWritePermission", "checkSticky %d",
-		checkStickyBit).out()
+	var arg string
+	if checkStickyBit {
+		arg = "checkStickyBit"
+	} else {
+		arg = "no checkStickyBit"
+	}
+	defer c.FuncIn("Directory::hasWritePermission", arg).out()
 
 	// If the directory is a workspace root, it is always permitted to modify the
 	// children inodes because its permission is 777 (Hardcoded in
