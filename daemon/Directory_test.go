@@ -329,7 +329,7 @@ func TestUnlinkPermissionsAsRootNoPermsOwner(t *testing.T) {
 
 func TestUnlinkPermissionsAsRootNoPermsOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, true, false, 0000, true)
+		testUnlinkPermissions(test, true, true, true, true, 0000, true)
 	})
 }
 
