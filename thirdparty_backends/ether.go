@@ -10,26 +10,42 @@ package thirdparty_backends
 
 import "fmt"
 
-import "github.com/aristanetworks/ether"
+import "github.com/aristanetworks/ether/blobstore"
+import "github.com/aristanetworks/ether/cql"
 import "github.com/aristanetworks/ether/filesystem"
 import "github.com/aristanetworks/quantumfs"
 
 func init() {
 	registerDatastore("ether.filesystem", NewEtherFilesystemStore)
+	registerDatastore("ether.cql", NewEtherCqlStore)
 }
 
 func NewEtherFilesystemStore(path string) quantumfs.DataStore {
+
 	blobstore, err := filesystem.NewFilesystemStore(path)
-	if err.ErrorCode != ether.ErrOk {
+	if err != nil {
 		fmt.Printf("Failed to init ether.filesystem datastore: %s\n",
 			err.Error())
+		return nil
+	}
+	translator := EtherBlobStoreTranslator{blobstore: blobstore}
+	return &translator
+}
+
+func NewEtherCqlStore(path string) quantumfs.DataStore {
+
+	blobstore, err := cql.NewCqlBlobStore(path)
+	if err != nil {
+		fmt.Printf("Failed to init ether.cql datastore: %s\n",
+			err.Error())
+		return nil
 	}
 	translator := EtherBlobStoreTranslator{blobstore: blobstore}
 	return &translator
 }
 
 type EtherBlobStoreTranslator struct {
-	blobstore ether.BlobStore
+	blobstore blobstore.BlobStore
 }
 
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
@@ -37,8 +53,8 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectK
 
 	data, _, err := ebt.blobstore.Get(key.String())
 
-	if err.ErrorCode != ether.ErrOk {
-		return &err
+	if err != nil {
+		return err
 	}
 
 	buf.Set(data, key.Type())
@@ -48,10 +64,5 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectK
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	err := ebt.blobstore.Insert(key.String(), buf.Get(), nil)
-	if err.ErrorCode != ether.ErrOk {
-		return &err
-	} else {
-		return nil
-	}
+	return ebt.blobstore.Insert(key.String(), buf.Get(), nil)
 }
