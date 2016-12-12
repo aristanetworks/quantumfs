@@ -202,57 +202,6 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	})
 }
 
-func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
-	dir string, notOwn bool) {
-
-	fd, err := syscall.Creat(file, 0)
-	test.assert(err == nil, "Error creating file: %v", err)
-	syscall.Close(fd)
-
-	if dir != "" {
-		var stat syscall.Stat_t
-		err = syscall.Stat(dir, &stat)
-		test.assert(err == nil,
-			"Error getting file stat with %v: %d, %d, %o",
-			err, stat.Uid, stat.Gid, stat.Mode)
-
-		err = syscall.Chmod(dir, stat.Mode|syscall.S_ISVTX)
-		test.assert(err == nil, "Error change the mode of file: %v", err)
-
-		err = syscall.Stat(dir, &stat)
-		test.assert(err == nil && stat.Mode&syscall.S_ISVTX != 0,
-			"Error getting file stat with %v: %d, %d, %o",
-			err, stat.Uid, stat.Gid, stat.Mode)
-		if notOwn {
-			err = syscall.Chown(file, 100, 100)
-			test.assert(err == nil,
-				"Error change the ownership of file: %v", err)
-		}
-
-	}
-
-	err = syscall.Unlink(file)
-	if expectedErr == 0 {
-		test.assert(err == nil, "Error unlinking file %s : %v", file, err)
-	} else {
-		test.assert(err == expectedErr,
-			"Incorrect error unlinking file %s : %v", file, err)
-	}
-}
-
-func modifyVerifyChown(test *testHelper, dir string, uid int, gid int) {
-	// Try to change the ownership of the rootDir to uid, gid
-	err := os.Chown(dir, uid, gid)
-	test.assert(err == nil, "Failed to chown: %v", err)
-
-	// Verify the file's uid is 99 and gid is 0
-	var stat syscall.Stat_t
-	err = syscall.Stat(dir, &stat)
-	test.assert(err == nil && int(stat.Uid) == uid && int(stat.Gid) == gid,
-		"Error getting directory stat with %v: %d, %d",
-		err, stat.Uid, stat.Gid)
-}
-
 func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	directoryMatchesUser bool, directorySticky bool, permissions uint32,
 	mustSucceed bool) {
