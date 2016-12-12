@@ -33,6 +33,7 @@ func (s *storeIntegrationTests) SetupSuite() {
 
 	confFile, err := EtherConfFile()
 	s.Require().NoError(err, "error in getting ether configuration file")
+
 	err = SetupTestSchema(confFile)
 	s.Require().NoError(err, "SetupSchema returned an error")
 
@@ -111,6 +112,7 @@ func (s *storeIntegrationTests) TearDownSuite() {
 
 	confFile, err := EtherConfFile()
 	s.Require().NoError(err, "error in getting ether configuration file")
-	_ = TearDownTestSchema(confFile)
+
 	resetCqlStore()
+	_ = TearDownTestSchema(confFile)
 }

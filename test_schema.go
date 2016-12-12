@@ -6,23 +6,28 @@ package cql
 import (
 	"fmt"
 	"time"
+
+	"github.com/gocql/gocql"
 )
 
-var numRetries = 20
+var schemaRetries = 20
+var schemaTimeout = 3 * time.Second
 
-func execWithRetry(q Query) error {
+func execWithRetry(q *gocql.Query) error {
 	var err error
 	var i int
-	for i = 0; i < numRetries; i++ {
-		if err = q.Exec(); err == nil {
+	for i = 0; i < schemaRetries; i++ {
+		err = q.Exec()
+		if err == nil {
 			break
 		}
 		time.Sleep(time.Second)
 	}
+
 	if err != nil {
-		fmt.Printf("Failed after %d attempts query: %q\n", i+1, q)
+		fmt.Printf("ETHER: Failed after %d attempts query: %q\n", i, q)
 	} else {
-		fmt.Printf("Took %d attempts query: %q\n", i+1, q)
+		fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
 	}
 	return err
 }
@@ -39,11 +44,9 @@ func SetupTestSchema(confFile string) error {
 	if err != nil {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-
-	cluster := NewRealCluster(cfg.Nodes...)
-	session, err := cluster.CreateSession()
+	session, err := getTestClusterSession(cfg)
 	if err != nil {
-		return fmt.Errorf("error in creating session: %s", err.Error())
+		return fmt.Errorf("error in creating gocql session inside SetupTestSchema: %s", err.Error())
 	}
 	defer session.Close()
 
@@ -83,11 +86,10 @@ func TearDownTestSchema(confFile string) error {
 	if err != nil {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-
-	cluster := NewRealCluster(cfg.Nodes...)
-	session, err := cluster.CreateSession()
+	session, err := getTestClusterSession(cfg)
 	if err != nil {
-		return fmt.Errorf("error in creating session: %s", err.Error())
+		return fmt.Errorf("error in creating gocql session inside TearDownTestSchema: %s",
+			err.Error())
 	}
 	defer session.Close()
 
@@ -106,13 +108,12 @@ func TruncateTable(confFile string) error {
 
 	cfg, err := readCqlConfig(confFile)
 	if err != nil {
-		return fmt.Errorf("error in reading cqlConfigFile: %s", err)
+		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-
-	cluster := NewRealCluster(cfg.Nodes...)
-	session, err := cluster.CreateSession()
+	session, err := getTestClusterSession(cfg)
 	if err != nil {
-		return fmt.Errorf("error in creating session: %s", err.Error())
+		return fmt.Errorf("error in creating gocql session inside TruncateTable: %s",
+			err.Error())
 	}
 	defer session.Close()
 
@@ -129,4 +130,32 @@ func TruncateTable(confFile string) error {
 		return fmt.Errorf("error in Truncate Table workspacedb: %s", err.Error())
 	}
 	return nil
+}
+
+func getTestClusterConfig(cfg *Config) *gocql.ClusterConfig {
+
+	var cluster = gocql.NewCluster(cfg.Nodes...)
+
+	cluster.ProtoVersion = 3
+	cluster.Consistency = gocql.Quorum
+	cluster.PoolConfig.HostSelectionPolicy =
+		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+	cluster.Events.DisableSchemaEvents = true
+
+	// Hardcoded for testing
+	cluster.Timeout = schemaTimeout
+	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: schemaRetries}
+
+	return cluster
+}
+
+func getTestClusterSession(cfg *Config) (*gocql.Session, error) {
+
+	cluster := getTestClusterConfig(cfg)
+	session, err := cluster.CreateSession()
+	if err != nil {
+		return nil, fmt.Errorf("error in creating session: %s", err.Error())
+	}
+
+	return session, nil
 }

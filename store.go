@@ -5,94 +5,78 @@ package cql
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
-	"github.com/aristanetworks/ether/blobstore"
-	"github.com/gocql/gocql"
+	"github.com/aristanetworks/ether/utils"
 )
 
-type cqlBlobStore struct {
-	store    *cqlStore
-	keyspace string
+// Config struct holds the info needed to connect to a cql cluster
+type Config struct {
+	Nodes      []string      `json:"nodes"`
+	NumConns   int           `json:"numconnections"`
+	NumRetries int           `json:"numretries"`
+	KeySpace   string        `json:"keyspace"`
+	Timeout    time.Duration `json:"timeout"`
 }
 
-// NewCqlBlobStore initializes a blobstore.BlobStore to be used with a cql cluster
-// This function is traversed only in the non-mock code path. In the mock path
-// initCqlStore is directly used.
-func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
-
-	cfg, err := readCqlConfig(confName)
-	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
-			"error in reading cql config file %s", err.Error())
-	}
-
-	cluster := NewRealCluster(cfg.Nodes...)
-	var store cqlStore
-	store, err = initCqlStore(cluster)
-	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
-			"error in initializing cql store %s", err.Error())
-	}
-
-	cbs := &cqlBlobStore{
-		store:    &store,
-		keyspace: cfg.KeySpace,
-	}
-	return cbs, nil
+type cqlStoreGlobal struct {
+	initOnce  sync.Once
+	resetOnce sync.Once
+	cluster   Cluster
+	session   Session
+	sem       utils.Semaphore
 }
 
-// Insert method has an semaphore limiting the number of
-// concurrent Inserts to 100. This limits the number of concurrent
-// insert queries to scyllaDB which is currently causing timeouts.
-// This workaround should be removed when get a fix from ScyllaDB.
-// The number 100, has been emperically determined.
-func (b *cqlBlobStore) Insert(key string, value []byte,
-	metadata map[string]string) error {
+var globalCqlStore cqlStoreGlobal
 
-	queryStr := fmt.Sprintf("INSERT into %s.blobStore (key, value) VALUES (?, ?)", b.keyspace)
-	query := b.store.session.Query(queryStr, key, value)
-
-	b.store.sem.P()
-	defer b.store.sem.V()
-
-	err := query.Exec()
-	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in Insert %s", err.Error())
-	}
-	return nil
+type cqlStore struct {
+	cluster Cluster
+	session Session
+	sem     *utils.Semaphore
 }
 
-// Get is the cql implementation of blobstore.Get()
-func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
+// Note: This routine is called by Init/New APIs
+//       in Ether and only one global initialization is done.
 
-	// Session.Query() does not return error
-	var value []byte
-	queryStr := fmt.Sprintf("SELECT value FROM %s.blobStore WHERE key = ?", b.keyspace)
-	query := b.store.session.Query(queryStr, key)
-	err := query.Scan(&value)
+// TBD: Based on use-cases revisit this singleton cluster
+//      and session context design
+// TBD: Need more investigation to see which parts of the
+//      config can be dynamically updated
+func initCqlStore(cluster Cluster) (cqlStore, error) {
 
-	if err != nil {
-		if err == gocql.ErrNotFound {
-			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get %s",
-				err.Error())
+	var err error
+	globalCqlStore.initOnce.Do(func() {
+
+		globalCqlStore.cluster = cluster
+		globalCqlStore.resetOnce = sync.Once{}
+		globalCqlStore.sem = make(utils.Semaphore, 100)
+		globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
+		if err != nil {
+			err = fmt.Errorf("error in initCqlStore: %v", err)
+			return
 		}
-		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get %s",
-			err.Error())
-	}
-	return value, nil, nil
+	})
+
+	var cStore cqlStore
+	cStore.cluster = globalCqlStore.cluster
+	cStore.session = globalCqlStore.session
+	cStore.sem = &globalCqlStore.sem
+
+	return cStore, err
 }
 
-// Delete is the cql implementation of blobstore.Delete()
-func (b *cqlBlobStore) Delete(key string) error {
-	panic("Delete not implemented")
-}
-
-// Metadata is the cql implementation of blobstore.Metadata()
-func (b *cqlBlobStore) Metadata(key string) (map[string]string, error) {
-	panic("Metadata not implemented")
-}
-
-// Update is the cql implementation of blobstore.Update()
-func (b *cqlBlobStore) Update(key string, metadata map[string]string) error {
-	panic("Update not implemented")
+// mostly used by tests
+func resetCqlStore() {
+	globalCqlStore.resetOnce.Do(func() {
+		if globalCqlStore.session != nil {
+			globalCqlStore.session.Close()
+		}
+		// we cannot do globalCqlStore = cqlStore{}
+		// since we are inside resetOnce
+		globalCqlStore.cluster = nil
+		globalCqlStore.session = nil
+		globalCqlStore.sem = nil
+		globalCqlStore.initOnce = sync.Once{}
+	})
 }

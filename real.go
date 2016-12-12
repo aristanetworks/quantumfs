@@ -5,6 +5,7 @@ package cql
 
 import (
 	"github.com/gocql/gocql"
+	"time"
 )
 
 // RealCluster is a wrapper around gocql.ClusterConfig
@@ -13,13 +14,28 @@ type RealCluster struct {
 }
 
 // NewRealCluster returns a default Cluster struct with the given hosts
-func NewRealCluster(hosts ...string) Cluster {
-	// Does not return nil
-	c := gocql.NewCluster(hosts...)
+func NewRealCluster(cfg *Config) Cluster {
+
+	c := gocql.NewCluster(cfg.Nodes...)
+	c.ProtoVersion = 3
+	c.Consistency = gocql.Quorum
+	c.PoolConfig.HostSelectionPolicy =
+		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+	c.Events.DisableSchemaEvents = true
+
+	if cfg.NumRetries == 0 {
+		cfg.NumRetries = 2
+	}
+	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: cfg.NumRetries}
+
+	if cfg.Timeout != 0 {
+		c.Timeout = cfg.Timeout * time.Second
+	}
+
 	cc := &RealCluster{
 		cluster: c,
 	}
-	getRealClusterConfig(cc)
+
 	return cc
 }
 
@@ -143,17 +159,4 @@ func (i *RealIter) SliceMap() ([]map[string]interface{}, error) {
 // WillSwitchPage is a wrapper around gocql.Iter.WillSwitchPage()
 func (i *RealIter) WillSwitchPage() bool {
 	return i.iter.WillSwitchPage()
-}
-
-func getRealClusterConfig(ccr *RealCluster) {
-
-	ccr.cluster.ProtoVersion = 3
-
-	ccr.cluster.Keyspace = globalCqlStore.config.KeySpace
-	ccr.cluster.Consistency = gocql.Quorum
-	ccr.cluster.RetryPolicy =
-		&gocql.SimpleRetryPolicy{NumRetries: globalCqlStore.config.NumRetries}
-	ccr.cluster.PoolConfig.HostSelectionPolicy =
-		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
-	ccr.cluster.Events.DisableSchemaEvents = true
 }
