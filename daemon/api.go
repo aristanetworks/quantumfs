@@ -291,21 +291,15 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	c.vlog("Received read request on Api")
 
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
+		if nonblocking {
+			return nil, fuse.Status(syscall.EAGAIN)
+		}
+
 		c.vlog("No outstanding requests, returning early")
 		return nil, fuse.OK
 	}
 
-	var response fuse.ReadResult
-	select {
-	case response = <-api.responses:
-	default:
-		if nonblocking {
-			c.vlog("Nonblocking socket, return nothing")
-			return nil, fuse.OK
-		} else {
-			response = <-api.responses
-		}
-	}
+	response := <-api.responses
 
 	atomic.AddInt32(&api.outstandingRequests, -1)
 	debug := make([]byte, response.Size())
