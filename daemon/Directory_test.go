@@ -206,23 +206,18 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	directoryMatchesUser bool, directorySticky bool, permissions uint32,
 	mustSucceed bool) {
 
-	workspace := test.newWorkspace()
-	var testDir string
-	if onDirectory {
-		testDir = workspace + "/testDir"
-	} else {
-		testDir = workspace
-	}
-	testFile := testDir + "/file"
-
 	if directorySticky {
 		permissions |= syscall.S_ISVTX
 	}
 
+	workspace := test.newWorkspace()
+	testDir := workspace
 	if onDirectory {
+		testDir = workspace + "/testDir"
 		err := os.Mkdir(testDir, os.FileMode(permissions))
 		test.assert(err == nil, "Failed creating testDir: %v", err)
 	}
+	testFile := testDir + "/file"
 
 	err := syscall.Mknod(testFile, syscall.S_IFREG, 0)
 	test.assert(err == nil, "Unable to create test file: %v", err)
@@ -242,6 +237,8 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		} else {
 			// We cannot chmod on a WorkspaceRoot, just leave the owner
 			// as root.
+			test.assert(!asRoot,
+				"Cannot chown workspaceroot, invalid combination")
 		}
 	}
 
