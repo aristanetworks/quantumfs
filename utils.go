@@ -163,12 +163,12 @@ func CreateTestDirContents() (string, string, error) {
 		"testDir30/testDir31/testDir32/",
 	}
 
-	testSrcDir, err := ioutil.TempDir("/tmp", "pcp-test-src-")
+	testSrcDir, err := ioutil.TempDir("/tmp", "test-src-")
 	if err != nil {
 		return "", "", err
 	}
 
-	testDstDir, err := ioutil.TempDir("/tmp", "pcp-test-dst-")
+	testDstDir, err := ioutil.TempDir("/tmp", "test-dst-")
 	if err != nil {
 		return "", "", err
 	}
