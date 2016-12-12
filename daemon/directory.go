@@ -729,9 +729,11 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		inode := dir.children[name]
 
-		// We already have an inode Mutex so we don't need Mutex for the
-		// map of its childrenRecords
-		record := dir.childrenRecords[inode]
+		record := func() DirectoryRecordIf {
+			defer dir.childRecordLock.Lock().Unlock()
+			return dir.childrenRecords[inode]
+		}()
+
 		type_ := objectTypeToFileType(c, record.Type())
 
 		if type_ == fuse.S_IFDIR {
