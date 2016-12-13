@@ -253,7 +253,7 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	}
 
 	if !asRoot {
-		test.setUidGid(99, -1)
+		test.setUidGid(99, 99)
 		defer test.setUidGidToDefault()
 	}
 
@@ -378,8 +378,6 @@ func TestUnlinkPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
 	})
 }
 
-/* TODO Temporarily disabled until the refactoring where we can change the test
-* effective gid comes in.
 func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, true, false, 0575,
@@ -393,7 +391,6 @@ func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
 			true)
 	})
 }
-*/
 
 func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
