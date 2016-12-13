@@ -38,7 +38,7 @@ type NamespaceList struct {
 func (nsl *NamespaceList) dirty(c *ctx) {
 }
 
-func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
+func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -129,7 +129,9 @@ func updateChildren(c *ctx, parentName string, names []string,
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
-			if parentName == "_null" && name == "null" {
+			if parentName == quantumfs.NullNamespaceName &&
+				name == quantumfs.NullWorkspaceName {
+
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
 					parentName, name, parent, inodeId))
 			} else {
@@ -422,7 +424,7 @@ func newWorkspaceList(c *ctx, parentName string, name string, parent Inode,
 		workspacesById:   make(map[InodeId]string),
 	}
 	wsl.self = &wsl
-	wsl.setParent(parent)
+	wsl.setParent(parent.inodeNum())
 	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
 	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl
@@ -442,7 +444,7 @@ type WorkspaceList struct {
 func (wsl *WorkspaceList) dirty(c *ctx) {
 }
 
-func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
+func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -684,7 +686,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	if wsl.namespaceName == "_null" && wsl.workspacesById[inodeNum] == "null" {
+	if wsl.namespaceName == quantumfs.NullNamespaceName &&
+		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
+
 		return newNullWorkspaceRoot(c, wsl.namespaceName,
 			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
 	} else {

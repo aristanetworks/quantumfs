@@ -13,7 +13,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
+	parent := c.qfs.inode(c, srcInode.parent())
+	origRecord, err := parent.getChildRecord(c, srcInode.inodeNum())
 	if err != nil {
 		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
 		return fuse.EIO
@@ -67,11 +68,12 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	defer c.funcIn("Directory::updateRecords_DOWN_").out()
 
-	for _, child := range dir.dirtyChildren_ {
+	for _, childId := range dir.dirtyChildren_ {
+		child := c.qfs.inode(c, childId)
 		newKey := child.flush_DOWN(c)
-		dir.childrenRecords[child.inodeNum()].SetID(newKey)
+		dir.childrenRecords[childId].SetID(newKey)
 	}
-	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
+	dir.dirtyChildren_ = make(map[InodeId]InodeId, 0)
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
