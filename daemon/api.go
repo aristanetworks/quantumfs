@@ -291,27 +291,21 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	c.vlog("Received read request on Api")
 
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
+		if nonblocking {
+			return nil, fuse.Status(syscall.EAGAIN)
+		}
+
 		c.vlog("No outstanding requests, returning early")
 		return nil, fuse.OK
 	}
 
-	var blocking chan struct{}
-	if !nonblocking {
-		blocking = make(chan struct{})
-	}
+	response := <-api.responses
 
-	select {
-	case response := <-api.responses:
-		atomic.AddInt32(&api.outstandingRequests, -1)
-		debug := make([]byte, response.Size())
-		bytes, _ := response.Bytes(debug)
-		c.vlog("API Response %s", string(bytes))
-		return response, fuse.OK
-	case <-blocking:
-		// This is a nonblocking socket, so return that nothing is ready
-		c.vlog("Nonblocking socket, return nothing")
-		return nil, fuse.OK
-	}
+	atomic.AddInt32(&api.outstandingRequests, -1)
+	debug := make([]byte, response.Size())
+	bytes, _ := response.Bytes(debug)
+	c.vlog("API Response %s", string(bytes))
+	return response, fuse.OK
 }
 
 func makeErrorResponse(code uint32, message string) []byte {
