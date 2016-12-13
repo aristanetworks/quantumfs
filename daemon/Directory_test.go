@@ -222,10 +222,6 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	err := syscall.Mknod(testFile, syscall.S_IFREG, 0)
 	test.assert(err == nil, "Unable to create test file: %v", err)
 
-	// The directory is created being owned by root. If we want the directory to
-	// be owned by the user we are running as, we need to change only if not
-	// root. If we don't want the directory ownership to match at all we use a
-	// third value.
 	var uid int
 	var gid int
 
@@ -250,7 +246,7 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		test.assert(err == nil, "Error chowning test directory: %v",
 			err)
 	} else {
-		// We cannot chmod on a WorkspaceRoot, just leave the owner
+		// We cannot chown on a WorkspaceRoot, just leave the owner
 		// as root.
 		test.assert(!asRoot,
 			"Cannot chown workspaceroot, invalid arguments")
@@ -262,7 +258,7 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 
 	err = syscall.Unlink(testFile)
 	if mustSucceed {
-		test.assert(err == nil, "Failed to unlink file as root: %v", err)
+		test.assert(err == nil, "Failed to unlink file: %v", err)
 	} else {
 		test.assert(err == syscall.EACCES, "Wrong error when unlinking: %v",
 			err)
@@ -380,6 +376,23 @@ func TestUnlinkPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
 			false)
 	})
 }
+
+/* TODO Temporarily disabled until the refactoring where we can change the test
+* effective gid comes in.
+func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, true, false, 0575,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, true, true, 0575,
+			true)
+	})
+}
+*/
 
 func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
