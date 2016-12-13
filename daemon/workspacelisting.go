@@ -187,6 +187,15 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
+func (nsl *NamespaceList) childInodes() []InodeId {
+	rtn := make([]InodeId, len(nsl.namespacesById))
+	for k, _ := range nsl.namespacesById {
+		rtn = append(rtn, k)
+	}
+
+	return rtn
+}
+
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
@@ -468,6 +477,15 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	out.OpenFlags = 0
 
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) childInodes() []InodeId {
+	rtn := make([]InodeId, len(wsl.workspacesById))
+	for k, _ := range wsl.workspacesById {
+		rtn = append(rtn, k)
+	}
+
+	return rtn
 }
 
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
