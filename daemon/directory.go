@@ -971,7 +971,7 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	var child *Directory
 
 	upwardsParent := c.qfs.inode(c, a.parent())
-	for ; upwardsParent != nil; {
+	for upwardsParent != nil {
 		if upwardsParent.inodeNum() == b.inodeNum() {
 
 			// a is a (grand-)child of b
@@ -979,13 +979,13 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 			child = a
 			break
 		}
-	
+
 		upwardsParent = c.qfs.inode(c, upwardsParent.parent())
 	}
 
 	if upwardsParent == nil {
 		upwardsParent := c.qfs.inode(c, b.parent())
-		for ; upwardsParent != nil; {
+		for upwardsParent != nil {
 			if upwardsParent.inodeNum() == a.inodeNum() {
 
 				// b is a (grand-)child of a

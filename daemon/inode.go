@@ -148,7 +148,7 @@ type InodeCommon struct {
 	accessed_ uint32
 
 	parentLock sync.Mutex // Protects parent_
-	parent_    InodeId      // nil if WorkspaceRoot
+	parent_    InodeId    // nil if WorkspaceRoot
 
 	lock sync.RWMutex
 
