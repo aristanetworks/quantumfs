@@ -581,7 +581,11 @@ func (th *testHelper) getInodeNum(path string) InodeId {
 func (th *testHelper) getInode(path string) Inode {
 	inodeNum := th.getInodeNum(path)
 	inode := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-	return inode
+	if inode == nil {
+		return nil
+	}
+
+	return inode.inode
 }
 
 // Retrieve the rootId of the given workspace
