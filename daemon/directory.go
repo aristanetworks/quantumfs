@@ -761,6 +761,17 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	return fuse.EACCES
 }
 
+func (dir *Directory) childInodes() []InodeId {
+	defer dir.RLock().RUnlock()
+
+	rtn := make([]InodeId, len(dir.children))
+	for _, v := range dir.children {
+		rtn = append(rtn, v)
+	}
+
+	return rtn
+}
+
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Unlink", "%s", name).out()
 
@@ -1486,6 +1497,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.childrenRecords[inodeNum]
+	c.vlog("Instantiate %s %d", entry.Filename(), inodeNum)
 
 	var constructor InodeConstructor
 	switch entry.Type() {
