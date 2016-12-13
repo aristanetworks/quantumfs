@@ -74,7 +74,7 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord, error)
+	getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error)
 
 	// Update the key for only this child and then notify all the grandparents of
 	// the cascading changes.
@@ -131,6 +131,10 @@ type Inode interface {
 	RLockTree() *sync.RWMutex
 
 	isWorkspaceRoot() bool
+}
+
+type inodeHolder interface {
+	childInodes() []InodeId
 }
 
 type InodeCommon struct {

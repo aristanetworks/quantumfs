@@ -20,14 +20,14 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	}
 	srcInode.markSelfAccessed(c, false)
 
-	newRecord := cloneDirectoryRecord(&origRecord)
+	newRecord := cloneDirectoryRecord(origRecord)
 	newRecord.SetFilename(newName)
 	newRecord.SetID(srcInode.flush_DOWN(c))
 
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := dir.loadChild_(c, *newRecord)
+	inodeNum := dir.loadChild_(c, newRecord)
 	dir.self.markAccessed(c, newName, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
