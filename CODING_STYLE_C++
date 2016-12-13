@@ -25,6 +25,19 @@ ReturnType LongClassName::ReallyReallyReallyLongFunctionName(
 	...
 }
 
+   If it is reasonable, you should align the arguments or variables using tabs to
+   match the indentation and spaces to align. For example:
+
+ReturnType ClassName::ReallyLongFunctionName(Type par_name1, Type par_name2,
+                                             Type par_name3) {
+|----------- Spaces for alignment ----------|
+	DoSomething(par_name1, par_name2, par_name3, par_name4,
+	            really_long_name_which_would_not_fit_above);
+^	|- Spaces -|
++--- Tab
+	...
+}
+
    Case statements inside switch statements are not indented relative to the switch
    statement itself. For example:
 
