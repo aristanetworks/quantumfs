@@ -5,7 +5,6 @@
 package daemon
 
 import "fmt"
-import "reflect"
 import "sync"
 import "sync/atomic"
 import "time"
@@ -103,8 +102,8 @@ type Inode interface {
 	markAccessed(c *ctx, path string, created bool)
 	markSelfAccessed(c *ctx, created bool)
 
-	parent() Inode
-	setParent(newParent Inode)
+	parent() InodeId
+	setParent(newParent InodeId)
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
 	// orphaned from the directory tree and cannot be accessed except directly by
@@ -113,7 +112,7 @@ type Inode interface {
 
 	dirty(c *ctx) // Mark this Inode dirty
 	// Mark this Inode dirty because a child is dirty
-	dirtyChild(c *ctx, child Inode)
+	dirtyChild(c *ctx, child InodeId)
 	isDirty() bool // Is this Inode dirty?
 
 	// Compute a new object key, possibly schedule the sync the object data
@@ -133,6 +132,10 @@ type Inode interface {
 	isWorkspaceRoot() bool
 }
 
+type inodeHolder interface {
+	childInodes() []InodeId
+}
+
 type InodeCommon struct {
 	// These fields are constant once instantiated
 	self Inode // Leaf subclass instance
@@ -144,7 +147,7 @@ type InodeCommon struct {
 	accessed_ uint32
 
 	parentLock sync.Mutex // Protects parent_
-	parent_    Inode      // nil if WorkspaceRoot
+	parent_    InodeId    // nil if WorkspaceRoot
 
 	lock sync.RWMutex
 
@@ -187,10 +190,9 @@ func (inode *InodeCommon) setDirty(dirty bool) bool {
 	}
 }
 
-func (inode *InodeCommon) dirtyChild(c *ctx, child Inode) {
-	inodeType := reflect.TypeOf(inode)
-	msg := fmt.Sprintf("Unsupported dirtyChild() call on leaf Inode: %v %v",
-		inodeType, inode)
+func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
+	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inodie %d: %v", child,
+		inode)
 	panic(msg)
 }
 
@@ -216,7 +218,7 @@ func (inode *InodeCommon) accessed() bool {
 	}
 }
 
-func (inode *InodeCommon) parent() Inode {
+func (inode *InodeCommon) parent() InodeId {
 	inode.parentLock.Lock()
 	p := inode.parent_
 	inode.parentLock.Unlock()
@@ -224,14 +226,14 @@ func (inode *InodeCommon) parent() Inode {
 	return p
 }
 
-func (inode *InodeCommon) setParent(newParent Inode) {
+func (inode *InodeCommon) setParent(newParent InodeId) {
 	inode.parentLock.Lock()
 	inode.parent_ = newParent
 	inode.parentLock.Unlock()
 }
 
 func (inode *InodeCommon) isOrphaned() bool {
-	return inode.inodeNum() == inode.parent().inodeNum()
+	return inode.inodeNum() == inode.parent()
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
@@ -300,7 +302,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	} else {
 		path = inode.name() + "/" + path
 	}
-	parent := inode.parent()
+	parent := c.qfs.inode(c, inode.parent())
 	parent.markAccessed(c, path, created)
 }
 

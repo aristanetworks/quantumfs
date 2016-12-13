@@ -74,7 +74,7 @@ const sourceDataLength = 30
 
 func initDirectory(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode, treeLock *sync.RWMutex) []InodeId {
+	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
 	defer c.FuncIn("initDirectory",
 		"Enter Fetching directory baselayer from %s",
@@ -145,7 +145,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	dir.self = &dir
 
 	uninstantiated := initDirectory(c, name, &dir, baseLayerId, inodeNum,
-		parent, parent.treeLock())
+		parent.inodeNum(), parent.treeLock())
 	return &dir, uninstantiated
 }
 
@@ -162,7 +162,9 @@ func (dir *Directory) updateSize_(c *ctx) {
 			defer dir.childRecordLock.Lock().Unlock()
 			return uint64(len(dir.childrenRecords))
 		}()
-		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil, true)
+
+		parent := c.qfs.inode(c, dir.parent())
+		parent.setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
@@ -191,7 +193,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 	// If this is a file we need to reparent it to itself
 	func() {
-		record := func() *quantumfs.DirectoryRecord {
+		record := func() DirectoryRecordIf {
 			defer dir.childRecordLock.Lock().Unlock()
 			record := dir.childrenRecords[inodeNum]
 			delete(dir.childrenRecords, inodeNum)
@@ -204,10 +206,10 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 			record.Type() == quantumfs.ObjectTypeVeryLargeFile {
 
 			inode := c.qfs.inodeNoInstantiate(c, inodeNum)
-			if inode != nil {
-				if file, isFile := inode.(*File); isFile {
+			if inode != nil && inode.inode != nil {
+				if file, isFile := inode.inode.(*File); isFile {
 					file.setChildRecord(c, record)
-					file.setParent(file)
+					file.setParent(file.inodeNum())
 				}
 			}
 		}
@@ -222,18 +224,19 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 func (dir *Directory) dirty(c *ctx) {
 	if !dir.setDirty(true) {
 		// Only go recursive if we aren't already dirty
-		dir.parent().dirtyChild(c, dir)
+		parent := c.qfs.inode(c, dir.parent())
+		parent.dirtyChild(c, dir.inodeNum())
 	}
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
 // as well.
-func (dir *Directory) dirtyChild(c *ctx, child Inode) {
+func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("Directory::dirtyChild").out()
 
 	func() {
 		defer dir.Lock().Unlock()
-		dir.dirtyChildren_[child.inodeNum()] = child
+		dir.dirtyChildren_[childId] = childId
 	}()
 	dir.self.dirty(c)
 }
@@ -427,7 +430,8 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("Directory::GetAttr").out()
 
-	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
+	parent := c.qfs.inode(c, dir.parent())
+	record, err := parent.getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)
 		return fuse.EIO
@@ -579,7 +583,8 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
 		attr.Size).out()
 
-	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
+	parent := c.qfs.inode(c, dir.parent())
+	return parent.setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
 }
 
@@ -688,9 +693,11 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		inode := dir.children[name]
 
-		// We already have an inode Mutex so we don't need Mutex for the
-		// map of its childrenRecords
-		record := dir.childrenRecords[inode]
+		record := func() DirectoryRecordIf {
+			defer dir.childRecordLock.Lock().Unlock()
+			return dir.childrenRecords[inode]
+		}()
+
 		type_ := objectTypeToFileType(c, record.Type())
 
 		if type_ == fuse.S_IFDIR {
@@ -704,7 +711,8 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		// needs a permission check.
 		if !dir.self.isWorkspaceRoot() {
 			owner := c.fuseCtx.Owner
-			dirRecord, err := dir.parent().getChildRecord(c,
+			parent := c.qfs.inode(c, dir.parent())
+			dirRecord, err := parent.getChildRecord(c,
 				dir.InodeCommon.id)
 			if err != nil {
 				return fuse.ENOENT
@@ -881,7 +889,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		}()
 		dir.self.markAccessed(c, newName, true)
 		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
-			child.setName(newName)
+			child.inode.setName(newName)
 		}
 
 		dir.children[newName] = oldInodeId
@@ -904,7 +912,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	return result
 }
 
-func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
+func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	childDir *Directory) {
 
 	// Determine if a parent-child relationship between the
@@ -912,8 +920,8 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 	var parent *Directory
 	var child *Directory
 
-	upwardsParent := a.parent()
-	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+	upwardsParent := c.qfs.inode(c, a.parent())
+	for upwardsParent != nil {
 		if upwardsParent.inodeNum() == b.inodeNum() {
 
 			// a is a (grand-)child of b
@@ -921,11 +929,13 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 			child = a
 			break
 		}
+
+		upwardsParent = c.qfs.inode(c, upwardsParent.parent())
 	}
 
 	if upwardsParent == nil {
-		upwardsParent = b.parent()
-		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+		upwardsParent := c.qfs.inode(c, b.parent())
+		for upwardsParent != nil {
 			if upwardsParent.inodeNum() == a.inodeNum() {
 
 				// b is a (grand-)child of a
@@ -933,6 +943,7 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 				child = b
 				break
 			}
+			upwardsParent = c.qfs.inode(c, upwardsParent.parent())
 		}
 	}
 
@@ -986,7 +997,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// successfully update the child. If the two directories are not
 		// related in that way then we choose arbitrarily because it doesn't
 		// matter.
-		parent, child := sortParentChild(dst, dir)
+		parent, child := sortParentChild(c, dst, dir)
 		firstLock, lastLock := getLockOrder(dst, dir)
 		firstLock.(*Directory).Lock()
 		lastLock.(*Directory).Lock()
@@ -1014,8 +1025,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
-				child.setParent(dst.self)
-				child.setName(newName)
+				child.inode.setParent(dst.self.inodeNum())
+				child.inode.setName(newName)
 			}
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
@@ -1028,11 +1039,16 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
-			dst.insertEntry_(c, oldInodeId, newEntry, child)
+			var childInode Inode
 			if child == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
+			} else {
+				childInode = child.inode
 			}
+
+			dst.insertEntry_(c, oldInodeId, newEntry,
+				childInode)
 
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
@@ -1073,7 +1089,7 @@ func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 	}()
 	// being inserted means you're dirty and need to be synced
 	if inode != nil {
-		dir.dirtyChildren_[inodeNum] = inode
+		dir.dirtyChildren_[inodeNum] = inode.inodeNum()
 	} else {
 		dir.self.dirty(c)
 	}
@@ -1082,25 +1098,30 @@ func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	return dir.parent().getChildXAttrSize(c, dir.inodeNum(), attr)
+	parent := c.qfs.inode(c, dir.parent())
+	return parent.getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	return dir.parent().getChildXAttrData(c, dir.inodeNum(), attr)
+	parent := c.qfs.inode(c, dir.parent())
+	return parent.getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	return dir.parent().listChildXAttr(c, dir.inodeNum())
+	parent := c.qfs.inode(c, dir.parent())
+	return parent.listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	return dir.parent().setChildXAttr(c, dir.inodeNum(), attr, data)
+	parent := c.qfs.inode(c, dir.parent())
+	return parent.setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
+	parent := c.qfs.inode(c, dir.parent())
+	return parent.removeChildXAttr(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
@@ -1126,7 +1147,8 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}()
 
 	if ok && !dir.self.isWorkspaceRoot() {
-		dir.parent().syncChild(c, dir.InodeCommon.id, key)
+		parent := c.qfs.inode(c, dir.parent())
+		parent.syncChild(c, dir.InodeCommon.id, key)
 	}
 }
 
@@ -1258,7 +1280,8 @@ func (dir *Directory) listChildXAttr(c *ctx,
 func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	defer c.FuncIn("Directory::setChildXAttr", "%d, %s", inodeNum, attr).out()
+	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
+		len(data)).out()
 	// The self-defined extended attribute is not able to be set
 	// it is the combination of two attributes
 	if attr == quantumfs.XAttrTypeKey {
@@ -1308,7 +1331,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 			return fuse.Status(syscall.ENOSPC)
 		}
 
-		c.vlog("Appending new attribute %v", attributeList.Bytes())
+		c.vlog("Appending new attribute")
 		attributeList.SetAttribute(attributeList.NumAttributes(), attr,
 			dataKey)
 		attributeList.SetNumAttributes(attributeList.NumAttributes() + 1)
