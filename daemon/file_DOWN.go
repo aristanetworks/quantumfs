@@ -33,7 +33,8 @@ func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
 	defer fd.file.Lock().Unlock()
 	if fd.file.isDirty() {
 		key := fd.file.flush_DOWN(c)
-		fd.file.parent().syncChild(c, fd.file.InodeCommon.id, key)
+		parent := c.qfs.inode(c, fd.file.parent())
+		parent.syncChild(c, fd.file.InodeCommon.id, key)
 	}
 
 	return fuse.OK

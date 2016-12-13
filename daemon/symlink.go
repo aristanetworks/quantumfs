@@ -26,7 +26,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		key: key,
 	}
 	symlink.self = &symlink
-	symlink.setParent(parent)
+	symlink.setParent(parent.inodeNum())
 	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 
 	if dirRecord != nil {
@@ -52,7 +52,8 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := link.parent().getChildRecord(c, link.InodeCommon.id)
+	parent := c.qfs.inode(c, link.parent())
+	record, err := parent.getChildRecord(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
 		return fuse.EIO
@@ -92,7 +93,8 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out,
+	parent := c.qfs.inode(c, link.parent())
+	return parent.setChildAttr(c, link.InodeCommon.id, nil, attr, out,
 		false)
 }
 
@@ -152,24 +154,31 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
-	return link.parent().getChildXAttrSize(c, link.inodeNum(), attr)
+
+	parent := c.qfs.inode(c, link.parent())
+	return parent.getChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
-	return link.parent().getChildXAttrData(c, link.inodeNum(), attr)
+
+	parent := c.qfs.inode(c, link.parent())
+	return parent.getChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	return link.parent().listChildXAttr(c, link.inodeNum())
+	parent := c.qfs.inode(c, link.parent())
+	return parent.listChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	return link.parent().setChildXAttr(c, link.inodeNum(), attr, data)
+	parent := c.qfs.inode(c, link.parent())
+	return parent.setChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
+	parent := c.qfs.inode(c, link.parent())
+	return parent.removeChildXAttr(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
@@ -235,5 +244,6 @@ func (link *Symlink) getChildRecord(c *ctx,
 
 func (link *Symlink) dirty(c *ctx) {
 	link.setDirty(true)
-	link.parent().dirtyChild(c, link)
+	parent := c.qfs.inode(c, link.parent())
+	parent.dirtyChild(c, link.inodeNum())
 }
