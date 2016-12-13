@@ -5,7 +5,6 @@
 package daemon
 
 import "fmt"
-import "math"
 import "sync"
 import "sync/atomic"
 import "time"
