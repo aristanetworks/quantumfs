@@ -202,98 +202,54 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	})
 }
 
-func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
-	dir string, notOwn bool) {
-
-	fd, err := syscall.Creat(file, 0)
-	test.assert(err == nil, "Error creating file: %v", err)
-	syscall.Close(fd)
-
-	if dir != "" {
-		var stat syscall.Stat_t
-		err = syscall.Stat(dir, &stat)
-		test.assert(err == nil,
-			"Error getting file stat with %v: %d, %d, %o",
-			err, stat.Uid, stat.Gid, stat.Mode)
-
-		err = syscall.Chmod(dir, stat.Mode|syscall.S_ISVTX)
-		test.assert(err == nil, "Error change the mode of file: %v", err)
-
-		err = syscall.Stat(dir, &stat)
-		test.assert(err == nil && stat.Mode&syscall.S_ISVTX != 0,
-			"Error getting file stat with %v: %d, %d, %o",
-			err, stat.Uid, stat.Gid, stat.Mode)
-		if notOwn {
-			err = syscall.Chown(file, 100, 100)
-			test.assert(err == nil,
-				"Error change the ownership of file: %v", err)
-		}
-
-	}
-
-	err = syscall.Unlink(file)
-	if expectedErr == 0 {
-		test.assert(err == nil, "Error unlinking file %s : %v", file, err)
-	} else {
-		test.assert(err == expectedErr,
-			"Incorrect error unlinking file %s : %v", file, err)
-	}
-}
-
-func modifyVerifyChown(test *testHelper, dir string, uid int, gid int) {
-	// Try to change the ownership of the rootDir to uid, gid
-	err := os.Chown(dir, uid, gid)
-	test.assert(err == nil, "Failed to chown: %v", err)
-
-	// Verify the file's uid is 99 and gid is 0
-	var stat syscall.Stat_t
-	err = syscall.Stat(dir, &stat)
-	test.assert(err == nil && int(stat.Uid) == uid && int(stat.Gid) == gid,
-		"Error getting directory stat with %v: %d, %d",
-		err, stat.Uid, stat.Gid)
-}
-
 func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
-	directoryMatchesUser bool, directorySticky bool, permissions uint32,
-	mustSucceed bool) {
-
-	workspace := test.newWorkspace()
-	var testDir string
-	if onDirectory {
-		testDir = workspace + "/testDir"
-	} else {
-		testDir = workspace
-	}
-	testFile := testDir + "/file"
+	directoryUserMatches bool, directoryGroupMatches bool, directorySticky bool,
+	permissions uint32, mustSucceed bool) {
 
 	if directorySticky {
 		permissions |= syscall.S_ISVTX
 	}
 
+	workspace := test.newWorkspace()
+	testDir := workspace
 	if onDirectory {
+		testDir = workspace + "/testDir"
 		err := os.Mkdir(testDir, os.FileMode(permissions))
 		test.assert(err == nil, "Failed creating testDir: %v", err)
 	}
+	testFile := testDir + "/file"
 
 	err := syscall.Mknod(testFile, syscall.S_IFREG, 0)
 	test.assert(err == nil, "Unable to create test file: %v", err)
 
-	// The directory is created being owned by root. If we want the directory to
-	// be owned by the user we are running as, we need to change only if not
-	// root. If we don't want the directory ownership to match at all we use a
-	// third value.
-	if directoryMatchesUser && !asRoot {
-		err = os.Chown(testDir, 99, 99)
-		test.assert(err == nil, "Error chowning test directory: %v", err)
-	} else if !directoryMatchesUser {
-		if onDirectory {
-			err = os.Chown(testDir, 100, 100)
-			test.assert(err == nil, "Error chowning test directory: %v",
-				err)
-		} else {
-			// We cannot chmod on a WorkspaceRoot, just leave the owner
-			// as root.
-		}
+	var uid int
+	var gid int
+
+	if !directoryUserMatches {
+		uid = 100
+	} else if asRoot {
+		uid = 0
+	} else { // !asRoot
+		uid = 99
+	}
+
+	if !directoryGroupMatches {
+		gid = 100
+	} else if asRoot {
+		gid = 0
+	} else { // !asRoot
+		gid = 99
+	}
+
+	if onDirectory {
+		err = os.Chown(testDir, uid, gid)
+		test.assert(err == nil, "Error chowning test directory: %v",
+			err)
+	} else {
+		// We cannot chown on a WorkspaceRoot, just leave the owner
+		// as root.
+		test.assert(!asRoot,
+			"Cannot chown workspaceroot, invalid arguments")
 	}
 
 	if !asRoot {
@@ -303,7 +259,7 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 
 	err = syscall.Unlink(testFile)
 	if mustSucceed {
-		test.assert(err == nil, "Failed to unlink file as root: %v", err)
+		test.assert(err == nil, "Failed to unlink file: %v", err)
 	} else {
 		test.assert(err == syscall.EACCES, "Wrong error when unlinking: %v",
 			err)
@@ -312,127 +268,165 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 
 func TestUnlinkPermissionsAsRootNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, false, false, 0000, true)
+		testUnlinkPermissions(test, true, true, false, false, false, 0000,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsRootNoPermsSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, false, true, 0000, true)
+		testUnlinkPermissions(test, true, true, false, false, true, 0000,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsRootNoPermsOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, true, false, 0000, true)
+		testUnlinkPermissions(test, true, true, true, true, false, 0000,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsRootNoPermsOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, true, false, 0000, true)
+		testUnlinkPermissions(test, true, true, true, true, true, 0000,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, 0555, false)
+		testUnlinkPermissions(test, true, false, false, false, false, 0555,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, true, 0555, false)
+		testUnlinkPermissions(test, true, false, false, false, true, 0555,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, false, 0555, false)
+		testUnlinkPermissions(test, true, false, true, true, false, 0555,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, 0555, false)
+		testUnlinkPermissions(test, true, false, true, true, true, 0555,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, 0755, false)
+		testUnlinkPermissions(test, true, false, false, false, false, 0755,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, true, 0755, false)
+		testUnlinkPermissions(test, true, false, false, false, true, 0755,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, false, 0755, true)
+		testUnlinkPermissions(test, true, false, true, true, false, 0755,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, 0755, true)
+		testUnlinkPermissions(test, true, false, true, true, true, 0755,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, 0575, false)
+		testUnlinkPermissions(test, true, false, false, false, false, 0575,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, true, 0575, false)
+		testUnlinkPermissions(test, true, false, false, false, true, 0575,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, false, 0575, false)
+		testUnlinkPermissions(test, true, false, true, true, false, 0575,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, 0575, false)
+		testUnlinkPermissions(test, true, false, true, true, true, 0575,
+			false)
 	})
 }
 
+/* TODO Temporarily disabled until the refactoring where we can change the test
+* effective gid comes in.
+func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, true, false, 0575,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, true, true, 0575,
+			true)
+	})
+}
+*/
+
 func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, 0557, true)
+		testUnlinkPermissions(test, true, false, false, false, false, 0557,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, true, 0557, true)
+		testUnlinkPermissions(test, true, false, false, false, true, 0557,
+			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, false, 0557, false)
+		testUnlinkPermissions(test, true, false, true, true, false, 0557,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, 0557, false)
+		testUnlinkPermissions(test, true, false, true, true, true, 0557,
+			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserInWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, false, false, false, false, 0000, true)
+		testUnlinkPermissions(test, false, false, false, false, false, 0000,
+			true)
 	})
 }
 

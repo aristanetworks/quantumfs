@@ -1337,7 +1337,8 @@ func (dir *Directory) listChildXAttr(c *ctx,
 func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	defer c.FuncIn("Directory::setChildXAttr", "%d, %s", inodeNum, attr).out()
+	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
+		len(data)).out()
 	// The self-defined extended attribute is not able to be set
 	// it is the combination of two attributes
 	if attr == quantumfs.XAttrTypeKey {
@@ -1387,7 +1388,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 			return fuse.Status(syscall.ENOSPC)
 		}
 
-		c.vlog("Appending new attribute %v", attributeList.Bytes())
+		c.vlog("Appending new attribute")
 		attributeList.SetAttribute(attributeList.NumAttributes(), attr,
 			dataKey)
 		attributeList.SetNumAttributes(attributeList.NumAttributes() + 1)
