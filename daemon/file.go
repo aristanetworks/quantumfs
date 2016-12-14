@@ -491,9 +491,9 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 	switch {
 	case numBlocks <= 1:
 		return quantumfs.ObjectTypeSmallFile
-	case numBlocks <= quantumfs.MaxBlocksMediumFile:
+	case numBlocks <= quantumfs.MaxBlocksMediumFile():
 		return quantumfs.ObjectTypeMediumFile
-	case numBlocks <= quantumfs.MaxBlocksLargeFile:
+	case numBlocks <= quantumfs.MaxBlocksLargeFile():
 		return quantumfs.ObjectTypeLargeFile
 	default:
 		return quantumfs.ObjectTypeVeryLargeFile

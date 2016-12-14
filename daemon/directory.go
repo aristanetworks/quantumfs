@@ -408,7 +408,7 @@ func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
 	for _, child := range dir.childrenRecords {
-		if entryIdx == quantumfs.MaxDirectoryRecords {
+		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
@@ -1394,7 +1394,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	// Append attribute
 	if !set {
 		if attributeList.NumAttributes() >
-			quantumfs.MaxNumExtendedAttributes {
+			quantumfs.MaxNumExtendedAttributes() {
 
 			c.vlog("XAttr list full %d", attributeList.NumAttributes())
 			return fuse.Status(syscall.ENOSPC)
