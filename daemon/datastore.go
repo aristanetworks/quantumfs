@@ -3,6 +3,7 @@
 
 package daemon
 
+import "container/list"
 import "crypto/sha1"
 
 import "github.com/aristanetworks/quantumfs"
@@ -10,14 +11,19 @@ import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
 
+const cacheSize = 4096
+
 func newDataStore(durableStore quantumfs.DataStore) *dataStore {
 	return &dataStore{
 		durableStore: durableStore,
+		cache:        make(map[quantumfs.ObjectKey]*buffer, cacheSize),
 	}
 }
 
 type dataStore struct {
 	durableStore quantumfs.DataStore
+	lru          list.List // Back is most recently used
+	cache        map[quantumfs.ObjectKey]*buffer
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
@@ -25,6 +31,12 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
+	}
+
+	// Check cache
+	if buf, exists := store.cache[key]; exists {
+		store.lru.MoveToBack(buf.lruElement)
+		return buf
 	}
 
 	var buf buffer
@@ -37,6 +49,14 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
+		// Store in cache
+		if len(store.cache) >= cacheSize {
+			buf := store.lru.Remove(store.lru.Front())
+			delete(store.cache, buf.(buffer).key)
+		}
+		store.cache[buf.key] = &buf
+		buf.lruElement = store.lru.PushBack(buf)
+
 		return &buf
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %v. Key %s",
@@ -88,11 +108,12 @@ func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
 }
 
 type buffer struct {
-	data      []byte
-	dirty     bool
-	keyType   quantumfs.KeyType
-	key       quantumfs.ObjectKey
-	dataStore *dataStore
+	data       []byte
+	dirty      bool
+	keyType    quantumfs.KeyType
+	key        quantumfs.ObjectKey
+	dataStore  *dataStore
+	lruElement *list.Element
 }
 
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
