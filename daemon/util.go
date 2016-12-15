@@ -172,6 +172,20 @@ func (df *DeferableMutex) Lock() *sync.Mutex {
 	return &df.lock
 }
 
+type DeferableRwMutex struct {
+	lock sync.RWMutex
+}
+
+func (df *DeferableRwMutex) RLock() *sync.RWMutex {
+	df.lock.RLock()
+	return &df.lock
+}
+
+func (df *DeferableRwMutex) Lock() *sync.RWMutex {
+	df.lock.Lock()
+	return &df.lock
+}
+
 // Return the fuse connection id for the filesystem mounted at the given path
 func findFuseConnection(c *ctx, mountPath string) int {
 	c.dlog("Finding FUSE Connection ID...")
