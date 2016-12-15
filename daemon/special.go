@@ -75,7 +75,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	parent := c.qfs.inode(c, special.parent())
+	parent := special.parent(c)
 	record, err := parent.getChildRecord(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
@@ -116,7 +116,7 @@ func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	parent := c.qfs.inode(c, special.parent())
+	parent := special.parent(c)
 	return parent.setChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
@@ -265,7 +265,7 @@ func (special *Special) getChildRecord(c *ctx,
 func (special *Special) dirty(c *ctx) {
 	special.setDirty(true)
 
-	parent := c.qfs.inode(c, special.parent())
+	parent := special.parent(c)
 	parent.dirtyChild(c, special.inodeNum())
 }
 

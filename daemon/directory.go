@@ -175,7 +175,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 			return uint64(len(dir.childrenRecords))
 		}()
 
-		parent := c.qfs.inode(c, dir.parent())
+		parent := dir.parent(c)
 		parent.setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
@@ -236,7 +236,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 func (dir *Directory) dirty(c *ctx) {
 	if !dir.setDirty(true) {
 		// Only go recursive if we aren't already dirty
-		parent := c.qfs.inode(c, dir.parent())
+		parent := dir.parent(c)
 		parent.dirtyChild(c, dir.inodeNum())
 	}
 }
@@ -482,7 +482,7 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("Directory::GetAttr").out()
 
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	record, err := parent.getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)
@@ -635,7 +635,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
 		attr.Size).out()
 
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	return parent.setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
 }
@@ -763,7 +763,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		// needs a permission check.
 		if !dir.self.isWorkspaceRoot() {
 			owner := c.fuseCtx.Owner
-			parent := c.qfs.inode(c, dir.parent())
+			parent := dir.parent(c)
 			dirRecord, err := parent.getChildRecord(c,
 				dir.InodeCommon.id)
 			if err != nil {
@@ -972,7 +972,7 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	var parent *Directory
 	var child *Directory
 
-	upwardsParent := c.qfs.inode(c, a.parent())
+	upwardsParent := a.parent(c)
 	for upwardsParent != nil {
 		if upwardsParent.inodeNum() == b.inodeNum() {
 
@@ -982,11 +982,11 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 			break
 		}
 
-		upwardsParent = c.qfs.inode(c, upwardsParent.parent())
+		upwardsParent = upwardsParent.parent(c)
 	}
 
 	if upwardsParent == nil {
-		upwardsParent := c.qfs.inode(c, b.parent())
+		upwardsParent = b.parent(c)
 		for upwardsParent != nil {
 			if upwardsParent.inodeNum() == a.inodeNum() {
 
@@ -995,7 +995,7 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 				child = b
 				break
 			}
-			upwardsParent = c.qfs.inode(c, upwardsParent.parent())
+			upwardsParent = upwardsParent.parent(c)
 		}
 	}
 
@@ -1150,29 +1150,29 @@ func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	return parent.getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	return parent.getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	return parent.listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	return parent.setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	parent := c.qfs.inode(c, dir.parent())
+	parent := dir.parent(c)
 	return parent.removeChildXAttr(c, dir.inodeNum(), attr)
 }
 
@@ -1199,7 +1199,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}()
 
 	if ok && !dir.self.isWorkspaceRoot() {
-		parent := c.qfs.inode(c, dir.parent())
+		parent := dir.parent(c)
 		parent.syncChild(c, dir.InodeCommon.id, key)
 	}
 }

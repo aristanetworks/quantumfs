@@ -535,7 +535,7 @@ func (qfs *QuantumFs) ForgetChain(inode Inode) []InodeId {
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 
 		if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
-			parent := qfs.inode(&qfs.c, inode.parent())
+			parent := inode.parent(&qfs.c)
 			parent.syncChild(&qfs.c, inode.inodeNum(), key)
 
 			qfs.addUninstantiated(&qfs.c,
@@ -857,7 +857,7 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	}
 
 	var dir *Directory
-	parent := c.qfs.inode(c, inode.parent())
+	parent := inode.parent(c)
 	if parent.isWorkspaceRoot() {
 		dir = &parent.(*WorkspaceRoot).Directory
 	} else {
