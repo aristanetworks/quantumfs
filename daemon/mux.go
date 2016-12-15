@@ -20,15 +20,15 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
-		RawFileSystem:    fuse.NewDefaultRawFileSystem(),
-		config:           config,
-		inodes:           make(map[InodeId]InodeItem),
-		fileHandles:      make(map[FileHandleId]FileHandle),
-		inodeNum:         quantumfs.InodeIdReservedEnd,
-		fileHandleNum:    quantumfs.InodeIdReservedEnd,
-		activeWorkspaces: make(map[string]*WorkspaceRoot),
-		parentOfUninstantiated:      make(map[InodeId]InodeId),
-		lookupCounts:     make(map[InodeId]uint64),
+		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
+		config:                 config,
+		inodes:                 make(map[InodeId]InodeItem),
+		fileHandles:            make(map[FileHandleId]FileHandle),
+		inodeNum:               quantumfs.InodeIdReservedEnd,
+		fileHandleNum:          quantumfs.InodeIdReservedEnd,
+		activeWorkspaces:       make(map[string]*WorkspaceRoot),
+		parentOfUninstantiated: make(map[InodeId]InodeId),
+		lookupCounts:           make(map[InodeId]uint64),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
