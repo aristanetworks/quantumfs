@@ -52,7 +52,7 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	record, err := parent.getChildRecord(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
@@ -93,7 +93,7 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	return parent.setChildAttr(c, link.InodeCommon.id, nil, attr, out,
 		false)
 }
@@ -155,29 +155,29 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	return parent.getChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	return parent.getChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	return parent.listChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	return parent.setChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	return parent.removeChildXAttr(c, link.inodeNum(), attr)
 }
 
@@ -244,6 +244,6 @@ func (link *Symlink) getChildRecord(c *ctx,
 
 func (link *Symlink) dirty(c *ctx) {
 	link.setDirty(true)
-	parent := c.qfs.inode(c, link.parent())
+	parent := link.parent(c)
 	parent.dirtyChild(c, link.inodeNum())
 }

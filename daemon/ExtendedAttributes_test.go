@@ -216,7 +216,7 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 	var id InodeId
 	id = InodeId(stat.Ino)
 	inode := test.qfs.inodes[id].inode
-	parent := test.qfs.inode(&test.qfs.c, inode.parent())
+	parent := inode.parent(&test.qfs.c)
 	record, err := parent.getChildRecord(&test.qfs.c, id)
 
 	// Verify the type and key matching
@@ -299,7 +299,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 		test.assert(err == nil, "Error stat'ing symlink: %v", err)
 		id := InodeId(stat.Ino)
 		inode := test.qfs.inode(&test.qfs.c, id)
-		parent := test.qfs.inode(&test.qfs.c, inode.parent())
+		parent := inode.parent(&test.qfs.c)
 		record, err := parent.getChildRecord(&test.qfs.c, id)
 
 		// Verify the type and key matching

@@ -23,7 +23,7 @@ func (special *Special) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 
 func (special *Special) Sync_DOWN(c *ctx) fuse.Status {
 	key := special.flush_DOWN(c)
-	parent := c.qfs.inode(c, special.parent())
+	parent := special.parent(c)
 	parent.syncChild(c, special.InodeCommon.id, key)
 
 	return fuse.OK
