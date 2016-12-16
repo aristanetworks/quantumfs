@@ -7,6 +7,7 @@ import "bytes"
 import "encoding/base64"
 import "encoding/binary"
 import "errors"
+import "fmt"
 import "syscall"
 import "sync"
 import "time"
@@ -109,6 +110,8 @@ func initDirectory(c *ctx, name string, dir *Directory,
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := dir.children.newChild(c,
 				baseLayer.Entry(i))
+			c.vlog("initDirectory %d getting child %d", inodeNum,
+				childInodeNum)
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
 
@@ -1033,15 +1036,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
-			var childInode Inode
 			if child == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
-			} else {
-				childInode = child.inode
 			}
 
-			dst.insertEntry_(c, newEntry, childInode)
+			dst.insertEntry_(c, newEntry, oldInodeId, child != nil)
 
 			// Remove entry in old directory
 			dir.deleteEntry_(c, oldName)
@@ -1072,13 +1072,14 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 	dir.children.deleteChild(inodeId)
 }
 
-func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inode Inode) {
+func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum InodeId,
+	inodeLoaded bool) {
 
-	dir.children.setChild(c, entry, inode.inodeNum())
+	dir.children.setChild(c, entry, inodeNum)
 
 	// being inserted means you're dirty and need to be synced
-	if inode != nil {
-		dir.children.setDirty(c, inode.inodeNum())
+	if inodeLoaded {
+		dir.children.setDirty(c, inodeNum)
 	} else {
 		dir.self.dirty(c)
 	}
@@ -1408,6 +1409,11 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	defer c.vlog("Directory::instantiateChild Exit")
 
 	entry := dir.children.record(inodeNum)
+	if entry == nil {
+		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
+			inodeNum))
+	}
+
 	c.vlog("Instantiate %s %d", entry.Filename(), inodeNum)
 
 	var constructor InodeConstructor

@@ -538,23 +538,30 @@ func (qfs *QuantumFs) ForgetChain(inode Inode) []InodeId {
 
 		// Great, we want to forget this so proceed
 		key := inode.flush_DOWN(&qfs.c)
-		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 
-		orphaned := inode.isOrphaned()
-		root := inode.isWorkspaceRoot()
-		qfs.c.vlog("Forgetting inode %d, %d %d", inode.inodeNum(), orphaned,
-			root)
-		if !orphaned && !root {
-			parent := inode.parent(&qfs.c)
-			parent.syncChild(&qfs.c, inode.inodeNum(), key)
+		parentId := inode.parentId()
+		if !inode.isWorkspaceRoot() && parentId != quantumfs.InodeIdInvalid {
+			orphaned := inode.isOrphaned()
+			qfs.c.vlog("Forgetting inode %d, %d %d", inode.inodeNum(),
+				orphaned, parentId)
 
-			qfs.addUninstantiated(&qfs.c,
-				[]InodeId{inode.inodeNum()},
-				parent.inodeNum())
+			if !orphaned {
+				parent := qfs.inode(&qfs.c, parentId)
+				parent.syncChild(&qfs.c, inode.inodeNum(), key)
 
-			// Then check our parent and iterate again
-			inode = parent
-			continue
+				qfs.addUninstantiated(&qfs.c,
+					[]InodeId{inode.inodeNum()},
+					parent.inodeNum())
+
+				qfs.setInode(&qfs.c, inode.inodeNum(), nil)
+
+				// Then check our parent and iterate again
+				inode = parent
+				continue
+			}
+
+			// we must delete the inode *after* we've done everything
+			qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 		}
 		break
 	}
