@@ -123,11 +123,11 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// we need to lock to do this without racing
 		test.qfs.mapMutex.Lock()
-		numUninstantiatedOld := len(test.qfs.parentInode)
+		numUninstantiatedOld := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock()
 
 		// Forgetting should now forget the Directory and thus remove all the
-		// uninstantiated children from the parentInode list.
+		// uninstantiated children from the parentOfUninstantiated list.
 		remountFilesystem(test)
 
 		test.assertLogContains("Forgetting inode",
@@ -136,14 +136,14 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.qfs.mapMutex.Lock()
 		//BUG: Between remountFilesystem and here, the kernel can and does
 		// lookup these files, thereby populating the map we're checking!
-		numUninstantiatedNew := len(test.qfs.parentInode)
+		numUninstantiatedNew := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock()
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed %d <= %d",
 			numUninstantiatedOld, numUninstantiatedNew)
 
-		for _, parent := range test.qfs.parentInode {
+		for _, parent := range test.qfs.parentOfUninstantiated {
 			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
 				"use forgotten directory as parent")
 		}

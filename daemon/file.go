@@ -82,7 +82,7 @@ func (fi *File) dirty(c *ctx) {
 	defer c.funcIn("File::dirty").out()
 
 	fi.setDirty(true)
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	parent.dirtyChild(c, fi.inodeNum())
 }
 
@@ -102,7 +102,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("File::GetAttr").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	record, err := parent.getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
@@ -125,7 +125,7 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 	defer c.funcIn("File::openPermission").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	record, error := parent.getChildRecord(c, fi.id)
 	if error != nil {
 		return false
@@ -249,7 +249,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	return parent.setChildAttr(c, fi.InodeCommon.id, nil, attr, out,
 		updateMtime)
 }
@@ -307,7 +307,7 @@ func (fi *File) GetXAttrSize(c *ctx,
 
 	defer c.funcIn("File::GetXAttrSize").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	return parent.getChildXAttrSize(c, fi.inodeNum(), attr)
 }
 
@@ -316,28 +316,28 @@ func (fi *File) GetXAttrData(c *ctx,
 
 	defer c.funcIn("File::GetXAttrData").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	return parent.getChildXAttrData(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
 	defer c.funcIn("File::ListXAttr").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	return parent.listChildXAttr(c, fi.inodeNum())
 }
 
 func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 	defer c.funcIn("File::SetXAttr").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	return parent.setChildXAttr(c, fi.inodeNum(), attr, data)
 }
 
 func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	defer c.funcIn("File::RemoveXAttr").out()
 
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	return parent.removeChildXAttr(c, fi.inodeNum(), attr)
 }
 
@@ -524,7 +524,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		parent := c.qfs.inode(c, fi.parent())
+		parent := fi.parent(c)
 		parent.setChildAttr(c, fi.id, &neededType, &attr, nil, false)
 	}
 	return nil
@@ -666,7 +666,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	parent := c.qfs.inode(c, fi.parent())
+	parent := fi.parent(c)
 	parent.setChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
 
