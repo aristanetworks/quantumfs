@@ -13,8 +13,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	parent := srcInode.parent(c)
-	origRecord, err := parent.getChildRecord(c, srcInode.inodeNum())
+	origRecord, err := srcInode.parent(c).getChildRecord(c, srcInode.inodeNum())
 	if err != nil {
 		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
 		return fuse.EIO
