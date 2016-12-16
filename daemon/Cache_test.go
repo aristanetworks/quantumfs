@@ -61,21 +61,29 @@ func primeDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataSt
 	}
 }
 
+func prepDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx, backingStore *testDataStore,
+	datastore *dataStore, keys map[int]quantumfs.ObjectKey) {
+
+	backingStore = newTestDataStore(test)
+	datastore = newDataStore(backingStore, cacheSize)
+
+	keys = make(map[int]quantumfs.ObjectKey, 2*cacheSize)
+
+	ctx := ctx{
+		Ctx: quantumfs.Ctx{
+			Qlog:      test.logger,
+			RequestId: qlog.TestReqId,
+		},
+	}
+	c = &ctx.Ctx
+
+	return c, backingStore, datastore, keys
+}
+
 func TestCacheLru(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
-		backingStore := newTestDataStore(test)
-		datastore := newDataStore(backingStore, cacheSize)
-
-		keys := make(map[int]quantumfs.ObjectKey, 2*cacheSize)
-
-		ctx := ctx{
-			Ctx: quantumfs.Ctx{
-				Qlog:      test.logger,
-				RequestId: qlog.TestReqId,
-			},
-		}
-		c := &ctx.Ctx
+		c, backingStore, datastore, keys := prepDatastore(test, cacheSize)
 
 		primeDatastore(c, test, backingStore, datastore, cacheSize, keys)
 
