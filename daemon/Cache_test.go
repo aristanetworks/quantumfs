@@ -84,7 +84,6 @@ func TestCacheLru(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
 		c, backingStore, datastore, keys := prepDatastore(test, cacheSize)
-
 		primeDatastore(c, test, backingStore, datastore, cacheSize, keys)
 
 		// Prime the LRU by reading every entry in reverse order. At the end
@@ -128,5 +127,28 @@ func TestCacheLru(t *testing.T) {
 		data = datastore.lru.Front().Value.(buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
 		test.assert(i == 255, "Incorrect least recent block %d != 255", i)
+	})
+}
+
+func TestCacheCaching(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		cacheSize := 256
+		c, backingStore, datastore, keys := prepDatastore(test, cacheSize)
+		primeDatastore(c, test, backingStore, datastore, cacheSize, keys)
+
+		// Prime the cache
+		for i := 1; i < 100; i++ {
+			buf := datastore.Get(c, keys[i])
+			test.assert(buf != nil, "Failed to get block %d", i)
+		}
+
+		backingStore.shouldRead = false
+
+		// Reading again should come entirely from the cache. If not
+		// testDataStore will assert.
+		for i := 1; i < 100; i++ {
+			buf := datastore.Get(c, keys[i])
+			test.assert(buf != nil, "Failed to get block %d", i)
+		}
 	})
 }
