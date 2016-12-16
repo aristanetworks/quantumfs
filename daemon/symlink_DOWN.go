@@ -22,8 +22,7 @@ func (link *Symlink) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 
 func (link *Symlink) Sync_DOWN(c *ctx) fuse.Status {
 	key := link.flush_DOWN(c)
-	parent := link.parent(c)
-	parent.syncChild(c, link.InodeCommon.id, key)
+	link.parent(c).syncChild(c, link.InodeCommon.id, key)
 
 	return fuse.OK
 }

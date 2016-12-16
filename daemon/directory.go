@@ -175,8 +175,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 			return uint64(len(dir.childrenRecords))
 		}()
 
-		parent := dir.parent(c)
-		parent.setChildAttr(c, dir.id, nil, &attr, nil, true)
+		dir.parent(c).setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
@@ -236,8 +235,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 func (dir *Directory) dirty(c *ctx) {
 	if !dir.setDirty(true) {
 		// Only go recursive if we aren't already dirty
-		parent := dir.parent(c)
-		parent.dirtyChild(c, dir.inodeNum())
+		dir.parent(c).dirtyChild(c, dir.inodeNum())
 	}
 }
 
@@ -482,8 +480,7 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("Directory::GetAttr").out()
 
-	parent := dir.parent(c)
-	record, err := parent.getChildRecord(c, dir.InodeCommon.id)
+	record, err := dir.parent(c).getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)
 		return fuse.EIO
@@ -635,8 +632,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
 		attr.Size).out()
 
-	parent := dir.parent(c)
-	return parent.setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
+	return dir.parent(c).setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
 }
 
@@ -763,8 +759,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		// needs a permission check.
 		if !dir.self.isWorkspaceRoot() {
 			owner := c.fuseCtx.Owner
-			parent := dir.parent(c)
-			dirRecord, err := parent.getChildRecord(c,
+			dirRecord, err := dir.parent(c).getChildRecord(c,
 				dir.InodeCommon.id)
 			if err != nil {
 				return fuse.ENOENT
@@ -1150,30 +1145,25 @@ func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	parent := dir.parent(c)
-	return parent.getChildXAttrSize(c, dir.inodeNum(), attr)
+	return dir.parent(c).getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	parent := dir.parent(c)
-	return parent.getChildXAttrData(c, dir.inodeNum(), attr)
+	return dir.parent(c).getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	parent := dir.parent(c)
-	return parent.listChildXAttr(c, dir.inodeNum())
+	return dir.parent(c).listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	parent := dir.parent(c)
-	return parent.setChildXAttr(c, dir.inodeNum(), attr, data)
+	return dir.parent(c).setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	parent := dir.parent(c)
-	return parent.removeChildXAttr(c, dir.inodeNum(), attr)
+	return dir.parent(c).removeChildXAttr(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
@@ -1199,8 +1189,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}()
 
 	if ok && !dir.self.isWorkspaceRoot() {
-		parent := dir.parent(c)
-		parent.syncChild(c, dir.InodeCommon.id, key)
+		dir.parent(c).syncChild(c, dir.InodeCommon.id, key)
 	}
 }
 
