@@ -500,15 +500,15 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 	return inode.Lookup(c, name, out)
 }
 
-func (qfs *QuantumFs) ForgetChain(inode Inode) []InodeId {
+func (qfs *QuantumFs) ForgetChain(inodeItem InodeItem) []InodeId {
 	// We must timeout if we cannot grab the tree lock. Forget is called on the
 	// unmount path and if we are trying to forcefully unmount due to some
 	// internal error or hang, if we don't timeout we can deadlock against that
 	// other broken operation.
-	lock := inode.LockTreeWaitAtMost(200 * time.Millisecond)
+	lock := inodeItem.inode.LockTreeWaitAtMost(200 * time.Millisecond)
 	if lock == nil {
 		qfs.c.elog("Timed out locking tree in Forget. Inode %d",
-			inode.inodeNum())
+			inodeItem.inode.inodeNum())
 		qfs.giveUpOnForget = true
 		return nil
 	} else {
@@ -517,6 +517,11 @@ func (qfs *QuantumFs) ForgetChain(inode Inode) []InodeId {
 
 	rtn := make([]InodeId, 0)
 	for {
+		if !inodeItem.toForget {
+			break
+		}
+		inode := inodeItem.inode
+
 		if dir, isDir := inode.(inodeHolder); isDir {
 			children := dir.childInodes()
 
@@ -535,15 +540,21 @@ func (qfs *QuantumFs) ForgetChain(inode Inode) []InodeId {
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 
 		if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
-			parent := inode.parent(&qfs.c)
-			parent.syncChild(&qfs.c, inode.inodeNum(), key)
+			parentId := inode.parentId()
+			parent := qfs.inodeNoInstantiate(&qfs.c, parentId)
+			if parent == nil || parent.inode == nil {
+				panic(fmt.Sprintf("Parent was unloaded before child"+
+					"! %d %d", parentId, inode.inodeNum()))
+			}
+
+			parent.inode.syncChild(&qfs.c, inode.inodeNum(), key)
 
 			qfs.addUninstantiated(&qfs.c,
 				[]InodeId{inode.inodeNum()},
-				parent.inodeNum())
+				parent.inode.inodeNum())
 
 			// Then check our parent and iterate again
-			inode = parent
+			inodeItem = *parent
 			continue
 		}
 		break
@@ -579,7 +590,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	inodeItem.toForget = true
 
-	toRemove := qfs.ForgetChain(inodeItem.inode)
+	toRemove := qfs.ForgetChain(*inodeItem)
 
 	if toRemove != nil {
 		// We need to remove all uninstantiated children.
