@@ -42,6 +42,10 @@ func (cmap *ChildMap) setChild(c *ctx, entry DirectoryRecordIf, inodeId InodeId)
 }
 
 func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
+	if entry == nil {
+		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
+	}
+
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
@@ -57,10 +61,15 @@ func (cmap *ChildMap) count() uint64 {
 func (cmap *ChildMap) deleteChild(inodeNum InodeId) DirectoryRecordIf {
 	defer cmap.childLock.Lock().Unlock()
 
-	record := cmap.childrenRecords[inodeNum]
+	record, exists := cmap.childrenRecords[inodeNum]
+	if !exists {
+		panic(fmt.Sprintf("Delete child that has no record: %d", inodeNum))
+	} else {
+		delete(cmap.children, record.Filename())
+	}
+
 	delete(cmap.childrenRecords, inodeNum)
 	delete(cmap.dirtyChildren, inodeNum)
-	delete(cmap.children, record.Filename())
 
 	return record
 }
@@ -125,7 +134,7 @@ func (cmap *ChildMap) inodeNum(name string) InodeId {
 func (cmap *ChildMap) inodes() []InodeId {
 	defer cmap.childLock.RLock().RUnlock()
 
-	rtn := make([]InodeId, len(cmap.children))
+	rtn := make([]InodeId, 0, len(cmap.children))
 	for _, v := range cmap.children {
 		rtn = append(rtn, v)
 	}
@@ -136,7 +145,7 @@ func (cmap *ChildMap) inodes() []InodeId {
 func (cmap *ChildMap) records() []DirectoryRecordIf {
 	defer cmap.childLock.RLock().RUnlock()
 
-	rtn := make([]DirectoryRecordIf, len(cmap.childrenRecords))
+	rtn := make([]DirectoryRecordIf, 0, len(cmap.childrenRecords))
 	for _, i := range cmap.childrenRecords {
 		rtn = append(rtn, i)
 	}
