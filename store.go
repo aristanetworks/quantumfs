@@ -12,12 +12,36 @@ import (
 )
 
 // Config struct holds the info needed to connect to a cql cluster
+// and knobs for the different APIs
 type Config struct {
+	Cluster   ClusterConfig   `json:"cluster"`
+	BlobStore BlobStoreConfig `json:"blobstore"`
+	WsDB      WsDBConfig      `json:"wsdb"`
+	BlobMap   BlobMapConfig   `json:"blobmap"`
+}
+
+// ClusterConfig struct holds the info needed to connect to a cql cluster
+type ClusterConfig struct {
 	Nodes      []string      `json:"nodes"`
 	NumConns   int           `json:"numconnections"`
 	NumRetries int           `json:"numretries"`
 	KeySpace   string        `json:"keyspace"`
 	Timeout    time.Duration `json:"timeout"`
+}
+
+// BlobStoreConfig holds config values specific to BlobStore API
+type BlobStoreConfig struct {
+	SomeConfig string `json:"someconfig"`
+}
+
+// WsDBConfig holds config values specfic to WorkspaceDB API
+type WsDBConfig struct {
+	SomeConfig string `json:"someconfig"`
+}
+
+// BlobMapConfig holds config values specific to BlobMap API
+type BlobMapConfig struct {
+	SomeConfig string `json:"someconfig"`
 }
 
 type cqlStoreGlobal struct {

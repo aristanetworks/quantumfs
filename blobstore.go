@@ -26,7 +26,7 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 			"error in reading cql config file %s", err.Error())
 	}
 
-	cluster := NewRealCluster(cfg)
+	cluster := NewRealCluster(cfg.Cluster)
 	var store cqlStore
 	store, err = initCqlStore(cluster)
 	if err != nil {
@@ -36,7 +36,7 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 
 	cbs := &cqlBlobStore{
 		store:    &store,
-		keyspace: cfg.KeySpace,
+		keyspace: cfg.Cluster.KeySpace,
 	}
 	return cbs, nil
 }

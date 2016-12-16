@@ -44,23 +44,24 @@ func SetupTestSchema(confFile string) error {
 	if err != nil {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-	session, err := getTestClusterSession(cfg)
+	session, err := getTestClusterSession(cfg.Cluster)
 	if err != nil {
 		return fmt.Errorf("error in creating gocql session inside SetupTestSchema: %s", err.Error())
 	}
 	defer session.Close()
 
 	queryStr := fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
-		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", cfg.KeySpace)
+		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", cfg.Cluster.KeySpace)
+
 	query := session.Query(queryStr)
 	err = execWithRetry(query)
 
 	if err != nil {
-		return fmt.Errorf("error in creating keyspace %s: %s", cfg.KeySpace, err.Error())
+		return fmt.Errorf("error in creating keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
 	}
 
 	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.blobstore"+
-		"( key text PRIMARY KEY, value blob )", cfg.KeySpace)
+		"( key text PRIMARY KEY, value blob )", cfg.Cluster.KeySpace)
 	query = session.Query(queryStr)
 	err = execWithRetry(query)
 	if err != nil {
@@ -69,7 +70,7 @@ func SetupTestSchema(confFile string) error {
 
 	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.workspacedb"+
 		" ( namespace text, workspace text, key blob, PRIMARY KEY ( namespace, workspace ))",
-		cfg.KeySpace)
+		cfg.Cluster.KeySpace)
 	query = session.Query(queryStr)
 	err = execWithRetry(query)
 	if err != nil {
@@ -86,18 +87,18 @@ func TearDownTestSchema(confFile string) error {
 	if err != nil {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-	session, err := getTestClusterSession(cfg)
+	session, err := getTestClusterSession(cfg.Cluster)
 	if err != nil {
 		return fmt.Errorf("error in creating gocql session inside TearDownTestSchema: %s",
 			err.Error())
 	}
 	defer session.Close()
 
-	queryStr := fmt.Sprintf("DROP keyspace if exists %s", cfg.KeySpace)
+	queryStr := fmt.Sprintf("DROP keyspace if exists %s", cfg.Cluster.KeySpace)
 	query := session.Query(queryStr)
 	err = execWithRetry(query)
 	if err != nil {
-		return fmt.Errorf("error in dropping keyspace %s: %s", cfg.KeySpace, err.Error())
+		return fmt.Errorf("error in dropping keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
 	}
 	return nil
 }
@@ -110,20 +111,20 @@ func TruncateTable(confFile string) error {
 	if err != nil {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-	session, err := getTestClusterSession(cfg)
+	session, err := getTestClusterSession(cfg.Cluster)
 	if err != nil {
 		return fmt.Errorf("error in creating gocql session inside TruncateTable: %s",
 			err.Error())
 	}
 	defer session.Close()
 
-	queryStr := fmt.Sprintf("Truncate %s.blobstore", cfg.KeySpace)
+	queryStr := fmt.Sprintf("Truncate %s.blobstore", cfg.Cluster.KeySpace)
 	query := session.Query(queryStr)
 	err = execWithRetry(query)
 	if err != nil {
 		return fmt.Errorf("error in Truncate Table blobstore: %s", err.Error())
 	}
-	queryStr = fmt.Sprintf("Truncate %s.workspacedb", cfg.KeySpace)
+	queryStr = fmt.Sprintf("Truncate %s.workspacedb", cfg.Cluster.KeySpace)
 	query = session.Query(queryStr)
 	err = execWithRetry(query)
 	if err != nil {
@@ -132,9 +133,9 @@ func TruncateTable(confFile string) error {
 	return nil
 }
 
-func getTestClusterConfig(cfg *Config) *gocql.ClusterConfig {
+func getTestClusterConfig(clusterCfg ClusterConfig) *gocql.ClusterConfig {
 
-	var cluster = gocql.NewCluster(cfg.Nodes...)
+	var cluster = gocql.NewCluster(clusterCfg.Nodes...)
 
 	cluster.ProtoVersion = 3
 	cluster.Consistency = gocql.Quorum
@@ -149,9 +150,9 @@ func getTestClusterConfig(cfg *Config) *gocql.ClusterConfig {
 	return cluster
 }
 
-func getTestClusterSession(cfg *Config) (*gocql.Session, error) {
+func getTestClusterSession(clusterCfg ClusterConfig) (*gocql.Session, error) {
 
-	cluster := getTestClusterConfig(cfg)
+	cluster := getTestClusterConfig(clusterCfg)
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, fmt.Errorf("error in creating session: %s", err.Error())

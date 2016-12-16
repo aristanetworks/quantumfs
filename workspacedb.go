@@ -24,7 +24,7 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 		panic(err.Error())
 	}
 
-	cluster := NewRealCluster(cfg)
+	cluster := NewRealCluster(cfg.Cluster)
 	var store cqlStore
 	store, err = initCqlStore(cluster)
 	if err != nil {
@@ -33,7 +33,7 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 
 	wsdb := &workspaceDB{
 		store:    &store,
-		keyspace: cfg.KeySpace,
+		keyspace: cfg.Cluster.KeySpace,
 	}
 
 	return wsdb

@@ -29,10 +29,32 @@ func (s *setupTests) SetupTest() {
 	//nop
 }
 
+func (s *setupTests) TestValidConfig() {
+	var config Config
+	var config2 *Config
+
+	config.Cluster.Nodes = []string{"node1", "node2"}
+	config.WsDB.SomeConfig = "Some String"
+
+	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	s.Require().NoError(err, "Tempfile creation failed")
+	name := file.Name()
+	file.Close()
+	defer os.Remove(name)
+
+	err = writeCqlConfig(name, &config)
+	s.Require().NoError(err, "CQL config file write failed")
+
+	config2, err = readCqlConfig(name)
+	s.Require().NoError(err, "CQL config file read failed")
+
+	s.Require().Equal(config, *config2, "The config read was not the same as the config written")
+}
+
 func (s *setupTests) TestInvalidConfigFilePath() {
 	var config Config
 
-	config.Nodes = []string{"node1", "node2"}
+	config.Cluster.Nodes = []string{"node1", "node2"}
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
 	s.Require().NoError(err, "Tempfile creation failed")
@@ -53,7 +75,7 @@ func (s *setupTests) TestInvalidConfigFilePath() {
 func (s *setupTests) TestInvalidConfigFilePerms() {
 	var config Config
 
-	config.Nodes = []string{"node1", "node2"}
+	config.Cluster.Nodes = []string{"node1", "node2"}
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
 	s.Require().NoError(err, "Tempfile creation failed")
@@ -77,7 +99,7 @@ func (s *setupTests) TestInvalidConfigFilePerms() {
 func (s *setupTests) TestInvalidConfigFormat() {
 	var config Config
 
-	config.Nodes = []string{"node1", "node2"}
+	config.Cluster.Nodes = []string{"node1", "node2"}
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
 	s.Require().NoError(err, "Tempfile creation failed")

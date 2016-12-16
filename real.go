@@ -14,22 +14,22 @@ type RealCluster struct {
 }
 
 // NewRealCluster returns a default Cluster struct with the given hosts
-func NewRealCluster(cfg *Config) Cluster {
+func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 
-	c := gocql.NewCluster(cfg.Nodes...)
+	c := gocql.NewCluster(clusterCfg.Nodes...)
 	c.ProtoVersion = 3
 	c.Consistency = gocql.Quorum
 	c.PoolConfig.HostSelectionPolicy =
 		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
 	c.Events.DisableSchemaEvents = true
 
-	if cfg.NumRetries == 0 {
-		cfg.NumRetries = 2
+	if clusterCfg.NumRetries == 0 {
+		clusterCfg.NumRetries = 2
 	}
-	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: cfg.NumRetries}
+	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: clusterCfg.NumRetries}
 
-	if cfg.Timeout != 0 {
-		c.Timeout = cfg.Timeout * time.Second
+	if clusterCfg.Timeout != 0 {
+		c.Timeout = clusterCfg.Timeout * time.Second
 	}
 
 	cc := &RealCluster{
