@@ -11,12 +11,11 @@ import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
 
-const cacheSize = 4096
-
-func newDataStore(durableStore quantumfs.DataStore) *dataStore {
+func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	return &dataStore{
 		durableStore: durableStore,
 		cache:        make(map[quantumfs.ObjectKey]*buffer, cacheSize),
+		cacheSize:    cacheSize,
 	}
 }
 
@@ -24,6 +23,7 @@ type dataStore struct {
 	durableStore quantumfs.DataStore
 	lru          list.List // Back is most recently used
 	cache        map[quantumfs.ObjectKey]*buffer
+	cacheSize    int
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
@@ -50,7 +50,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
 		// Store in cache
-		if len(store.cache) >= cacheSize {
+		if store.lru.Len() >= store.cacheSize {
 			buf := store.lru.Remove(store.lru.Front())
 			delete(store.cache, buf.(buffer).key)
 		}
