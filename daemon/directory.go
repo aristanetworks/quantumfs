@@ -968,7 +968,7 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	var child *Directory
 
 	upwardsParent := a.parent(c)
-	for upwardsParent != nil {
+	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent(c) {
 		if upwardsParent.inodeNum() == b.inodeNum() {
 
 			// a is a (grand-)child of b
@@ -976,13 +976,13 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 			child = a
 			break
 		}
-
-		upwardsParent = upwardsParent.parent(c)
 	}
 
 	if upwardsParent == nil {
 		upwardsParent = b.parent(c)
-		for upwardsParent != nil {
+		for ; upwardsParent != nil;
+			upwardsParent = upwardsParent.parent(c) {
+
 			if upwardsParent.inodeNum() == a.inodeNum() {
 
 				// b is a (grand-)child of a
@@ -990,7 +990,6 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 				child = b
 				break
 			}
-			upwardsParent = upwardsParent.parent(c)
 		}
 	}
 

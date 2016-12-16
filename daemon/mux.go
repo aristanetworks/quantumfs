@@ -533,6 +533,8 @@ func (qfs *QuantumFs) ForgetChain(inodeItem InodeItem) []InodeId {
 					return rtn
 				}
 			}
+
+			rtn = append(rtn, children...)
 		}
 
 		// Great, we want to forget this so proceed
