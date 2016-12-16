@@ -61,8 +61,9 @@ func primeDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataSt
 	}
 }
 
-func prepDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx, backingStore *testDataStore,
-	datastore *dataStore, keys map[int]quantumfs.ObjectKey) {
+func prepDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
+	backingStore *testDataStore, datastore *dataStore,
+	keys map[int]quantumfs.ObjectKey) {
 
 	backingStore = newTestDataStore(test)
 	datastore = newDataStore(backingStore, cacheSize)
