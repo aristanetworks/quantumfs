@@ -39,6 +39,28 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
+func primeDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataStore,
+	datastore *dataStore, cacheSize int,
+	keys map[int]quantumfs.ObjectKey) {
+
+	for i := 1; i < 2*cacheSize; i++ {
+		bytes := make([]byte, quantumfs.ObjectKeyLength)
+		bytes[1] = byte(i % 256)
+		bytes[2] = byte(i / 256)
+		key := quantumfs.NewObjectKeyFromBytes(bytes)
+		keys[i] = key
+		buf := &buffer{
+			data:      bytes,
+			dirty:     false,
+			keyType:   quantumfs.KeyTypeData,
+			key:       key,
+			dataStore: datastore,
+		}
+		err := backingStore.Set(c, key, buf)
+		test.assert(err == nil, "Error priming datastore: %v", err)
+	}
+}
+
 func TestCacheLru(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
@@ -55,23 +77,7 @@ func TestCacheLru(t *testing.T) {
 		}
 		c := &ctx.Ctx
 
-		// Prime the datastore
-		for i := 1; i < 2*cacheSize; i++ {
-			bytes := make([]byte, quantumfs.ObjectKeyLength)
-			bytes[1] = byte(i % 256)
-			bytes[2] = byte(i / 256)
-			key := quantumfs.NewObjectKeyFromBytes(bytes)
-			keys[i] = key
-			buf := &buffer{
-				data:      bytes,
-				dirty:     false,
-				keyType:   quantumfs.KeyTypeData,
-				key:       key,
-				dataStore: datastore,
-			}
-			err := backingStore.Set(c, key, buf)
-			test.assert(err == nil, "Error priming datastore: %v", err)
-		}
+		primeDatastore(c, test, backingStore, datastore, cacheSize, keys)
 
 		// Prime the LRU by reading every entry in reverse order. At the end
 		// we should have the first cacheSize elements in the cache.
