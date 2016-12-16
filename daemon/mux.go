@@ -272,7 +272,12 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
+	parent := qfs.inode_(c, parentId)
+	if parent == nil {
+		c.elog("Unable to instantiate parent required: %d", parentId)
+	}
+
+	inode, newUninstantiated := parent.instantiateChild(c, id)
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = newInodeItem(inode)
 	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
@@ -285,10 +290,11 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
-	c.vlog("Setting inode %d", id)
 	if inode != nil {
+		c.vlog("Setting inode %d", id)
 		qfs.inodes[id] = newInodeItem(inode)
 	} else {
+		c.vlog("Clearing inode %d", id)
 		delete(qfs.inodes, id)
 	}
 }
@@ -534,7 +540,11 @@ func (qfs *QuantumFs) ForgetChain(inode Inode) []InodeId {
 		key := inode.flush_DOWN(&qfs.c)
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 
-		if !inode.isOrphaned() && !inode.isWorkspaceRoot() {
+		orphaned := inode.isOrphaned()
+		root := inode.isWorkspaceRoot()
+		qfs.c.vlog("Forgetting inode %d, %d %d", inode.inodeNum(), orphaned,
+			root)
+		if !orphaned && !root {
 			parent := inode.parent(&qfs.c)
 			parent.syncChild(&qfs.c, inode.inodeNum(), key)
 
