@@ -1024,7 +1024,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// Delete the target InodeId, before (possibly) overwriting
 			// it.
-			dst.deleteEntry_(newName)
+			dst.deleteEntry_(c, newName)
 			overwrittenRecord := dst.children.recordByName(c, newName)
 			if overwrittenRecord != nil {
 				c.qfs.removeUninstantiated(c,
@@ -1044,7 +1044,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dst.insertEntry_(c, newEntry, childInode)
 
 			// Remove entry in old directory
-			dir.deleteEntry_(oldName)
+			dir.deleteEntry_(c, oldName)
 
 			parent.updateSize_(c)
 			parent.self.dirty(c)
@@ -1062,7 +1062,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	return result
 }
 
-func (dir *Directory) deleteEntry_(name string) {
+func (dir *Directory) deleteEntry_(c *ctx, name string) {
+	if record := dir.children.recordByName(c, name); record == nil {
+		// Nothing to do
+		return
+	}
+
 	inodeId := dir.children.inodeNum(name)
 	dir.children.deleteChild(inodeId)
 }
