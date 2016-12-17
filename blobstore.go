@@ -1,16 +1,20 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Package blobstore implements a key value blobstore for data that is usually
-// referenced by a content hash. It implements multiple backends to store data
-// like a filesystem, scylladb, etc.
+// Package blobstore provides an interface for a key-value store where the key is typically
+// content hash. A backend data store (eg: filesystem, CQL based store etc) can implement the
+// blobstore interface. It assumes that a given key refers to an
+// unique value and clients do not provide multiple values for the same key. It also
+// stores meta data for the blobs which are passed back and forth as a map of name
+// and value pairs. The blobstore makes no assumptions about the data and metadata
+// being stored in there and treats them as bytes and strings respectively.
 package blobstore
 
 import (
 	"fmt"
 )
 
-// BSErrorCode are intger codes for error responses from ether package
+// BSErrorCode are integer codes for error responses from ether/blobstore package
 type BSErrorCode int
 
 // Different error code exported by blobstore package
@@ -23,7 +27,8 @@ const (
 	ErrKeyNotFound           BSErrorCode = iota // The key and associated value was not found
 )
 
-// Error implements error interface and encapsulates the error returned by ether package's APIs
+// Error implements error interface and encapsulates the error returned by ether/blobstore
+// package's APIs
 type Error struct {
 	Code BSErrorCode // This can be used as a sentinal value
 	Msg  string      // This is for human eyes only
@@ -38,12 +43,7 @@ func NewError(code BSErrorCode, msg string, a ...interface{}) error {
 	return &Error{Code: code, Msg: fmt.Sprintf(msg, a...)}
 }
 
-// BlobStore stores blobs of data that are referenced by a key which typically
-// includes the content hash of the value. It assumes that a given key refers to an
-// unique value and clients do not provide multiple values for the same key. It also
-// stores meta data for the blobs which are passed back and forth as a map of name
-// and value pairs. The blobstore makes no assumptions about the data and metadata
-// being stored in there and treats them as bytes and strings respectively.
+// BlobStore interface
 type BlobStore interface {
 
 	// Get returns both the value and metadata for the given key along
