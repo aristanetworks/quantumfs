@@ -15,10 +15,11 @@ type cqlBlobStore struct {
 	keyspace string
 }
 
-// NewCqlBlobStore initializes a blobstore.BlobStore to be used with a cql cluster
-// This function is traversed only in the non-mock code path. In the mock path
-// initCqlStore is directly used.
+// NewCqlBlobStore initializes a blobstore.BlobStore to be used with a CQL cluster.
 func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
+	// This function is traversed only in the non-mock code path. In the mock path
+	// initCqlStore is directly used. Also ensures that an active session exists with
+	// the CQL cluster.
 
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
@@ -62,7 +63,7 @@ func (b *cqlBlobStore) Insert(key string, value []byte,
 	return nil
 }
 
-// Get is the cql implementation of blobstore.Get()
+// Get is the CQL implementation of blobstore.Get()
 func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
 
 	// Session.Query() does not return error
@@ -82,17 +83,17 @@ func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
 	return value, nil, nil
 }
 
-// Delete is the cql implementation of blobstore.Delete()
+// Delete is the CQL implementation of blobstore.Delete()
 func (b *cqlBlobStore) Delete(key string) error {
 	panic("Delete not implemented")
 }
 
-// Metadata is the cql implementation of blobstore.Metadata()
+// Metadata is the CQL implementation of blobstore.Metadata()
 func (b *cqlBlobStore) Metadata(key string) (map[string]string, error) {
 	panic("Metadata not implemented")
 }
 
-// Update is the cql implementation of blobstore.Update()
+// Update is the CQL implementation of blobstore.Update()
 func (b *cqlBlobStore) Update(key string, metadata map[string]string) error {
 	panic("Update not implemented")
 }

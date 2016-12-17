@@ -20,7 +20,8 @@ var testKey2Metadata = map[string]string{}
 
 var etherConfFile string
 
-// EtherConfFile is returns the full path to the Ether's configuration file.
+// EtherConfFile returns the full path to the ether's configuration file
+// based on environment variable ETHER_CQL_CONFIG.
 func EtherConfFile() (string, error) {
 
 	if etherConfFile == "" {

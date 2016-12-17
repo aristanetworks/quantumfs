@@ -33,11 +33,9 @@ func execWithRetry(q *gocql.Query) error {
 }
 
 // SetupTestSchema does the setup of schema for docker/k8s
-// CREATE KEYSPACE IF NOT EXISTS ether WITH REPLICATION = { 'class' : 'SimpleStrategy',
-//   'replication_factor' : 1 };
-// CREATE TABLE IF NOT EXISTS ether.blobstore ( key text PRIMARY KEY, value blob );
-// CREATE TABLE IF NOT EXISTS ether.workspacedb ( namespace text, workspace text, key text,
-//   PRIMARY KEY ( namespace, workspace )) ;
+//   CREATE KEYSPACE IF NOT EXISTS ether WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
+//   CREATE TABLE IF NOT EXISTS ether.blobstore ( key text PRIMARY KEY, value blob );
+//   CREATE TABLE IF NOT EXISTS ether.workspacedb ( namespace text, workspace text, key text, PRIMARY KEY ( namespace, workspace )) ;
 func SetupTestSchema(confFile string) error {
 
 	cfg, err := readCqlConfig(confFile)
@@ -80,7 +78,7 @@ func SetupTestSchema(confFile string) error {
 	return nil
 }
 
-// TearDownTestSchema drops the c.keyspace keyspace
+// TearDownTestSchema drops the entire keyspace.
 func TearDownTestSchema(confFile string) error {
 
 	cfg, err := readCqlConfig(confFile)
@@ -103,8 +101,8 @@ func TearDownTestSchema(confFile string) error {
 	return nil
 }
 
-// TruncateTable truncates the blobstore and workspacedb tables in cfg.KeySpace keyspace
-// Not used right now. Can be used later.
+// TruncateTable truncates the blobstore and workspacedb tables in the
+// keyspace. Not used right now. Can be used later.
 func TruncateTable(confFile string) error {
 
 	cfg, err := readCqlConfig(confFile)
