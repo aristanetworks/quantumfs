@@ -39,7 +39,7 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
-func primeDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataStore,
+func fillDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataStore,
 	datastore *dataStore, cacheSize int,
 	keys map[int]quantumfs.ObjectKey) {
 
@@ -61,7 +61,7 @@ func primeDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataSt
 	}
 }
 
-func prepDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
+func createDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
 	backingStore *testDataStore, datastore *dataStore,
 	keys map[int]quantumfs.ObjectKey) {
 
@@ -84,8 +84,8 @@ func prepDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
 func TestCacheLru(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
-		c, backingStore, datastore, keys := prepDatastore(test, cacheSize)
-		primeDatastore(c, test, backingStore, datastore, cacheSize, keys)
+		c, backingStore, datastore, keys := createDatastore(test, cacheSize)
+		fillDatastore(c, test, backingStore, datastore, cacheSize, keys)
 
 		// Prime the LRU by reading every entry in reverse order. At the end
 		// we should have the first cacheSize elements in the cache.
@@ -134,8 +134,8 @@ func TestCacheLru(t *testing.T) {
 func TestCacheCaching(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
-		c, backingStore, datastore, keys := prepDatastore(test, cacheSize)
-		primeDatastore(c, test, backingStore, datastore, cacheSize, keys)
+		c, backingStore, datastore, keys := createDatastore(test, cacheSize)
+		fillDatastore(c, test, backingStore, datastore, cacheSize, keys)
 
 		// Prime the cache
 		for i := 1; i < 100; i++ {
