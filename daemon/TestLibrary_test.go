@@ -978,3 +978,11 @@ func (test *testHelper) revert() {
 	runtime.UnlockOSThread()
 	test.assert(err == nil, "Failed to set test EUID back to 0: %v", err)
 }
+
+// A lot of times you're trying to do a test and you get error codes. The errors
+// often describe the problem better than any test.assert message, so use them
+func (test *testHelper) noErr(err error) {
+	if err != nil {
+		test.assert(false, err.Error())
+	}
+}
