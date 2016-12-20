@@ -64,9 +64,9 @@ type Directory struct {
 	InodeCommon
 
 	// These fields are protected by the InodeCommon.lock
-	baseLayerId    quantumfs.ObjectKey
+	baseLayerId quantumfs.ObjectKey
 
-	children	*ChildMap
+	children *ChildMap
 }
 
 // The size of the ObjectKey: 21 + 1 + 8
@@ -1005,7 +1005,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
-				child.setParent(dst.self.inodeNum())
+				child.setParent(dst.inodeNum())
 				child.setName(newName)
 			}
 			dir.self.markAccessed(c, oldName, false)
@@ -1020,14 +1020,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 					[]InodeId{dst.children.inodeNum(newName)})
 			}
 
+			dst.insertEntry_(c, newEntry, oldInodeId, child != nil)
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
 			if child == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
 			}
-
-			dst.insertEntry_(c, newEntry, oldInodeId, child != nil)
 
 			// Remove entry in old directory
 			dir.deleteEntry_(c, oldName)
