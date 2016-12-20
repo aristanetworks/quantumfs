@@ -7,6 +7,7 @@ package main
 import "io/ioutil"
 import "os"
 import "os/exec"
+import "runtime"
 import "syscall"
 import "testing"
 
@@ -150,11 +151,63 @@ func terminateNetnsdServer(rootdir string, t *testing.T) {
 	}
 }
 
+// Change the UID/GID the test thread to the given values. Use -1 not to change
+// either the UID or GID.
+func setUidGid(uid int, gid int, t *testing.T) {
+	// The quantumfs tests are run as root because some tests require
+	// root privileges. However, root can read or write any file
+	// irrespective of the file permissions. Obviously if we want to
+	// test permissions then we cannot run as root.
+	//
+	// To accomplish this we lock this goroutine to a particular OS
+	// thread, then we change the EUID of that thread to something which
+	// isn't root. Finally at the end we need to restore the EUID of the
+	// thread before unlocking ourselves from that thread. If we do not
+	// follow this precise cleanup order other tests or goroutines may
+	// run using the other UID incorrectly.
+	runtime.LockOSThread()
+	if gid != -1 {
+		err := syscall.Setregid(-1, gid)
+		if err != nil {
+			runtime.UnlockOSThread()
+			t.Fatal(err.Error())
+		}
+	}
+
+	if uid != -1 {
+		err := syscall.Setreuid(-1, uid)
+		if err != nil {
+			syscall.Setregid(-1, 0)
+			runtime.UnlockOSThread()
+			t.Fatal(err.Error())
+		}
+	}
+
+}
+
+// Set the UID and GID back to the defaults
+func setUidGidToDefault(t *testing.T) {
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+	if err1 != nil {
+		t.Fatal(err1.Error())
+	}
+	if err2 != nil {
+		t.Fatal(err2.Error())
+	}
+}
+
 func TestPersistentChroot(t *testing.T) {
 	dirTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(dirTest, t)
 	defer terminateNetnsdServer(dirTest, t)
+
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
 
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
@@ -210,6 +263,9 @@ func TestNetnsPersistency(t *testing.T) {
 
 	defer cleanupWorkspace(dirTest, t)
 	defer terminateNetnsdServer(dirTest, t)
+
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
 
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
@@ -330,6 +386,9 @@ func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
 
 	defer cleanupWorkspace(rootTest, t)
 
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
+
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	fileTest = fileTest[len(rootTest):]
@@ -347,6 +406,9 @@ func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
 
 	defer cleanupWorkspace(rootTest, t)
 
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
+
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	fileTest = "." + fileTest[len(dirTest):]
@@ -363,6 +425,9 @@ func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
+
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
 
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
@@ -387,6 +452,9 @@ func TestNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T) {
 
 	defer cleanupWorkspace(rootTest, t)
 
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
+
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	if err := os.Chdir("/"); err != nil {
@@ -410,6 +478,9 @@ func TestNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T) {
 
 	defer cleanupWorkspace(rootTest, t)
 
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
+
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	fileTest = fileTest[len(rootTest):]
@@ -427,6 +498,9 @@ func TestNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T) {
 
 	defer cleanupWorkspace(rootTest, t)
 
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
+
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	fileTest = "." + fileTest[len(dirTest):]
@@ -443,6 +517,9 @@ func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
+
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
 
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
@@ -466,6 +543,9 @@ func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
 	rootTest := setupWorkspace(t)
 
 	defer cleanupWorkspace(rootTest, t)
+
+	setUidGid(99, 99, t)
+	defer setUidGidToDefault(t)
 
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
