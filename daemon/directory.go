@@ -65,9 +65,9 @@ type Directory struct {
 	InodeCommon
 
 	// These fields are protected by the InodeCommon.lock
-	baseLayerId    quantumfs.ObjectKey
+	baseLayerId quantumfs.ObjectKey
 
-	children	*ChildMap
+	children *ChildMap
 }
 
 // The size of the ObjectKey: 21 + 1 + 8
