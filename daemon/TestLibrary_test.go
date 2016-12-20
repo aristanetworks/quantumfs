@@ -585,7 +585,7 @@ func (th *testHelper) getInode(path string) Inode {
 		return nil
 	}
 
-	return inode.inode
+	return inode
 }
 
 // Retrieve the rootId of the given workspace

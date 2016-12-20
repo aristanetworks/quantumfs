@@ -217,8 +217,8 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 			record.Type() == quantumfs.ObjectTypeVeryLargeFile {
 
 			inode := c.qfs.inodeNoInstantiate(c, inodeNum)
-			if inode != nil && inode.inode != nil {
-				if file, isFile := inode.inode.(*File); isFile {
+			if inode != nil {
+				if file, isFile := inode.(*File); isFile {
 					file.setChildRecord(c, record)
 					file.setParent(file.inodeNum())
 				}
@@ -722,7 +722,7 @@ func (dir *Directory) checkPermissions(c *ctx, permission uint32, uid uint32,
 func (dir *Directory) childInodes() []InodeId {
 	defer dir.RLock().RUnlock()
 
-	rtn := make([]InodeId, len(dir.children))
+	rtn := make([]InodeId, 0, len(dir.children))
 	for _, v := range dir.children {
 		rtn = append(rtn, v)
 	}
@@ -936,7 +936,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		}()
 		dir.self.markAccessed(c, newName, true)
 		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
-			child.inode.setName(newName)
+			child.setName(newName)
 		}
 
 		dir.children[newName] = oldInodeId
@@ -1071,8 +1071,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
-				child.inode.setParent(dst.self.inodeNum())
-				child.inode.setName(newName)
+				child.setParent(dst.self.inodeNum())
+				child.setName(newName)
 			}
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
@@ -1085,16 +1085,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
-			var childInode Inode
 			if child == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
-			} else {
-				childInode = child.inode
 			}
 
-			dst.insertEntry_(c, oldInodeId, newEntry,
-				childInode)
+			dst.insertEntry_(c, oldInodeId, newEntry, child)
 
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
