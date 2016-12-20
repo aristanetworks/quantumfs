@@ -980,8 +980,7 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 
 	if upwardsParent == nil {
 		upwardsParent = b.parent(c)
-		for ; upwardsParent != nil;
-			upwardsParent = upwardsParent.parent(c) {
+		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent(c) {
 
 			if upwardsParent.inodeNum() == a.inodeNum() {
 

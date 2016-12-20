@@ -337,6 +337,7 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) uint64 {
 
 	return lookupCount
 }
+
 // Returns true if the count became zero or was previously zero
 func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 	defer qfs.lookupCountLock.Lock().Unlock()
