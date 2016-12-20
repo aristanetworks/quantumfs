@@ -218,9 +218,9 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	inode := func() Inode {
 		qfs.mapMutex.RLock()
 		defer qfs.mapMutex.RUnlock()
-		inodeItem, needsInstantiation := qfs.getInode_(c, id)
-		if !needsInstantiation && inodeItem != nil {
-			return inodeItem
+		cheapInode, needsInstantiation := qfs.getInode_(c, id)
+		if !needsInstantiation && cheapInode != nil {
+			return cheapInode
 		} else {
 			return nil
 		}
