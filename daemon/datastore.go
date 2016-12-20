@@ -5,7 +5,6 @@ package daemon
 
 import "container/list"
 import "crypto/sha1"
-import "sync"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
@@ -23,7 +22,7 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 type dataStore struct {
 	durableStore quantumfs.DataStore
 
-	cacheLock sync.RWMutex
+	cacheLock DeferableMutex
 	lru       list.List // Back is most recently used
 	cache     map[quantumfs.ObjectKey]*buffer
 	cacheSize int
@@ -38,8 +37,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	// Check cache
 	bufResult := func() quantumfs.Buffer {
-		store.cacheLock.RLock()
-		defer store.cacheLock.RUnlock()
+		defer store.cacheLock.Lock().Unlock()
 
 		if buf, exists := store.cache[key]; exists {
 			store.lru.MoveToBack(buf.lruElement)
@@ -62,12 +60,11 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
 		// Store in cache
-		store.cacheLock.Lock()
-		defer store.cacheLock.Unlock()
+		defer store.cacheLock.Lock().Unlock()
 
 		if store.lru.Len() >= store.cacheSize {
-			buf := store.lru.Remove(store.lru.Front())
-			delete(store.cache, buf.(buffer).key)
+			evictedBuf := store.lru.Remove(store.lru.Front())
+			delete(store.cache, evictedBuf.(buffer).key)
 		}
 		store.cache[buf.key] = &buf
 		buf.lruElement = store.lru.PushBack(buf)
