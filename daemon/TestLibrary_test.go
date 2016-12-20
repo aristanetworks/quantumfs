@@ -580,12 +580,7 @@ func (th *testHelper) getInodeNum(path string) InodeId {
 // Retrieve the Inode from Quantumfs. Returns nil is not instantiated
 func (th *testHelper) getInode(path string) Inode {
 	inodeNum := th.getInodeNum(path)
-	inode := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-	if inode == nil {
-		return nil
-	}
-
-	return inode
+	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
 // Retrieve the rootId of the given workspace
@@ -999,7 +994,7 @@ func (test *testHelper) setUidGidToDefault() {
 
 // A lot of times you're trying to do a test and you get error codes. The errors
 // often describe the problem better than any test.assert message, so use them
-func (test *testHelper) noErr(err error) {
+func (test *testHelper) assertNoErr(err error) {
 	if err != nil {
 		test.assert(false, err.Error())
 	}
