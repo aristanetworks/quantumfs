@@ -236,15 +236,15 @@ func TestForgetMarking(t *testing.T) {
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
 		parent := test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent != nil && parent.inode != nil,
+		test.assert(parent != nil,
 			"Parent not loaded when expected")
 
 		childA := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.assert(childA != nil && childA.inode != nil,
+		test.assert(childA != nil,
 			"ChildA not loaded when expected")
 
 		childB := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
-		test.assert(childB != nil && childB.inode != nil,
+		test.assert(childB != nil,
 			"ChildB not loaded when expected")
 
 		// Now start Forgetting
@@ -252,14 +252,14 @@ func TestForgetMarking(t *testing.T) {
 
 		// Parent should still be loaded
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent != nil && parent.inode != nil,
+		test.assert(parent != nil,
 			"Parent forgotten while children are loaded")
 
 		// Forget one child, not enough to forget the parent
 		test.qfs.Forget(uint64(childIdA), 1)
 
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent != nil && parent.inode != nil,
+		test.assert(parent != nil,
 			"Parent forgotten when only 1/2 children unloaded")
 
 		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)

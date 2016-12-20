@@ -109,7 +109,7 @@ func TestLargeFileExpansion(t *testing.T) {
 }
 
 func TestLargeFileAttr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
