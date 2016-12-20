@@ -161,7 +161,7 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 }
 
 func publishDirectoryRecordIfs(c *ctx,
-	records map[InodeId]DirectoryRecordIf) quantumfs.ObjectKey {
+	records []DirectoryRecordIf) quantumfs.ObjectKey {
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
