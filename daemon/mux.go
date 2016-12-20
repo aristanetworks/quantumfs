@@ -572,8 +572,8 @@ func (qfs *QuantumFs) ForgetChain(inodeNum InodeId) []InodeId {
 		delete(qfs.lookupCounts, inode.inodeNum())
 		qfs.c.vlog("Set inode %d to nil", inode.inodeNum())
 
-		parentId := inode.parentId()
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
+			parentId := inode.parentId()
 			parent := qfs.inodeNoInstantiate(&qfs.c, parentId)
 			if parent == nil {
 				panic(fmt.Sprintf("Parent was unloaded before child"+
