@@ -598,7 +598,6 @@ func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
 		return nil
 	}
 
-
 	return qfs.uninstantiateChain_(inode)
 }
 
