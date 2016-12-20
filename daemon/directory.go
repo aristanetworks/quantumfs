@@ -352,7 +352,7 @@ func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
 
 	oldBaseLayer := dir.baseLayerId
-	dir.baseLayerId = publishDirectoryRecordIfs(c, dir.childrenRecords)
+	dir.baseLayerId = publishDirectoryRecordIfs(c, dir.children.records())
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
