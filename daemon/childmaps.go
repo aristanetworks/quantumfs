@@ -9,18 +9,18 @@ import "fmt"
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
 	// ChildMap needs protection to be concurrency safe
-	childLock	DeferableRwMutex
+	childLock DeferableRwMutex
 
-	children	map[string]InodeId
-	dirtyChildren	map[InodeId]InodeId // a set
+	children      map[string]InodeId
+	dirtyChildren map[InodeId]InodeId // a set
 
 	childrenRecords map[InodeId]DirectoryRecordIf
 }
 
 func newChildMap(numEntries int) *ChildMap {
-	return &ChildMap {
-		children:	make(map[string]InodeId, numEntries),
-		dirtyChildren:	make(map[InodeId]InodeId, 0),
+	return &ChildMap{
+		children:        make(map[string]InodeId, numEntries),
+		dirtyChildren:   make(map[InodeId]InodeId, 0),
 		childrenRecords: make(map[InodeId]DirectoryRecordIf, numEntries),
 	}
 }
