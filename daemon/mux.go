@@ -218,9 +218,9 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	inode := func() Inode {
 		qfs.mapMutex.RLock()
 		defer qfs.mapMutex.RUnlock()
-		inodeItem, needsInstantiation := qfs.getInode_(c, id)
-		if !needsInstantiation && inodeItem != nil {
-			return inodeItem
+		cheapInode, needsInstantiation := qfs.getInode_(c, id)
+		if !needsInstantiation && cheapInode != nil {
+			return cheapInode
 		} else {
 			return nil
 		}
@@ -245,9 +245,9 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 
 // Must hold the mapMutex for write
 func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
-	inodeItem, needsInstantiation := qfs.getInode_(c, id)
-	if !needsInstantiation && inodeItem != nil {
-		return inodeItem
+	inode, needsInstantiation := qfs.getInode_(c, id)
+	if !needsInstantiation && inode != nil {
+		return inode
 	}
 
 	c.vlog("Inode %d needs to be instantiated", id)
@@ -503,41 +503,8 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 	return inode.Lookup(c, name, out)
 }
 
-func (qfs *QuantumFs) ForgetChain(inodeNum InodeId) []InodeId {
-	inode := qfs.inodeNoInstantiate(&qfs.c, inodeNum)
-	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
-		inodeNum == quantumfs.InodeIdApi {
-
-		qfs.c.dlog("inode %d doesn't need to be forgotten", inodeNum)
-		// Nothing to do
-		return nil
-	}
-
-	// We must timeout if we cannot grab the tree lock. Forget is called on the
-	// unmount path and if we are trying to forcefully unmount due to some
-	// internal error or hang, if we don't timeout we can deadlock against that
-	// other broken operation.
-	lock := inode.LockTreeWaitAtMost(200 * time.Millisecond)
-	if lock == nil {
-		qfs.c.elog("Timed out locking tree in Forget. Inode %d",
-			inode.inodeNum())
-		qfs.giveUpOnForget = true
-		return nil
-	} else {
-		defer lock.Unlock()
-	}
-
-	// Now that we have the tree locked, we need to re-check the inode because
-	// another ForgetChain could have forgotten us before we got the tree lock
-	inode = qfs.inodeNoInstantiate(&qfs.c, inodeNum)
-	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
-		inodeNum == quantumfs.InodeIdApi {
-
-		qfs.c.dlog("inode %d forgotten underneath us", inodeNum)
-		// Nothing to do
-		return nil
-	}
-
+// Needs treelock
+func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 	rtn := make([]InodeId, 0)
 	for {
 		lookupCount := qfs.lookupCount(inode.inodeNum())
@@ -601,6 +568,44 @@ func (qfs *QuantumFs) ForgetChain(inodeNum InodeId) []InodeId {
 	return rtn
 }
 
+func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
+	inode := qfs.inodeNoInstantiate(&qfs.c, inodeNum)
+	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
+		inodeNum == quantumfs.InodeIdApi {
+
+		qfs.c.dlog("inode %d doesn't need to be forgotten", inodeNum)
+		// Nothing to do
+		return nil
+	}
+
+	// We must timeout if we cannot grab the tree lock. Forget is called on the
+	// unmount path and if we are trying to forcefully unmount due to some
+	// internal error or hang, if we don't timeout we can deadlock against that
+	// other broken operation.
+	lock := inode.LockTreeWaitAtMost(200 * time.Millisecond)
+	if lock == nil {
+		qfs.c.elog("Timed out locking tree in Forget. Inode %d",
+			inode.inodeNum())
+		qfs.giveUpOnForget = true
+		return nil
+	} else {
+		defer lock.Unlock()
+	}
+
+	// Now that we have the tree locked, we need to re-check the inode because
+	// another forgetChain could have forgotten us before we got the tree lock
+	inode = qfs.inodeNoInstantiate(&qfs.c, inodeNum)
+	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
+		inodeNum == quantumfs.InodeIdApi {
+
+		qfs.c.dlog("inode %d forgotten underneath us", inodeNum)
+		// Nothing to do
+		return nil
+	}
+
+	return qfs.uninstantiateChain_(inode)
+}
+
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer qfs.c.funcIn("Mux::Forget").out()
 	defer logRequestPanic(&qfs.c)
@@ -619,7 +624,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	toRemove := qfs.ForgetChain(InodeId(nodeID))
+	toRemove := qfs.forgetChain(InodeId(nodeID))
 
 	if toRemove != nil {
 		// We need to remove all uninstantiated children.

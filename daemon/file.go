@@ -86,7 +86,7 @@ func (fi *File) dirty(c *ctx) {
 }
 
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
-	if child != fi.self.inodeNum() {
+	if child != fi.inodeNum() {
 		panic("Unsupported dirtyChild() call on File")
 	}
 }
