@@ -222,11 +222,11 @@ func TestForgetMarking(t *testing.T) {
 		workspace := test.newWorkspace()
 
 		// Make a simple one directory two children structure
-		test.noErr(os.MkdirAll(workspace + "/testdir", 0777))
+		test.noErr(os.MkdirAll(workspace+"/testdir", 0777))
 
 		data := genData(1000)
-		test.noErr(ioutil.WriteFile(workspace + "/testdir/a", data, 0777))
-		test.noErr(ioutil.WriteFile(workspace + "/testdir/b", data, 0777))
+		test.noErr(ioutil.WriteFile(workspace+"/testdir/a", data, 0777))
+		test.noErr(ioutil.WriteFile(workspace+"/testdir/b", data, 0777))
 
 		// get the inode numbers
 		parentId := test.getInodeNum(workspace + "/testdir")
