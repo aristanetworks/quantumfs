@@ -188,7 +188,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) childInodes() []InodeId {
-	rtn := make([]InodeId, len(nsl.namespacesById))
+	rtn := make([]InodeId, 0, len(nsl.namespacesById))
 	for k, _ := range nsl.namespacesById {
 		rtn = append(rtn, k)
 	}
@@ -480,7 +480,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (wsl *WorkspaceList) childInodes() []InodeId {
-	rtn := make([]InodeId, len(wsl.workspacesById))
+	rtn := make([]InodeId, 0, len(wsl.workspacesById))
 	for k, _ := range wsl.workspacesById {
 		rtn = append(rtn, k)
 	}
