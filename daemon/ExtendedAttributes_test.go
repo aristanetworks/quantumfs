@@ -215,7 +215,7 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 	test.assert(err == nil, "Error stat'ing test type %d: %v", Type, err)
 	var id InodeId
 	id = InodeId(stat.Ino)
-	inode := test.qfs.inodes[id].inode
+	inode := test.qfs.inodes[id]
 	parent := inode.parent(&test.qfs.c)
 	record, err := parent.getChildRecord(&test.qfs.c, id)
 

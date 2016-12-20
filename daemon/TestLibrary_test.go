@@ -585,7 +585,7 @@ func (th *testHelper) getInode(path string) Inode {
 		return nil
 	}
 
-	return inode.inode
+	return inode
 }
 
 // Retrieve the rootId of the given workspace
@@ -951,8 +951,9 @@ func TestGenData(t *testing.T) {
 	})
 }
 
-// Disable the root mode
-func (test *testHelper) setEuid(uid int) *testHelper {
+// Change the UID/GID the test thread to the given values. Use -1 not to change
+// either the UID or GID.
+func (test *testHelper) setUidGid(uid int, gid int) {
 	// The quantumfs tests are run as root because some tests require
 	// root privileges. However, root can read or write any file
 	// irrespective of the file permissions. Obviously if we want to
@@ -965,16 +966,41 @@ func (test *testHelper) setEuid(uid int) *testHelper {
 	// follow this precise cleanup order other tests or goroutines may
 	// run using the other UID incorrectly.
 	runtime.LockOSThread()
-	err := syscall.Setreuid(-1, uid)
-	test.assert(err == nil, "Failed to change test EUID: %v", err)
+	if gid != -1 {
+		err := syscall.Setregid(-1, gid)
+		if err != nil {
+			runtime.UnlockOSThread()
+		}
+		test.assert(err == nil, "Faild to change test EGID: %v", err)
+	}
 
-	return test
+	if uid != -1 {
+		err := syscall.Setreuid(-1, uid)
+		if err != nil {
+			syscall.Setregid(-1, 0)
+			runtime.UnlockOSThread()
+		}
+		test.assert(err == nil, "Failed to change test EUID: %v", err)
+	}
+
 }
 
-// Set the Uid back to zero
-func (test *testHelper) revert() {
-	// Test always runs as root, so its euid is 0
-	err := syscall.Setreuid(-1, 0)
-	runtime.UnlockOSThread()
-	test.assert(err == nil, "Failed to set test EUID back to 0: %v", err)
+// Set the UID and GID back to the defaults
+func (test *testHelper) setUidGidToDefault() {
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+
+	test.assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
+	test.assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+}
+
+// A lot of times you're trying to do a test and you get error codes. The errors
+// often describe the problem better than any test.assert message, so use them
+func (test *testHelper) noErr(err error) {
+	if err != nil {
+		test.assert(false, err.Error())
+	}
 }

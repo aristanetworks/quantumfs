@@ -192,7 +192,7 @@ func (inode *InodeCommon) setDirty(dirty bool) bool {
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
-	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inodie %d: %v", child,
+	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
 		inode)
 	panic(msg)
 }

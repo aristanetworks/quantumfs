@@ -1,7 +1,7 @@
 Coding Style
 ############
 
-The coding style used in quantumfs is defined by these simple rules:
+The coding style used in QuantumFS with golang is defined by these simple rules:
 
 1. Use go fmt
 2. Tabs are eight spaces
