@@ -1105,7 +1105,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
-				child.setParent(dst.self.inodeNum())
+				child.setParent(dst.inodeNum())
 				child.setName(newName)
 			}
 			dir.self.markAccessed(c, oldName, false)
@@ -1117,14 +1117,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			c.qfs.removeUninstantiated(c,
 				[]InodeId{dst.children[newName]})
 
+			dst.insertEntry_(c, oldInodeId, newEntry, child)
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
 			if child == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
 			}
-
-			dst.insertEntry_(c, oldInodeId, newEntry, child)
 
 			// Remove entry in old directory
 			dir.deleteEntry_(oldName)
