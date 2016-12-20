@@ -191,7 +191,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer wsr.RLock().RUnlock()
 
 	var numChildDirectories uint32
-	for _, entry := range wsr.childrenRecords {
+	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
 			numChildDirectories++
 		}

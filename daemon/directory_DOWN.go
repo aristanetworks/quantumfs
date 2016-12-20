@@ -13,8 +13,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	parent := c.qfs.inode(c, srcInode.parent())
-	origRecord, err := parent.getChildRecord(c, srcInode.inodeNum())
+	origRecord, err := srcInode.parent(c).getChildRecord(c, srcInode.inodeNum())
 	if err != nil {
 		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
 		return fuse.EIO
@@ -28,7 +27,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := dir.loadChild_(c, newRecord)
+	inodeNum := dir.children.newChild(c, newRecord)
 	dir.self.markAccessed(c, newName, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
@@ -55,7 +54,6 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	}
 
 	defer dir.Lock().Unlock()
-	defer dir.childRecordLock.Lock().Unlock()
 
 	dir.updateRecords_DOWN_(c)
 	return dir.publish_(c)
@@ -68,12 +66,12 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	defer c.funcIn("Directory::updateRecords_DOWN_").out()
 
-	for _, childId := range dir.dirtyChildren_ {
+	dirtyIds := dir.children.popDirty()
+	for _, childId := range dirtyIds {
 		child := c.qfs.inode(c, childId)
 		newKey := child.flush_DOWN(c)
-		dir.childrenRecords[childId].SetID(newKey)
+		dir.children.record(childId).SetID(newKey)
 	}
-	dir.dirtyChildren_ = make(map[InodeId]InodeId, 0)
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {

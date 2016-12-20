@@ -102,7 +102,8 @@ type Inode interface {
 	markAccessed(c *ctx, path string, created bool)
 	markSelfAccessed(c *ctx, created bool)
 
-	parent() InodeId
+	parentId() InodeId
+	parent(c *ctx) Inode
 	setParent(newParent InodeId)
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -191,7 +192,7 @@ func (inode *InodeCommon) setDirty(dirty bool) bool {
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
-	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inodie %d: %v", child,
+	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
 		inode)
 	panic(msg)
 }
@@ -218,7 +219,15 @@ func (inode *InodeCommon) accessed() bool {
 	}
 }
 
-func (inode *InodeCommon) parent() InodeId {
+func (inode *InodeCommon) parent(c *ctx) Inode {
+	inode.parentLock.Lock()
+	p := inode.parent_
+	inode.parentLock.Unlock()
+
+	return c.qfs.inode(c, p)
+}
+
+func (inode *InodeCommon) parentId() InodeId {
 	inode.parentLock.Lock()
 	p := inode.parent_
 	inode.parentLock.Unlock()
@@ -233,7 +242,7 @@ func (inode *InodeCommon) setParent(newParent InodeId) {
 }
 
 func (inode *InodeCommon) isOrphaned() bool {
-	return inode.inodeNum() == inode.parent()
+	return inode.inodeNum() == inode.parentId()
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
@@ -302,7 +311,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	} else {
 		path = inode.name() + "/" + path
 	}
-	parent := c.qfs.inode(c, inode.parent())
+	parent := inode.parent(c)
 	parent.markAccessed(c, path, created)
 }
 
