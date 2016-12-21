@@ -219,11 +219,11 @@ func netnsLogin(rootdir string, svrName string) error {
 	args := []string{netns, svrName, sh, "-l", "-c",
 		"\"$@\"", bash, bash}
 	if err := syscall.Exec(netns, args, env); err != nil {
-		fmt.Println("The erro is ", err.Error())
+		fmt.Println("The error is ", err.Error())
 		return fmt.Errorf("netnsLogin Exec error: %s", err.Error())
 	}
 
-	fmt.Println("The erro is nil")
+	fmt.Println("The error is nil")
 	return nil
 }
 
