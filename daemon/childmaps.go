@@ -4,6 +4,7 @@
 package daemon
 
 import "fmt"
+import "github.com/aristanetworks/quantumfs"
 
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
@@ -25,7 +26,6 @@ func newChildMap(numEntries int) *ChildMap {
 	}
 }
 
-// The directory parent must be exclusively locked
 func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf) InodeId {
 	defer cmap.childLock.Lock().Unlock()
 
@@ -75,10 +75,10 @@ func (cmap *ChildMap) deleteChild(inodeNum InodeId) DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) renameChild(oldName string,
-	newName string) (oldInodeRemoved *InodeId) {
+	newName string) (oldInodeRemoved InodeId) {
 
 	if oldName == newName {
-		return nil
+		return quantumfs.InodeIdInvalid
 	}
 
 	defer cmap.childLock.Lock().Unlock()
@@ -95,10 +95,10 @@ func (cmap *ChildMap) renameChild(oldName string,
 	if needCleanup {
 		delete(cmap.childrenRecords, cleanupInodeId)
 		delete(cmap.dirtyChildren, cleanupInodeId)
-		return &cleanupInodeId
+		return cleanupInodeId
 	}
 
-	return nil
+	return quantumfs.InodeIdInvalid
 }
 
 func (cmap *ChildMap) popDirty() map[InodeId]InodeId {
