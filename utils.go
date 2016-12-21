@@ -136,9 +136,16 @@ func showProgress(totalSize uint64, current uint64, start time.Time,
 		speed = HumanizeBytes(current/uint64(now.Sub(start).Seconds())) + "/s"
 	}
 	// log.Printf is thread-safe but it doesn't handle \r
-	fmt.Printf("\r[Started] %10s [Copied] %10s [Done] %3d%% [Speed] %10s [Duration] %10s",
-		start.Format(time.Kitchen), HumanizeBytes(current),
-		(current*100)/totalSize, speed, time.Since(start))
+	if totalSize == 0 {
+		fmt.Printf("\r[Started] %10s [Copied] %10s [Done] NA [Speed] %10s [Duration] %10s",
+			start.Format(time.Kitchen), HumanizeBytes(current),
+			speed, time.Since(start))
+	} else {
+		fmt.Printf("\r[Started] %10s [Copied] %10s [Done] %3d%% [Speed] %10s [Duration] %10s",
+			start.Format(time.Kitchen), HumanizeBytes(current),
+			(current*100)/totalSize, speed, time.Since(start))
+
+	}
 }
 
 // CreateTestDirContents creates a temporary source directory hierarchy
