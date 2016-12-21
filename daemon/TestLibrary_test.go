@@ -580,8 +580,7 @@ func (th *testHelper) getInodeNum(path string) InodeId {
 // Retrieve the Inode from Quantumfs. Returns nil is not instantiated
 func (th *testHelper) getInode(path string) Inode {
 	inodeNum := th.getInodeNum(path)
-	inode := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-	return inode
+	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
 // Retrieve the rootId of the given workspace
@@ -991,4 +990,12 @@ func (test *testHelper) setUidGidToDefault() {
 
 	test.assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
 	test.assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+}
+
+// A lot of times you're trying to do a test and you get error codes. The errors
+// often describe the problem better than any test.assert message, so use them
+func (test *testHelper) assertNoErr(err error) {
+	if err != nil {
+		test.assert(false, err.Error())
+	}
 }

@@ -34,7 +34,7 @@ const (
 
 // Special reserved inode numbers
 const (
-	_                  = iota // Invalid
+	InodeIdInvalid     = iota // Invalid
 	InodeIdRoot        = iota // Same as fuse.FUSE_ROOT_ID
 	InodeIdApi         = iota // /api file
 	InodeId_null       = iota // /_null namespace

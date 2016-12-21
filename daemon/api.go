@@ -16,7 +16,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func NewApiInode(treeLock *sync.RWMutex, parent Inode) Inode {
+func NewApiInode(treeLock *sync.RWMutex, parent InodeId) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:        quantumfs.InodeIdApi,
