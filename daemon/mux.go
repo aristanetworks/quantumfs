@@ -498,7 +498,7 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 	return inode.Lookup(c, name, out)
 }
 
-// Needs treelock
+// Needs treelock for write
 func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 	rtn := make([]InodeId, 0)
 	for {
