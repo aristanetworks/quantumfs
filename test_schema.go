@@ -27,7 +27,9 @@ func execWithRetry(q *gocql.Query) error {
 	if err != nil {
 		fmt.Printf("ETHER: Failed after %d attempts query: %q\n", i, q)
 	} else {
-		fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
+		if i > 0 {
+			fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
+		}
 	}
 	return err
 }
