@@ -66,7 +66,7 @@ type Directory struct {
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId    quantumfs.ObjectKey
 	children       map[string]InodeId
-	dirtyChildren_ map[InodeId]Inode // set of children which are currently dirty
+	dirtyChildren_ map[InodeId]InodeId // set of children which are dirty
 
 	// These fields are protected by childRecordLock. This includes all the
 	// entries within childrenRecords, which must be accessed only under this
@@ -81,7 +81,7 @@ const sourceDataLength = 30
 
 func initDirectory(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent Inode, treeLock *sync.RWMutex) []InodeId {
+	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
 	defer c.FuncIn("initDirectory",
 		"Enter Fetching directory baselayer from %s",
@@ -94,7 +94,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
-	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
+	dir.dirtyChildren_ = make(map[InodeId]InodeId, 0)
 	dir.baseLayerId = baseLayerId
 
 	uninstantiated := make([]InodeId, 0)
@@ -157,7 +157,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	dir.self = &dir
 
 	uninstantiated := initDirectory(c, name, &dir, baseLayerId, inodeNum,
-		parent, parent.treeLock())
+		parent.inodeNum(), parent.treeLock())
 	return &dir, uninstantiated
 }
 
@@ -174,7 +174,8 @@ func (dir *Directory) updateSize_(c *ctx) {
 			defer dir.childRecordLock.Lock().Unlock()
 			return uint64(len(dir.childrenRecords))
 		}()
-		dir.parent().setChildAttr(c, dir.id, nil, &attr, nil, true)
+
+		dir.parent(c).setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
@@ -219,7 +220,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 			if inode != nil {
 				if file, isFile := inode.(*File); isFile {
 					file.setChildRecord(c, record)
-					file.setParent(file)
+					file.setParent(file.inodeNum())
 				}
 			}
 		}
@@ -234,18 +235,18 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 func (dir *Directory) dirty(c *ctx) {
 	if !dir.setDirty(true) {
 		// Only go recursive if we aren't already dirty
-		dir.parent().dirtyChild(c, dir)
+		dir.parent(c).dirtyChild(c, dir.inodeNum())
 	}
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
 // as well.
-func (dir *Directory) dirtyChild(c *ctx, child Inode) {
+func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("Directory::dirtyChild").out()
 
 	func() {
 		defer dir.Lock().Unlock()
-		dir.dirtyChildren_[child.inodeNum()] = child
+		dir.dirtyChildren_[childId] = childId
 	}()
 	dir.self.dirty(c)
 }
@@ -479,7 +480,7 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("Directory::GetAttr").out()
 
-	record, err := dir.parent().getChildRecord(c, dir.InodeCommon.id)
+	record, err := dir.parent(c).getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)
 		return fuse.EIO
@@ -636,7 +637,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
 		attr.Size).out()
 
-	return dir.parent().setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
+	return dir.parent(c).setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
 }
 
@@ -707,8 +708,7 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	}
 
 	owner := c.fuseCtx.Owner
-	dirRecord, err := dir.parent().getChildRecord(c,
-		dir.InodeCommon.id)
+	dirRecord, err := dir.parent(c).getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.wlog("Failed to find directory record in parent")
 		return fuse.ENOENT
@@ -764,7 +764,7 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 func (dir *Directory) childInodes() []InodeId {
 	defer dir.RLock().RUnlock()
 
-	rtn := make([]InodeId, len(dir.children))
+	rtn := make([]InodeId, 0, len(dir.children))
 	for _, v := range dir.children {
 		rtn = append(rtn, v)
 	}
@@ -994,7 +994,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	return result
 }
 
-func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
+func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	childDir *Directory) {
 
 	// Determine if a parent-child relationship between the
@@ -1002,8 +1002,8 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 	var parent *Directory
 	var child *Directory
 
-	upwardsParent := a.parent()
-	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+	upwardsParent := a.parent(c)
+	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent(c) {
 		if upwardsParent.inodeNum() == b.inodeNum() {
 
 			// a is a (grand-)child of b
@@ -1014,8 +1014,9 @@ func sortParentChild(a *Directory, b *Directory) (parentDir *Directory,
 	}
 
 	if upwardsParent == nil {
-		upwardsParent = b.parent()
-		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent() {
+		upwardsParent = b.parent(c)
+		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent(c) {
+
 			if upwardsParent.inodeNum() == a.inodeNum() {
 
 				// b is a (grand-)child of a
@@ -1076,7 +1077,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// successfully update the child. If the two directories are not
 		// related in that way then we choose arbitrarily because it doesn't
 		// matter.
-		parent, child := sortParentChild(dst, dir)
+		parent, child := sortParentChild(c, dst, dir)
 		firstLock, lastLock := getLockOrder(dst, dir)
 		firstLock.(*Directory).Lock()
 		lastLock.(*Directory).Lock()
@@ -1104,7 +1105,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// accessed in both parents.
 			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
 			if child != nil {
-				child.setParent(dst.self)
+				child.setParent(dst.inodeNum())
 				child.setName(newName)
 			}
 			dir.self.markAccessed(c, oldName, false)
@@ -1116,9 +1117,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			c.qfs.removeUninstantiated(c,
 				[]InodeId{dst.children[newName]})
 
+			dst.insertEntry_(c, oldInodeId, newEntry, child)
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
-			dst.insertEntry_(c, oldInodeId, newEntry, child)
 			if child == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
@@ -1163,7 +1164,7 @@ func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 	}()
 	// being inserted means you're dirty and need to be synced
 	if inode != nil {
-		dir.dirtyChildren_[inodeNum] = inode
+		dir.dirtyChildren_[inodeNum] = inode.inodeNum()
 	} else {
 		dir.self.dirty(c)
 	}
@@ -1172,25 +1173,25 @@ func (dir *Directory) insertEntry_(c *ctx, inodeNum InodeId,
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	return dir.parent().getChildXAttrSize(c, dir.inodeNum(), attr)
+	return dir.parent(c).getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	return dir.parent().getChildXAttrData(c, dir.inodeNum(), attr)
+	return dir.parent(c).getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	return dir.parent().listChildXAttr(c, dir.inodeNum())
+	return dir.parent(c).listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	return dir.parent().setChildXAttr(c, dir.inodeNum(), attr, data)
+	return dir.parent(c).setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	return dir.parent().removeChildXAttr(c, dir.inodeNum(), attr)
+	return dir.parent(c).removeChildXAttr(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
@@ -1216,7 +1217,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}()
 
 	if ok && !dir.self.isWorkspaceRoot() {
-		dir.parent().syncChild(c, dir.InodeCommon.id, key)
+		dir.parent(c).syncChild(c, dir.InodeCommon.id, key)
 	}
 }
 
