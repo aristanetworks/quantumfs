@@ -43,7 +43,10 @@ do
 					fi
 					LOCKLINE=$((ITER+1))
 				fi
-				if [[ ( "$LINE" =~ ".LockTree().Unlock()" ) || ( "$LINE" =~ ".LockTreeWaitAtMost(" ) ]]; then
+				if [[ ( "$LINE" =~ ".LockTree().Unlock()" ) || \
+					( "$LINE" =~ ".LockTreeWaitAtMost(" ) ||\
+					( "$LINE" =~ "func" && "$LINE" =~ "_(" ) ]]
+					then
 					if [ "$LOCKLINE" -ne "-1" ]; then
 						LOCKLINE=-1
 					fi

@@ -36,7 +36,7 @@ func TestForgetOnDirectory(t *testing.T) {
 		// Now force the kernel to drop all cached inodes
 		remountFilesystem(test)
 
-		test.assertLogContains("Forgetting",
+		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -67,7 +67,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		// Now force the kernel to drop all cached inodes
 		remountFilesystem(test)
 
-		test.assertLogContains("Forgetting",
+		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -123,27 +123,27 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// we need to lock to do this without racing
 		test.qfs.mapMutex.Lock()
-		numUninstantiatedOld := len(test.qfs.uninstantiatedInodes)
+		numUninstantiatedOld := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock()
 
 		// Forgetting should now forget the Directory and thus remove all the
-		// uninstantiated children from the uninstantiatedInodes list.
+		// uninstantiated children from the parentOfUninstantiated list.
 		remountFilesystem(test)
 
-		test.assertLogContains("Forgetting inode",
+		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		test.qfs.mapMutex.Lock()
 		//BUG: Between remountFilesystem and here, the kernel can and does
 		// lookup these files, thereby populating the map we're checking!
-		numUninstantiatedNew := len(test.qfs.uninstantiatedInodes)
+		numUninstantiatedNew := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock()
 
 		test.assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed %d <= %d",
 			numUninstantiatedOld, numUninstantiatedNew)
 
-		for _, parent := range test.qfs.uninstantiatedInodes {
+		for _, parent := range test.qfs.parentOfUninstantiated {
 			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
 				"use forgotten directory as parent")
 		}
@@ -214,5 +214,71 @@ func TestLookupCountHardlinks(t *testing.T) {
 
 		test.assertLogDoesNotContain("Looked up 2 Times",
 			"Failed to cause a second lookup")
+	})
+}
+
+func TestForgetMarking(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		// Make a simple one directory two children structure
+		test.assertNoErr(os.MkdirAll(workspace+"/testdir", 0777))
+
+		data := genData(1000)
+		test.assertNoErr(ioutil.WriteFile(workspace+"/testdir/a", data,
+			0777))
+		test.assertNoErr(ioutil.WriteFile(workspace+"/testdir/b", data,
+			0777))
+
+		// get the inode numbers
+		parentId := test.getInodeNum(workspace + "/testdir")
+		childIdA := test.getInodeNum(workspace + "/testdir/a")
+		childIdB := test.getInodeNum(workspace + "/testdir/b")
+
+		// We need to trigger, ourselves, the kind of Forget sequence where
+		// markings are necessary: parent, childA, then childB
+		parent := test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
+		test.assert(parent != nil,
+			"Parent not loaded when expected")
+
+		childA := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
+		test.assert(childA != nil,
+			"ChildA not loaded when expected")
+
+		childB := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
+		test.assert(childB != nil,
+			"ChildB not loaded when expected")
+
+		// Now start Forgetting
+		test.qfs.Forget(uint64(parentId), 1)
+
+		// Parent should still be loaded
+		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
+		test.assert(parent != nil,
+			"Parent forgotten while children are loaded")
+
+		// Forget one child, not enough to forget the parent
+		test.qfs.Forget(uint64(childIdA), 1)
+
+		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
+		test.assert(parent != nil,
+			"Parent forgotten when only 1/2 children unloaded")
+
+		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
+		test.assert(childA == nil, "ChildA not forgotten when requested")
+
+		// Now forget the last child, which should unload the parent also
+		test.qfs.Forget(uint64(childIdB), 1)
+
+		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
+		test.assert(parent == nil,
+			"Parent %d not forgotten when all children unloaded",
+			parentId)
+
+		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
+		test.assert(childA == nil, "ChildA not forgotten when requested")
+
+		childB = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
+		test.assert(childB == nil, "ChildB not forgotten when requested")
 	})
 }
