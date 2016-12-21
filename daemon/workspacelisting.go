@@ -38,7 +38,7 @@ type NamespaceList struct {
 func (nsl *NamespaceList) dirty(c *ctx) {
 }
 
-func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
+func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -188,7 +188,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) childInodes() []InodeId {
-	rtn := make([]InodeId, len(nsl.namespacesById))
+	rtn := make([]InodeId, 0, len(nsl.namespacesById))
 	for k, _ := range nsl.namespacesById {
 		rtn = append(rtn, k)
 	}
@@ -424,7 +424,7 @@ func newWorkspaceList(c *ctx, parentName string, name string, parent Inode,
 		workspacesById:   make(map[InodeId]string),
 	}
 	wsl.self = &wsl
-	wsl.setParent(parent)
+	wsl.setParent(parent.inodeNum())
 	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
 	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl
@@ -444,7 +444,7 @@ type WorkspaceList struct {
 func (wsl *WorkspaceList) dirty(c *ctx) {
 }
 
-func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
+func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -480,7 +480,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (wsl *WorkspaceList) childInodes() []InodeId {
-	rtn := make([]InodeId, len(wsl.workspacesById))
+	rtn := make([]InodeId, 0, len(wsl.workspacesById))
 	for k, _ := range wsl.workspacesById {
 		rtn = append(rtn, k)
 	}

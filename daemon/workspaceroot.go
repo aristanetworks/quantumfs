@@ -58,7 +58,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	uninstantiated := initDirectory(c, name, &wsr.Directory,
-		workspaceRoot.BaseLayer(), inodeNum, parent, &wsr.realTreeLock)
+		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
+		&wsr.realTreeLock)
 
 	c.qfs.addUninstantiated(c, uninstantiated, wsr.inodeNum())
 
