@@ -62,7 +62,7 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 //
-// Requires the Inode lock and dir.childRecordLock
+// Requires the Inode lock
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	defer c.funcIn("Directory::updateRecords_DOWN_").out()
 

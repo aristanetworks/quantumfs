@@ -924,8 +924,8 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			child.setName(newName)
 		}
 
-		if oldRemoved != nil {
-			c.qfs.removeUninstantiated(c, []InodeId{*oldRemoved})
+		if oldRemoved != quantumfs.InodeIdInvalid {
+			c.qfs.removeUninstantiated(c, []InodeId{oldRemoved})
 		}
 
 		dir.updateSize_(c)
@@ -1522,7 +1522,8 @@ func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
 
 	record := dir.children.recordByName(c, name)
 	if record == nil {
-		return 0, nil, errors.New("Non-existing Inode")
+		return quantumfs.InodeIdInvalid, nil,
+			errors.New("Non-existing Inode")
 	}
 
 	inodeNum := dir.children.inodeNum(name)
