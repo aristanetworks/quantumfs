@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -258,4 +259,56 @@ func GetDirSize(path string) (uint64, error) {
 
 	err := filepath.Walk(path, findSizeFunc)
 	return totalSize, err
+}
+
+// RandomizeData takes a dir path and writes random data to random offsets in
+// files under the directory
+func RandomizeData(srcDir string) error {
+
+	randDataFunc := func(path string, info os.FileInfo, err error) error {
+
+		if err != nil {
+			fmt.Println(err.Error())
+			return err
+		}
+
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+
+		// Size of buffer is 1% of the file's size
+		size := uint64(info.Size())
+		if size == 0 {
+			return nil
+		}
+		buf := make([]byte, size/100+1)
+
+		// Generate a random buffer
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		_, err = r.Read(buf)
+		if err != nil {
+			fmt.Println(err.Error())
+			return err
+		}
+
+		// Open file for write
+		f, err := os.OpenFile(path, syscall.O_WRONLY, 0666)
+		if err != nil {
+			fmt.Println(err.Error())
+			return err
+		}
+		defer f.Close()
+
+		// Write data at offeset = (randNum % size)  + 1
+		_, err = f.WriteAt(buf, r.Int63n(int64(size)))
+		if err != nil {
+			fmt.Println("write to file ", err.Error())
+			return err
+		}
+
+		return nil
+	}
+
+	err := filepath.Walk(srcDir, randDataFunc)
+	return err
 }
