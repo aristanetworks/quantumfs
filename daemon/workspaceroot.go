@@ -27,7 +27,7 @@ type WorkspaceRoot struct {
 
 	// Hardlink support structures
 	hardlinks	map[uint64]*quantumfs.DirectoryRecord
-	dirtyLinks	map[InodeId]Inode
+	dirtyLinks	map[InodeId]InodeId
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -61,6 +61,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
 	uninstantiated := initDirectory(c, name, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
@@ -73,6 +74,26 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 // Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
+}
+
+func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
+	for {
+		for i := 0; i < entry.NumEntries(); i++ {
+			hardlink := entry.Entry(i)
+			wsr.hardlinks[hardlink.HardlinkID()] = hardlink.Record()
+		}
+
+		if entry.Next() == quantumfs.EmptyDirKey || entry.NumEntries() == 0 {
+			break
+		}
+
+		buffer := c.dataStore.Get(&c.Ctx, entry.Next())
+		if buffer == nil {
+			panic("Missing next HardlinkEntry object")
+		}
+
+		entry = buffer.AsHardlinkEntry()
+	}
 }
 
 func publishHardlinkMap(c *ctx,
