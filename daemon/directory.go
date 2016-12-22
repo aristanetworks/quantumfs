@@ -1429,7 +1429,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
 	defer c.vlog("Directory::instantiateChild Exit")
 
-	//defer dir.Lock().Unlock()
+	defer dir.Lock().Unlock()
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
