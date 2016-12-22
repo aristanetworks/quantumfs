@@ -78,11 +78,10 @@ const sourceDataLength = 30
 func initDirectory_(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
-/*
+
 	defer c.FuncIn("initDirectory_",
-		"Enter Fetching directory baselayer from %s",
-		baseLayerId.String()).out()
-*/
+		"baselayer from %s", baseLayerId.String()).out()
+
 	// Set directory data before processing the children in case the children
 	// access the parent.
 	dir.InodeCommon.id = inodeNum
