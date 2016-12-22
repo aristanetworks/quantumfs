@@ -68,7 +68,7 @@ func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 
 	dirtyIds := dir.children.popDirty()
 	for _, childId := range dirtyIds {
-		child := c.qfs.inode(c, childId)
+		child := c.qfs.inodeNoInstantiate(c, childId)
 		newKey := child.flush_DOWN(c)
 		dir.children.record(childId).SetID(newKey)
 	}
