@@ -85,3 +85,10 @@ func (buf *TestBuffer) AsExtendedAttributes() ExtendedAttributes {
 	return OverlayExtendedAttributes(
 		encoding.ReadRootExtendedAttributes(segment))
 }
+
+func (buf *TestBuffer) AsHardlinkEntry() HardlinkEntry {
+	segment := capn.NewBuffer(buf.data)
+	return OverlayHardlinkEntry(
+		encoding.ReadRootHardlinkEntry(segment))
+
+}

@@ -430,7 +430,7 @@ func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
 	return &record
 }
 
-func (r *HardlinkRecord) hardlinkID() uint64 {
+func (r *HardlinkRecord) HardlinkID() uint64 {
 	return r.record.HardlinkID()
 }
 
@@ -464,7 +464,7 @@ func NewHardlinkEntry() *HardlinkEntry {
 	return &dirEntry
 }
 
-func overlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
+func OverlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
 	dir := HardlinkEntry{
 		entry: edir,
 	}
@@ -500,7 +500,7 @@ func (dir *HardlinkEntry) SetNext(key ObjectKey) {
 }
 
 func (wsr *WorkspaceRoot) HardlinkEntry() HardlinkEntry {
-	return overlayHardlinkEntry(wsr.wsr.HardlinkEntry())
+	return OverlayHardlinkEntry(wsr.wsr.HardlinkEntry())
 }
 
 func (wsr *WorkspaceRoot) SetHardlinkEntry(v *HardlinkEntry) {
@@ -850,6 +850,7 @@ type Buffer interface {
 	AsMultiBlockFile() MultiBlockFile
 	AsVeryLargeFile() VeryLargeFile
 	AsExtendedAttributes() ExtendedAttributes
+	AsHardlinkEntry() HardlinkEntry
 }
 
 type DataStore interface {
