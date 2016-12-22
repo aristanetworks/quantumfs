@@ -50,6 +50,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
+	//defer wsr.Lock().Unlock()
+
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
@@ -57,7 +59,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
-	uninstantiated := initDirectory(c, name, &wsr.Directory,
+	uninstantiated := initDirectory_(c, name, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
