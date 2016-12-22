@@ -50,7 +50,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
-	//defer wsr.Lock().Unlock()
+	defer wsr.Lock().Unlock()
 
 	wsr.self = &wsr
 	wsr.namespace = parentName
