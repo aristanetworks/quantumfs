@@ -12,6 +12,8 @@ import "os"
 import "strconv"
 import "testing"
 
+import "github.com/aristanetworks/quantumfs"
+
 func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	workspace := test.newWorkspace()
 
@@ -75,6 +77,12 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 func TestSmallConvert(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, 512*1024)
+	})
+}
+
+func TestMaxSmallConvert(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		runConvertFrom(test, uint64(quantumfs.MaxBlockSize))
 	})
 }
 
