@@ -447,7 +447,7 @@ func (r *HardlinkRecord) SetRecord(v *DirectoryRecord) {
 }
 
 type HardlinkEntry struct {
-	entry	encoding.HardlinkEntry
+	entry encoding.HardlinkEntry
 }
 
 func NewHardlinkEntry() *HardlinkEntry {

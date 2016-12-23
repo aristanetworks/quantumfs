@@ -26,8 +26,8 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	hardlinks	map[uint64]*quantumfs.DirectoryRecord
-	dirtyLinks	map[InodeId]InodeId
+	hardlinks  map[uint64]*quantumfs.DirectoryRecord
+	dirtyLinks map[InodeId]InodeId
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -79,6 +79,9 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 }
 
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
+	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
+	wsr.dirtyLinks = make(map[InodeId]InodeId)
+
 	for {
 		for i := 0; i < entry.NumEntries(); i++ {
 			hardlink := entry.Entry(i)
@@ -140,6 +143,9 @@ func publishHardlinkMap(c *ctx,
 func (wsr *WorkspaceRoot) publish(c *ctx) {
 	c.vlog("WorkspaceRoot::publish Enter")
 	defer c.vlog("WorkspaceRoot::publish Exit")
+
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
 
 	// Upload the workspaceroot object
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
