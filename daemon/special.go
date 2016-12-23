@@ -52,7 +52,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		device:   device,
 	}
 	special.self = &special
-	special.setParent(parent)
+	special.setParent(parent.inodeNum())
 	assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
@@ -75,7 +75,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := special.parent().getChildRecord(c, special.InodeCommon.id)
+	record, err := special.parent(c).getChildRecord(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
 		return fuse.EIO
@@ -115,7 +115,7 @@ func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return special.parent().setChildAttr(c, special.InodeCommon.id,
+	return special.parent(c).setChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
 
@@ -262,7 +262,8 @@ func (special *Special) getChildRecord(c *ctx,
 
 func (special *Special) dirty(c *ctx) {
 	special.setDirty(true)
-	special.parent().dirtyChild(c, special)
+
+	special.parent(c).dirtyChild(c, special.inodeNum())
 }
 
 func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {

@@ -216,7 +216,8 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 	var id InodeId
 	id = InodeId(stat.Ino)
 	inode := test.qfs.inodes[id]
-	record, err := inode.parent().getChildRecord(&test.qfs.c, id)
+	parent := inode.parent(&test.qfs.c)
+	record, err := parent.getChildRecord(&test.qfs.c, id)
 
 	// Verify the type and key matching
 	test.assert(type_ == Type && size == record.Size() &&
@@ -297,8 +298,9 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 		err = syscall.Lstat(linkName, &stat)
 		test.assert(err == nil, "Error stat'ing symlink: %v", err)
 		id := InodeId(stat.Ino)
-		inode := test.qfs.inodes[id]
-		record, err := inode.parent().getChildRecord(&test.qfs.c, id)
+		inode := test.qfs.inode(&test.qfs.c, id)
+		parent := inode.parent(&test.qfs.c)
+		record, err := parent.getChildRecord(&test.qfs.c, id)
 
 		// Verify the type and key matching
 		test.assert(type_ == quantumfs.ObjectTypeSymlink &&
