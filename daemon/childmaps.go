@@ -9,9 +9,6 @@ import "github.com/aristanetworks/quantumfs"
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
-	// ChildMap needs protection to be concurrency safe
-	childLock DeferableRwMutex
-
 	children      map[string]InodeId
 	dirtyChildren map[InodeId]InodeId // a set
 
@@ -27,8 +24,6 @@ func newChildMap(numEntries int) *ChildMap {
 }
 
 func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf) InodeId {
-	defer cmap.childLock.Lock().Unlock()
-
 	inodeId := c.qfs.newInodeId()
 	cmap.setChild_(c, entry, inodeId)
 
@@ -36,8 +31,6 @@ func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf) InodeId {
 }
 
 func (cmap *ChildMap) setChild(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
-	defer cmap.childLock.Lock().Unlock()
-
 	cmap.setChild_(c, entry, inodeId)
 }
 
@@ -53,14 +46,10 @@ func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId
 }
 
 func (cmap *ChildMap) count() uint64 {
-	defer cmap.childLock.RLock().RUnlock()
-
 	return uint64(len(cmap.childrenRecords))
 }
 
 func (cmap *ChildMap) deleteChild(inodeNum InodeId) DirectoryRecordIf {
-	defer cmap.childLock.Lock().Unlock()
-
 	record, exists := cmap.childrenRecords[inodeNum]
 	if !exists {
 		panic(fmt.Sprintf("Delete child that has no record: %d", inodeNum))
@@ -81,8 +70,6 @@ func (cmap *ChildMap) renameChild(oldName string,
 		return quantumfs.InodeIdInvalid
 	}
 
-	defer cmap.childLock.Lock().Unlock()
-
 	// record whether we need to cleanup a file we're overwriting
 	cleanupInodeId, needCleanup := cmap.children[newName]
 
@@ -102,8 +89,6 @@ func (cmap *ChildMap) renameChild(oldName string,
 }
 
 func (cmap *ChildMap) popDirty() map[InodeId]InodeId {
-	defer cmap.childLock.Lock().Unlock()
-
 	rtn := cmap.dirtyChildren
 	cmap.dirtyChildren = make(map[InodeId]InodeId, 0)
 
@@ -111,8 +96,6 @@ func (cmap *ChildMap) popDirty() map[InodeId]InodeId {
 }
 
 func (cmap *ChildMap) setDirty(c *ctx, inodeNum InodeId) {
-	defer cmap.childLock.Lock().Unlock()
-
 	if _, exists := cmap.childrenRecords[inodeNum]; !exists {
 		c.elog("Attempt to dirty child that doesn't exist: %d", inodeNum)
 		return
@@ -122,18 +105,14 @@ func (cmap *ChildMap) setDirty(c *ctx, inodeNum InodeId) {
 }
 
 func (cmap *ChildMap) inodeNum(name string) InodeId {
-	defer cmap.childLock.RLock().RUnlock()
-
 	if inodeId, exists := cmap.children[name]; exists {
 		return inodeId
 	}
 
-	panic(fmt.Sprintf("No valid child: %s", name))
+	return quantumfs.InodeIdInvalid
 }
 
 func (cmap *ChildMap) inodes() []InodeId {
-	defer cmap.childLock.RLock().RUnlock()
-
 	rtn := make([]InodeId, 0, len(cmap.children))
 	for _, v := range cmap.children {
 		rtn = append(rtn, v)
@@ -143,8 +122,6 @@ func (cmap *ChildMap) inodes() []InodeId {
 }
 
 func (cmap *ChildMap) records() []DirectoryRecordIf {
-	defer cmap.childLock.RLock().RUnlock()
-
 	rtn := make([]DirectoryRecordIf, 0, len(cmap.childrenRecords))
 	for _, i := range cmap.childrenRecords {
 		rtn = append(rtn, i)
@@ -154,8 +131,6 @@ func (cmap *ChildMap) records() []DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) record(inodeNum InodeId) DirectoryRecordIf {
-	defer cmap.childLock.RLock().RUnlock()
-
 	entry, exists := cmap.childrenRecords[inodeNum]
 	if !exists {
 		return nil
@@ -165,8 +140,6 @@ func (cmap *ChildMap) record(inodeNum InodeId) DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
-	defer cmap.childLock.RLock().RUnlock()
-
 	inodeNum, exists := cmap.children[name]
 	if !exists {
 		return nil
