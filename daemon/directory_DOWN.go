@@ -27,6 +27,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
+	defer dir.childRecordLock.Lock().Unlock()
 	inodeNum := dir.children.newChild(c, newRecord)
 	dir.self.markAccessed(c, newName, true)
 
@@ -54,6 +55,7 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	}
 
 	defer dir.Lock().Unlock()
+	defer dir.childRecordLock.Lock().Unlock()
 
 	dir.updateRecords_DOWN_(c)
 	return dir.publish_(c)
@@ -62,7 +64,7 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 //
-// Requires the Inode lock
+// Requires the Inode lock and childRecordLock
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	defer c.funcIn("Directory::updateRecords_DOWN_").out()
 
