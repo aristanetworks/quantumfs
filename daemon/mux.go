@@ -263,7 +263,8 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 
 	parent := qfs.inode_(c, parentId)
 	if parent == nil {
-		c.elog("Unable to instantiate parent required: %d", parentId)
+		panic(fmt.Sprintf("Unable to instantiate parent required: %d",
+			parentId))
 	}
 
 	inode, newUninstantiated := parent.instantiateChild(c, id)
