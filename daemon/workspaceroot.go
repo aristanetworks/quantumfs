@@ -78,6 +78,37 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
+// Return a snapshot / instance so that it's concurrency safe
+func (wsr *WorkspaceRoot) getHardlink(linkId uint64) quantumfs.DirectoryRecord {
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+
+	link, exists := wsr.hardlinks[linkId]
+	if exists {
+		return *link
+	}
+
+	// This function should only be called from Hardlink objects, meaning the
+	// linkId really should never be invalid
+	panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+}
+
+// We need the wsr lock to cover setting safely
+func (wsr *WorkspaceRoot) setHardlink(linkId uint64,
+	fnSetter func (dir *quantumfs.DirectoryRecord)) {
+
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+
+	link, exists := wsr.hardlinks[linkId]
+	if !exists {
+		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+	}
+
+	// It's critical that our lock covers both the fetch and this change
+	fnSetter(link)
+}
+
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
 	wsr.dirtyLinks = make(map[InodeId]InodeId)

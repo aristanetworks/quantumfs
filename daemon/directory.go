@@ -46,7 +46,7 @@ type DirectoryRecordIf interface {
 	ModificationTime() quantumfs.Time
 	SetModificationTime(v quantumfs.Time)
 
-	Record() *quantumfs.DirectoryRecord
+	Record() quantumfs.DirectoryRecord
 }
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
