@@ -983,8 +983,8 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			dir.self.markAccessed(c, oldName, false)
 
 			if oldName == newName {
-				// Nothing more to be done other than marking the file
-				// accessed above.
+				// Nothing more to be done other than marking the
+				// file accessed above.
 				return quantumfs.InodeIdInvalid,
 					quantumfs.InodeIdInvalid, fuse.OK
 			}
