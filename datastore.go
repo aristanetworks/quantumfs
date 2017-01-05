@@ -597,7 +597,7 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
 }
 
 func (record *DirectoryRecord) Record() *DirectoryRecord {
-	return overlayDirectoryRecord(record.record)
+	return record
 }
 
 func (record *DirectoryRecord) Filename() string {
