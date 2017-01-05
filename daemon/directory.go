@@ -69,7 +69,7 @@ type Directory struct {
 
 	// ChildMap needs protection to be concurrency safe
 	childRecordLock DeferableMutex
-	children *ChildMap
+	children        *ChildMap
 }
 
 // The size of the ObjectKey: 21 + 1 + 8
@@ -225,7 +225,7 @@ func (dir *Directory) dirty(c *ctx) {
 func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("Directory::dirtyChild").out()
 
-	func () {
+	func() {
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.children.setDirty(c, childId)
@@ -780,7 +780,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		var recordType quantumfs.ObjectType
 		var owner quantumfs.UID
 		var inode InodeId
-		err := func () fuse.Status {
+		err := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 
 			record := dir.children.recordByName(c, name)
@@ -1110,7 +1110,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// we need to unlock the parent early
 			defer parent.lock.Unlock()
 
-			newEntry, oldInodeId, err := func () (DirectoryRecordIf,
+			newEntry, oldInodeId, err := func() (DirectoryRecordIf,
 				InodeId, fuse.Status) {
 
 				defer dir.childRecordLock.Lock().Unlock()
@@ -1146,7 +1146,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// it.
 			dst.deleteEntry_(c, newName)
 
-			func () {
+			func() {
 				defer dir.childRecordLock.Lock().Unlock()
 
 				overwrittenRecord := dst.children.recordByName(c,
@@ -1455,7 +1455,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		return fuse.EIO
 	}
 
-	func () {
+	func() {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.children.record(inodeNum).SetExtendedAttributes(key)
 	}()
@@ -1524,7 +1524,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		key = quantumfs.EmptyBlockKey
 	}
 
-	func (){
+	func() {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.children.record(inodeNum).SetExtendedAttributes(key)
 	}()

@@ -27,7 +27,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := func () InodeId {
+	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.newChild(c, newRecord)
 	}()
