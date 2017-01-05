@@ -18,6 +18,8 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
+const defaultCacheSize = 4096
+
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
@@ -36,7 +38,8 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 			},
 			config:      &config,
 			workspaceDB: config.WorkspaceDB,
-			dataStore:   newDataStore(config.DurableStore),
+			dataStore: newDataStore(config.DurableStore,
+				defaultCacheSize),
 		},
 	}
 
