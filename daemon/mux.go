@@ -544,7 +544,12 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 		// Great, we want to forget this so proceed
 		key := inode.flush_DOWN(&qfs.c)
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
-		delete(qfs.lookupCounts, inode.inodeNum())
+
+		func () {
+			defer qfs.lookupCountLock.Lock().Unlock()
+			delete(qfs.lookupCounts, inode.inodeNum())
+		}()
+
 		qfs.c.vlog("Set inode %d to nil", inode.inodeNum())
 
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
