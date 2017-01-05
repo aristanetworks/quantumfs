@@ -181,7 +181,8 @@ func publishDirectoryRecordIfs(c *ctx,
 			entryIdx = 0
 		}
 
-		baseLayer.SetEntry(entryIdx, child.Record())
+		recordCopy := child.Record()
+		baseLayer.SetEntry(entryIdx, &recordCopy)
 
 		entryIdx++
 	}
