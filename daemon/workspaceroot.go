@@ -101,7 +101,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	}
 }
 
-func publishHardlinkMap_(c *ctx,
+func publishHardlinkMap(c *ctx,
 	records map[uint64]*quantumfs.DirectoryRecord) *quantumfs.HardlinkEntry {
 
 	// entryIdx indexes into the metadata block
@@ -150,7 +150,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	// Upload the workspaceroot object
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
-	workspaceRoot.SetHardlinkEntry(publishHardlinkMap_(c, wsr.hardlinks))
+	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
+	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, wsr.hardlinks))
 
 	bytes := workspaceRoot.Bytes()
 
