@@ -545,7 +545,7 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 		key := inode.flush_DOWN(&qfs.c)
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
 
-		func () {
+		func() {
 			defer qfs.lookupCountLock.Lock().Unlock()
 			delete(qfs.lookupCounts, inode.inodeNum())
 		}()
