@@ -226,6 +226,7 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("Directory::dirtyChild").out()
 
 	func () {
+		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.children.setDirty(c, childId)
 	}()
@@ -970,6 +971,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 		oldInodeId, oldRemoved, err := func() (InodeId, InodeId,
 			fuse.Status) {
+
 			defer dir.childRecordLock.Lock().Unlock()
 
 			record := dir.children.recordByName(c, oldName)
@@ -991,9 +993,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			oldRemoved_ := dir.children.renameChild(oldName, newName)
 			return oldInodeId_, oldRemoved_, fuse.OK
 		}()
-		if oldInodeId == quantumfs.InodeIdInvalid ||
-			oldRemoved == quantumfs.InodeIdInvalid {
-
+		if oldName == newName || err != fuse.OK {
 			return err
 		}
 
@@ -1156,9 +1156,11 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 					c.qfs.removeUninstantiated(c,
 						[]InodeId{overwrittenId})
 				}
+
+				dst.insertEntry_(c, newEntry, oldInodeId,
+					child != nil)
 			}()
 
-			dst.insertEntry_(c, newEntry, oldInodeId, child != nil)
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
 			if child == nil {
@@ -1196,6 +1198,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 	dir.children.deleteChild(inodeId)
 }
 
+// Needs to hold childRecordLock
 func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum InodeId,
 	inodeLoaded bool) {
 

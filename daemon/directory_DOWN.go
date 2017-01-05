@@ -27,8 +27,11 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	defer dir.childRecordLock.Lock().Unlock()
-	inodeNum := dir.children.newChild(c, newRecord)
+	inodeNum := func () InodeId {
+		defer dir.childRecordLock.Lock().Unlock()
+		return dir.children.newChild(c, newRecord)
+	}()
+
 	dir.self.markAccessed(c, newName, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
