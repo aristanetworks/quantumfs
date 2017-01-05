@@ -52,7 +52,7 @@ func (cmap *ChildMap) count() uint64 {
 func (cmap *ChildMap) deleteChild(inodeNum InodeId) DirectoryRecordIf {
 	record, exists := cmap.childrenRecords[inodeNum]
 	if !exists {
-		panic(fmt.Sprintf("Delete child that has no record: %d", inodeNum))
+		return nil
 	} else {
 		delete(cmap.children, record.Filename())
 	}
