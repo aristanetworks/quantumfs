@@ -67,7 +67,12 @@ type Directory struct {
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
 
-	// ChildMap needs protection to be concurrency safe, since it uses maps
+	// childRecordLock protects the maps inside childMap as well as the
+	// records contained within those maps themselves. This lock is not
+	// the same as the Directory Inode lock because these records must be
+	// accessible in instantiateChild(), which may be called indirectly
+	// via qfs.inode() from a context where the Inode lock is already
+	// held.
 	childRecordLock DeferableMutex
 	children        *ChildMap
 }
