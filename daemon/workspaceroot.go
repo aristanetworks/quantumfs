@@ -110,7 +110,7 @@ func publishHardlinkMap(c *ctx,
 	var err error
 	entryIdx := 0
 	for hardlinkID, record := range records {
-		if entryIdx == quantumfs.MaxDirectoryRecords {
+		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
 			baseLayer.SetNext(nextBaseLayerId)
