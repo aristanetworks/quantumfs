@@ -3,12 +3,38 @@
 
 package daemon
 
+import "encoding/binary"
+
 import "github.com/aristanetworks/quantumfs"
 
 // Should implement DirectoryRecordIf
 type Hardlink struct {
 	linkId		uint64
 	wsr		*WorkspaceRoot
+}
+
+func decodeHardlinkKey(key quantumfs.ObjectKey) (hardlinkId uint64) {
+	if key.Type() != quantumfs.KeyTypeEmbedded {
+		panic("Non-embedded key attempted decode as Hardlink Id")
+	}
+
+	hash := key.Hash()
+	return binary.LittleEndian.Uint64(hash[0:8])
+}
+
+func encodeHardlinkId(hardlinkId uint64) quantumfs.ObjectKey {
+	var hash [quantumfs.ObjectKeyLength - 1]byte
+
+	binary.LittleEndian.PutUint64(hash[0:8], hardlinkId)
+	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
+}
+
+func newHardlink(linkId uint64, wsr *WorkspaceRoot) *Hardlink {
+	var newLink Hardlink
+	newLink.wsr = wsr
+	newLink.linkId = linkId
+
+	return &newLink
 }
 
 func (link *Hardlink) get() *quantumfs.DirectoryRecord {

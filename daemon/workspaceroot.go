@@ -26,8 +26,9 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	hardlinks  map[uint64]*quantumfs.DirectoryRecord
-	dirtyLinks map[InodeId]InodeId
+	hardlinks  	map[uint64]*quantumfs.DirectoryRecord
+	hardlinkInode	map[uint64]InodeId
+	dirtyLinks 	map[InodeId]InodeId
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -64,7 +65,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
-	uninstantiated := initDirectory(c, name, &wsr.Directory,
+	uninstantiated := initDirectory(c, name, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
@@ -76,6 +77,18 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 // Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
+}
+
+func (wsr *WorkspaceRoot) getHardlinkInodeId(linkId uint64) InodeId {
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+
+	inode, exists := wsr.hardlinkInode[linkId]
+	if exists {
+		return inode
+	}
+
+	return quantumfs.InodeIdInvalid
 }
 
 // Return a snapshot / instance so that it's concurrency safe
@@ -111,6 +124,7 @@ func (wsr *WorkspaceRoot) setHardlink(linkId uint64,
 
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
+	wsr.hardlinkInode = make(map[uint64]InodeId)
 	wsr.dirtyLinks = make(map[InodeId]InodeId)
 
 	for {
