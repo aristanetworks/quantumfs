@@ -47,8 +47,8 @@ func newVeryLargeShell(file *LargeFile) *VeryLargeFile {
 func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
-	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile
-	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile
+	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile()
+	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile()
 
 	c.vlog("VeryLargeFile::readBlock part %d/%d", partIdx, len(fi.parts))
 
@@ -79,7 +79,7 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 }
 
 func (fi *VeryLargeFile) expandTo(lengthParts int) {
-	if lengthParts > quantumfs.MaxPartsVeryLargeFile {
+	if lengthParts > quantumfs.MaxPartsVeryLargeFile() {
 		panic("Invalid new length set to expandTo for file accessor")
 	}
 
@@ -93,8 +93,8 @@ func (fi *VeryLargeFile) expandTo(lengthParts int) {
 func (fi *VeryLargeFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
-	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile
-	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile
+	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile()
+	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile()
 
 	// Ensure we have a part to write to
 	for len(fi.parts) <= partIdx {
@@ -110,7 +110,7 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 	// Count everything except the last block as being full
 	for i := 0; i < len(fi.parts)-1; i++ {
 		length += uint64(fi.parts[i].metadata.BlockSize) *
-			uint64(quantumfs.MaxBlocksLargeFile)
+			uint64(quantumfs.MaxBlocksLargeFile())
 	}
 
 	// And add what's in the last block
@@ -127,13 +127,13 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	c.vlog("Searching existing large files")
 	for i := 0; i < len(fi.parts); i++ {
 		maxLengthFile := uint64(fi.parts[i].metadata.BlockSize) *
-			uint64(quantumfs.MaxBlocksLargeFile)
+			uint64(quantumfs.MaxBlocksLargeFile())
 
 		// If this extends past the remaining offset, then this
 		// is the file we're looking for
 		if maxLengthFile > absOffset {
 			blockIdx, offset := fi.parts[i].blockIdxInfo(c, absOffset)
-			blockIdx += i * quantumfs.MaxBlocksLargeFile
+			blockIdx += i * quantumfs.MaxBlocksLargeFile()
 			return blockIdx, offset
 		}
 
@@ -144,13 +144,13 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	// New blocks will be quantumfs.MaxBlockSize, so use that info to calculate
 	// our return values
 	maxLengthFile := uint64(quantumfs.MaxBlockSize) *
-		uint64(quantumfs.MaxBlocksLargeFile)
+		uint64(quantumfs.MaxBlocksLargeFile())
 	c.vlog("Extending into sparse space until %d > %d", maxLengthFile, absOffset)
 	for i := len(fi.parts); ; i++ {
 		if maxLengthFile > absOffset {
 			tmpLargeFile := newLargeShell()
 			blockIdx, offset := tmpLargeFile.blockIdxInfo(c, absOffset)
-			blockIdx += i * quantumfs.MaxBlocksLargeFile
+			blockIdx += i * quantumfs.MaxBlocksLargeFile()
 			return blockIdx, offset
 		}
 		absOffset -= maxLengthFile
@@ -203,7 +203,7 @@ func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
 	// If we're expanding the length, handle that first
 	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(c, newLengthBytes-1)
 
-	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile
+	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile()
 	newNumParts := lastPartIdx + 1
 
 	if newNumParts > len(fi.parts) {
