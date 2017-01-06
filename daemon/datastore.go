@@ -254,3 +254,10 @@ func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
 		encoding.ReadRootExtendedAttributes(segment))
 
 }
+
+func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayHardlinkEntry(
+		encoding.ReadRootHardlinkEntry(segment))
+
+}

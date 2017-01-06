@@ -42,11 +42,24 @@ struct DirectoryEntry {
         entries    @2 :List(DirectoryRecord);
 }
 
+struct HardlinkRecord {
+	hardlinkID @0 :UInt64;
+	record     @1 :DirectoryRecord;
+}
+
+struct HardlinkEntry {
+	numEntries @0 :UInt32;
+	next       @1 :ObjectKey;
+	entries    @2 :List(HardlinkRecord);
+}
+
 struct WorkspaceRoot {
         baseLayer  @0 :ObjectKey;
         vcsLayer   @1 :ObjectKey;
         buildLayer @2 :ObjectKey;
         userLayer  @3 :ObjectKey;
+
+	hardlinkEntry @4 :HardlinkEntry;
 }
 
 struct VeryLargeFile {
