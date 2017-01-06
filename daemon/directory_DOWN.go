@@ -29,7 +29,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.newChild(c, newRecord)
+		return dir.children.newChild(c, newRecord, dir.wsr)
 	}()
 
 	dir.self.markAccessed(c, newName, true)

@@ -63,6 +63,8 @@ type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 type Directory struct {
 	InodeCommon
 
+	wsr		*WorkspaceRoot
+
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
 
@@ -75,7 +77,7 @@ type Directory struct {
 // The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
 const sourceDataLength = 30
 
-func initDirectory(c *ctx, name string, dir *Directory,
+func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
@@ -89,6 +91,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
+	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
 	uninstantiated := make([]InodeId, 0)
@@ -110,7 +113,8 @@ func initDirectory(c *ctx, name string, dir *Directory,
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := func() InodeId {
 				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.newChild(c, baseLayer.Entry(i))
+				return dir.children.newChild(c, baseLayer.Entry(i),
+					wsr)
 			}()
 			c.vlog("initDirectory %d getting child %d", inodeNum,
 				childInodeNum)
@@ -140,8 +144,19 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	var dir Directory
 	dir.self = &dir
 
-	uninstantiated := initDirectory(c, name, &dir, baseLayerId, inodeNum,
-		parent.inodeNum(), parent.treeLock())
+	var wsr *WorkspaceRoot
+	switch v := parent.(type) {
+		case *Directory:
+			wsr = v.wsr
+		case *WorkspaceRoot:
+			wsr = v
+		default:
+			panic(fmt.Sprintf("Parent of inode %d is neither "+
+				"Directory nor WorkspaceRoot", inodeNum))
+	}
+
+	uninstantiated := initDirectory(c, name, &dir, wsr, baseLayerId,
+		inodeNum, parent.inodeNum(), parent.treeLock())
 	return &dir, uninstantiated
 }
 
@@ -395,7 +410,8 @@ func publishDirectoryRecordIfs(c *ctx,
 			entryIdx = 0
 		}
 
-		baseLayer.SetEntry(entryIdx, child.Record())
+		recordCopy := child.Record()
+		baseLayer.SetEntry(entryIdx, &recordCopy)
 
 		entryIdx++
 	}
@@ -1659,7 +1675,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	defer dir.childRecordLock.Lock().Unlock()
-	inodeNum := dir.children.newChild(c, entry)
+	inodeNum := dir.children.newChild(c, entry, dir.wsr)
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }

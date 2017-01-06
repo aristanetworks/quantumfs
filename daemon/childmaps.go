@@ -23,14 +23,29 @@ func newChildMap(numEntries int) *ChildMap {
 	}
 }
 
-func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf) InodeId {
-	inodeId := c.qfs.newInodeId()
+func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf,
+	wsr *WorkspaceRoot) InodeId {	
+
+	inodeId := InodeId(quantumfs.InodeIdInvalid)
+	if entry.Type() == quantumfs.ObjectTypeHardlink {
+		linkId := decodeHardlinkKey(entry.ID())
+		entry = newHardlink(linkId, wsr)
+		inodeId = wsr.getHardlinkInodeId(linkId)
+	} else {
+		inodeId = c.qfs.newInodeId()
+	}
+
 	cmap.setChild_(c, entry, inodeId)
 
 	return inodeId
 }
 
 func (cmap *ChildMap) setChild(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
+	if entry.Type() == quantumfs.ObjectTypeHardlink {
+		panic(fmt.Sprintf("Hardlink inodeId manually set, not naturally "+
+			"loaded %d", inodeId))
+	}
+
 	cmap.setChild_(c, entry, inodeId)
 }
 
