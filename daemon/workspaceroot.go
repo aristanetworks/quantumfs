@@ -50,6 +50,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
+	defer wsr.Lock().Unlock()
+
 	wsr.self = &wsr
 	wsr.namespace = parentName
 	wsr.workspace = name
@@ -146,7 +148,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer wsr.RLock().RUnlock()
 
 	var numChildDirectories uint32
-	for _, entry := range wsr.childrenRecords {
+	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
 			numChildDirectories++
 		}

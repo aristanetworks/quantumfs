@@ -261,7 +261,13 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
+	parent := qfs.inode_(c, parentId)
+	if parent == nil {
+		panic(fmt.Sprintf("Unable to instantiate parent required: %d",
+			parentId))
+	}
+
+	inode, newUninstantiated := parent.instantiateChild(c, id)
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
@@ -274,10 +280,10 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
-	c.vlog("Setting inode %d", id)
 	if inode != nil {
 		qfs.inodes[id] = inode
 	} else {
+		c.vlog("Clearing inode %d", id)
 		delete(qfs.inodes, id)
 	}
 }
