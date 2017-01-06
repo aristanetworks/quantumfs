@@ -16,7 +16,7 @@ import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 import "github.com/hanwen/go-fuse/fuse"
 import "github.com/pivotal-golang/bytefmt"
 
-// Various exist reasons, will be returned to the shell as an exit code
+// Various exit reasons, will be returned to the shell as an exit code
 const (
 	exitOk                  = iota
 	exitBadCacheSize        = iota
@@ -31,6 +31,7 @@ var cacheTimeNsecs uint
 var memLogMegabytes uint
 var config daemon.QuantumFsConfig
 var cpuProfileFile string
+var showMaxSizes bool
 
 func init() {
 	const (
@@ -73,6 +74,33 @@ func init() {
 
 	flag.StringVar(&cpuProfileFile, "profilePath", "",
 		"File to write CPU Profiling data to")
+
+	flag.BoolVar(&showMaxSizes, "showMaxSizes", false,
+		"Show max block counts, metadata entries and max file sizes")
+}
+
+func maxSizes() {
+	fmt.Printf("%30s %d\n", "MaxBlockSize",
+		quantumfs.MaxBlockSize)
+	fmt.Printf("%30s %d\n", "MaxBlocksLargeFile",
+		quantumfs.MaxBlocksLargeFile())
+	fmt.Printf("%30s %d\n", "MaxDirectoryRecords",
+		quantumfs.MaxDirectoryRecords())
+	fmt.Printf("%30s %d\n", "MaxNumExtendedAttributes",
+		quantumfs.MaxNumExtendedAttributes())
+	fmt.Printf("%30s %d\n", "MaxBlocksMediumFile",
+		quantumfs.MaxBlocksMediumFile())
+	fmt.Printf("%30s %d\n", "MaxPartsVeryLargeFile",
+		quantumfs.MaxPartsVeryLargeFile())
+
+	fmt.Printf("%30s %d\n", "MaxSmallFileSize",
+		quantumfs.MaxSmallFileSize())
+	fmt.Printf("%30s %d\n", "MaxMediumFileSize",
+		quantumfs.MaxMediumFileSize())
+	fmt.Printf("%30s %d\n", "MaxLargeFileSize",
+		quantumfs.MaxLargeFileSize())
+	fmt.Printf("%30s %d\n", "MaxVeryLargeFileSize",
+		quantumfs.MaxVeryLargeFileSize())
 }
 
 func loadDatastore() {
@@ -122,6 +150,11 @@ func loadWorkspaceDB() {
 // Exit if processing failed
 func processArgs() {
 	flag.Parse()
+
+	if showMaxSizes {
+		maxSizes()
+		os.Exit(0)
+	}
 
 	if cacheSize, err := bytefmt.ToBytes(cacheSizeString); err != nil {
 		os.Exit(exitBadCacheSize)

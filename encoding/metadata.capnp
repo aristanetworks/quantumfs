@@ -10,21 +10,11 @@ $Go.import("github.com/aristanetworks.com/quantumfs/encoding");
 # Maximum size of a block which can be stored in a datastore
 const maxBlockSize :UInt32 = 1048576;
 
-# Maximum number of blocks for each file type
-const maxBlocksMediumFile :UInt32 = 32;
-
-# TODO: Increase these to 48000 when we choose a more efficient encoding than json
-const maxBlocksLargeFile :UInt32 = 22000;
-
-# TODO: Increase this to 48000 when we switch away from json
-const maxPartsVeryLargeFile :UInt32 = 22000;
-
-const maxDirectoryRecords :UInt32 = 1200;
-
 # Maximum length of a filename
 const maxFilenameLength :UInt32 = 256;
 
-const maxNumExtendedAttributes :UInt32 = 3700;
+# Maximum length of an extended attribute
+const maxXAttrnameLength :UInt32 = 256;
 
 struct ObjectKey {
         keyType @0 :UInt8; # 1
