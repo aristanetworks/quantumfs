@@ -4,8 +4,11 @@
 package cql
 
 import (
-	"github.com/aristanetworks/quantumfs"
 	"time"
+
+	"github.com/aristanetworks/ether/utils/stats"
+	"github.com/aristanetworks/ether/utils/stats/inmem"
+	"github.com/aristanetworks/quantumfs"
 )
 
 // In this implementation of workspace DB API,
@@ -18,6 +21,9 @@ import (
 type cacheWsdb struct {
 	base  quantumfs.WorkspaceDB
 	cache *entityCache
+
+	branchStats  stats.OpStats
+	advanceStats stats.OpStats
 }
 
 // this wsdb implementation wraps any wsdb (base) implementation
@@ -25,7 +31,9 @@ type cacheWsdb struct {
 func newCacheWsdb(base quantumfs.WorkspaceDB, cfg WsDBConfig) quantumfs.WorkspaceDB {
 
 	cwsdb := &cacheWsdb{
-		base: base,
+		base:         base,
+		branchStats:  inmem.NewOpStatsInMem("branchWorkspace"),
+		advanceStats: inmem.NewOpStatsInMem("advanceWorkspace"),
 	}
 
 	// TODO: default max cache age can be a configuration parameter?
@@ -86,6 +94,9 @@ func (cw *cacheWsdb) WorkspaceExists(c *quantumfs.Ctx, namespace string,
 func (cw *cacheWsdb) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 	srcWorkspace string, dstNamespace string, dstWorkspace string) error {
 
+	start := time.Now()
+	defer func() { cw.branchStats.RecordOp(time.Since(start)) }()
+
 	if err := cw.base.BranchWorkspace(c, srcNamespace, srcWorkspace,
 		dstNamespace, dstWorkspace); err != nil {
 		return err
@@ -109,6 +120,9 @@ func (cw *cacheWsdb) Workspace(c *quantumfs.Ctx, namespace string,
 func (cw *cacheWsdb) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
 	workspace string, currentRootID quantumfs.ObjectKey,
 	newRootID quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+
+	start := time.Now()
+	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()
 
 	key, err := cw.base.AdvanceWorkspace(c, namespace,
 		workspace, currentRootID, newRootID)
@@ -147,4 +161,9 @@ func wsdbFetcherImpl(arg interface{}, entityPath ...string) map[string]bool {
 	}
 
 	return m
+}
+
+func (cw *cacheWsdb) ReportAPIStats() {
+	cw.branchStats.(stats.OpStatReporter).ReportOpStats()
+	cw.advanceStats.(stats.OpStatReporter).ReportOpStats()
 }
