@@ -502,7 +502,7 @@ func NewHardlinkEntry() *HardlinkEntry {
 	}
 	dirEntry.entry.SetNumEntries(0)
 
-	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords)
+	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords())
 	dirEntry.entry.SetEntries(recordList)
 
 	return &dirEntry
