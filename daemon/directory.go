@@ -66,7 +66,7 @@ type Directory struct {
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
 
-	// ChildMap needs protection to be concurrency safe
+	// ChildMap needs protection to be concurrency safe, since it uses maps
 	childRecordLock DeferableMutex
 	children        *ChildMap
 }
@@ -75,12 +75,11 @@ type Directory struct {
 // The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
 const sourceDataLength = 30
 
-// Parent must be locked for writing
-func initDirectory_(c *ctx, name string, dir *Directory,
+func initDirectory(c *ctx, name string, dir *Directory,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
-	defer c.FuncIn("initDirectory_",
+	defer c.FuncIn("initDirectory",
 		"baselayer from %s", baseLayerId.String()).out()
 
 	// Set directory data before processing the children in case the children
@@ -113,7 +112,7 @@ func initDirectory_(c *ctx, name string, dir *Directory,
 				defer dir.childRecordLock.Lock().Unlock()
 				return dir.children.newChild(c, baseLayer.Entry(i))
 			}()
-			c.vlog("initDirectory_ %d getting child %d", inodeNum,
+			c.vlog("initDirectory %d getting child %d", inodeNum,
 				childInodeNum)
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
@@ -132,7 +131,7 @@ func initDirectory_(c *ctx, name string, dir *Directory,
 	return uninstantiated
 }
 
-func newDirectory_(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
+func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
@@ -141,7 +140,7 @@ func newDirectory_(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size ui
 	var dir Directory
 	dir.self = &dir
 
-	uninstantiated := initDirectory_(c, name, &dir, baseLayerId, inodeNum,
+	uninstantiated := initDirectory(c, name, &dir, baseLayerId, inodeNum,
 		parent.inodeNum(), parent.treeLock())
 	return &dir, uninstantiated
 }
@@ -360,6 +359,52 @@ func modeToPermissions(mode uint32, umask uint32) uint32 {
 	return permissions
 }
 
+func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
+	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
+
+	layer.SetNext(nextKey)
+	bytes := layer.Bytes()
+
+	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
+	newKey, err := buf.Key(&c.Ctx)
+	if err != nil {
+		panic("Failed to upload new baseLayer object")
+	}
+
+	return newKey
+}
+
+func publishDirectoryRecordIfs(c *ctx,
+	records []DirectoryRecordIf) quantumfs.ObjectKey {
+
+	// Compile the internal records into a series of blocks which can be placed
+	// in the datastore.
+	newBaseLayerId := quantumfs.EmptyDirKey
+
+	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
+	// metadata block
+	baseLayer := quantumfs.NewDirectoryEntry()
+	entryIdx := 0
+	for _, child := range records {
+		if entryIdx == quantumfs.MaxDirectoryRecords {
+			// This block is full, upload and create a new one
+			baseLayer.SetNumEntries(entryIdx)
+			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
+				newBaseLayerId)
+			baseLayer = quantumfs.NewDirectoryEntry()
+			entryIdx = 0
+		}
+
+		baseLayer.SetEntry(entryIdx, child.Record())
+
+		entryIdx++
+	}
+
+	baseLayer.SetNumEntries(entryIdx)
+	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
+	return newBaseLayerId
+}
+
 // Must hold the dir.childRecordsLock
 func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
@@ -532,6 +577,16 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	return newEntity
 }
 
+func (dir *Directory) childExists(c *ctx, name string) fuse.Status {
+	defer dir.childRecordLock.Lock().Unlock()
+
+	record := dir.children.recordByName(c, name)
+	if record != nil {
+		return fuse.Status(syscall.EEXIST)
+	}
+	return fuse.OK
+}
+
 func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
@@ -541,14 +596,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
-		recordErr := func() fuse.Status {
-			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, name)
-			if record != nil {
-				return fuse.Status(syscall.EEXIST)
-			}
-			return fuse.OK
-		}()
+		recordErr := dir.childExists(c, name)
 		if recordErr != fuse.OK {
 			return recordErr
 		}
@@ -603,14 +651,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
-		recordErr := func() fuse.Status {
-			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, name)
-			if record != nil {
-				return fuse.Status(syscall.EEXIST)
-			}
-			return fuse.OK
-		}()
+		recordErr := dir.childExists(c, name)
 		if recordErr != fuse.OK {
 			return recordErr
 		}
@@ -620,7 +661,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return err
 		}
 
-		dir.create_(c, name, input.Mode, input.Umask, 0, newDirectory_,
+		dir.create_(c, name, input.Mode, input.Umask, 0, newDirectory,
 			quantumfs.ObjectTypeDirectoryEntry, quantumfs.EmptyDirKey,
 			out)
 		return fuse.OK
@@ -825,14 +866,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
-		recordErr := func() fuse.Status {
-			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, name)
-			if record != nil {
-				return fuse.Status(syscall.EEXIST)
-			}
-			return fuse.OK
-		}()
+		recordErr := dir.childExists(c, name)
 		if recordErr != fuse.OK {
 			return recordErr
 		}
@@ -875,14 +909,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
-		recordErr := func() fuse.Status {
-			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, name)
-			if record != nil {
-				return fuse.Status(syscall.EEXIST)
-			}
-			return fuse.OK
-		}()
+		recordErr := dir.childExists(c, name)
 		if recordErr != fuse.OK {
 			return recordErr
 		}
@@ -1511,7 +1538,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		c.elog("Unknown InodeConstructor type: %d", entry.Type())
 		panic("Unknown InodeConstructor type")
 	case quantumfs.ObjectTypeDirectoryEntry:
-		constructor = newDirectory_
+		constructor = newDirectory
 	case quantumfs.ObjectTypeSmallFile:
 		constructor = newSmallFile
 	case quantumfs.ObjectTypeMediumFile:

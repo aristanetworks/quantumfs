@@ -64,7 +64,7 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
-	uninstantiated := initDirectory_(c, name, &wsr.Directory,
+	uninstantiated := initDirectory(c, name, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
@@ -132,7 +132,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	}
 }
 
-func publishHardlinkMap_(c *ctx,
+func publishHardlinkMap(c *ctx,
 	records map[uint64]*quantumfs.DirectoryRecord) *quantumfs.HardlinkEntry {
 
 	// entryIdx indexes into the metadata block
@@ -181,7 +181,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	// Upload the workspaceroot object
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
-	workspaceRoot.SetHardlinkEntry(publishHardlinkMap_(c, wsr.hardlinks))
+	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
+	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, wsr.hardlinks))
 
 	bytes := workspaceRoot.Bytes()
 

@@ -145,53 +145,6 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 	}
 }
 
-func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
-	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
-
-	layer.SetNext(nextKey)
-	bytes := layer.Bytes()
-
-	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newKey, err := buf.Key(&c.Ctx)
-	if err != nil {
-		panic("Failed to upload new baseLayer object")
-	}
-
-	return newKey
-}
-
-func publishDirectoryRecordIfs(c *ctx,
-	records []DirectoryRecordIf) quantumfs.ObjectKey {
-
-	// Compile the internal records into a series of blocks which can be placed
-	// in the datastore.
-	newBaseLayerId := quantumfs.EmptyDirKey
-
-	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
-	// metadata block
-	baseLayer := quantumfs.NewDirectoryEntry()
-	entryIdx := 0
-	for _, child := range records {
-		if entryIdx == quantumfs.MaxDirectoryRecords {
-			// This block is full, upload and create a new one
-			baseLayer.SetNumEntries(entryIdx)
-			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
-				newBaseLayerId)
-			baseLayer = quantumfs.NewDirectoryEntry()
-			entryIdx = 0
-		}
-
-		recordCopy := child.Record()
-		baseLayer.SetEntry(entryIdx, &recordCopy)
-
-		entryIdx++
-	}
-
-	baseLayer.SetNumEntries(entryIdx)
-	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
-	return newBaseLayerId
-}
-
 func cloneDirectoryRecord(
 	orig DirectoryRecordIf) DirectoryRecordIf {
 
