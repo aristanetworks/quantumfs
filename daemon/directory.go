@@ -68,7 +68,12 @@ type Directory struct {
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
 
-	// ChildMap needs protection to be concurrency safe, since it uses maps
+	// childRecordLock protects the maps inside childMap as well as the
+	// records contained within those maps themselves. This lock is not
+	// the same as the Directory Inode lock because these records must be
+	// accessible in instantiateChild(), which may be called indirectly
+	// via qfs.inode() from a context where the Inode lock is already
+	// held.
 	childRecordLock DeferableMutex
 	children        *ChildMap
 }
@@ -401,7 +406,7 @@ func publishDirectoryRecordIfs(c *ctx,
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
 	for _, child := range records {
-		if entryIdx == quantumfs.MaxDirectoryRecords {
+		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
@@ -1437,7 +1442,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	// Append attribute
 	if !set {
 		if attributeList.NumAttributes() >
-			quantumfs.MaxNumExtendedAttributes {
+			quantumfs.MaxNumExtendedAttributes() {
 
 			c.vlog("XAttr list full %d", attributeList.NumAttributes())
 			return fuse.Status(syscall.ENOSPC)
