@@ -561,8 +561,8 @@ func TestLargeDirectory(t *testing.T) {
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
 		test.assert(err == nil, "Error creating directory:%v", err)
-		numToCreate := quantumfs.MaxDirectoryRecords +
-			quantumfs.MaxDirectoryRecords/4
+		numToCreate := quantumfs.MaxDirectoryRecords() +
+			quantumfs.MaxDirectoryRecords()/4
 
 		// Create enough children to overflow a single block
 		for i := 0; i < numToCreate; i++ {

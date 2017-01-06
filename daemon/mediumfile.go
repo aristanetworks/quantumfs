@@ -14,7 +14,7 @@ type MediumFile struct {
 // Shell constructor
 func newMediumShell() MediumFile {
 	var rtn MediumFile
-	initMultiBlockAccessor(&rtn.MultiBlockFile, quantumfs.MaxBlocksMediumFile)
+	initMultiBlockAccessor(&rtn.MultiBlockFile, quantumfs.MaxBlocksMediumFile())
 
 	return rtn
 }
@@ -22,7 +22,7 @@ func newMediumShell() MediumFile {
 func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
 	var rtn MediumFile
 
-	multiFile := newMultiBlockAccessor(c, key, quantumfs.MaxBlocksMediumFile)
+	multiFile := newMultiBlockAccessor(c, key, quantumfs.MaxBlocksMediumFile())
 	if multiFile == nil {
 		return nil
 	}
