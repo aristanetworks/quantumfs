@@ -12,7 +12,6 @@ import "syscall"
 import "sync"
 import "time"
 
-import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -47,7 +46,7 @@ type DirectoryRecordIf interface {
 	ModificationTime() quantumfs.Time
 	SetModificationTime(v quantumfs.Time)
 
-	Record() encoding.DirectoryRecord
+	Record() *quantumfs.DirectoryRecord
 }
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
@@ -380,21 +379,18 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	return newKey
 }
 
-// Must hold the dir.childRecordsLock
-func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
-	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
+func publishDirectoryRecordIfs(c *ctx,
+	records []DirectoryRecordIf) quantumfs.ObjectKey {
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
-
 	newBaseLayerId := quantumfs.EmptyDirKey
 
 	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
 	// metadata block
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
-
-	for _, child := range dir.children.records() {
+	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
@@ -411,10 +407,18 @@ func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 
 	baseLayer.SetNumEntries(entryIdx)
 	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
+	return newBaseLayerId
+}
 
-	c.vlog("Directory key %s -> %s", dir.baseLayerId.String(),
-		newBaseLayerId.String())
-	dir.baseLayerId = newBaseLayerId
+// Must hold the dir.childRecordsLock
+func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
+	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
+
+	oldBaseLayer := dir.baseLayerId
+	dir.baseLayerId = publishDirectoryRecordIfs(c, dir.children.records())
+
+	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
+		dir.baseLayerId.String())
 
 	if !dir.self.isWorkspaceRoot() {
 		// TODO This violates layering and is ugly
