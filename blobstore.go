@@ -5,14 +5,20 @@ package cql
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/ether/utils/stats"
+	"github.com/aristanetworks/ether/utils/stats/inmem"
 	"github.com/gocql/gocql"
 )
 
 type cqlBlobStore struct {
 	store    *cqlStore
 	keyspace string
+
+	insertStats stats.OpStats
+	getStats    stats.OpStats
 }
 
 // NewCqlBlobStore initializes a blobstore.BlobStore to be used with a CQL cluster.
@@ -36,8 +42,10 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 	}
 
 	cbs := &cqlBlobStore{
-		store:    &store,
-		keyspace: cfg.Cluster.KeySpace,
+		store:       &store,
+		keyspace:    cfg.Cluster.KeySpace,
+		insertStats: inmem.NewOpStatsInMem("insertBlobStore"),
+		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
 	}
 	return cbs, nil
 }
@@ -56,6 +64,9 @@ func (b *cqlBlobStore) Insert(key string, value []byte,
 	b.store.sem.P()
 	defer b.store.sem.V()
 
+	start := time.Now()
+	defer func() { b.insertStats.RecordOp(time.Since(start)) }()
+
 	err := query.Exec()
 	if err != nil {
 		return blobstore.NewError(blobstore.ErrOperationFailed, "error in Insert %s", err.Error())
@@ -70,8 +81,11 @@ func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
 	var value []byte
 	queryStr := fmt.Sprintf("SELECT value FROM %s.blobStore WHERE key = ?", b.keyspace)
 	query := b.store.session.Query(queryStr, key)
-	err := query.Scan(&value)
 
+	start := time.Now()
+	defer func() { b.getStats.RecordOp(time.Since(start)) }()
+
+	err := query.Scan(&value)
 	if err != nil {
 		if err == gocql.ErrNotFound {
 			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get %s",
@@ -96,4 +110,9 @@ func (b *cqlBlobStore) Metadata(key string) (map[string]string, error) {
 // Update is the CQL implementation of blobstore.Update()
 func (b *cqlBlobStore) Update(key string, metadata map[string]string) error {
 	panic("Update not implemented")
+}
+
+func (b *cqlBlobStore) ReportAPIStats() {
+	b.insertStats.(stats.OpStatReporter).ReportOpStats()
+	b.getStats.(stats.OpStatReporter).ReportOpStats()
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/ether/utils/stats/inmem"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/suite"
 )
@@ -35,8 +36,10 @@ func (s *storeTests) SetupTest() {
 	s.Require().NoError(err, "initCqlStore Failed: ", err)
 
 	s.bls = &cqlBlobStore{
-		store:    &store,
-		keyspace: "ether",
+		store:       &store,
+		keyspace:    "ether",
+		insertStats: inmem.NewOpStatsInMem("insertBlobStore"),
+		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
 	}
 	s.Require().NoError(err)
 
