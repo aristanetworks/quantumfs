@@ -26,7 +26,9 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
+	linkLock	DeferableRwMutex
 	hardlinks  	map[uint64]*quantumfs.DirectoryRecord
+	nextHardlinkId	uint64
 	hardlinkInode	map[uint64]InodeId
 	dirtyLinks 	map[InodeId]InodeId
 }
@@ -79,9 +81,32 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
+func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
+	record DirectoryRecordIf) *Hardlink {
+
+	if _, isLink := record.(*Hardlink); isLink {
+		panic("newHardlink called on existing hardlink")
+	}
+
+	dirRecord, isRecord := record.(*quantumfs.DirectoryRecord)
+	if !isRecord{
+		panic("newHardlink called on non-DirectoryRecord")
+	}
+
+	defer wsr.linkLock.Lock().Unlock()
+
+	newId := wsr.nextHardlinkId
+	wsr.nextHardlinkId++
+
+	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
+	wsr.hardlinks[newId] = dirRecord
+	wsr.hardlinkInode[newId] = inodeId
+
+	return newHardlink(newId, wsr)
+}
+
 func (wsr *WorkspaceRoot) getHardlinkInodeId(linkId uint64) InodeId {
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
+	defer wsr.linkLock.RLock().RUnlock()
 
 	inode, exists := wsr.hardlinkInode[linkId]
 	if exists {
@@ -93,8 +118,7 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(linkId uint64) InodeId {
 
 // Return a snapshot / instance so that it's concurrency safe
 func (wsr *WorkspaceRoot) getHardlink(linkId uint64) quantumfs.DirectoryRecord {
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
+	defer wsr.linkLock.RLock().RUnlock()
 
 	link, exists := wsr.hardlinks[linkId]
 	if exists {
@@ -110,8 +134,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId uint64) quantumfs.DirectoryRecord {
 func (wsr *WorkspaceRoot) setHardlink(linkId uint64,
 	fnSetter func (dir *quantumfs.DirectoryRecord)) {
 
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
+	defer wsr.linkLock.Lock().Unlock()
 
 	link, exists := wsr.hardlinks[linkId]
 	if !exists {
@@ -123,6 +146,8 @@ func (wsr *WorkspaceRoot) setHardlink(linkId uint64,
 }
 
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
+	defer wsr.linkLock.Lock().Unlock()
+
 	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
 	wsr.hardlinkInode = make(map[uint64]InodeId)
 	wsr.dirtyLinks = make(map[InodeId]InodeId)
@@ -148,7 +173,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 
 func publishHardlinkMap(c *ctx,
 	records map[uint64]*quantumfs.DirectoryRecord) *quantumfs.HardlinkEntry {
-
+	
 	// entryIdx indexes into the metadata block
 	baseLayer := quantumfs.NewHardlinkEntry()
 	nextBaseLayerId := quantumfs.EmptyDirKey
@@ -191,6 +216,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 	wsr.lock.RLock()
 	defer wsr.lock.RUnlock()
+	defer wsr.linkLock.RLock().RUnlock()
 
 	// Upload the workspaceroot object
 	workspaceRoot := quantumfs.NewWorkspaceRoot()

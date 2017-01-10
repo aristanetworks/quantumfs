@@ -57,23 +57,24 @@ func (link *Hardlink) SetFilename(v string) {
 }
 
 func (link *Hardlink) ID() quantumfs.ObjectKey {
-	return link.get().ID()
+	return encodeHardlinkId(link.linkId)
 }
 
 func (link *Hardlink) SetID(v quantumfs.ObjectKey) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
-		dir.SetID(v)
-	})
+	decodedId := decodeHardlinkKey(v)
+
+	if decodedId != link.linkId {
+		panic("Change of ID attempted on Hardlink")
+	}
 }
 
 func (link *Hardlink) Type() quantumfs.ObjectType {
-	return link.get().Type()
+	// Don't return the actual file type, just the hardlink
+	return quantumfs.ObjectTypeHardlink
 }
 
 func (link *Hardlink) SetType(v quantumfs.ObjectType) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
-		dir.SetType(v)
-	})
+	panic("SetType called on hardlink")
 }
 
 func (link *Hardlink) Permissions() uint32 {
