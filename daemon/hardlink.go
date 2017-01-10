@@ -9,8 +9,8 @@ import "github.com/aristanetworks/quantumfs"
 
 // Should implement DirectoryRecordIf
 type Hardlink struct {
-	linkId		uint64
-	wsr		*WorkspaceRoot
+	linkId uint64
+	wsr    *WorkspaceRoot
 }
 
 func decodeHardlinkKey(key quantumfs.ObjectKey) (hardlinkId uint64) {
@@ -42,7 +42,7 @@ func (link *Hardlink) get() *quantumfs.DirectoryRecord {
 	return &link_
 }
 
-func (link *Hardlink) set(fnSetter func (dir *quantumfs.DirectoryRecord)) {
+func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectoryRecord)) {
 	link.wsr.setHardlink(link.linkId, fnSetter)
 }
 
@@ -51,7 +51,7 @@ func (link *Hardlink) Filename() string {
 }
 
 func (link *Hardlink) SetFilename(v string) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetFilename(v)
 	})
 }
@@ -82,7 +82,7 @@ func (link *Hardlink) Permissions() uint32 {
 }
 
 func (link *Hardlink) SetPermissions(v uint32) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetPermissions(v)
 	})
 }
@@ -92,7 +92,7 @@ func (link *Hardlink) Owner() quantumfs.UID {
 }
 
 func (link *Hardlink) SetOwner(v quantumfs.UID) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetOwner(v)
 	})
 }
@@ -102,7 +102,7 @@ func (link *Hardlink) Group() quantumfs.GID {
 }
 
 func (link *Hardlink) SetGroup(v quantumfs.GID) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetGroup(v)
 	})
 }
@@ -112,7 +112,7 @@ func (link *Hardlink) Size() uint64 {
 }
 
 func (link *Hardlink) SetSize(v uint64) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetSize(v)
 	})
 }
@@ -122,7 +122,7 @@ func (link *Hardlink) ExtendedAttributes() quantumfs.ObjectKey {
 }
 
 func (link *Hardlink) SetExtendedAttributes(v quantumfs.ObjectKey) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetExtendedAttributes(v)
 	})
 }
@@ -132,7 +132,7 @@ func (link *Hardlink) ContentTime() quantumfs.Time {
 }
 
 func (link *Hardlink) SetContentTime(v quantumfs.Time) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetContentTime(v)
 	})
 }
@@ -142,7 +142,7 @@ func (link *Hardlink) ModificationTime() quantumfs.Time {
 }
 
 func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
-	link.set(func (dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectoryRecord) {
 		dir.SetModificationTime(v)
 	})
 }

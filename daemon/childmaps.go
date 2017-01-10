@@ -24,7 +24,7 @@ func newChildMap(numEntries int) *ChildMap {
 }
 
 func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf,
-	wsr *WorkspaceRoot) InodeId {	
+	wsr *WorkspaceRoot) InodeId {
 
 	inodeId := InodeId(quantumfs.InodeIdInvalid)
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
