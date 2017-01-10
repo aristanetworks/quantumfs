@@ -26,11 +26,11 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	linkLock	DeferableRwMutex
-	hardlinks  	map[uint64]*quantumfs.DirectoryRecord
-	nextHardlinkId	uint64
-	hardlinkInode	map[uint64]InodeId
-	dirtyLinks 	map[InodeId]InodeId
+	linkLock       DeferableRwMutex
+	hardlinks      map[uint64]*quantumfs.DirectoryRecord
+	nextHardlinkId uint64
+	hardlinkInode  map[uint64]InodeId
+	dirtyLinks     map[InodeId]InodeId
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -89,7 +89,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	}
 
 	dirRecord, isRecord := record.(*quantumfs.DirectoryRecord)
-	if !isRecord{
+	if !isRecord {
 		panic("newHardlink called on non-DirectoryRecord")
 	}
 
@@ -132,7 +132,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId uint64) quantumfs.DirectoryRecord {
 
 // We need the wsr lock to cover setting safely
 func (wsr *WorkspaceRoot) setHardlink(linkId uint64,
-	fnSetter func (dir *quantumfs.DirectoryRecord)) {
+	fnSetter func(dir *quantumfs.DirectoryRecord)) {
 
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -173,7 +173,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 
 func publishHardlinkMap(c *ctx,
 	records map[uint64]*quantumfs.DirectoryRecord) *quantumfs.HardlinkEntry {
-	
+
 	// entryIdx indexes into the metadata block
 	baseLayer := quantumfs.NewHardlinkEntry()
 	nextBaseLayerId := quantumfs.EmptyDirKey

@@ -63,7 +63,7 @@ type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 type Directory struct {
 	InodeCommon
 
-	wsr		*WorkspaceRoot
+	wsr *WorkspaceRoot
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -151,13 +151,13 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 
 	var wsr *WorkspaceRoot
 	switch v := parent.(type) {
-		case *Directory:
-			wsr = v.wsr
-		case *WorkspaceRoot:
-			wsr = v
-		default:
-			panic(fmt.Sprintf("Parent of inode %d is neither "+
-				"Directory nor WorkspaceRoot", inodeNum))
+	case *Directory:
+		wsr = v.wsr
+	case *WorkspaceRoot:
+		wsr = v
+	default:
+		panic(fmt.Sprintf("Parent of inode %d is neither "+
+			"Directory nor WorkspaceRoot", inodeNum))
 	}
 
 	uninstantiated := initDirectory(c, name, &dir, wsr, baseLayerId,

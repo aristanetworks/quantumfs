@@ -16,14 +16,14 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// Grab the source parent as a Directory
 	var srcParent *Directory
 	switch v := srcInode.parent(c).(type) {
-		case *Directory:
-			srcParent = v
-		case *WorkspaceRoot:
-			srcParent = &(v.Directory)
-		default:
-			c.elog("Source directory is not a directory: %d",
-				srcInode.inodeNum())
-			return fuse.EINVAL
+	case *Directory:
+		srcParent = v
+	case *WorkspaceRoot:
+		srcParent = &(v.Directory)
+	default:
+		c.elog("Source directory is not a directory: %d",
+			srcInode.inodeNum())
+		return fuse.EINVAL
 	}
 
 	newRecord, err := srcParent.makeHardlink_DOWN(c, dir.wsr, srcInode)
