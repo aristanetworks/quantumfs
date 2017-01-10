@@ -119,6 +119,10 @@ func (cmap *ChildMap) setDirty(c *ctx, inodeNum InodeId) {
 	cmap.dirtyChildren[inodeNum] = inodeNum
 }
 
+func (cmap *ChildMap) clearDirty(inodeNum InodeId) {
+	delete(cmap.dirtyChildren, inodeNum)
+}
+
 func (cmap *ChildMap) inodeNum(name string) InodeId {
 	if inodeId, exists := cmap.children[name]; exists {
 		return inodeId

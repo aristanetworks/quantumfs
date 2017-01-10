@@ -13,16 +13,27 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	origRecord, err := srcInode.parent(c).getChildRecord(c, srcInode.inodeNum())
-	if err != nil {
-		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
-		return fuse.EIO
+	// Grab the source parent as a Directory
+	var srcParent *Directory
+	switch v := srcInode.parent(c).(type) {
+		case *Directory:
+			srcParent = v
+		case *WorkspaceRoot:
+			srcParent = &(v.Directory)
+		default:
+			c.elog("Source directory is not a directory: %d",
+				srcInode.inodeNum())
+			return fuse.EINVAL
+	}
+
+	newRecord, err := srcParent.makeHardlink_DOWN(c, dir.wsr, srcInode)
+	if err != fuse.OK {
+		c.elog("QuantumFs::Link Failed with srcInode record")
+		return err
 	}
 	srcInode.markSelfAccessed(c, false)
 
-	newRecord := cloneDirectoryRecord(origRecord)
 	newRecord.SetFilename(newName)
-	newRecord.SetID(srcInode.flush_DOWN(c))
 
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
@@ -34,7 +45,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	dir.self.markAccessed(c, newName, true)
 
-	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
+	c.dlog("Hardlinked %d to %s as inode %d", srcInode.inodeNum(), newName,
 		inodeNum)
 
 	out.NodeId = uint64(inodeNum)
@@ -43,7 +54,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		newRecord)
 
 	dir.self.dirty(c)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
+	// Hardlinks aren't tracked by the uninstantiated list, they need a more
+	// complicated reference counting system handled by workspaceroot
 
 	return fuse.OK
 }
@@ -129,4 +141,22 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	}
 
 	return currDir, nil
+}
+
+func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
+	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
+
+	defer dir.Lock().Unlock()
+	defer dir.childRecordLock.Lock().Unlock()
+
+	record := dir.children.record(toLink.inodeNum())
+	if record == nil {
+		return nil, fuse.ENOENT
+	}
+
+	newKey := toLink.flush_DOWN(c)
+	dir.children.record(toLink.inodeNum()).SetID(newKey)
+	dir.children.clearDirty(toLink.inodeNum())
+
+	return dir.children.makeHardlink_DOWN(c, wsr, toLink.inodeNum())
 }
