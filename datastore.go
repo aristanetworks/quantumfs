@@ -25,9 +25,10 @@ const MaxNumExtendedAttributes = int(encoding.MaxNumExtendedAttributes)
 // Maximum length of a filename
 const MaxFilenameLength = int(encoding.MaxFilenameLength)
 
-// Special reserved namespace/workspace names
+// Special reserved typespace/namespace/workspace names
 const (
 	ApiPath           = "api" // File used for the qfs api
+	NullTypespaceName = "_null_"
 	NullNamespaceName = "_null"
 	NullWorkspaceName = "null"
 )
@@ -37,8 +38,9 @@ const (
 	InodeIdInvalid     = iota // Invalid
 	InodeIdRoot        = iota // Same as fuse.FUSE_ROOT_ID
 	InodeIdApi         = iota // /api file
-	InodeId_null       = iota // /_null namespace
-	InodeId_nullNull   = iota // /_null/null workspace
+	InodeId_nullType   = iota // /_null_ typespace
+	InodeId_nullName   = iota // /_null_/_null namespace
+	InodeId_nullWork   = iota // /_null_/_null/null workspace
 	InodeIdReservedEnd = iota // End of the reserved range
 )
 

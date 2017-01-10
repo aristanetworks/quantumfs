@@ -156,7 +156,7 @@ func TestLargeFileAttr(t *testing.T) {
 			"Offset write failed in sparse file")
 
 		// Branch the workspace
-		dst := "largeattrsparse/test"
+		dst := "dst/largeattrsparse/test"
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 

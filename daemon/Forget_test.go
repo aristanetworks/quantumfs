@@ -45,7 +45,7 @@ func TestForgetOnDirectory(t *testing.T) {
 			readBack, err := ioutil.ReadFile(workspace + "/dir/file" +
 				strconv.Itoa(i))
 			test.assert(bytes.Equal(readBack, data),
-				"File contents not preserved after Forget")
+				"File contents not preserved after Forget %v \t%v", readBack, data)
 			test.assert(err == nil, "Unable to read file after Forget")
 		}
 	})

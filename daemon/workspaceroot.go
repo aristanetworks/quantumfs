@@ -14,6 +14,7 @@ import "github.com/hanwen/go-fuse/fuse"
 // WorkspaceDB instead of passed in from the parent.
 type WorkspaceRoot struct {
 	Directory
+	typespace string
 	namespace string
 	workspace string
 	rootId    quantumfs.ObjectKey
@@ -30,34 +31,37 @@ type WorkspaceRoot struct {
 // is relatively expensive and not terribly useful. Instead fake it and assume a
 // normal number here.
 func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	workspace string) {
+	workspace []string) {
 
 	fillAttr(attr, inodeNum, 27)
 	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
-func newWorkspaceRoot(c *ctx, parentName string, name string,
+func newWorkspaceRoot(c *ctx, typeSpace string, nameSpace string, workSpace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceRoot::newWorkspaceRoot").out()
 
 	var wsr WorkspaceRoot
 
-	rootId, err := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
+	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
+		typeSpace, nameSpace, workSpace)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
-	c.vlog("Workspace Loading %s/%s %s", parentName, name, rootId.String())
+	c.vlog("Workspace Loading %s/%s/%s %s",
+		typeSpace, nameSpace, workSpace, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
 	wsr.self = &wsr
-	wsr.namespace = parentName
-	wsr.workspace = name
+	wsr.typespace = typeSpace
+	wsr.namespace = nameSpace
+	wsr.workspace = workSpace
 	wsr.rootId = rootId
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
-	uninstantiated := initDirectory(c, name, &wsr.Directory,
+	uninstantiated := initDirectory(c, workSpace, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
@@ -68,7 +72,8 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 
 // Mark this workspace dirty
 func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
+	c.qfs.activateWorkspace(c,
+		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) {
@@ -88,8 +93,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.namespace,
-			wsr.workspace, wsr.rootId, newRootId)
+		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
 			msg := fmt.Sprintf("Unexpected workspace rootID update "+
@@ -102,7 +107,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			rootId.String())
 		wsr.rootId = rootId
 	}
-	c.qfs.deactivateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
+	c.qfs.deactivateWorkspace(c,
+		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {

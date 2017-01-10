@@ -135,7 +135,7 @@ func TestMedFileAttr(t *testing.T) {
 		test.assert(err == nil, "Unable to close file handle")
 
 		// Branch the workspace
-		dst := "medattrsparse/test"
+		dst := "dst/medattrsparse/test"
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
