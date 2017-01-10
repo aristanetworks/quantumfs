@@ -161,11 +161,11 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 // branch the src workspace into a new workspace called dst.
 func (api *Api) Branch(src string, dst string) error {
 	if !isWorkspaceNameValid(src) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", src)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", src)
 	}
 
 	if !isWorkspaceNameValid(dst) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", dst)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
 	}
 
 	cmd := BranchRequest{
@@ -330,14 +330,14 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 }
 
 func isWorkspaceNameValid(wsr string) bool {
-	if slashes := strings.Count(wsr, "/"); slashes != 1 {
+	if slashes := strings.Count(wsr, "/"); slashes != 2 {
 		return false
 	}
 	return true
 }
 
 func isWorkspacePathValid(dst string) bool {
-	if slashes := strings.Count(dst, "/"); slashes < 1 {
+	if slashes := strings.Count(dst, "/"); slashes < 2 {
 		return false
 	}
 	return true

@@ -17,13 +17,13 @@ func TestWorkspaceBranching(t *testing.T) {
 
 		// First branch the null workspace
 		src := test.nullWorkspaceRel()
-		dst := "apitest/a"
+		dst := "work/apitest/a"
 		err := api.Branch(src, dst)
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
 
 		// Branch the branch to have a writeable workspace
 		src = dst
-		dst = "apitest/b"
+		dst = "work/apitest/b"
 		err = api.Branch(src, dst)
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
 
