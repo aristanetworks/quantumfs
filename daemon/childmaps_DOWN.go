@@ -9,12 +9,17 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
-	childId InodeId) (copy DirectoryRecordIf, err fuse.Status) {
+	childName string) (copy DirectoryRecordIf, err fuse.Status) {
 
-	child, exists := cmap.childrenRecords[childId]
+	childId, exists := cmap.children[childName]
 	if !exists {
-		c.elog("No child record or %d in childmap", childId)
+		c.elog("No child record or %s in childmap", childName)
 		return nil, fuse.ENOENT
+	}
+
+	child := cmap.getRecord(childId, childName)
+	if child == nil {
+		panic("Mismatched childId and record")
 	}
 
 	// If it's already a hardlink, great no more work is needed
@@ -29,7 +34,7 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 		child.Type() != quantumfs.ObjectTypeLargeFile &&
 		child.Type() != quantumfs.ObjectTypeVeryLargeFile {
 
-		c.dlog("Cannot hardlink %d - not a file", childId)
+		c.dlog("Cannot hardlink %s - not a file", childName)
 		return nil, fuse.EINVAL
 	}
 
@@ -41,7 +46,8 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 
 	// It needs to become a hardlink now. Hand it off to wsr
 	newLink := wsr.newHardlink(c, childId, child)
-	cmap.childrenRecords[childId] = newLink
+
+	cmap.setRecord(childId, newLink)
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
 }

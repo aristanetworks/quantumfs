@@ -9,17 +9,18 @@ import "github.com/aristanetworks/quantumfs"
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
+	// can be many to one
 	children      map[string]InodeId
 	dirtyChildren map[InodeId]InodeId // a set
 
-	childrenRecords map[InodeId]DirectoryRecordIf
+	childrenRecords map[InodeId][]DirectoryRecordIf
 }
 
 func newChildMap(numEntries int) *ChildMap {
 	return &ChildMap{
 		children:        make(map[string]InodeId, numEntries),
 		dirtyChildren:   make(map[InodeId]InodeId, 0),
-		childrenRecords: make(map[InodeId]DirectoryRecordIf, numEntries),
+		childrenRecords: make(map[InodeId][]DirectoryRecordIf, numEntries),
 	}
 }
 
@@ -29,7 +30,7 @@ func (cmap *ChildMap) newChild(c *ctx, entry DirectoryRecordIf,
 	inodeId := InodeId(quantumfs.InodeIdInvalid)
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		linkId := decodeHardlinkKey(entry.ID())
-		entry = newHardlink(linkId, wsr)
+		entry = newHardlink(entry.Filename(), linkId, wsr)
 		inodeId = wsr.getHardlinkInodeId(linkId)
 	} else {
 		inodeId = c.qfs.newInodeId()
@@ -49,6 +50,68 @@ func (cmap *ChildMap) setChild(c *ctx, entry DirectoryRecordIf, inodeId InodeId)
 	cmap.setChild_(c, entry, inodeId)
 }
 
+func (cmap *ChildMap) setRecord(inodeId InodeId, record DirectoryRecordIf) {
+	// To prevent overwriting one map, but not the other, ensure we clear first
+	cmap.delRecord(inodeId, record.Filename())
+
+	list, exists := cmap.childrenRecords[inodeId]
+	if !exists {
+		list = make([]DirectoryRecordIf, 0)
+	}
+
+	list = append(list, record)
+	cmap.childrenRecords[inodeId] = list
+}
+
+func (cmap *ChildMap) delRecord(inodeId InodeId, name string) DirectoryRecordIf {
+	list, exists := cmap.childrenRecords[inodeId]
+	if !exists {
+		return nil
+	}
+
+	for i, v := range list {
+		if v.Filename() == name {
+			list = append(list[:i], list[i+1:]...)
+			if len(list) > 0 {
+				cmap.childrenRecords[inodeId] = list
+			} else {
+				delete(cmap.childrenRecords, inodeId)
+			}
+			return v
+		}
+	}
+
+	return nil
+}
+
+func (cmap *ChildMap) firstRecord(inodeId InodeId) DirectoryRecordIf {
+	list, exists := cmap.childrenRecords[inodeId]
+	if !exists {
+		return nil
+	}
+
+	if len(list) == 0 {
+		panic("Empty list leftover and not cleanup up")
+	}
+
+	return list[0]
+}
+
+func (cmap *ChildMap) getRecord(inodeId InodeId, name string) DirectoryRecordIf {
+	list, exists := cmap.childrenRecords[inodeId]
+	if !exists {
+		return nil
+	}
+
+	for _, v := range list {
+		if v.Filename() == name {
+			return v
+		}
+	}
+
+	return nil
+}
+
 func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
 	if entry == nil {
 		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
@@ -57,25 +120,21 @@ func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
-	cmap.childrenRecords[inodeId] = entry
+	cmap.setRecord(inodeId, entry)
 }
 
 func (cmap *ChildMap) count() uint64 {
-	return uint64(len(cmap.childrenRecords))
+	return uint64(len(cmap.children))
 }
 
-func (cmap *ChildMap) deleteChild(inodeNum InodeId) DirectoryRecordIf {
-	record, exists := cmap.childrenRecords[inodeNum]
-	if !exists {
-		return nil
-	} else {
-		delete(cmap.children, record.Filename())
+func (cmap *ChildMap) deleteChild(name string) (needsReparent DirectoryRecordIf) {
+	inodeId, exists := cmap.children[name]
+	if exists {
+		delete(cmap.dirtyChildren, inodeId)
+		delete(cmap.children, name)
 	}
 
-	delete(cmap.childrenRecords, inodeNum)
-	delete(cmap.dirtyChildren, inodeNum)
-
-	return record
+	return cmap.delRecord(inodeId, name)
 }
 
 func (cmap *ChildMap) renameChild(oldName string,
@@ -85,18 +144,32 @@ func (cmap *ChildMap) renameChild(oldName string,
 		return quantumfs.InodeIdInvalid
 	}
 
+	inodeId, exists := cmap.children[oldName]
+	if !exists {
+		return quantumfs.InodeIdInvalid
+	}
+
+	record := cmap.getRecord(inodeId, oldName)
+	if record == nil {
+		panic("inode set without record")
+	}
+
 	// record whether we need to cleanup a file we're overwriting
 	cleanupInodeId, needCleanup := cmap.children[newName]
-
-	inodeId := cmap.children[oldName]
-	cmap.children[newName] = inodeId
-	cmap.childrenRecords[inodeId].SetFilename(newName)
+	if needCleanup {
+		// we have to cleanup before we move, to allow the case where we
+		// rename a hardlink to an existing one with the same inode
+		cmap.delRecord(cleanupInodeId, newName)
+		delete(cmap.children, newName)
+		delete(cmap.dirtyChildren, cleanupInodeId)
+	}
 
 	delete(cmap.children, oldName)
+	cmap.children[newName] = inodeId
+	record.SetFilename(newName)
+
 
 	if needCleanup {
-		delete(cmap.childrenRecords, cleanupInodeId)
-		delete(cmap.dirtyChildren, cleanupInodeId)
 		return cleanupInodeId
 	}
 
@@ -111,8 +184,12 @@ func (cmap *ChildMap) popDirty() map[InodeId]InodeId {
 }
 
 func (cmap *ChildMap) setDirty(c *ctx, inodeNum InodeId) {
-	if _, exists := cmap.childrenRecords[inodeNum]; !exists {
-		c.elog("Attempt to dirty child that doesn't exist: %d", inodeNum)
+	entry := cmap.firstRecord(inodeNum)
+	if entry == nil {
+		panic(fmt.Sprintf("setDirty on empty record for %d",
+			inodeNum))
+	} else if entry.Type() == quantumfs.ObjectTypeHardlink {
+		// we don't need to track dirty hardlinks
 		return
 	}
 
@@ -143,19 +220,14 @@ func (cmap *ChildMap) inodes() []InodeId {
 func (cmap *ChildMap) records() []DirectoryRecordIf {
 	rtn := make([]DirectoryRecordIf, 0, len(cmap.childrenRecords))
 	for _, i := range cmap.childrenRecords {
-		rtn = append(rtn, i)
+		rtn = append(rtn, i...)
 	}
 
 	return rtn
 }
 
 func (cmap *ChildMap) record(inodeNum InodeId) DirectoryRecordIf {
-	entry, exists := cmap.childrenRecords[inodeNum]
-	if !exists {
-		return nil
-	}
-
-	return entry
+	return cmap.firstRecord(inodeNum)
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
@@ -164,8 +236,8 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
 		return nil
 	}
 
-	entry, exists := cmap.childrenRecords[inodeNum]
-	if !exists {
+	entry := cmap.getRecord(inodeNum, name)
+	if entry == nil {
 		c.elog("child record map mismatch %d %s", inodeNum, name)
 		return nil
 	}

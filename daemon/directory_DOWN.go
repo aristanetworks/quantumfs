@@ -155,8 +155,9 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 	}
 
 	newKey := toLink.flush_DOWN(c)
-	dir.children.record(toLink.inodeNum()).SetID(newKey)
+	dir.children.recordByName(c, record.Filename()).SetID(newKey)
 	dir.children.clearDirty(toLink.inodeNum())
 
-	return dir.children.makeHardlink_DOWN(c, wsr, toLink.inodeNum())
+	dir.self.dirty(c)
+	return dir.children.makeHardlink_DOWN(c, wsr, record.Filename())
 }

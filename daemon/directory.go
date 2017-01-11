@@ -196,19 +196,25 @@ func (dir *Directory) addChild_(c *ctx, inode InodeId, child DirectoryRecordIf) 
 }
 
 // Needs inode lock for write
-func (dir *Directory) delChild_(c *ctx, inodeNum InodeId) {
+func (dir *Directory) delChild_(c *ctx, name string) {
 	defer c.funcIn("Directory::delChild_").out()
 
-	c.dlog("Unlinking inode %d", inodeNum)
+	c.dlog("Unlinking inode %s", name)
 
 	// If this is a file we need to reparent it to itself
-	record := func() DirectoryRecordIf {
+	record, inodeNum := func() (DirectoryRecordIf, InodeId) {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.deleteChild(inodeNum)
+		inodeNum := dir.children.inodeNum(name)
+		return dir.children.deleteChild(name), inodeNum
 	}()
 	if record == nil {
-		c.elog("Child already deleted: %d", inodeNum)
+		// This can happen if the child is already deleted or its a hardlink
+		c.dlog("Child delete doesn't need reparent: %d", inodeNum)
 		return
+	}
+
+	if inodeNum == quantumfs.InodeIdInvalid {
+		panic("InodeId and record mismatch in childmap")
 	}
 
 	dir.self.markAccessed(c, record.Filename(), false)
@@ -830,7 +836,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return err
 		}
 
-		dir.delChild_(c, inode)
+		dir.delChild_(c, name)
 		return fuse.OK
 	}()
 
@@ -867,7 +873,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			return result
 		}
 
-		dir.delChild_(c, inode)
+		dir.delChild_(c, name)
 		return fuse.OK
 	}()
 
@@ -1200,8 +1206,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	inodeId := dir.children.inodeNum(name)
-	dir.children.deleteChild(inodeId)
+	dir.children.deleteChild(name)
 }
 
 // Needs to hold childRecordLock
