@@ -73,11 +73,6 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	return &wsr
 }
 
-// Mark this workspace dirty
-func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	c.qfs.activateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
-}
-
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
 	wsr.dirtyLinks = make(map[InodeId]InodeId)
@@ -177,7 +172,6 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			rootId.String())
 		wsr.rootId = rootId
 	}
-	c.qfs.deactivateWorkspace(c, wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {

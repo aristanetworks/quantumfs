@@ -5,6 +5,7 @@
 // requests and forwards them to the correct Inode.
 package daemon
 
+import "container/list"
 import "fmt"
 import "io/ioutil"
 import "math"
@@ -19,6 +20,13 @@ import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
 const defaultCacheSize = 4096
+const sanityTimeout = time.Minute
+
+type dirtyInode struct {
+	inode               Inode
+	shouldUninstantiate bool
+	expiryTime          time.Time
+}
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
@@ -28,7 +36,10 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
-		activeWorkspaces:       make(map[string]*WorkspaceRoot),
+		dirtyQueue:             make(map[*sync.RWMutex]*list.List),
+		kickFlush:              make(chan struct{}, 10),
+		flushAll:               make(chan *ctx),
+		flushComplete:          make(chan struct{}),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
 		c: ctx{
@@ -73,10 +84,26 @@ type QuantumFs struct {
 	// try any further.
 	giveUpOnForget bool
 
-	mapMutex         sync.RWMutex
-	inodes           map[InodeId]Inode
-	fileHandles      map[FileHandleId]FileHandle
-	activeWorkspaces map[string]*WorkspaceRoot
+	mapMutex    sync.RWMutex
+	inodes      map[InodeId]Inode
+	fileHandles map[FileHandleId]FileHandle
+
+	// This is a map from the treeLock to a list of dirty inodes. We use the
+	// treelock because every Inode already has the treelock of its workspace so
+	// this is an easy way to sort Inodes by workspace.
+	//
+	// The Front of the list are the Inodes next in line to flush.
+	dirtyQueueLock DeferableMutex
+	dirtyQueue     map[*sync.RWMutex]*list.List
+
+	// Notify the flusher that there is a new entry in the dirty queue
+	kickFlush chan struct{}
+
+	// Notify the flusher that all dirty inodes should be flushed
+	flushAll chan *ctx
+
+	// Notify whoever used flushAll that flushing is complete
+	flushComplete chan struct{}
 
 	// Uninstantiated Inodes are inode numbers which have been reserved for a
 	// particular inode, but the corresponding Inode has not yet been
@@ -104,7 +131,7 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	stopFlushTimer := make(chan bool)
 	flushTimerStopped := make(chan bool)
 
-	go qfs.flushTimer(stopFlushTimer, flushTimerStopped)
+	go qfs.flusher(stopFlushTimer, flushTimerStopped)
 	go qfs.adjustKernelKnobs()
 
 	qfs.server = server
@@ -124,18 +151,33 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	return nil
 }
 
-func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
-	c := qfs.c.reqId(qlog.FlushReqId, nil)
-	for {
-		var stop bool
-		select {
-		case <-time.After(30 * time.Second):
-			func() {
-				defer logRequestPanic(c)
-				qfs.syncAll(c)
-			}()
+func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
+	flusherContext := qfs.c.reqId(qlog.FlushReqId, nil)
 
+	// When we think we have no inodes try periodically anyways to ensure sanity
+	nextExpiringInode := time.Now().Add(sanityTimeout)
+	for {
+		stop := false
+		flushAll := false
+
+		// If we've been directed to flushAll, use that caller's context
+		c := flusherContext
+
+		select {
 		case stop = <-quit:
+		case <-qfs.kickFlush:
+		case c = <-qfs.flushAll:
+			flushAll = true
+		case <-time.After(time.Now().Sub(nextExpiringInode)):
+		}
+
+		nextExpiringInode = func() time.Time {
+			defer logRequestPanic(c)
+			return qfs.flushDirtyLists(c, flushAll)
+		}()
+
+		if flushAll {
+			qfs.flushComplete <- struct{}{}
 		}
 
 		if stop {
@@ -143,6 +185,78 @@ func (qfs *QuantumFs) flushTimer(quit chan bool, finished chan bool) {
 			return
 		}
 	}
+}
+
+func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
+	defer c.FuncIn("Mux::flushDirtyLists", "flushAll %t", flushAll)
+
+	defer qfs.dirtyQueueLock.Lock().Unlock()
+	nextExpiringInode := time.Now().Add(sanityTimeout)
+
+	for key, dirtyList := range qfs.dirtyQueue {
+		earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
+		if earliestNext.Before(nextExpiringInode) {
+			nextExpiringInode = earliestNext
+		}
+
+		if dirtyList.Len() == 0 {
+			delete(qfs.dirtyQueue, key)
+		}
+	}
+
+	return nextExpiringInode
+}
+
+// Requires dirtyQueueLock
+func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
+	flushAll bool) time.Time {
+
+	defer c.funcIn("Mux::flushDirtyList")
+
+	for dirtyList.Len() > 0 {
+		// Should we clean this inode?
+		candidate := dirtyList.Front().Value.(dirtyInode)
+
+		now := time.Now()
+		if !flushAll && candidate.expiryTime.After(now) {
+			// We are up to date with this list
+			return candidate.expiryTime
+		}
+
+		dirtyList.Remove(dirtyList.Front())
+
+		// Note, drops and regrabs the dirtyQueueLock
+		qfs.flushInode_(c, candidate)
+	}
+
+	// If we get here then we've emptied the dirtyList out entirely.
+	return time.Now().Add(sanityTimeout)
+}
+
+// Requires the dirtyQueueLock be held.
+//
+// NOTE This method gives up the dirtyQueueLock lock and then regrabs it.
+func (qfs *QuantumFs) flushInode_(c *ctx, dirtyInode dirtyInode) {
+	inodeNum := dirtyInode.inode.inodeNum()
+	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
+		inodeNum, dirtyInode.shouldUninstantiate)
+
+	qfs.dirtyQueueLock.Unlock()
+
+	dirtyInode.inode.flush_DOWN(c)
+
+	if dirtyInode.shouldUninstantiate {
+		c.vlog("Starting uninstantiation at inode %d", inodeNum)
+		toRemove := qfs.forgetChain(inodeNum)
+
+		if toRemove != nil {
+			// We need to remove all uninstantiated children.
+			// Note: locks mapMutex
+			qfs.removeUninstantiated(c, toRemove)
+		}
+	}
+
+	qfs.dirtyQueueLock.Lock()
 }
 
 // There are several configuration knobs in the kernel which can affect FUSE
@@ -404,68 +518,14 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 	return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
 }
 
-// Track a workspace as active so we know if we have to sync it
-func (qfs *QuantumFs) activateWorkspace(c *ctx, name string,
-	workspaceroot *WorkspaceRoot) {
-
-	defer c.FuncIn("Mux::activateWorkspace", "%s", name).out()
-
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
-
-	// we need the lock to check Dirty to avoid active / dirty races
-	if workspaceroot.setDirty(true) {
-		// if the wsr is already dirty, then its already active so skip
-		return
-	}
-
-	if _, exists := qfs.activeWorkspaces[name]; exists {
-		panic("Workspace registered twice")
-	}
-	qfs.activeWorkspaces[name] = workspaceroot
-}
-
-// Untrack a workspace as active so we won't sync it. Usually this is called when
-// the workspaceroot Inode is about to be deleted
-func (qfs *QuantumFs) deactivateWorkspace(c *ctx, name string,
-	workspaceroot *WorkspaceRoot) {
-
-	defer c.FuncIn("Mux::deactivateWorkspace", "%s", name).out()
-
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
-
-	workspaceroot.setDirty(false)
-	delete(qfs.activeWorkspaces, name)
-}
-
 // Trigger all active workspaces to sync
 func (qfs *QuantumFs) syncAll(c *ctx) {
 	defer c.funcIn("Mux::syncAll").out()
 
-	var workspaces []*WorkspaceRoot
+	// Trigger the flusher goroutine to flush everything
+	qfs.flushAll <- c
 
-	func() {
-		qfs.mapMutex.RLock()
-		defer qfs.mapMutex.RUnlock()
-
-		workspaces = make([]*WorkspaceRoot, 0, len(qfs.activeWorkspaces))
-
-		for _, workspace := range qfs.activeWorkspaces {
-			workspaces = append(workspaces, workspace)
-		}
-	}()
-
-	c.dlog("Num active workspaces: %d", len(workspaces))
-
-	for _, workspace := range workspaces {
-		func() {
-			c.vlog("Locking and syncing workspace %s/%s",
-				workspace.namespace, workspace.workspace)
-			defer workspace.LockTree().Unlock()
-			workspace.flush_DOWN(c)
-		}()
-	}
+	<-qfs.flushComplete
 }
 
 func logRequestPanic(c *ctx) {
@@ -633,13 +693,8 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	toRemove := qfs.forgetChain(InodeId(nodeID))
+	// TODO Add to queue
 
-	if toRemove != nil {
-		// We need to remove all uninstantiated children.
-		// Note: locks mapMutex
-		qfs.removeUninstantiated(&qfs.c, toRemove)
-	}
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
