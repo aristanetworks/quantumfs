@@ -16,7 +16,7 @@ func (special *Special) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (special *Special) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	special.setDirty(false)
+	// TODO update parent?
 
 	return special.embedDataIntoKey_(c)
 }

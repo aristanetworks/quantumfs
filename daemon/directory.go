@@ -413,11 +413,6 @@ func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
 
-	if !dir.self.isWorkspaceRoot() {
-		// TODO This violates layering and is ugly
-		dir.setDirty(false)
-	}
-
 	return dir.baseLayerId
 }
 

@@ -19,7 +19,7 @@ func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush_DOWN", "%s", fi.name_).out()
 
 	key := fi.accessor.sync(c)
-	fi.setDirty(false)
+	// TODO Update parent?
 	return key
 }
 
