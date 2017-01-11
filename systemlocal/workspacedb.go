@@ -321,7 +321,7 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 		if c != nil {
 			objectKey := quantumfs.NewObjectKeyFromBytes(srcKey)
 			c.Dlog(qlog.LogWorkspaceDb,
-				"Branched workspace '%s/%s/%s' to '%s/%s/%s' with key %s",
+				"Branch workspace '%s/%s/%s' to '%s/%s/%s' with %s",
 				srcTypespace, srcNamespace, srcWorkspace,
 				dstTypespace, dstNamespace, dstWorkspace,
 				objectKey.String())
