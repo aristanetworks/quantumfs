@@ -194,10 +194,14 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 
 	for key, dirtyList := range qfs.dirtyQueue {
-		earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
-		if earliestNext.Before(nextExpiringInode) {
-			nextExpiringInode = earliestNext
-		}
+		func() {
+			key.RLock()
+			defer key.RUnlock()
+			earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
+			if earliestNext.Before(nextExpiringInode) {
+				nextExpiringInode = earliestNext
+			}
+		}()
 
 		if dirtyList.Len() == 0 {
 			delete(qfs.dirtyQueue, key)
@@ -207,7 +211,7 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 	return nextExpiringInode
 }
 
-// Requires dirtyQueueLock
+// Requires dirtyQueueLock and the treeLock of the workspace held read-only
 func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 	flushAll bool) time.Time {
 
