@@ -16,7 +16,7 @@ func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (link *Symlink) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	link.setDirty(false)
+	// TODO update parent?
 	return link.key
 }
 

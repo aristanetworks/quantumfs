@@ -113,6 +113,7 @@ type Inode interface {
 	isOrphaned() bool
 
 	dirty(c *ctx) // Mark this Inode dirty
+	markClean()   // Mark this Inode as cleaned
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child InodeId)
 	isDirty() bool // Is this Inode dirty?
@@ -184,26 +185,19 @@ func (inode *InodeCommon) isDirty() bool {
 	}
 }
 
-// Returns if this Inode was already dirty or not
-func (inode *InodeCommon) setDirty(dirty bool) bool {
-	var val uint32
-	if dirty {
-		val = 1
-	} else {
-		val = 0
-	}
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
 	defer inode.dirtyElementLock.Lock().Unlock()
 
-	old := atomic.SwapUint32(&inode.dirty_, val)
-	if old == 1 {
-		return true
-	} else {
-		return false
 	if inode.dirtyElement_ == nil {
 		inode.dirtyElement_ = c.qfs.queueDirtyInode(c, inode.self)
 	}
+}
+
+// Mark this Inode as having been cleaned
+func (inode *InodeCommon) markClean() {
+	defer inode.dirtyElementLock.Lock().Unlock()
+	inode.dirtyElement_ = nil
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {

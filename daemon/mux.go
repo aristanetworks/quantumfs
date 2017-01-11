@@ -244,6 +244,7 @@ func (qfs *QuantumFs) flushInode_(c *ctx, dirtyInode dirtyInode) {
 	qfs.dirtyQueueLock.Unlock()
 
 	dirtyInode.inode.flush_DOWN(c)
+	dirtyInode.inode.markClean()
 
 	if dirtyInode.shouldUninstantiate {
 		c.vlog("Starting uninstantiation at inode %d", inodeNum)
