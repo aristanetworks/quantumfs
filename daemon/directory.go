@@ -216,13 +216,6 @@ func (dir *Directory) delChild_(c *ctx, inodeNum InodeId) {
 	dir.updateSize_(c)
 }
 
-func (dir *Directory) dirty(c *ctx) {
-	if !dir.setDirty(true) {
-		// Only go recursive if we aren't already dirty
-		dir.parent(c).dirtyChild(c, dir.inodeNum())
-	}
-}
-
 // Record that a specific child is dirty and when syncing heirarchically, sync them
 // as well.
 func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {

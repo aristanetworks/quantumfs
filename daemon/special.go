@@ -260,12 +260,6 @@ func (special *Special) getChildRecord(c *ctx,
 	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
-func (special *Special) dirty(c *ctx) {
-	special.setDirty(true)
-
-	special.parent(c).dirtyChild(c, special.inodeNum())
-}
-
 func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
 	var hash [quantumfs.ObjectKeyLength - 1]byte
 
