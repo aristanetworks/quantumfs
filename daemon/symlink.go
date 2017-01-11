@@ -234,8 +234,3 @@ func (link *Symlink) getChildRecord(c *ctx,
 	c.elog("Unsupported record fetch on Symlink")
 	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
-
-func (link *Symlink) dirty(c *ctx) {
-	link.setDirty(true)
-	link.parent(c).dirtyChild(c, link.inodeNum())
-}

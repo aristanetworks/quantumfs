@@ -192,12 +192,17 @@ func (inode *InodeCommon) setDirty(dirty bool) bool {
 	} else {
 		val = 0
 	}
+// Add this Inode to the dirty list
+func (inode *InodeCommon) dirty(c *ctx) {
+	defer inode.dirtyElementLock.Lock().Unlock()
 
 	old := atomic.SwapUint32(&inode.dirty_, val)
 	if old == 1 {
 		return true
 	} else {
 		return false
+	if inode.dirtyElement_ == nil {
+		inode.dirtyElement_ = c.qfs.queueDirtyInode(c, inode.self)
 	}
 }
 
