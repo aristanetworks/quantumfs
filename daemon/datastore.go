@@ -3,6 +3,7 @@
 
 package daemon
 
+import "container/list"
 import "crypto/sha1"
 
 import "github.com/aristanetworks/quantumfs"
@@ -10,14 +11,21 @@ import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
 
-func newDataStore(durableStore quantumfs.DataStore) *dataStore {
+func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	return &dataStore{
 		durableStore: durableStore,
+		cache:        make(map[quantumfs.ObjectKey]*buffer, cacheSize),
+		cacheSize:    cacheSize,
 	}
 }
 
 type dataStore struct {
 	durableStore quantumfs.DataStore
+
+	cacheLock DeferableMutex
+	lru       list.List // Back is most recently used
+	cache     map[quantumfs.ObjectKey]*buffer
+	cacheSize int
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
@@ -25,6 +33,20 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
+	}
+
+	// Check cache
+	bufResult := func() quantumfs.Buffer {
+		defer store.cacheLock.Lock().Unlock()
+
+		if buf, exists := store.cache[key]; exists {
+			store.lru.MoveToBack(buf.lruElement)
+			return buf
+		}
+		return nil
+	}()
+	if bufResult != nil {
+		return bufResult
 	}
 
 	var buf buffer
@@ -37,6 +59,16 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
+		// Store in cache
+		defer store.cacheLock.Lock().Unlock()
+
+		if store.lru.Len() >= store.cacheSize {
+			evictedBuf := store.lru.Remove(store.lru.Front())
+			delete(store.cache, evictedBuf.(buffer).key)
+		}
+		store.cache[buf.key] = &buf
+		buf.lruElement = store.lru.PushBack(buf)
+
 		return &buf
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %v. Key %s",
@@ -88,11 +120,12 @@ func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
 }
 
 type buffer struct {
-	data      []byte
-	dirty     bool
-	keyType   quantumfs.KeyType
-	key       quantumfs.ObjectKey
-	dataStore *dataStore
+	data       []byte
+	dirty      bool
+	keyType    quantumfs.KeyType
+	key        quantumfs.ObjectKey
+	dataStore  *dataStore
+	lruElement *list.Element
 }
 
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
@@ -219,5 +252,12 @@ func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayExtendedAttributes(
 		encoding.ReadRootExtendedAttributes(segment))
+
+}
+
+func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
+	segment := capn.NewBuffer(buf.data)
+	return quantumfs.OverlayHardlinkEntry(
+		encoding.ReadRootHardlinkEntry(segment))
 
 }

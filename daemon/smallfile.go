@@ -99,12 +99,15 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
 		float64(input.metadata.BlockSize)))
 	input.expandTo(numBlocks)
+	dataInPrevBlocks := 0
 	if numBlocks > 0 {
 		c.dlog("Syncing smallFile dataBlock")
 		input.toSync[0] = fi.buf
+		dataInPrevBlocks = (numBlocks - 1) * int(input.metadata.BlockSize)
 	}
+	// last block (could be the only block) may be full or partial
 	input.metadata.LastBlockBytes =
-		uint32(fi.buf.Size() % int(input.metadata.BlockSize))
+		uint32(fi.buf.Size() - dataInPrevBlocks)
 
 	return input
 }
