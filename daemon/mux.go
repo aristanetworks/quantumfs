@@ -20,7 +20,7 @@ import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
 const defaultCacheSize = 4096
-const sanityTimeout = time.Minute
+const flushSanityTimeout = time.Minute
 
 type dirtyInode struct {
 	inode               Inode
@@ -155,7 +155,7 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 	flusherContext := qfs.c.reqId(qlog.FlushReqId, nil)
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
-	nextExpiringInode := time.Now().Add(sanityTimeout)
+	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	for {
 		stop := false
 		flushAll := false
@@ -191,7 +191,7 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 	defer c.FuncIn("Mux::flushDirtyLists", "flushAll %t", flushAll)
 
 	defer qfs.dirtyQueueLock.Lock().Unlock()
-	nextExpiringInode := time.Now().Add(sanityTimeout)
+	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 
 	for key, dirtyList := range qfs.dirtyQueue {
 		earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
@@ -230,7 +230,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 	}
 
 	// If we get here then we've emptied the dirtyList out entirely.
-	return time.Now().Add(sanityTimeout)
+	return time.Now().Add(flushSanityTimeout)
 }
 
 // Requires the dirtyQueueLock be held.
