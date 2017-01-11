@@ -160,7 +160,6 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 
 		select {
 		case stop = <-quit:
-			flushAll = true
 		case <-qfs.kickFlush:
 		case c = <-qfs.flushAll:
 			flushAll = true
@@ -169,7 +168,7 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 
 		nextExpiringInode = func() time.Time {
 			defer logRequestPanic(c)
-			return qfs.flushDirtyLists(c, flushAll)
+			return qfs.flushDirtyLists(c, flushAll || stop)
 		}()
 
 		if flushAll {
