@@ -148,7 +148,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
 	defer c.vlog("Directory::instantiateChild Exit")
 
-	hardlinkRecord := func () *quantumfs.DirectoryRecord {
+	hardlinkRecord := func() *quantumfs.DirectoryRecord {
 		defer wsr.linkLock.Lock().Unlock()
 
 		id, exists := wsr.inodeToLink[inodeNum]
@@ -367,7 +367,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	isHardlink, linkId := wsr.checkHardlink(inodeNum)
 
 	if isHardlink {
-		func () {
+		func() {
 			defer wsr.Directory.Lock().Unlock()
 			wsr.Directory.self.dirty(c)
 

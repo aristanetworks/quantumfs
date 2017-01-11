@@ -10,7 +10,7 @@ import "github.com/aristanetworks/quantumfs"
 
 // Should implement DirectoryRecordIf
 type Hardlink struct {
-	name	string
+	name   string
 	linkId uint64
 	wsr    *WorkspaceRoot
 }
