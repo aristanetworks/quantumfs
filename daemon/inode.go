@@ -4,6 +4,7 @@
 // The basic Inode and FileHandle structures
 package daemon
 
+import "container/list"
 import "fmt"
 import "sync"
 import "sync/atomic"
@@ -116,6 +117,13 @@ type Inode interface {
 	dirtyChild(c *ctx, child InodeId)
 	isDirty() bool // Is this Inode dirty?
 
+	// The kernel has forgotten about this Inode. Add yourself to the list to be
+	// flushed and forgotten.
+	queueToForget(c *ctx)
+
+	// Returns this inodes place in the dirtyQueue
+	dirtyElement() *list.Element
+
 	// Compute a new object key, possibly schedule the sync the object data
 	// itself to the datastore
 	flush_DOWN(c *ctx) quantumfs.ObjectKey
@@ -159,7 +167,9 @@ type InodeCommon struct {
 	treeLock_ *sync.RWMutex
 
 	// This field is accessed using atomic instructions
-	dirty_ uint32 // 1 if this Inode or any children are dirty
+	dirty_           uint32 // 1 if this Inode or any children are dirty
+	dirtyElementLock DeferableMutex
+	dirtyElement_    *list.Element
 }
 
 func (inode *InodeCommon) inodeNum() InodeId {
@@ -195,6 +205,17 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
 		inode)
 	panic(msg)
+}
+
+func (inode *InodeCommon) queueToForget(c *ctx) {
+	defer inode.dirtyElementLock.Lock().Unlock()
+
+	inode.dirtyElement_ = c.qfs.queueInodeToForget(c, inode.self)
+}
+
+func (inode *InodeCommon) dirtyElement() *list.Element {
+	defer inode.dirtyElementLock.Lock().Unlock()
+	return inode.dirtyElement_
 }
 
 func (inode *InodeCommon) name() string {

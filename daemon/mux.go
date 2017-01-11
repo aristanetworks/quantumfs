@@ -259,6 +259,54 @@ func (qfs *QuantumFs) flushInode_(c *ctx, dirtyInode dirtyInode) {
 	qfs.dirtyQueueLock.Lock()
 }
 
+// Don't use this method directly, use one of the semantically specific variants
+// instead.
+func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate bool,
+	shouldWait bool) *list.Element {
+
+	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d su %t sw %t",
+		inode.inodeNum(), shouldUninstantiate, shouldWait)
+
+	defer qfs.dirtyQueueLock.Lock().Unlock()
+
+	var dirtyNode *dirtyInode
+	dirtyElement := inode.dirtyElement()
+	if dirtyElement == nil {
+		// This inode wasn't in the dirtyQueue so add it now
+		dirtyNode := &dirtyInode{
+			inode:               inode,
+			shouldUninstantiate: shouldUninstantiate,
+		}
+
+		treelock := inode.treeLock()
+		if shouldWait {
+			dirtyNode.expiryTime =
+				time.Now().Add(qfs.config.DirtyFlushDelay)
+
+			dirtyElement = qfs.dirtyQueue[treelock].PushBack(dirtyNode)
+		} else {
+			// dirtyInode.expiryTime will be the epoch
+			dirtyElement = qfs.dirtyQueue[treelock].PushFront(dirtyNode)
+		}
+	}
+
+	if shouldUninstantiate {
+		dirtyNode.shouldUninstantiate = true
+	}
+
+	return dirtyElement
+}
+
+// Queue an Inode to be flushed because it is dirty
+func (qfs *QuantumFs) queueDirtyInode(c *ctx, inode Inode) *list.Element {
+	return qfs._queueDirtyInode(c, inode, false, true)
+}
+
+// Queue an Inode because the kernel has forgotten about it
+func (qfs *QuantumFs) queueInodeToForget(c *ctx, inode Inode) *list.Element {
+	return qfs._queueDirtyInode(c, inode, true, false)
+}
+
 // There are several configuration knobs in the kernel which can affect FUSE
 // performance. Don't depend on the system being configured correctly for QuantumFS,
 // instead try to change the settings ourselves.
@@ -693,8 +741,8 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	// TODO Add to queue
-
+	inode := qfs.inode(&qfs.c, InodeId(nodeID))
+	inode.queueToForget(&qfs.c)
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
