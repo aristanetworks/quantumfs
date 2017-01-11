@@ -168,7 +168,6 @@ func (cmap *ChildMap) renameChild(oldName string,
 	cmap.children[newName] = inodeId
 	record.SetFilename(newName)
 
-
 	if needCleanup {
 		return cleanupInodeId
 	}
