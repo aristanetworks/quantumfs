@@ -9,6 +9,7 @@ import "github.com/aristanetworks/quantumfs"
 
 // Should implement DirectoryRecordIf
 type Hardlink struct {
+	name	string
 	linkId uint64
 	wsr    *WorkspaceRoot
 }
@@ -29,8 +30,9 @@ func encodeHardlinkId(hardlinkId uint64) quantumfs.ObjectKey {
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 }
 
-func newHardlink(linkId uint64, wsr *WorkspaceRoot) *Hardlink {
+func newHardlink(name string, linkId uint64, wsr *WorkspaceRoot) *Hardlink {
 	var newLink Hardlink
+	newLink.name = name
 	newLink.wsr = wsr
 	newLink.linkId = linkId
 
@@ -47,13 +49,11 @@ func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectoryRecord)) {
 }
 
 func (link *Hardlink) Filename() string {
-	return link.get().Filename()
+	return link.name
 }
 
 func (link *Hardlink) SetFilename(v string) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
-		dir.SetFilename(v)
-	})
+	link.name = v
 }
 
 func (link *Hardlink) ID() quantumfs.ObjectKey {
@@ -148,5 +148,10 @@ func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
 }
 
 func (link *Hardlink) Record() quantumfs.DirectoryRecord {
-	return *(link.get())
+	rtn := quantumfs.NewDirectoryRecord()
+	rtn.SetType(quantumfs.ObjectTypeHardlink)
+	rtn.SetID(encodeHardlinkId(link.linkId))
+	rtn.SetFilename(link.name)
+
+	return *rtn
 }
