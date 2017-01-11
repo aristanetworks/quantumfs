@@ -424,7 +424,7 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	return newNamespaceList(c, name, "", "", tsl, inodeNum), nil
+	return newNamespaceList(c, "", "", name, tsl, inodeNum), nil
 }
 
 func newNamespaceList(c *ctx, rootName string, parentName string, name string,
