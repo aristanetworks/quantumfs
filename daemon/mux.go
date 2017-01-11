@@ -279,14 +279,20 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 		}
 
 		treelock := inode.treeLock()
+		dirtyList, ok := qfs.dirtyQueue[treelock]
+		if !ok {
+			dirtyList = list.New()
+			qfs.dirtyQueue[treelock] = dirtyList
+		}
+
 		if shouldWait {
 			dirtyNode.expiryTime =
 				time.Now().Add(qfs.config.DirtyFlushDelay)
 
-			dirtyElement = qfs.dirtyQueue[treelock].PushBack(dirtyNode)
+			dirtyElement = dirtyList.PushBack(dirtyNode)
 		} else {
 			// dirtyInode.expiryTime will be the epoch
-			dirtyElement = qfs.dirtyQueue[treelock].PushFront(dirtyNode)
+			dirtyElement = dirtyList.PushFront(dirtyNode)
 		}
 	}
 
