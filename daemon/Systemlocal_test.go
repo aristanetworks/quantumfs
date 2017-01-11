@@ -26,6 +26,7 @@ func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
+		DirtyFlushDelay:  30 * time.Second,
 		MountPath:        mountPath,
 		WorkspaceDB:      workspaceDB,
 		DurableStore:     processlocal.NewDataStore(""),
