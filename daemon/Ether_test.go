@@ -8,6 +8,7 @@ package daemon
 // Smoke tests for the Ether datastores
 
 import "testing"
+import "time"
 
 import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
@@ -23,6 +24,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
+		DirtyFlushDelay:  30 * time.Second,
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
 		DurableStore:     datastore,
