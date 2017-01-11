@@ -25,6 +25,10 @@ type WorkspaceRoot struct {
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
 	realTreeLock sync.RWMutex
+
+	// Hardlink support structures
+	hardlinks  map[uint64]*quantumfs.DirectoryRecord
+	dirtyLinks map[InodeId]InodeId
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -53,6 +57,8 @@ func newWorkspaceRoot(c *ctx, typeSpace string, nameSpace string, workSpace stri
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
+	defer wsr.Lock().Unlock()
+
 	wsr.self = &wsr
 	wsr.typespace = typeSpace
 	wsr.namespace = nameSpace
@@ -61,6 +67,7 @@ func newWorkspaceRoot(c *ctx, typeSpace string, nameSpace string, workSpace stri
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
 	uninstantiated := initDirectory(c, workSpace, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
@@ -76,13 +83,81 @@ func (wsr *WorkspaceRoot) dirty(c *ctx) {
 		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
+func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
+	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
+	wsr.dirtyLinks = make(map[InodeId]InodeId)
+
+	for {
+		for i := 0; i < entry.NumEntries(); i++ {
+			hardlink := entry.Entry(i)
+			wsr.hardlinks[hardlink.HardlinkID()] = hardlink.Record()
+		}
+
+		if entry.Next() == quantumfs.EmptyDirKey || entry.NumEntries() == 0 {
+			break
+		}
+
+		buffer := c.dataStore.Get(&c.Ctx, entry.Next())
+		if buffer == nil {
+			panic("Missing next HardlinkEntry object")
+		}
+
+		entry = buffer.AsHardlinkEntry()
+	}
+}
+
+func publishHardlinkMap(c *ctx,
+	records map[uint64]*quantumfs.DirectoryRecord) *quantumfs.HardlinkEntry {
+
+	// entryIdx indexes into the metadata block
+	baseLayer := quantumfs.NewHardlinkEntry()
+	nextBaseLayerId := quantumfs.EmptyDirKey
+	var err error
+	entryIdx := 0
+	for hardlinkID, record := range records {
+		if entryIdx == quantumfs.MaxDirectoryRecords() {
+			// This block is full, upload and create a new one
+			baseLayer.SetNumEntries(entryIdx)
+			baseLayer.SetNext(nextBaseLayerId)
+
+			buf := newBuffer(c, baseLayer.Bytes(),
+				quantumfs.KeyTypeMetadata)
+
+			nextBaseLayerId, err = buf.Key(&c.Ctx)
+			if err != nil {
+				panic("Failed to upload new baseLayer object")
+			}
+
+			baseLayer = quantumfs.NewHardlinkEntry()
+			entryIdx = 0
+		}
+
+		newRecord := quantumfs.NewHardlinkRecord()
+		newRecord.SetHardlinkID(hardlinkID)
+		newRecord.SetRecord(record)
+		baseLayer.SetEntry(entryIdx, newRecord)
+
+		entryIdx++
+	}
+
+	baseLayer.SetNumEntries(entryIdx)
+	baseLayer.SetNext(nextBaseLayerId)
+	return baseLayer
+}
+
 func (wsr *WorkspaceRoot) publish(c *ctx) {
 	c.vlog("WorkspaceRoot::publish Enter")
 	defer c.vlog("WorkspaceRoot::publish Exit")
 
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+
 	// Upload the workspaceroot object
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
+	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
+	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, wsr.hardlinks))
+
 	bytes := workspaceRoot.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
@@ -152,7 +227,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer wsr.RLock().RUnlock()
 
 	var numChildDirectories uint32
-	for _, entry := range wsr.childrenRecords {
+	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
 			numChildDirectories++
 		}

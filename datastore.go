@@ -15,15 +15,54 @@ import capn "github.com/glycerine/go-capnproto"
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
 
-// Maximum number of blocks for each file type
-const MaxBlocksMediumFile = int(encoding.MaxBlocksMediumFile)
-const MaxBlocksLargeFile = int(encoding.MaxBlocksLargeFile)
-const MaxPartsVeryLargeFile = int(encoding.MaxPartsVeryLargeFile)
-const MaxDirectoryRecords = int(encoding.MaxDirectoryRecords)
-const MaxNumExtendedAttributes = int(encoding.MaxNumExtendedAttributes)
-
 // Maximum length of a filename
 const MaxFilenameLength = int(encoding.MaxFilenameLength)
+const MaxXAttrnameLength = int(encoding.MaxXAttrnameLength)
+
+// Maximum number of blocks for each file type
+var maxBlocksMediumFile int
+var maxBlocksLargeFile int
+var maxPartsVeryLargeFile int
+var maxDirectoryRecords int
+var maxNumExtendedAttributes int
+
+// accessors for max blocks information per file type
+func MaxBlocksMediumFile() int {
+	return maxBlocksMediumFile
+}
+
+func MaxBlocksLargeFile() int {
+	return maxBlocksLargeFile
+}
+
+func MaxPartsVeryLargeFile() int {
+	return maxPartsVeryLargeFile
+}
+
+func MaxDirectoryRecords() int {
+	return maxDirectoryRecords
+}
+
+func MaxNumExtendedAttributes() int {
+	return maxNumExtendedAttributes
+}
+
+// max file sizes based on file type
+func MaxSmallFileSize() uint64 {
+	return uint64(MaxBlockSize)
+}
+
+func MaxMediumFileSize() uint64 {
+	return uint64(MaxBlocksMediumFile() * MaxBlockSize)
+}
+
+func MaxLargeFileSize() uint64 {
+	return uint64(MaxBlocksLargeFile() * MaxBlockSize)
+}
+
+func MaxVeryLargeFileSize() uint64 {
+	return uint64(MaxPartsVeryLargeFile()) * MaxLargeFileSize()
+}
 
 // Special reserved typespace/namespace/workspace names
 const (
@@ -186,6 +225,10 @@ type DirectoryEntry struct {
 }
 
 func NewDirectoryEntry() *DirectoryEntry {
+	return newDirectoryEntryRecords(MaxDirectoryRecords())
+}
+
+func newDirectoryEntryRecords(recs int) *DirectoryEntry {
 	segment := capn.NewBuffer(nil)
 
 	dirEntry := DirectoryEntry{
@@ -193,10 +236,11 @@ func NewDirectoryEntry() *DirectoryEntry {
 	}
 	dirEntry.dir.SetNumEntries(0)
 
-	recordList := encoding.NewDirectoryRecordList(segment, MaxDirectoryRecords)
+	recordList := encoding.NewDirectoryRecordList(segment, recs)
 	dirEntry.dir.SetEntries(recordList)
 
 	return &dirEntry
+
 }
 
 func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
@@ -222,8 +266,8 @@ func (dir *DirectoryEntry) Entry(i int) *DirectoryRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
 }
 
-func (dir *DirectoryEntry) SetEntry(i int, record encoding.DirectoryRecord) {
-	dir.dir.Entries().Set(i, record)
+func (dir *DirectoryEntry) SetEntry(i int, record *DirectoryRecord) {
+	dir.dir.Entries().Set(i, record.record)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
@@ -412,6 +456,103 @@ func OverlayWorkspaceRoot(ewsr encoding.WorkspaceRoot) WorkspaceRoot {
 	return wsr
 }
 
+func NewHardlinkRecord() *HardlinkRecord {
+	segment := capn.NewBuffer(nil)
+	record := HardlinkRecord{
+		record: encoding.NewRootHardlinkRecord(segment),
+	}
+
+	return &record
+}
+
+type HardlinkRecord struct {
+	record encoding.HardlinkRecord
+}
+
+func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
+	record := HardlinkRecord{
+		record: r,
+	}
+	return &record
+}
+
+func (r *HardlinkRecord) HardlinkID() uint64 {
+	return r.record.HardlinkID()
+}
+
+func (r *HardlinkRecord) SetHardlinkID(v uint64) {
+	r.record.SetHardlinkID(v)
+}
+
+func (r *HardlinkRecord) Record() *DirectoryRecord {
+	return overlayDirectoryRecord(r.record.Record())
+}
+
+func (r *HardlinkRecord) SetRecord(v *DirectoryRecord) {
+	r.record.SetRecord(v.record)
+}
+
+type HardlinkEntry struct {
+	entry encoding.HardlinkEntry
+}
+
+func NewHardlinkEntry() *HardlinkEntry {
+	segment := capn.NewBuffer(nil)
+
+	dirEntry := HardlinkEntry{
+		entry: encoding.NewRootHardlinkEntry(segment),
+	}
+	dirEntry.entry.SetNumEntries(0)
+
+	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords())
+	dirEntry.entry.SetEntries(recordList)
+
+	return &dirEntry
+}
+
+func OverlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
+	dir := HardlinkEntry{
+		entry: edir,
+	}
+	return dir
+}
+
+func (dir *HardlinkEntry) Bytes() []byte {
+	return dir.entry.Segment.Data
+}
+
+func (dir *HardlinkEntry) NumEntries() int {
+	return int(dir.entry.NumEntries())
+}
+
+func (dir *HardlinkEntry) SetNumEntries(n int) {
+	dir.entry.SetNumEntries(uint32(n))
+}
+
+func (dir *HardlinkEntry) Entry(i int) *HardlinkRecord {
+	return overlayHardlinkRecord(dir.entry.Entries().At(i))
+}
+
+func (dir *HardlinkEntry) SetEntry(i int, record *HardlinkRecord) {
+	dir.entry.Entries().Set(i, record.record)
+}
+
+func (dir *HardlinkEntry) Next() ObjectKey {
+	return overlayObjectKey(dir.entry.Next())
+}
+
+func (dir *HardlinkEntry) SetNext(key ObjectKey) {
+	dir.entry.SetNext(key.key)
+}
+
+func (wsr *WorkspaceRoot) HardlinkEntry() HardlinkEntry {
+	return OverlayHardlinkEntry(wsr.wsr.HardlinkEntry())
+}
+
+func (wsr *WorkspaceRoot) SetHardlinkEntry(v *HardlinkEntry) {
+	wsr.wsr.SetHardlinkEntry(v.entry)
+}
+
 func (wsr *WorkspaceRoot) Bytes() []byte {
 	return wsr.wsr.Segment.Data
 }
@@ -501,8 +642,8 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
 	return &record
 }
 
-func (record *DirectoryRecord) Record() encoding.DirectoryRecord {
-	return record.record
+func (record *DirectoryRecord) Record() *DirectoryRecord {
+	return record
 }
 
 func (record *DirectoryRecord) Filename() string {
@@ -655,7 +796,7 @@ func NewVeryLargeFile() *VeryLargeFile {
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
-	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile)
+	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile())
 	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
 }
@@ -692,13 +833,17 @@ func (vlf *VeryLargeFile) Bytes() []byte {
 }
 
 func NewExtendedAttributes() *ExtendedAttributes {
+	return newExtendedAttributesAttrs(MaxNumExtendedAttributes())
+}
+
+func newExtendedAttributesAttrs(attrs int) *ExtendedAttributes {
 	segment := capn.NewBuffer(nil)
 	ea := ExtendedAttributes{
 		ea: encoding.NewRootExtendedAttributes(segment),
 	}
 
 	attributes := encoding.NewExtendedAttributeList(segment,
-		MaxNumExtendedAttributes)
+		attrs)
 	ea.ea.SetAttributes(attributes)
 	return &ea
 }
@@ -755,6 +900,7 @@ type Buffer interface {
 	AsMultiBlockFile() MultiBlockFile
 	AsVeryLargeFile() VeryLargeFile
 	AsExtendedAttributes() ExtendedAttributes
+	AsHardlinkEntry() HardlinkEntry
 }
 
 type DataStore interface {
@@ -790,6 +936,47 @@ func (store *ConstDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 
 var ZeroKey ObjectKey
 
+func calcMaxNumExtendedAttributes(maxSize int) int {
+	attrs0 := newExtendedAttributesAttrs(0)
+	size0attrs := len(attrs0.Bytes())
+
+	attrs1 := newExtendedAttributesAttrs(1)
+	// setup the pointers in ExtendedAttribute to practical max values
+	attrs1.SetAttribute(0, string(make([]byte, MaxXAttrnameLength)),
+		createEmptyBlock())
+	size1attrs := len(attrs1.Bytes())
+
+	return (maxSize - size0attrs) / (size1attrs - size0attrs)
+}
+
+func calcMaxDirectoryRecords(maxSize int) int {
+	dir0 := newDirectoryEntryRecords(0)
+	size0recs := len(dir0.Bytes())
+
+	// setup the pointers in DirectoryRecord to practical max values
+	record := NewDirectoryRecord()
+	record.SetFilename(string(make([]byte, MaxFilenameLength)))
+	record.SetExtendedAttributes(createEmptyBlock())
+
+	dir1 := newDirectoryEntryRecords(1)
+	dir1.dir.Entries().Set(0, record.record)
+	size1recs := len(dir1.Bytes())
+
+	return (maxSize - size0recs) / (size1recs - size0recs)
+}
+
+func calcMaxBlocksLargeFile(maxSize int) int {
+	mb0 := NewMultiBlockFile(0)
+	size0keys := len(mb0.Bytes())
+
+	mb1 := NewMultiBlockFile(1)
+	// all keys are of same size so use any key
+	mb1.SetListOfBlocks([]ObjectKey{createEmptyBlock()})
+	size1keys := len(mb1.Bytes())
+
+	return (maxSize - size0keys) / (size1keys - size0keys)
+}
+
 func init() {
 	emptyDirKey := createEmptyDirectory()
 	emptyBlockKey := createEmptyBlock()
@@ -798,4 +985,38 @@ func init() {
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
 	ZeroKey = NewObjectKey(KeyTypeEmbedded, [ObjectKeyLength - 1]byte{})
+
+	if MaxBlockSize > 1024*1024*1024 || MaxBlockSize < 32*1024 {
+		// if a MaxBlockSize beyond this range is needed then
+		// notions like max medium file type size is 32MB etc needs
+		// to be revisited
+		panic(fmt.Sprintf("MaxBlockSize %d .Valid range is 32KB..1MB\n",
+			MaxBlockSize))
+	}
+
+	maxBlocksLargeFile = calcMaxBlocksLargeFile(MaxBlockSize)
+	if maxBlocksLargeFile == 0 {
+		panic(fmt.Sprintf("MaxBlockSize %d is small for Large file type",
+			MaxBlockSize))
+	}
+
+	// maximum medium file size should be 32MB
+	// for supported range, maxBlocksMediumFile < maxBlocksLargeFile
+	maxBlocksMediumFile = (32 * 1024 * 1024) / MaxBlockSize
+	// if MaxBlockSize is within supported size then
+	// maxBlocksMediumFile < (maxBlocksLargeFile-1)
+
+	maxPartsVeryLargeFile = MaxBlocksLargeFile()
+
+	maxDirectoryRecords = calcMaxDirectoryRecords(int(MaxBlockSize))
+	if maxDirectoryRecords == 0 {
+		panic(fmt.Sprintf("MaxBlockSize %d is small for DirectoryEntry",
+			MaxBlockSize))
+	}
+
+	maxNumExtendedAttributes = calcMaxNumExtendedAttributes(int(MaxBlockSize))
+	if maxNumExtendedAttributes == 0 {
+		panic(fmt.Sprintf("MaxBlockSize %d is small for ExtendedAttributes",
+			MaxBlockSize))
+	}
 }

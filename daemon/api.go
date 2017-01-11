@@ -525,8 +525,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	target := dst[len(dst)-1]
 
 	defer parent.Lock().Unlock()
-	_, exist := parent.children[target]
-	if exist {
+	if record := parent.children.recordByName(c, target); record != nil {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist", target)
 		return

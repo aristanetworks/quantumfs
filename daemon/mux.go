@@ -18,6 +18,8 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/hanwen/go-fuse/fuse"
 
+const defaultCacheSize = 4096
+
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
@@ -36,7 +38,8 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 			},
 			config:      &config,
 			workspaceDB: config.WorkspaceDB,
-			dataStore:   newDataStore(config.DurableStore),
+			dataStore: newDataStore(config.DurableStore,
+				defaultCacheSize),
 		},
 	}
 
@@ -258,7 +261,13 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	inode, newUninstantiated := qfs.inode_(c, parentId).instantiateChild(c, id)
+	parent := qfs.inode_(c, parentId)
+	if parent == nil {
+		panic(fmt.Sprintf("Unable to instantiate parent required: %d",
+			parentId))
+	}
+
+	inode, newUninstantiated := parent.instantiateChild(c, id)
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
@@ -271,10 +280,10 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	qfs.mapMutex.Lock()
 	defer qfs.mapMutex.Unlock()
 
-	c.vlog("Setting inode %d", id)
 	if inode != nil {
 		qfs.inodes[id] = inode
 	} else {
+		c.vlog("Clearing inode %d", id)
 		delete(qfs.inodes, id)
 	}
 }
@@ -537,7 +546,12 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 		// Great, we want to forget this so proceed
 		key := inode.flush_DOWN(&qfs.c)
 		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
-		delete(qfs.lookupCounts, inode.inodeNum())
+
+		func() {
+			defer qfs.lookupCountLock.Lock().Unlock()
+			delete(qfs.lookupCounts, inode.inodeNum())
+		}()
+
 		qfs.c.vlog("Set inode %d to nil", inode.inodeNum())
 
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
