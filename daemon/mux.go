@@ -143,11 +143,6 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	stopFlushTimer <- true
 	<-flushTimerStopped
 
-	func() {
-		defer logRequestPanic(&qfs.c)
-		qfs.syncAll(&qfs.c)
-	}()
-
 	return nil
 }
 
@@ -165,6 +160,7 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 
 		select {
 		case stop = <-quit:
+			flushAll = true
 		case <-qfs.kickFlush:
 		case c = <-qfs.flushAll:
 			flushAll = true
