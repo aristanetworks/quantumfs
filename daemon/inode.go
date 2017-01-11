@@ -124,9 +124,10 @@ type Inode interface {
 	// Returns this inodes place in the dirtyQueue
 	dirtyElement() *list.Element
 
-	// Compute a new object key, possibly schedule the sync the object data
-	// itself to the datastore
+	// Compute a new object key, schedule the object data to be uploaded to the
+	// datastore and update the parent with the new key.
 	flush_DOWN(c *ctx) quantumfs.ObjectKey
+
 	Sync_DOWN(c *ctx) fuse.Status
 	link_DOWN(c *ctx, srcInode Inode, newName string,
 		out *fuse.EntryOut) fuse.Status

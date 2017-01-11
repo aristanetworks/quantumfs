@@ -375,6 +375,8 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 func publishDirectoryRecordIfs(c *ctx,
 	records []DirectoryRecordIf) quantumfs.ObjectKey {
 
+	defer c.funcIn("publishDirectoryRecordIfs").out()
+
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
 	newBaseLayerId := quantumfs.EmptyDirKey
@@ -404,7 +406,7 @@ func publishDirectoryRecordIfs(c *ctx,
 }
 
 // Must hold the dir.childRecordsLock
-func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
+func (dir *Directory) publish_(c *ctx) {
 	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
 
 	oldBaseLayer := dir.baseLayerId
@@ -412,8 +414,6 @@ func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
-
-	return dir.baseLayerId
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
