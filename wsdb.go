@@ -5,7 +5,8 @@ package cql
 
 import (
 	"fmt"
-	"github.com/aristanetworks/quantumfs"
+
+	"github.com/aristanetworks/ether/qubit/wsdb"
 )
 
 // The workspace DB API endpoint is instantiated here.
@@ -14,7 +15,7 @@ import (
 // on workspace DB configuration parameter.
 
 // NewWorkspaceDB creates a workspace DB API endpoint
-func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
+func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
 
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
@@ -23,7 +24,7 @@ func NewWorkspaceDB(confName string) quantumfs.WorkspaceDB {
 	}
 	cluster := NewRealCluster(cfg.Cluster)
 
-	var wsdb quantumfs.WorkspaceDB
+	var wsdb wsdb.WorkspaceDB
 	if wsdb, err = newNoCacheWsdb(cluster, cfg); err != nil {
 		panic(fmt.Sprintf("Error %q during NewNoCacheWsdb", err))
 	}

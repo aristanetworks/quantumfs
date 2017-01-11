@@ -6,9 +6,9 @@ package cql
 import (
 	"time"
 
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/ether/utils/stats"
 	"github.com/aristanetworks/ether/utils/stats/inmem"
-	"github.com/aristanetworks/quantumfs"
 )
 
 // In this implementation of workspace DB API,
@@ -19,7 +19,7 @@ import (
 // API to interact with underlying datastore.
 
 type cacheWsdb struct {
-	base  quantumfs.WorkspaceDB
+	base  wsdb.WorkspaceDB
 	cache *entityCache
 
 	branchStats  stats.OpStats
@@ -28,7 +28,7 @@ type cacheWsdb struct {
 
 // this wsdb implementation wraps any wsdb (base) implementation
 // with entity cache
-func newCacheWsdb(base quantumfs.WorkspaceDB, cfg WsDBConfig) quantumfs.WorkspaceDB {
+func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 
 	cwsdb := &cacheWsdb{
 		base:         base,
@@ -50,54 +50,62 @@ func newCacheWsdb(base quantumfs.WorkspaceDB, cfg WsDBConfig) quantumfs.Workspac
 
 // --- workspace DB API implementation ---
 
-func (cw *cacheWsdb) NumNamespaces(c *quantumfs.Ctx) int {
-	return cw.cache.CountEntities()
+func (cw *cacheWsdb) NumNamespaces() (int, error) {
+	return cw.cache.CountEntities(), nil
 }
 
-func (cw *cacheWsdb) NamespaceList(c *quantumfs.Ctx) []string {
-	return cw.cache.ListEntities()
+func (cw *cacheWsdb) NamespaceList() ([]string, error) {
+	return cw.cache.ListEntities(), nil
 }
 
-func (cw *cacheWsdb) NumWorkspaces(c *quantumfs.Ctx, namespace string) int {
-	return cw.cache.CountEntities(namespace)
+func (cw *cacheWsdb) NumWorkspaces(namespace string) (int, error) {
+	return cw.cache.CountEntities(namespace), nil
 }
 
-func (cw *cacheWsdb) WorkspaceList(c *quantumfs.Ctx, namespace string) []string {
-	return cw.cache.ListEntities(namespace)
+func (cw *cacheWsdb) WorkspaceList(namespace string) ([]string, error) {
+	return cw.cache.ListEntities(namespace), nil
 }
 
-func (cw *cacheWsdb) NamespaceExists(c *quantumfs.Ctx, namespace string) bool {
+func (cw *cacheWsdb) NamespaceExists(namespace string) (bool, error) {
 
-	exist := cw.base.NamespaceExists(c, namespace)
+	exist, err := cw.base.NamespaceExists(namespace)
+	if err != nil {
+		return exist, err
+	}
+
 	if !exist {
 		cw.cache.DeleteEntities(namespace)
 	} else {
 		cw.cache.InsertEntities(namespace)
 	}
 
-	return exist
+	return exist, nil
 }
 
-func (cw *cacheWsdb) WorkspaceExists(c *quantumfs.Ctx, namespace string,
-	workspace string) bool {
+func (cw *cacheWsdb) WorkspaceExists(namespace string,
+	workspace string) (bool, error) {
 
-	exist := cw.base.WorkspaceExists(c, namespace, workspace)
+	exist, err := cw.base.WorkspaceExists(namespace, workspace)
+	if err != nil {
+		return exist, err
+	}
+
 	if !exist {
 		cw.cache.DeleteEntities(namespace, workspace)
 	} else {
 		cw.cache.InsertEntities(namespace, workspace)
 	}
 
-	return exist
+	return exist, nil
 }
 
-func (cw *cacheWsdb) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
+func (cw *cacheWsdb) BranchWorkspace(srcNamespace string,
 	srcWorkspace string, dstNamespace string, dstWorkspace string) error {
 
 	start := time.Now()
 	defer func() { cw.branchStats.RecordOp(time.Since(start)) }()
 
-	if err := cw.base.BranchWorkspace(c, srcNamespace, srcWorkspace,
+	if err := cw.base.BranchWorkspace(srcNamespace, srcWorkspace,
 		dstNamespace, dstWorkspace); err != nil {
 		return err
 	}
@@ -108,23 +116,25 @@ func (cw *cacheWsdb) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
 	return nil
 }
 
-func (cw *cacheWsdb) Workspace(c *quantumfs.Ctx, namespace string,
-	workspace string) quantumfs.ObjectKey {
+func (cw *cacheWsdb) Workspace(namespace string,
+	workspace string) (wsdb.ObjectKey, error) {
 
-	key := cw.base.Workspace(c, namespace, workspace)
-	// TODO: check errors
+	key, err := cw.base.Workspace(namespace, workspace)
+	if err != nil {
+		return wsdb.ObjectKey{}, err
+	}
 	cw.cache.InsertEntities(namespace, workspace)
-	return key
+	return key, nil
 }
 
-func (cw *cacheWsdb) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
-	workspace string, currentRootID quantumfs.ObjectKey,
-	newRootID quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+func (cw *cacheWsdb) AdvanceWorkspace(namespace string,
+	workspace string, currentRootID wsdb.ObjectKey,
+	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
 	start := time.Now()
 	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()
 
-	key, err := cw.base.AdvanceWorkspace(c, namespace,
+	key, err := cw.base.AdvanceWorkspace(namespace,
 		workspace, currentRootID, newRootID)
 	if err != nil {
 		return key, err
@@ -148,9 +158,9 @@ func wsdbFetcherImpl(arg interface{}, entityPath ...string) map[string]bool {
 	var list []string
 	switch len(entityPath) {
 	case 0:
-		list = cw.base.NamespaceList(nil)
+		list, _ = cw.base.NamespaceList()
 	case 1:
-		list = cw.base.WorkspaceList(nil, entityPath[0])
+		list, _ = cw.base.WorkspaceList(entityPath[0])
 	default:
 		panic("unsupported entityPath depth")
 	}

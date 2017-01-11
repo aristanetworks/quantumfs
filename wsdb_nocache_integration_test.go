@@ -8,7 +8,7 @@ package cql
 import (
 	"testing"
 
-	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -26,7 +26,7 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	err = SetupTestSchema(confFile)
 	suite.Require().NoError(err, "SetupSchema returned an error")
 
-	var wsdb quantumfs.WorkspaceDB
+	var wsdb wsdb.WorkspaceDB
 	cluster := NewRealCluster(cfg.Cluster)
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
@@ -37,15 +37,15 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	}
 }
 
-func (suite *wsdbNoCacheIntegTestSuite) TestCacheIntegEmptyDB() {
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegEmptyDB() {
 	suite.common.TestIntegEmptyDB()
 }
 
-func (suite *wsdbNoCacheIntegTestSuite) TestCacheIntegBranching() {
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegBranching() {
 	suite.common.TestIntegBranching()
 }
 
-func (suite *wsdbNoCacheIntegTestSuite) TestCacheIntegAdvanceOk() {
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegAdvanceOk() {
 	suite.common.TestIntegAdvanceOk()
 }
 

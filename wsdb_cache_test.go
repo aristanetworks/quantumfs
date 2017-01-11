@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/suite"
 )
@@ -31,7 +30,7 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
 	mockWsdbKeyPut(mockSession, "_null", "null",
-		quantumfs.EmptyWorkspaceKey.Value(), nil)
+		[]byte(nil), nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
@@ -84,17 +83,27 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 	suite.cache.disableCqlRefresh(1 * time.Hour)
 	suite.cache.disableCqlRefresh(1*time.Hour, "_null")
 
-	nsCount := suite.common.wsdb.NumNamespaces(nil)
+	nsCount, err1 := suite.common.wsdb.NumNamespaces()
+	suite.Require().NoError(err1,
+		"NumNamespaces failed: %s", err1)
 	suite.Require().Equal(1, nsCount,
 		"Incorrect number of namespaces in cache: %d", nsCount)
-	nsList := suite.common.wsdb.NamespaceList(nil)
+
+	nsList, err2 := suite.common.wsdb.NamespaceList()
+	suite.Require().NoError(err2,
+		"NamespaceList failed: %s", err2)
 	suite.Require().Contains(nsList, "_null",
 		"Incorrect namespaces in cache")
 
-	wsCount := suite.common.wsdb.NumWorkspaces(nil, "_null")
+	wsCount, err3 := suite.common.wsdb.NumWorkspaces("_null")
+	suite.Require().NoError(err3,
+		"NumWorkspaces failed: %s", err3)
 	suite.Require().Equal(1, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
-	wsList := suite.common.wsdb.WorkspaceList(nil, "_null")
+
+	wsList, err4 := suite.common.wsdb.WorkspaceList("_null")
+	suite.Require().NoError(err4,
+		"WorkspaceList failed: %s", err4)
 	suite.Require().Equal([]string{"null"}, wsList,
 		"Incorrect workspaces in cache")
 
@@ -119,7 +128,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 
 	suite.cache.enableCqlRefresh()
 
-	nsCount := suite.common.wsdb.NumNamespaces(nil)
+	nsCount, err1 := suite.common.wsdb.NumNamespaces()
+	suite.Require().NoError(err1, "NumNamespace failed: %s", err1)
 	suite.Require().Equal(2, nsCount,
 		"Incorrect number of namespaces in cache: %d", nsCount)
 
@@ -131,7 +141,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 	nsIter.Reset()
 	wsIter.Reset()
 
-	nsList := suite.common.wsdb.NamespaceList(nil)
+	nsList, err2 := suite.common.wsdb.NamespaceList()
+	suite.Require().NoError(err2, "NamespaceList failed: %s", err2)
 	suite.Require().Contains(nsList, "_null",
 		"Incorrect namespaces in cache")
 	suite.Require().Contains(nsList, "remoteNS",
@@ -140,14 +151,16 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 	nsIter.Reset()
 	wsIter.Reset()
 
-	wsCount := suite.common.wsdb.NumWorkspaces(nil, "remoteNS")
+	wsCount, err3 := suite.common.wsdb.NumWorkspaces("remoteNS")
+	suite.Require().NoError(err3, "NumWorkspaces failed: %s", err3)
 	suite.Require().Equal(1, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
 
 	nsIter.Reset()
 	wsIter.Reset()
 
-	wsList := suite.common.wsdb.WorkspaceList(nil, "remoteNS")
+	wsList, err4 := suite.common.wsdb.WorkspaceList("remoteNS")
+	suite.Require().NoError(err4, "WorkspaceList failed: %s", err4)
 	suite.Require().Equal([]string{"remoteWS"}, wsList,
 		"Incorrect workspaces in cache")
 }
@@ -172,7 +185,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 
 	suite.cache.enableCqlRefresh()
 
-	nsCount := suite.common.wsdb.NumNamespaces(nil)
+	nsCount, err1 := suite.common.wsdb.NumNamespaces()
+	suite.Require().NoError(err1, "NumNamespaces failed: %s", err1)
 	suite.Require().Equal(2, nsCount,
 		"Incorrect number of namespaces in cache: %d", nsCount)
 
@@ -184,7 +198,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 	nsIter.Reset()
 	wsIter.Reset()
 
-	wsCount := suite.common.wsdb.NumWorkspaces(nil, "remoteNS")
+	wsCount, err2 := suite.common.wsdb.NumWorkspaces("remoteNS")
+	suite.Require().NoError(err2, "NumWorkspaces failed: %s", err2)
 	suite.Require().Equal(2, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
 
@@ -202,7 +217,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 
 	suite.cache.enableCqlRefresh("remoteNS")
 
-	wsList := suite.common.wsdb.WorkspaceList(nil, "remoteNS")
+	wsList, err3 := suite.common.wsdb.WorkspaceList("remoteNS")
+	suite.Require().NoError(err3, "WorkspaceList failed: %s", err3)
 	suite.Require().Equal([]string{"remoteWS2"}, wsList,
 		"Incorrect workspaces in cache")
 
@@ -212,20 +228,21 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 
 	// newly branched workspace must be in cache
 	mockBranchWorkspace(suite.common.mockSess, "_null", "null",
-		"test", "a", quantumfs.EmptyWorkspaceKey.Value(),
-		gocql.ErrNotFound)
+		"test", "a", []byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace(nil, "_null", "null", "test", "a")
+	err := suite.common.wsdb.BranchWorkspace("_null", "null", "test", "a")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	// disable fetches from DB so that cache state is unchanged
 	suite.cache.disableCqlRefresh(1 * time.Hour)
 	suite.cache.disableCqlRefresh(1*time.Hour, "test")
 
-	nsCount := suite.common.wsdb.NumNamespaces(nil)
+	nsCount, err1 := suite.common.wsdb.NumNamespaces()
+	suite.Require().NoError(err1, "NumNamespaces failed: %s", err1)
 	suite.Require().Equal(2, nsCount,
 		"Incorrect number of namespaces in cache: %d", nsCount)
-	nsList := suite.common.wsdb.NamespaceList(nil)
+	nsList, err2 := suite.common.wsdb.NamespaceList()
+	suite.Require().NoError(err2, "NamespaceList failed: %s", err2)
 	// use Contains since order of elements within a list can change
 	// as map traversal doesn't ensure order
 	suite.Require().Contains(nsList, "_null",
@@ -233,10 +250,12 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 	suite.Require().Contains(nsList, "test",
 		"Incorrect namespaces in cache")
 
-	wsCount := suite.common.wsdb.NumWorkspaces(nil, "test")
+	wsCount, err3 := suite.common.wsdb.NumWorkspaces("test")
+	suite.Require().NoError(err3, "NumWorkspaces failed: %s", err3)
 	suite.Require().Equal(1, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
-	wsList := suite.common.wsdb.WorkspaceList(nil, "test")
+	wsList, err4 := suite.common.wsdb.WorkspaceList("test")
+	suite.Require().NoError(err4, "WorkspaceList failed: %s", err4)
 	suite.Require().Equal([]string{"a"}, wsList,
 		"Incorrect workspaces in cache")
 }
@@ -267,7 +286,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList = suite.common.wsdb.WorkspaceList(nil, "_null")
+		wsList, _ = suite.common.wsdb.WorkspaceList("_null")
 	}()
 
 	// wait for fetch to stall
@@ -276,11 +295,10 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	// fetched data contains null and specialWS workspaces for _null
 	// namespace
 	mockBranchWorkspace(suite.common.mockSess, "_null", "null",
-		"_null", "ws1", quantumfs.EmptyWorkspaceKey.Value(),
-		gocql.ErrNotFound)
+		"_null", "ws1", []byte(nil), gocql.ErrNotFound)
 
 	// causes a local insert of ws1 workspace for _null namespace
-	err := suite.common.wsdb.BranchWorkspace(nil, "_null", "null", "_null", "ws1")
+	err := suite.common.wsdb.BranchWorkspace("_null", "null", "_null", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	// unpause the DB fetch
@@ -323,7 +341,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList = suite.common.wsdb.WorkspaceList(nil, "_null")
+		wsList, _ = suite.common.wsdb.WorkspaceList("_null")
 	}()
 
 	// wait for fetch to stall
@@ -367,7 +385,7 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList = suite.common.wsdb.WorkspaceList(nil, "_null")
+		wsList, _ = suite.common.wsdb.WorkspaceList("_null")
 	}()
 
 	// wait for fetch to stall
@@ -398,17 +416,15 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 
 	mockBranchWorkspace(suite.common.mockSess, "_null", "null",
-		"test", "a", quantumfs.EmptyWorkspaceKey.Value(),
-		gocql.ErrNotFound)
+		"test", "a", []byte(nil), gocql.ErrNotFound)
 
 	mockBranchWorkspace(suite.common.mockSess, "_null", "null",
-		"test", "b", quantumfs.EmptyWorkspaceKey.Value(),
-		gocql.ErrNotFound)
+		"test", "b", []byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace(nil, "_null", "null", "test", "a")
+	err := suite.common.wsdb.BranchWorkspace("_null", "null", "test", "a")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
-	err = suite.common.wsdb.BranchWorkspace(nil, "_null", "null", "test", "b")
+	err = suite.common.wsdb.BranchWorkspace("_null", "null", "test", "b")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{{"a"}, {"b"}}
@@ -427,7 +443,7 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList = suite.common.wsdb.WorkspaceList(nil, "test")
+		wsList, _ = suite.common.wsdb.WorkspaceList("test")
 	}()
 
 	// wait for fetch to stall
@@ -454,10 +470,9 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	// The list of workspaces must be empty due to parent detachment
 	// detection
 	mockBranchWorkspace(suite.common.mockSess, "_null", "null",
-		"test", "a", quantumfs.EmptyWorkspaceKey.Value(),
-		gocql.ErrNotFound)
+		"test", "a", []byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace(nil, "_null", "null", "test", "a")
+	err := suite.common.wsdb.BranchWorkspace("_null", "null", "test", "a")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{{"null"}}
@@ -476,7 +491,7 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList = suite.common.wsdb.WorkspaceList(nil, "_null")
+		wsList, _ = suite.common.wsdb.WorkspaceList("_null")
 	}()
 
 	// wait for fetch to stall

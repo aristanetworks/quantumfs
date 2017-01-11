@@ -6,7 +6,6 @@ package cql
 import (
 	"testing"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -26,8 +25,7 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockWsdbKeyPut(mockSession, "_null", "null",
-		quantumfs.EmptyWorkspaceKey.Value(), nil)
+	mockWsdbKeyPut(mockSession, "_null", "null", []byte(nil), nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{

@@ -9,9 +9,10 @@ package cql
 // this implementation
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
-	"github.com/aristanetworks/quantumfs"
+
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/gocql/gocql"
 )
 
@@ -20,7 +21,7 @@ type noCacheWsdb struct {
 	keyspace string
 }
 
-func newNoCacheWsdb(cluster Cluster, cfg *Config) (quantumfs.WorkspaceDB, error) {
+func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 	var store cqlStore
 	var err error
 
@@ -34,7 +35,7 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (quantumfs.WorkspaceDB, error)
 		keyspace: cfg.Cluster.KeySpace,
 	}
 
-	err = wsdb.wsdbKeyPut("_null", "null", quantumfs.EmptyWorkspaceKey.Value())
+	err = wsdb.wsdbKeyPut("_null", "null", []byte(nil))
 	if err != nil {
 		return nil, err
 	}
@@ -44,98 +45,150 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (quantumfs.WorkspaceDB, error)
 
 // --- workspace DB API implementation ---
 
-func (nc *noCacheWsdb) NumNamespaces(c *quantumfs.Ctx) int {
+func (nc *noCacheWsdb) NumNamespaces() (int, error) {
 	count, _, err := nc.fetchDBNamespaces()
 	if err != nil {
-		return 0
+		return 0, wsdb.NewError(wsdb.ErrFatal,
+			"during NumNamespaces: %s", err.Error())
 	}
-	return count
+	return count, nil
 }
 
-func (nc *noCacheWsdb) NamespaceList(c *quantumfs.Ctx) []string {
+func (nc *noCacheWsdb) NamespaceList() ([]string, error) {
 	_, list, err := nc.fetchDBNamespaces()
 	if err != nil {
-		return nil
+		return list, wsdb.NewError(wsdb.ErrFatal,
+			"during NamespaceList: %s", err.Error())
 	}
-	return list
+	return list, nil
 }
 
-func (nc *noCacheWsdb) NumWorkspaces(c *quantumfs.Ctx, namespace string) int {
+func (nc *noCacheWsdb) NumWorkspaces(namespace string) (int, error) {
 	count, _, err := nc.fetchDBWorkspaces(namespace)
 	if err != nil {
-		return 0
+		return 0, wsdb.NewError(wsdb.ErrFatal,
+			"during NumWorkspaces %s : %s",
+			namespace, err.Error())
 	}
-	return count
+	return count, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceList(c *quantumfs.Ctx, namespace string) []string {
+func (nc *noCacheWsdb) WorkspaceList(namespace string) ([]string, error) {
 	_, list, err := nc.fetchDBWorkspaces(namespace)
 	if err != nil {
-		return nil
+		return list, wsdb.NewError(wsdb.ErrFatal,
+			"during WorkspaceList %s : %s",
+			namespace, err.Error())
 	}
-	return list
+	return list, nil
 }
 
-func (nc *noCacheWsdb) NamespaceExists(c *quantumfs.Ctx, namespace string) bool {
-	return nc.wsdbNamespaceExists(namespace)
+func (nc *noCacheWsdb) NamespaceExists(namespace string) (bool, error) {
+	exists, err := nc.wsdbNamespaceExists(namespace)
+	if err != nil {
+		return exists, wsdb.NewError(wsdb.ErrFatal,
+			"during NamespaceExists %s : %s", namespace, err.Error())
+	}
+
+	return exists, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceExists(c *quantumfs.Ctx, namespace string,
-	workspace string) bool {
+func (nc *noCacheWsdb) WorkspaceExists(namespace string,
+	workspace string) (bool, error) {
 
-	_, present := nc.wsdbKeyGet(namespace, workspace)
-	return present
+	_, present, err := nc.wsdbKeyGet(namespace, workspace)
+	if err != nil {
+		return present, wsdb.NewError(wsdb.ErrFatal,
+			"during WorkspaceExists %s/%s : %s",
+			namespace, workspace, err.Error())
+	}
+
+	return present, nil
 }
 
-func (nc *noCacheWsdb) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
+func (nc *noCacheWsdb) BranchWorkspace(srcNamespace string,
 	srcWorkspace string, dstNamespace string, dstWorkspace string) error {
 
-	key, present := nc.wsdbKeyGet(srcNamespace, srcWorkspace)
+	key, present, err := nc.wsdbKeyGet(srcNamespace, srcWorkspace)
+	if err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Get in BranchWorkspace %s/%s : %s ",
+			srcNamespace, srcWorkspace,
+			err.Error())
+	}
 
 	if !present {
-		return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_NOT_FOUND)
+		return wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+			"cannot branch workspace: %s/%s", srcNamespace, srcWorkspace)
 	}
 
 	// branching to an existing workspace shouldn't be allowed
-	// TODO: define an explicit error WSDB_WORKSPACE_EXISTS
-	_, present = nc.wsdbKeyGet(dstNamespace, dstWorkspace)
+	_, present, err = nc.wsdbKeyGet(dstNamespace, dstWorkspace)
+	if err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Get in BranchWorkspace %s/%s : %s",
+			dstNamespace, dstWorkspace,
+			err.Error())
+	}
+
 	if present {
-		return errors.New("Workspace already exists")
+		return wsdb.NewError(wsdb.ErrWorkspaceExists,
+			"cannot branch workspace: %s/%s", dstNamespace, dstWorkspace)
 	}
 
-	return nc.wsdbKeyPut(dstNamespace, dstWorkspace, key)
+	if err = nc.wsdbKeyPut(dstNamespace, dstWorkspace, key); err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Put in BranchWorkspace %s/%s : %s",
+			dstNamespace, dstWorkspace,
+			err.Error())
+	}
+
+	return nil
 }
 
-func (nc *noCacheWsdb) Workspace(c *quantumfs.Ctx, namespace string,
-	workspace string) quantumfs.ObjectKey {
+func (nc *noCacheWsdb) Workspace(namespace string,
+	workspace string) (wsdb.ObjectKey, error) {
 
-	key, present := nc.wsdbKeyGet(namespace, workspace)
-
-	if !present {
-		panic("workspace not found in Workspace()")
+	key, present, err := nc.wsdbKeyGet(namespace, workspace)
+	if err != nil {
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
+			"during Get in Workspace %s/%s : %s",
+			namespace, workspace, err.Error())
 	}
 
-	objKey := quantumfs.NewObjectKeyFromBytes(key)
-	return objKey
+	if !present {
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+			"during Workspace %s/%s", namespace, workspace)
+	}
+
+	return key, nil
 }
 
-func (nc *noCacheWsdb) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
-	workspace string, currentRootID quantumfs.ObjectKey,
-	newRootID quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+func (nc *noCacheWsdb) AdvanceWorkspace(namespace string,
+	workspace string, currentRootID wsdb.ObjectKey,
+	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
-	key, present := nc.wsdbKeyGet(namespace, workspace)
+	key, present, err := nc.wsdbKeyGet(namespace, workspace)
+	if err != nil {
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
+			"during Get in AdvanceWorkspace %s/%s : %s",
+			namespace, workspace, err.Error())
+	}
+
 	if !present {
-		return quantumfs.ObjectKey{}, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_NOT_FOUND)
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+			"cannot advance workspace %s/%s", namespace, workspace)
 	}
 
-	objKey := quantumfs.NewObjectKeyFromBytes(key)
-
-	if !currentRootID.IsEqualTo(objKey) {
-		return quantumfs.ObjectKey{}, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE)
+	if !bytes.Equal(currentRootID, key) {
+		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
+			"cannot advance workspace %s/%s", currentRootID, key)
 	}
 
-	if err := nc.wsdbKeyPut(namespace, workspace, newRootID.Value()); err != nil {
-		panic(fmt.Sprintf("Panic advancing rootID: %v", err))
+	if err := nc.wsdbKeyPut(namespace, workspace, newRootID); err != nil {
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
+			"during Put in AdvanceWorkspace %s/%s : %s",
+			namespace, workspace, err.Error())
 	}
 
 	return newRootID, nil
@@ -143,7 +196,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
 
 // --- helper routines ---
 
-func (nc *noCacheWsdb) wsdbNamespaceExists(namespace string) bool {
+func (nc *noCacheWsdb) wsdbNamespaceExists(namespace string) (bool, error) {
 	qryStr := fmt.Sprintf(`
 SELECT namespace
 FROM %s.workspacedb
@@ -156,13 +209,12 @@ WHERE namespace = ? LIMIT 1`, nc.keyspace)
 	if err != nil {
 		switch err {
 		case gocql.ErrNotFound:
-			return false
+			return false, nil
 		default:
-			// TODO: handle error gracefully but how?
-			panic(fmt.Sprintf("Error %q in NamespaceExists ", err))
+			return false, err
 		}
 	} else {
-		return true
+		return true, nil
 	}
 
 }
@@ -211,7 +263,9 @@ WHERE namespace = ?`, nc.keyspace)
 	return count, workspaceList, nil
 }
 
-func (nc *noCacheWsdb) wsdbKeyGet(namespace string, workspace string) (key []byte, present bool) {
+func (nc *noCacheWsdb) wsdbKeyGet(namespace string,
+	workspace string) (key []byte, present bool, err error) {
+
 	qryStr := fmt.Sprintf(`
 SELECT key
 FROM %s.workspacedb
@@ -219,16 +273,16 @@ WHERE namespace = ? AND workspace = ?`, nc.keyspace)
 
 	query := nc.store.session.Query(qryStr, namespace, workspace)
 
-	err := query.Scan(&key)
+	err = query.Scan(&key)
 	if err != nil {
 		switch err {
 		case gocql.ErrNotFound:
-			return nil, false
+			return nil, false, nil
 		default:
-			panic(fmt.Sprintf("Error %q during wsdbKeyGet", err))
+			return nil, false, err
 		}
 	} else {
-		return key, true
+		return key, true, nil
 	}
 }
 
