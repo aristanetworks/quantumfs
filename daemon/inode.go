@@ -187,10 +187,17 @@ func (inode *InodeCommon) isDirty() bool {
 
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
-	defer inode.dirtyElementLock.Lock().Unlock()
+	inode.dirtyElementLock.Lock()
+	de := inode.dirtyElement_
+	inode.dirtyElementLock.Unlock()
 
-	if inode.dirtyElement_ == nil {
-		inode.dirtyElement_ = c.qfs.queueDirtyInode(c, inode.self)
+	if de == nil {
+		de = c.qfs.queueDirtyInode(c, inode.self)
+
+		// queueDirtyInode requests the dirtyElement so we cannot hold the
+		// dirtyElementLock over that call.
+		defer inode.dirtyElementLock.Lock().Unlock()
+		inode.dirtyElement_ = de
 	}
 }
 
@@ -207,9 +214,10 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (inode *InodeCommon) queueToForget(c *ctx) {
-	defer inode.dirtyElementLock.Lock().Unlock()
+	de := c.qfs.queueInodeToForget(c, inode.self)
 
-	inode.dirtyElement_ = c.qfs.queueInodeToForget(c, inode.self)
+	defer inode.dirtyElementLock.Lock().Unlock()
+	inode.dirtyElement_ = de
 }
 
 func (inode *InodeCommon) dirtyElement() *list.Element {
