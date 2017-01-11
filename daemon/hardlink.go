@@ -4,6 +4,7 @@
 package daemon
 
 import "encoding/binary"
+import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -64,7 +65,8 @@ func (link *Hardlink) SetID(v quantumfs.ObjectKey) {
 	decodedId := decodeHardlinkKey(v)
 
 	if decodedId != link.linkId {
-		panic("Change of ID attempted on Hardlink")
+		panic(fmt.Sprintf("Change of ID attempted on Hardlink to %d",
+			decodedId))
 	}
 }
 

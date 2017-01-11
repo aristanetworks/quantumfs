@@ -118,7 +118,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := func() InodeId {
 				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.newChild(c, baseLayer.Entry(i),
+				return dir.children.loadChild(c, baseLayer.Entry(i),
 					wsr)
 			}()
 			c.vlog("initDirectory %d getting child %d", inodeNum,
@@ -1556,6 +1556,12 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 			inodeNum))
 	}
 
+	return dir.recordToChild(c, inodeNum, entry)
+}
+
+func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
+	entry DirectoryRecordIf) (Inode, []InodeId) {
+
 	c.vlog("Instantiate %s %d", entry.Filename(), inodeNum)
 
 	var constructor InodeConstructor
@@ -1685,7 +1691,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	defer dir.childRecordLock.Lock().Unlock()
-	inodeNum := dir.children.newChild(c, entry, dir.wsr)
+	inodeNum := dir.children.loadChild(c, entry, dir.wsr)
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }

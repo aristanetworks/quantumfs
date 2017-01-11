@@ -130,23 +130,70 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	wsr.inodeToLink[inodeId] = newId
 
 	// Fix the inode to use the wsr as direct parent
-	inode := c.qfs.inode(c, inodeId)
-	inode.setParent(wsr.inodeNum())
+	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+	if inode == nil {
+		c.qfs.addUninstantiated(c, []InodeId{inodeId}, wsr.inodeNum())
+	} else {
+		inode.setParent(wsr.inodeNum())
+	}
 
 	wsr.dirty(c)
 
 	return newHardlink(record.Filename(), newId, wsr)
 }
 
-func (wsr *WorkspaceRoot) getHardlinkInodeId(linkId uint64) InodeId {
+func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
+	[]InodeId) {
+
+	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
+	defer c.vlog("Directory::instantiateChild Exit")
+
+	hardlinkRecord := func () *quantumfs.DirectoryRecord {
+		defer wsr.linkLock.Lock().Unlock()
+
+		id, exists := wsr.inodeToLink[inodeNum]
+		if !exists {
+			return nil
+		}
+
+		c.dlog("Instantiating hardlink %d", id)
+		return wsr.hardlinks[id]
+	}()
+	if hardlinkRecord != nil {
+		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
+	}
+
+	// This isn't a hardlink, so proceed as normal
+	defer wsr.Directory.childRecordLock.Lock().Unlock()
+
+	entry := wsr.Directory.children.record(inodeNum)
+	if entry == nil {
+		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
+			inodeNum))
+	}
+
+	return wsr.recordToChild(c, inodeNum, entry)
+}
+
+func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId uint64) InodeId {
 	defer wsr.linkLock.RLock().RUnlock()
+
+	// Ensure the linkId is valid
+	if _, exists := wsr.hardlinks[linkId]; !exists {
+		panic("Invalid hardlinkId in system")
+	}
 
 	inode, exists := wsr.linkToInode[linkId]
 	if exists {
 		return inode
 	}
 
-	return quantumfs.InodeIdInvalid
+	// we need to load this Hardlink partially - giving it an inode number
+	inodeId := c.qfs.newInodeId()
+	wsr.linkToInode[linkId] = inodeId
+	wsr.inodeToLink[inodeId] = linkId
+
+	return inodeId
 }
 
 // Return a snapshot / instance so that it's concurrency safe
@@ -316,7 +363,29 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	c.vlog("WorkspaceRoot::syncChild Enter")
 	defer c.vlog("WorkspaceRoot::syncChild Exit")
-	wsr.Directory.syncChild(c, inodeNum, newKey)
+
+	isHardlink, linkId := wsr.checkHardlink(inodeNum)
+
+	if isHardlink {
+		func () {
+			defer wsr.Directory.Lock().Unlock()
+			wsr.Directory.self.dirty(c)
+
+			defer wsr.linkLock.Lock().Unlock()
+			entry := wsr.hardlinks[linkId]
+			if entry == nil {
+				panic("isHardlink but hardlink not set")
+			}
+
+			entry.SetID(newKey)
+
+			defer wsr.Directory.childRecordLock.Lock().Unlock()
+			wsr.Directory.publish_(c)
+		}()
+	} else {
+		wsr.Directory.syncChild(c, inodeNum, newKey)
+	}
+
 	wsr.publish(c)
 }
 
