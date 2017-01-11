@@ -76,8 +76,7 @@ type Inode interface {
 
 	getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error)
 
-	// Update the key for only this child and then notify all the grandparents of
-	// the cascading changes.
+	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
 	getChildXAttrSize(c *ctx, inodeNum InodeId,

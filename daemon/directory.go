@@ -1220,25 +1220,18 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	defer c.FuncIn("Directory::syncChild", "(%d %d) %s", dir.inodeNum(),
 		inodeNum, newKey.String()).out()
 
-	ok, key := func() (bool, quantumfs.ObjectKey) {
-		defer dir.Lock().Unlock()
-		dir.self.dirty(c)
-		defer dir.childRecordLock.Lock().Unlock()
+	defer dir.Lock().Unlock()
+	dir.self.dirty(c)
+	defer dir.childRecordLock.Lock().Unlock()
 
-		entry := dir.children.record(inodeNum)
-		if entry == nil {
-			c.elog("Directory::syncChild inode %d not a valid child",
-				inodeNum)
-			return false, quantumfs.ObjectKey{}
-		}
-
-		entry.SetID(newKey)
-		return true, dir.publish_(c)
-	}()
-
-	if ok && !dir.self.isWorkspaceRoot() {
-		dir.parent(c).syncChild(c, dir.InodeCommon.id, key)
+	entry := dir.children.record(inodeNum)
+	if entry == nil {
+		c.elog("Directory::syncChild inode %d not a valid child",
+			inodeNum)
+		return
 	}
+
+	entry.SetID(newKey)
 }
 
 // Get the extended attributes object. The status is EIO on error or ENOENT if there
