@@ -19,7 +19,7 @@ func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush_DOWN", "%s", fi.name_).out()
 
 	key := fi.accessor.sync(c)
-	// TODO Update parent?
+	fi.parent(c).syncChild(c, fi.inodeNum(), key)
 	return key
 }
 
@@ -32,8 +32,7 @@ func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
 
 	defer fd.file.Lock().Unlock()
 	if fd.file.isDirty() {
-		key := fd.file.flush_DOWN(c)
-		fd.file.parent(c).syncChild(c, fd.file.InodeCommon.id, key)
+		fd.file.flush_DOWN(c)
 	}
 
 	return fuse.OK

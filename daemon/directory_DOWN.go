@@ -60,23 +60,11 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	dir.updateRecords_DOWN_(c)
-	return dir.publish_(c)
-}
+	dir.publish_(c)
 
-// Walk the list of children which are dirty and have them recompute their new key
-// wsr can update its new key.
-//
-// Requires the Inode lock and childRecordLock
-func (dir *Directory) updateRecords_DOWN_(c *ctx) {
-	defer c.funcIn("Directory::updateRecords_DOWN_").out()
+	dir.parent(c).syncChild(c, dir.inodeNum(), dir.baseLayerId)
 
-	dirtyIds := dir.children.popDirty()
-	for _, childId := range dirtyIds {
-		child := c.qfs.inodeNoInstantiate(c, childId)
-		newKey := child.flush_DOWN(c)
-		dir.children.record(childId).SetID(newKey)
-	}
+	return dir.baseLayerId
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
@@ -92,7 +80,11 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	fuse.Status) {
 
 	// Update the Hash value before generating the key
-	dir.flush_DOWN(c)
+	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
+		// Since the child is instantiated it may be modified, flush is to be
+		// sure
+		childInode.flush_DOWN(c)
+	}
 
 	// flush_DOWN already acquired an Inode lock exclusively. In case of the
 	// dead lock, the Inode lock for reading should be required after releasing
