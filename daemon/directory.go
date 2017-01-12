@@ -155,7 +155,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 	defer c.funcIn("Directory::updateSize_").out()
 
 	// We think we've made a change to this directory, so we should mark it dirty
-	dir.self.dirty()
+	dir.self.dirty(c)
 
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
