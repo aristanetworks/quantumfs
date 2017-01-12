@@ -52,11 +52,6 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush_DOWN", "%d %s", dir.inodeNum(),
 		dir.name_).out()
 
-	if !dir.isDirty() {
-		c.vlog("directory %s not dirty", dir.name_)
-		return dir.baseLayerId
-	}
-
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
