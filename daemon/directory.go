@@ -565,6 +565,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
+	newEntity.dirty(c)
 	newEntity.markSelfAccessed(c, true)
 
 	return newEntity
