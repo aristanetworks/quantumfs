@@ -166,3 +166,23 @@ func TestHardlinkConversion(t *testing.T) {
 		test.assert(!exists, "hardlink not converted back to file")
 	})
 }
+
+func TestHardlinkChain(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		linkFile2 := workspace + "/testLink2"
+		err = syscall.Link(linkFile, linkFile2)
+		test.assertNoErr(err)
+	})
+}
