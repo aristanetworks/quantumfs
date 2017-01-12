@@ -26,7 +26,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		return fuse.EINVAL
 	}
 
-	newRecord, err := srcParent.makeHardlink_DOWN(c, dir.wsr, srcInode)
+	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
 	if err != fuse.OK {
 		c.elog("QuantumFs::Link Failed with srcInode record")
 		return err
@@ -40,7 +40,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, newRecord, dir.wsr)
+		return dir.children.loadChild(c, newRecord)
 	}()
 
 	dir.self.markAccessed(c, newName, true)
@@ -143,7 +143,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	return currDir, nil
 }
 
-func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
+func (dir *Directory) makeHardlink_DOWN(c *ctx,
 	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
 
 	defer dir.Lock().Unlock()
@@ -159,5 +159,5 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 	dir.children.clearDirty(toLink.inodeNum())
 
 	dir.self.dirty(c)
-	return dir.children.makeHardlink_DOWN(c, wsr, record.Filename())
+	return dir.children.makeHardlink_DOWN(c, record.Filename())
 }
