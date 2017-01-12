@@ -158,12 +158,21 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 		// If we've been directed to flushAll, use that caller's context
 		c := flusherContext
 
+		sleepTime := nextExpiringInode.Sub(time.Now())
+
+		c.vlog("Waiting until %s (%s)...", nextExpiringInode.String(),
+			sleepTime.String())
+
 		select {
 		case stop = <-quit:
+			c.vlog("flusher woken up due to stop")
 		case <-qfs.kickFlush:
+			c.vlog("flusher woken up due to kick")
 		case c = <-qfs.flushAll:
 			flushAll = true
-		case <-time.After(time.Now().Sub(nextExpiringInode)):
+			c.vlog("flusher woken up due to syncAll")
+		case <-time.After(sleepTime):
+			c.vlog("flusher woken up due to timer")
 		}
 
 		nextExpiringInode = func() time.Time {
@@ -194,6 +203,9 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 			defer key.RUnlock()
 			earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
 			if earliestNext.Before(nextExpiringInode) {
+				c.vlog("changing next time from %s to %s",
+					nextExpiringInode.String(),
+					earliestNext.String())
 				nextExpiringInode = earliestNext
 			}
 		}()
@@ -214,7 +226,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 
 	for dirtyList.Len() > 0 {
 		// Should we clean this inode?
-		candidate := dirtyList.Front().Value.(dirtyInode)
+		candidate := dirtyList.Front().Value.(*dirtyInode)
 
 		now := time.Now()
 		if !flushAll && candidate.expiryTime.After(now) {
@@ -273,7 +285,7 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 	dirtyElement := inode.dirtyElement()
 	if dirtyElement == nil {
 		// This inode wasn't in the dirtyQueue so add it now
-		dirtyNode := &dirtyInode{
+		dirtyNode = &dirtyInode{
 			inode:               inode,
 			shouldUninstantiate: shouldUninstantiate,
 		}
@@ -294,6 +306,8 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 			// dirtyInode.expiryTime will be the epoch
 			dirtyElement = dirtyList.PushFront(dirtyNode)
 		}
+	} else {
+		dirtyNode = dirtyElement.Value.(*dirtyInode)
 	}
 
 	if shouldUninstantiate {
