@@ -10,7 +10,6 @@ import "io/ioutil"
 import "math"
 import "runtime/debug"
 import "syscall"
-import "sync"
 import "sync/atomic"
 import "time"
 
