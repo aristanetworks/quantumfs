@@ -179,11 +179,11 @@ func abortFuse(th *testHelper) {
 	if err != nil {
 		// We cannot abort so we won't terminate. We are
 		// truly wedged.
-		panic("Failed to abort FUSE connection (open)")
+		th.log("ERROR: Failed to abort FUSE connection (open)")
 	}
 
 	if _, err := abort.Write([]byte("1")); err != nil {
-		panic("Failed to abort FUSE connection (write)")
+		th.log("ERROR: Failed to abort FUSE connection (write)")
 	}
 
 	abort.Close()
@@ -253,7 +253,7 @@ func (th *testHelper) waitToBeUnmounted() {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	panic("Filesystem didn't unmount in time")
+	th.log("ERROR: Filesystem didn't unmount in time")
 }
 
 // Repeatedly check the condition by calling the function until that function returns
@@ -550,7 +550,7 @@ func (th *testHelper) syncAllWorkspaces() {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	th.qfs.mapMutex.Lock()
+	defer th.qfs.mapMutex.Lock().Unlock()
 
 	for _, file := range th.qfs.fileHandles {
 		fh, ok := file.(*FileDescriptor)
@@ -562,8 +562,6 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 			handles = append(handles, fh)
 		}
 	}
-
-	th.qfs.mapMutex.Unlock()
 
 	return handles
 }
@@ -639,7 +637,7 @@ func TestMain(m *testing.M) {
 	//
 	// Because the filesystem request is blocked waiting on GC and the syscall
 	// will never return to allow GC to progress, the test program is deadlocked.
-	debug.SetGCPercent(-1)
+	origGC := debug.SetGCPercent(-1)
 
 	// Precompute a bunch of our genData to save time during tests
 	genData(40 * 1024 * 1024)
@@ -649,10 +647,29 @@ func TestMain(m *testing.M) {
 
 	result := m.Run()
 
-	testSummary := ""
+	// We've finished running the tests and are about to do the full logscan.
+	// This create a tremendous amount of garbage, so we must enable garbage
+	// collection.
+	runtime.GC()
+	debug.SetGCPercent(origGC)
+
 	errorMutex.Lock()
+	fullLogs := make(chan string, len(errorLogs))
+	var logProcessing sync.WaitGroup
 	for i := 0; i < len(errorLogs); i++ {
-		testSummary += outputLogError(errorLogs[i])
+		logProcessing.Add(1)
+		go func(i int) {
+			defer logProcessing.Done()
+			testSummary := outputLogError(errorLogs[i])
+			fullLogs <- testSummary
+		}(i)
+	}
+
+	logProcessing.Wait()
+	close(fullLogs)
+	testSummary := ""
+	for summary := range fullLogs {
+		testSummary += summary
 	}
 	errorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
