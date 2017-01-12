@@ -37,7 +37,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
 		dirtyQueue:             make(map[*sync.RWMutex]*list.List),
-		kickFlush:              make(chan struct{}, 10),
+		kickFlush:              make(chan struct{}, 1),
 		flushAll:               make(chan *ctx),
 		flushComplete:          make(chan struct{}),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -279,45 +279,47 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d su %t sw %t",
 		inode.inodeNum(), shouldUninstantiate, shouldWait)
 
-	dirtyElement := func() *list.Element {
-		defer qfs.dirtyQueueLock.Lock().Unlock()
+	defer qfs.dirtyQueueLock.Lock().Unlock()
 
-		var dirtyNode *dirtyInode
-		dirtyElement := inode.dirtyElement()
-		if dirtyElement == nil {
-			// This inode wasn't in the dirtyQueue so add it now
-			dirtyNode = &dirtyInode{
-				inode:               inode,
-				shouldUninstantiate: shouldUninstantiate,
-			}
+	var dirtyNode *dirtyInode
+	dirtyElement := inode.dirtyElement()
+	if dirtyElement == nil {
+		// This inode wasn't in the dirtyQueue so add it now
+		dirtyNode = &dirtyInode{
+			inode:               inode,
+			shouldUninstantiate: shouldUninstantiate,
+		}
 
-			treelock := inode.treeLock()
-			dirtyList, ok := qfs.dirtyQueue[treelock]
-			if !ok {
-				dirtyList = list.New()
-				qfs.dirtyQueue[treelock] = dirtyList
-			}
+		treelock := inode.treeLock()
+		dirtyList, ok := qfs.dirtyQueue[treelock]
+		if !ok {
+			dirtyList = list.New()
+			qfs.dirtyQueue[treelock] = dirtyList
+		}
 
-			if shouldWait {
-				dirtyNode.expiryTime =
-					time.Now().Add(qfs.config.DirtyFlushDelay)
+		if shouldWait {
+			dirtyNode.expiryTime =
+				time.Now().Add(qfs.config.DirtyFlushDelay)
 
-				dirtyElement = dirtyList.PushBack(dirtyNode)
-			} else {
-				// dirtyInode.expiryTime will be the epoch
-				dirtyElement = dirtyList.PushFront(dirtyNode)
-			}
+			dirtyElement = dirtyList.PushBack(dirtyNode)
 		} else {
-			dirtyNode = dirtyElement.Value.(*dirtyInode)
+			// dirtyInode.expiryTime will be the epoch
+			dirtyElement = dirtyList.PushFront(dirtyNode)
 		}
+	} else {
+		dirtyNode = dirtyElement.Value.(*dirtyInode)
+	}
 
-		if shouldUninstantiate {
-			dirtyNode.shouldUninstantiate = true
-		}
-		return dirtyElement
-	}()
+	if shouldUninstantiate {
+		dirtyNode.shouldUninstantiate = true
+	}
 
-	qfs.kickFlush <- struct{}{}
+	select {
+	case qfs.kickFlush <- struct{}{}:
+		// We have successfully kicked the flusher
+	default:
+		// Somebody else had kicked the flusher already
+	}
 
 	return dirtyElement
 }
