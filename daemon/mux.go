@@ -279,40 +279,45 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d su %t sw %t",
 		inode.inodeNum(), shouldUninstantiate, shouldWait)
 
-	defer qfs.dirtyQueueLock.Lock().Unlock()
+	dirtyElement := func() *list.Element {
+		defer qfs.dirtyQueueLock.Lock().Unlock()
 
-	var dirtyNode *dirtyInode
-	dirtyElement := inode.dirtyElement()
-	if dirtyElement == nil {
-		// This inode wasn't in the dirtyQueue so add it now
-		dirtyNode = &dirtyInode{
-			inode:               inode,
-			shouldUninstantiate: shouldUninstantiate,
-		}
+		var dirtyNode *dirtyInode
+		dirtyElement := inode.dirtyElement()
+		if dirtyElement == nil {
+			// This inode wasn't in the dirtyQueue so add it now
+			dirtyNode = &dirtyInode{
+				inode:               inode,
+				shouldUninstantiate: shouldUninstantiate,
+			}
 
-		treelock := inode.treeLock()
-		dirtyList, ok := qfs.dirtyQueue[treelock]
-		if !ok {
-			dirtyList = list.New()
-			qfs.dirtyQueue[treelock] = dirtyList
-		}
+			treelock := inode.treeLock()
+			dirtyList, ok := qfs.dirtyQueue[treelock]
+			if !ok {
+				dirtyList = list.New()
+				qfs.dirtyQueue[treelock] = dirtyList
+			}
 
-		if shouldWait {
-			dirtyNode.expiryTime =
-				time.Now().Add(qfs.config.DirtyFlushDelay)
+			if shouldWait {
+				dirtyNode.expiryTime =
+					time.Now().Add(qfs.config.DirtyFlushDelay)
 
-			dirtyElement = dirtyList.PushBack(dirtyNode)
+				dirtyElement = dirtyList.PushBack(dirtyNode)
+			} else {
+				// dirtyInode.expiryTime will be the epoch
+				dirtyElement = dirtyList.PushFront(dirtyNode)
+			}
 		} else {
-			// dirtyInode.expiryTime will be the epoch
-			dirtyElement = dirtyList.PushFront(dirtyNode)
+			dirtyNode = dirtyElement.Value.(*dirtyInode)
 		}
-	} else {
-		dirtyNode = dirtyElement.Value.(*dirtyInode)
-	}
 
-	if shouldUninstantiate {
-		dirtyNode.shouldUninstantiate = true
-	}
+		if shouldUninstantiate {
+			dirtyNode.shouldUninstantiate = true
+		}
+		return dirtyElement
+	}()
+
+	qfs.kickFlush <- struct{}{}
 
 	return dirtyElement
 }
