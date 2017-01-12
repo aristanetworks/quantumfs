@@ -179,11 +179,11 @@ func abortFuse(th *testHelper) {
 	if err != nil {
 		// We cannot abort so we won't terminate. We are
 		// truly wedged.
-		panic("Failed to abort FUSE connection (open)")
+		th.log("ERROR: Failed to abort FUSE connection (open)")
 	}
 
 	if _, err := abort.Write([]byte("1")); err != nil {
-		panic("Failed to abort FUSE connection (write)")
+		th.log("ERROR: Failed to abort FUSE connection (write)")
 	}
 
 	abort.Close()
@@ -253,7 +253,7 @@ func (th *testHelper) waitToBeUnmounted() {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	panic("Filesystem didn't unmount in time")
+	th.log("ERROR: Filesystem didn't unmount in time")
 }
 
 // Repeatedly check the condition by calling the function until that function returns
@@ -649,7 +649,7 @@ func TestMain(m *testing.M) {
 	//
 	// Because the filesystem request is blocked waiting on GC and the syscall
 	// will never return to allow GC to progress, the test program is deadlocked.
-	debug.SetGCPercent(-1)
+	origGC := debug.SetGCPercent(-1)
 
 	// Precompute a bunch of our genData to save time during tests
 	genData(40 * 1024 * 1024)
@@ -658,6 +658,12 @@ func TestMain(m *testing.M) {
 	errorLogs = make([]logscanError, 0)
 
 	result := m.Run()
+
+	// We've finished running the tests and are about to do the full logscan.
+	// This create a tremendous amount of garbage, so we must enable garbage
+	// collection.
+	runtime.GC()
+	debug.SetGCPercent(origGC)
 
 	testSummary := ""
 	errorMutex.Lock()
