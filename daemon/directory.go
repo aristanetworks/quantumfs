@@ -154,6 +154,9 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 func (dir *Directory) updateSize_(c *ctx) {
 	defer c.funcIn("Directory::updateSize_").out()
 
+	// We think we've made a change to this directory, so we should mark it dirty
+	dir.self.dirty()
+
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
 	if !dir.self.isWorkspaceRoot() {
@@ -987,7 +990,6 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		}
 
 		dir.updateSize_(c)
-		dir.self.dirty(c)
 
 		return fuse.OK
 	}()
@@ -1151,14 +1153,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.deleteEntry_(c, oldName)
 
 			parent.updateSize_(c)
-			parent.self.dirty(c)
 
 			return fuse.OK
 		}()
 
 		if result == fuse.OK {
 			child.updateSize_(c)
-			child.self.dirty(c)
 		}
 		return result
 	}()
