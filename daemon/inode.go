@@ -8,7 +8,6 @@ import "container/list"
 import "fmt"
 import "sync"
 import "sync/atomic"
-import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -135,7 +134,6 @@ type Inode interface {
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
-	LockTreeWaitAtMost(ms time.Duration) *sync.RWMutex
 	RLockTree() *sync.RWMutex
 
 	isWorkspaceRoot() bool
@@ -272,34 +270,6 @@ func (inode *InodeCommon) treeLock() *sync.RWMutex {
 func (inode *InodeCommon) LockTree() *sync.RWMutex {
 	inode.treeLock_.Lock()
 	return inode.treeLock_
-}
-
-// Attempt to exclusively grab the TreeLock. Wait at most the duration given. If the
-// lock is successfully grabbed, return the lock so "defer lock.Unlock()" may be
-// written. If the lock is not successfully grabbed, nil is returned.
-func (inode *InodeCommon) LockTreeWaitAtMost(wait time.Duration) *sync.RWMutex {
-	var lock *sync.RWMutex
-	waitForTreeLock := make(chan *sync.RWMutex)
-	go func() {
-		waitForTreeLock <- inode.LockTree()
-	}()
-
-	select {
-	case <-time.After(wait):
-		// Since we've timed out we need to launch a receiver for the lock.
-		// Should the lock ever eventually be acquired if we don't have
-		// something waiting to release it we'll indefinitely block that
-		// tree.
-		go func() {
-			lock := <-waitForTreeLock
-			lock.Unlock()
-		}()
-		return nil
-
-	case lock = <-waitForTreeLock:
-	}
-
-	return lock
 }
 
 func (inode *InodeCommon) RLockTree() *sync.RWMutex {

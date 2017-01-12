@@ -80,10 +80,6 @@ type QuantumFs struct {
 	fileHandleNum uint64
 	c             ctx
 
-	// If we've previously failed to forget an inode due to a lock timeout, don't
-	// try any further.
-	giveUpOnForget bool
-
 	mapMutex    sync.RWMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
@@ -724,19 +720,7 @@ func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
 		return nil
 	}
 
-	// We must timeout if we cannot grab the tree lock. Forget is called on the
-	// unmount path and if we are trying to forcefully unmount due to some
-	// internal error or hang, if we don't timeout we can deadlock against that
-	// other broken operation.
-	lock := inode.LockTreeWaitAtMost(200 * time.Millisecond)
-	if lock == nil {
-		qfs.c.elog("Timed out locking tree in Forget. Inode %d",
-			inode.inodeNum())
-		qfs.giveUpOnForget = true
-		return nil
-	} else {
-		defer lock.Unlock()
-	}
+	defer inode.LockTree().Unlock()
 
 	// Now that we have the tree locked, we need to re-check the inode because
 	// another forgetChain could have forgotten us before we got the tree lock
@@ -756,11 +740,6 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer qfs.c.funcIn("Mux::Forget").out()
 	defer logRequestPanic(&qfs.c)
 
-	if qfs.giveUpOnForget {
-		qfs.c.dlog("Not forgetting inode %d Looked up %d Times", nodeID,
-			nlookup)
-		return
-	}
 	qfs.c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
 	if !qfs.shouldForget(InodeId(nodeID), nlookup) {
