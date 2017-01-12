@@ -149,19 +149,21 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 	flusherContext := qfs.c.reqId(qlog.FlushReqId, nil)
 
+	c := flusherContext
+
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	for {
-		stop := false
-		flushAll := false
-
-		// If we've been directed to flushAll, use that caller's context
-		c := flusherContext
-
 		sleepTime := nextExpiringInode.Sub(time.Now())
 
 		c.vlog("Waiting until %s (%s)...", nextExpiringInode.String(),
 			sleepTime.String())
+
+		// If we've been directed to flushAll, use that caller's context
+		c = flusherContext
+
+		stop := false
+		flushAll := false
 
 		select {
 		case stop = <-quit:
