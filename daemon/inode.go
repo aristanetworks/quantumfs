@@ -183,6 +183,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 	inode.dirtyElementLock.Unlock()
 
 	if de == nil {
+		c.vlog("Queing inode %d on dirty list", inode.id)
 		de = c.qfs.queueDirtyInode(c, inode.self)
 
 		// queueDirtyInode requests the dirtyElement so we cannot hold the
