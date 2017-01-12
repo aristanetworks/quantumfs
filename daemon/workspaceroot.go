@@ -27,11 +27,23 @@ type WorkspaceRoot struct {
 
 	// Hardlink support structures
 	linkLock       DeferableRwMutex
-	hardlinks      map[uint64]*quantumfs.DirectoryRecord
+	hardlinks      map[uint64]linkEntry
 	nextHardlinkId uint64
 	linkToInode    map[uint64]InodeId
 	inodeToLink    map[InodeId]uint64
 	dirtyLinks     map[InodeId]uint64
+}
+
+type linkEntry struct {
+	record		*quantumfs.DirectoryRecord
+	nlink		uint32
+}
+
+func newLinkEntry(record_ *quantumfs.DirectoryRecord) linkEntry {
+	return linkEntry {
+		record:	record_,
+		nlink:	2,
+	}
 }
 
 // Fetching the number of child directories for all the workspaces within a namespace
@@ -107,6 +119,33 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 	}
 }
 
+func (wsr *WorkspaceRoot) nlinks(hardlinkId uint64) uint32 {
+	defer wsr.linkLock.Lock().Unlock()
+
+	entry, exists := wsr.hardlinks[hardlinkId]
+	if !exists {
+		panic("Invalid hardlinkId in system")
+	}
+
+	return entry.nlink
+}
+
+// if inc is true, we add one. Else, we subtract one.
+func (wsr *WorkspaceRoot) chgHardlinkRef(linkId uint64, inc bool) {
+	defer wsr.linkLock.Lock().Unlock()
+
+	entry := wsr.hardlinks[linkId]
+	if inc {
+		entry.nlink++
+	} else if entry.nlink > 0 {
+		entry.nlink--
+	} else {
+		panic("over decrement in hardlink ref count")
+	}
+
+	wsr.hardlinks[linkId] = entry
+}
+
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	record DirectoryRecordIf) *Hardlink {
 
@@ -125,7 +164,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	wsr.nextHardlinkId++
 
 	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
-	wsr.hardlinks[newId] = dirRecord
+	wsr.hardlinks[newId] = newLinkEntry(dirRecord)
 	wsr.linkToInode[newId] = inodeId
 	wsr.inodeToLink[inodeId] = newId
 
@@ -157,7 +196,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 		}
 
 		c.dlog("Instantiating hardlink %d", id)
-		return wsr.hardlinks[id]
+		return wsr.hardlinks[id].record
 	}()
 	if hardlinkRecord != nil {
 		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
@@ -202,7 +241,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId uint64) quantumfs.DirectoryRecord {
 
 	link, exists := wsr.hardlinks[linkId]
 	if exists {
-		return *link
+		return *(link.record)
 	}
 
 	// This function should only be called from Hardlink objects, meaning the
@@ -222,13 +261,13 @@ func (wsr *WorkspaceRoot) setHardlink(linkId uint64,
 	}
 
 	// It's critical that our lock covers both the fetch and this change
-	fnSetter(link)
+	fnSetter(link.record)
 }
 
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	defer wsr.linkLock.Lock().Unlock()
 
-	wsr.hardlinks = make(map[uint64]*quantumfs.DirectoryRecord)
+	wsr.hardlinks = make(map[uint64]linkEntry)
 	wsr.linkToInode = make(map[uint64]InodeId)
 	wsr.inodeToLink = make(map[InodeId]uint64)
 	wsr.dirtyLinks = make(map[InodeId]uint64)
@@ -236,7 +275,8 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	for {
 		for i := 0; i < entry.NumEntries(); i++ {
 			hardlink := entry.Entry(i)
-			wsr.hardlinks[hardlink.HardlinkID()] = hardlink.Record()
+			newLink := newLinkEntry(hardlink.Record())
+			wsr.hardlinks[hardlink.HardlinkID()] = newLink
 		}
 
 		if entry.Next() == quantumfs.EmptyDirKey || entry.NumEntries() == 0 {
@@ -253,14 +293,15 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 }
 
 func publishHardlinkMap(c *ctx,
-	records map[uint64]*quantumfs.DirectoryRecord) *quantumfs.HardlinkEntry {
+	records map[uint64]linkEntry) *quantumfs.HardlinkEntry {
 
 	// entryIdx indexes into the metadata block
 	baseLayer := quantumfs.NewHardlinkEntry()
 	nextBaseLayerId := quantumfs.EmptyDirKey
 	var err error
 	entryIdx := 0
-	for hardlinkID, record := range records {
+	for hardlinkID, entry := range records {
+		record := entry.record
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
@@ -372,7 +413,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			wsr.Directory.self.dirty(c)
 
 			defer wsr.linkLock.Lock().Unlock()
-			entry := wsr.hardlinks[linkId]
+			entry := wsr.hardlinks[linkId].record
 			if entry == nil {
 				panic("isHardlink but hardlink not set")
 			}

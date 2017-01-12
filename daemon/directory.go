@@ -47,6 +47,7 @@ type DirectoryRecordIf interface {
 	SetModificationTime(v quantumfs.Time)
 
 	Record() quantumfs.DirectoryRecord
+	Nlinks() uint32
 }
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
@@ -205,7 +206,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 	record, inodeNum := func() (DirectoryRecordIf, InodeId) {
 		defer dir.childRecordLock.Lock().Unlock()
 		inodeNum := dir.children.inodeNum(name)
-		return dir.children.deleteChild(name), inodeNum
+		return dir.children.deleteChild(name, dir.wsr), inodeNum
 	}()
 	if record == nil {
 		// This can happen if the child is already deleted or its a hardlink
@@ -279,7 +280,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 		attr.Size = entry.Size()
 		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
-		attr.Nlink = 2 // Workaround for BUG166665
+		attr.Nlink = entry.Nlinks()
 	}
 
 	attr.Atime = entry.ModificationTime().Seconds()
@@ -1206,7 +1207,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	dir.children.deleteChild(name)
+	dir.children.deleteChild(name, dir.wsr)
 }
 
 // Needs to hold childRecordLock
