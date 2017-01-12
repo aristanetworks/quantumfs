@@ -666,6 +666,7 @@ func TestMain(m *testing.M) {
 	}
 
 	logProcessing.Wait()
+	close(fullLogs)
 	testSummary := ""
 	for summary := range fullLogs {
 		testSummary += summary
