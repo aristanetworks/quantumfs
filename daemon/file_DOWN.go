@@ -30,10 +30,7 @@ func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
 func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.funcIn("File::Sync_DOWN").out()
 
-	defer fd.file.Lock().Unlock()
-	if fd.file.isDirty() {
-		fd.file.flush_DOWN(c)
-	}
+	fd.file.flush_DOWN(c)
 
 	return fuse.OK
 }

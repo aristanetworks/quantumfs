@@ -115,7 +115,6 @@ type Inode interface {
 	markClean()   // Mark this Inode as cleaned
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child InodeId)
-	isDirty() bool // Is this Inode dirty?
 
 	// The kernel has forgotten about this Inode. Add yourself to the list to be
 	// flushed and forgotten.
@@ -175,14 +174,6 @@ type InodeCommon struct {
 
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
-}
-
-func (inode *InodeCommon) isDirty() bool {
-	if atomic.LoadUint32(&inode.dirty_) == 1 {
-		return true
-	} else {
-		return false
-	}
 }
 
 // Add this Inode to the dirty list

@@ -381,8 +381,6 @@ func TestFileDescriptorDirtying(t *testing.T) {
 			wsWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
-		test.assert(!file.isDirty(),
-			"FileDescriptor not cleaned after change")
 
 		syscall.Close(fd)
 	})
