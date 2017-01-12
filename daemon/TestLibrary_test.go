@@ -179,11 +179,11 @@ func abortFuse(th *testHelper) {
 	if err != nil {
 		// We cannot abort so we won't terminate. We are
 		// truly wedged.
-		panic("Failed to abort FUSE connection (open)")
+		th.log("ERROR: Failed to abort FUSE connection (open)")
 	}
 
 	if _, err := abort.Write([]byte("1")); err != nil {
-		panic("Failed to abort FUSE connection (write)")
+		th.log("ERROR: Failed to abort FUSE connection (write)")
 	}
 
 	abort.Close()
@@ -253,7 +253,7 @@ func (th *testHelper) waitToBeUnmounted() {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	panic("Filesystem didn't unmount in time")
+	th.log("ERROR: Filesystem didn't unmount in time")
 }
 
 // Repeatedly check the condition by calling the function until that function returns
