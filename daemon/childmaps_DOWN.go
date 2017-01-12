@@ -25,6 +25,10 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*Hardlink); isLink {
 		recordCopy := *link
+
+		// Ensure we update the ref count for this hardlink
+		wsr.chgHardlinkRef(link.linkId, true)
+
 		return &recordCopy, fuse.OK
 	}
 

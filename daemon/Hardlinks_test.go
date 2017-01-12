@@ -5,6 +5,10 @@ package daemon
 
 // Test that different parts of Hardlink support are working
 
+import "bytes"
+import "io/ioutil"
+import "os"
+import "syscall"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
 
@@ -28,7 +32,7 @@ func TestHardlinkReload(t *testing.T) {
 		files := wsr.children.records()
 		for i := uint64(0); i < uint64(len(files)); i++ {
 			record := files[i].(*quantumfs.DirectoryRecord)
-			wsr.hardlinks[i] = record
+			wsr.hardlinks[i] = newLinkEntry(record)
 			wsr.dirtyLinks[InodeId(i)] = i
 		}
 
@@ -53,9 +57,10 @@ func TestHardlinkReload(t *testing.T) {
 		test.assert(len(wsrB.dirtyLinks) == 0,
 			"Dirty state not clean after branch: %d", wsrB.dirtyLinks)
 
-		for k, v := range wsr.hardlinks {
+		for k, l := range wsr.hardlinks {
+			v := l.record
 			linkBPtr, exists := wsrB.hardlinks[k]
-			linkB := *linkBPtr
+			linkB := *(linkBPtr.record)
 			test.assert(exists, "link not reloaded in new wsr")
 			test.assert(v.Filename() == linkB.Filename(),
 				"Filename not preserved")
@@ -81,5 +86,68 @@ func TestHardlinkReload(t *testing.T) {
 			test.assert(v.ContentTime() == linkB.ContentTime(),
 				"ContentTime not preserved")
 		}
+	})
+}
+
+func TestHardlinkForget(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		// Read the hardlink to ensure its instantiated
+		readData, err := ioutil.ReadFile(linkFile)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
+
+		// Forget it
+		linkInode := test.getInodeNum(linkFile)
+		test.qfs.Forget(uint64(linkInode), 1)
+
+		// Check that it's uninstantiated
+		inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
+		test.assert(inode == nil, "hardlink inode not forgotten")
+	})
+}
+
+// When all hardlinks, but one, are deleted then we need to convert a hardlink back
+// into a regular file.
+func TestHardlinkConversion(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		linkInode := test.getInodeNum(linkFile)
+
+		wsr := test.getWorkspaceRoot(workspace)
+		linkId := func () uint64 {
+			defer wsr.linkLock.Lock().Unlock()
+			return wsr.inodeToLink[linkInode]
+		}()
+
+		err = os.Remove(testFile)
+		test.assertNoErr(err)
+
+		wsr = test.getWorkspaceRoot(workspace)
+		defer wsr.linkLock.Lock().Unlock()
+		_, exists := wsr.hardlinks[linkId]
+		test.assert(!exists, "hardlink not converted back to file")
 	})
 }

@@ -157,3 +157,7 @@ func (link *Hardlink) Record() quantumfs.DirectoryRecord {
 
 	return *rtn
 }
+
+func (link *Hardlink) Nlinks() uint32 {
+	return link.wsr.nlinks(link.linkId)
+}

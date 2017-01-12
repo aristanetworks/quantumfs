@@ -127,11 +127,22 @@ func (cmap *ChildMap) count() uint64 {
 	return uint64(len(cmap.children))
 }
 
-func (cmap *ChildMap) deleteChild(name string) (needsReparent DirectoryRecordIf) {
+func (cmap *ChildMap) deleteChild(name string,
+	wsr *WorkspaceRoot) (needsReparent DirectoryRecordIf) {
+
 	inodeId, exists := cmap.children[name]
 	if exists {
 		delete(cmap.dirtyChildren, inodeId)
 		delete(cmap.children, name)
+	}
+
+	record := cmap.getRecord(inodeId, name)
+	if record == nil {
+		return nil
+	}
+
+	if link, isHardlink := record.(*Hardlink); isHardlink {
+		wsr.chgHardlinkRef(link.linkId, false)
 	}
 
 	return cmap.delRecord(inodeId, name)
