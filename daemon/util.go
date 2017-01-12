@@ -195,6 +195,14 @@ func (df *DeferableRwMutex) Lock() NeedWriteUnlock {
 	return &df.lock
 }
 
+func (df *DeferableRwMutex) RUnlock() {
+	df.lock.RUnlock()
+}
+
+func (df *DeferableRwMutex) Unlock() {
+	df.lock.Unlock()
+}
+
 // Return the fuse connection id for the filesystem mounted at the given path
 func findFuseConnection(c *ctx, mountPath string) int {
 	c.dlog("Finding FUSE Connection ID...")
