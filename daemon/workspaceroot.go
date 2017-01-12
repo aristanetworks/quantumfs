@@ -124,7 +124,7 @@ func (wsr *WorkspaceRoot) nlinks(hardlinkId uint64) uint32 {
 
 	entry, exists := wsr.hardlinks[hardlinkId]
 	if !exists {
-		panic("Invalid hardlinkId in system")
+		panic(fmt.Sprintf("Invalid hardlinkId in system %d", hardlinkId))
 	}
 
 	return entry.nlink
@@ -247,6 +247,46 @@ func (wsr *WorkspaceRoot) getHardlink(linkId uint64) quantumfs.DirectoryRecord {
 	// This function should only be called from Hardlink objects, meaning the
 	// linkId really should never be invalid
 	panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+}
+
+func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId uint64,
+	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId,
+	wasDirty bool) {
+
+	defer c.FuncIn("Removing Hardlink", "%d for new parent %d", linkId,
+		newParent).out()
+
+	defer wsr.linkLock.RLock().RUnlock()
+
+	link, exists := wsr.hardlinks[linkId]
+	if !exists {
+		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+	}
+	delete(wsr.hardlinks, linkId)
+
+	inodeId, exists = wsr.linkToInode[linkId]
+	wasDirty = false
+	if exists {
+		_, wasDirty = wsr.dirtyLinks[inodeId]
+
+		delete(wsr.inodeToLink, inodeId)
+		delete(wsr.linkToInode, linkId)
+		delete(wsr.dirtyLinks, inodeId)
+	} else {
+		// hardlink was never given an inodeId
+		inodeId = c.qfs.newInodeId()
+	}
+
+	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+	if inode == nil {
+		c.qfs.addUninstantiated(c, []InodeId{inodeId}, newParent)
+	} else {
+		inode.setParent(newParent)
+	}
+
+	wsr.dirty(c)
+
+	return link.record, inodeId, wasDirty
 }
 
 // We need the wsr lock to cover setting safely
