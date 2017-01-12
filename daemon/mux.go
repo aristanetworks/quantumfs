@@ -237,7 +237,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 		dirtyList.Remove(dirtyList.Front())
 
 		// Note, drops and regrabs the dirtyQueueLock
-		qfs.flushInode_(c, candidate)
+		qfs.flushInode_(c, *candidate)
 	}
 
 	// If we get here then we've emptied the dirtyList out entirely.
