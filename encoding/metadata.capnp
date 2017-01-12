@@ -60,6 +60,7 @@ struct WorkspaceRoot {
         userLayer  @3 :ObjectKey;
 
 	hardlinkEntry @4 :HardlinkEntry;
+	nextHardlinkId @5 :UInt64;
 }
 
 struct VeryLargeFile {

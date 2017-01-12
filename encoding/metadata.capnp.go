@@ -1229,9 +1229,9 @@ func (s HardlinkEntry_List) Set(i int, item HardlinkEntry) { C.PointerList(s).Se
 
 type WorkspaceRoot C.Struct
 
-func NewWorkspaceRoot(s *C.Segment) WorkspaceRoot      { return WorkspaceRoot(s.NewStruct(0, 5)) }
-func NewRootWorkspaceRoot(s *C.Segment) WorkspaceRoot  { return WorkspaceRoot(s.NewRootStruct(0, 5)) }
-func AutoNewWorkspaceRoot(s *C.Segment) WorkspaceRoot  { return WorkspaceRoot(s.NewStructAR(0, 5)) }
+func NewWorkspaceRoot(s *C.Segment) WorkspaceRoot      { return WorkspaceRoot(s.NewStruct(8, 5)) }
+func NewRootWorkspaceRoot(s *C.Segment) WorkspaceRoot  { return WorkspaceRoot(s.NewRootStruct(8, 5)) }
+func AutoNewWorkspaceRoot(s *C.Segment) WorkspaceRoot  { return WorkspaceRoot(s.NewStructAR(8, 5)) }
 func ReadRootWorkspaceRoot(s *C.Segment) WorkspaceRoot { return WorkspaceRoot(s.Root(0).ToStruct()) }
 func (s WorkspaceRoot) BaseLayer() ObjectKey           { return ObjectKey(C.Struct(s).GetObject(0).ToStruct()) }
 func (s WorkspaceRoot) SetBaseLayer(v ObjectKey)       { C.Struct(s).SetObject(0, C.Object(v)) }
@@ -1245,6 +1245,8 @@ func (s WorkspaceRoot) HardlinkEntry() HardlinkEntry {
 	return HardlinkEntry(C.Struct(s).GetObject(4).ToStruct())
 }
 func (s WorkspaceRoot) SetHardlinkEntry(v HardlinkEntry) { C.Struct(s).SetObject(4, C.Object(v)) }
+func (s WorkspaceRoot) NextHardlinkId() uint64           { return C.Struct(s).Get64(0) }
+func (s WorkspaceRoot) SetNextHardlinkId(v uint64)       { C.Struct(s).Set64(0, v) }
 func (s WorkspaceRoot) WriteJSON(w io.Writer) error {
 	b := bufio.NewWriter(w)
 	var err error
@@ -1321,6 +1323,25 @@ func (s WorkspaceRoot) WriteJSON(w io.Writer) error {
 	{
 		s := s.HardlinkEntry()
 		err = s.WriteJSON(b)
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte(',')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("\"nextHardlinkId\":")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.NextHardlinkId()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
 		if err != nil {
 			return err
 		}
@@ -1417,6 +1438,25 @@ func (s WorkspaceRoot) WriteCapLit(w io.Writer) error {
 			return err
 		}
 	}
+	_, err = b.WriteString(", ")
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("nextHardlinkId = ")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.NextHardlinkId()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
 	err = b.WriteByte(')')
 	if err != nil {
 		return err
@@ -1433,7 +1473,7 @@ func (s WorkspaceRoot) MarshalCapLit() ([]byte, error) {
 type WorkspaceRoot_List C.PointerList
 
 func NewWorkspaceRootList(s *C.Segment, sz int) WorkspaceRoot_List {
-	return WorkspaceRoot_List(s.NewCompositeList(0, 5, sz))
+	return WorkspaceRoot_List(s.NewCompositeList(8, 5, sz))
 }
 func (s WorkspaceRoot_List) Len() int { return C.PointerList(s).Len() }
 func (s WorkspaceRoot_List) At(i int) WorkspaceRoot {

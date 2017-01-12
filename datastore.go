@@ -551,6 +551,14 @@ func (wsr *WorkspaceRoot) SetHardlinkEntry(v *HardlinkEntry) {
 	wsr.wsr.SetHardlinkEntry(v.entry)
 }
 
+func (wsr *WorkspaceRoot) NextHardlinkId() uint64 {
+	return wsr.wsr.NextHardlinkId()
+}
+
+func (wsr *WorkspaceRoot) SetNextHardlinkId(v uint64) {
+	wsr.wsr.SetNextHardlinkId(v)
+}
+
 func (wsr *WorkspaceRoot) Bytes() []byte {
 	return wsr.wsr.Segment.Data
 }
