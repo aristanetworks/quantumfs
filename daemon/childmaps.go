@@ -9,8 +9,8 @@ import "github.com/aristanetworks/quantumfs"
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
-	wsr		*WorkspaceRoot
-	dir		*Directory
+	wsr *WorkspaceRoot
+	dir *Directory
 
 	// can be many to one
 	children      map[string]InodeId
@@ -21,8 +21,8 @@ type ChildMap struct {
 
 func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
 	return &ChildMap{
-		wsr:		 wsr_,
-		dir:		 owner,
+		wsr:             wsr_,
+		dir:             owner,
 		children:        make(map[string]InodeId, numEntries),
 		dirtyChildren:   make(map[InodeId]InodeId, 0),
 		childrenRecords: make(map[InodeId][]DirectoryRecordIf, numEntries),

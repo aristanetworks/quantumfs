@@ -137,7 +137,7 @@ func TestHardlinkConversion(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 
 		wsr := test.getWorkspaceRoot(workspace)
-		linkId := func () uint64 {
+		linkId := func() uint64 {
 			defer wsr.linkLock.Lock().Unlock()
 			return wsr.inodeToLink[linkInode]
 		}()
@@ -147,7 +147,7 @@ func TestHardlinkConversion(t *testing.T) {
 
 		// Ensure it's converted by performing an operation on linkFile
 		// that would trigger recordByName
-		err = os.Rename(linkFile, linkFile + "_newname")
+		err = os.Rename(linkFile, linkFile+"_newname")
 		test.assertNoErr(err)
 		linkFile += "_newname"
 

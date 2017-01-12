@@ -64,7 +64,7 @@ type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 type Directory struct {
 	InodeCommon
 
-	wsr		*WorkspaceRoot
+	wsr *WorkspaceRoot
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
