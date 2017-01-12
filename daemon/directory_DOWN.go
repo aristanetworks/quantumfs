@@ -154,9 +154,12 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 		return nil, fuse.ENOENT
 	}
 
-	newKey := toLink.flush_DOWN(c)
-	dir.children.recordByName(c, record.Filename()).SetID(newKey)
-	dir.children.clearDirty(toLink.inodeNum())
+	// if the file isn't a hardlink, then we must flush it first
+	if record.Type() != quantumfs.ObjectTypeHardlink {
+		newKey := toLink.flush_DOWN(c)
+		dir.children.recordByName(c, record.Filename()).SetID(newKey)
+		dir.children.clearDirty(toLink.inodeNum())
+	}
 
 	dir.self.dirty(c)
 	return dir.children.makeHardlink_DOWN(c, record.Filename())
