@@ -655,10 +655,22 @@ func TestMain(m *testing.M) {
 	runtime.GC()
 	debug.SetGCPercent(origGC)
 
-	testSummary := ""
 	errorMutex.Lock()
+	fullLogs := make(chan string, len(errorLogs))
+	var logProcessing sync.WaitGroup
 	for i := 0; i < len(errorLogs); i++ {
-		testSummary += outputLogError(errorLogs[i])
+		logProcessing.Add(1)
+		go func(i int) {
+			defer logProcessing.Done()
+			testSummary := outputLogError(errorLogs[i])
+			fullLogs <- testSummary
+		}(i)
+	}
+
+	logProcessing.Wait()
+	testSummary := ""
+	for summary := range fullLogs {
+		testSummary += summary
 	}
 	errorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
