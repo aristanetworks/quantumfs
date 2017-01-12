@@ -197,8 +197,6 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 
 	for key, dirtyList := range qfs.dirtyQueue {
 		func() {
-			key.RLock()
-			defer key.RUnlock()
 			earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
 			if earliestNext.Before(nextExpiringInode) {
 				c.vlog("changing next time from %s to %s",
@@ -216,7 +214,7 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 	return nextExpiringInode
 }
 
-// Requires dirtyQueueLock and the treeLock of the workspace held read-only
+// Requires dirtyQueueLock
 func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 	flushAll bool) time.Time {
 
@@ -234,30 +232,28 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 
 		dirtyList.Remove(dirtyList.Front())
 
-		// Note: drops and regrabs the dirtyQueueLock
-		qfs.flushInode_(c, *candidate)
+		qfs.dirtyQueueLock.Unlock()
+		qfs.flushInode(c, *candidate)
+		qfs.dirtyQueueLock.Lock()
 	}
 
 	// If we get here then we've emptied the dirtyList out entirely.
 	return time.Now().Add(flushSanityTimeout)
 }
 
-// Requires the dirtyQueueLock be held.
-//
-// NOTE This method gives up the dirtyQueueLock lock and then regrabs it.
-func (qfs *QuantumFs) flushInode_(c *ctx, dirtyInode dirtyInode) {
+func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	inodeNum := dirtyInode.inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
 		inodeNum, dirtyInode.shouldUninstantiate)
 
-	qfs.dirtyQueueLock.Unlock()
+	defer dirtyInode.inode.LockTree().Unlock()
 
 	dirtyInode.inode.flush_DOWN(c)
 	dirtyInode.inode.markClean()
 
 	if dirtyInode.shouldUninstantiate {
 		c.vlog("Starting uninstantiation at inode %d", inodeNum)
-		toRemove := qfs.forgetChain(inodeNum)
+		toRemove := qfs.forgetChain_(inodeNum)
 
 		if toRemove != nil {
 			// We need to remove all uninstantiated children.
@@ -265,8 +261,6 @@ func (qfs *QuantumFs) flushInode_(c *ctx, dirtyInode dirtyInode) {
 			qfs.removeUninstantiated(c, toRemove)
 		}
 	}
-
-	qfs.dirtyQueueLock.Lock()
 }
 
 // Don't use this method directly, use one of the semantically specific variants
@@ -710,25 +704,13 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 	return rtn
 }
 
-func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
+// Requires the treeLock be held for write.
+func (qfs *QuantumFs) forgetChain_(inodeNum InodeId) []InodeId {
 	inode := qfs.inodeNoInstantiate(&qfs.c, inodeNum)
 	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
 		inodeNum == quantumfs.InodeIdApi {
 
 		qfs.c.dlog("inode %d doesn't need to be forgotten", inodeNum)
-		// Nothing to do
-		return nil
-	}
-
-	defer inode.LockTree().Unlock()
-
-	// Now that we have the tree locked, we need to re-check the inode because
-	// another forgetChain could have forgotten us before we got the tree lock
-	inode = qfs.inodeNoInstantiate(&qfs.c, inodeNum)
-	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
-		inodeNum == quantumfs.InodeIdApi {
-
-		qfs.c.dlog("inode %d forgotten underneath us", inodeNum)
 		// Nothing to do
 		return nil
 	}
