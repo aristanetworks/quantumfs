@@ -127,7 +127,7 @@ func TestHardlinkConversion(t *testing.T) {
 		data := genData(2000)
 
 		testFile := workspace + "/testFile"
-		err := printToFile(testFile, string(data))
+		err := printToFile(testFile, string(data[:1000]))
 		test.assertNoErr(err)
 
 		linkFile := workspace + "/testLink"
@@ -144,6 +144,21 @@ func TestHardlinkConversion(t *testing.T) {
 
 		err = os.Remove(testFile)
 		test.assertNoErr(err)
+
+		// Ensure it's converted by performing an operation on linkFile
+		// that would trigger recordByName
+		err = os.Rename(linkFile, linkFile + "_newname")
+		test.assertNoErr(err)
+		linkFile += "_newname"
+
+		// ensure we can still use the file as normal
+		err = printToFile(linkFile, string(data[1000:]))
+		test.assertNoErr(err)
+
+		output, err := ioutil.ReadFile(linkFile)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(output, data),
+			"File not working after conversion from hardlink")
 
 		wsr = test.getWorkspaceRoot(workspace)
 		defer wsr.linkLock.Lock().Unlock()

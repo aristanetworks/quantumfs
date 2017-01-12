@@ -113,7 +113,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 		baseLayer := buffer.AsDirectoryEntry()
 
 		if dir.children == nil {
-			dir.children = newChildMap(baseLayer.NumEntries(), wsr)
+			dir.children = newChildMap(baseLayer.NumEntries(), wsr, dir)
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
@@ -205,7 +205,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 	record, inodeNum := func() (DirectoryRecordIf, InodeId) {
 		defer dir.childRecordLock.Lock().Unlock()
 		inodeNum := dir.children.inodeNum(name)
-		return dir.children.deleteChild(name), inodeNum
+		return dir.children.deleteChild(c, name), inodeNum
 	}()
 	if record == nil {
 		// This can happen if the child is already deleted or its a hardlink
@@ -1002,7 +1002,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			}
 
 			oldInodeId_ := dir.children.inodeNum(oldName)
-			oldRemoved_ := dir.children.renameChild(oldName, newName)
+			oldRemoved_ := dir.children.renameChild(c, oldName, newName)
 			return oldInodeId_, oldRemoved_, fuse.OK
 		}()
 		if oldName == newName || err != fuse.OK {
@@ -1206,7 +1206,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	dir.children.deleteChild(name)
+	dir.children.deleteChild(c, name)
 }
 
 // Needs to hold childRecordLock
