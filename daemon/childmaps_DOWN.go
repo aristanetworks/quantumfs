@@ -8,7 +8,7 @@ package daemon
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
+func (cmap *ChildMap) makeHardlink_DOWN(c *ctx,
 	childName string) (copy DirectoryRecordIf, err fuse.Status) {
 
 	childId, exists := cmap.children[childName]
@@ -27,7 +27,7 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		wsr.chgHardlinkRef(link.linkId, true)
+		cmap.wsr.chgHardlinkRef(link.linkId, true)
 
 		return &recordCopy, fuse.OK
 	}
@@ -49,7 +49,7 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 	}
 
 	// It needs to become a hardlink now. Hand it off to wsr
-	newLink := wsr.newHardlink(c, childId, child)
+	newLink := cmap.wsr.newHardlink(c, childId, child)
 
 	cmap.setRecord(childId, newLink)
 	linkCopy := *newLink

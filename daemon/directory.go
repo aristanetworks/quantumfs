@@ -64,7 +64,7 @@ type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 type Directory struct {
 	InodeCommon
 
-	wsr *WorkspaceRoot
+	wsr		*WorkspaceRoot
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -113,14 +113,13 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 		baseLayer := buffer.AsDirectoryEntry()
 
 		if dir.children == nil {
-			dir.children = newChildMap(baseLayer.NumEntries())
+			dir.children = newChildMap(baseLayer.NumEntries(), wsr)
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := func() InodeId {
 				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.loadChild(c, baseLayer.Entry(i),
-					wsr)
+				return dir.children.loadChild(c, baseLayer.Entry(i))
 			}()
 			c.vlog("initDirectory %d getting child %d", inodeNum,
 				childInodeNum)
@@ -206,7 +205,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 	record, inodeNum := func() (DirectoryRecordIf, InodeId) {
 		defer dir.childRecordLock.Lock().Unlock()
 		inodeNum := dir.children.inodeNum(name)
-		return dir.children.deleteChild(name, dir.wsr), inodeNum
+		return dir.children.deleteChild(name), inodeNum
 	}()
 	if record == nil {
 		// This can happen if the child is already deleted or its a hardlink
@@ -1207,7 +1206,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	dir.children.deleteChild(name, dir.wsr)
+	dir.children.deleteChild(name)
 }
 
 // Needs to hold childRecordLock
@@ -1692,7 +1691,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	defer dir.childRecordLock.Lock().Unlock()
-	inodeNum := dir.children.loadChild(c, entry, dir.wsr)
+	inodeNum := dir.children.loadChild(c, entry)
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }

@@ -9,6 +9,8 @@ import "github.com/aristanetworks/quantumfs"
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
+	wsr	      *WorkspaceRoot
+
 	// can be many to one
 	children      map[string]InodeId
 	dirtyChildren map[InodeId]InodeId // a set
@@ -16,22 +18,22 @@ type ChildMap struct {
 	childrenRecords map[InodeId][]DirectoryRecordIf
 }
 
-func newChildMap(numEntries int) *ChildMap {
+func newChildMap(numEntries int, wsr_ *WorkspaceRoot) *ChildMap {
 	return &ChildMap{
+		wsr:		 wsr_,
 		children:        make(map[string]InodeId, numEntries),
 		dirtyChildren:   make(map[InodeId]InodeId, 0),
 		childrenRecords: make(map[InodeId][]DirectoryRecordIf, numEntries),
 	}
 }
 
-func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf,
-	wsr *WorkspaceRoot) InodeId {
+func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf) InodeId {
 
 	inodeId := InodeId(quantumfs.InodeIdInvalid)
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		linkId := decodeHardlinkKey(entry.ID())
-		entry = newHardlink(entry.Filename(), linkId, wsr)
-		inodeId = wsr.getHardlinkInodeId(c, linkId)
+		entry = newHardlink(entry.Filename(), linkId, cmap.wsr)
+		inodeId = cmap.wsr.getHardlinkInodeId(c, linkId)
 	} else {
 		inodeId = c.qfs.newInodeId()
 	}
@@ -127,8 +129,7 @@ func (cmap *ChildMap) count() uint64 {
 	return uint64(len(cmap.children))
 }
 
-func (cmap *ChildMap) deleteChild(name string,
-	wsr *WorkspaceRoot) (needsReparent DirectoryRecordIf) {
+func (cmap *ChildMap) deleteChild(name string) (needsReparent DirectoryRecordIf) {
 
 	inodeId, exists := cmap.children[name]
 	if exists {
@@ -142,7 +143,7 @@ func (cmap *ChildMap) deleteChild(name string,
 	}
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
-		wsr.chgHardlinkRef(link.linkId, false)
+		cmap.wsr.chgHardlinkRef(link.linkId, false)
 	}
 
 	return cmap.delRecord(inodeId, name)
