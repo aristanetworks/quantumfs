@@ -551,7 +551,7 @@ func (th *testHelper) syncAllWorkspaces() {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	th.qfs.mapMutex.Lock()
+	defer th.qfs.mapMutex.Lock().Unlock()
 
 	for _, file := range th.qfs.fileHandles {
 		fh, ok := file.(*FileDescriptor)
@@ -563,8 +563,6 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 			handles = append(handles, fh)
 		}
 	}
-
-	th.qfs.mapMutex.Unlock()
 
 	return handles
 }
@@ -669,6 +667,7 @@ func TestMain(m *testing.M) {
 	}
 
 	logProcessing.Wait()
+	close(fullLogs)
 	testSummary := ""
 	for summary := range fullLogs {
 		testSummary += summary

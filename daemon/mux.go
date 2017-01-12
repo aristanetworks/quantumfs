@@ -80,7 +80,7 @@ type QuantumFs struct {
 	fileHandleNum uint64
 	c             ctx
 
-	mapMutex    sync.RWMutex
+	mapMutex    DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
 
@@ -385,8 +385,7 @@ func (qfs *QuantumFs) getInode_(c *ctx, id InodeId) (Inode, bool) {
 }
 
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
-	qfs.mapMutex.RLock()
-	defer qfs.mapMutex.RUnlock()
+	defer qfs.mapMutex.RLock().RUnlock()
 	inode, _ := qfs.getInode_(c, id)
 	return inode
 }
@@ -400,8 +399,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 
 	// First find the Inode under a cheaper lock
 	inode := func() Inode {
-		qfs.mapMutex.RLock()
-		defer qfs.mapMutex.RUnlock()
+		defer qfs.mapMutex.RLock().RUnlock()
 		inode_, needsInstantiation := qfs.getInode_(c, id)
 		if !needsInstantiation && inode_ != nil {
 			return inode_
@@ -416,8 +414,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
+	defer qfs.mapMutex.Lock().Unlock()
 
 	inode = qfs.inode_(c, id)
 	if inode == nil {
@@ -458,8 +455,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 
 // Set an inode in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
+	defer qfs.mapMutex.Lock().Unlock()
 
 	if inode != nil {
 		qfs.inodes[id] = inode
@@ -477,8 +473,7 @@ func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
 		panic("Invalid parentId in addUninstantiated")
 	}
 
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
+	defer qfs.mapMutex.Lock().Unlock()
 
 	qfs.addUninstantiated_(c, uninstantiated, parent)
 }
@@ -496,8 +491,7 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
 
 // Remove a list of inode numbers from the parentOfUninstantiated list
 func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
-	qfs.mapMutex.Lock()
-	defer qfs.mapMutex.Unlock()
+	defer qfs.mapMutex.Lock().Unlock()
 
 	for _, inodeNum := range uninstantiated {
 		delete(qfs.parentOfUninstantiated, inodeNum)
@@ -556,9 +550,8 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
-	qfs.mapMutex.RLock()
+	defer qfs.mapMutex.RLock().RUnlock()
 	fileHandle := qfs.fileHandles[id]
-	qfs.mapMutex.RUnlock()
 	return fileHandle
 }
 
@@ -566,13 +559,12 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").out()
 
-	qfs.mapMutex.Lock()
+	defer qfs.mapMutex.Lock().Unlock()
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
 	} else {
 		delete(qfs.fileHandles, id)
 	}
-	qfs.mapMutex.Unlock()
 }
 
 // Retrieve a unique inode number
