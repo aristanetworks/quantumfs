@@ -328,8 +328,8 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 			id := HardlinkId(hardlink.HardlinkID())
 			wsr.hardlinks[id] = newLink
 
-			if hardlink.HardlinkID() >= wsr.nextHardlinkId {
-				wsr.nextHardlinkId = hardlink.HardlinkID() + 1
+			if id >= wsr.nextHardlinkId {
+				wsr.nextHardlinkId = id + 1
 			}
 		}
 
