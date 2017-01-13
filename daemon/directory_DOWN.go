@@ -45,8 +45,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	dir.self.markAccessed(c, newName, true)
 
-	c.dlog("Hardlinked %d to %s as inode %d", srcInode.inodeNum(), newName,
-		inodeNum)
+	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)

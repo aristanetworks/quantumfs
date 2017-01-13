@@ -32,5 +32,5 @@ func (wsr *WorkspaceRoot) flushHardlinks_DOWN(c *ctx) {
 		wsr.hardlinks[hardlinkId].SetID(newKey)
 	}
 
-	wsr.dirtyLinks = make(map[InodeId]uint64, 0)
+	wsr.dirtyLinks = make(map[InodeId]HardlinkId, 0)
 }
