@@ -22,7 +22,7 @@ func init() {
 // The database underlying the system local WorkspaceDB has two levels of buckets.
 //
 // The first level bucket are all the typespaces. Keys into this bucket are typespace
-// names and are maaped to the second level bucket.
+// names and are mapped to the second level bucket.
 //
 // The second level bucket are all the namespaces. Keys into this bucket are
 // namespace names and are mapped to the third level bucket.
@@ -63,9 +63,9 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 			panic("Unable to create Typespaces bucket")
 		}
 
-		_null_, err := typespaces.CreateBucketIfNotExists([]byte("_null_"))
+		_null_, err := typespaces.CreateBucketIfNotExists([]byte("_null"))
 		if err != nil {
-			panic("Unable to create _null_ typespace")
+			panic("Unable to create _null typespace")
 		}
 
 		_null, err := _null_.CreateBucketIfNotExists([]byte("_null"))
@@ -255,6 +255,7 @@ func getWorkspaceKey_(tx *bolt.Tx, typespace string, namespace string,
 
 	workspaces := namespaces.Bucket([]byte(namespace))
 	if workspaces == nil {
+		// The namespace doesn't exist, so the workspace cannot exist
 		return nil
 	}
 

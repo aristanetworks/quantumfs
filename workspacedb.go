@@ -7,8 +7,13 @@ package quantumfs
 // WorkspaceDB provides a cluster-wide and consistent mapping between names and
 // rootids. Workspace names have two components and are represented as strings with
 // the format "<typespace>/<namespace>/<workspace>". <typespace> would often be a
-// type such as abuild, <namespace> would often be a username something like abuild.
-// <workspace> will be somewhat arbitrary.
+// type such as abuild, <namespace> would often be a branch under typespace such as
+// eos-trunk. <workspace> will be somewhat arbitrary.
+//
+// With diffrent typespace, its namespace and workspace can vary:
+//	abuild/eos-trunk/eos-trunk@12345
+//	users/joe/arbitrary
+//	releases/eos/EOS-4.25.6
 //
 // Most of the API is synchronous and consistent. The notable exceptions are the
 // calls to list the available namespaces and workspaces within a namespace. These

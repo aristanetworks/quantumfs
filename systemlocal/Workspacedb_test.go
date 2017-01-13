@@ -54,7 +54,7 @@ func TestEmptyDB(t *testing.T) {
 		assert(err == nil, "Error in counting typespaces: %v", err)
 		assert(num == 1, "Too many typespaces")
 
-		exists, err = db.TypespaceExists(nil, "_null_")
+		exists, err = db.TypespaceExists(nil, "_null")
 		assert(err == nil, "Error checking existence of typespace: %v", err)
 		assert(exists, "Expected typespace not there")
 
@@ -63,35 +63,35 @@ func TestEmptyDB(t *testing.T) {
 			err)
 		assert(!exists, "Unexpected namespace")
 
-		num, err = db.NumNamespaces(nil, "_null_")
+		num, err = db.NumNamespaces(nil, "_null")
 		assert(err == nil, "Error in counting namespaces: %v", err)
 		assert(num == 1, "Too many namespaces")
 
-		exists, err = db.NamespaceExists(nil, "_null_", "_null")
+		exists, err = db.NamespaceExists(nil, "_null", "_null")
 		assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		assert(exists, "Expected namespace not there")
 
-		exists, err = db.NamespaceExists(nil, "_null_", "test")
+		exists, err = db.NamespaceExists(nil, "_null", "test")
 		assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		assert(!exists, "Unexpected namespace")
 
-		num, err = db.NumWorkspaces(nil, "_null_", "_null")
+		num, err = db.NumWorkspaces(nil, "_null", "_null")
 		assert(err == nil, "Error in counting workspaces: %v", err)
 		assert(num == 1, "Too many workspaces")
 
-		exists, err = db.WorkspaceExists(nil, "_null_", "_null", "null")
+		exists, err = db.WorkspaceExists(nil, "_null", "_null", "null")
 		assert(err == nil, "Error checking existence workspace: %v",
 			err)
 		assert(exists, "Expected workspace not there")
 
-		exists, err = db.WorkspaceExists(nil, "_null_", "_null", "other")
+		exists, err = db.WorkspaceExists(nil, "_null", "_null", "other")
 		assert(err == nil, "Error checking existence of workspace: %v",
 			err)
 		assert(!exists, "Unexpected workspace")
 
-		key, err := db.Workspace(nil, "_null_", "_null", "null")
+		key, err := db.Workspace(nil, "_null", "_null", "null")
 		assert(err == nil, "Error fetching key: %v",
 			err)
 		assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
@@ -107,19 +107,19 @@ func TestBranching(t *testing.T) {
 			"somewhere", "else")
 		assert(err != nil, "Succeeded branching invalid typespace")
 
-		err = db.BranchWorkspace(nil, "_null_", "notthere", "a", "branch",
+		err = db.BranchWorkspace(nil, "_null", "notthere", "a", "branch",
 			"somewhere", "else")
 		assert(err != nil, "Succeeded branching invalid namespace")
 
-		err = db.BranchWorkspace(nil, "_null_", "_null", "notthere",
+		err = db.BranchWorkspace(nil, "_null", "_null", "notthere",
 			"branch", "somewhere", "else")
 		assert(err != nil, "Succeeded branching invalid workspace")
 
-		err = db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err == nil, "Error branching null workspace: %v", err)
 
-		err = db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err != nil, "Succeeded branching to existing workspace")
 
@@ -138,11 +138,11 @@ func TestNamespaceList(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err == nil, "Failed branching workspace: %v", err)
 
-		err = db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "b")
 		assert(err == nil, "Failed branching workspace: %v", err)
 
@@ -182,7 +182,7 @@ func TestWorkspaceList(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err == nil, "Error branching  workspace: %v", err)
 
@@ -214,7 +214,7 @@ func TestWorkspaceList(t *testing.T) {
 		branch := false
 
 		for _, typespace := range typespaces {
-			if typespace == "_null_" {
+			if typespace == "_null" {
 				_null_ = true
 			}
 
@@ -222,8 +222,28 @@ func TestWorkspaceList(t *testing.T) {
 				branch = true
 			}
 		}
+		assert(_null_ && branch, "Expected typespaces not there")
 
-		assert(_null_ && branch, "Expected namespaces not there")
+		err = db.BranchWorkspace(nil, "branch", "test", "a", "branch",
+			"test2", "b")
+		assert(err == nil, "Error branching the workspace: %v", err)
+		namespaces, err = db.NamespaceList(nil, "branch")
+		assert(err == nil, "Error getting namespace list: %v", err)
+		assert(len(namespaces) == 2, "Incorrect number of namespaces")
+		test := false
+		test2 := false
+
+		for _, namespace := range namespaces {
+			if namespace == "test2" {
+				test2 = true
+			}
+
+			if namespace == "test" {
+				test = true
+			}
+		}
+
+		assert(test && test2, "Expected namespaces not there")
 	})
 }
 
@@ -231,11 +251,11 @@ func TestAdvanceOk(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err == nil, "Error branching workspace: %v", err)
 
-		oldRootId, err := db.Workspace(nil, "_null_", "_null", "null")
+		oldRootId, err := db.Workspace(nil, "_null", "_null", "null")
 		assert(err == nil, "Error getting key: %v", err)
 
 		newRootId, err := db.AdvanceWorkspace(nil, "branch", "test", "a",
@@ -250,7 +270,7 @@ func TestAdvanceNotExist(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		oldRootId, err := db.Workspace(nil, "_null_", "_null", "null")
+		oldRootId, err := db.Workspace(nil, "_null", "_null", "null")
 		assert(err == nil, "Error getting key: %v", err)
 
 		_, err = db.AdvanceWorkspace(nil, "branch", "test", "a", oldRootId,
@@ -263,11 +283,11 @@ func TestAdvanceOldRootId(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err == nil, "Error branching workspace: %v", err)
 
-		oldRootId, err := db.Workspace(nil, "_null_", "_null", "null")
+		oldRootId, err := db.Workspace(nil, "_null", "_null", "null")
 		assert(err == nil, "Error getting key: %v", err)
 
 		newRootId, err := db.AdvanceWorkspace(nil, "branch", "test", "a",
@@ -289,7 +309,7 @@ func TestDbRestart(t *testing.T) {
 		assert(err == nil, "Error counting typespaces: %v", err)
 		assert(num == 1, "Too many typespaces")
 
-		err = db.BranchWorkspace(nil, "_null_", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
 			"test", "a")
 		assert(err == nil, "Error branching workspace: %v", err)
 

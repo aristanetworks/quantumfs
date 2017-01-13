@@ -41,7 +41,7 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
-func newWorkspaceRoot(c *ctx, typeSpace string, nameSpace string, workSpace string,
+func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceRoot::newWorkspaceRoot").out()
@@ -49,10 +49,10 @@ func newWorkspaceRoot(c *ctx, typeSpace string, nameSpace string, workSpace stri
 	var wsr WorkspaceRoot
 
 	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
-		typeSpace, nameSpace, workSpace)
+		typespace, namespace, workspace)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
 	c.vlog("Workspace Loading %s/%s/%s %s",
-		typeSpace, nameSpace, workSpace, rootId.String())
+		typespace, namespace, workspace, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -60,15 +60,15 @@ func newWorkspaceRoot(c *ctx, typeSpace string, nameSpace string, workSpace stri
 	defer wsr.Lock().Unlock()
 
 	wsr.self = &wsr
-	wsr.typespace = typeSpace
-	wsr.namespace = nameSpace
-	wsr.workspace = workSpace
+	wsr.typespace = typespace
+	wsr.namespace = namespace
+	wsr.workspace = workspace
 	wsr.rootId = rootId
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
-	uninstantiated := initDirectory(c, workSpace, &wsr.Directory,
+	uninstantiated := initDirectory(c, workspace, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 

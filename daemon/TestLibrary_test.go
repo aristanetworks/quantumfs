@@ -782,7 +782,7 @@ func TestPanicFilesystemAbort(t *testing.T) {
 		test.qfs.mapMutex.Unlock()
 
 		// panic Quantumfs
-		api.Branch("_null_/_null/null", "branch/test/crash")
+		api.Branch("_null/_null/null", "branch/test/crash")
 	})
 }
 
