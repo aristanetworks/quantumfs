@@ -188,3 +188,38 @@ func TestHardlinkChain(t *testing.T) {
 		test.assertNoErr(err)
 	})
 }
+
+func TestHardlinkInterWorkspace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspaceA := test.newWorkspace()
+		workspaceB := test.newWorkspace()
+
+		data := genData(1000)
+
+		testFile := workspaceA + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFileA := workspaceA + "/testLink"
+		err = syscall.Link(testFile, linkFileA)
+		test.assertNoErr(err)
+
+		linkFail := workspaceB + "/testLinkFail"
+		err = syscall.Link(linkFileA, linkFail)
+		test.assert(err != nil,
+			"qfs allows existing link copy to another wsr")
+		test.assert(os.IsPermission(err),
+			"qfs not returning EPERM for inter-wsr link")
+
+		testFileB := workspaceA + "/testFileB"
+		err = printToFile(testFileB, string(data))
+		test.assertNoErr(err)
+
+		linkFailB := workspaceB + "/testLinkFailB"
+		err = syscall.Link(testFileB, linkFailB)
+		test.assert(err != nil,
+			"qfs allows creation of hardlink across workspace bounds")
+		test.assert(os.IsPermission(err),
+			"qfs not returning EPERM for link across wsrs")
+	})
+}
