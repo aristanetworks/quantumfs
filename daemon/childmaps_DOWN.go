@@ -13,7 +13,7 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx,
 
 	childId, exists := cmap.children[childName]
 	if !exists {
-		c.elog("No child record or %s in childmap", childName)
+		c.elog("No child record for %s in childmap", childName)
 		return nil, fuse.ENOENT
 	}
 
@@ -27,7 +27,7 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx,
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		cmap.wsr.chgHardlinkRef(link.linkId, true)
+		cmap.wsr.hardlinkInc(link.linkId)
 
 		return &recordCopy, fuse.OK
 	}

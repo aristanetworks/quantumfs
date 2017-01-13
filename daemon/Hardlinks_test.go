@@ -32,8 +32,8 @@ func TestHardlinkReload(t *testing.T) {
 		files := wsr.children.records()
 		for i := uint64(0); i < uint64(len(files)); i++ {
 			record := files[i].(*quantumfs.DirectoryRecord)
-			wsr.hardlinks[i] = newLinkEntry(record)
-			wsr.dirtyLinks[InodeId(i)] = i
+			wsr.hardlinks[HardlinkId(i)] = newLinkEntry(record)
+			wsr.dirtyLinks[InodeId(i)] = HardlinkId(i)
 		}
 
 		// Write another file to ensure the wsr is dirty
@@ -103,7 +103,7 @@ func TestHardlinkForget(t *testing.T) {
 		err = syscall.Link(testFile, linkFile)
 		test.assertNoErr(err)
 
-		// Read the hardlink to ensure its instantiated
+		// Read the hardlink to ensure it's instantiated
 		readData, err := ioutil.ReadFile(linkFile)
 		test.assertNoErr(err)
 		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
@@ -137,7 +137,7 @@ func TestHardlinkConversion(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 
 		wsr := test.getWorkspaceRoot(workspace)
-		linkId := func() uint64 {
+		linkId := func() HardlinkId {
 			defer wsr.linkLock.Lock().Unlock()
 			return wsr.inodeToLink[linkInode]
 		}()
@@ -149,6 +149,8 @@ func TestHardlinkConversion(t *testing.T) {
 		// that would trigger recordByName
 		err = os.Rename(linkFile, linkFile+"_newname")
 		test.assertNoErr(err)
+		test.assertLogContains("ChildMap::recordByName",
+			"recordByName not triggered by Rename")
 		linkFile += "_newname"
 
 		// ensure we can still use the file as normal
