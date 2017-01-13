@@ -122,7 +122,7 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 	}
 }
 
-func (wsr *WorkspaceRoot) nlinks(hardlinkId uint64) uint32 {
+func (wsr *WorkspaceRoot) nlinks(hardlinkId HardlinkId) uint32 {
 	defer wsr.linkLock.Lock().Unlock()
 
 	entry, exists := wsr.hardlinks[hardlinkId]
@@ -133,7 +133,7 @@ func (wsr *WorkspaceRoot) nlinks(hardlinkId uint64) uint32 {
 	return entry.nlink
 }
 
-func (wsr *WorkspaceRoot) hardlinkInc(linkId uint64) {
+func (wsr *WorkspaceRoot) hardlinkInc(linkId HardlinkId) {
 	defer wsr.linkLock.Lock().Unlock()
 
 	entry := wsr.hardlinks[linkId]
@@ -141,7 +141,7 @@ func (wsr *WorkspaceRoot) hardlinkInc(linkId uint64) {
 	wsr.hardlinks[linkId] = entry
 }
 
-func (wsr *WorkspaceRoot) hardlinkDec(linkId uint64) {
+func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) {
 	defer wsr.linkLock.Lock().Unlock()
 
 	entry := wsr.hardlinks[linkId]
@@ -252,7 +252,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) quantumfs.DirectoryReco
 	panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
 }
 
-func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId uint64,
+func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId,
 	wasDirty bool) {
 
