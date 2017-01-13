@@ -8,30 +8,35 @@ import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
 
+type HardlinkId uint64
+func (v HardlinkId) Primitive() interface{} {
+	return uint64(v)
+}
+
 // Should implement DirectoryRecordIf
 type Hardlink struct {
 	name   string
-	linkId uint64
+	linkId HardlinkId
 	wsr    *WorkspaceRoot
 }
 
-func decodeHardlinkKey(key quantumfs.ObjectKey) (hardlinkId uint64) {
+func decodeHardlinkKey(key quantumfs.ObjectKey) (hardlinkId HardlinkId) {
 	if key.Type() != quantumfs.KeyTypeEmbedded {
 		panic("Non-embedded key attempted decode as Hardlink Id")
 	}
 
 	hash := key.Hash()
-	return binary.LittleEndian.Uint64(hash[0:8])
+	return HardlinkId(binary.LittleEndian.Uint64(hash[0:8]))
 }
 
-func encodeHardlinkId(hardlinkId uint64) quantumfs.ObjectKey {
+func encodeHardlinkId(hardlinkId HardlinkId) quantumfs.ObjectKey {
 	var hash [quantumfs.ObjectKeyLength - 1]byte
 
-	binary.LittleEndian.PutUint64(hash[0:8], hardlinkId)
+	binary.LittleEndian.PutUint64(hash[0:8], uint64(hardlinkId))
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 }
 
-func newHardlink(name string, linkId uint64, wsr *WorkspaceRoot) *Hardlink {
+func newHardlink(name string, linkId HardlinkId, wsr *WorkspaceRoot) *Hardlink {
 	var newLink Hardlink
 	newLink.name = name
 	newLink.wsr = wsr
