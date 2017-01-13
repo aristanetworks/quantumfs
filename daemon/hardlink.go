@@ -9,6 +9,7 @@ import "fmt"
 import "github.com/aristanetworks/quantumfs"
 
 type HardlinkId uint64
+
 func (v HardlinkId) Primitive() interface{} {
 	return uint64(v)
 }
