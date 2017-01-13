@@ -212,9 +212,7 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 	defer wsr.linkLock.Lock().Unlock()
 
 	link, exists := wsr.hardlinks[linkId]
-	if !exists {
-		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
-	}
+	assert(exists, fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
 
 	// It's critical that our lock covers both the fetch and this change
 	fnSetter(link)
