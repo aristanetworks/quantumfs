@@ -64,6 +64,7 @@ func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 
 func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
+
 	wsdb.cacheMutex.RLock()
 	namespaces := make([]string, 0, len(wsdb.cache[typespace]))
 
@@ -113,7 +114,6 @@ func (wsdb *WorkspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bo
 	return exists, nil
 }
 
-// Non-lock grabbing variant of workspace
 func (wsdb *WorkspaceDB) namespace(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]quantumfs.ObjectKey, bool) {
 

@@ -117,7 +117,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	// skip the first two Inodes: typespace / namespace / workspace
+	// skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, err := currDir.lookupInternal(c, path[num],

@@ -427,12 +427,12 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 	return newNamespaceList(c, "", "", name, tsl, inodeNum), nil
 }
 
-func newNamespaceList(c *ctx, rootName string, parentName string, name string,
+func newNamespaceList(c *ctx, empty string, empty_ string, typespace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	nsl := NamespaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
-		typespaceName:    name,
+		typespaceName:    typespace,
 		namespacesByName: make(map[string]InodeId),
 		namespacesById:   make(map[InodeId]string),
 	}
@@ -701,7 +701,7 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	return newWorkspaceList(c, nsl.typespaceName, name, "", nsl, inodeNum), nil
+	return newWorkspaceList(c, "", nsl.typespaceName, name, nsl, inodeNum), nil
 }
 
 func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
@@ -714,13 +714,13 @@ func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
 	return
 }
 
-func newWorkspaceList(c *ctx, rootName string, parentName string, name string,
+func newWorkspaceList(c *ctx, empty string, typespace string, namespace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	wsl := WorkspaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
-		typespaceName:    parentName,
-		namespaceName:    name,
+		typespaceName:    typespace,
+		namespaceName:    namespace,
 		workspacesByName: make(map[string]InodeId),
 		workspacesById:   make(map[InodeId]string),
 	}

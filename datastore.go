@@ -67,7 +67,7 @@ func MaxVeryLargeFileSize() uint64 {
 // Special reserved typespace/namespace/workspace names
 const (
 	ApiPath           = "api" // File used for the qfs api
-	NullTypespaceName = "_null_"
+	NullTypespaceName = "_null"
 	NullNamespaceName = "_null"
 	NullWorkspaceName = "null"
 )
@@ -77,9 +77,9 @@ const (
 	InodeIdInvalid     = iota // Invalid
 	InodeIdRoot        = iota // Same as fuse.FUSE_ROOT_ID
 	InodeIdApi         = iota // /api file
-	InodeId_nullType   = iota // /_null_ typespace
-	InodeId_nullName   = iota // /_null_/_null namespace
-	InodeId_nullWork   = iota // /_null_/_null/null workspace
+	InodeId_nullType   = iota // /_null typespace
+	InodeId_nullName   = iota // /_null/_null namespace
+	InodeId_nullWork   = iota // /_null/_null/null workspace
 	InodeIdReservedEnd = iota // End of the reserved range
 )
 
