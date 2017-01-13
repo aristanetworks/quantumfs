@@ -94,7 +94,7 @@ func TestHardlinkRelay(t *testing.T) {
 		workspace := test.newWorkspace()
 
 		testData := genData(2000)
-		
+
 		file1 := workspace + "/orig_file"
 		err := ioutil.WriteFile(file1, testData[:1000], 0777)
 		test.assertNoErr(err)
