@@ -29,7 +29,6 @@ type WorkspaceRoot struct {
 	linkLock       DeferableRwMutex
 	hardlinks      map[uint64]linkEntry
 	nextHardlinkId uint64
-	linkToInode    map[uint64]InodeId
 	inodeToLink    map[InodeId]uint64
 	dirtyLinks     map[InodeId]uint64
 }
@@ -37,12 +36,14 @@ type WorkspaceRoot struct {
 type linkEntry struct {
 	record *quantumfs.DirectoryRecord
 	nlink  uint32
+	inodeId  InodeId
 }
 
 func newLinkEntry(record_ *quantumfs.DirectoryRecord) linkEntry {
 	return linkEntry{
 		record: record_,
 		nlink:  2,
+		inodeId:  quantumfs.InodeIdInvalid,
 	}
 }
 
@@ -130,14 +131,20 @@ func (wsr *WorkspaceRoot) nlinks(hardlinkId uint64) uint32 {
 	return entry.nlink
 }
 
-// if inc is true, we add one. Else, we subtract one.
-func (wsr *WorkspaceRoot) chgHardlinkRef(linkId uint64, inc bool) {
+func (wsr *WorkspaceRoot) hardlinkInc(linkId uint64) {
 	defer wsr.linkLock.Lock().Unlock()
 
 	entry := wsr.hardlinks[linkId]
-	if inc {
-		entry.nlink++
-	} else if entry.nlink > 0 {
+	entry.nlink++
+	wsr.hardlinks[linkId] = entry
+}
+
+func (wsr *WorkspaceRoot) hardlinkDec(linkId uint64) {
+	defer wsr.linkLock.Lock().Unlock()
+
+	entry := wsr.hardlinks[linkId]
+
+	if entry.nlink > 0 {
 		entry.nlink--
 	} else {
 		panic("over decrement in hardlink ref count")
@@ -164,8 +171,9 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	wsr.nextHardlinkId++
 
 	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
-	wsr.hardlinks[newId] = newLinkEntry(dirRecord)
-	wsr.linkToInode[newId] = inodeId
+	newEntry := newLinkEntry(dirRecord)
+	newEntry.inodeId = inodeId
+	wsr.hardlinks[newId] = newEntry
 	wsr.inodeToLink[inodeId] = newId
 
 	// Fix the inode to use the wsr as direct parent
@@ -218,18 +226,19 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId uint64) InodeId {
 	defer wsr.linkLock.RLock().RUnlock()
 
 	// Ensure the linkId is valid
-	if _, exists := wsr.hardlinks[linkId]; !exists {
+	hardlink, exists := wsr.hardlinks[linkId]
+	if !exists {
 		panic("Invalid hardlinkId in system")
 	}
 
-	inode, exists := wsr.linkToInode[linkId]
-	if exists {
-		return inode
+	if hardlink.inodeId != quantumfs.InodeIdInvalid {
+		return hardlink.inodeId
 	}
 
 	// we need to load this Hardlink partially - giving it an inode number
 	inodeId := c.qfs.newInodeId()
-	wsr.linkToInode[linkId] = inodeId
+	hardlink.inodeId = inodeId
+	wsr.hardlinks[linkId] = hardlink
 	wsr.inodeToLink[inodeId] = linkId
 
 	return inodeId
@@ -262,15 +271,21 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId uint64,
 	if !exists {
 		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
 	}
+
+	if link.nlink > 1 {
+		// Not ready to remove hardlink yet
+		return nil, quantumfs.InodeIdInvalid, false
+	}
+
 	delete(wsr.hardlinks, linkId)
 
-	inodeId, exists = wsr.linkToInode[linkId]
+	inodeId = link.inodeId
 	wasDirty = false
-	if exists {
+	if inodeId != quantumfs.InodeIdInvalid {
 		_, wasDirty = wsr.dirtyLinks[inodeId]
 
 		delete(wsr.inodeToLink, inodeId)
-		delete(wsr.linkToInode, linkId)
+		link.inodeId = quantumfs.InodeIdInvalid
 		delete(wsr.dirtyLinks, inodeId)
 	} else {
 		// hardlink was never given an inodeId
@@ -308,7 +323,6 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	defer wsr.linkLock.Lock().Unlock()
 
 	wsr.hardlinks = make(map[uint64]linkEntry)
-	wsr.linkToInode = make(map[uint64]InodeId)
 	wsr.inodeToLink = make(map[InodeId]uint64)
 	wsr.dirtyLinks = make(map[InodeId]uint64)
 

@@ -27,7 +27,7 @@ func (cmap *ChildMap) makeHardlink_DOWN(c *ctx,
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		cmap.wsr.chgHardlinkRef(link.linkId, true)
+		cmap.wsr.hardlinkInc(link.linkId)
 
 		return &recordCopy, fuse.OK
 	}
