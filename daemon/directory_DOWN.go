@@ -26,6 +26,12 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		return fuse.EINVAL
 	}
 
+	// Ensure the source and dest are in the same workspace
+	if srcParent.wsr != dir.wsr {
+		c.elog("Source and dest are not different workspaces.")
+		return fuse.EPERM
+	}
+
 	newRecord, err := srcParent.makeHardlink_DOWN(c, dir.wsr, srcInode)
 	if err != fuse.OK {
 		c.elog("QuantumFs::Link Failed with srcInode record")
