@@ -80,7 +80,6 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
-	wsr.nextHardlinkId = workspaceRoot.NextHardlinkId()
 	uninstantiated := initDirectory(c, name, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
@@ -312,12 +311,17 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	wsr.linkToInode = make(map[uint64]InodeId)
 	wsr.inodeToLink = make(map[InodeId]uint64)
 	wsr.dirtyLinks = make(map[InodeId]uint64)
+	wsr.nextHardlinkId = 0
 
 	for {
 		for i := 0; i < entry.NumEntries(); i++ {
 			hardlink := entry.Entry(i)
 			newLink := newLinkEntry(hardlink.Record())
 			wsr.hardlinks[hardlink.HardlinkID()] = newLink
+
+			if hardlink.HardlinkID() >= wsr.nextHardlinkId {
+				wsr.nextHardlinkId = hardlink.HardlinkID()+1
+			}
 		}
 
 		if entry.Next() == quantumfs.EmptyDirKey || entry.NumEntries() == 0 {
@@ -386,7 +390,6 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
 	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
 	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, wsr.hardlinks))
-	workspaceRoot.SetNextHardlinkId(wsr.nextHardlinkId)
 
 	bytes := workspaceRoot.Bytes()
 
