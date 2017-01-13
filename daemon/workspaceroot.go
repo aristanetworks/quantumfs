@@ -34,16 +34,16 @@ type WorkspaceRoot struct {
 }
 
 type linkEntry struct {
-	record *quantumfs.DirectoryRecord
-	nlink  uint32
-	inodeId  InodeId
+	record  *quantumfs.DirectoryRecord
+	nlink   uint32
+	inodeId InodeId
 }
 
 func newLinkEntry(record_ *quantumfs.DirectoryRecord) linkEntry {
 	return linkEntry{
-		record: record_,
-		nlink:  2,
-		inodeId:  quantumfs.InodeIdInvalid,
+		record:  record_,
+		nlink:   2,
+		inodeId: quantumfs.InodeIdInvalid,
 	}
 }
 
