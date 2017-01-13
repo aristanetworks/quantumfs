@@ -32,8 +32,8 @@ func TestHardlinkReload(t *testing.T) {
 		files := wsr.children.records()
 		for i := uint64(0); i < uint64(len(files)); i++ {
 			record := files[i].(*quantumfs.DirectoryRecord)
-			wsr.hardlinks[i] = newLinkEntry(record)
-			wsr.dirtyLinks[InodeId(i)] = i
+			wsr.hardlinks[HardlinkId(i)] = newLinkEntry(record)
+			wsr.dirtyLinks[InodeId(i)] = HardlinkId(i)
 		}
 
 		// Write another file to ensure the wsr is dirty
