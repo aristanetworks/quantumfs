@@ -137,7 +137,7 @@ func TestHardlinkConversion(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 
 		wsr := test.getWorkspaceRoot(workspace)
-		linkId := func() uint64 {
+		linkId := func() HardlinkId {
 			defer wsr.linkLock.Lock().Unlock()
 			return wsr.inodeToLink[linkInode]
 		}()
