@@ -130,15 +130,15 @@ func (cmap *ChildMap) checkForReplace(c *ctx,
 	}
 
 	link := record.(*Hardlink)
-	count := cmap.wsr.nlinks(link.linkId)
-
-	if count > 1 {
-		return record
-	}
 
 	// This needs to be turned back into a normal file
 	newRecord, inodeId, dirty := cmap.wsr.removeHardlink(c, link.linkId,
 		cmap.dir.inodeNum())
+
+	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
+		// wsr says hardlink isn't ready for removal yet
+		return record
+	}
 
 	// Ensure that we update this version of the record with this instance
 	// of the hardlink's information
@@ -184,7 +184,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	}
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
-		cmap.wsr.chgHardlinkRef(link.linkId, false)
+		cmap.wsr.hardlinkDec(link.linkId)
 	}
 
 	return cmap.delRecord(inodeId, name)
@@ -283,6 +283,8 @@ func (cmap *ChildMap) record(inodeNum InodeId) DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
+	c.funcIn("ChildMap::recordByName").out()
+
 	inodeNum, exists := cmap.children[name]
 	if !exists {
 		return nil

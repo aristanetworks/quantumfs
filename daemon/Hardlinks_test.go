@@ -103,7 +103,7 @@ func TestHardlinkForget(t *testing.T) {
 		err = syscall.Link(testFile, linkFile)
 		test.assertNoErr(err)
 
-		// Read the hardlink to ensure its instantiated
+		// Read the hardlink to ensure it's instantiated
 		readData, err := ioutil.ReadFile(linkFile)
 		test.assertNoErr(err)
 		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
@@ -149,6 +149,8 @@ func TestHardlinkConversion(t *testing.T) {
 		// that would trigger recordByName
 		err = os.Rename(linkFile, linkFile+"_newname")
 		test.assertNoErr(err)
+		test.assertLogContains("ChildMap::recordByName",
+			"recordByName not triggered by Rename")
 		linkFile += "_newname"
 
 		// ensure we can still use the file as normal
