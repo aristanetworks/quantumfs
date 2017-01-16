@@ -26,7 +26,7 @@ func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
 
 func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
 	var filetype uint32
 	var device uint32
@@ -52,7 +52,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		device:   device,
 	}
 	special.self = &special
-	special.setParent(parent)
+	special.setParent(parent.inodeNum())
 	assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
@@ -75,7 +75,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := special.parent().getChildRecord(c, special.InodeCommon.id)
+	record, err := special.parent(c).getChildRecord(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
 		return fuse.EIO
@@ -83,7 +83,7 @@ func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 	fillAttrOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, special.InodeCommon.id,
-		c.fuseCtx.Owner, &record)
+		c.fuseCtx.Owner, record)
 
 	return fuse.OK
 }
@@ -115,7 +115,7 @@ func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return special.parent().setChildAttr(c, special.InodeCommon.id,
+	return special.parent(c).setChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
 
@@ -254,15 +254,16 @@ func (special *Special) instantiateChild(c *ctx,
 }
 
 func (special *Special) getChildRecord(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	c.elog("Unsupported record fetch on Special")
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (special *Special) dirty(c *ctx) {
 	special.setDirty(true)
-	special.parent().dirtyChild(c, special)
+
+	special.parent(c).dirtyChild(c, special.inodeNum())
 }
 
 func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
@@ -274,7 +275,7 @@ func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 }
 
-func specialOverrideAttr(entry *quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
+func specialOverrideAttr(entry DirectoryRecordIf, attr *fuse.Attr) uint32 {
 	attr.Size = 0
 	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = 1

@@ -25,7 +25,7 @@ func TestDirectoryCreation(t *testing.T) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test dir: %v", err)
-		test.assert(stat.Size == qfsBlockSize, "Incorrect Size: %d",
+		test.assert(stat.Size == int64(qfsBlockSize), "Incorrect Size: %d",
 			stat.Size)
 		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
@@ -49,7 +49,7 @@ func TestRecursiveDirectoryCreation(t *testing.T) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(dirName, &stat)
 		test.assert(err == nil, "Error stat'ing test dir: %v", err)
-		test.assert(stat.Size == qfsBlockSize, "Incorrect Size: %d",
+		test.assert(stat.Size == int64(qfsBlockSize), "Incorrect Size: %d",
 			stat.Size)
 		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
@@ -202,190 +202,241 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	})
 }
 
-func checkUnlink(test *testHelper, file string, expectedErr syscall.Errno,
-	dir string, notOwn bool) {
+func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
+	directoryUserMatches bool, directoryGroupMatches bool, directorySticky bool,
+	permissions uint32, mustSucceed bool) {
 
-	fd, err := syscall.Creat(file, 0)
-	test.assert(err == nil, "Error creating file: %v", err)
-	syscall.Close(fd)
-
-	if dir != "" {
-		var stat syscall.Stat_t
-		err = syscall.Stat(dir, &stat)
-		test.assert(err == nil,
-			"Error getting file stat with %v: %d, %d, %o",
-			err, stat.Uid, stat.Gid, stat.Mode)
-
-		err = syscall.Chmod(dir, stat.Mode|syscall.S_ISVTX)
-		test.assert(err == nil, "Error change the mode of file: %v", err)
-
-		err = syscall.Stat(dir, &stat)
-		test.assert(err == nil && stat.Mode&syscall.S_ISVTX != 0,
-			"Error getting file stat with %v: %d, %d, %o",
-			err, stat.Uid, stat.Gid, stat.Mode)
-		if notOwn {
-			err = syscall.Chown(file, 100, 100)
-			test.assert(err == nil,
-				"Error change the ownership of file: %v", err)
-		}
-
+	if directorySticky {
+		permissions |= syscall.S_ISVTX
 	}
 
-	err = syscall.Unlink(file)
-	if expectedErr == 0 {
-		test.assert(err == nil, "Error unlinking file %s : %v", file, err)
+	workspace := test.newWorkspace()
+	testDir := workspace
+	if onDirectory {
+		testDir = workspace + "/testDir"
+		err := os.Mkdir(testDir, os.FileMode(permissions))
+		test.assert(err == nil, "Failed creating testDir: %v", err)
+	}
+	testFile := testDir + "/file"
+
+	err := syscall.Mknod(testFile, syscall.S_IFREG, 0)
+	test.assert(err == nil, "Unable to create test file: %v", err)
+
+	var uid int
+	var gid int
+
+	if !directoryUserMatches {
+		uid = 100
+	} else if asRoot {
+		uid = 0
+	} else { // !asRoot
+		uid = 99
+	}
+
+	if !directoryGroupMatches {
+		gid = 100
+	} else if asRoot {
+		gid = 0
+	} else { // !asRoot
+		gid = 99
+	}
+
+	if onDirectory {
+		err = os.Chown(testDir, uid, gid)
+		test.assert(err == nil, "Error chowning test directory: %v",
+			err)
 	} else {
-		test.assert(err == expectedErr,
-			"Incorrect error unlinking file %s : %v", file, err)
+		// We cannot chown on a WorkspaceRoot, just leave the owner
+		// as root.
+		test.assert(!asRoot,
+			"Cannot chown workspaceroot, invalid arguments")
+	}
+
+	if !asRoot {
+		test.setUidGid(99, 99)
+		defer test.setUidGidToDefault()
+	}
+
+	err = syscall.Unlink(testFile)
+	if mustSucceed {
+		test.assert(err == nil, "Failed to unlink file: %v", err)
+	} else {
+		test.assert(err == syscall.EACCES, "Wrong error when unlinking: %v",
+			err)
 	}
 }
 
-func modifyVerifyChown(test *testHelper, dir string, uid int, gid int) {
-	// Try to change the ownership of the rootDir to uid, gid
-	err := os.Chown(dir, uid, gid)
-	test.assert(err == nil, "Failed to chown: %v", err)
-
-	// Verify the file's uid is 99 and gid is 0
-	var stat syscall.Stat_t
-	err = syscall.Stat(dir, &stat)
-	test.assert(err == nil && int(stat.Uid) == uid && int(stat.Gid) == gid,
-		"Error getting directory stat with %v: %d, %d",
-		err, stat.Uid, stat.Gid)
-}
-
-// Check the root user bypassing all the permission
-func TestUnlinkPermissionRoot(t *testing.T) {
+func TestUnlinkPermissionsAsRootNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-
-		// No Write/Excute permission on directory
-		rootDir := workspace + "/" + "Root"
-		err := os.Mkdir(rootDir, 0)
-		test.assert(err == nil, "Failed to create a direcotry: %v", err)
-		checkUnlink(test, rootDir+"/"+"NoPermissions", 0, "", false)
-
-		// Directory and file are not owned when sticky bit is set
-		modifyVerifyChown(test, rootDir, 100, 100)
-		checkUnlink(test, rootDir+"/"+"NoOwnership", 0, rootDir, true)
-
+		testUnlinkPermissions(test, true, true, false, false, false, 0000,
+			true)
 	})
 }
 
-func TestUnlinkUserPermission(t *testing.T) {
+func TestUnlinkPermissionsAsRootNoPermsSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-
-		defer test.setEuid(99).revert()
-
-		// Check non-existing file
-		nonExist := workspace + "/" + "nonExist"
-		err := syscall.Unlink(nonExist)
-		test.assert(err == syscall.ENOENT, "Error unlinking file: %v", err)
-
-		// The directory is the WorkspaceRoot whose permission is 777,
-		// It should be able to unlink files with any permission
-		testFilename := workspace + "/" + "testFile"
-		checkUnlink(test, testFilename, 0, "", false)
-
-		testDir := workspace + "/" + "testDir"
-		err = os.Mkdir(testDir, 0124)
-		test.assert(err == nil, "Error creating directory: %v", err)
-
-		// Directory without enough permission
-		checkUnlink(test, testDir+"/"+"File", syscall.EACCES, "", false)
-
-		// Give the parent directory enough user permission
-		err = os.Chmod(testDir, 0300)
-		test.assert(err == nil, "Error change the mode of directory: %v",
-			err)
-		checkUnlink(test, testDir+"/"+"Owner", 0, "", false)
-
-		// Check the group/other permission
-		err = os.Chmod(testDir, 0077)
-		test.assert(err == nil, "Error change the mode of directory: %v",
-			err)
-		checkUnlink(test, testDir+"/"+"Grp", syscall.EACCES, "", false)
-		checkUnlink(test, testDir+"/"+"Other", syscall.EACCES, "", false)
-
-		// Testcases when sticky bit is set
-		// Have ownership of directory or both but without permission
-		checkUnlink(test, testDir+"/"+"Sticky-DirNoPerm",
-			syscall.EACCES, testDir, true)
-		checkUnlink(test, testDir+"/"+"Sticky-DualNoPerms",
-			syscall.EACCES, testDir, false)
-
-		// Have ownership of directory or both with permission
-		err = os.Chmod(testDir, 0777)
-		test.assert(err == nil, "Error change the mode of directory: %v",
-			err)
-
-		checkUnlink(test, testDir+"/"+"Sticky-DirPerm", 0, testDir, true)
-		checkUnlink(test, testDir+"/"+"Sticky-DualPerms", 0, testDir, false)
-
+		testUnlinkPermissions(test, true, true, false, false, true, 0000,
+			true)
 	})
 }
 
-func TestUnlinkGroupPermission(t *testing.T) {
+func TestUnlinkPermissionsAsRootNoPermsOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-
-		defer test.setEuid(99).revert()
-
-		testDir := workspace + "/" + "testDir"
-		err := os.Mkdir(testDir, 0747)
-		test.assert(err == nil, "Error creating directory: %v", err)
-
-		modifyVerifyChown(test, testDir, 100, 0)
-		checkUnlink(test, testDir+"/"+"Grp-NoPerm",
-			syscall.EACCES, "", false)
-
-		// Have ownership of file or no owernship when sticky bit is set
-		checkUnlink(test, testDir+"/"+"Sticky-FileNoPerm",
-			syscall.EACCES, testDir, false)
-		checkUnlink(test, testDir+"/"+"Sticky-NoOwnNoPerms",
-			syscall.EACCES, testDir, true)
-
-		// Have the group permission
-		err = os.Chmod(testDir, 0030)
-		test.assert(err == nil, "Error change the mode of directory: %v",
-			err)
-		checkUnlink(test, testDir+"/"+"Grp-Perm", 0, "", false)
-
-		checkUnlink(test, testDir+"/"+"Sticky-FilePerm", 0, testDir, false)
-		checkUnlink(test, testDir+"/"+"Sticky-NoOwnPerm",
-			syscall.EACCES, testDir, true)
+		testUnlinkPermissions(test, true, true, true, true, false, 0000,
+			true)
 	})
 }
 
-func TestUnlinkOtherPermission(t *testing.T) {
+func TestUnlinkPermissionsAsRootNoPermsOwnerSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, true, true, true, true, 0000,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserNoWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, false, 0555,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserNoWriteSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, true, 0555,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserNoWriteOwner(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, false, 0555,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserNoWriteOwnerSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, true, 0555,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserUserWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, false, 0755,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, true, 0755,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserUserWriteOwner(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, false, 0755,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserUserWriteOwnerSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, true, 0755,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, false, 0575,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, true, 0575,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteOwner(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, false, 0575,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, true, 0575,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, true, false, 0575,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, true, true, 0575,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, false, 0557,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserOtherWriteSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, true, 0557,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserOtherWriteOwner(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, false, 0557,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, true, true, true, 0557,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserInWorkspaceRoot(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, false, false, false, false, false, 0000,
+			true)
+	})
+}
+
+func TestUnlinkPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		defer test.setEuid(99).revert()
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
 
-		testDir := workspace + "/" + "testDir"
-		err := os.Mkdir(testDir, 0774)
-		test.assert(err == nil, "Error creating directory: %v", err)
-
-		modifyVerifyChown(test, testDir, 100, 100)
-		checkUnlink(test, testDir+"/"+"Other-NoPerm",
-			syscall.EACCES, "", false)
-
-		// Have ownership of file or no owernship when sticky bit is set
-		checkUnlink(test, testDir+"/"+"Sticky-FileNoPerm",
-			syscall.EACCES, testDir, false)
-		checkUnlink(test, testDir+"/"+"Sticky-NoOwnNoPerm",
-			syscall.EACCES, testDir, true)
-
-		// Have the other permission
-		err = os.Chmod(testDir, 0003)
-		test.assert(err == nil, "Error change the mode of directory: %v",
+		err := syscall.Unlink(workspace + "/file")
+		test.assert(err == syscall.ENOENT, "Wrong error when unlinking: %v",
 			err)
-		checkUnlink(test, testDir+"/"+"Other-Perm", 0, "", false)
-
-		checkUnlink(test, testDir+"/"+"Sticky-FilePerm", 0, testDir, false)
-		checkUnlink(test, testDir+"/"+"Sticky-NoOwnPerm",
-			syscall.EACCES, testDir, true)
 	})
 }
 
@@ -510,8 +561,8 @@ func TestLargeDirectory(t *testing.T) {
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
 		test.assert(err == nil, "Error creating directory:%v", err)
-		numToCreate := quantumfs.MaxDirectoryRecords +
-			quantumfs.MaxDirectoryRecords/4
+		numToCreate := quantumfs.MaxDirectoryRecords() +
+			quantumfs.MaxDirectoryRecords()/4
 
 		// Create enough children to overflow a single block
 		for i := 0; i < numToCreate; i++ {
@@ -973,5 +1024,259 @@ func TestDirectoryGetAttr(t *testing.T) {
 		test.assert(err == nil, "Error stat'ing directory: %v", err)
 		test.assert(fileInfo.Mode()&os.ModePerm == 0124,
 			"Directory permissions incorrect: %d", fileInfo.Mode())
+	})
+}
+
+func testInodeCreatePermissions(test *testHelper, testDir string, mustSucceed bool,
+	failMsg string) {
+
+	check := func(err error) {
+		if mustSucceed {
+			test.assert(err == nil, "%s: %v", failMsg, err)
+		} else {
+			test.assert(err != nil, "%s", failMsg)
+		}
+	}
+
+	// Test Mkdir
+	err := os.Mkdir(testDir+"/testMkdir", 777)
+	check(err)
+
+	// Test Mknod
+	err = syscall.Mknod(testDir+"/testMknod",
+		syscall.S_IFSOCK|syscall.S_IRWXU, 0x12345678)
+	check(err)
+
+	// Test Create
+	fd, err := syscall.Creat(testDir+"/testCreate", 0777)
+	syscall.Close(fd)
+	check(err)
+
+	// Test Symlink
+	err = os.Symlink("arst", testDir+"/testSymlink")
+	check(err)
+}
+
+func TestInodeCreatePermissionsAsRootNoPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0000)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Failed creating directory as root")
+	})
+}
+
+func TestInodeCreatePermissionsAsRootUserPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0700)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Failed creating directory as root with ownership")
+	})
+}
+
+func TestInodeCreatePermissionsAsRootGroupPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0070)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Failed creating directory as root with ownership")
+	})
+}
+
+func TestInodeCreatePermissionsAsRootOtherPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0007)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Failed creating directory as root with ownership")
+	})
+}
+
+func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0000)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, 99)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0700)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, 99)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0070)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, 99)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0007)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, 99)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Failed creating directory as root with ownership")
+	})
+}
+
+func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0000)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0700)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0070)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Fail creating directory as group member")
+	})
+}
+
+func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		err := os.Mkdir(testDir, 0007)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		err := os.Mkdir(testDir, 0000)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		err := os.Mkdir(testDir, 0700)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, true,
+			"Failed creating directory I own")
+	})
+}
+
+func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		err := os.Mkdir(testDir, 0070)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
+	})
+}
+
+func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
+
+		err := os.Mkdir(testDir, 0007)
+		test.assert(err == nil, "Failed creating directory: %v", err)
+
+		testInodeCreatePermissions(test, testDir, false,
+			"Didn't fail creating directory")
 	})
 }

@@ -13,21 +13,25 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	origRecord, err := srcInode.parent().getChildRecord(c, srcInode.inodeNum())
+	origRecord, err := srcInode.parent(c).getChildRecord(c, srcInode.inodeNum())
 	if err != nil {
 		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
 		return fuse.EIO
 	}
 	srcInode.markSelfAccessed(c, false)
 
-	newRecord := cloneDirectoryRecord(&origRecord)
+	newRecord := cloneDirectoryRecord(origRecord)
 	newRecord.SetFilename(newName)
 	newRecord.SetID(srcInode.flush_DOWN(c))
 
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := dir.loadChild_(c, *newRecord)
+	inodeNum := func() InodeId {
+		defer dir.childRecordLock.Lock().Unlock()
+		return dir.children.newChild(c, newRecord)
+	}()
+
 	dir.self.markAccessed(c, newName, true)
 
 	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
@@ -39,16 +43,17 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		newRecord)
 
 	dir.self.dirty(c)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir)
+	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
 	return fuse.OK
 }
 
 func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("Directory::flush_DOWN").out()
+	defer c.FuncIn("Directory::flush_DOWN", "%d %s", dir.inodeNum(),
+		dir.name_).out()
 
 	if !dir.isDirty() {
-		c.vlog("directory not dirty")
+		c.vlog("directory %s not dirty", dir.name_)
 		return dir.baseLayerId
 	}
 
@@ -62,15 +67,16 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 // Walk the list of children which are dirty and have them recompute their new key
 // wsr can update its new key.
 //
-// Requires the Inode lock and dir.childRecordLock
+// Requires the Inode lock and childRecordLock
 func (dir *Directory) updateRecords_DOWN_(c *ctx) {
 	defer c.funcIn("Directory::updateRecords_DOWN_").out()
 
-	for _, child := range dir.dirtyChildren_ {
+	dirtyIds := dir.children.popDirty()
+	for _, childId := range dirtyIds {
+		child := c.qfs.inodeNoInstantiate(c, childId)
 		newKey := child.flush_DOWN(c)
-		dir.childrenRecords[child.inodeNum()].SetID(newKey)
+		dir.children.record(childId).SetID(newKey)
 	}
-	dir.dirtyChildren_ = make(map[InodeId]Inode, 0)
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {

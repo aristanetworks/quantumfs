@@ -14,7 +14,7 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
@@ -26,7 +26,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		key: key,
 	}
 	symlink.self = &symlink
-	symlink.setParent(parent)
+	symlink.setParent(parent.inodeNum())
 	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 
 	if dirRecord != nil {
@@ -52,7 +52,7 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := link.parent().getChildRecord(c, link.InodeCommon.id)
+	record, err := link.parent(c).getChildRecord(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
 		return fuse.EIO
@@ -60,7 +60,7 @@ func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 	fillAttrOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, link.InodeCommon.id,
-		c.fuseCtx.Owner, &record)
+		c.fuseCtx.Owner, record)
 
 	return fuse.OK
 }
@@ -92,7 +92,7 @@ func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return link.parent().setChildAttr(c, link.InodeCommon.id, nil, attr, out,
+	return link.parent(c).setChildAttr(c, link.InodeCommon.id, nil, attr, out,
 		false)
 }
 
@@ -152,24 +152,26 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
-	return link.parent().getChildXAttrSize(c, link.inodeNum(), attr)
+
+	return link.parent(c).getChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
-	return link.parent().getChildXAttrData(c, link.inodeNum(), attr)
+
+	return link.parent(c).getChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	return link.parent().listChildXAttr(c, link.inodeNum())
+	return link.parent(c).listChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	return link.parent().setChildXAttr(c, link.inodeNum(), attr, data)
+	return link.parent(c).setChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	return link.parent().removeChildXAttr(c, link.inodeNum(), attr)
+	return link.parent(c).removeChildXAttr(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
@@ -227,13 +229,13 @@ func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeI
 }
 
 func (link *Symlink) getChildRecord(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	c.elog("Unsupported record fetch on Symlink")
-	return quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (link *Symlink) dirty(c *ctx) {
 	link.setDirty(true)
-	link.parent().dirtyChild(c, link)
+	link.parent(c).dirtyChild(c, link.inodeNum())
 }

@@ -109,6 +109,7 @@ func makedest(src, dst string) bool {
 
 	dstInfo, err := os.Stat(dst)
 	if err != nil && !os.IsNotExist(err) {
+		fmt.Println("Destination Inode already exists: ", err)
 		return false
 	}
 
@@ -118,12 +119,14 @@ func makedest(src, dst string) bool {
 
 	if srcInfo.IsDir() {
 		if err := os.Mkdir(dst, srcInfo.Mode()); err != nil {
+			fmt.Println("Fail to create a directory: ", err)
 			return false
 		} else {
 			return true
 		}
 	} else {
 		if fd, err := os.Create(dst); err != nil {
+			fmt.Println("Fail to create another type: ", err)
 			return false
 		} else {
 			fd.Close()
@@ -216,9 +219,11 @@ func netnsLogin(rootdir string, svrName string) error {
 	args := []string{netns, svrName, sh, "-l", "-c",
 		"\"$@\"", bash, bash}
 	if err := syscall.Exec(netns, args, env); err != nil {
+		fmt.Println("The error is ", err.Error())
 		return fmt.Errorf("netnsLogin Exec error: %s", err.Error())
 	}
 
+	fmt.Println("The error is nil")
 	return nil
 }
 
@@ -293,7 +298,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 			rootdir, err.Error())
 	}
 
-	if err := runCommand(sudo, setarch, archString, netnsd,
+	if err := runCommand(setarch, archString, netnsd,
 		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
 		"--pre-chroot-cmd="+prechrootCmd, svrName); err != nil {
 		return err
@@ -402,10 +407,9 @@ func copyDirStayOnFs(src string, dst string) error {
 			}
 		} else if finfo.Mode().IsRegular() {
 			// There should not be any ordinary files in /dev directory,
-			// if there is, we should return an error to user, and if
-			// it is something necessary, a bug should be filed.
-			return fmt.Errorf("Ordinary files should not be present" +
-				" in /dev!")
+			// though in rare cases like /dev/shm there may be. Warn, but
+			// skip the file and continue
+			fmt.Printf("Skipping ordinary file in /dev: %s\n", dst)
 		} else if (finfo.Mode() & os.ModeSymlink) != 0 {
 			oldPath, errOldPath := os.Readlink(name)
 			if errOldPath != nil {
@@ -514,6 +518,17 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
 		}
 
+		dst = rootdir + "/tmp"
+		if err := os.MkdirAll(dst, os.ModeSticky|0777); err != nil {
+
+			return fmt.Errorf("Mounting /tmp as tmpfs error: %s",
+				err.Error())
+		}
+		if err := syscall.Mount("tmpfs", dst, "tmpfs", 0, ""); err != nil {
+			return fmt.Errorf("Mounting tmp as tmpfs error: %s",
+				err.Error())
+		}
+
 		if err := setupBindMounts(rootdir); err != nil {
 			return err
 		}
@@ -604,7 +619,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 			err.Error())
 	}
 
-	// switch to non-root user
+	// Switch to non-root user
 	if err := switchUserMode(); err != nil {
 		return fmt.Errorf("Switching usermode error: %s", err.Error())
 	}
@@ -629,6 +644,23 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 }
 
 func chroot() {
+	// If we do not have root privilege, then gain it now
+	if syscall.Geteuid() != 0 {
+		sudo_cmd := []string{sudo}
+		sudo_cmd = append(sudo_cmd, os.Args...)
+		env := os.Environ()
+
+		if err := syscall.Exec(sudo_cmd[0],
+			sudo_cmd, env); err != nil {
+
+			fmt.Printf("Exec'ing sudo command error: %s\n",
+				err.Error())
+			os.Exit(1)
+		}
+
+		return
+	}
+
 	args := os.Args[2:]
 
 	var wsr string
@@ -679,26 +711,10 @@ ArgumentProcessingLoop:
 			os.Exit(1)
 		}
 
-		// if we do not have root privilege, then gain it now
-		if syscall.Getuid() != 0 {
-			sudo_cmd := []string{sudo, qfs, "chroot",
-				"--nonpersistent", wsr, dir}
-			sudo_cmd = append(sudo_cmd, cmd...)
-			env := os.Environ()
-
-			if err := syscall.Exec(sudo_cmd[0],
-				sudo_cmd, env); err != nil {
-
-				fmt.Printf("Exec'ing sudo command error: %s\n",
-					err.Error())
-				os.Exit(1)
-			}
-		} else {
-			if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
-				fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s",
-					err.Error())
-				os.Exit(1)
-			}
+		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
+			fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s",
+				err.Error())
+			os.Exit(1)
 		}
 
 		return
@@ -718,6 +734,12 @@ ArgumentProcessingLoop:
 				"chrootInNsd Error:", err.Error())
 			os.Exit(1)
 		}
+	}
+
+	// Switch to non-root user
+	if err := switchUserMode(); err != nil {
+		fmt.Println("Switching usermode error: ", err.Error())
+		os.Exit(1)
 	}
 
 	err = netnsLogin(rootdir, svrName)
