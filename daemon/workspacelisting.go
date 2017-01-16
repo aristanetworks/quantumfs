@@ -362,7 +362,7 @@ func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.elog("Invalid syncChild on TypespaceList for %d", inodeNum)
+	c.elog("Invalid syncChild on TypespaceList")
 }
 
 func (tsl *TypespaceList) setChildAttr(c *ctx, inodeNum InodeId,
