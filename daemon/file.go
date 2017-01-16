@@ -17,7 +17,7 @@ const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
 	accessor := newSmallAccessor(c, size, key)
 
@@ -26,7 +26,7 @@ func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
 	accessor := newMediumAccessor(c, key)
 
@@ -35,7 +35,7 @@ func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
 	accessor := newLargeAccessor(c, key)
 
@@ -44,7 +44,7 @@ func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord *quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
 
 	accessor := newVeryLargeAccessor(c, key)
 
@@ -64,7 +64,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 		accessor: accessor,
 	}
 	file.self = &file
-	file.setParent(parent)
+	file.setParent(parent.inodeNum())
 
 	assert(file.treeLock() != nil, "File treeLock nil at init")
 
@@ -74,7 +74,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 type File struct {
 	InodeCommon
 	accessor     blockAccessor
-	unlinkRecord *quantumfs.DirectoryRecord
+	unlinkRecord DirectoryRecordIf
 }
 
 // Mark this file dirty and notify your paent
@@ -82,11 +82,11 @@ func (fi *File) dirty(c *ctx) {
 	defer c.funcIn("File::dirty").out()
 
 	fi.setDirty(true)
-	fi.parent().dirtyChild(c, fi)
+	fi.parent(c).dirtyChild(c, fi.inodeNum())
 }
 
-func (fi *File) dirtyChild(c *ctx, child Inode) {
-	if child != fi.self {
+func (fi *File) dirtyChild(c *ctx, child InodeId) {
+	if child != fi.inodeNum() {
 		panic("Unsupported dirtyChild() call on File")
 	}
 }
@@ -101,7 +101,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("File::GetAttr").out()
 
-	record, err := fi.parent().getChildRecord(c, fi.InodeCommon.id)
+	record, err := fi.parent(c).getChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
 		return fuse.EIO
@@ -109,7 +109,7 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 	fillAttrOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, fi.InodeCommon.id, c.fuseCtx.Owner,
-		&record)
+		record)
 
 	return fuse.OK
 }
@@ -123,7 +123,7 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 	defer c.funcIn("File::openPermission").out()
 
-	record, error := fi.parent().getChildRecord(c, fi.id)
+	record, error := fi.parent(c).getChildRecord(c, fi.id)
 	if error != nil {
 		return false
 	}
@@ -246,7 +246,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent().setChildAttr(c, fi.InodeCommon.id, nil, attr, out,
+	return fi.parent(c).setChildAttr(c, fi.InodeCommon.id, nil, attr, out,
 		updateMtime)
 }
 
@@ -303,7 +303,7 @@ func (fi *File) GetXAttrSize(c *ctx,
 
 	defer c.funcIn("File::GetXAttrSize").out()
 
-	return fi.parent().getChildXAttrSize(c, fi.inodeNum(), attr)
+	return fi.parent(c).getChildXAttrSize(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) GetXAttrData(c *ctx,
@@ -311,25 +311,25 @@ func (fi *File) GetXAttrData(c *ctx,
 
 	defer c.funcIn("File::GetXAttrData").out()
 
-	return fi.parent().getChildXAttrData(c, fi.inodeNum(), attr)
+	return fi.parent(c).getChildXAttrData(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
 	defer c.funcIn("File::ListXAttr").out()
 
-	return fi.parent().listChildXAttr(c, fi.inodeNum())
+	return fi.parent(c).listChildXAttr(c, fi.inodeNum())
 }
 
 func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 	defer c.funcIn("File::SetXAttr").out()
 
-	return fi.parent().setChildXAttr(c, fi.inodeNum(), attr, data)
+	return fi.parent(c).setChildXAttr(c, fi.inodeNum(), attr, data)
 }
 
 func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	defer c.funcIn("File::RemoveXAttr").out()
 
-	return fi.parent().removeChildXAttr(c, fi.inodeNum(), attr)
+	return fi.parent(c).removeChildXAttr(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
@@ -413,14 +413,13 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
-	error) {
+func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	defer c.funcIn("File::getChildRecord").out()
 
 	if inodeNum != fi.inodeNum() {
 		c.elog("Unsupported record fetch on file")
-		return quantumfs.DirectoryRecord{},
+		return &quantumfs.DirectoryRecord{},
 			errors.New("Unsupported record fetch")
 	}
 
@@ -433,10 +432,10 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRec
 		panic("getChildRecord on self file before unlinking")
 	}
 
-	return *fi.unlinkRecord, nil
+	return fi.unlinkRecord, nil
 }
 
-func (fi *File) setChildRecord(c *ctx, record *quantumfs.DirectoryRecord) {
+func (fi *File) setChildRecord(c *ctx, record DirectoryRecordIf) {
 	defer c.funcIn("File::setChildRecord").out()
 
 	fi.parentLock.Lock()
@@ -492,9 +491,9 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 	switch {
 	case numBlocks <= 1:
 		return quantumfs.ObjectTypeSmallFile
-	case numBlocks <= quantumfs.MaxBlocksMediumFile:
+	case numBlocks <= quantumfs.MaxBlocksMediumFile():
 		return quantumfs.ObjectTypeMediumFile
-	case numBlocks <= quantumfs.MaxBlocksLargeFile:
+	case numBlocks <= quantumfs.MaxBlocksLargeFile():
 		return quantumfs.ObjectTypeLargeFile
 	default:
 		return quantumfs.ObjectTypeVeryLargeFile
@@ -516,7 +515,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		fi.parent().setChildAttr(c, fi.id, &neededType, &attr, nil, false)
+		fi.parent(c).setChildAttr(c, fi.id, &neededType, &attr, nil, false)
 	}
 	return nil
 }
@@ -657,7 +656,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent().setChildAttr(c, fi.id, nil, &attr, nil, true)
+	fi.parent(c).setChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
 
 	return writeCount, fuse.OK

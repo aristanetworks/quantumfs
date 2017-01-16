@@ -155,7 +155,8 @@ func TestFileDescriptorPermissions(t *testing.T) {
 		err := syscall.Mkdir(testDir, 0777)
 		test.assert(err == nil, "Error creating directories: %v", err)
 
-		defer test.setEuid(99).revert()
+		test.setUidGid(99, -1)
+		defer test.setUidGidToDefault()
 
 		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)

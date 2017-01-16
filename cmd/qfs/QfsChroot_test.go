@@ -7,6 +7,7 @@ package main
 import "io/ioutil"
 import "os"
 import "os/exec"
+import "runtime"
 import "syscall"
 import "testing"
 
@@ -150,12 +151,56 @@ func terminateNetnsdServer(rootdir string, t *testing.T) {
 	}
 }
 
-func TestPersistentChroot(t *testing.T) {
-	dirTest := setupWorkspace(t)
+// Change the UID/GID the test thread to the given values. Use -1 not to change
+// either the UID or GID.
+func setUidGid(uid int, gid int, t *testing.T) {
+	// The quantumfs tests are run as root because some tests require
+	// root privileges. However, root can read or write any file
+	// irrespective of the file permissions. Obviously if we want to
+	// test permissions then we cannot run as root.
+	//
+	// To accomplish this we lock this goroutine to a particular OS
+	// thread, then we change the EUID of that thread to something which
+	// isn't root. Finally at the end we need to restore the EUID of the
+	// thread before unlocking ourselves from that thread. If we do not
+	// follow this precise cleanup order other tests or goroutines may
+	// run using the other UID incorrectly.
+	runtime.LockOSThread()
+	if gid != -1 {
+		err := syscall.Setregid(-1, gid)
+		if err != nil {
+			runtime.UnlockOSThread()
+			t.Fatal(err.Error())
+		}
+	}
 
-	defer cleanupWorkspace(dirTest, t)
-	defer terminateNetnsdServer(dirTest, t)
+	if uid != -1 {
+		err := syscall.Setreuid(-1, uid)
+		if err != nil {
+			syscall.Setregid(-1, 0)
+			runtime.UnlockOSThread()
+			t.Fatal(err.Error())
+		}
+	}
 
+}
+
+// Set the UID and GID back to the defaults
+func setUidGidToDefault(t *testing.T) {
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+	if err1 != nil {
+		t.Fatal(err1.Error())
+	}
+	if err2 != nil {
+		t.Fatal(err2.Error())
+	}
+}
+
+func testPersistentChroot(t *testing.T, dirTest string) {
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
 		t.Fatalf("Creating test file error: %s", err.Error())
@@ -205,12 +250,29 @@ func TestPersistentChroot(t *testing.T) {
 	}
 }
 
-func TestNetnsPersistency(t *testing.T) {
-	dirTest := setupWorkspace(t)
+func TestPersistentChroot(t *testing.T) {
+	func() {
+		dirTest := setupWorkspace(t)
 
-	defer cleanupWorkspace(dirTest, t)
-	defer terminateNetnsdServer(dirTest, t)
+		defer cleanupWorkspace(dirTest, t)
+		defer terminateNetnsdServer(dirTest, t)
 
+		testPersistentChroot(t, dirTest)
+	}()
+
+	func() {
+		dirTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(dirTest, t)
+		defer terminateNetnsdServer(dirTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testPersistentChroot(t, dirTest)
+	}()
+}
+
+func testNetnsPersistency(t *testing.T, dirTest string) {
 	var fileTest string
 	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
 		t.Fatalf("Creating test file error: %s", err.Error())
@@ -284,6 +346,28 @@ func TestNetnsPersistency(t *testing.T) {
 	}
 }
 
+func TestNetnsPersistency(t *testing.T) {
+	func() {
+		dirTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(dirTest, t)
+		defer terminateNetnsdServer(dirTest, t)
+
+		testNetnsPersistency(t, dirTest)
+	}()
+
+	func() {
+		dirTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(dirTest, t)
+		defer terminateNetnsdServer(dirTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNetnsPersistency(t, dirTest)
+	}()
+}
+
 // Here we can define several variants of each of the following arguments
 // <WSR>:
 // AbsWsr: Absolute path of workspaceroot in the filesystem before chroot
@@ -325,11 +409,7 @@ func setupNonPersistentChrootTest(t *testing.T, rootTest string) (string, string
 	return dirTest, fileTest
 }
 
-func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
-
-	defer cleanupWorkspace(rootTest, t)
-
+func testNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	fileTest = fileTest[len(rootTest):]
@@ -342,11 +422,26 @@ func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
 	}
 }
 
-func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootAbsWsrAbsDirAbsCmd(t, rootTest)
+	}()
 
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootAbsWsrAbsDirAbsCmd(t, rootTest)
+	}()
+}
+
+func testNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	fileTest = "." + fileTest[len(dirTest):]
@@ -359,11 +454,26 @@ func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
 	}
 }
 
-func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootAbsWsrAbsDirRelCmd(t, rootTest)
+	}()
 
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootAbsWsrAbsDirRelCmd(t, rootTest)
+	}()
+}
+
+func testNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	if err := os.Chdir("/"); err != nil {
@@ -372,6 +482,44 @@ func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
 	}
 
 	fileTest = fileTest[len(rootTest):]
+	dirTest = dirTest[len(rootTest):]
+	rootTest = "." + rootTest
+
+	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
+		dirTest, "ls", fileTest); err != nil {
+
+		t.Fatal(err.Error())
+	}
+}
+
+func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
+
+		testNonPersistentChrootRelWsrAbsDirAbsCmd(t, rootTest)
+	}()
+
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootRelWsrAbsDirAbsCmd(t, rootTest)
+	}()
+}
+
+func testNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T, rootTest string) {
+	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
+
+	if err := os.Chdir("/"); err != nil {
+		t.Fatalf("Changing to directory / error: %s",
+			err.Error())
+	}
+
+	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
@@ -383,20 +531,29 @@ func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
 }
 
 func TestNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootRelWsrAbsDirRelCmd(t, rootTest)
+	}()
 
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootRelWsrAbsDirRelCmd(t, rootTest)
+	}()
+}
+
+func testNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
-	if err := os.Chdir("/"); err != nil {
-		t.Fatalf("Changing to directory / error: %s",
-			err.Error())
-	}
-
-	fileTest = "." + fileTest[len(dirTest):]
-	dirTest = dirTest[len(rootTest):]
-	rootTest = "." + rootTest
+	fileTest = fileTest[len(rootTest):]
+	dirTest = dirTest[len(rootTest)+1:]
 
 	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
@@ -406,13 +563,28 @@ func TestNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T) {
 }
 
 func TestNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootAbsWsrRelDirAbsCmd(t, rootTest)
+	}()
 
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootAbsWsrRelDirAbsCmd(t, rootTest)
+	}()
+}
+
+func testNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
-	fileTest = fileTest[len(rootTest):]
+	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
 	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
@@ -423,14 +595,36 @@ func TestNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T) {
 }
 
 func TestNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootAbsWsrRelDirRelCmd(t, rootTest)
+	}()
 
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootAbsWsrRelDirRelCmd(t, rootTest)
+
+	}()
+}
+
+func testNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
-	fileTest = "." + fileTest[len(dirTest):]
+	if err := os.Chdir("/"); err != nil {
+		t.Fatalf("Changing to directory / error: %s",
+			err.Error())
+	}
+
+	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest)+1:]
+	rootTest = "." + rootTest
 
 	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
 		dirTest, "ls", fileTest); err != nil {
@@ -440,10 +634,26 @@ func TestNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T) {
 }
 
 func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootRelWsrRelDirAbsCmd(t, rootTest)
+	}()
 
+	func() {
+		rootTest := setupWorkspace(t)
+
+		defer cleanupWorkspace(rootTest, t)
+
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootRelWsrRelDirAbsCmd(t, rootTest)
+
+	}()
+}
+
+func testNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T, rootTest string) {
 	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
 
 	if err := os.Chdir("/"); err != nil {
@@ -451,7 +661,7 @@ func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
 			err.Error())
 	}
 
-	fileTest = fileTest[len(rootTest):]
+	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
@@ -463,24 +673,21 @@ func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
 }
 
 func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
-	rootTest := setupWorkspace(t)
+	func() {
+		rootTest := setupWorkspace(t)
+		defer cleanupWorkspace(rootTest, t)
 
-	defer cleanupWorkspace(rootTest, t)
+		testNonPersistentChrootRelWsrRelDirRelCmd(t, rootTest)
+	}()
 
-	dirTest, fileTest := setupNonPersistentChrootTest(t, rootTest)
+	func() {
+		rootTest := setupWorkspace(t)
 
-	if err := os.Chdir("/"); err != nil {
-		t.Fatalf("Changing to directory / error: %s",
-			err.Error())
-	}
+		defer cleanupWorkspace(rootTest, t)
 
-	fileTest = "." + fileTest[len(dirTest):]
-	dirTest = dirTest[len(rootTest)+1:]
-	rootTest = "." + rootTest
+		setUidGid(99, 99, t)
+		defer setUidGidToDefault(t)
+		testNonPersistentChrootRelWsrRelDirRelCmd(t, rootTest)
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
-		t.Fatal(err.Error())
-	}
+	}()
 }

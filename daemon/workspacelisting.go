@@ -38,7 +38,7 @@ type NamespaceList struct {
 func (nsl *NamespaceList) dirty(c *ctx) {
 }
 
-func (nsl *NamespaceList) dirtyChild(c *ctx, child Inode) {
+func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -129,7 +129,9 @@ func updateChildren(c *ctx, parentName string, names []string,
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
-			if parentName == "_null" && name == "null" {
+			if parentName == quantumfs.NullNamespaceName &&
+				name == quantumfs.NullWorkspaceName {
+
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
 					parentName, name, parent, inodeId))
 			} else {
@@ -183,6 +185,15 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	out.OpenFlags = 0
 
 	return fuse.OK
+}
+
+func (nsl *NamespaceList) childInodes() []InodeId {
+	rtn := make([]InodeId, 0, len(nsl.namespacesById))
+	for k, _ := range nsl.namespacesById {
+		rtn = append(rtn, k)
+	}
+
+	return rtn
 }
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -255,10 +266,10 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (nsl *NamespaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	c.elog("Unsupported record fetch on NamespaceList")
-	return quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectoryRecord{},
 		errors.New("Unsupported record fetch on NamespaceList")
 }
 
@@ -413,7 +424,7 @@ func newWorkspaceList(c *ctx, parentName string, name string, parent Inode,
 		workspacesById:   make(map[InodeId]string),
 	}
 	wsl.self = &wsl
-	wsl.setParent(parent)
+	wsl.setParent(parent.inodeNum())
 	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
 	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl
@@ -433,7 +444,7 @@ type WorkspaceList struct {
 func (wsl *WorkspaceList) dirty(c *ctx) {
 }
 
-func (wsl *WorkspaceList) dirtyChild(c *ctx, child Inode) {
+func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -466,6 +477,15 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	out.OpenFlags = 0
 
 	return fuse.OK
+}
+
+func (wsl *WorkspaceList) childInodes() []InodeId {
+	rtn := make([]InodeId, 0, len(wsl.workspacesById))
+	for k, _ := range wsl.workspacesById {
+		rtn = append(rtn, k)
+	}
+
+	return rtn
 }
 
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -524,10 +544,10 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (wsl *WorkspaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	c.elog("Unsupported record fetch on WorkspaceList")
-	return quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectoryRecord{},
 		errors.New("Unsupported record fetch on WorkspaceList")
 }
 
@@ -666,7 +686,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	if wsl.namespaceName == "_null" && wsl.workspacesById[inodeNum] == "null" {
+	if wsl.namespaceName == quantumfs.NullNamespaceName &&
+		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
+
 		return newNullWorkspaceRoot(c, wsl.namespaceName,
 			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
 	} else {

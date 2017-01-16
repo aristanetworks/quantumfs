@@ -11,6 +11,8 @@ import "os"
 import "testing"
 import "syscall"
 
+import "github.com/aristanetworks/quantumfs"
+
 func TestLargeFileRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
@@ -18,8 +20,9 @@ func TestLargeFileRead(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		fullLength := 34 * 1024 * 1024
-		offset := 30 * 1024 * 1024
+		maxMediumFileSize := int(quantumfs.MaxMediumFileSize())
+		offset := maxMediumFileSize - 2*quantumfs.MaxBlockSize
+		fullLength := maxMediumFileSize + 2*quantumfs.MaxBlockSize
 		data := genData(fullLength - offset)
 		err := printToFile(testFilename, string(data[0]))
 		test.assert(err == nil, "Error creating file")
@@ -54,22 +57,28 @@ func TestLargeFileExpansion(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a medium file could hold.
-		fullLength := 34 * 1024 * 1024
-		offset := 30 * 1024 * 1024
+		maxMediumFileSize := int(quantumfs.MaxMediumFileSize())
+		offset := maxMediumFileSize - 2*quantumfs.MaxBlockSize
+		fullLength := maxMediumFileSize + 2*quantumfs.MaxBlockSize
 		data := genData(fullLength - offset)
+		// write 4 blocks at the start of file
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error creating file")
 		os.Truncate(testFilename, int64(offset))
+		// write 4 blocks at offset creating a large file
 		err = printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error writing into medium sparse file: %v",
 			err)
 
-		// Test that we can truncate this
-		newLen := 2500000
+		// Test that we can truncate this large file
+		// to a medium file
+		newLen := int(quantumfs.MaxSmallFileSize()) +
+			quantumfs.MaxBlockSize
 		os.Truncate(testFilename, int64(newLen))
 
 		// Ensure that the data ends where we expect
-		offset = 2432132
+		// offset is < newLen and < len(data)
+		offset = newLen - 1024
 		fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
 		test.assert(fdErr == nil, "Unable to open file for RDONLY")
 		// Try to read more than should exist
@@ -109,7 +118,7 @@ func TestLargeFileExpansion(t *testing.T) {
 }
 
 func TestLargeFileAttr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -121,7 +130,8 @@ func TestLargeFileAttr(t *testing.T) {
 		syscall.Close(fd)
 
 		// Then expand it via SetAttr to large file size
-		newSize := int64(34 * 1024 * 1024)
+		newSize := int64(quantumfs.MaxMediumFileSize()) +
+			int64(quantumfs.MaxBlockSize)
 		os.Truncate(testFilename, newSize)
 
 		// Check that the size increase worked
@@ -131,14 +141,16 @@ func TestLargeFileAttr(t *testing.T) {
 		test.assert(stat.Size == newSize, "File size incorrect, %d",
 			stat.Size)
 
-		// Read what should be 34MB of zeros
-		test.checkZeroSparse(testFilename, 34000)
+		// Read what should be all zeros
+		// stride offset to cause 1000 checks
+		test.checkZeroSparse(testFilename, int(newSize)/1000)
 
 		// Ensure that we can write data into the hole
 		testString := []byte("testData")
 		var file *os.File
 		var count int
-		dataOffset := 4500000
+		// hole exists from offset 0 to EOF
+		dataOffset := 2 * quantumfs.MaxBlockSize
 		file, err = os.OpenFile(testFilename, os.O_RDWR, 0777)
 		test.assert(err == nil, "Unable to open file for rdwr: %v", err)
 		count, err = file.WriteAt(testString, int64(dataOffset))
@@ -160,8 +172,8 @@ func TestLargeFileAttr(t *testing.T) {
 		err = api.Branch(test.relPath(workspace), dst)
 		test.assert(err == nil, "Unable to branch")
 
-		test.checkSparse(test.absPath(dst+"/test"), testFilename, 250000,
-			10)
+		test.checkSparse(test.absPath(dst+"/test"), testFilename,
+			int(newSize)/100, 10)
 	})
 }
 
@@ -174,8 +186,9 @@ func TestLargeFileZero(t *testing.T) {
 		data := genData(10 * 1024)
 		err := printToFile(testFilename, string(data))
 		test.assert(err == nil, "Error writing tiny data to new fd")
-		// expand this to be the desired file type
-		os.Truncate(testFilename, 34*1048576)
+		// expand this to Large file type
+		os.Truncate(testFilename, int64(quantumfs.MaxMediumFileSize())+
+			int64(quantumfs.MaxBlockSize))
 
 		os.Truncate(testFilename, 0)
 		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")

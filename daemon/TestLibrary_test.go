@@ -5,7 +5,6 @@ package daemon
 
 // Test library
 
-import "bufio"
 import "bytes"
 import "errors"
 import "flag"
@@ -180,11 +179,11 @@ func abortFuse(th *testHelper) {
 	if err != nil {
 		// We cannot abort so we won't terminate. We are
 		// truly wedged.
-		panic("Failed to abort FUSE connection (open)")
+		th.log("ERROR: Failed to abort FUSE connection (open)")
 	}
 
 	if _, err := abort.Write([]byte("1")); err != nil {
-		panic("Failed to abort FUSE connection (write)")
+		th.log("ERROR: Failed to abort FUSE connection (write)")
 	}
 
 	abort.Close()
@@ -202,6 +201,8 @@ func (th *testHelper) endTest() {
 		if exception != nil {
 			th.t.Logf("Failed with exception, forcefully unmounting: %v",
 				exception)
+			th.log("Failed with exception, forcefully unmounting: %v",
+				exception)
 			abortFuse(th)
 		}
 
@@ -211,10 +212,10 @@ func (th *testHelper) endTest() {
 			runtime.GC()
 
 			if err := th.qfs.server.Unmount(); err != nil {
-				th.t.Fatalf("ERROR: Failed to unmount quantumfs "+
+				th.log("ERROR: Failed to unmount quantumfs "+
 					"instance after aborting: %v", err)
 			}
-			th.t.Fatalf("ERROR: Failed to unmount quantumfs instance, "+
+			th.log("ERROR: Failed to unmount quantumfs instance, "+
 				"are you leaking a file descriptor?: %v", err)
 		}
 	}
@@ -252,7 +253,24 @@ func (th *testHelper) waitToBeUnmounted() {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	panic("Filesystem didn't unmount in time")
+	th.log("ERROR: Filesystem didn't unmount in time")
+}
+
+// Repeatedly check the condition by calling the function until that function returns
+// true.
+//
+// No timeout is provided beyond the normal test timeout.
+func (th *testHelper) waitFor(description string, condition func() bool) {
+	th.log("Started waiting for %s", description)
+	for {
+		if condition() {
+			th.log("Finished waiting for %s", description)
+			return
+		} else {
+			th.log("Condition not satisfied")
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
 }
 
 // Check the test output for errors
@@ -375,46 +393,6 @@ func (th *testHelper) startDefaultQuantumFs() {
 	th.startQuantumFs(config)
 }
 
-// Return the fuse connection id for the filesystem mounted at the given path
-func (th *testHelper) findFuseConnection(mountPath string) int {
-	th.log("Finding FUSE Connection ID...")
-	for i := 0; i < 100; i++ {
-		th.log("Waiting for mount try %d...", i)
-		file, err := os.Open("/proc/self/mountinfo")
-		if err != nil {
-			th.log("Failed opening mountinfo: %v", err)
-			return -1
-		}
-		defer file.Close()
-
-		mountinfo := bufio.NewReader(file)
-
-		for {
-			bline, _, err := mountinfo.ReadLine()
-			if err != nil {
-				break
-			}
-
-			line := string(bline)
-
-			if strings.Contains(line, mountPath) {
-				fields := strings.SplitN(line, " ", 5)
-				dev := strings.Split(fields[2], ":")[1]
-				devInt, err := strconv.Atoi(dev)
-				if err != nil {
-					th.log("Failed to convert dev to integer")
-					return -1
-				}
-				return devInt
-			}
-		}
-
-		time.Sleep(50 * time.Millisecond)
-	}
-	th.log("Mount not found")
-	return -1
-}
-
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
 // hanging.
 func serveSafely(th *testHelper) {
@@ -455,7 +433,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 
 	go serveSafely(th)
 
-	th.fuseConnection = th.findFuseConnection(config.MountPath)
+	th.fuseConnection = findFuseConnection(th.testCtx(), config.MountPath)
 	th.assert(th.fuseConnection != -1, "Failed to find mount")
 	th.log("QuantumFs instance started")
 }
@@ -572,7 +550,7 @@ func (th *testHelper) syncAllWorkspaces() {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	th.qfs.mapMutex.Lock()
+	defer th.qfs.mapMutex.Lock().Unlock()
 
 	for _, file := range th.qfs.fileHandles {
 		fh, ok := file.(*FileDescriptor)
@@ -585,19 +563,22 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 		}
 	}
 
-	th.qfs.mapMutex.Unlock()
-
 	return handles
+}
+
+// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
+func (th *testHelper) getInodeNum(path string) InodeId {
+	var stat syscall.Stat_t
+	err := syscall.Stat(path, &stat)
+	th.assert(err == nil, "Error grabbing file inode: %v", err)
+
+	return InodeId(stat.Ino)
 }
 
 // Retrieve the Inode from Quantumfs. Returns nil is not instantiated
 func (th *testHelper) getInode(path string) Inode {
-	var stat syscall.Stat_t
-	err := syscall.Stat(path, &stat)
-	th.assert(err == nil, "Error grabbing file inode: %v", err)
-	inode := th.qfs.inodeNoInstantiate(&th.qfs.c,
-		InodeId(stat.Ino))
-	return inode
+	inodeNum := th.getInodeNum(path)
+	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
 // Retrieve the rootId of the given workspace
@@ -656,7 +637,7 @@ func TestMain(m *testing.M) {
 	//
 	// Because the filesystem request is blocked waiting on GC and the syscall
 	// will never return to allow GC to progress, the test program is deadlocked.
-	debug.SetGCPercent(-1)
+	origGC := debug.SetGCPercent(-1)
 
 	// Precompute a bunch of our genData to save time during tests
 	genData(40 * 1024 * 1024)
@@ -666,10 +647,29 @@ func TestMain(m *testing.M) {
 
 	result := m.Run()
 
-	testSummary := ""
+	// We've finished running the tests and are about to do the full logscan.
+	// This create a tremendous amount of garbage, so we must enable garbage
+	// collection.
+	runtime.GC()
+	debug.SetGCPercent(origGC)
+
 	errorMutex.Lock()
+	fullLogs := make(chan string, len(errorLogs))
+	var logProcessing sync.WaitGroup
 	for i := 0; i < len(errorLogs); i++ {
-		testSummary += outputLogError(errorLogs[i])
+		logProcessing.Add(1)
+		go func(i int) {
+			defer logProcessing.Done()
+			testSummary := outputLogError(errorLogs[i])
+			fullLogs <- testSummary
+		}(i)
+	}
+
+	logProcessing.Wait()
+	close(fullLogs)
+	testSummary := ""
+	for summary := range fullLogs {
+		testSummary += summary
 	}
 	errorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
@@ -685,6 +685,12 @@ func (th *testHelper) newCtx() *ctx {
 	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
 		th.testName)
 	return c
+}
+
+// Produce a test infrastructure ctx variable for use with QuantumFS utility
+// functions.
+func (th *testHelper) testCtx() *ctx {
+	return th.qfs.c.dummyReq(qlog.TestReqId)
 }
 
 //only to be used for some testing - not all functions will work with this
@@ -788,7 +794,7 @@ func printToFile(filename string, data string) error {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR,
 		0777)
 	if file == nil || err != nil {
-		return errors.New("Unable to open file for RDRW")
+		return err
 	}
 	defer file.Close()
 
@@ -957,8 +963,9 @@ func TestGenData(t *testing.T) {
 	})
 }
 
-// Disable the root mode
-func (test *testHelper) setEuid(uid int) *testHelper {
+// Change the UID/GID the test thread to the given values. Use -1 not to change
+// either the UID or GID.
+func (test *testHelper) setUidGid(uid int, gid int) {
 	// The quantumfs tests are run as root because some tests require
 	// root privileges. However, root can read or write any file
 	// irrespective of the file permissions. Obviously if we want to
@@ -971,16 +978,41 @@ func (test *testHelper) setEuid(uid int) *testHelper {
 	// follow this precise cleanup order other tests or goroutines may
 	// run using the other UID incorrectly.
 	runtime.LockOSThread()
-	err := syscall.Setreuid(-1, uid)
-	test.assert(err == nil, "Failed to change test EUID: %v", err)
+	if gid != -1 {
+		err := syscall.Setregid(-1, gid)
+		if err != nil {
+			runtime.UnlockOSThread()
+		}
+		test.assert(err == nil, "Faild to change test EGID: %v", err)
+	}
 
-	return test
+	if uid != -1 {
+		err := syscall.Setreuid(-1, uid)
+		if err != nil {
+			syscall.Setregid(-1, 0)
+			runtime.UnlockOSThread()
+		}
+		test.assert(err == nil, "Failed to change test EUID: %v", err)
+	}
+
 }
 
-// Set the Uid back to zero
-func (test *testHelper) revert() {
-	// Test always runs as root, so its euid is 0
-	err := syscall.Setreuid(-1, 0)
-	runtime.UnlockOSThread()
-	test.assert(err == nil, "Failed to set test EUID back to 0: %v", err)
+// Set the UID and GID back to the defaults
+func (test *testHelper) setUidGidToDefault() {
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+
+	test.assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
+	test.assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+}
+
+// A lot of times you're trying to do a test and you get error codes. The errors
+// often describe the problem better than any test.assert message, so use them
+func (test *testHelper) assertNoErr(err error) {
+	if err != nil {
+		test.assert(false, err.Error())
+	}
 }
