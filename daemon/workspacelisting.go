@@ -73,21 +73,22 @@ func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	fillAttr(attr, inodeNum, uint32(num))
 }
 
-type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId, names []string)
+type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId,
+	typespace string, namespace string)
 
-func fillSpaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId, names []string) {
-	level := len(names)
+func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
+	typespace string, namespace string) {
 
-	var num int
-	var err error
-	if level == 1 {
-		num, err = c.workspaceDB.NumNamespaces(&c.Ctx, names[0])
-	} else if level == 2 {
-		num, err = c.workspaceDB.NumWorkspaces(&c.Ctx, names[0], names[1])
-	} else {
-		panic("Incorrect number of hierachical levels")
-	}
+	num, err := c.workspaceDB.NumNamespaces(&c.Ctx, typespace)
+	assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
+	fillAttr(attr, inodeNum, uint32(num))
+}
+
+func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
+	typespace string, namespace string) {
+
+	num, err := c.workspaceDB.NumWorkspaces(&c.Ctx, typespace, namespace)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	fillAttr(attr, inodeNum, uint32(num))
@@ -129,11 +130,23 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 // Update the internal namespaces list with the most recent available listing
 func updateChildren(c *ctx, rootName string, parentName string, names []string,
 	inodeMap *map[string]InodeId, nameMap *map[InodeId]string, parent Inode,
-	newInode func(c *ctx, rootName string, parentName string, name string,
+	newInode func(c *ctx, typespace string, namespace string, workspace string,
 		parent Inode, inodeId InodeId) Inode) {
 
-	touched := make(map[string]bool)
+	// Re-arrange the order of rootName/parentName/names by a proper order of
+	// typespace/namespace/workspace in the constructor newInode
+	indx := 0
+	input := make([]string, 3)
+	if rootName != "" {
+		input[indx] = rootName
+		indx += 1
+	}
+	if parentName != "" {
+		input[indx] = parentName
+		indx += 1
+	}
 
+	touched := make(map[string]bool)
 	// First add any new entries
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
@@ -147,8 +160,9 @@ func updateChildren(c *ctx, rootName string, parentName string, names []string,
 				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
 					rootName, parentName, name, parent, inodeId))
 			} else {
-				c.qfs.setInode(c, inodeId, newInode(c, rootName,
-					parentName, name, parent, inodeId))
+				input[indx] = name
+				c.qfs.setInode(c, inodeId, newInode(c, input[0],
+					input[1], input[2], parent, inodeId))
 			}
 		}
 		touched[name] = true
@@ -165,7 +179,7 @@ func updateChildren(c *ctx, rootName string, parentName string, names []string,
 	}
 }
 
-func snapshotChildren(c *ctx, children *map[string]InodeId, names []string,
+func snapshotChildren(c *ctx, children *map[string]InodeId, typespace string,
 	fillAttr listingAttrFill) []directoryContents {
 
 	out := make([]directoryContents, 0, len(*children))
@@ -174,8 +188,12 @@ func snapshotChildren(c *ctx, children *map[string]InodeId, names []string,
 			filename: name,
 			fuseType: fuse.S_IFDIR,
 		}
-		names[len(names)-1] = name
-		fillAttr(c, &child.attr, inode, names)
+
+		if typespace == "" {
+			fillAttr(c, &child.attr, inode, name, "")
+		} else {
+			fillAttr(c, &child.attr, inode, typespace, name)
+		}
 
 		out = append(out, child)
 	}
@@ -215,8 +233,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	updateChildren(c, "", "", list, &tsl.typespacesByName,
 		&tsl.typespacesById, tsl, newNamespaceList)
-	names := make([]string, 1)
-	children := snapshotChildren(c, &tsl.typespacesByName, names, fillSpaceAttr)
+	children := snapshotChildren(c, &tsl.typespacesByName, "", fillTypespaceAttr)
 
 	api := directoryContents{
 		filename: quantumfs.ApiPath,
@@ -255,7 +272,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	inodeNum := tsl.typespacesByName[name]
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillSpaceAttr(c, &out.Attr, inodeNum, []string{name})
+	fillTypespaceAttr(c, &out.Attr, inodeNum, name, "")
 
 	return fuse.OK
 }
@@ -424,10 +441,10 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	return newNamespaceList(c, "", "", name, tsl, inodeNum), nil
+	return newNamespaceList(c, name, "", "", tsl, inodeNum), nil
 }
 
-func newNamespaceList(c *ctx, empty string, empty_ string, typespace string,
+func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	nsl := NamespaceList{
@@ -507,9 +524,8 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	updateChildren(c, "", nsl.typespaceName, list,
 		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
-	names := make([]string, 2)
-	names[0] = nsl.typespaceName
-	children := snapshotChildren(c, &nsl.namespacesByName, names, fillSpaceAttr)
+	children := snapshotChildren(c, &nsl.namespacesByName, nsl.typespaceName,
+		fillNamespaceAttr)
 
 	return children
 }
@@ -534,7 +550,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	inodeNum := nsl.namespacesByName[name]
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillSpaceAttr(c, &out.Attr, inodeNum, []string{nsl.typespaceName, name})
+	fillNamespaceAttr(c, &out.Attr, inodeNum, nsl.typespaceName, name)
 
 	return fuse.OK
 }
@@ -701,7 +717,7 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	return newWorkspaceList(c, "", nsl.typespaceName, name, nsl, inodeNum), nil
+	return newWorkspaceList(c, nsl.typespaceName, name, "", nsl, inodeNum), nil
 }
 
 func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
@@ -714,7 +730,7 @@ func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
 	return
 }
 
-func newWorkspaceList(c *ctx, empty string, typespace string, namespace string,
+func newWorkspaceList(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	wsl := WorkspaceList{
@@ -798,7 +814,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	updateChildren(c, wsl.typespaceName, wsl.namespaceName, list,
 		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
 	children := snapshotChildren(c, &wsl.workspacesByName,
-		[]string{}, fillWorkspaceAttrFake)
+		"", fillWorkspaceAttrFake)
 
 	return children
 }
@@ -825,7 +841,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	inodeNum := wsl.workspacesByName[name]
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
-	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, []string{name})
+	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, "", "")
 
 	return fuse.OK
 }
