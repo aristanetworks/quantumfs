@@ -190,7 +190,7 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 }
 
 func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
-	defer c.FuncIn("Mux::flushDirtyLists", "flushAll %t", flushAll)
+	defer c.FuncIn("Mux::flushDirtyLists", "flushAll %t", flushAll).out()
 
 	defer qfs.dirtyQueueLock.Lock().Unlock()
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
@@ -218,7 +218,7 @@ func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
 func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 	flushAll bool) time.Time {
 
-	defer c.funcIn("Mux::flushDirtyList")
+	defer c.funcIn("Mux::flushDirtyList").out()
 
 	for dirtyList.Len() > 0 {
 		// Should we clean this inode?
@@ -246,7 +246,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	inodeNum := dirtyInode.inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
-		inodeNum, dirtyInode.shouldUninstantiate)
+		inodeNum, dirtyInode.shouldUninstantiate).out()
 
 	defer dirtyInode.inode.LockTree().Unlock()
 
@@ -271,7 +271,7 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 	shouldWait bool) *list.Element {
 
 	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d su %t sw %t",
-		inode.inodeNum(), shouldUninstantiate, shouldWait)
+		inode.inodeNum(), shouldUninstantiate, shouldWait).out()
 
 	defer qfs.dirtyQueueLock.Lock().Unlock()
 
