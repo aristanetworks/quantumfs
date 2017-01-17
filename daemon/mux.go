@@ -650,7 +650,7 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 					qfs.inodeNoInstantiate(&qfs.c, i) != nil {
 
 					// Not ready to forget, no more to do
-					qfs.c.dlog("Not all children unloaded, %d"+
+					qfs.c.dlog("Not all children unloaded, %d "+
 						"in %d", i,
 						inode.inodeNum())
 					return rtn
