@@ -44,10 +44,10 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	qfs.c.qfs = qfs
 
-	namespaceList := NewNamespaceList()
-	qfs.inodes[quantumfs.InodeIdRoot] = namespaceList
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(namespaceList.treeLock(),
-		namespaceList.inodeNum())
+	typespaceList := NewTypespaceList()
+	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeLock(),
+		typespaceList.inodeNum())
 	return qfs
 }
 
@@ -448,8 +448,9 @@ func (qfs *QuantumFs) syncAll(c *ctx) {
 
 	for _, workspace := range workspaces {
 		func() {
-			c.vlog("Locking and syncing workspace %s/%s",
-				workspace.namespace, workspace.workspace)
+			c.vlog("Locking and syncing workspace %s/%s/%s",
+				workspace.typespace, workspace.namespace,
+				workspace.workspace)
 			defer workspace.LockTree().Unlock()
 			workspace.flush_DOWN(c)
 		}()
@@ -1218,14 +1219,23 @@ func (qfs *QuantumFs) Init(*fuse.Server) {
 	qfs.c.elog("Unhandled request Init")
 }
 
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, namespace string,
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
+
 	workspace string) (*WorkspaceRoot, bool) {
 
-	c.vlog("QuantumFs::getWorkspaceRoot %s/%s", namespace, workspace)
+	c.vlog("QuantumFs::getWorkspaceRoot %s/%s/%s",
+		typespace, namespace, workspace)
 
 	// Get the WorkspaceList Inode number
+	var typespaceAttr fuse.EntryOut
+	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
+		&typespaceAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
+
 	var namespaceAttr fuse.EntryOut
-	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, namespace,
+	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
 	if result != fuse.OK {
 		return nil, false
