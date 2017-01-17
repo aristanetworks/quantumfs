@@ -119,7 +119,7 @@ type Inode interface {
 	// flushed and forgotten.
 	queueToForget(c *ctx)
 
-	// Returns this inodes place in the dirtyQueue
+	// Returns this inode's place in the dirtyQueue
 	dirtyElement() *list.Element
 
 	// Compute a new object key, schedule the object data to be uploaded to the
