@@ -646,9 +646,8 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
-				if qfs.lookupCount(InodeId(i)) != 0 ||
-					qfs.inodeNoInstantiate(&qfs.c,
-						InodeId(i)) != nil {
+				if qfs.lookupCount(i) != 0 ||
+					qfs.inodeNoInstantiate(&qfs.c, i) != nil {
 
 					// Not ready to forget, no more to do
 					qfs.c.dlog("Not all children unloaded, %d"+
