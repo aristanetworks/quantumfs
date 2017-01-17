@@ -72,7 +72,6 @@ type QuantumFs struct {
 	// try any further.
 	giveUpOnForget bool
 
-	forgetMutex      DeferableRwMutex
 	mapMutex         DeferableRwMutex
 	inodes           map[InodeId]Inode
 	fileHandles      map[FileHandleId]FileHandle
@@ -608,7 +607,6 @@ func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer qfs.c.funcIn("Mux::Forget").out()
 	defer logRequestPanic(&qfs.c)
-	defer qfs.forgetMutex.Lock().Unlock()
 
 	if qfs.giveUpOnForget {
 		qfs.c.dlog("Not forgetting inode %d Looked up %d Times", nodeID,
@@ -624,7 +622,6 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	qfs.c.dlog("Mux::Forget inode %d start remove the chain", nodeID)
 	toRemove := qfs.forgetChain(InodeId(nodeID))
 
 	if toRemove != nil {

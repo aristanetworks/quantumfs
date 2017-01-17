@@ -10,7 +10,7 @@ package quantumfs
 // type such as abuild, <namespace> would often be a branch under typespace such as
 // eos-trunk. <workspace> will be somewhat arbitrary.
 //
-// With diffrent typespace, its namespace and workspace can vary:
+// With different typespaces, its namespace and workspace can vary:
 //	abuild/eos-trunk/eos-trunk@12345
 //	users/joe/arbitrary
 //	releases/eos/EOS-4.25.6

@@ -35,7 +35,7 @@ type WorkspaceRoot struct {
 // is relatively expensive and not terribly useful. Instead fake it and assume a
 // normal number here.
 func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	workspace []string) {
+	typespace string, namespace string) {
 
 	fillAttr(attr, inodeNum, 27)
 	attr.Mode = 0777 | fuse.S_IFDIR
