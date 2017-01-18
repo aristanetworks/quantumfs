@@ -641,6 +641,12 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 			break
 		}
 
+		if inode.dirtyElement() != nil {
+			c.vlog("Inode %d dirty, not uninstantiating yet",
+				inode.inodeNum())
+			break
+		}
+
 		if dir, isDir := inode.(inodeHolder); isDir {
 			children := dir.childInodes()
 
