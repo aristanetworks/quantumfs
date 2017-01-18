@@ -354,8 +354,9 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
 		panic(msg)
 	} else if lookupCount == 0 {
-		// Don't leave the zero entry in the map at this moment. Do it after
-		// trying to grab the treelock in case of the race condition
+		// Don't leave the zero entry in the map at this moment. Do it with
+		// qfs.makeLookupCountZero(inodeId) after trying to grab the treelock
+		// in case of the race condition
 		if count > 1 {
 			qfs.c.dlog("Forgetting inode with lookupCount of %d", count)
 		}
@@ -505,7 +506,7 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 	for {
 		lookupCount, exists := qfs.lookupCount(inode.inodeNum())
 		// If the loop is in the first iteration, we can treat the
-		// non-existence of loopupCount as zero value and overpass the
+		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if lookupCount != 0 || (!exists && initial) {
 			qfs.c.vlog("No forget called on inode %d yet",
@@ -606,6 +607,15 @@ func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
 	// Make the zero entry in the lookupCounts map to indicate this node needs to
 	// actually be forgotten (marked toForget)
 	qfs.makeLookupCountZero(inodeNum)
+
+	// Now that we have the tree locked, we need to re-check the inode because
+	// another forgetChain could have forgotten us before we got the tree lock
+	inode = qfs.inodeNoInstantiate(&qfs.c, inodeNum)
+	if inode == nil {
+		qfs.c.dlog("inode %d forgotten underneath us", inodeNum)
+		// Nothing to do
+		return nil
+	}
 
 	return qfs.uninstantiateChain_(inode)
 }
