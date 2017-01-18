@@ -270,7 +270,7 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate bool,
 	shouldWait bool) *list.Element {
 
-	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d su %t sw %t",
+	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d uninstantiate %t wait %t",
 		inode.inodeNum(), shouldUninstantiate, shouldWait).out()
 
 	defer qfs.dirtyQueueLock.Lock().Unlock()
