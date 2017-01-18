@@ -109,6 +109,7 @@ type Inode interface {
 	// orphaned from the directory tree and cannot be accessed except directly by
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
+	orphan(c *ctx)
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean()   // Mark this Inode as cleaned
@@ -266,6 +267,14 @@ func (inode *InodeCommon) setParent(newParent InodeId) {
 
 func (inode *InodeCommon) isOrphaned() bool {
 	return inode.inodeNum() == inode.parentId()
+}
+
+func (inode *InodeCommon) orphan(c *ctx) {
+	inode.parentLock.Lock()
+	inode.parent_ = inode.id
+	inode.parentLock.Unlock()
+
+	c.qfs.dequeueDirtyInode(c, inode.self)
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {

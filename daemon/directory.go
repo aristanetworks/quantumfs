@@ -210,8 +210,8 @@ func (dir *Directory) delChild_(c *ctx, inodeNum InodeId) {
 		if inode != nil {
 			if file, isFile := inode.(*File); isFile {
 				file.setChildRecord(c, record)
-				file.setParent(file.inodeNum())
 			}
+			inode.orphan(c)
 		}
 	}
 
