@@ -330,14 +330,14 @@ func (qfs *QuantumFs) increaseLookupCount(inodeId InodeId) {
 	}
 }
 
-func (qfs *QuantumFs) lookupCount(inodeId InodeId) uint64 {
+func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		return 0
+		return 0, false
 	}
 
-	return lookupCount
+	return lookupCount, true
 }
 
 // Returns true if the count became zero or was previously zero
@@ -345,6 +345,7 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
+		qfs.c.dlog("inode %d has not been instantiated", inodeId)
 		return true
 	}
 
@@ -353,9 +354,8 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
 		panic(msg)
 	} else if lookupCount == 0 {
-		// Leave the zero entry in the map to indicate this node needs
-		// to actually be forgotten (marked toForget)
-		qfs.lookupCounts[inodeId] = 0
+		// Don't leave the zero entry in the map at this moment. Do it after
+		// trying to grab the treelock in case of the race condition
 		if count > 1 {
 			qfs.c.dlog("Forgetting inode with lookupCount of %d", count)
 		}
@@ -499,13 +499,21 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 // Needs treelock for write
 func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 	rtn := make([]InodeId, 0)
+	// Set an indicator to verify whether the for loop is in the first iteration
+	// Hence, we can decide whether to use the condition in the if-statement
+	initial := true
 	for {
-		lookupCount := qfs.lookupCount(inode.inodeNum())
-		if lookupCount != 0 {
+		lookupCount, exists := qfs.lookupCount(inode.inodeNum())
+		// If the loop is in the first iteration, we can treat the
+		// non-existence of loopupCount as zero value and overpass the
+		// if-statement
+		if lookupCount != 0 || (!exists && initial) {
 			qfs.c.vlog("No forget called on inode %d yet",
 				inode.inodeNum())
 			break
 		}
+		// Set indicator to false right after its usage
+		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
 			children := dir.childInodes()
@@ -514,9 +522,9 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
-				if qfs.lookupCount(InodeId(i)) != 0 ||
-					qfs.inodeNoInstantiate(&qfs.c,
-						InodeId(i)) != nil {
+				lookupCount, _ = qfs.lookupCount(InodeId(i))
+				if lookupCount != 0 || qfs.inodeNoInstantiate(&qfs.c,
+					InodeId(i)) != nil {
 
 					// Not ready to forget, no more to do
 					qfs.c.dlog("Not all children unloaded, %d"+
@@ -585,23 +593,29 @@ func (qfs *QuantumFs) forgetChain(inodeNum InodeId) []InodeId {
 		qfs.c.elog("Timed out locking tree in Forget. Inode %d",
 			inode.inodeNum())
 		qfs.giveUpOnForget = true
+
+		// Make the zero entry in the lookupCounts map to indicate this node
+		// needs to actually be forgotten (marked toForget)
+		qfs.makeLookupCountZero(inodeNum)
+
 		return nil
 	} else {
 		defer lock.Unlock()
 	}
 
-	// Now that we have the tree locked, we need to re-check the inode because
-	// another forgetChain could have forgotten us before we got the tree lock
-	inode = qfs.inodeNoInstantiate(&qfs.c, inodeNum)
-	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
-		inodeNum == quantumfs.InodeIdApi {
-
-		qfs.c.dlog("inode %d forgotten underneath us", inodeNum)
-		// Nothing to do
-		return nil
-	}
+	// Make the zero entry in the lookupCounts map to indicate this node needs to
+	// actually be forgotten (marked toForget)
+	qfs.makeLookupCountZero(inodeNum)
 
 	return qfs.uninstantiateChain_(inode)
+}
+
+func (qfs *QuantumFs) makeLookupCountZero(inodeId InodeId) {
+	defer qfs.lookupCountLock.Lock().Unlock()
+	_, exists := qfs.lookupCounts[inodeId]
+	if exists {
+		qfs.lookupCounts[inodeId] = 0
+	}
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
