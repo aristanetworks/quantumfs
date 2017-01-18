@@ -176,6 +176,11 @@ func (inode *InodeCommon) inodeNum() InodeId {
 
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
+	if inode.isOrphaned() {
+		c.vlog("Not dirtying inode %d because it is orphaned", inode.id)
+		return
+	}
+
 	inode.dirtyElementLock.Lock()
 	de := inode.dirtyElement_
 	inode.dirtyElementLock.Unlock()
