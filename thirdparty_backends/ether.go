@@ -119,7 +119,25 @@ func NewEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	return eWsdb
 }
 
-func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx) (int, error) {
+func (w *EtherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
+	return 1, nil
+}
+
+func (w *EtherWsdbTranslator) TypespaceList(
+	c *quantumfs.Ctx) ([]string, error) {
+
+	return []string{"user"}, nil
+}
+
+func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
+	typespace string) (int, error) {
+
+	if typespace != "user" {
+		return 0, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Currently ether adapter supports only 1 typespace \"user\"")
+	}
+
 	count, err := w.wsdb.NumNamespaces()
 	if err != nil {
 		return 0, convertWsdbError(err)
@@ -127,7 +145,15 @@ func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx) (int, error) {
 	return count, nil
 }
 
-func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx) ([]string, error) {
+func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
+	typespace string) ([]string, error) {
+
+	if typespace != "user" {
+		return nil, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Currently ether adapter supports only 1 typespace \"user\"")
+	}
+
 	list, err := w.wsdb.NamespaceList()
 	if err != nil {
 		return nil, convertWsdbError(err)
@@ -136,7 +162,13 @@ func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx) ([]string, error) 
 }
 
 func (w *EtherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
-	namespace string) (int, error) {
+	typespace string, namespace string) (int, error) {
+
+	if typespace != "user" {
+		return 0, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Currently ether adapter supports only 1 typespace \"user\"")
+	}
 
 	count, err := w.wsdb.NumWorkspaces(namespace)
 	if err != nil {
@@ -146,7 +178,13 @@ func (w *EtherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 }
 
 func (w *EtherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
-	namespace string) ([]string, error) {
+	typespace string, namespace string) ([]string, error) {
+
+	if typespace != "user" {
+		return nil, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Currently ether adapter supports only 1 typespace \"user\"")
+	}
 
 	list, err := w.wsdb.WorkspaceList(namespace)
 	if err != nil {
@@ -155,8 +193,22 @@ func (w *EtherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	return list, nil
 }
 
+func (w *EtherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
+	typespace string) (bool, error) {
+
+	if typespace != "user" {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (w *EtherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
-	namespace string) (bool, error) {
+	typespace string, namespace string) (bool, error) {
+
+	if typespace != "user" {
+		return false, nil
+	}
 
 	exists, err := w.wsdb.NamespaceExists(namespace)
 	if err != nil {
@@ -165,8 +217,12 @@ func (w *EtherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
 	return exists, nil
 }
 
-func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, namespace string,
-	workspace string) (bool, error) {
+func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string) (bool, error) {
+
+	if typespace != "user" {
+		return false, nil
+	}
 
 	exists, err := w.wsdb.WorkspaceExists(namespace, workspace)
 	if err != nil {
@@ -175,8 +231,14 @@ func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, namespace string
 	return exists, nil
 }
 
-func (w *EtherWsdbTranslator) Workspace(c *quantumfs.Ctx, namespace string,
-	workspace string) (quantumfs.ObjectKey, error) {
+func (w *EtherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+
+	if typespace != "user" {
+		return quantumfs.ObjectKey{}, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_FATAL_DB_ERROR,
+			"Currently ether wsdb only supports 1 typespace \"user\"")
+	}
 
 	key, err := w.wsdb.Workspace(namespace, workspace)
 	if err != nil {
@@ -186,8 +248,21 @@ func (w *EtherWsdbTranslator) Workspace(c *quantumfs.Ctx, namespace string,
 	return quantumfs.NewObjectKeyFromBytes(key), nil
 }
 
-func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcNamespace string,
-	srcWorkspace string, dstNamespace string, dstWorkspace string) error {
+func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
+	srcNamespace string, srcWorkspace string, dstTypespace string,
+	dstNamespace string, dstWorkspace string) error {
+
+	if srcTypespace != "user" {
+		return quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Currently ether wsdb only supports 1 typespace \"user\"")
+	}
+
+	if dstTypespace != "user" {
+		return quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_FATAL_DB_ERROR,
+			"Currently ether wsdb only supports 1 typespace \"user\"")
+	}
 
 	err := w.wsdb.BranchWorkspace(srcNamespace, srcWorkspace,
 		dstNamespace, dstWorkspace)
@@ -197,9 +272,15 @@ func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcNamespace str
 	return nil
 }
 
-func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, namespace string,
-	workspace string, currentRootId quantumfs.ObjectKey,
+func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+
+	if typespace != "user" {
+		return quantumfs.ObjectKey{}, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Currently ether wsdb only supports 1 typespace \"user\"")
+	}
 
 	key, err := w.wsdb.AdvanceWorkspace(namespace, workspace,
 		currentRootId.Value(), newRootId.Value())
