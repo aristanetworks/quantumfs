@@ -362,13 +362,17 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		rootId := getWorkspaceKey_(tx, typespace, namespace, workspace)
 		if rootId == nil {
 			return quantumfs.NewWorkspaceDbErr(
-				quantumfs.WSDB_WORKSPACE_NOT_FOUND)
+				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+				"Advance failed")
 		}
 
 		if !bytes.Equal(currentRootId.Value(), rootId) {
 			dbRootId = quantumfs.NewObjectKeyFromBytes(rootId)
 			return quantumfs.NewWorkspaceDbErr(
-				quantumfs.WSDB_OUT_OF_DATE)
+				quantumfs.WSDB_OUT_OF_DATE,
+				"%s vs %s Advance failed", currentRootId.String(),
+				dbRootId.String())
+
 		}
 
 		if c != nil {
