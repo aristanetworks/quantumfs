@@ -255,7 +255,7 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 
 	if dirtyInode.shouldUninstantiate {
 		c.vlog("Starting uninstantiation at inode %d", inodeNum)
-		toRemove := qfs.forgetChain_(inodeNum)
+		toRemove := qfs.forgetChain_(c, inodeNum)
 
 		if toRemove != nil {
 			// We need to remove all uninstantiated children.
@@ -629,13 +629,15 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 }
 
 // Needs treelock for write
-func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
+func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
+	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d",
+		inode.inodeNum()).out()
+
 	rtn := make([]InodeId, 0)
 	for {
 		lookupCount := qfs.lookupCount(inode.inodeNum())
 		if lookupCount != 0 {
-			qfs.c.vlog("No forget called on inode %d yet",
-				inode.inodeNum())
+			c.vlog("No forget called on inode %d yet", inode.inodeNum())
 			break
 		}
 
@@ -647,15 +649,14 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
 				if qfs.lookupCount(i) != 0 ||
-					qfs.inodeNoInstantiate(&qfs.c, i) != nil {
+					qfs.inodeNoInstantiate(c, i) != nil {
 
 					// Not ready to forget, no more to do
-					qfs.c.dlog("Not all children unloaded, %d "+
-						"in %d", i,
-						inode.inodeNum())
+					c.dlog("Not all children unloaded, %d in %d",
+						i, inode.inodeNum())
 					return rtn
 				}
-				qfs.c.dlog("Child %d of %d not loaded", i,
+				c.dlog("Child %d of %d not loaded", i,
 					inode.inodeNum())
 			}
 
@@ -663,28 +664,27 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 		}
 
 		// Great, we want to forget this so proceed
-		key := inode.flush_DOWN(&qfs.c)
-		qfs.setInode(&qfs.c, inode.inodeNum(), nil)
+		key := inode.flush_DOWN(c)
+		qfs.setInode(c, inode.inodeNum(), nil)
 
 		func() {
 			defer qfs.lookupCountLock.Lock().Unlock()
 			delete(qfs.lookupCounts, inode.inodeNum())
 		}()
 
-		qfs.c.vlog("Set inode %d to nil", inode.inodeNum())
+		c.vlog("Set inode %d to nil", inode.inodeNum())
 
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
 			parentId := inode.parentId()
-			parent := qfs.inodeNoInstantiate(&qfs.c, parentId)
+			parent := qfs.inodeNoInstantiate(c, parentId)
 			if parent == nil {
 				panic(fmt.Sprintf("Parent was unloaded before child"+
 					"! %d %d", parentId, inode.inodeNum()))
 			}
 
-			parent.syncChild(&qfs.c, inode.inodeNum(), key)
+			parent.syncChild(c, inode.inodeNum(), key)
 
-			qfs.addUninstantiated(&qfs.c,
-				[]InodeId{inode.inodeNum()},
+			qfs.addUninstantiated(c, []InodeId{inode.inodeNum()},
 				parent.inodeNum())
 
 			// Then check our parent and iterate again
@@ -698,17 +698,18 @@ func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 }
 
 // Requires the treeLock be held for write.
-func (qfs *QuantumFs) forgetChain_(inodeNum InodeId) []InodeId {
-	inode := qfs.inodeNoInstantiate(&qfs.c, inodeNum)
+func (qfs *QuantumFs) forgetChain_(c *ctx, inodeNum InodeId) []InodeId {
+	defer c.FuncIn("Mux::forgetChain_", "inode %d", inodeNum).out()
+	inode := qfs.inodeNoInstantiate(c, inodeNum)
 	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
 		inodeNum == quantumfs.InodeIdApi {
 
-		qfs.c.dlog("inode %d doesn't need to be forgotten", inodeNum)
+		c.dlog("inode %d doesn't need to be forgotten", inodeNum)
 		// Nothing to do
 		return nil
 	}
 
-	return qfs.uninstantiateChain_(inode)
+	return qfs.uninstantiateChain_(c, inode)
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
