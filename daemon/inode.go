@@ -273,8 +273,6 @@ func (inode *InodeCommon) orphan(c *ctx) {
 	inode.parentLock.Lock()
 	inode.parent_ = inode.id
 	inode.parentLock.Unlock()
-
-	c.qfs.dequeueDirtyInode(c, inode.self)
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {

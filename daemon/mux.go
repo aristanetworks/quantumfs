@@ -330,22 +330,6 @@ func (qfs *QuantumFs) queueInodeToForget(c *ctx, inode Inode) *list.Element {
 	return qfs._queueDirtyInode(c, inode, true, false)
 }
 
-func (qfs *QuantumFs) dequeueDirtyInode(c *ctx, inode Inode) {
-	defer c.FuncIn("Mux::dequeueDirtyInode", "inode %d", inode.inodeNum())
-
-	defer qfs.dirtyQueueLock.Lock().Unlock()
-
-	dirtyElement := inode.dirtyElement()
-	if dirtyElement == nil {
-		c.vlog("inode not queue on dirty list")
-		return
-	}
-
-	treelock := inode.treeLock()
-	qfs.dirtyQueue[treelock].Remove(dirtyElement)
-	inode.markClean()
-}
-
 // There are several configuration knobs in the kernel which can affect FUSE
 // performance. Don't depend on the system being configured correctly for QuantumFS,
 // instead try to change the settings ourselves.
