@@ -250,7 +250,9 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 
 	defer dirtyInode.inode.LockTree().Unlock()
 
-	dirtyInode.inode.flush_DOWN(c)
+	if !dirtyInode.inode.isOrphaned() {
+		dirtyInode.inode.flush_DOWN(c)
+	}
 	dirtyInode.inode.markClean()
 
 	if dirtyInode.shouldUninstantiate {
