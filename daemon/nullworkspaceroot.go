@@ -14,12 +14,12 @@ type NullWorkspaceRoot struct {
 	WorkspaceRoot
 }
 
-func newNullWorkspaceRoot(c *ctx, parentName string, name string,
-	parent Inode, inodeNum InodeId) Inode {
+func newNullWorkspaceRoot(c *ctx, typeSpace string, nameSpace string,
+	workSpace string, parent Inode, inodeNum InodeId) Inode {
 
 	nwsr := NullWorkspaceRoot{
-		WorkspaceRoot: *(newWorkspaceRoot(c, parentName, name, parent,
-			inodeNum).(*WorkspaceRoot)),
+		WorkspaceRoot: *(newWorkspaceRoot(c, typeSpace, nameSpace, workSpace,
+			parent, inodeNum).(*WorkspaceRoot)),
 	}
 	return &nwsr
 }
