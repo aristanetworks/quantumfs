@@ -368,6 +368,7 @@ const (
 	TypeUint64        = 16
 	TypeString        = 17
 	TypeByteArray     = 18
+	TypeBoolean       = 19
 )
 
 // Writes the data, with a type prefix field two bytes long
@@ -430,11 +431,11 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 		writeArray(w, format, v, TypeByteArray)
 		return
 	case bool:
-		byteType = TypeUint16
+		byteType = TypeBoolean
 		if v {
-			data = interface{}(uint16(1))
+			data = interface{}(uint8(1))
 		} else {
-			data = interface{}(uint16(0))
+			data = interface{}(uint8(0))
 		}
 	default:
 		needDataWrite = false
