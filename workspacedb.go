@@ -4,6 +4,8 @@
 // This is the interface to the Workspace Name database.
 package quantumfs
 
+import "fmt"
+
 // WorkspaceDB provides a cluster-wide and consistent mapping between names and
 // rootids. Workspace names have two components and are represented as strings with
 // the format "<typespace>/<namespace>/<workspace>". <typespace> would often be a
@@ -62,26 +64,39 @@ type WorkspaceDB interface {
 type WsdbErrCode int
 type WorkspaceDbErr struct {
 	code WsdbErrCode
+	msg  string
 }
 
-func NewWorkspaceDbErr(code WsdbErrCode) error {
-	return &WorkspaceDbErr{code: code}
+func NewWorkspaceDbErr(code WsdbErrCode, format string,
+	args ...interface{}) error {
+
+	return &WorkspaceDbErr{code: code, msg: fmt.Sprintf(format, args)}
 }
 
 const (
 	WSDB_RESERVED            WsdbErrCode = iota
 	WSDB_WORKSPACE_NOT_FOUND             = iota // The workspace didn't exist
+	WSDB_WORKSPACE_EXISTS                = iota // The workspace already exists
+	WSDB_FATAL_DB_ERROR                  = iota // Fatal error in workspace DB
 
 	// The operation was based off out of date information
 	WSDB_OUT_OF_DATE = iota
 )
 
 func (err *WorkspaceDbErr) Error() string {
+	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.msg)
+}
+
+func (err *WorkspaceDbErr) ErrorCode() string {
 	switch err.code {
 	default:
 		return "Unknown wsdb error"
+	case WSDB_WORKSPACE_EXISTS:
+		return "Workspace already exists"
 	case WSDB_WORKSPACE_NOT_FOUND:
 		return "Workspace not found"
+	case WSDB_FATAL_DB_ERROR:
+		return "Fatal error in workspace DB"
 	case WSDB_OUT_OF_DATE:
 		return "Workspace changed remotely"
 	}
