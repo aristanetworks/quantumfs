@@ -122,6 +122,7 @@ func TestSyncToDatastore(t *testing.T) {
 		test.api.Close()
 		err := test.qfs.server.Unmount()
 		test.assert(err == nil, "Failed to unmount during test")
+		test.waitForQuantumFsToFinish()
 
 		test.startQuantumFs(config)
 
