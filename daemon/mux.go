@@ -643,9 +643,14 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 			break
 		}
 
-		if inode.dirtyElement() != nil {
+		if dirtyElement := inode.dirtyElement(); dirtyElement != nil {
 			c.vlog("Inode %d dirty, not uninstantiating yet",
 				inode.inodeNum())
+			func() {
+				defer qfs.dirtyQueueLock.Lock().Unlock()
+				dirtyNode := dirtyElement.Value.(*dirtyInode)
+				dirtyNode.shouldUninstantiate = true
+			}()
 			break
 		}
 
