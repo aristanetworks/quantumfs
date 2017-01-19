@@ -733,8 +733,9 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		return
 	}
 
-	inode := qfs.inode(&qfs.c, InodeId(nodeID))
-	inode.queueToForget(&qfs.c)
+	if inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID)); inode != nil {
+		inode.queueToForget(&qfs.c)
+	}
 }
 
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
