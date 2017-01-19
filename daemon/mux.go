@@ -500,20 +500,23 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 // Needs treelock for write
 func (qfs *QuantumFs) uninstantiateChain_(inode Inode) []InodeId {
 	rtn := make([]InodeId, 0)
-	// Set an indicator to verify whether the for loop is in the first iteration
-	// Hence, we can decide whether to use the condition in the if-statement
 	initial := true
 	for {
 		lookupCount, exists := qfs.lookupCount(inode.inodeNum())
-		// If the loop is in the first iteration, we can treat the
-		// non-existence of lookupCount as zero value and bypass the
-		// if-statement
-		if lookupCount != 0 || (!exists && initial) {
+		if lookupCount != 0 {
 			qfs.c.vlog("No forget called on inode %d yet",
 				inode.inodeNum())
 			break
 		}
-		// Set indicator to false right after its usage
+
+		// If the loop is in the first iteration, we can treat the
+		// non-existence of lookupCount as zero value and bypass the
+		// if-statement
+		if !exists && !initial {
+			qfs.c.vlog("A inode %d without lookupCount "+
+				"is uninstantiated by its child", inode.inodeNum())
+			break
+		}
 		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
