@@ -407,7 +407,7 @@ func publishDirectoryRecordIfs(c *ctx,
 
 // Must hold the dir.childRecordsLock
 func (dir *Directory) publish_(c *ctx) {
-	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
+	defer c.FuncIn("Directory::publish_", "%s", dir.name_).out()
 
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecordIfs(c, dir.children.records())

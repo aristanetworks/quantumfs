@@ -245,7 +245,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 
 func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	inodeNum := dirtyInode.inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
+	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
 		inodeNum, dirtyInode.shouldUninstantiate).out()
 
 	defer dirtyInode.inode.LockTree().Unlock()
