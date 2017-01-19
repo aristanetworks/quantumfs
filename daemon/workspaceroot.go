@@ -163,8 +163,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 		if err != nil {
 			msg := fmt.Sprintf("Unexpected workspace rootID update "+
-				"failure, current %s: %s", rootId.String(),
-				err.Error())
+				"failure, wsdb %s, new %s, wsr %s: %s",
+				rootId.String(), newRootId.String(),
+				wsr.rootId.String(), err.Error())
 			panic(msg)
 		}
 
