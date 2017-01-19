@@ -350,6 +350,7 @@ type testHelper struct {
 	t                 *testing.T
 	testName          string
 	qfs               *QuantumFs
+	qfsWait           sync.WaitGroup
 	cachePath         string
 	logger            *qlog.Qlog
 	tempDir           string
@@ -418,7 +419,9 @@ func serveSafely(th *testHelper) {
 	mountOptions.Options = append(mountOptions.Options, "suid")
 	mountOptions.Options = append(mountOptions.Options, "dev")
 
+	th.qfsWait.Add(1)
 	th.qfs.Serve(mountOptions)
+	th.qfsWait.Done()
 }
 
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
@@ -437,6 +440,10 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.fuseConnection = findFuseConnection(th.testCtx(), config.MountPath)
 	th.assert(th.fuseConnection != -1, "Failed to find mount")
 	th.log("QuantumFs instance started")
+}
+
+func (th *testHelper) waitForQuantumFsToFinish() {
+	th.qfsWait.Wait()
 }
 
 func (th *testHelper) log(format string, args ...interface{}) error {
