@@ -645,6 +645,9 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 	case TypeUint64:
 		var tmp uint64
 		rtn = reflect.ValueOf(&tmp)
+	case TypeBoolean:
+		var tmp uint8
+		rtn = reflect.ValueOf(&tmp)
 	default:
 		handledWrite = false
 	}
@@ -654,6 +657,16 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		if byteType == TypeBoolean {
+			val := rtn.Elem().Interface().(uint8)
+			if val == 0 {
+				return false, nil
+			} else {
+				return true, nil
+			}
+		}
+
 		return rtn.Elem().Interface(), nil
 	}
 
