@@ -677,7 +677,6 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 		}
 
 		// Great, we want to forget this so proceed
-		key := inode.flush_DOWN(c)
 		qfs.setInode(c, inode.inodeNum(), nil)
 
 		func() {
@@ -688,6 +687,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 		c.vlog("Set inode %d to nil", inode.inodeNum())
 
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
+			key := inode.flush_DOWN(c)
+
 			parentId := inode.parentId()
 			parent := qfs.inodeNoInstantiate(c, parentId)
 			if parent == nil {
