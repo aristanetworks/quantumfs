@@ -248,7 +248,7 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
 		inodeNum, dirtyInode.shouldUninstantiate).out()
 
-	defer dirtyInode.inode.LockTree().Unlock()
+	defer dirtyInode.inode.RLockTree().RUnlock()
 
 	if !dirtyInode.inode.isOrphaned() {
 		dirtyInode.inode.flush_DOWN(c)
@@ -630,7 +630,7 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 	return inode.Lookup(c, name, out)
 }
 
-// Needs treelock for write
+// Needs treelock for read
 func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d",
 		inode.inodeNum()).out()
