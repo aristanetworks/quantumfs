@@ -344,7 +344,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
-		wsNamespaceName, wsWorkspaceName :=
+		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
 		testFilename := workspace + "/" + "test"
@@ -368,7 +368,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, because we
 		// currently do not support delayed syncing, change the workspace
 		// rootId and mark the fileDescriptor clean.
-		oldRootId := test.workspaceRootId(wsNamespaceName,
+		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
 		c := test.newCtx()
@@ -377,7 +377,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.syncAllWorkspaces()
-		newRootId := test.workspaceRootId(wsNamespaceName,
+		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
@@ -396,7 +396,7 @@ func TestFileAttrUpdate(t *testing.T) {
 		src := test.newWorkspace()
 		src = test.relPath(src)
 
-		dst := "attrupdate/test"
+		dst := "dst/attrupdate/test"
 
 		// First create a file
 		testFile := test.absPath(src + "/" + "test")
@@ -434,7 +434,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 		src := test.newWorkspace()
 		src = test.relPath(src)
 
-		dst := "attrwriteupdate/test"
+		dst := "dst/attrwriteupdate/test"
 
 		// First create a file
 		testFile := test.absPath(src + "/" + "test")
