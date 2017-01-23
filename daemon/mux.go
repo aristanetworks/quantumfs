@@ -660,7 +660,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if !exists && !initial {
-			qfs.c.vlog("A inode %d with nil lookupCount "+
+			c.vlog("A inode %d with nil lookupCount "+
 				"is uninstantiated by its child", inode.inodeNum())
 			break
 		}
@@ -675,7 +675,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 				// be uninstantiated
 				lookupCount, _ = qfs.lookupCount(i)
 				if lookupCount != 0 ||
-					qfs.inodeNoInstantiate(&qfs.c, i) != nil {
+					qfs.inodeNoInstantiate(c, i) != nil {
 
 					// Not ready to forget, no more to do
 					c.dlog("Not all children unloaded, %d in %d",
