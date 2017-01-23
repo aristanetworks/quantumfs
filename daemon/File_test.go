@@ -559,3 +559,28 @@ func TestSmallFileReadPastEnd(t *testing.T) {
 		file.Close()
 	})
 }
+
+func TestFileStatBlockCount(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genData(1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+		defer file.Close()
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		// stat.Blocks must always be in terms of 512B blocks
+		test.assert(uint64(stat.Blocks) == BlocksRoundUp(uint64(stat.Size),
+			uint64(512)),
+			"Blocks is not in terms of 512B blocks. Blocks %v Size %v",
+			stat.Blocks, stat.Size)
+	})
+}
