@@ -421,8 +421,8 @@ func serveSafely(th *testHelper) {
 	mountOptions.Options = append(mountOptions.Options, "dev")
 
 	th.qfsWait.Add(1)
+	defer th.qfsWait.Done()
 	th.qfs.Serve(mountOptions)
-	th.qfsWait.Done()
 }
 
 func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
