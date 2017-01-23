@@ -14,6 +14,7 @@ import "github.com/hanwen/go-fuse/fuse"
 // WorkspaceDB instead of passed in from the parent.
 type WorkspaceRoot struct {
 	Directory
+	typespace string
 	namespace string
 	workspace string
 	rootId    quantumfs.ObjectKey
@@ -34,22 +35,24 @@ type WorkspaceRoot struct {
 // is relatively expensive and not terribly useful. Instead fake it and assume a
 // normal number here.
 func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	workspace string) {
+	typespace string, namespace string) {
 
 	fillAttr(attr, inodeNum, 27)
 	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
-func newWorkspaceRoot(c *ctx, parentName string, name string,
+func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceRoot::newWorkspaceRoot").out()
 
 	var wsr WorkspaceRoot
 
-	rootId, err := c.workspaceDB.Workspace(&c.Ctx, parentName, name)
+	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
+		typespace, namespace, workspace)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
-	c.vlog("Workspace Loading %s/%s %s", parentName, name, rootId.String())
+	c.vlog("Workspace Loading %s/%s/%s %s",
+		typespace, namespace, workspace, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -57,14 +60,15 @@ func newWorkspaceRoot(c *ctx, parentName string, name string,
 	defer wsr.Lock().Unlock()
 
 	wsr.self = &wsr
-	wsr.namespace = parentName
-	wsr.workspace = name
+	wsr.typespace = typespace
+	wsr.namespace = namespace
+	wsr.workspace = workspace
 	wsr.rootId = rootId
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
-	uninstantiated := initDirectory(c, name, &wsr.Directory,
+	uninstantiated := initDirectory(c, workspace, &wsr.Directory,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
@@ -158,8 +162,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.namespace,
-			wsr.workspace, wsr.rootId, newRootId)
+		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
 			msg := fmt.Sprintf("Unexpected workspace rootID update "+

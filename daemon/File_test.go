@@ -344,7 +344,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
-		wsNamespaceName, wsWorkspaceName :=
+		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
 		testFilename := workspace + "/" + "test"
@@ -368,7 +368,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, because we
 		// currently do not support delayed syncing, change the workspace
 		// rootId and mark the fileDescriptor clean.
-		oldRootId := test.workspaceRootId(wsNamespaceName,
+		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
 		c := test.newCtx()
@@ -377,7 +377,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.syncAllWorkspaces()
-		newRootId := test.workspaceRootId(wsNamespaceName,
+		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
@@ -394,7 +394,7 @@ func TestFileAttrUpdate(t *testing.T) {
 		src := test.newWorkspace()
 		src = test.relPath(src)
 
-		dst := "attrupdate/test"
+		dst := "dst/attrupdate/test"
 
 		// First create a file
 		testFile := test.absPath(src + "/" + "test")
@@ -432,7 +432,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 		src := test.newWorkspace()
 		src = test.relPath(src)
 
-		dst := "attrwriteupdate/test"
+		dst := "dst/attrwriteupdate/test"
 
 		// First create a file
 		testFile := test.absPath(src + "/" + "test")
@@ -555,5 +555,30 @@ func TestSmallFileReadPastEnd(t *testing.T) {
 		test.assert(err == io.EOF, "Expected EOF got: %v", err)
 
 		file.Close()
+	})
+}
+
+func TestFileStatBlockCount(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testFilename := workspace + "/test"
+
+		// First create a file with some data
+		file, err := os.Create(testFilename)
+		test.assert(err == nil, "Error creating test file: %v", err)
+
+		data := genData(1024)
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing data to file: %v", err)
+		defer file.Close()
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFilename, &stat)
+		test.assert(err == nil, "Error stat'ing test file: %v", err)
+		// stat.Blocks must always be in terms of 512B blocks
+		test.assert(uint64(stat.Blocks) == BlocksRoundUp(uint64(stat.Size),
+			uint64(512)),
+			"Blocks is not in terms of 512B blocks. Blocks %v Size %v",
+			stat.Blocks, stat.Size)
 	})
 }

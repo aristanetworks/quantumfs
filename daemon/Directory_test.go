@@ -98,7 +98,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
-		wsNamespaceName, wsWorkspaceName :=
+		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
 		dirName := workspace + "/test/a/b"
@@ -127,7 +127,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, after we
 		// trigger a delayed sync, change the workspace rootId and mark the
 		// fileDescriptor clean.
-		oldRootId := test.workspaceRootId(wsNamespaceName,
+		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
 		c := test.newCtx()
@@ -136,7 +136,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.syncAllWorkspaces()
-		newRootId := test.workspaceRootId(wsNamespaceName,
+		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
 		test.assert(oldRootId != newRootId, "Workspace rootId didn't change")
@@ -156,7 +156,7 @@ func TestDirectoryUpdate(t *testing.T) {
 		src := test.newWorkspace()
 		src = test.relPath(src)
 
-		dst := "dirupdate/test"
+		dst := "branch/dirupdate/test"
 
 		// First create a file
 		testFilename := test.absPath(src + "/" + "test")
