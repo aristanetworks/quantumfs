@@ -222,6 +222,7 @@ func (th *testHelper) endTest() {
 
 	if th.tempDir != "" {
 		th.waitToBeUnmounted()
+		th.waitForQuantumFsToFinish()
 		time.Sleep(1 * time.Second)
 
 		if testFailed := th.logscan(); !testFailed {
