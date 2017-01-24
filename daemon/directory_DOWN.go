@@ -53,11 +53,19 @@ func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 		dir.name_).out()
 
 	defer dir.Lock().Unlock()
+
+	parent := dir.parent(c)
+
+	if parent == dir {
+		c.vlog("Not flushing orphaned directory")
+		return dir.baseLayerId
+	}
+
 	defer dir.childRecordLock.Lock().Unlock()
 
 	dir.publish_(c)
 
-	dir.parent(c).syncChild(c, dir.inodeNum(), dir.baseLayerId)
+	parent.syncChild(c, dir.inodeNum(), dir.baseLayerId)
 
 	return dir.baseLayerId
 }
