@@ -261,7 +261,7 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	defer dirtyInode.inode.RLockTree().RUnlock()
 
 	if !dirtyInode.inode.isOrphaned() {
-		dirtyInode.inode.flush_DOWN(c)
+		dirtyInode.inode.flush(c)
 	}
 	dirtyInode.inode.markClean()
 
@@ -710,7 +710,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 		c.vlog("Set inode %d to nil", inode.inodeNum())
 
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
-			key := inode.flush_DOWN(c)
+			key := inode.flush(c)
 
 			parentId := inode.parentId()
 			parent := qfs.inodeNoInstantiate(c, parentId)
