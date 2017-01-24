@@ -734,7 +734,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 	return rtn
 }
 
-// Requires the treeLock be held for write.
+// Requires the treeLock be held for read.
 func (qfs *QuantumFs) forgetChain_(c *ctx, inodeNum InodeId) []InodeId {
 	defer c.FuncIn("Mux::forgetChain_", "inode %d", inodeNum).out()
 	inode := qfs.inodeNoInstantiate(c, inodeNum)
