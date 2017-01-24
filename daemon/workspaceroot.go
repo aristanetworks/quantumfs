@@ -42,9 +42,10 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 }
 
 func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) Inode {
+	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
-	defer c.funcIn("WorkspaceRoot::newWorkspaceRoot").out()
+	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s/%s/%s", typespace,
+		namespace, workspace).out()
 
 	var wsr WorkspaceRoot
 
@@ -72,9 +73,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
-	c.qfs.addUninstantiated(c, uninstantiated, wsr.inodeNum())
-
-	return &wsr
+	return &wsr, uninstantiated
 }
 
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
