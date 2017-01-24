@@ -15,13 +15,15 @@ type NullWorkspaceRoot struct {
 }
 
 func newNullWorkspaceRoot(c *ctx, typeSpace string, nameSpace string,
-	workSpace string, parent Inode, inodeNum InodeId) Inode {
+	workSpace string, parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
+	inode, uninstantiated := newWorkspaceRoot(c, typeSpace, nameSpace, workSpace,
+		parent, inodeNum)
+	wsr := *(inode.(*WorkspaceRoot))
 	nwsr := NullWorkspaceRoot{
-		WorkspaceRoot: *(newWorkspaceRoot(c, typeSpace, nameSpace, workSpace,
-			parent, inodeNum).(*WorkspaceRoot)),
+		WorkspaceRoot: wsr,
 	}
-	return &nwsr
+	return &nwsr, uninstantiated
 }
 
 func (nwsr *NullWorkspaceRoot) Create(c *ctx, input *fuse.CreateIn, name string,
