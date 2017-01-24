@@ -20,9 +20,9 @@ func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 
 	defer fi.Lock().Unlock()
 
-	if isOrphaned() {
+	if fi.isOrphaned() {
 		c.vlog("Not flushing orphaned file")
-		return
+		return quantumfs.EmptyBlockKey
 	}
 
 	key := fi.accessor.sync(c)
