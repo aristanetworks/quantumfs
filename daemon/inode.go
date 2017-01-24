@@ -273,6 +273,7 @@ func (inode *InodeCommon) orphan(c *ctx) {
 	inode.parentLock.Lock()
 	inode.parent_ = inode.id
 	inode.parentLock.Unlock()
+	c.vlog("Orphaned inode %d", inode.id)
 }
 
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
