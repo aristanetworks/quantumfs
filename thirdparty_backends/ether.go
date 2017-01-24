@@ -1,11 +1,11 @@
-// +build linux
+// +build !skip_backends
 
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Disable this file by replacing "linux" from the first line with "ignore" if you
-// want to compile in support for the ether datastores. You will need to do the same
-// in daemon/Ether_test.go as well.
+// To avoid compiling in support for ether datastore
+// change "!skip_backends" in first line with "ignore"
+// You will need to do the same in daemon/Ether_test.go as well.
 package thirdparty_backends
 
 import "bytes"
