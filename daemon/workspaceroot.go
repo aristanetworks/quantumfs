@@ -263,3 +263,11 @@ func (wsr *WorkspaceRoot) clearList() {
 func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
 	return true
 }
+
+func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("WorkspaceRoot::flush").out()
+
+	wsr.Directory.flush(c)
+	wsr.publish(c)
+	return wsr.rootId
+}

@@ -22,7 +22,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	newRecord := cloneDirectoryRecord(origRecord)
 	newRecord.SetFilename(newName)
-	newRecord.SetID(srcInode.flush_DOWN(c))
+	newRecord.SetID(srcInode.flush(c))
 
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
@@ -48,28 +48,6 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.OK
 }
 
-func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.FuncIn("Directory::flush_DOWN", "%d %s", dir.inodeNum(),
-		dir.name_).out()
-
-	defer dir.Lock().Unlock()
-
-	parent := dir.parent(c)
-
-	if parent == dir {
-		c.vlog("Not flushing orphaned directory")
-		return dir.baseLayerId
-	}
-
-	defer dir.childRecordLock.Lock().Unlock()
-
-	dir.publish_(c)
-
-	parent.syncChild(c, dir.inodeNum(), dir.baseLayerId)
-
-	return dir.baseLayerId
-}
-
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
@@ -86,7 +64,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
 		// Since the child is instantiated it may be modified, flush is to be
 		// sure
-		childInode.flush_DOWN(c)
+		childInode.flush(c)
 	}
 
 	// flush_DOWN already acquired an Inode lock exclusively. In case of the
