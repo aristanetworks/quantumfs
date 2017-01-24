@@ -153,7 +153,9 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 		sleepTime := nextExpiringInode.Sub(time.Now())
 
 		if sleepTime < 0 {
-			c.elog("Negative flusher sleepTime %s!", sleepTime)
+			c.elog("ERROR: Negative flusher sleepTime %s! %s %s",
+				sleepTime.String(), time.Now().String(),
+				nextExpiringInode.String())
 			sleepTime = flushSanityTimeout
 		} else if sleepTime > flushSanityTimeout {
 			c.elog("Overlong flusher sleepTime %s!", sleepTime)
