@@ -266,14 +266,20 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	dirtyInode.inode.markClean()
 
 	if dirtyInode.shouldUninstantiate {
-		c.vlog("Starting uninstantiation at inode %d", inodeNum)
-		toRemove := qfs.forgetChain_(c, inodeNum)
+		qfs.uninstantiateInode_(c, inodeNum)
+	}
+}
 
-		if toRemove != nil {
-			// We need to remove all uninstantiated children.
-			// Note: locks mapMutex
-			qfs.removeUninstantiated(c, toRemove)
-		}
+// Requires treeLock for read
+func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
+	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).out()
+
+	toRemove := qfs.forgetChain_(c, inodeNum)
+
+	if toRemove != nil {
+		// We need to remove all uninstantiated children.
+		// Note: locks mapMutex
+		qfs.removeUninstantiated(c, toRemove)
 	}
 }
 
@@ -734,7 +740,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 	return rtn
 }
 
-// Requires the treeLock be held for write.
+// Requires the treeLock be held for read.
 func (qfs *QuantumFs) forgetChain_(c *ctx, inodeNum InodeId) []InodeId {
 	defer c.FuncIn("Mux::forgetChain_", "inode %d", inodeNum).out()
 	inode := qfs.inodeNoInstantiate(c, inodeNum)
@@ -776,6 +782,9 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	if inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID)); inode != nil {
 		inode.queueToForget(&qfs.c)
+	} else {
+		qfs.c.dlog("Forgetting uninstantiated Inode %d", nodeID)
+		qfs.uninstantiateInode_(&qfs.c, InodeId(nodeID))
 	}
 }
 
