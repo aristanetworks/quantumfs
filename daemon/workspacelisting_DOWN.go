@@ -37,3 +37,18 @@ func (nsl *NamespaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 func (nsl *NamespaceList) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
+
+func (tsl *TypespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
+	out *fuse.EntryOut) fuse.Status {
+
+	c.elog("Invalid Link on TypespaceList")
+	return fuse.ENOTDIR
+}
+
+func (tsl *TypespaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
+}
+
+func (tsl *TypespaceList) Sync_DOWN(c *ctx) fuse.Status {
+	return fuse.OK
+}

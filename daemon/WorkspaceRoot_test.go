@@ -12,8 +12,8 @@ import "github.com/aristanetworks/quantumfs"
 
 func TestWorkspaceRootApiAccess(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		// fix the api path as _null/null/api so that we can verify that
-		// api files in workspaceroot are really functional
+		// fix the api path as _null/_null/null/api so that we can verify
+		// that api files in workspaceroot are really functional
 		workspace := test.nullWorkspace()
 		apiPath := workspace + "/" + quantumfs.ApiPath
 
@@ -24,8 +24,8 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 		test.assert(stat_t.Ino == quantumfs.InodeIdApi,
 			"Wrong Inode number for api file")
 
-		src := "_null/null"
-		dst := "wsrtest/wsrtest"
+		src := "_null/_null/null"
+		dst := "wsrtest/wsrtest/wsrtest"
 		api := quantumfs.NewApiWithPath(apiPath)
 		assert(api != nil, "Api nil")
 		err = api.Branch(src, dst)
