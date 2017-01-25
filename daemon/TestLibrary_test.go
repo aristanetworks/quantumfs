@@ -439,6 +439,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 }
 
 func (th *testHelper) log(format string, args ...interface{}) error {
+	th.t.Logf(th.testName+": "+format, args...)
 	th.logger.Log(qlog.LogTest, qlog.TestReqId, 1,
 		"[%s] "+format, append([]interface{}{th.testName},
 			args...)...)
@@ -768,10 +769,9 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort(t *testing.T) {
-	runTestNoQfs(t, func(test *testHelper) {
+	runTest(t, func(test *testHelper) {
 		test.shouldFailLogscan = true
 
-		test.startDefaultQuantumFs()
 		api := test.getApi()
 
 		// Introduce a panicing error into quantumfs
