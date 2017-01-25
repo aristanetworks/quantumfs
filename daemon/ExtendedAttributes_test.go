@@ -75,7 +75,9 @@ func TestExtendedAttrList(t *testing.T) {
 		data := make([]byte, 64000)
 		size, err := syscall.Listxattr(testFilename, data)
 		test.assert(err == nil, "Error listing XAttr: %v", err)
-		test.assert(size == 0, "Unexpected XAttr, size %d", size)
+		// by default NULL-terminated XAttrTypeKey is present
+		test.assert(size-1 == len([]byte(quantumfs.XAttrTypeKey)),
+			"Unexpected XAttr, size %d", size)
 
 		// Add a bunch of attributes
 		const N = 100
