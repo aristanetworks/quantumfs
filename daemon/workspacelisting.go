@@ -131,7 +131,9 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 func updateChildren(c *ctx, rootName string, parentName string, names []string,
 	inodeMap *map[string]InodeId, nameMap *map[InodeId]string, parent Inode,
 	newInode func(c *ctx, typespace string, namespace string, workspace string,
-		parent Inode, inodeId InodeId) Inode) {
+		parent Inode, inodeId InodeId) (Inode, []InodeId)) {
+
+	defer c.FuncIn("updateChildren", "%s/%s", rootName, parentName).out()
 
 	// Re-arrange the order of rootName/parentName/names by a proper order of
 	// typespace/namespace/workspace in the constructor newInode
@@ -157,13 +159,18 @@ func updateChildren(c *ctx, rootName string, parentName string, names []string,
 				parentName == quantumfs.NullNamespaceName &&
 				name == quantumfs.NullWorkspaceName {
 
-				c.qfs.setInode(c, inodeId, newNullWorkspaceRoot(c,
-					rootName, parentName, name, parent, inodeId))
-			} else {
-				input[indx] = name
-				c.qfs.setInode(c, inodeId, newInode(c, input[0],
-					input[1], input[2], parent, inodeId))
+				newInode = newNullWorkspaceRoot
 			}
+
+			c.vlog("Instantiating workspace %s/%s/%s", input[0],
+				input[1], input[2])
+
+			input[indx] = name
+			inode, uninstantiated := newInode(c, input[0], input[1],
+				input[2], parent, inodeId)
+
+			c.qfs.setInode(c, inodeId, inode)
+			c.qfs.addUninstantiated(c, uninstantiated, inodeId)
 		}
 		touched[name] = true
 	}
@@ -441,11 +448,11 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	return newNamespaceList(c, name, "", "", tsl, inodeNum), nil
+	return newNamespaceList(c, name, "", "", tsl, inodeNum)
 }
 
 func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) Inode {
+	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
 	nsl := NamespaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
@@ -457,7 +464,7 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 	nsl.setParent(parent.inodeNum())
 	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock
 	assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
-	return &nsl
+	return &nsl, nil
 }
 
 type NamespaceList struct {
@@ -717,7 +724,7 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	return newWorkspaceList(c, nsl.typespaceName, name, "", nsl, inodeNum), nil
+	return newWorkspaceList(c, nsl.typespaceName, name, "", nsl, inodeNum)
 }
 
 func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
@@ -731,7 +738,7 @@ func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
 }
 
 func newWorkspaceList(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) Inode {
+	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
 	wsl := WorkspaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
@@ -744,7 +751,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string, workspace stri
 	wsl.setParent(parent.inodeNum())
 	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
 	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
-	return &wsl
+	return &wsl, nil
 }
 
 type WorkspaceList struct {
@@ -1013,10 +1020,10 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
 
 		return newNullWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
-			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
+			wsl.workspacesById[inodeNum], wsl, inodeNum)
 	} else {
 		return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
-			wsl.workspacesById[inodeNum], wsl, inodeNum), nil
+			wsl.workspacesById[inodeNum], wsl, inodeNum)
 	}
 }
 
