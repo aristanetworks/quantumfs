@@ -29,6 +29,7 @@ func init() {
 	testqfs = os.Getenv("GOPATH") + "/bin/qfs"
 
 	libsToCopy = make(map[string]bool)
+	libsToCopy["/usr/lib64/ld-linux-x86-64.so.2"] = true
 
 	for _, binary := range commandsInUsrBin {
 		ldd := exec.Command("ldd", binary)
