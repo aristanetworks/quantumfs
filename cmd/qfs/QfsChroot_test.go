@@ -4,10 +4,12 @@
 // tests of qfs chroot tool
 package main
 
+import "fmt"
 import "io/ioutil"
 import "os"
 import "os/exec"
 import "runtime"
+import "strings"
 import "syscall"
 import "testing"
 
@@ -19,24 +21,39 @@ var commandsInUsrBin = []string{
 	"/usr/bin/ls",
 }
 
-var libsToCopy = []string{
-	"/usr/lib64/libtinfo.so.5",
-	"/usr/lib64/libdl.so.2",
-	"/usr/lib64/libc.so.6",
-	"/usr/lib64/librt.so.1",
-	"/usr/lib64/libpcre.so.1",
-	"/usr/lib64/ld-linux-x86-64.so.2",
-	"/usr/lib64/libpthread.so.0",
-	"/usr/lib64/libcap.so.2",
-	"/usr/lib64/libacl.so.1",
-	"/usr/lib64/libattr.so.1",
-	"/usr/lib64/libselinux.so.1",
-}
+var libsToCopy map[string]bool
 
 var testqfs string
 
 func init() {
 	testqfs = os.Getenv("GOPATH") + "/bin/qfs"
+
+	libsToCopy = make(map[string]bool)
+
+	for _, binary := range commandsInUsrBin {
+		ldd := exec.Command("ldd", binary)
+		output, err := ldd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to get libraries for binary %s: %v\n",
+				binary, err)
+			continue
+		}
+
+		lines := strings.Split(string(output), "\n")
+
+		for _, line := range lines {
+			if !strings.Contains(line, "=>") ||
+				!strings.Contains(line, "/lib") {
+
+				// This line doesn't contain a library we can copy
+				continue
+			}
+
+			tokens := strings.Split(line, " ")
+			library := tokens[2]
+			libsToCopy[library] = true
+		}
+	}
 }
 
 // setup a minimal workspace
@@ -77,7 +94,7 @@ func setupWorkspace(t *testing.T) string {
 
 	}
 
-	for _, lib := range libsToCopy {
+	for lib := range libsToCopy {
 		if err := runCommand("cp", lib, dirUsrLib64); err != nil {
 			t.Fatal(err.Error())
 		}
