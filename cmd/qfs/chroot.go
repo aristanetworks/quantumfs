@@ -357,6 +357,18 @@ func switchUserMode() error {
 		return err
 	}
 
+	if err = os.Setenv("USER", lognameStr); err != nil {
+		return err
+	}
+
+	if err = os.Setenv("USERNAME", lognameStr); err != nil {
+		return err
+	}
+
+	if err = os.Setenv("HOME", logUser.HomeDir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
