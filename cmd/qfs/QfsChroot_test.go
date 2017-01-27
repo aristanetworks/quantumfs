@@ -269,11 +269,15 @@ func testPersistentChroot(t *testing.T, dirTest string) {
 }
 
 func TestPersistentChroot(t *testing.T) {
+	cleanup := func(t *testing.T, dirTest string) {
+		terminateNetnsdServer(dirTest, t)
+		cleanupWorkspace(dirTest, t)
+	}
+
 	func() {
 		dirTest := setupWorkspace(t)
 
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		testPersistentChroot(t, dirTest)
 	}()
@@ -281,8 +285,7 @@ func TestPersistentChroot(t *testing.T) {
 	func() {
 		dirTest := setupWorkspace(t)
 
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		setUidGid(99, 99, t)
 		defer setUidGidToDefault(t)
@@ -365,20 +368,21 @@ func testNetnsPersistency(t *testing.T, dirTest string) {
 }
 
 func TestNetnsPersistency(t *testing.T) {
+	cleanup := func(t *testing.T, dirTest string) {
+		terminateNetnsdServer(dirTest, t)
+		cleanupWorkspace(dirTest, t)
+	}
+
 	func() {
 		dirTest := setupWorkspace(t)
-
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		testNetnsPersistency(t, dirTest)
 	}()
 
 	func() {
 		dirTest := setupWorkspace(t)
-
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		setUidGid(99, 99, t)
 		defer setUidGidToDefault(t)
