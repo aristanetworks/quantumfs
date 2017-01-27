@@ -12,6 +12,7 @@ import "runtime"
 import "strings"
 import "syscall"
 import "testing"
+import "time"
 
 var commandsInUsrBin = []string{
 	umount,
@@ -166,6 +167,8 @@ func terminateNetnsdServer(rootdir string, t *testing.T) {
 		if err := runCommand(sudo, netns, "-k", svrName); err != nil {
 			t.Fatal(err.Error())
 		}
+		// Wait for the chroot to no longer be used
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
