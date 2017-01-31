@@ -150,37 +150,36 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	for {
-		sleepTime := nextExpiringInode.Sub(time.Now())
-
-		if sleepTime < 0 {
-			c.elog("ERROR: Negative flusher sleepTime %s! %s %s",
-				sleepTime.String(), time.Now().String(),
-				nextExpiringInode.String())
-			sleepTime = flushSanityTimeout
-		} else if sleepTime > flushSanityTimeout {
-			c.elog("Overlong flusher sleepTime %s!", sleepTime)
-			sleepTime = flushSanityTimeout
-		}
-
-		c.vlog("Waiting until %s (%s)...", nextExpiringInode.String(),
-			sleepTime.String())
-
-		// If we've been directed to flushAll, use that caller's context
-		c = flusherContext
-
 		stop := false
 		flushAll := false
 
-		select {
-		case stop = <-quit:
-			c.vlog("flusher woken up due to stop")
-		case <-qfs.kickFlush:
-			c.vlog("flusher woken up due to kick")
-		case c = <-qfs.flushAll:
-			flushAll = true
-			c.vlog("flusher woken up due to syncAll")
-		case <-time.After(sleepTime):
-			c.vlog("flusher woken up due to timer")
+		sleepTime := nextExpiringInode.Sub(time.Now())
+
+		if sleepTime > flushSanityTimeout {
+			c.elog("Overlong flusher sleepTime %s!", sleepTime)
+			sleepTime = flushSanityTimeout
+		} else if sleepTime > 0 {
+			c.vlog("Waiting until %s (%s)...",
+				nextExpiringInode.String(), sleepTime.String())
+
+			// If we've been directed to flushAll, use that caller's
+			// context
+			c = flusherContext
+
+			stop = false
+			flushAll = false
+
+			select {
+			case stop = <-quit:
+				c.vlog("flusher woken up due to stop")
+			case <-qfs.kickFlush:
+				c.vlog("flusher woken up due to kick")
+			case c = <-qfs.flushAll:
+				flushAll = true
+				c.vlog("flusher woken up due to syncAll")
+			case <-time.After(sleepTime):
+				c.vlog("flusher woken up due to timer")
+			}
 		}
 
 		nextExpiringInode = func() time.Time {
