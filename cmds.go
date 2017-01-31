@@ -147,15 +147,20 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	api.fd.Seek(0, 0)
-	buf = make([]byte, 4096)
-	n, err := api.fd.Read(buf)
+	info, err := api.fd.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	buf = buf[:n]
-	return buf, nil
+	size := info.Size()
+	buf = make([]byte, size)
+	api.fd.Seek(0, 0)
+	n, err := api.fd.Read(buf[:size])
+	if err != nil {
+		return nil, err
+	}
+
+	return buf[:n], nil
 }
 
 // branch the src workspace into a new workspace called dst.
@@ -199,7 +204,7 @@ func (api *Api) Branch(src string, dst string) error {
 // Get the list of accessed file from workspaceroot
 func (api *Api) GetAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -239,7 +244,7 @@ func (api *Api) GetAccessed(wsr string) error {
 // clear the list of accessed files in workspaceroot
 func (api *Api) ClearAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
