@@ -24,6 +24,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
+		apiFileSize:            0,
 		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
@@ -71,6 +72,10 @@ type QuantumFs struct {
 	// If we've previously failed to forget an inode due to a lock timeout, don't
 	// try any further.
 	giveUpOnForget bool
+
+	// We accumulate the size of each responses to set up a proper responding
+	// file in FUSE
+	apiFileSize uint64
 
 	mapMutex         DeferableRwMutex
 	inodes           map[InodeId]Inode
@@ -1071,8 +1076,10 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	}
 
 	defer fileHandle.RLockTree().RUnlock()
-	return fileHandle.Read(c, input.Offset, input.Size,
+	readRes, result = fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
+
+	return
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
@@ -1280,4 +1287,20 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
 
 	return wsr.(*WorkspaceRoot), wsr != nil
+}
+
+func (qfs *QuantumFs) increaseApiFileSize(offset int) {
+	qfs.apiFileSize += uint64(offset)
+	qfs.c.vlog("QuantumFs::APIFileSize add %d to %d", offset, qfs.apiFileSize)
+}
+func (qfs *QuantumFs) makeApiFileSizeZero() {
+	qfs.apiFileSize = 0
+	qfs.c.vlog("QuantumFs::APIFileSize set to %d", qfs.apiFileSize)
+}
+func (qfs *QuantumFs) decreaseApiFileSize(offset int) {
+	qfs.apiFileSize -= uint64(offset)
+	if qfs.apiFileSize < 0 {
+		qfs.c.elog("ERROR: PANIC Global variable should"+
+			" be less than zero %d", qfs.apiFileSize)
+	}
 }
