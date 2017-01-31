@@ -182,9 +182,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 		return
 	}
 
-	inode.dirtyElementLock.Lock()
-	de := inode.dirtyElement_
-	inode.dirtyElementLock.Unlock()
+	de := inode.dirtyElement()
 
 	if de == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
