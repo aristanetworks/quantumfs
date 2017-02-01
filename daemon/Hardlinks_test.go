@@ -44,7 +44,7 @@ func TestHardlinkReload(t *testing.T) {
 		// trigger a sync so the workspace is published
 		test.syncAllWorkspaces()
 
-		workspaceB := "copyWorkspace/test"
+		workspaceB := "branch/copyWorkspace/test"
 		api := test.getApi()
 		err = api.Branch(test.relPath(workspace), workspaceB)
 		test.assert(err == nil, "Unable to branch")

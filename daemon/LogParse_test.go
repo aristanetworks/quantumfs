@@ -211,3 +211,14 @@ func TestQParsePartials_test(t *testing.T) {
 			"Unable to confidently prove partial packet reading")
 	})
 }
+
+func TestBooleanLogType(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		test.qfs.c.elog("booleans %t %t", true, false)
+
+		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+		test.assert(strings.Contains(testLogs, "booleans true false"),
+			"boolean log types incorrectly output: %s", testLogs)
+	})
+}

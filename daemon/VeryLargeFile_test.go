@@ -76,7 +76,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 
 	// Branch the workspace
 	api := test.getApi()
-	dst := strconv.FormatUint(fromFileSize, 10) + "verylargeattrsparse/test"
+	dst := strconv.FormatUint(fromFileSize, 10) + "dst/verylargeattrsparse/test"
 	err = api.Branch(test.relPath(workspace), dst)
 	test.assert(err == nil, "Unable to branch")
 
