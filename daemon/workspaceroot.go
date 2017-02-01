@@ -166,12 +166,12 @@ func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) {
 	// Normally, nlink should still be at least 1
 	if entry.nlink > 0 {
 		wsr.hardlinks[linkId] = entry
-		return;
+		return
 	}
 
 	// But via races, it's possible nlink could be zero here, at which point
 	// all references to this hardlink are gone and we must remove it
-	wsr.removeHardlink_(linkId, entry.inodeId);
+	wsr.removeHardlink_(linkId, entry.inodeId)
 }
 
 // Must hold the linkLock for writing
@@ -312,7 +312,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 		inodeId = c.qfs.newInodeId()
 	}
 
-	wsr.removeHardlink_(linkId, link.inodeId);
+	wsr.removeHardlink_(linkId, link.inodeId)
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
 
