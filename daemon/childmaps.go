@@ -283,7 +283,7 @@ func (cmap *ChildMap) record(inodeNum InodeId) DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
-	c.funcIn("ChildMap::recordByName").out()
+	defer c.funcIn("ChildMap::recordByName").out()
 
 	inodeNum, exists := cmap.children[name]
 	if !exists {
