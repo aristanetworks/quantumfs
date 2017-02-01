@@ -439,6 +439,7 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 }
 
 func (th *testHelper) log(format string, args ...interface{}) error {
+	th.t.Logf(th.testName+": "+format, args...)
 	th.logger.Log(qlog.LogTest, qlog.TestReqId, 1,
 		"[%s] "+format, append([]interface{}{th.testName},
 			args...)...)
@@ -467,11 +468,13 @@ func (th *testHelper) relPath(path string) string {
 
 // Extract namespace and workspace path from the absolute path of
 // a workspaceroot
-func (th *testHelper) getWorkspaceComponents(abspath string) (string, string) {
+func (th *testHelper) getWorkspaceComponents(abspath string) (string,
+	string, string) {
+
 	relpath := th.relPath(abspath)
 	components := strings.Split(relpath, "/")
 
-	return components[0], components[1]
+	return components[0], components[1], components[2]
 }
 
 // Return a random namespace/workspace name of given length
@@ -500,7 +503,10 @@ func TestRandomNamespaceName(t *testing.T) {
 }
 
 func (th *testHelper) nullWorkspaceRel() string {
-	return quantumfs.NullNamespaceName + "/" + quantumfs.NullWorkspaceName
+	type_ := quantumfs.NullTypespaceName
+	name_ := quantumfs.NullNamespaceName
+	work_ := quantumfs.NullWorkspaceName
+	return type_ + "/" + name_ + "/" + work_
 }
 
 func (th *testHelper) nullWorkspace() string {
@@ -513,8 +519,12 @@ func (th *testHelper) nullWorkspace() string {
 func (th *testHelper) newWorkspace() string {
 	api := th.getApi()
 
+	type_ := randomNamespaceName(8)
+	name_ := randomNamespaceName(10)
+	work_ := randomNamespaceName(8)
+
 	src := th.nullWorkspaceRel()
-	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
+	dst := type_ + "/" + name_ + "/" + work_
 
 	err := api.Branch(src, dst)
 	th.assert(err == nil, "Failed to branch workspace: %v", err)
@@ -527,7 +537,8 @@ func (th *testHelper) newWorkspace() string {
 // Returns the relative path of the new workspace.
 func (th *testHelper) branchWorkspace(original string) string {
 	src := th.relPath(original)
-	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10)
+	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10) +
+		"/" + randomNamespaceName(8)
 
 	api := th.getApi()
 	err := api.Branch(src, dst)
@@ -582,11 +593,11 @@ func (th *testHelper) getInode(path string) Inode {
 }
 
 // Retrieve the rootId of the given workspace
-func (th *testHelper) workspaceRootId(namespace string,
+func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	workspace string) quantumfs.ObjectKey {
 
 	key, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
-		namespace, workspace)
+		typespace, namespace, workspace)
 	th.assert(err == nil, "Error fetching key")
 
 	return key
@@ -758,10 +769,9 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 // a blocked state. testHelper needs to forcefully abort and umount these to keep the
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort(t *testing.T) {
-	runTestNoQfs(t, func(test *testHelper) {
+	runTest(t, func(test *testHelper) {
 		test.shouldFailLogscan = true
 
-		test.startDefaultQuantumFs()
 		api := test.getApi()
 
 		// Introduce a panicing error into quantumfs
@@ -772,7 +782,7 @@ func TestPanicFilesystemAbort(t *testing.T) {
 		test.qfs.mapMutex.Unlock()
 
 		// panic Quantumfs
-		api.Branch("_null/null", "test/crash")
+		api.Branch("_null/_null/null", "branch/test/crash")
 	})
 }
 
@@ -910,7 +920,8 @@ func (test *testHelper) fileSize(filename string) int64 {
 // Convert an absolute workspace path to the matching WorkspaceRoot object
 func (test *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
 	parts := strings.Split(test.relPath(workspace), "/")
-	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c, parts[0], parts[1])
+	wsr, ok := test.qfs.getWorkspaceRoot(&test.qfs.c,
+		parts[0], parts[1], parts[2])
 
 	test.assert(ok, "WorkspaceRoot object for %s not found", workspace)
 
