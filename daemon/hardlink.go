@@ -160,6 +160,8 @@ func (link *Hardlink) Record() quantumfs.DirectoryRecord {
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
 	rtn.SetID(encodeHardlinkId(link.linkId))
 	rtn.SetFilename(link.name)
+	// we only need to return a thin record - just enough information to
+	// create the hardlink. The rest is stored in workspaceroot.
 
 	return *rtn
 }
