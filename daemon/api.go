@@ -411,8 +411,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) {
 
 	c.qfs.syncAll(c)
 
-	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], dst[0],
-		dst[1]); err != nil {
+	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
+		dst[0], dst[1], dst[2]); err != nil {
 
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
 		return
@@ -430,7 +430,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 
 	wsr := cmd.WorkspaceRoot
 	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -450,7 +450,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 
 	wsr := cmd.WorkspaceRoot
 	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -479,18 +479,18 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	dst := strings.Split(cmd.DstPath, "/")
 	key, type_, size, err := decodeExtendedKey(cmd.Key)
 	permissions := cmd.Permissions
-	uid := cmd.Uid
-	gid := cmd.Gid
+	uid := quantumfs.ObjectUid(c.Ctx, uint32(cmd.Uid), uint32(cmd.Uid))
+	gid := quantumfs.ObjectGid(c.Ctx, uint32(cmd.Gid), uint32(cmd.Gid))
 
-	wsr := dst[0] + "/" + dst[1]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1])
+	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
 
-	if len(dst) == 2 { // only have namespace and workspace
+	if len(dst) == 3 { // only have typespace/namespace/workspace
 		// duplicate the entire workspace root is illegal
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"WorkspaceRoot can not be duplicated")
