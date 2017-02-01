@@ -74,7 +74,8 @@ type QuantumFs struct {
 	giveUpOnForget bool
 
 	// We accumulate the size of each responses to set up a proper responding
-	// file in FUSE
+	// file in FUSE. A quantumfs system is a signle file system, so there is
+	// only one FUSE file regarless of the numbers of the workspaces
 	apiFileSize uint64
 
 	mapMutex         DeferableRwMutex

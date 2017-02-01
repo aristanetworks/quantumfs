@@ -160,8 +160,7 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	buf = buf[:n]
-	return buf, nil
+	return buf[:n], nil
 }
 
 // branch the src workspace into a new workspace called dst.

@@ -313,7 +313,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	debug := make([]byte, response.Size())
 	bytes, _ := response.Bytes(debug)
 	c.vlog("API Response %s", string(bytes))
-	//defer c.qfs.decreaseApiFileSize(response.Size())
+
 	return response, fuse.OK
 }
 
@@ -427,7 +427,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
 		dst[0], dst[1], dst[2]); err != nil {
 
-		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			err.Error())
 
 	}
 
@@ -467,7 +468,8 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 	}
 
 	workspace.clearList()
-	return api.queueErrorResponse(quantumfs.ErrorOK, "Clear AccessList Succeeded")
+	return api.queueErrorResponse(quantumfs.ErrorOK,
+		"Clear AccessList Succeeded")
 }
 
 func (api *ApiHandle) syncAll(c *ctx) int {
