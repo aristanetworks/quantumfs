@@ -46,7 +46,6 @@ func TestHardlink(t *testing.T) {
 		test.assert(len(wsr.hardlinks) == 1, "Wsr hardlink link len is %d",
 			len(wsr.hardlinks))
 
-		// Ensure nextHardlinkId was stored in the workspace root hash
 		nextHardlinkId_ := test.getWorkspaceRoot(workspace).nextHardlinkId
 		test.assert(nextHardlinkId == nextHardlinkId_ && nextHardlinkId != 0,
 			"nextHardlinkId unset or not saved/loaded")
