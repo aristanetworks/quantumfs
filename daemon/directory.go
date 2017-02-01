@@ -15,6 +15,12 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
+var emptyExtendedAttributes *quantumfs.ExtendedAttributes
+
+func init() {
+	emptyExtendedAttributes = quantumfs.NewExtendedAttributes()
+}
+
 type DirectoryRecordIf interface {
 	Filename() string
 	SetFilename(v string)
@@ -1248,7 +1254,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 
 	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
 		c.vlog("Directory::getExtendedAttributes_ returning new object")
-		return quantumfs.NewExtendedAttributes(), fuse.ENOENT
+		return emptyExtendedAttributes, fuse.ENOENT
 	}
 
 	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
@@ -1376,6 +1382,14 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
 	if ok == fuse.EIO {
 		return fuse.EIO
+	}
+
+	if ok == fuse.ENOENT {
+		// getExtendedAttributes_() returns a shared
+		// quantumfs.ExtendedAttributes instance when the file has no
+		// extended attributes for performance reasons. Thus we need to
+		// instantiate our own before we modify it.
+		attributeList = quantumfs.NewExtendedAttributes()
 	}
 
 	var dataKey quantumfs.ObjectKey
