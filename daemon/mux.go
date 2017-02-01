@@ -149,10 +149,10 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
-	for {
-		stop := false
-		flushAll := false
+	stop := false
+	flushAll := false
 
+	for {
 		sleepTime := nextExpiringInode.Sub(time.Now())
 
 		if sleepTime > flushSanityTimeout {
