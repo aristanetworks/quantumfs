@@ -11,7 +11,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 
-func TestNamespaceListing(t *testing.T) {
+func TestTypespaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		var stat syscall.Stat_t
 		err := syscall.Stat(test.absPath(quantumfs.ApiPath), &stat)
@@ -23,6 +23,17 @@ func TestNamespaceListing(t *testing.T) {
 		test.assert(err == nil, "Couldn't read root listing")
 		test.assert(len(entries) == 2,
 			"Incorrect number of entries in empty root: %d",
+			len(entries))
+	})
+}
+
+func TestNamespaceListing(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		entries, err :=
+			ioutil.ReadDir(test.absPath(quantumfs.NullTypespaceName))
+		test.assert(err == nil, "Couldn't read typespace listing")
+		test.assert(len(entries) == 1,
+			"Incorrect number of entries in null typespace: %d",
 			len(entries))
 	})
 }
