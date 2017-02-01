@@ -243,6 +243,12 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 		dirtyList.Remove(dirtyList.Front())
 
 		func() {
+			// We must release the dirtyQueueLock because when we flush
+			// an Inode it will modify its parent and likely place that
+			// parent onto the dirty queue. If we still hold that lock
+			// we'll deadlock. We defer relocking in order to balance
+			// against the deferred unlocking from our caller, even in
+			// the case of a panic.
 			qfs.dirtyQueueLock.Unlock()
 			defer qfs.dirtyQueueLock.Lock()
 			qfs.flushInode(c, *candidate)
