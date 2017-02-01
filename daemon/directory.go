@@ -1373,9 +1373,8 @@ func (dir *Directory) listChildXAttr(c *ctx,
 	defer dir.RLock().RUnlock()
 
 	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
-	if ok == fuse.ENOENT {
-		return []byte{}, fuse.OK
-	}
+	// even when the attributeList is empty here, we must include
+	// XAttrTypeKey in the attributeList
 
 	if ok == fuse.EIO {
 		return nil, fuse.EIO
