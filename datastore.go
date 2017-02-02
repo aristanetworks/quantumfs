@@ -306,6 +306,10 @@ func (v ObjectType) Primitive() interface{} {
 // UID is done at access time.
 const UIDUser = 1001 // The currently accessing user
 
+// UID to use if a system user (ie. root) views the attributes of a file owned by the
+// user.
+const UniversalUID = 10000
+
 // Convert object UID to system UID.
 //
 // userId is the UID of the current user
@@ -317,7 +321,7 @@ func SystemUid(uid UID, userId uint32) uint32 {
 			// If the user is running as a system account then we don't
 			// want the files to appear to be owned by that account.
 			// Instead make it appear owned by a normal user.
-			return 10000
+			return UniversalUID
 		}
 		return userId
 	} else {
@@ -346,6 +350,10 @@ func (v UID) Primitive() interface{} {
 // Similar to the UIDs above, group ownership is divided into special classes.
 const GIDUser = 1001 // The currently accessing user
 
+// GID to use if a system user (ie. root) views the attributes of a file owned by the
+// user group.
+const UniversalGID = 10000
+
 // Convert object GID to system GID.
 //
 // userId is the GID of the current user
@@ -357,7 +365,7 @@ func SystemGid(gid GID, userId uint32) uint32 {
 			// If the user is running as a system account then we don't
 			// want the files to appear to be owned by that account.
 			// Instead make it appear owned by a normal user.
-			return 10000
+			return UniversalGID
 		}
 		return userId
 	} else {
