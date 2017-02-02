@@ -5,6 +5,7 @@ package daemon
 
 import "fmt"
 import "github.com/aristanetworks/quantumfs"
+import "github.com/hanwen/go-fuse/fuse"
 
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
@@ -91,7 +92,7 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) DirectoryRecordIf {
 	}
 
 	if len(list) == 0 {
-		panic("Empty list leftover and not cleanup up")
+		panic("Empty list leftover and not cleaned up")
 	}
 
 	return list[0]
@@ -242,4 +243,48 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
 	}
 
 	return entry
+}
+
+func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
+	childName string) (copy DirectoryRecordIf, err fuse.Status) {
+
+	childId, exists := cmap.children[childName]
+	if !exists {
+		c.elog("No child record for %s in childmap", childName)
+		return nil, fuse.ENOENT
+	}
+
+	child := cmap.getRecord(childId, childName)
+	if child == nil {
+		panic("Mismatched childId and record")
+	}
+
+	// If it's already a hardlink, great no more work is needed
+	if link, isLink := child.(*Hardlink); isLink {
+		recordCopy := *link
+		return &recordCopy, fuse.OK
+	}
+
+	// record must be a file type to be hardlinked
+	if child.Type() != quantumfs.ObjectTypeSmallFile &&
+		child.Type() != quantumfs.ObjectTypeMediumFile &&
+		child.Type() != quantumfs.ObjectTypeLargeFile &&
+		child.Type() != quantumfs.ObjectTypeVeryLargeFile {
+
+		c.dlog("Cannot hardlink %s - not a file", childName)
+		return nil, fuse.EINVAL
+	}
+
+	// If the file hasn't been synced already, then we can't link it yet
+	if _, exists = cmap.dirtyChildren[childId]; exists {
+		c.elog("makeHardlink called on dirty child %d", childId)
+		return nil, fuse.EIO
+	}
+
+	// It needs to become a hardlink now. Hand it off to wsr
+	newLink := wsr.newHardlink(c, childId, child)
+
+	cmap.setRecord(childId, newLink)
+	linkCopy := *newLink
+	return &linkCopy, fuse.OK
 }
