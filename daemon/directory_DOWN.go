@@ -164,5 +164,5 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 	dir.children.clearDirty(toLink.inodeNum())
 
 	dir.self.dirty(c)
-	return dir.children.makeHardlink_DOWN(c, wsr, record.Filename())
+	return dir.children.makeHardlink(c, wsr, record.Filename())
 }
