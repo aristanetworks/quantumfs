@@ -49,6 +49,7 @@ var stdDevMin float64
 var stdDevMax float64
 var wildMin int
 var wildMax int
+var sampleMin int
 var maxThreads int
 var maxLenWildcards int
 var maxLen int
@@ -137,6 +138,8 @@ func init() {
 	flag.IntVar(&wildMin, "wcMin", 0, "Filter results, requiring minimum "+
 		"number of wildcards in function pattern.")
 	flag.IntVar(&wildMax, "wcMax", 100, "Same as wmin, but setting a maximum")
+	flag.IntVar(&sampleMin, "smMin", 1, "Filter results, requiring minimum "+
+		"number of samples in function pattern.")
 	flag.IntVar(&maxThreads, "threads", 30, "Max threads to use")
 	flag.IntVar(&maxLenWildcards, "maxWc", 16,
 		"Max sequence length to wildcard during -stat")
@@ -322,7 +325,7 @@ func main() {
 
 		fmt.Println("Top function patterns by total time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
-			wildMax, maxLen, topTotal)
+			wildMax, sampleMin, maxLen, topTotal)
 	case topAvg != 0:
 		if inFile == "" {
 			fmt.Println("To -topAvg, you must specify a stat file " +
@@ -345,7 +348,7 @@ func main() {
 
 		fmt.Println("Top function patterns by average time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
-			wildMax, maxLen, topAvg)
+			wildMax, sampleMin, maxLen, topAvg)
 	default:
 		fmt.Println("No action flags (-log, -stat, -csv) specified.")
 		os.Exit(1)
@@ -519,7 +522,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 }
 
 func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
-	maxStdDev float64, minWildcards int, maxWildcards int,
+	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
 	maxLen int, maxResults int) (filtered []qlog.PatternData, firstLog int64,
 	lastLog int64) {
 
@@ -542,6 +545,10 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			if t.StartTime+t.Delta > latestLog {
 				latestLog = t.StartTime + t.Delta
 			}
+		}
+
+		if len(patterns[i].Data.Times) < minSamples {
+			continue
 		}
 
 		wildcards := qlog.CountWildcards(patterns[i].Wildcards, false)
@@ -615,11 +622,12 @@ func printPatternCommon(pattern qlog.PatternData) {
 
 // stddev units are microseconds
 func showStats(patterns []qlog.PatternData, minStdDev float64,
-	maxStdDev float64, minWildcards int, maxWildcards int, maxLen int,
-	maxResults int) {
+	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
+	maxLen int, maxResults int) {
 
 	funcResults, firstLog, lastLog := filterPatterns(patterns, minStdDev,
-		maxStdDev, minWildcards, maxWildcards, maxLen, maxResults)
+		maxStdDev, minWildcards, maxWildcards, minSamples, maxLen,
+		maxResults)
 
 	count := 0
 	for i := 0; i < len(funcResults); i++ {
