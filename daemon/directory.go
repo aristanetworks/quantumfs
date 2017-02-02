@@ -15,12 +15,6 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-var emptyExtendedAttributes *quantumfs.ExtendedAttributes
-
-func init() {
-	emptyExtendedAttributes = quantumfs.NewExtendedAttributes()
-}
-
 type DirectoryRecordIf interface {
 	Filename() string
 	SetFilename(v string)
@@ -1254,7 +1248,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 
 	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
 		c.vlog("Directory::getExtendedAttributes_ returning new object")
-		return emptyExtendedAttributes, fuse.ENOENT
+		return nil, fuse.ENOENT
 	}
 
 	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
@@ -1345,11 +1339,13 @@ func (dir *Directory) listChildXAttr(c *ctx,
 	}
 
 	var nameBuffer bytes.Buffer
-	for i := 0; i < attributeList.NumAttributes(); i++ {
-		name, _ := attributeList.Attribute(i)
-		c.vlog("Appending %s", name)
-		nameBuffer.WriteString(name)
-		nameBuffer.WriteByte(0)
+	if ok != fuse.ENOENT {
+		for i := 0; i < attributeList.NumAttributes(); i++ {
+			name, _ := attributeList.Attribute(i)
+			c.vlog("Appending %s", name)
+			nameBuffer.WriteString(name)
+			nameBuffer.WriteByte(0)
+		}
 	}
 
 	// append our self-defined extended attribute XAttrTypeKey
