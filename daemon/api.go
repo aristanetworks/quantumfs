@@ -80,9 +80,7 @@ func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
-	size := (c.qfs.apiFileSize/1024 + 1) * 1024
-
-	defer c.qfs.makeApiFileSizeZero()
+	size := uint64((atomic.LoadInt64(&c.qfs.apiFileSize)/1024 + 1) * 1024)
 	fillApiAttrWithSize(&out.Attr, size)
 	return fuse.OK
 }
@@ -314,7 +312,14 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	bytes, _ := response.Bytes(debug)
 	c.vlog("API Response %s", string(bytes))
 
-	return response, fuse.OK
+	chunk := len(bytes)
+	if chunk > 4096 {
+		chunk = 4096
+		api.responses <- fuse.ReadResultData(bytes[chunk:])
+	}
+	c.qfs.decreaseApiFileSize(chunk)
+
+	return fuse.ReadResultData(bytes[:chunk]), fuse.OK
 }
 
 func makeErrorResponse(code uint32, message string) []byte {
@@ -409,7 +414,8 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	c.vlog("done writing to file")
 	c.qfs.increaseApiFileSize(fileSize)
-	atomic.AddInt32(&api.outstandingRequests, 1)
+	// Long response needs multiple reads to complete the data communication
+	atomic.AddInt32(&api.outstandingRequests, int32(1+fileSize/4096))
 	return size, fuse.OK
 }
 

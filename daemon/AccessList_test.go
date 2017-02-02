@@ -509,26 +509,3 @@ func TestAccessListClear(t *testing.T) {
 			"Error maps not clear")
 	})
 }
-
-func TestAccessListLargeSize(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
-
-		for i := 0; i < 1000; i++ {
-			filename := fmt.Sprintf("/testfile%d", i)
-			path := workspace + filename
-			fd, err := syscall.Creat(path, 666)
-			test.assert(err == nil, "Create file error: %v at %s",
-				err, filename)
-			accessList[filename] = true
-			syscall.Close(fd)
-		}
-		test.assert(len(accessList) == 1000, "Fail creating correct "+
-			"accesslist with size of %d", len(accessList))
-
-		wsrlist := test.getAccessList(workspace)
-		test.assertAccessList(accessList, wsrlist,
-			"Error two maps different")
-	})
-}

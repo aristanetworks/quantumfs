@@ -5,6 +5,7 @@ package daemon
 
 // Test the various Api calls
 
+import "fmt"
 import "os"
 import "syscall"
 import "testing"
@@ -39,6 +40,51 @@ func TestWorkspaceBranching(t *testing.T) {
 		testFilename = test.absPath(src + "/" + "test")
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err != nil, "Original workspace was modified")
+	})
+}
+
+func testApiAccessList(test *testHelper, size int, filename string) {
+	accessList := make(map[string]bool)
+	workspace := test.newWorkspace()
+
+	for i := 0; i < size; i++ {
+		filename := fmt.Sprintf("%s%d", filename, i)
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 666)
+		test.assert(err == nil, "Create file error: %v at %s",
+			err, filename)
+		accessList[filename] = true
+		syscall.Close(fd)
+	}
+
+	test.assert(len(accessList) == size, "Fail creating correct "+
+		"accesslist with size of %d", len(accessList))
+
+	wsrlist := test.getAccessList(workspace)
+	test.assertAccessList(accessList, wsrlist,
+		"Error two maps different")
+
+	api := test.getApi()
+	relpath := test.relPath(workspace)
+	err, responselist := api.GetAccessedWithRtr(relpath)
+	test.assert(err == nil, "Error getting accessList with api %v", err)
+
+	test.assertAccessList(accessList, responselist, "Error two maps different")
+}
+
+func TestApiAccessListLargeSize(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testApiAccessList(test, 100, "/testfiletestfiletestfiletestfile"+
+			"testfiletestfiletestfiletestfiletestfiletestfile")
+	})
+}
+
+// Every test function is running in parallel, so This test function will run
+// concurrently with TestApiAccessListLargeSize
+func TestApiAccessListConcurrency(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testApiAccessList(test, 500, "/sample")
+
 	})
 }
 
