@@ -577,7 +577,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 
 		// pivot_root to the root that we want to keep
 		if err := rootfd.Chdir(); err != nil {
-			return fmt.Errorf("Retoring %s error: %s",
+			return fmt.Errorf("Restoring %s error: %s",
 				rootdir, err.Error())
 		}
 
