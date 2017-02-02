@@ -147,20 +147,19 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	info, err := api.fd.Stat()
-	if err != nil {
-		return nil, err
+	size := 4096
+	result := make([]byte, 0)
+	buf = make([]byte, 4096)
+	for size == 4096 {
+		api.fd.Seek(0, 0)
+		size, err = api.fd.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, buf[:size]...)
 	}
 
-	size := info.Size()
-	buf = make([]byte, size)
-	api.fd.Seek(0, 0)
-	n, err := api.fd.Read(buf[:size])
-	if err != nil {
-		return nil, err
-	}
-
-	return buf[:n], nil
+	return result, nil
 }
 
 // branch the src workspace into a new workspace called dst.
@@ -203,8 +202,13 @@ func (api *Api) Branch(src string, dst string) error {
 
 // Get the list of accessed file from workspaceroot
 func (api *Api) GetAccessed(wsr string) error {
+	err, _ := api.GetAccessedWithRtr(wsr)
+	return err
+}
+func (api *Api) GetAccessedWithRtr(wsr string) (error, map[string]bool) {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr),
+			nil
 	}
 
 	cmd := AccessedRequest{
@@ -214,31 +218,32 @@ func (api *Api) GetAccessed(wsr string) error {
 
 	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return err
+		return err, nil
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message),
+			nil
 	}
 
 	var accesslistResponse AccessListResponse
 	err = json.Unmarshal(buf, &accesslistResponse)
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	printAccessList(accesslistResponse.AccessList)
-	return nil
+	return nil, accesslistResponse.AccessList
 }
 
 // clear the list of accessed files in workspaceroot

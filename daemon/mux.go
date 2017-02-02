@@ -24,7 +24,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
-		apiFileSize:            0,
 		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
@@ -76,7 +75,7 @@ type QuantumFs struct {
 	// We accumulate the size of each responses to set up a proper responding
 	// file in FUSE. A quantumfs system is a signle file system, so there is
 	// only one FUSE file regarless of the numbers of the workspaces
-	apiFileSize uint64
+	apiFileSize int64
 
 	mapMutex         DeferableRwMutex
 	inodes           map[InodeId]Inode
@@ -1077,10 +1076,8 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	}
 
 	defer fileHandle.RLockTree().RUnlock()
-	readRes, result = fileHandle.Read(c, input.Offset, input.Size,
+	return fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
-
-	return
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
@@ -1291,17 +1288,20 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 }
 
 func (qfs *QuantumFs) increaseApiFileSize(offset int) {
-	qfs.apiFileSize += uint64(offset)
-	qfs.c.vlog("QuantumFs::APIFileSize add %d to %d", offset, qfs.apiFileSize)
+	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset))
+	qfs.c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
 }
+
 func (qfs *QuantumFs) makeApiFileSizeZero() {
-	qfs.apiFileSize = 0
-	qfs.c.vlog("QuantumFs::APIFileSize set to %d", qfs.apiFileSize)
+	atomic.StoreInt64(&qfs.apiFileSize, 0)
+	qfs.c.vlog("QuantumFs::APIFileSize becomes 0")
 }
+
 func (qfs *QuantumFs) decreaseApiFileSize(offset int) {
-	qfs.apiFileSize -= uint64(offset)
-	if qfs.apiFileSize < 0 {
-		qfs.c.elog("ERROR: PANIC Global variable should"+
-			" be less than zero %d", qfs.apiFileSize)
+	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
+	if result < 0 {
+		qfs.c.elog("ERROR: PANIC Global variable %d should"+
+			" be greater than zero", result)
+		qfs.makeApiFileSizeZero()
 	}
 }
