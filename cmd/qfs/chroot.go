@@ -357,6 +357,18 @@ func switchUserMode() error {
 		return err
 	}
 
+	if err = os.Setenv("USER", lognameStr); err != nil {
+		return err
+	}
+
+	if err = os.Setenv("USERNAME", lognameStr); err != nil {
+		return err
+	}
+
+	if err = os.Setenv("HOME", logUser.HomeDir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -409,7 +421,7 @@ func copyDirStayOnFs(src string, dst string) error {
 			// There should not be any ordinary files in /dev directory,
 			// though in rare cases like /dev/shm there may be. Warn, but
 			// skip the file and continue
-			fmt.Printf("Skipping ordinary file in /dev: %s\n", dst)
+			fmt.Printf("Skipping ordinary file in /dev: %s\n", name)
 		} else if (finfo.Mode() & os.ModeSymlink) != 0 {
 			oldPath, errOldPath := os.Readlink(name)
 			if errOldPath != nil {
