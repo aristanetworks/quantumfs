@@ -654,6 +654,10 @@ func (record *DirectoryRecord) Record() DirectoryRecord {
 	return *record
 }
 
+func (record *DirectoryRecord) Nlinks() uint32 {
+	return 1
+}
+
 func (record *DirectoryRecord) Filename() string {
 	return record.record.Filename()
 }

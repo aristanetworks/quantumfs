@@ -32,7 +32,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		return fuse.EPERM
 	}
 
-	newRecord, err := srcParent.makeHardlink_DOWN(c, dir.wsr, srcInode)
+	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
 	if err != fuse.OK {
 		c.elog("QuantumFs::Link Failed with srcInode record")
 		return err
@@ -46,7 +46,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, newRecord, dir.wsr)
+		return dir.children.loadChild(c, newRecord)
 	}()
 
 	dir.self.markAccessed(c, newName, true)
@@ -148,7 +148,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	return currDir, nil
 }
 
-func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
+func (dir *Directory) makeHardlink_DOWN(c *ctx,
 	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
 
 	defer dir.Lock().Unlock()
@@ -159,10 +159,13 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx, wsr *WorkspaceRoot,
 		return nil, fuse.ENOENT
 	}
 
-	newKey := toLink.flush_DOWN(c)
-	dir.children.recordByName(c, record.Filename()).SetID(newKey)
-	dir.children.clearDirty(toLink.inodeNum())
+	// if the file isn't a hardlink, then we must flush it first
+	if record.Type() != quantumfs.ObjectTypeHardlink {
+		newKey := toLink.flush_DOWN(c)
+		dir.children.recordByName(c, record.Filename()).SetID(newKey)
+		dir.children.clearDirty(toLink.inodeNum())
+	}
 
 	dir.self.dirty(c)
-	return dir.children.makeHardlink(c, wsr, record.Filename())
+	return dir.children.makeHardlink(c, record.Filename())
 }
