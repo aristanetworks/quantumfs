@@ -322,6 +322,7 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 	mapIdx := 0
 	for _, wcseq := range patterns.dataByList {
 		status.Process(float32(mapIdx) / float32(len(patterns.dataByList)))
+		mapIdx++
 
 		var newResult PatternData
 		newResult.SeqStrRaw = genSeqStr(wcseq.sequence)
@@ -346,10 +347,10 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 			deviationSum += float64(deviation * deviation)
 		}
 		newResult.Stddev = int64(math.Sqrt(deviationSum))
-		newResult.Id = mapIdx
+		// We need an ID that's unique but deterministic
+		newResult.Id = md5.Sum(newResult.SeqStrRaw)[:8]
 
 		rawResults[mapIdx] = newResult
-		mapIdx++
 	}
 	status.Process(1)
 
