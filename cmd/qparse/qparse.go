@@ -4,9 +4,11 @@
 // qparse is the shared memory log parser for the qlog quantumfs subsystem
 package main
 
+import "crypto/md5"
 import "flag"
 import "fmt"
 import "os"
+import "runtime"
 import "sort"
 import "strconv"
 import "strings"
@@ -14,7 +16,7 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-type intSlice []int
+type intSlice []uint64
 
 func (i *intSlice) String() string {
 	return fmt.Sprintf("%d", *i)
@@ -26,7 +28,7 @@ func (i *intSlice) Set(value string) error {
 		fmt.Printf("Error: %s is not a valid int\n", value)
 		os.Exit(1)
 	} else {
-		*i = append(*i, token)
+		*i = append(*i, uint64(token))
 	}
 
 	return nil
@@ -129,7 +131,7 @@ func init() {
 		"consumed in bucket t per SequenceId. To be output needs "+
 		"<minTimeslicePct>/100 in any bucket or -id")
 	flag.Var(&filterId, "id", "Filter certain output to include only given "+
-		"Sequence Id. Multiple -id flags are supported.")
+		"8 byte Sequence Id Hash. Multiple -id flags are supported.")
 	flag.IntVar(&bucketWidthMs, "bucketMs", 1000, "Bucket width for -csv in Ms")
 	flag.BoolVar(&showClose, "similars", false,
 		"Don't hide similar sequences when using -byTotal or -byAvg")
@@ -230,7 +232,7 @@ func main() {
 		}
 
 		if logHash != "" {
-			filterLogOut(inFile, logHash)
+			filterLogOut(inFile, logHash, true, tabSpaces)
 		} else if outFile == "" {
 			// Log parse mode only
 			qlog.ParseLogsExt(inFile, tabSpaces,
@@ -267,7 +269,7 @@ func main() {
 		defer file.Close()
 		patterns := qlog.LoadFromStat(file)
 
-		filterMap := make(map[int]bool)
+		filterMap := make(map[uint64]bool)
 		for i := 0; i < len(filterId); i++ {
 			filterMap[filterId[i]] = true
 		}
@@ -361,11 +363,11 @@ func main() {
 }
 
 type bucket struct {
-	timeSums map[int]float64
+	timeSums map[uint64]float64
 	totalSum float64
 }
 
-func fillTimeline(out map[int64]bucket, seqId int,
+func fillTimeline(out map[int64]bucket, seqId uint64,
 	pattern qlog.PatternData) (minStartTime int64) {
 
 	times := pattern.Data.Times
@@ -382,7 +384,7 @@ func fillTimeline(out map[int64]bucket, seqId int,
 		for n := bucketIdx; n <= endBucketIdx; n++ {
 			bucketIt := out[n]
 			if bucketIt.timeSums == nil {
-				bucketIt.timeSums = make(map[int]float64)
+				bucketIt.timeSums = make(map[uint64]float64)
 			}
 
 			timeDeltaStart := n * bucketWidthNs
@@ -406,14 +408,25 @@ func fillTimeline(out map[int64]bucket, seqId int,
 	return minTime
 }
 
-func filterLogOut(inFile string, filterHash string) {
+func filterLogOut(inFile string, filterHash string, showStatus bool, tabSpaces int) {
+
+	if len(filterHash) != 16 {
+		fmt.Println("Log filter hash must be 8 bytes (16 hex chars)")
+		os.Exit(1)
+	}
+
+	_, err := strconv.ParseInt(filterHash, 16, 64)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	// Structures during this process can be massive. Throw them away asap
 
-	var logs []LogOutput
+	var logs []qlog.LogOutput
 	{
-		pastEndIdx, dataArray, strMap := ExtractFields(inFile)
-		logs = OutputLogsExt(pastEndIdx, dataArray, strMap,
+		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
+		logs = qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
 			maxThreads, true)
 
 		dataArray = nil
@@ -422,17 +435,57 @@ func filterLogOut(inFile string, filterHash string) {
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
 
-	var trackerMap map[uint64][]sequenceTracker
+	var trackerMap map[uint64][]qlog.SequenceTracker
 	var trackerCount int
 	{
-		trackerCount, trackerMap = ExtractTrackerMap(logs, maxThreads)
+		trackerCount, trackerMap = qlog.ExtractTrackerMap(logs, maxThreads)
 		logs = nil
 	}
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
 
-	// now we just need to output the contents of the tracker maps entries
-	// that were selected by filterId
+	// now we just need to output the contents of the tracker maps we match
+	trackerIdx := 0
+	status := qlog.NewLogStatus(50)
+	sequences := make([]*qlog.SequenceTracker, 0)
+	for reqId, trackers := range trackerMap {
+		if len(trackers) == 0 {
+			continue
+		}
+
+		for k := 0; k < len(trackers); k++ {
+			trackerIdx++
+			if showStatus {
+				status.Process(float32(trackerIdx) /
+					float32(trackerCount))
+			}
+
+			if trackers[k].Ready() == false {
+				fmt.Printf("Error: Mismatched '%s' in requestId %d"+
+					" log\n", qlog.FnEnterStr, reqId)
+				break
+			}
+
+			rawSeq := trackers[k].Seq()
+			seq := qlog.GenSeqStr(rawSeq)
+			hash := md5.Sum([]byte(seq))
+			if string(hash[:]) == filterHash {
+				sequences = append(sequences, &trackers[k])
+			}
+		}
+	}
+	if showStatus {
+		status.Process(1)
+	}
+
+	if len(sequences) == 0 {
+		fmt.Println("No log patterns match %s", filterHash);
+		os.Exit(0);
+	}
+
+	for _, i := range sequences {
+		qlog.FormatLogs(i.Seq(), tabSpaces, false, fmt.Printf);
+	}
 }
 
 func outputCsvCover(patterns []qlog.PatternData) {
@@ -479,7 +532,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	status.Process(1)
 
 	bucketThreshold := float64(minTimeslicePct) / float64(100)
-	outputIndices := make([]int, 0)
+	outputIndices := make([]uint64, 0)
 	if len(filterId) != 0 {
 		for i := 0; i < len(filterId); i++ {
 			outputIndices = append(outputIndices, filterId[i])
@@ -489,7 +542,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 		fmt.Printf("Determining which of %d buckets to output...\n",
 			len(timeline))
 
-		outputIdxMap := make(map[int]bool)
+		outputIdxMap := make(map[uint64]bool)
 		bucketKey := minTime / bucketWidthNs
 		for outCount := 0; outCount < len(timeline); bucketKey++ {
 			status.Process(float32(outCount) / float32(len(timeline)))
@@ -649,7 +702,7 @@ func printPatternCommon(pattern qlog.PatternData) {
 	fmt.Printf("Average sequence time: %12s\n",
 		time.Duration(pattern.Avg).String())
 	fmt.Printf("Number of samples: %d\n", len(pattern.Data.Times))
-	fmt.Printf("Sequence Id: %d\n", pattern.Id)
+	fmt.Printf("Sequence Id: %016x\n", pattern.Id)
 	fmt.Printf("Standard Deviation: %12s\n",
 		time.Duration(pattern.Stddev).String())
 }
