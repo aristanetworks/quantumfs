@@ -89,6 +89,64 @@ func TestHardlinkReload(t *testing.T) {
 	})
 }
 
+func TestHardlinkRelay(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		testData := genData(2000)
+
+		file1 := workspace + "/orig_file"
+		err := ioutil.WriteFile(file1, testData[:1000], 0777)
+		test.assertNoErr(err)
+
+		file2 := workspace + "/hardlink"
+		err = syscall.Link(file1, file2)
+		test.assertNoErr(err)
+
+		file3 := workspace + "/second_file"
+		err = ioutil.WriteFile(file3, testData[:577], 0777)
+		test.assertNoErr(err)
+
+		file4 := workspace + "/hardlink2"
+		err = syscall.Link(file3, file4)
+		test.assertNoErr(err)
+
+		// Change file contents
+		err = printToFile(file2, string(testData[1000:]))
+		test.assertNoErr(err)
+
+		// Change permissions
+		err = os.Chmod(file2, 0654)
+		test.assertNoErr(err)
+
+		// Ensure that file1 changed
+		readData, err := ioutil.ReadFile(file1)
+		test.assert(bytes.Equal(readData, testData), "data not linked")
+
+		info, err := os.Stat(file1)
+		test.assertNoErr(err)
+		test.assert(info.Mode().Perm() == 0654, "Permissions not linked")
+		test.assert(info.Size() == int64(len(testData)), "Size not linked")
+
+		infoLink, err := os.Stat(file2)
+		test.assertNoErr(err)
+		test.assert(info.ModTime() == infoLink.ModTime(),
+			"hardlink instance modTimes not shared")
+
+		// Ensure that file 3 and file4 didn't
+		info2, err := os.Stat(file3)
+		test.assertNoErr(err)
+		test.assert(info.Mode().Perm() != info2.Mode().Perm(),
+			"hardlink permissions not separate")
+		test.assert(info.Size() != info2.Size(),
+			"hardlink sizes not separate")
+		test.assert(test.getInodeNum(file3) != test.getInodeNum(file1),
+			"multiple different hardlinks joined")
+		test.assert(info.ModTime() != info2.ModTime(),
+			"hardlink mod times not separate")
+	})
+}
+
 func TestHardlinkForget(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
