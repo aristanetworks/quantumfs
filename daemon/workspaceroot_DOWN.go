@@ -29,7 +29,7 @@ func (wsr *WorkspaceRoot) flushHardlinks_DOWN(c *ctx) {
 		}
 
 		newKey := child.flush_DOWN(c)
-		wsr.hardlinks[hardlinkId].SetID(newKey)
+		wsr.hardlinks[hardlinkId].record.SetID(newKey)
 	}
 
 	wsr.dirtyLinks = make(map[InodeId]HardlinkId, 0)

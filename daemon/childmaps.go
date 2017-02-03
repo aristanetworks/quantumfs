@@ -10,6 +10,9 @@ import "github.com/hanwen/go-fuse/fuse"
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
+	wsr *WorkspaceRoot
+	dir *Directory
+
 	// can be many to one
 	children      map[string]InodeId
 	dirtyChildren map[InodeId]InodeId // a set
@@ -17,22 +20,23 @@ type ChildMap struct {
 	childrenRecords map[InodeId][]DirectoryRecordIf
 }
 
-func newChildMap(numEntries int) *ChildMap {
+func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
 	return &ChildMap{
+		wsr:             wsr_,
+		dir:             owner,
 		children:        make(map[string]InodeId, numEntries),
 		dirtyChildren:   make(map[InodeId]InodeId, 0),
 		childrenRecords: make(map[InodeId][]DirectoryRecordIf, numEntries),
 	}
 }
 
-func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf,
-	wsr *WorkspaceRoot) InodeId {
+func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf) InodeId {
 
 	inodeId := InodeId(quantumfs.InodeIdInvalid)
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		linkId := decodeHardlinkKey(entry.ID())
-		entry = newHardlink(entry.Filename(), linkId, wsr)
-		inodeId = wsr.getHardlinkInodeId(c, linkId)
+		entry = newHardlink(entry.Filename(), linkId, cmap.wsr)
+		inodeId = cmap.wsr.getHardlinkInodeId(c, linkId)
 	} else {
 		inodeId = c.qfs.newInodeId()
 	}
@@ -98,7 +102,11 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) DirectoryRecordIf {
 	return list[0]
 }
 
-func (cmap *ChildMap) getRecord(inodeId InodeId, name string) DirectoryRecordIf {
+func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
+	name string) DirectoryRecordIf {
+
+	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).out()
+
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
 		return nil
@@ -106,11 +114,45 @@ func (cmap *ChildMap) getRecord(inodeId InodeId, name string) DirectoryRecordIf 
 
 	for _, v := range list {
 		if v.Filename() == name {
-			return v
+			return cmap.checkForReplace(c, v)
 		}
 	}
 
 	return nil
+}
+
+// We need to check a record when we're returning it so that if a hardlink has nlink
+// of 1, that we turn it back into a normal file again
+func (cmap *ChildMap) checkForReplace(c *ctx,
+	record DirectoryRecordIf) DirectoryRecordIf {
+
+	if record.Type() != quantumfs.ObjectTypeHardlink {
+		return record
+	}
+
+	link := record.(*Hardlink)
+
+	// This needs to be turned back into a normal file
+	newRecord, inodeId, dirty := cmap.wsr.removeHardlink(c, link.linkId,
+		cmap.dir.inodeNum())
+
+	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
+		// wsr says hardlink isn't ready for removal yet
+		return record
+	}
+
+	// Ensure that we update this version of the record with this instance
+	// of the hardlink's information
+	newRecord.SetFilename(link.Filename())
+
+	// Here we do the opposite of makeHardlink DOWN - we re-insert it
+	cmap.setRecord(inodeId, newRecord)
+	if dirty {
+		cmap.dirtyChildren[inodeId] = inodeId
+	}
+	cmap.dir.dirty(c)
+
+	return newRecord
 }
 
 func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
@@ -128,17 +170,28 @@ func (cmap *ChildMap) count() uint64 {
 	return uint64(len(cmap.children))
 }
 
-func (cmap *ChildMap) deleteChild(name string) (needsReparent DirectoryRecordIf) {
+func (cmap *ChildMap) deleteChild(c *ctx,
+	name string) (needsReparent DirectoryRecordIf) {
+
 	inodeId, exists := cmap.children[name]
 	if exists {
 		delete(cmap.dirtyChildren, inodeId)
 		delete(cmap.children, name)
 	}
 
+	record := cmap.getRecord(c, inodeId, name)
+	if record == nil {
+		return nil
+	}
+
+	if link, isHardlink := record.(*Hardlink); isHardlink {
+		cmap.wsr.hardlinkDec(link.linkId)
+	}
+
 	return cmap.delRecord(inodeId, name)
 }
 
-func (cmap *ChildMap) renameChild(oldName string,
+func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	newName string) (oldInodeRemoved InodeId) {
 
 	if oldName == newName {
@@ -150,7 +203,7 @@ func (cmap *ChildMap) renameChild(oldName string,
 		return quantumfs.InodeIdInvalid
 	}
 
-	record := cmap.getRecord(inodeId, oldName)
+	record := cmap.getRecord(c, inodeId, oldName)
 	if record == nil {
 		panic("inode set without record")
 	}
@@ -231,12 +284,14 @@ func (cmap *ChildMap) record(inodeNum InodeId) DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
+	defer c.funcIn("ChildMap::recordByName").out()
+
 	inodeNum, exists := cmap.children[name]
 	if !exists {
 		return nil
 	}
 
-	entry := cmap.getRecord(inodeNum, name)
+	entry := cmap.getRecord(c, inodeNum, name)
 	if entry == nil {
 		c.elog("child record map mismatch %d %s", inodeNum, name)
 		return nil
@@ -245,7 +300,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
 	return entry
 }
 
-func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
+func (cmap *ChildMap) makeHardlink(c *ctx,
 	childName string) (copy DirectoryRecordIf, err fuse.Status) {
 
 	childId, exists := cmap.children[childName]
@@ -254,7 +309,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
 		return nil, fuse.ENOENT
 	}
 
-	child := cmap.getRecord(childId, childName)
+	child := cmap.getRecord(c, childId, childName)
 	if child == nil {
 		panic("Mismatched childId and record")
 	}
@@ -262,6 +317,10 @@ func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*Hardlink); isLink {
 		recordCopy := *link
+
+		// Ensure we update the ref count for this hardlink
+		cmap.wsr.hardlinkInc(link.linkId)
+
 		return &recordCopy, fuse.OK
 	}
 
@@ -282,7 +341,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
 	}
 
 	// It needs to become a hardlink now. Hand it off to wsr
-	newLink := wsr.newHardlink(c, childId, child)
+	newLink := cmap.wsr.newHardlink(c, childId, child)
 
 	cmap.setRecord(childId, newLink)
 	linkCopy := *newLink
