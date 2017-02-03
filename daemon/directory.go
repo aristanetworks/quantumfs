@@ -208,7 +208,7 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 		return dir.children.deleteChild(c, name), inodeNum
 	}()
 	if record == nil {
-		// This can happen if the child is already deleted or its a hardlink
+		// This can happen if the child is already deleted or it's a hardlink
 		c.dlog("Child delete doesn't need reparent: %d", inodeNum)
 		return
 	}
