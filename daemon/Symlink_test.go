@@ -149,7 +149,7 @@ func TestSymlinkCreation(t *testing.T) {
 		var stat syscall.Stat_t
 		err := syscall.Lstat(linkFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
+		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
 	})
 }
 

@@ -38,6 +38,7 @@ var tabSpaces int
 var logOut bool
 var patternsOut bool
 var stats bool
+var logHash string
 var topTotal int
 var topAvg int
 var minTimeslicePct int
@@ -49,6 +50,7 @@ var stdDevMin float64
 var stdDevMax float64
 var wildMin int
 var wildMax int
+var sampleMin int
 var maxThreads int
 var maxLenWildcards int
 var maxLen int
@@ -117,6 +119,8 @@ func init() {
 		"Show patterns given in a stat file. Works with -id.")
 	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
 		"a stats file (-out). Default stats filename is logfile.stats")
+	flag.StringVar(&logHash, "loghash", "", "Filter logs by requests which "+
+		"match the hash given. Try -byTotal or -byAvg to get hashes.")
 	flag.IntVar(&topTotal, "byTotal", 0, "Parse a stat file (-in) and "+
 		"print top <byTotal> functions by total time usage in logs")
 	flag.IntVar(&topAvg, "byAvg", 0, "Parse a stat file (-in) and "+
@@ -137,6 +141,8 @@ func init() {
 	flag.IntVar(&wildMin, "wcMin", 0, "Filter results, requiring minimum "+
 		"number of wildcards in function pattern.")
 	flag.IntVar(&wildMax, "wcMax", 100, "Same as wmin, but setting a maximum")
+	flag.IntVar(&sampleMin, "smMin", 1, "Filter results, requiring minimum "+
+		"number of samples in function pattern.")
 	flag.IntVar(&maxThreads, "threads", 30, "Max threads to use")
 	flag.IntVar(&maxLenWildcards, "maxWc", 16,
 		"Max sequence length to wildcard during -stat")
@@ -223,7 +229,9 @@ func main() {
 			os.Exit(1)
 		}
 
-		if outFile == "" {
+		if logHash != "" {
+			filterLogOut(inFile, logHash)
+		} else if outFile == "" {
 			// Log parse mode only
 			qlog.ParseLogsExt(inFile, tabSpaces,
 				maxThreads, false, fmt.Printf)
@@ -322,7 +330,7 @@ func main() {
 
 		fmt.Println("Top function patterns by total time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
-			wildMax, maxLen, topTotal)
+			wildMax, sampleMin, maxLen, topTotal)
 	case topAvg != 0:
 		if inFile == "" {
 			fmt.Println("To -topAvg, you must specify a stat file " +
@@ -345,7 +353,7 @@ func main() {
 
 		fmt.Println("Top function patterns by average time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
-			wildMax, maxLen, topAvg)
+			wildMax, sampleMin, maxLen, topAvg)
 	default:
 		fmt.Println("No action flags (-log, -stat, -csv) specified.")
 		os.Exit(1)
@@ -396,6 +404,35 @@ func fillTimeline(out map[int64]bucket, seqId int,
 	}
 
 	return minTime
+}
+
+func filterLogOut(inFile string, filterHash string) {
+
+	// Structures during this process can be massive. Throw them away asap
+
+	var logs []LogOutput
+	{
+		pastEndIdx, dataArray, strMap := ExtractFields(inFile)
+		logs = OutputLogsExt(pastEndIdx, dataArray, strMap,
+			maxThreads, true)
+
+		dataArray = nil
+		strMap = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	var trackerMap map[uint64][]sequenceTracker
+	var trackerCount int
+	{
+		trackerCount, trackerMap = ExtractTrackerMap(logs, maxThreads)
+		logs = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	// now we just need to output the contents of the tracker maps entries
+	// that were selected by filterId
 }
 
 func outputCsvCover(patterns []qlog.PatternData) {
@@ -519,7 +556,7 @@ func outputCsvCover(patterns []qlog.PatternData) {
 }
 
 func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
-	maxStdDev float64, minWildcards int, maxWildcards int,
+	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
 	maxLen int, maxResults int) (filtered []qlog.PatternData, firstLog int64,
 	lastLog int64) {
 
@@ -542,6 +579,10 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			if t.StartTime+t.Delta > latestLog {
 				latestLog = t.StartTime + t.Delta
 			}
+		}
+
+		if len(patterns[i].Data.Times) < minSamples {
+			continue
 		}
 
 		wildcards := qlog.CountWildcards(patterns[i].Wildcards, false)
@@ -615,11 +656,12 @@ func printPatternCommon(pattern qlog.PatternData) {
 
 // stddev units are microseconds
 func showStats(patterns []qlog.PatternData, minStdDev float64,
-	maxStdDev float64, minWildcards int, maxWildcards int, maxLen int,
-	maxResults int) {
+	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
+	maxLen int, maxResults int) {
 
 	funcResults, firstLog, lastLog := filterPatterns(patterns, minStdDev,
-		maxStdDev, minWildcards, maxWildcards, maxLen, maxResults)
+		maxStdDev, minWildcards, maxWildcards, minSamples, maxLen,
+		maxResults)
 
 	count := 0
 	for i := 0; i < len(funcResults); i++ {
