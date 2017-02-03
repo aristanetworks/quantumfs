@@ -23,9 +23,9 @@ func (i *intSlice) String() string {
 }
 
 func (i *intSlice) Set(value string) error {
-	token, err := strconv.Atoi(value)
+	token, err := strconv.ParseInt(value, 16, 64)
 	if err != nil {
-		fmt.Printf("Error: %s is not a valid int\n", value)
+		fmt.Printf("Error: %s is not a valid 8 byte hex id\n", value)
 		os.Exit(1)
 	} else {
 		*i = append(*i, uint64(token))
