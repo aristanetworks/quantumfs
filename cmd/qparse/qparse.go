@@ -38,6 +38,7 @@ var tabSpaces int
 var logOut bool
 var patternsOut bool
 var stats bool
+var logHash string
 var topTotal int
 var topAvg int
 var minTimeslicePct int
@@ -118,6 +119,8 @@ func init() {
 		"Show patterns given in a stat file. Works with -id.")
 	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
 		"a stats file (-out). Default stats filename is logfile.stats")
+	flag.StringVar(&logHash, "loghash", "", "Filter logs by requests which "+
+		"match the hash given. Try -byTotal or -byAvg to get hashes.")
 	flag.IntVar(&topTotal, "byTotal", 0, "Parse a stat file (-in) and "+
 		"print top <byTotal> functions by total time usage in logs")
 	flag.IntVar(&topAvg, "byAvg", 0, "Parse a stat file (-in) and "+
@@ -226,7 +229,9 @@ func main() {
 			os.Exit(1)
 		}
 
-		if outFile == "" {
+		if logHash != "" {
+			filterLogOut(inFile, logHash)
+		} else if outFile == "" {
 			// Log parse mode only
 			qlog.ParseLogsExt(inFile, tabSpaces,
 				maxThreads, false, fmt.Printf)
@@ -399,6 +404,35 @@ func fillTimeline(out map[int64]bucket, seqId int,
 	}
 
 	return minTime
+}
+
+func filterLogOut(inFile string, filterHash string) {
+
+	// Structures during this process can be massive. Throw them away asap
+
+	var logs []LogOutput
+	{
+		pastEndIdx, dataArray, strMap := ExtractFields(inFile)
+		logs = OutputLogsExt(pastEndIdx, dataArray, strMap,
+			maxThreads, true)
+
+		dataArray = nil
+		strMap = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	var trackerMap map[uint64][]sequenceTracker
+	var trackerCount int
+	{
+		trackerCount, trackerMap = ExtractTrackerMap(logs, maxThreads)
+		logs = nil
+	}
+	fmt.Println("Garbage Collecting...")
+	runtime.GC()
+
+	// now we just need to output the contents of the tracker maps entries
+	// that were selected by filterId
 }
 
 func outputCsvCover(patterns []qlog.PatternData) {
