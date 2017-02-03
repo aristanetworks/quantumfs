@@ -487,8 +487,8 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	if isHardlink {
 		func() {
-			defer wsr.Directory.Lock().Unlock()
-			wsr.Directory.self.dirty(c)
+			defer wsr.Lock().Unlock()
+			wsr.self.dirty(c)
 
 			defer wsr.linkLock.Lock().Unlock()
 			entry := wsr.hardlinks[linkId].record
