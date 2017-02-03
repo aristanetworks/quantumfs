@@ -5,6 +5,10 @@ package daemon
 
 // Test that different parts of Hardlink support are working
 
+import "bytes"
+import "io/ioutil"
+import "os"
+import "syscall"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
 
@@ -28,8 +32,8 @@ func TestHardlinkReload(t *testing.T) {
 		files := wsr.children.records()
 		for i := uint64(0); i < uint64(len(files)); i++ {
 			record := files[i].(*quantumfs.DirectoryRecord)
-			wsr.hardlinks[i] = record
-			wsr.dirtyLinks[InodeId(i)] = InodeId(i)
+			wsr.hardlinks[HardlinkId(i)] = newLinkEntry(record)
+			wsr.dirtyLinks[InodeId(i)] = HardlinkId(i)
 		}
 
 		// Write another file to ensure the wsr is dirty
@@ -53,9 +57,10 @@ func TestHardlinkReload(t *testing.T) {
 		test.assert(len(wsrB.dirtyLinks) == 0,
 			"Dirty state not clean after branch: %d", wsrB.dirtyLinks)
 
-		for k, v := range wsr.hardlinks {
+		for k, l := range wsr.hardlinks {
+			v := l.record
 			linkBPtr, exists := wsrB.hardlinks[k]
-			linkB := *linkBPtr
+			linkB := *(linkBPtr.record)
 			test.assert(exists, "link not reloaded in new wsr")
 			test.assert(v.Filename() == linkB.Filename(),
 				"Filename not preserved")
@@ -81,5 +86,198 @@ func TestHardlinkReload(t *testing.T) {
 			test.assert(v.ContentTime() == linkB.ContentTime(),
 				"ContentTime not preserved")
 		}
+	})
+}
+
+func TestHardlinkRelay(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		testData := genData(2000)
+
+		file1 := workspace + "/orig_file"
+		err := ioutil.WriteFile(file1, testData[:1000], 0777)
+		test.assertNoErr(err)
+
+		file2 := workspace + "/hardlink"
+		err = syscall.Link(file1, file2)
+		test.assertNoErr(err)
+
+		file3 := workspace + "/second_file"
+		err = ioutil.WriteFile(file3, testData[:577], 0777)
+		test.assertNoErr(err)
+
+		file4 := workspace + "/hardlink2"
+		err = syscall.Link(file3, file4)
+		test.assertNoErr(err)
+
+		// Change file contents
+		err = printToFile(file2, string(testData[1000:]))
+		test.assertNoErr(err)
+
+		// Change permissions
+		err = os.Chmod(file2, 0654)
+		test.assertNoErr(err)
+
+		// Ensure that file1 changed
+		readData, err := ioutil.ReadFile(file1)
+		test.assert(bytes.Equal(readData, testData), "data not linked")
+
+		info, err := os.Stat(file1)
+		test.assertNoErr(err)
+		test.assert(info.Mode().Perm() == 0654, "Permissions not linked")
+		test.assert(info.Size() == int64(len(testData)), "Size not linked")
+
+		infoLink, err := os.Stat(file2)
+		test.assertNoErr(err)
+		test.assert(info.ModTime() == infoLink.ModTime(),
+			"hardlink instance modTimes not shared")
+
+		// Ensure that file 3 and file4 didn't
+		info2, err := os.Stat(file3)
+		test.assertNoErr(err)
+		test.assert(info.Mode().Perm() != info2.Mode().Perm(),
+			"hardlink permissions not separate")
+		test.assert(info.Size() != info2.Size(),
+			"hardlink sizes not separate")
+		test.assert(test.getInodeNum(file3) != test.getInodeNum(file1),
+			"multiple different hardlinks joined")
+		test.assert(info.ModTime() != info2.ModTime(),
+			"hardlink mod times not separate")
+	})
+}
+
+func TestHardlinkForget(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		// Read the hardlink to ensure it's instantiated
+		readData, err := ioutil.ReadFile(linkFile)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
+
+		// Forget it
+		linkInode := test.getInodeNum(linkFile)
+		test.qfs.Forget(uint64(linkInode), 1)
+
+		// Check that it's uninstantiated
+		inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
+		test.assert(inode == nil, "hardlink inode not forgotten")
+	})
+}
+
+// When all hardlinks, but one, are deleted then we need to convert a hardlink back
+// into a regular file.
+func TestHardlinkConversion(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data[:1000]))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		linkInode := test.getInodeNum(linkFile)
+
+		wsr := test.getWorkspaceRoot(workspace)
+		linkId := func() HardlinkId {
+			defer wsr.linkLock.Lock().Unlock()
+			return wsr.inodeToLink[linkInode]
+		}()
+
+		err = os.Remove(testFile)
+		test.assertNoErr(err)
+
+		// Ensure it's converted by performing an operation on linkFile
+		// that would trigger recordByName
+		err = os.Rename(linkFile, linkFile+"_newname")
+		test.assertNoErr(err)
+		test.assertLogContains("ChildMap::recordByName",
+			"recordByName not triggered by Rename")
+		linkFile += "_newname"
+
+		// ensure we can still use the file as normal
+		err = printToFile(linkFile, string(data[1000:]))
+		test.assertNoErr(err)
+
+		output, err := ioutil.ReadFile(linkFile)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(output, data),
+			"File not working after conversion from hardlink")
+
+		wsr = test.getWorkspaceRoot(workspace)
+		defer wsr.linkLock.Lock().Unlock()
+		_, exists := wsr.hardlinks[linkId]
+		test.assert(!exists, "hardlink not converted back to file")
+	})
+}
+
+func TestHardlinkChain(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		linkFile2 := workspace + "/testLink2"
+		err = syscall.Link(linkFile, linkFile2)
+		test.assertNoErr(err)
+	})
+}
+
+func TestHardlinkInterWorkspace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspaceA := test.newWorkspace()
+		workspaceB := test.newWorkspace()
+
+		data := genData(1000)
+
+		testFile := workspaceA + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFileA := workspaceA + "/testLink"
+		err = syscall.Link(testFile, linkFileA)
+		test.assertNoErr(err)
+
+		linkFail := workspaceB + "/testLinkFail"
+		err = syscall.Link(linkFileA, linkFail)
+		test.assert(err != nil,
+			"qfs allows existing link copy to another wsr")
+		test.assert(os.IsPermission(err),
+			"qfs not returning EPERM for inter-wsr link")
+
+		testFileB := workspaceA + "/testFileB"
+		err = printToFile(testFileB, string(data))
+		test.assertNoErr(err)
+
+		linkFailB := workspaceB + "/testLinkFailB"
+		err = syscall.Link(testFileB, linkFailB)
+		test.assert(err != nil,
+			"qfs allows creation of hardlink across workspace bounds")
+		test.assert(os.IsPermission(err),
+			"qfs not returning EPERM for link across wsrs")
 	})
 }
