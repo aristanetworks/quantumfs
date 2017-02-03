@@ -347,6 +347,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 	wsr.hardlinks = make(map[HardlinkId]linkEntry)
 	wsr.inodeToLink = make(map[InodeId]HardlinkId)
 	wsr.dirtyLinks = make(map[InodeId]HardlinkId)
+	wsr.nextHardlinkId = 0
 
 	for {
 		for i := 0; i < entry.NumEntries(); i++ {
@@ -354,6 +355,10 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 			newLink := newLinkEntry(hardlink.Record())
 			id := HardlinkId(hardlink.HardlinkID())
 			wsr.hardlinks[id] = newLink
+
+			if id >= wsr.nextHardlinkId {
+				wsr.nextHardlinkId = id + 1
+			}
 		}
 
 		if entry.Next() == quantumfs.EmptyDirKey || entry.NumEntries() == 0 {
