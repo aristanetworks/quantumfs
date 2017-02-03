@@ -309,7 +309,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 		return nil, fuse.ENOENT
 	}
 
-	child := cmap.getRecord(childId, childName)
+	child := cmap.getRecord(c, childId, childName)
 	if child == nil {
 		panic("Mismatched childId and record")
 	}
