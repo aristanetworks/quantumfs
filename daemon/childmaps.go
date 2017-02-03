@@ -300,7 +300,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
 	return entry
 }
 
-func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
+func (cmap *ChildMap) makeHardlink(c *ctx,
 	childName string) (copy DirectoryRecordIf, err fuse.Status) {
 
 	childId, exists := cmap.children[childName]
@@ -317,6 +317,10 @@ func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*Hardlink); isLink {
 		recordCopy := *link
+
+		// Ensure we update the ref count for this hardlink
+		cmap.wsr.hardlinkInc(link.linkId)
+
 		return &recordCopy, fuse.OK
 	}
 
@@ -337,7 +341,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, wsr *WorkspaceRoot,
 	}
 
 	// It needs to become a hardlink now. Hand it off to wsr
-	newLink := wsr.newHardlink(c, childId, child)
+	newLink := cmap.wsr.newHardlink(c, childId, child)
 
 	cmap.setRecord(childId, newLink)
 	linkCopy := *newLink
