@@ -140,7 +140,11 @@ func (wsr *WorkspaceRoot) nlinks(hardlinkId HardlinkId) uint32 {
 func (wsr *WorkspaceRoot) hardlinkInc(linkId HardlinkId) {
 	defer wsr.linkLock.Lock().Unlock()
 
-	entry := wsr.hardlinks[linkId]
+	entry, exists := wsr.hardlinks[linkId]
+	if !exists {
+		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+	}
+
 	entry.nlink++
 	wsr.hardlinks[linkId] = entry
 }
@@ -148,7 +152,10 @@ func (wsr *WorkspaceRoot) hardlinkInc(linkId HardlinkId) {
 func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) {
 	defer wsr.linkLock.Lock().Unlock()
 
-	entry := wsr.hardlinks[linkId]
+	entry, exists := wsr.hardlinks[linkId]
+	if !exists {
+		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+	}
 
 	if entry.nlink > 0 {
 		entry.nlink--
@@ -156,7 +163,25 @@ func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) {
 		panic("over decrement in hardlink ref count")
 	}
 
-	wsr.hardlinks[linkId] = entry
+	// Normally, nlink should still be at least 1
+	if entry.nlink > 0 {
+		wsr.hardlinks[linkId] = entry
+		return
+	}
+
+	// But via races, it's possible nlink could be zero here, at which point
+	// all references to this hardlink are gone and we must remove it
+	wsr.removeHardlink_(linkId, entry.inodeId)
+}
+
+// Must hold the linkLock for writing
+func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
+	delete(wsr.hardlinks, linkId)
+
+	if inodeId != quantumfs.InodeIdInvalid {
+		delete(wsr.inodeToLink, inodeId)
+		delete(wsr.dirtyLinks, inodeId)
+	}
 }
 
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
@@ -263,7 +288,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 	defer c.FuncIn("Removing Hardlink", "%d for new parent %d", linkId,
 		newParent).out()
 
-	defer wsr.linkLock.RLock().RUnlock()
+	defer wsr.linkLock.Lock().Unlock()
 
 	link, exists := wsr.hardlinks[linkId]
 	if !exists {
@@ -275,20 +300,21 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 		return nil, quantumfs.InodeIdInvalid, false
 	}
 
-	delete(wsr.hardlinks, linkId)
-
+	// our return variables
 	inodeId = link.inodeId
 	wasDirty = false
+
+	// ensure we have a valid inodeId to return
 	if inodeId != quantumfs.InodeIdInvalid {
 		_, wasDirty = wsr.dirtyLinks[inodeId]
-
-		delete(wsr.inodeToLink, inodeId)
-		link.inodeId = quantumfs.InodeIdInvalid
-		delete(wsr.dirtyLinks, inodeId)
 	} else {
 		// hardlink was never given an inodeId
 		inodeId = c.qfs.newInodeId()
 	}
+
+	wsr.removeHardlink_(linkId, link.inodeId)
+	// we're throwing link away, but be safe and clear its inodeId
+	link.inodeId = quantumfs.InodeIdInvalid
 
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 	if inode == nil {
@@ -466,8 +492,8 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	if isHardlink {
 		func() {
-			defer wsr.Directory.Lock().Unlock()
-			wsr.Directory.self.dirty(c)
+			defer wsr.Lock().Unlock()
+			wsr.self.dirty(c)
 
 			defer wsr.linkLock.Lock().Unlock()
 			entry := wsr.hardlinks[linkId].record
