@@ -167,5 +167,5 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 	}
 
 	dir.self.dirty(c)
-	return dir.children.makeHardlink_DOWN(c, record.Filename())
+	return dir.children.makeHardlink(c, record.Filename())
 }
