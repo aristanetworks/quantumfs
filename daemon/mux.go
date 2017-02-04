@@ -72,9 +72,12 @@ type QuantumFs struct {
 	// try any further.
 	giveUpOnForget bool
 
-	// We accumulate the size of each responses to set up a proper responding
-	// file in FUSE. A quantumfs system is a signle file system, so there is
-	// only one FUSE file regarless of the numbers of the workspaces
+	// We present the sum of the size of all responses waiting on the api file as
+	// the size of that file because the kernel will clear any reads past the end
+	// of the file. Thus the file length needs to be at least as long as the
+	// largest response and using the sum of all response lengths is more
+	// efficient than computing the maximum response length over a large number
+	// of ApiHandles.
 	apiFileSize int64
 
 	mapMutex         DeferableRwMutex
@@ -1287,21 +1290,16 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	return wsr.(*WorkspaceRoot), wsr != nil
 }
 
-func (qfs *QuantumFs) increaseApiFileSize(offset int) {
+func (qfs *QuantumFs) increaseApiFileSize(c *ctx, offset int) {
 	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset))
-	qfs.c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
+	c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
 }
 
-func (qfs *QuantumFs) makeApiFileSizeZero() {
-	atomic.StoreInt64(&qfs.apiFileSize, 0)
-	qfs.c.vlog("QuantumFs::APIFileSize becomes 0")
-}
-
-func (qfs *QuantumFs) decreaseApiFileSize(offset int) {
+func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
 	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
 	if result < 0 {
-		qfs.c.elog("ERROR: PANIC Global variable %d should"+
+		c.elog("ERROR: PANIC Global variable %d should"+
 			" be greater than zero", result)
-		qfs.makeApiFileSizeZero()
+		atomic.StoreInt64(&qfs.apiFileSize, 0)
 	}
 }

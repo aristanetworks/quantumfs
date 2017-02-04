@@ -47,8 +47,10 @@ func testApiAccessList(test *testHelper, size int, filename string) {
 	accessList := make(map[string]bool)
 	workspace := test.newWorkspace()
 
+	expectedSize := 0
 	for i := 0; i < size; i++ {
 		filename := fmt.Sprintf("%s%d", filename, i)
+		expectedSize += len(filename)
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 666)
 		test.assert(err == nil, "Create file error: %v at %s",
@@ -69,7 +71,26 @@ func testApiAccessList(test *testHelper, size int, filename string) {
 	err, responselist := api.GetAccessedWithRtr(relpath)
 	test.assert(err == nil, "Error getting accessList with api %v", err)
 
+	test.assert(mapSize(responselist) == expectedSize,
+		"Error getting unequal sizes %d != %d",
+		mapSize(responselist), expectedSize)
+
 	test.assertAccessList(accessList, responselist, "Error two maps different")
+}
+
+func mapSize(list map[string]bool) int {
+	size := 0
+	for key, _ := range list {
+		size += len(key)
+	}
+
+	return size
+}
+
+func TestApiAccessListEmpty(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testApiAccessList(test, 0, "")
+	})
 }
 
 func TestApiAccessListLargeSize(t *testing.T) {

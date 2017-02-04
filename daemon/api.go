@@ -41,7 +41,7 @@ func fillApiAttr(attr *fuse.Attr) {
 func fillApiAttrWithSize(attr *fuse.Attr, size uint64) {
 	attr.Ino = quantumfs.InodeIdApi
 	attr.Size = size
-	attr.Blocks = 1
+	attr.Blocks = 1 + size/4096
 
 	now := time.Now()
 	attr.Atime = uint64(now.Unix())
@@ -80,8 +80,7 @@ func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
-	size := uint64((atomic.LoadInt64(&c.qfs.apiFileSize)/1024 + 1) * 1024)
-	fillApiAttrWithSize(&out.Attr, size)
+	fillApiAttrWithSize(&out.Attr, uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
 	return fuse.OK
 }
 
@@ -282,6 +281,8 @@ type ApiHandle struct {
 	FileHandleCommon
 	outstandingRequests int32
 	responses           chan fuse.ReadResult
+	// The is
+	partialRead []byte
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -305,19 +306,24 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return nil, fuse.OK
 	}
 
-	response := <-api.responses
-
 	atomic.AddInt32(&api.outstandingRequests, -1)
-	debug := make([]byte, response.Size())
-	bytes, _ := response.Bytes(debug)
-	c.vlog("API Response %s", string(bytes))
+	var bytes []byte
+	if len(api.partialRead) == 0 {
+		response := <-api.responses
+		debug := make([]byte, response.Size())
+		bytes, _ = response.Bytes(debug)
 
+	} else {
+		bytes = api.partialRead
+	}
+
+	c.vlog("API Response %s", string(bytes))
 	chunk := len(bytes)
 	if chunk > 4096 {
 		chunk = 4096
-		api.responses <- fuse.ReadResultData(bytes[chunk:])
+		api.partialRead = bytes[chunk:]
 	}
-	c.qfs.decreaseApiFileSize(chunk)
+	c.qfs.decreaseApiFileSize(c, chunk)
 
 	return fuse.ReadResultData(bytes[:chunk]), fuse.OK
 }
@@ -383,39 +389,39 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
 	}
 
-	var fileSize int
+	var responseSize int
 	switch cmd.CommandId {
 	default:
-		fileSize = api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+		responseSize = api.queueErrorResponse(quantumfs.ErrorBadCommandId,
 			"Unknown command number %d", cmd.CommandId)
 
 	case quantumfs.CmdError:
-		fileSize = api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+		responseSize = api.queueErrorResponse(quantumfs.ErrorBadCommandId,
 			"Invalid message %d to send to quantumfsd",
 			cmd.CommandId)
 
 	case quantumfs.CmdBranchRequest:
 		c.vlog("Received branch request")
-		fileSize = api.branchWorkspace(c, buf)
+		responseSize = api.branchWorkspace(c, buf)
 	case quantumfs.CmdGetAccessed:
 		c.vlog("Received GetAccessed request")
-		fileSize = api.getAccessed(c, buf)
+		responseSize = api.getAccessed(c, buf)
 	case quantumfs.CmdClearAccessed:
 		c.vlog("Received ClearAccessed request")
-		fileSize = api.clearAccessed(c, buf)
+		responseSize = api.clearAccessed(c, buf)
 	case quantumfs.CmdSyncAll:
 		c.vlog("Received all workspace sync request")
-		fileSize = api.syncAll(c)
+		responseSize = api.syncAll(c)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
 		c.vlog("Recieved InsertInode request")
-		fileSize = api.insertInode(c, buf)
+		responseSize = api.insertInode(c, buf)
 	}
 
 	c.vlog("done writing to file")
-	c.qfs.increaseApiFileSize(fileSize)
+	c.qfs.increaseApiFileSize(c, responseSize)
 	// Long response needs multiple reads to complete the data communication
-	atomic.AddInt32(&api.outstandingRequests, int32(1+fileSize/4096))
+	atomic.AddInt32(&api.outstandingRequests, int32(1+responseSize/4096))
 	return size, fuse.OK
 }
 

@@ -150,6 +150,7 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	size := 4096
 	result := make([]byte, 0)
 	buf = make([]byte, 4096)
+
 	for size == 4096 {
 		api.fd.Seek(0, 0)
 		size, err = api.fd.Read(buf)
