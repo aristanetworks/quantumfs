@@ -202,11 +202,7 @@ func (dir *Directory) delChild_(c *ctx, inodeNum InodeId) {
 	dir.self.markAccessed(c, record.Filename(), false)
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
-		file, isFile := inode.(*File)
-		if isFile && record.Type() == quantumfs.ObjectTypeSmallFile ||
-			record.Type() == quantumfs.ObjectTypeMediumFile ||
-			record.Type() == quantumfs.ObjectTypeLargeFile ||
-			record.Type() == quantumfs.ObjectTypeVeryLargeFile {
+		if file, isFile := inode.(*File); isFile {
 			file.setChildRecord(c, record)
 		}
 		inode.orphan(c)
