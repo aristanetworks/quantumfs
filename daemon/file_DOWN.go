@@ -31,6 +31,7 @@ func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 }
 
 func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
+	fi.flush_DOWN(c)
 	return fuse.OK
 }
 
