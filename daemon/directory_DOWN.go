@@ -58,7 +58,7 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 		}
 	}
 
-	dir.flush_DOWN(c)
+	dir.flush(c)
 
 	return fuse.OK
 }
