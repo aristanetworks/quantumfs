@@ -84,7 +84,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 
 	// Update the Hash value before generating the key
 	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
-		// Since the child is instantiated it may be modified, flush is to be
+		// Since the child is instantiated it may be modified, flush it to be
 		// sure
 		childInode.flush_DOWN(c)
 	}
