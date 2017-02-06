@@ -4,9 +4,9 @@
 // qparse is the shared memory log parser for the qlog quantumfs subsystem
 package main
 
-import "crypto/md5"
 import "flag"
 import "fmt"
+import "io/ioutil"
 import "os"
 import "runtime"
 import "sort"
@@ -40,7 +40,7 @@ var tabSpaces int
 var logOut bool
 var patternsOut bool
 var stats bool
-var logHash string
+var patternFile string
 var topTotal int
 var topAvg int
 var minTimeslicePct int
@@ -56,6 +56,8 @@ var sampleMin int
 var maxThreads int
 var maxLenWildcards int
 var maxLen int
+
+var wildcardStr string
 
 // -- worker structures
 type SortResultsAverage []qlog.PatternData
@@ -118,11 +120,12 @@ func init() {
 	flag.BoolVar(&logOut, "log", false,
 		"Parse a log file (-in) and print to stdout or a file with -out")
 	flag.BoolVar(&patternsOut, "pattern", false,
-		"Show patterns given in a stat file. Works with -id.")
+		"Print patterns given in a stat file. Works with -id.")
 	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
 		"a stats file (-out). Default stats filename is logfile.stats")
-	flag.StringVar(&logHash, "loghash", "", "Filter logs by requests which "+
-		"match the hash given. Try -byTotal or -byAvg to get hashes.")
+	flag.StringVar(&patternFile, "logpatt", "", "Filter logs by requests which "+
+		"match the pattern given in the file <logpatt>. Try -byTotal or "+
+		"-byAvg to get patterns.")
 	flag.IntVar(&topTotal, "byTotal", 0, "Parse a stat file (-in) and "+
 		"print top <byTotal> functions by total time usage in logs")
 	flag.IntVar(&topAvg, "byAvg", 0, "Parse a stat file (-in) and "+
@@ -160,6 +163,8 @@ func init() {
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 	}
+
+	wildcardStr = "***Wildcard***"
 }
 
 func printIndexedLog(idx int, sequence []qlog.LogOutput, wildcards []bool) {
@@ -170,13 +175,13 @@ func printIndexedLog(idx int, sequence []qlog.LogOutput, wildcards []bool) {
 func printIndexedLogExt(idx int, sequence []qlog.LogOutput, wildcards []bool,
 	collapseWildcards bool) {
 
-	fmt.Printf("=================%2d===================\n", idx)
+	fmt.Printf("=====%2d=====PATTERN SECTION BELOW=====\n", idx)
 	outputWildcard := false
 	for j := 0; j < len(sequence); j++ {
 		if j < len(wildcards) && wildcards[j] {
 			// Don't show consecutive wildcards
 			if !outputWildcard {
-				fmt.Println("***Wildcards***")
+				fmt.Println(wildcardStr)
 				if collapseWildcards {
 					outputWildcard = true
 				}
@@ -231,8 +236,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		if logHash != "" {
-			filterLogOut(inFile, logHash, true, tabSpaces)
+		if patternFile != "" {
+			filterLogOut(inFile, patternFile, true, tabSpaces)
 		} else if outFile == "" {
 			// Log parse mode only
 			qlog.ParseLogsExt(inFile, tabSpaces,
@@ -408,17 +413,33 @@ func fillTimeline(out map[int64]bucket, seqId uint64,
 	return minTime
 }
 
-func filterLogOut(inFile string, filterHash string, showStatus bool, tabSpaces int) {
+func filterLogOut(inFile string, patternFile string, showStatus bool, tabSpaces int) {
 
-	if len(filterHash) != 16 {
-		fmt.Println("Log filter hash must be 8 bytes (16 hex chars)")
-		os.Exit(1)
-	}
-
-	_, err := strconv.ParseInt(filterHash, 16, 64)
+	pattern := make([]qlog.LogOutput, 0)
+	wildcards := make([]bool, 0)
+	patternData, err := ioutil.ReadFile(patternFile)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+	fmt.Printf("Showing logs from requests matching:\n%s\n\n", patternData)
+
+	patternStrings := strings.Split(string(patternData), "\n")
+	for i := 0; i < len(patternStrings); i++ {
+		// ignore empty lines
+		if len(patternStrings[i]) == 0 {
+			continue
+		}
+
+		pattern = append(pattern, qlog.LogOutput {
+			Format:	patternStrings[i] + "\n",
+		})
+
+		if patternStrings[i] == wildcardStr {
+			wildcards = append(wildcards, true)
+		} else {
+			wildcards = append(wildcards, false)
+		}
 	}
 
 	// Structures during this process can be massive. Throw them away asap
@@ -446,6 +467,7 @@ func filterLogOut(inFile string, filterHash string, showStatus bool, tabSpaces i
 
 	// now we just need to output the contents of the tracker maps we match
 	trackerIdx := 0
+	fmt.Println("Filtering for relevant subsequences...");
 	status := qlog.NewLogStatus(50)
 	sequences := make([]*qlog.SequenceTracker, 0)
 	for reqId, trackers := range trackerMap {
@@ -459,17 +481,15 @@ func filterLogOut(inFile string, filterHash string, showStatus bool, tabSpaces i
 				status.Process(float32(trackerIdx) /
 					float32(trackerCount))
 			}
-
 			if trackers[k].Ready() == false {
 				fmt.Printf("Error: Mismatched '%s' in requestId %d"+
 					" log\n", qlog.FnEnterStr, reqId)
 				break
 			}
 
-			rawSeq := trackers[k].Seq()
-			seq := qlog.GenSeqStr(rawSeq)
-			hash := md5.Sum([]byte(seq))
-			if string(hash[:]) == filterHash {
+			if qlog.PatternMatches(pattern, wildcards,
+				trackers[k].Seq()) {
+
 				sequences = append(sequences, &trackers[k])
 			}
 		}
@@ -479,7 +499,7 @@ func filterLogOut(inFile string, filterHash string, showStatus bool, tabSpaces i
 	}
 
 	if len(sequences) == 0 {
-		fmt.Println("No log patterns match %s", filterHash);
+		fmt.Println("No log pattern match for", patternFile);
 		os.Exit(0);
 	}
 
@@ -680,7 +700,7 @@ func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int
 	logTime := lastLog - firstLog
 	logPct := float64(pattern.Sum) / float64(logTime)
 
-	fmt.Println("--------------------------------------")
+	fmt.Println("------------PATTERN SECTION ABOVE-----")
 	fmt.Printf("Total sequence time: %.12s (%.4f%% of %.10s total in logs)\n",
 		time.Duration(pattern.Sum).String(), 100*logPct,
 		time.Duration(logTime).String())
@@ -690,7 +710,7 @@ func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int
 }
 
 func printPatternData(pattern qlog.PatternData) {
-	fmt.Println("--------------------------------------")
+	fmt.Println("------------PATTERN SECTION ABOVE-----")
 	fmt.Printf("Total sequence time: %12s\n",
 		time.Duration(pattern.Sum).String())
 
