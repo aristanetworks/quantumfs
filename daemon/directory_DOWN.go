@@ -49,6 +49,17 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
+	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum())
+
+	children := dir.childInodes()
+	for _, child := range children {
+		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
+			inode.Sync_DOWN(c)
+		}
+	}
+
+	dir.flush_DOWN(c)
+
 	return fuse.OK
 }
 
@@ -62,9 +73,9 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 
 	// Update the Hash value before generating the key
 	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
-		// Since the child is instantiated it may be modified, flush is to be
-		// sure
-		childInode.flush(c)
+		// Since the child is instantiated it may be modified, flush it
+		// synchronously and recusively to be sure.
+		childInode.Sync_DOWN(c)
 	}
 
 	// flush already acquired an Inode lock exclusively. In case of the dead
