@@ -35,7 +35,7 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 		keyspace: cfg.Cluster.KeySpace,
 	}
 
-	err = wsdb.wsdbKeyPut("_null", "null", []byte(nil))
+	err = wsdb.wsdbKeyPut("_null", "_null", "null", []byte(nil))
 	if err != nil {
 		return nil, err
 	}
@@ -45,150 +45,208 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 
 // --- workspace DB API implementation ---
 
-func (nc *noCacheWsdb) NumNamespaces() (int, error) {
-	count, _, err := nc.fetchDBNamespaces()
+func (nc *noCacheWsdb) NumTypespaces() (int, error) {
+	count, _, err := nc.fetchDBTypespaces()
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
-			"during NumNamespaces: %s", err.Error())
+			"during NumTypespaces: %s", err.Error())
 	}
 	return count, nil
 }
 
-func (nc *noCacheWsdb) NamespaceList() ([]string, error) {
-	_, list, err := nc.fetchDBNamespaces()
+func (nc *noCacheWsdb) TypespaceList() ([]string, error) {
+	_, list, err := nc.fetchDBTypespaces()
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
-			"during NamespaceList: %s", err.Error())
+			"during TypespaceList: %s", err.Error())
 	}
 	return list, nil
 }
-
-func (nc *noCacheWsdb) NumWorkspaces(namespace string) (int, error) {
-	count, _, err := nc.fetchDBWorkspaces(namespace)
+func (nc *noCacheWsdb) NumNamespaces(typespace string) (int, error) {
+	count, _, err := nc.fetchDBNamespaces(typespace)
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
-			"during NumWorkspaces %s : %s",
-			namespace, err.Error())
+			"during NumNamespaces %s : %s", typespace,
+			err.Error())
 	}
 	return count, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceList(namespace string) ([]string, error) {
-	_, list, err := nc.fetchDBWorkspaces(namespace)
+func (nc *noCacheWsdb) NamespaceList(typespace string) ([]string, error) {
+	_, list, err := nc.fetchDBNamespaces(typespace)
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
-			"during WorkspaceList %s : %s",
-			namespace, err.Error())
+			"during NamespaceList %s: %s", typespace,
+			err.Error())
 	}
 	return list, nil
 }
 
-func (nc *noCacheWsdb) NamespaceExists(namespace string) (bool, error) {
-	exists, err := nc.wsdbNamespaceExists(namespace)
+func (nc *noCacheWsdb) NumWorkspaces(typespace string,
+	namespace string) (int, error) {
+
+	count, _, err := nc.fetchDBWorkspaces(typespace, namespace)
+	if err != nil {
+		return 0, wsdb.NewError(wsdb.ErrFatal,
+			"during NumWorkspaces %s/%s : %s",
+			typespace, namespace, err.Error())
+	}
+	return count, nil
+}
+
+func (nc *noCacheWsdb) WorkspaceList(typespace string,
+	namespace string) ([]string, error) {
+
+	_, list, err := nc.fetchDBWorkspaces(typespace, namespace)
+	if err != nil {
+		return list, wsdb.NewError(wsdb.ErrFatal,
+			"during WorkspaceList %s/%s : %s",
+			typespace, namespace, err.Error())
+	}
+	return list, nil
+}
+
+func (nc *noCacheWsdb) TypespaceExists(typespace string) (bool, error) {
+	exists, err := nc.wsdbTypespaceExists(typespace)
 	if err != nil {
 		return exists, wsdb.NewError(wsdb.ErrFatal,
-			"during NamespaceExists %s : %s", namespace, err.Error())
+			"during TypespaceExists %s : %s", typespace, err.Error())
 	}
 
 	return exists, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceExists(namespace string,
+func (nc *noCacheWsdb) NamespaceExists(typespace string,
+	namespace string) (bool, error) {
+
+	exists, err := nc.wsdbNamespaceExists(typespace, namespace)
+	if err != nil {
+		return exists, wsdb.NewError(wsdb.ErrFatal,
+			"during NamespaceExists %s/%s : %s", typespace,
+			namespace, err.Error())
+	}
+
+	return exists, nil
+}
+
+func (nc *noCacheWsdb) WorkspaceExists(typespace string, namespace string,
 	workspace string) (bool, error) {
 
-	_, present, err := nc.wsdbKeyGet(namespace, workspace)
+	_, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
 	if err != nil {
 		return present, wsdb.NewError(wsdb.ErrFatal,
-			"during WorkspaceExists %s/%s : %s",
-			namespace, workspace, err.Error())
+			"during WorkspaceExists %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
 	}
 
 	return present, nil
 }
 
-func (nc *noCacheWsdb) BranchWorkspace(srcNamespace string,
-	srcWorkspace string, dstNamespace string, dstWorkspace string) error {
+func isTypespaceReserved(typespace string) bool {
+	// verify that this is not an attempt to alter the
+	// seed/first workspaceDB entry setup by ether implementation of workspaceDB
+	return typespace == "_null"
+}
 
-	key, present, err := nc.wsdbKeyGet(srcNamespace, srcWorkspace)
+func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
+	srcNamespace string, srcWorkspace string,
+	dstTypespace string, dstNamespace string, dstWorkspace string) error {
+
+	if isTypespaceReserved(dstTypespace) {
+		return wsdb.NewError(wsdb.ErrInvalidArgs,
+			"Branch failed: cannot use reserved _null typespace")
+	}
+
+	key, present, err := nc.wsdbKeyGet(srcTypespace, srcNamespace,
+		srcWorkspace)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
-			"during Get in BranchWorkspace %s/%s : %s ",
-			srcNamespace, srcWorkspace,
+			"during Get in BranchWorkspace %s/%s/%s : %s ",
+			srcTypespace, srcNamespace, srcWorkspace,
 			err.Error())
 	}
 
 	if !present {
 		return wsdb.NewError(wsdb.ErrWorkspaceNotFound,
-			"cannot branch workspace: %s/%s", srcNamespace, srcWorkspace)
+			"cannot branch workspace: %s/%s/%s",
+			srcTypespace, srcNamespace, srcWorkspace)
 	}
 
 	// branching to an existing workspace shouldn't be allowed
-	_, present, err = nc.wsdbKeyGet(dstNamespace, dstWorkspace)
+	_, present, err = nc.wsdbKeyGet(dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
-			"during Get in BranchWorkspace %s/%s : %s",
-			dstNamespace, dstWorkspace,
+			"during Get in BranchWorkspace %s/%s/%s : %s",
+			dstTypespace, dstNamespace, dstWorkspace,
 			err.Error())
 	}
 
 	if present {
 		return wsdb.NewError(wsdb.ErrWorkspaceExists,
-			"cannot branch workspace: %s/%s", dstNamespace, dstWorkspace)
+			"cannot branch workspace: %s/%s/%s",
+			dstTypespace, dstNamespace, dstWorkspace)
 	}
 
-	if err = nc.wsdbKeyPut(dstNamespace, dstWorkspace, key); err != nil {
+	if err = nc.wsdbKeyPut(dstTypespace, dstNamespace,
+		dstWorkspace, key); err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
-			"during Put in BranchWorkspace %s/%s : %s",
-			dstNamespace, dstWorkspace,
+			"during Put in BranchWorkspace %s/%s/%s : %s",
+			dstTypespace, dstNamespace, dstWorkspace,
 			err.Error())
 	}
 
 	return nil
 }
 
-func (nc *noCacheWsdb) Workspace(namespace string,
+func (nc *noCacheWsdb) Workspace(typespace string, namespace string,
 	workspace string) (wsdb.ObjectKey, error) {
 
-	key, present, err := nc.wsdbKeyGet(namespace, workspace)
+	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
 	if err != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
-			"during Get in Workspace %s/%s : %s",
-			namespace, workspace, err.Error())
+			"during Get in Workspace %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
 	}
 
 	if !present {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
-			"during Workspace %s/%s", namespace, workspace)
+			"during Workspace %s/%s/%s", typespace, namespace, workspace)
 	}
 
 	return key, nil
 }
 
-func (nc *noCacheWsdb) AdvanceWorkspace(namespace string,
-	workspace string, currentRootID wsdb.ObjectKey,
+func (nc *noCacheWsdb) AdvanceWorkspace(typespace string,
+	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
-	key, present, err := nc.wsdbKeyGet(namespace, workspace)
+	if isTypespaceReserved(typespace) {
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrInvalidArgs,
+			"Branch failed: cannot use reserved _null typespace")
+	}
+
+	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
 	if err != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
-			"during Get in AdvanceWorkspace %s/%s : %s",
-			namespace, workspace, err.Error())
+			"during Get in AdvanceWorkspace %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
 	}
 
 	if !present {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
-			"cannot advance workspace %s/%s", namespace, workspace)
+			"cannot advance workspace %s/%s/%s", typespace,
+			namespace, workspace)
 	}
 
 	if !bytes.Equal(currentRootID, key) {
 		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
-			"cannot advance workspace %s/%s", currentRootID, key)
+			"cannot advance workspace expected:%s found:%s", currentRootID, key)
 	}
 
-	if err := nc.wsdbKeyPut(namespace, workspace, newRootID); err != nil {
+	if err := nc.wsdbKeyPut(typespace, namespace, workspace, newRootID); err != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
-			"during Put in AdvanceWorkspace %s/%s : %s",
-			namespace, workspace, err.Error())
+			"during Put in AdvanceWorkspace %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
 	}
 
 	return newRootID, nil
@@ -196,13 +254,13 @@ func (nc *noCacheWsdb) AdvanceWorkspace(namespace string,
 
 // --- helper routines ---
 
-func (nc *noCacheWsdb) wsdbNamespaceExists(namespace string) (bool, error) {
+func (nc *noCacheWsdb) wsdbTypespaceExists(typespace string) (bool, error) {
 	qryStr := fmt.Sprintf(`
-SELECT namespace
+SELECT typespace
 FROM %s.workspacedb
-WHERE namespace = ? LIMIT 1`, nc.keyspace)
+WHERE typespace = ? LIMIT 1`, nc.keyspace)
 
-	query := nc.store.session.Query(qryStr, namespace)
+	query := nc.store.session.Query(qryStr, typespace)
 
 	nspace := ""
 	err := query.Scan(&nspace)
@@ -219,19 +277,72 @@ WHERE namespace = ? LIMIT 1`, nc.keyspace)
 
 }
 
-func (nc *noCacheWsdb) fetchDBNamespaces(keys ...string) (int, []string, error) {
+func (nc *noCacheWsdb) fetchDBTypespaces() (int, []string, error) {
 	qryStr := fmt.Sprintf(`
-SELECT distinct namespace
+SELECT distinct typespace
 FROM %s.workspacedb`, nc.keyspace)
 
 	query := nc.store.session.Query(qryStr)
 	iter := query.Iter()
 	count := 0
+	var tempTypespace string
+	typespaceList := make([]string, 0)
+	for iter.Scan(&tempTypespace) {
+		typespaceList = append(typespaceList, tempTypespace)
+		count++
+	}
+	if err := iter.Close(); err != nil {
+		return 0, nil, err
+	}
+
+	return count, typespaceList, nil
+}
+
+func (nc *noCacheWsdb) wsdbNamespaceExists(typespace string,
+	namespace string) (bool, error) {
+
+	qryStr := fmt.Sprintf(`
+SELECT namespace
+FROM %s.workspacedb
+WHERE typespace = ? AND namespace = ? LIMIT 1`, nc.keyspace)
+
+	query := nc.store.session.Query(qryStr, typespace, namespace)
+
+	nspace := ""
+	err := query.Scan(&nspace)
+	if err != nil {
+		switch err {
+		case gocql.ErrNotFound:
+			return false, nil
+		default:
+			return false, err
+		}
+	} else {
+		return true, nil
+	}
+
+}
+
+func (nc *noCacheWsdb) fetchDBNamespaces(
+	typespace string) (int, []string, error) {
+
+	qryStr := fmt.Sprintf(`
+SELECT namespace
+FROM %s.workspacedb
+WHERE typespace = ?`, nc.keyspace)
+
+	query := nc.store.session.Query(qryStr, typespace)
+	iter := query.Iter()
+	count := 0
 	var tempNamespace string
 	namespaceList := make([]string, 0)
+	found := make(map[string]bool)
 	for iter.Scan(&tempNamespace) {
-		namespaceList = append(namespaceList, tempNamespace)
-		count++
+		if _, exists := found[tempNamespace]; !exists {
+			namespaceList = append(namespaceList, tempNamespace)
+			count++
+			found[tempNamespace] = true
+		}
 	}
 	if err := iter.Close(); err != nil {
 		return 0, nil, err
@@ -240,13 +351,16 @@ FROM %s.workspacedb`, nc.keyspace)
 	return count, namespaceList, nil
 }
 
-func (nc *noCacheWsdb) fetchDBWorkspaces(keys ...string) (int, []string, error) {
+func (nc *noCacheWsdb) fetchDBWorkspaces(typespace string,
+	namespace string) (int, []string, error) {
+
 	qryStr := fmt.Sprintf(`
 SELECT workspace
 FROM %s.workspacedb
-WHERE namespace = ?`, nc.keyspace)
+WHERE typespace = ? AND namespace = ?`, nc.keyspace)
 
-	query := nc.store.session.Query(qryStr, keys[0])
+	query := nc.store.session.Query(qryStr, typespace,
+		namespace)
 
 	iter := query.Iter()
 	count := 0
@@ -263,15 +377,17 @@ WHERE namespace = ?`, nc.keyspace)
 	return count, workspaceList, nil
 }
 
-func (nc *noCacheWsdb) wsdbKeyGet(namespace string,
+func (nc *noCacheWsdb) wsdbKeyGet(typespace string,
+	namespace string,
 	workspace string) (key []byte, present bool, err error) {
 
 	qryStr := fmt.Sprintf(`
 SELECT key
 FROM %s.workspacedb
-WHERE namespace = ? AND workspace = ?`, nc.keyspace)
+WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
 
-	query := nc.store.session.Query(qryStr, namespace, workspace)
+	query := nc.store.session.Query(qryStr, typespace,
+		namespace, workspace)
 
 	err = query.Scan(&key)
 	if err != nil {
@@ -286,15 +402,17 @@ WHERE namespace = ? AND workspace = ?`, nc.keyspace)
 	}
 }
 
-func (nc *noCacheWsdb) wsdbKeyPut(namespace string, workspace string,
+func (nc *noCacheWsdb) wsdbKeyPut(typespace string,
+	namespace string, workspace string,
 	key []byte) error {
 
 	qryStr := fmt.Sprintf(`
 INSERT INTO %s.workspacedb
-(namespace, workspace, key)
-VALUES (?,?,?)`, nc.keyspace)
+(typespace, namespace, workspace, key)
+VALUES (?,?,?,?)`, nc.keyspace)
 
-	query := nc.store.session.Query(qryStr, namespace, workspace, key)
+	query := nc.store.session.Query(qryStr, typespace,
+		namespace, workspace, key)
 
 	return query.Exec()
 }

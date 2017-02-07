@@ -25,7 +25,8 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockWsdbKeyPut(mockSession, "_null", "null", []byte(nil), nil)
+	mockWsdbKeyPut(mockSession, "_null",
+		"_null", "null", []byte(nil), nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
@@ -65,6 +66,18 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceNotExist() {
 
 func (suite *wsdbNoCacheTestSuite) TestNoCacheNamespaceNotExist() {
 	suite.common.TestNamespaceNotExist()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheTypespaceNotExist() {
+	suite.common.TestTypespaceNotExist()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheInvalidArgsBranching() {
+	suite.common.TestInvalidArgsBranchWorkspace()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheInvalidArgsAdvance() {
+	suite.common.TestInvalidArgsAdvanceWorkspace()
 }
 
 func (suite *wsdbNoCacheTestSuite) TearDownTest() {

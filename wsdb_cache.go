@@ -37,11 +37,11 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 	}
 
 	// TODO: default max cache age can be a configuration parameter?
-	c := newEntityCache(2, 1*time.Second, cwsdb, wsdbFetcherImpl)
+	c := newEntityCache(3, 1*time.Second, cwsdb, wsdbFetcherImpl)
 
 	// QFS requires an empty workspaceDB to contain null namespace
 	// and _null workspace
-	c.InsertEntities("_null", "null")
+	c.InsertEntities("_null", "_null", "null")
 
 	cwsdb.cache = c
 
@@ -50,97 +50,130 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 
 // --- workspace DB API implementation ---
 
-func (cw *cacheWsdb) NumNamespaces() (int, error) {
+func (cw *cacheWsdb) NumTypespaces() (int, error) {
 	return cw.cache.CountEntities(), nil
 }
 
-func (cw *cacheWsdb) NamespaceList() ([]string, error) {
+func (cw *cacheWsdb) TypespaceList() ([]string, error) {
 	return cw.cache.ListEntities(), nil
 }
 
-func (cw *cacheWsdb) NumWorkspaces(namespace string) (int, error) {
-	return cw.cache.CountEntities(namespace), nil
+func (cw *cacheWsdb) NumNamespaces(typespace string) (int, error) {
+	return cw.cache.CountEntities(typespace), nil
 }
 
-func (cw *cacheWsdb) WorkspaceList(namespace string) ([]string, error) {
-	return cw.cache.ListEntities(namespace), nil
+func (cw *cacheWsdb) NamespaceList(
+	typespace string) ([]string, error) {
+
+	return cw.cache.ListEntities(typespace), nil
 }
 
-func (cw *cacheWsdb) NamespaceExists(namespace string) (bool, error) {
+func (cw *cacheWsdb) NumWorkspaces(typespace,
+	namespace string) (int, error) {
 
-	exist, err := cw.base.NamespaceExists(namespace)
+	return cw.cache.CountEntities(typespace, namespace), nil
+}
+
+func (cw *cacheWsdb) WorkspaceList(typespace string,
+	namespace string) ([]string, error) {
+
+	return cw.cache.ListEntities(typespace, namespace), nil
+}
+
+func (cw *cacheWsdb) TypespaceExists(
+	typespace string) (bool, error) {
+
+	exist, err := cw.base.TypespaceExists(typespace)
 	if err != nil {
 		return exist, err
 	}
 
 	if !exist {
-		cw.cache.DeleteEntities(namespace)
+		cw.cache.DeleteEntities(typespace)
 	} else {
-		cw.cache.InsertEntities(namespace)
+		cw.cache.InsertEntities(typespace)
 	}
 
 	return exist, nil
 }
 
-func (cw *cacheWsdb) WorkspaceExists(namespace string,
-	workspace string) (bool, error) {
+func (cw *cacheWsdb) NamespaceExists(typespace string,
+	namespace string) (bool, error) {
 
-	exist, err := cw.base.WorkspaceExists(namespace, workspace)
+	exist, err := cw.base.NamespaceExists(typespace, namespace)
 	if err != nil {
 		return exist, err
 	}
 
 	if !exist {
-		cw.cache.DeleteEntities(namespace, workspace)
+		cw.cache.DeleteEntities(typespace, namespace)
 	} else {
-		cw.cache.InsertEntities(namespace, workspace)
+		cw.cache.InsertEntities(typespace, namespace)
 	}
 
 	return exist, nil
 }
 
-func (cw *cacheWsdb) BranchWorkspace(srcNamespace string,
-	srcWorkspace string, dstNamespace string, dstWorkspace string) error {
+func (cw *cacheWsdb) WorkspaceExists(typespace string,
+	namespace string, workspace string) (bool, error) {
+
+	exist, err := cw.base.WorkspaceExists(typespace, namespace, workspace)
+	if err != nil {
+		return exist, err
+	}
+
+	if !exist {
+		cw.cache.DeleteEntities(typespace, namespace, workspace)
+	} else {
+		cw.cache.InsertEntities(typespace, namespace, workspace)
+	}
+
+	return exist, nil
+}
+
+func (cw *cacheWsdb) BranchWorkspace(srcTypespace string, srcNamespace string,
+	srcWorkspace string, dstTypespace string,
+	dstNamespace string, dstWorkspace string) error {
 
 	start := time.Now()
 	defer func() { cw.branchStats.RecordOp(time.Since(start)) }()
 
-	if err := cw.base.BranchWorkspace(srcNamespace, srcWorkspace,
-		dstNamespace, dstWorkspace); err != nil {
+	if err := cw.base.BranchWorkspace(srcTypespace, srcNamespace, srcWorkspace,
+		dstTypespace, dstNamespace, dstWorkspace); err != nil {
 		return err
 	}
 
-	cw.cache.InsertEntities(srcNamespace, srcWorkspace)
-	cw.cache.InsertEntities(dstNamespace, dstWorkspace)
+	cw.cache.InsertEntities(srcTypespace, srcNamespace, srcWorkspace)
+	cw.cache.InsertEntities(dstTypespace, dstNamespace, dstWorkspace)
 
 	return nil
 }
 
-func (cw *cacheWsdb) Workspace(namespace string,
+func (cw *cacheWsdb) Workspace(typespace string, namespace string,
 	workspace string) (wsdb.ObjectKey, error) {
 
-	key, err := cw.base.Workspace(namespace, workspace)
+	key, err := cw.base.Workspace(typespace, namespace, workspace)
 	if err != nil {
 		return wsdb.ObjectKey{}, err
 	}
-	cw.cache.InsertEntities(namespace, workspace)
+	cw.cache.InsertEntities(typespace, namespace, workspace)
 	return key, nil
 }
 
-func (cw *cacheWsdb) AdvanceWorkspace(namespace string,
-	workspace string, currentRootID wsdb.ObjectKey,
+func (cw *cacheWsdb) AdvanceWorkspace(typespace string,
+	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
 	start := time.Now()
 	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()
 
-	key, err := cw.base.AdvanceWorkspace(namespace,
+	key, err := cw.base.AdvanceWorkspace(typespace, namespace,
 		workspace, currentRootID, newRootID)
 	if err != nil {
 		return key, err
 	}
 
-	cw.cache.InsertEntities(namespace, workspace)
+	cw.cache.InsertEntities(typespace, namespace, workspace)
 
 	return key, nil
 }
@@ -149,7 +182,6 @@ func (cw *cacheWsdb) AdvanceWorkspace(namespace string,
 // the returned map contains entities inserted on local node or
 // insertions from other nodes in the CQL cluster
 func wsdbFetcherImpl(arg interface{}, entityPath ...string) map[string]bool {
-
 	cw, ok := arg.(*cacheWsdb)
 	if !ok {
 		panic("unsupported type of arg")
@@ -158,9 +190,11 @@ func wsdbFetcherImpl(arg interface{}, entityPath ...string) map[string]bool {
 	var list []string
 	switch len(entityPath) {
 	case 0:
-		list, _ = cw.base.NamespaceList()
+		list, _ = cw.base.TypespaceList()
 	case 1:
-		list, _ = cw.base.WorkspaceList(entityPath[0])
+		list, _ = cw.base.NamespaceList(entityPath[0])
+	case 2:
+		list, _ = cw.base.WorkspaceList(entityPath[0], entityPath[1])
 	default:
 		panic("unsupported entityPath depth")
 	}
