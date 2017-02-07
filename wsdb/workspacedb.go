@@ -28,6 +28,10 @@ const (
 	// concurrent updates to same workspace is supported
 	// from different cluster nodes
 	ErrWorkspaceOutOfDate = iota
+
+	// ErrInvalidArgs means invalid arguments to the API
+	// more details are available in the error message
+	ErrInvalidArgs = iota
 )
 
 // Error represents the error returned from workspace DB APIs
@@ -54,6 +58,8 @@ func (err *Error) ErrorCode() string {
 		return "Fatal workspaceDB error"
 	case ErrWorkspaceOutOfDate:
 		return "Workspace changed remotely"
+	case ErrInvalidArgs:
+		return "Invalid arguments"
 	}
 }
 
@@ -78,15 +84,20 @@ type WorkspaceDB interface {
 
 	// These methods need to be instant, but not necessarily completely up to
 	// date
-	NumNamespaces() (int, error)
-	NamespaceList() ([]string, error)
-	NumWorkspaces(namespace string) (int, error)
-	WorkspaceList(namespace string) ([]string, error)
+	NumTypespaces() (int, error)
+	TypespaceList() ([]string, error)
+	NumNamespaces(typespace string) (int, error)
+	NamespaceList(typespace string) ([]string, error)
+	NumWorkspaces(typespace string, namespace string) (int, error)
+	WorkspaceList(typespace string, namespace string) ([]string, error)
 
 	// These methods need to be up to date
-	NamespaceExists(namespace string) (bool, error)
-	WorkspaceExists(namespace string, workspace string) (bool, error)
-	Workspace(namespace string, workspace string) (ObjectKey, error)
+	TypespaceExists(typespace string) (bool, error)
+	NamespaceExists(typespace string, namespace string) (bool, error)
+	WorkspaceExists(typespace string, namespace string,
+		workspace string) (bool, error)
+	Workspace(typespace string, namespace string,
+		workspace string) (ObjectKey, error)
 
 	// These methods need to be atomic, but may retry internally
 
@@ -96,8 +107,8 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	//  ErrWorkspaceNotFound
-	BranchWorkspace(srcNamespace string, srcWorkspace string,
-		dstNamespace string, dstWorkspace string) error
+	BranchWorkspace(srcTypespace string, srcNamespace string, srcWorkspace string,
+		dstTypespace string, dstNamespace string, dstWorkspace string) error
 
 	// AdvanceWorkspace changes the workspace rootID. If the current rootID
 	// doesn't match what the client considers the current rootID then no changes
@@ -110,6 +121,6 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceNotFound
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed remotely so the local
 	//                         instance is out of date
-	AdvanceWorkspace(namespace string, workspace string,
+	AdvanceWorkspace(typespace string, namespace string, workspace string,
 		currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
 }
