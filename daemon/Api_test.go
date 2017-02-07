@@ -55,12 +55,12 @@ func testApiAccessList(test *testHelper, size int, filename string,
 	if concurrent {
 		workspace2 := test.newWorkspace()
 		size2 := 100
-		filename2 := "concurrent"
+		filename2 := "concurrentconcurrentconcurrentconcurrentconcurrent"
 		generateFile(test, size2, workspace2, filename2)
 
 		relpath2 := test.relPath(workspace2)
 		go func() {
-			path := workspace2 + "/concurrent0"
+			path := workspace2 + "/" + filename2 + "0"
 			api2 := test.getNewApi(path)
 			test.assert(api != api2,
 				"Error getting the same file descriptor")
@@ -127,7 +127,7 @@ func TestApiAccessListLargeSize(t *testing.T) {
 
 func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 100, "sample", true)
+		testApiAccessList(test, 500, "sample", true)
 	})
 }
 
