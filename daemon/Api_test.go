@@ -166,7 +166,7 @@ func getExtendedKeyHelper(test *testHelper, dst string, type_ string) []byte {
 	return key
 }
 
-func ApiInsertInodeTest(test *testHelper, uid uint16, gid uint16) {
+func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	api := test.getApi()
 
 	// Create the source and the target workspace

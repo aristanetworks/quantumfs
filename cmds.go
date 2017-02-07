@@ -136,8 +136,8 @@ type InsertInodeRequest struct {
 	CommandCommon
 	DstPath     string
 	Key         string
-	Uid         uint16
-	Gid         uint16
+	Uid         uint32
+	Gid         uint32
 	Permissions uint32
 }
 
@@ -292,7 +292,7 @@ func (api *Api) SyncAll() error {
 
 // duplicate an object with a given key and path
 func (api *Api) InsertInode(dst string, key string, permissions uint32,
-	uid uint16, gid uint16) error {
+	uid uint32, gid uint32) error {
 
 	if !isWorkspacePathValid(dst) {
 		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
