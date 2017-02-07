@@ -34,7 +34,7 @@ type ApiInode struct {
 	InodeCommon
 }
 
-func fillApiAttrWithSize(attr *fuse.Attr, size uint64) {
+func fillApiAttr(attr *fuse.Attr, size uint64) {
 	attr.Ino = quantumfs.InodeIdApi
 	attr.Size = size
 	attr.Blocks = BlocksRoundUp(attr.Size, 4096)
@@ -76,7 +76,7 @@ func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
-	fillApiAttrWithSize(&out.Attr, uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
+	fillApiAttr(&out.Attr, uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
 	return fuse.OK
 }
 
