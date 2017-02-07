@@ -28,7 +28,7 @@ func TestFileCreation(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
-		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
+		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
