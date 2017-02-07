@@ -54,7 +54,7 @@ func testApiAccessList(test *testHelper, size int, filename string,
 
 	if concurrent {
 		workspace2 := test.newWorkspace()
-		size2 := 200
+		size2 := 100
 		filename2 := "concurrent"
 		generateFile(test, size2, workspace2, filename2)
 
@@ -127,7 +127,7 @@ func TestApiAccessListLargeSize(t *testing.T) {
 
 func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 500, "sample", true)
+		testApiAccessList(test, 100, "sample", true)
 	})
 }
 
