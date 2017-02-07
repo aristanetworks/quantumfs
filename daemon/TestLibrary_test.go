@@ -305,12 +305,14 @@ func (th *testHelper) logscan() (foundErrors bool) {
 
 func outputLogError(errInfo logscanError) (summary string) {
 	errors := make([]string, 0, 10)
-	testOutput := qlog.ParseLogs(errInfo.logFile)
-
-	lines := strings.Split(testOutput, "\n")
+	testOutputRaw := qlog.ParseLogsRaw(errInfo.logFile)
+	testOutput := ""
 
 	extraLines := 0
-	for _, line := range lines {
+	for _, rawLine := range testOutputRaw {
+		line := rawLine.ToString()
+		testOutput += line
+
 		if strings.Contains(line, "PANIC") ||
 			strings.Contains(line, "WARN") ||
 			strings.Contains(line, "ERROR") {
@@ -747,11 +749,22 @@ func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
 
 func (th *testHelper) assertTestLog(logs []TLA) {
 	logFile := th.tempDir + "/ramfs/qlog"
-	logOutput := qlog.ParseLogs(logFile)
+	logLines := qlog.ParseLogsRaw(logFile)
 
-	for _, tla := range logs {
-		exists := strings.Contains(logOutput, tla.text)
-		th.assert(exists == tla.mustContain, tla.failMsg)
+	containChecker := make([]bool, len(logs), len(logs))
+
+	for _, rawlog := range logLines {
+		logOutput := rawlog.ToString()
+		for idx, tla := range logs {
+			exists := strings.Contains(logOutput, tla.text)
+			if exists {
+				containChecker[idx] = true
+			}
+		}
+	}
+
+	for idx, tla := range logs {
+		th.assert(containChecker[idx] == tla.mustContain, tla.failMsg)
 	}
 }
 
