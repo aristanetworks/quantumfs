@@ -155,7 +155,16 @@ func setupWorkspace(t *testing.T) string {
 }
 
 func cleanupWorkspace(workspace string, t *testing.T) {
-	if err := os.RemoveAll(workspace); err != nil {
+	var err error
+
+	for i := 0; i < 10; i++ {
+		if err = os.RemoveAll(workspace); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err != nil {
 		t.Fatalf("Error cleaning up testing workspace: %s", err.Error())
 	}
 }
