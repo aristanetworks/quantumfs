@@ -5,6 +5,7 @@ package daemon
 
 import "fmt"
 import "sync"
+import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -192,7 +193,7 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 		filename: quantumfs.ApiPath,
 		fuseType: fuse.S_IFREG,
 	}
-	fillApiAttr(&api.attr)
+	fillApiAttrWithSize(&api.attr, uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
 	children = append(children, api)
 
 	return children
@@ -204,7 +205,8 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
-		fillApiAttr(&out.Attr)
+		fillApiAttrWithSize(&out.Attr,
+			uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
 		return fuse.OK
 	}
 

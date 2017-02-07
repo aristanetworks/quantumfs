@@ -7,6 +7,7 @@ package daemon
 
 import "errors"
 import "sync"
+import "sync/atomic"
 import "syscall"
 import "time"
 
@@ -246,7 +247,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		filename: quantumfs.ApiPath,
 		fuseType: fuse.S_IFREG,
 	}
-	fillApiAttr(&api.attr)
+	fillApiAttrWithSize(&api.attr, uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
 	children = append(children, api)
 
 	return children
@@ -258,7 +259,8 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
-		fillApiAttr(&out.Attr)
+		fillApiAttrWithSize(&out.Attr,
+			uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
 		return fuse.OK
 	}
 

@@ -201,15 +201,10 @@ func (api *Api) Branch(src string, dst string) error {
 	return nil
 }
 
-// Get the list of accessed file from workspaceroot
-func (api *Api) GetAccessed(wsr string) error {
-	err, _ := api.GetAccessedWithRtr(wsr)
-	return err
-}
-func (api *Api) GetAccessedWithRtr(wsr string) (error, map[string]bool) {
+func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr),
-			nil
+		return nil,
+			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -219,32 +214,30 @@ func (api *Api) GetAccessedWithRtr(wsr string) (error, map[string]bool) {
 
 	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message),
-			nil
+		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
 	var accesslistResponse AccessListResponse
 	err = json.Unmarshal(buf, &accesslistResponse)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
-	printAccessList(accesslistResponse.AccessList)
-	return nil, accesslistResponse.AccessList
+	return accesslistResponse.AccessList, nil
 }
 
 // clear the list of accessed files in workspaceroot
@@ -359,19 +352,4 @@ func isKeyValid(key string) bool {
 		return false
 	}
 	return true
-}
-
-func printAccessList(list map[string]bool) {
-	fmt.Println("------ Created Files ------")
-	for key, val := range list {
-		if val {
-			fmt.Println(key)
-		}
-	}
-	fmt.Println("------ Accessed Files ------")
-	for key, val := range list {
-		if !val {
-			fmt.Println(key)
-		}
-	}
 }

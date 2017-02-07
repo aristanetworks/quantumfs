@@ -98,10 +98,13 @@ func getAccessed() {
 	fmt.Printf("Getting the accessed list of Workspace:\"%s\"\n", workspaceName)
 	api := quantumfs.NewApi()
 
-	if err := api.GetAccessed(workspaceName); err != nil {
+	if response, err := api.GetAccessed(workspaceName); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
+	} else {
+		printAccessList(response)
 	}
+
 }
 
 // Implement the clearaccessed command
@@ -167,4 +170,26 @@ func sync() {
 
 	api.SyncAll()
 	fmt.Println("Synced.")
+}
+
+func printAccessList(list map[string]bool) {
+	fmt.Println("------ Created Files ------")
+	create := 0
+	for key, val := range list {
+		if val {
+			fmt.Println(key)
+			create += 1
+		}
+	}
+	fmt.Println("Total Created Files: ", create)
+
+	fmt.Println("------ Accessed Files ------")
+	access := 0
+	for key, val := range list {
+		if !val {
+			fmt.Println(key)
+			access += 1
+		}
+	}
+	fmt.Println("Total Accessed Files: ", access)
 }

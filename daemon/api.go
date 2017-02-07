@@ -34,14 +34,10 @@ type ApiInode struct {
 	InodeCommon
 }
 
-func fillApiAttr(attr *fuse.Attr) {
-	fillApiAttrWithSize(attr, 1024)
-}
-
 func fillApiAttrWithSize(attr *fuse.Attr, size uint64) {
 	attr.Ino = quantumfs.InodeIdApi
 	attr.Size = size
-	attr.Blocks = 1 + size/4096
+	attr.Blocks = BlocksRoundUp(attr.Size, 4096)
 
 	now := time.Now()
 	attr.Atime = uint64(now.Unix())
@@ -281,7 +277,7 @@ type ApiHandle struct {
 	FileHandleCommon
 	outstandingRequests int32
 	responses           chan fuse.ReadResult
-	// The is
+	// The is temporary memory for the remain after the first parial-read
 	partialRead []byte
 }
 

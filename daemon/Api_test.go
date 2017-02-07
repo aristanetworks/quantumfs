@@ -43,13 +43,49 @@ func TestWorkspaceBranching(t *testing.T) {
 	})
 }
 
-func testApiAccessList(test *testHelper, size int, filename string) {
-	accessList := make(map[string]bool)
-	workspace := test.newWorkspace()
+func testApiAccessList(test *testHelper, size int, filename string,
+	concurrent bool) {
 
+	workspace := test.newWorkspace()
+	accessList, expectedSize := generateFile(test, size, workspace, filename)
+
+	api := test.getApi()
+	relpath := test.relPath(workspace)
+
+	if concurrent {
+		workspace2 := test.newWorkspace()
+		size2 := 200
+		filename2 := "concurrent"
+		generateFile(test, size2, workspace2, filename2)
+
+		relpath2 := test.relPath(workspace2)
+		go func() {
+			path := workspace2 + "/concurrent0"
+			api2 := test.getNewApi(path)
+			test.assert(api != api2,
+				"Error getting the same file descriptor")
+			defer api2.Close()
+			api2.GetAccessed(relpath2)
+		}()
+	}
+
+	responselist, err := api.GetAccessed(relpath)
+	test.assert(err == nil, "Error getting accessList with api %v", err)
+
+	test.assert(mapSize(responselist) == expectedSize,
+		"Error getting unequal sizes %d != %d",
+		mapSize(responselist), expectedSize)
+
+	test.assertAccessList(accessList, responselist, "Error two maps different")
+}
+
+func generateFile(test *testHelper, size int, workspace,
+	filename string) (map[string]bool, int) {
+
+	accessList := make(map[string]bool)
 	expectedSize := 0
 	for i := 0; i < size; i++ {
-		filename := fmt.Sprintf("%s%d", filename, i)
+		filename := fmt.Sprintf("/%s%d", filename, i)
 		expectedSize += len(filename)
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 666)
@@ -63,21 +99,10 @@ func testApiAccessList(test *testHelper, size int, filename string) {
 		"accesslist with size of %d", len(accessList))
 
 	wsrlist := test.getAccessList(workspace)
-	test.assertAccessList(accessList, wsrlist,
-		"Error two maps different")
+	test.assertAccessList(accessList, wsrlist, "Error two maps different")
 
-	api := test.getApi()
-	relpath := test.relPath(workspace)
-	err, responselist := api.GetAccessedWithRtr(relpath)
-	test.assert(err == nil, "Error getting accessList with api %v", err)
-
-	test.assert(mapSize(responselist) == expectedSize,
-		"Error getting unequal sizes %d != %d",
-		mapSize(responselist), expectedSize)
-
-	test.assertAccessList(accessList, responselist, "Error two maps different")
+	return accessList, expectedSize
 }
-
 func mapSize(list map[string]bool) int {
 	size := 0
 	for key, _ := range list {
@@ -89,23 +114,20 @@ func mapSize(list map[string]bool) int {
 
 func TestApiAccessListEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 0, "")
+		testApiAccessList(test, 0, "", false)
 	})
 }
 
 func TestApiAccessListLargeSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 100, "/testfiletestfiletestfiletestfile"+
-			"testfiletestfiletestfiletestfiletestfiletestfile")
+		testApiAccessList(test, 100, "testfiletestfiletestfiletestfile"+
+			"testfiletestfiletestfiletestfiletestfiletestfile", false)
 	})
 }
 
-// Every test function is running in parallel, so This test function will run
-// concurrently with TestApiAccessListLargeSize
-func TestApiAccessListConcurrency(t *testing.T) {
+func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 500, "/sample")
-
+		testApiAccessList(test, 500, "sample", true)
 	})
 }
 

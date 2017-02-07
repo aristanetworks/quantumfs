@@ -456,6 +456,11 @@ func (th *testHelper) getApi() *quantumfs.Api {
 	return th.api
 }
 
+func (th *testHelper) getNewApi(fdPath string) *quantumfs.Api {
+	api := quantumfs.NewApiWithPath(fdPath)
+	return api
+}
+
 // Make the given path absolute to the mount root
 func (th *testHelper) absPath(path string) string {
 	return th.tempDir + "/mnt/" + path
