@@ -44,13 +44,15 @@ func fillDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataSto
 	keys map[int]quantumfs.ObjectKey) {
 
 	for i := 1; i < 2*cacheSize; i++ {
-		bytes := make([]byte, quantumfs.ObjectKeyLength)
+		bytes := make([]byte, quantumfs.MaxBlockSize)
 		bytes[1] = byte(i % 256)
 		bytes[2] = byte(i / 256)
-		key := quantumfs.NewObjectKeyFromBytes(bytes)
+		key := quantumfs.NewObjectKeyFromBytes(
+			bytes[:quantumfs.ObjectKeyLength])
 		keys[i] = key
 		buf := &buffer{
 			data:      bytes,
+			size:      quantumfs.ObjectKeyLength,
 			dirty:     false,
 			keyType:   quantumfs.KeyTypeData,
 			key:       key,
