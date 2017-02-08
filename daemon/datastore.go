@@ -49,7 +49,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return bufResult
 	}
 
-	var buf buffer
+	buf := newEmptyBuffer()
 	initBuffer(&buf, store, key)
 
 	err := quantumfs.ConstantStore.Get(c, key, &buf)
@@ -89,11 +89,28 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	return store.durableStore.Set(c, key, buffer)
 }
 
-// buffer is the central data-handling type of quantumfsd
-// newBuffer takes ownership of the []byte passed in
+func newEmptyBuffer() buffer {
+	return buffer{
+		data:	make([]byte, quantumfs.MaxBlockSize),
+		size:	0,
+	}
+}
+
+// buffer is the central data-handling type of quantumfsd. Copying once here into
+// a buffer the max size we'll ever need is better than using append a bunch
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
+	inSize := len(in)
+
+	// ensure our buffer is of max size
+	if inSize < quantumfs.MaxBlockSize {
+		newData := make([]byte, quantumfs.MaxBlockSize)
+		copy(newData, in)
+		in = newData
+	}
+
 	return &buffer{
 		data:      in,
+		size:      inSize,
 		dirty:     true,
 		keyType:   keyType,
 		dataStore: c.dataStore,
@@ -102,10 +119,11 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 
 // Like newBuffer(), but 'in' is copied and ownership is not assumed
 func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	data := make([]byte, len(in))
-	copy(data, in)
+	newData := make([]byte, quantumfs.MaxBlockSize)
+	copy(newData, in)
 	return &buffer{
-		data:      data,
+		data:      newData,
+		size:      len(in),
 		dirty:     true,
 		keyType:   keyType,
 		dataStore: c.dataStore,
@@ -120,7 +138,11 @@ func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
 }
 
 type buffer struct {
+	// changing slice size is expensive. Allocate less, remember the real size
+	// and allocate a fixed amount only once
 	data       []byte
+	size       int
+
 	dirty      bool
 	keyType    quantumfs.KeyType
 	key        quantumfs.ObjectKey
@@ -139,50 +161,48 @@ func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
 		in = in[:maxWriteLen]
 	}
 
-	// Ensure that our data ends where we need it to. This allows us to write
-	// past the end of a block, but not past the block's max capacity
-	deltaLen := int(offset) - len(buf.data)
-	if deltaLen > 0 {
-		buf.data = append(buf.data, make([]byte, deltaLen)...)
+	// Ensure that our data ends where we need it to. Clear with zeros.
+	for i := buf.size; i < int(offset); i++ {
+		buf.data[i] = 0;
 	}
 
-	var finalBuffer []byte
-	// append our write data to the first split of the existing data
-	finalBuffer = append(buf.data[:offset], in...)
+	// copy the data right in there. This is great 'cause it preserves data
+	// that already lies past where we're writing
+	copied := uint32(copy(buf.data[offset:], in))
 
-	// record how much was actually appended (in case len(in) < size)
-	copied := uint32(len(finalBuffer)) - uint32(offset)
-
-	// then add on the rest of the existing data afterwards, excluding the amount
-	// that we just wrote (to overwrite instead of insert)
-	remainingStart := offset + copied
-	if int(remainingStart) < len(buf.data) {
-		finalBuffer = append(finalBuffer, buf.data[remainingStart:]...)
+	// update size, compensating for overwrites
+	copyPastEndIdx := offset + copied
+	if copyPastEndIdx > uint32(buf.size) {
+		buf.size = int(copyPastEndIdx)
 	}
 
 	c.Vlog(qlog.LogDaemon, "Marking buffer dirty")
 	buf.dirty = true
-	buf.data = finalBuffer
 
-	return copied
+	return uint32(copied)
 }
 
 func (buf *buffer) Read(out []byte, offset uint32) int {
-	return copy(out, buf.data[offset:])
+	return copy(out, buf.data[offset:buf.size])
 }
 
 func (buf *buffer) Get() []byte {
-	return buf.data
+	return buf.get_()
+}
+
+func (buf *buffer) get_() []byte {
+	return buf.data[:buf.size]
 }
 
 func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
-	buf.data = data
+	copy(buf.data, data)
+	buf.size = len(data)
 	buf.keyType = keyType
 	buf.dirty = true
 }
 
 func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
-	return sha1.Sum(buf.data)
+	return sha1.Sum(buf.get_())
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
@@ -203,60 +223,60 @@ func (buf *buffer) SetSize(size int) {
 		panic("New block size greater than maximum")
 	}
 
-	if len(buf.data) > size {
-		buf.data = buf.data[:size]
+	if buf.size > size {
+		buf.size = size
 		return
 	}
 
-	for len(buf.data) < size {
-		extraBytes := make([]byte, size-len(buf.data))
-		buf.data = append(buf.data, extraBytes...)
+	for i := buf.size; i < size; i++ {
+		buf.data[i] = 0;
 	}
+	buf.size = size
 
 	buf.dirty = true
 }
 
 func (buf *buffer) Size() int {
-	return len(buf.data)
+	return buf.size
 }
 
 func (buf *buffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
-	segment := capn.NewBuffer(buf.data)
+	segment := capn.NewBuffer(buf.get_())
 	return quantumfs.OverlayDirectoryEntry(
 		encoding.ReadRootDirectoryEntry(segment))
 
 }
 
 func (buf *buffer) AsWorkspaceRoot() quantumfs.WorkspaceRoot {
-	segment := capn.NewBuffer(buf.data)
+	segment := capn.NewBuffer(buf.get_())
 	return quantumfs.OverlayWorkspaceRoot(
 		encoding.ReadRootWorkspaceRoot(segment))
 
 }
 
 func (buf *buffer) AsMultiBlockFile() quantumfs.MultiBlockFile {
-	segment := capn.NewBuffer(buf.data)
+	segment := capn.NewBuffer(buf.get_())
 	return quantumfs.OverlayMultiBlockFile(
 		encoding.ReadRootMultiBlockFile(segment))
 
 }
 
 func (buf *buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
-	segment := capn.NewBuffer(buf.data)
+	segment := capn.NewBuffer(buf.get_())
 	return quantumfs.OverlayVeryLargeFile(
 		encoding.ReadRootVeryLargeFile(segment))
 
 }
 
 func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
-	segment := capn.NewBuffer(buf.data)
+	segment := capn.NewBuffer(buf.get_())
 	return quantumfs.OverlayExtendedAttributes(
 		encoding.ReadRootExtendedAttributes(segment))
 
 }
 
 func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
-	segment := capn.NewBuffer(buf.data)
+	segment := capn.NewBuffer(buf.get_())
 	return quantumfs.OverlayHardlinkEntry(
 		encoding.ReadRootHardlinkEntry(segment))
 
