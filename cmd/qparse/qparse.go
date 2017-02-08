@@ -413,7 +413,8 @@ func fillTimeline(out map[int64]bucket, seqId uint64,
 	return minTime
 }
 
-func filterLogOut(inFile string, patternFile string, showStatus bool, tabSpaces int) {
+func filterLogOut(inFile string, patternFile string, showStatus bool,
+	tabSpaces int) {
 
 	pattern := make([]qlog.LogOutput, 0)
 	wildcards := make([]bool, 0)
