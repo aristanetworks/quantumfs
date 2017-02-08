@@ -31,6 +31,12 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
+	return store.GetExt(c, key, quantumfs.InitBlockSize)
+}
+
+func (store *dataStore) GetExt(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey, sizeHint int) quantumfs.Buffer {
+
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
 	}
@@ -49,7 +55,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return bufResult
 	}
 
-	buf := newEmptyBuffer()
+	buf := newEmptyBuffer(sizeHint)
 	initBuffer(&buf, store, key)
 
 	err := quantumfs.ConstantStore.Get(c, key, &buf)
@@ -89,9 +95,9 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 	return store.durableStore.Set(c, key, buffer)
 }
 
-func newEmptyBuffer() buffer {
+func newEmptyBuffer(sizeHint int) buffer {
 	return buffer{
-		data: make([]byte, quantumfs.InitBlockSize),
+		data: make([]byte, sizeHint),
 		size: 0,
 	}
 }
