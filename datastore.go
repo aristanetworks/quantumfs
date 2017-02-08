@@ -14,6 +14,7 @@ import capn "github.com/glycerine/go-capnproto"
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
+
 // This number empirically derived by looking at file sizes
 const InitBlockSize = 8192
 
