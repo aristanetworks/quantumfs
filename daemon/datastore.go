@@ -91,8 +91,8 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 
 func newEmptyBuffer() buffer {
 	return buffer{
-		data:	make([]byte, quantumfs.MaxBlockSize),
-		size:	0,
+		data: make([]byte, quantumfs.MaxBlockSize),
+		size: 0,
 	}
 }
 
@@ -140,8 +140,8 @@ func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
 type buffer struct {
 	// changing slice size is expensive. Allocate less, remember the real size
 	// and allocate a fixed amount only once
-	data       []byte
-	size       int
+	data []byte
+	size int
 
 	dirty      bool
 	keyType    quantumfs.KeyType
@@ -163,7 +163,7 @@ func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
 
 	// Ensure that our data ends where we need it to. Clear with zeros.
 	for i := buf.size; i < int(offset); i++ {
-		buf.data[i] = 0;
+		buf.data[i] = 0
 	}
 
 	// copy the data right in there. This is great 'cause it preserves data
@@ -229,7 +229,7 @@ func (buf *buffer) SetSize(size int) {
 	}
 
 	for i := buf.size; i < size; i++ {
-		buf.data[i] = 0;
+		buf.data[i] = 0
 	}
 	buf.size = size
 
