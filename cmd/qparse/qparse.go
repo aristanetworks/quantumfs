@@ -431,8 +431,8 @@ func filterLogOut(inFile string, patternFile string, showStatus bool, tabSpaces 
 			continue
 		}
 
-		pattern = append(pattern, qlog.LogOutput {
-			Format:	patternStrings[i] + "\n",
+		pattern = append(pattern, qlog.LogOutput{
+			Format: patternStrings[i] + "\n",
 		})
 
 		if patternStrings[i] == wildcardStr {
@@ -467,7 +467,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool, tabSpaces 
 
 	// now we just need to output the contents of the tracker maps we match
 	trackerIdx := 0
-	fmt.Println("Filtering for relevant subsequences...");
+	fmt.Println("Filtering for relevant subsequences...")
 	status := qlog.NewLogStatus(50)
 	sequences := make([]*qlog.SequenceTracker, 0)
 	for reqId, trackers := range trackerMap {
@@ -499,12 +499,12 @@ func filterLogOut(inFile string, patternFile string, showStatus bool, tabSpaces 
 	}
 
 	if len(sequences) == 0 {
-		fmt.Println("No log pattern match for", patternFile);
-		os.Exit(0);
+		fmt.Println("No log pattern match for", patternFile)
+		os.Exit(0)
 	}
 
 	for _, i := range sequences {
-		qlog.FormatLogs(i.Seq(), tabSpaces, false, fmt.Printf);
+		qlog.FormatLogs(i.Seq(), tabSpaces, false, fmt.Printf)
 	}
 }
 
