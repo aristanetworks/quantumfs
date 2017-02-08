@@ -91,7 +91,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 
 func newEmptyBuffer() buffer {
 	return buffer{
-		data: make([]byte, quantumfs.MaxBlockSize),
+		data: make([]byte, quantumfs.InitBlockSize),
 		size: 0,
 	}
 }
@@ -101,9 +101,9 @@ func newEmptyBuffer() buffer {
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	inSize := len(in)
 
-	// ensure our buffer is of max size
-	if inSize < quantumfs.MaxBlockSize {
-		newData := make([]byte, quantumfs.MaxBlockSize)
+	// ensure our buffer meets min size
+	if inSize < quantumfs.InitBlockSize {
+		newData := make([]byte, quantumfs.InitBlockSize)
 		copy(newData, in)
 		in = newData
 	}
@@ -119,11 +119,20 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 
 // Like newBuffer(), but 'in' is copied and ownership is not assumed
 func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	newData := make([]byte, quantumfs.MaxBlockSize)
+	inSize := len(in)
+
+	var newData []byte
+	// ensure our buffer meets min size
+	if inSize < quantumfs.InitBlockSize {
+		newData = make([]byte, quantumfs.InitBlockSize)
+	} else {
+		newData = make([]byte, inSize)
+	}
 	copy(newData, in)
+
 	return &buffer{
 		data:      newData,
-		size:      len(in),
+		size:      inSize,
 		dirty:     true,
 		keyType:   keyType,
 		dataStore: c.dataStore,
@@ -150,6 +159,16 @@ type buffer struct {
 	lruElement *list.Element
 }
 
+func calcNewCap(oldSize int, proposedLen int) int {
+	newCap := oldSize
+	for {
+		newCap *= 2
+		if newCap >= proposedLen {
+			return newCap
+		}
+	}
+}
+
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
 	// Sanity check offset and length
 	maxWriteLen := quantumfs.MaxBlockSize - int(offset)
@@ -161,13 +180,26 @@ func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
 		in = in[:maxWriteLen]
 	}
 
-	// Ensure that our data ends where we need it to. Clear with zeros.
-	for i := buf.size; i < int(offset); i++ {
-		buf.data[i] = 0
+	// we want to minimize append / make. Since append has to make and copy,
+	// we can't get any better than a single make and two copies
+	pastEndIdx := offset + uint32(len(in))
+	if pastEndIdx > uint32(len(buf.data)) {
+		// We can take advantage of the fact that new memory is zero'd,
+		// but can't avoid two copies and a make
+
+		newCap := calcNewCap(len(buf.data), int(pastEndIdx))
+		newData := make([]byte, newCap)
+		copy(newData, buf.data)
+		buf.data = newData
+	} else {
+		// This is the easy case. No buffer enlargement
+
+		// Ensure that our data ends where we need it to. Clear with zeros.
+		for i := buf.size; i < int(offset); i++ {
+			buf.data[i] = 0
+		}
 	}
 
-	// copy the data right in there. This is great 'cause it preserves data
-	// that already lies past where we're writing
 	copied := uint32(copy(buf.data[offset:], in))
 
 	// update size, compensating for overwrites
@@ -187,22 +219,31 @@ func (buf *buffer) Read(out []byte, offset uint32) int {
 }
 
 func (buf *buffer) Get() []byte {
-	return buf.get_()
+	return buf.get()
 }
 
-func (buf *buffer) get_() []byte {
+func (buf *buffer) get() []byte {
 	return buf.data[:buf.size]
 }
 
 func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
-	copy(buf.data, data)
-	buf.size = len(data)
+	inSize := len(data)
+
+	// ensure our buffer meets min size
+	if inSize < quantumfs.InitBlockSize {
+		newData := make([]byte, quantumfs.InitBlockSize)
+		copy(newData, data)
+		data = newData
+	}
+
+	buf.data = data
+	buf.size = inSize
 	buf.keyType = keyType
 	buf.dirty = true
 }
 
 func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
-	return sha1.Sum(buf.get_())
+	return sha1.Sum(buf.get())
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
@@ -228,6 +269,14 @@ func (buf *buffer) SetSize(size int) {
 		return
 	}
 
+	if size > len(buf.data) {
+		// we have to increase our capacity first
+		newCap := calcNewCap(len(buf.data), size)
+		newData := make([]byte, newCap)
+		copy(newData, buf.data)
+		buf.data = newData
+	}
+
 	for i := buf.size; i < size; i++ {
 		buf.data[i] = 0
 	}
@@ -241,42 +290,42 @@ func (buf *buffer) Size() int {
 }
 
 func (buf *buffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
-	segment := capn.NewBuffer(buf.get_())
+	segment := capn.NewBuffer(buf.get())
 	return quantumfs.OverlayDirectoryEntry(
 		encoding.ReadRootDirectoryEntry(segment))
 
 }
 
 func (buf *buffer) AsWorkspaceRoot() quantumfs.WorkspaceRoot {
-	segment := capn.NewBuffer(buf.get_())
+	segment := capn.NewBuffer(buf.get())
 	return quantumfs.OverlayWorkspaceRoot(
 		encoding.ReadRootWorkspaceRoot(segment))
 
 }
 
 func (buf *buffer) AsMultiBlockFile() quantumfs.MultiBlockFile {
-	segment := capn.NewBuffer(buf.get_())
+	segment := capn.NewBuffer(buf.get())
 	return quantumfs.OverlayMultiBlockFile(
 		encoding.ReadRootMultiBlockFile(segment))
 
 }
 
 func (buf *buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
-	segment := capn.NewBuffer(buf.get_())
+	segment := capn.NewBuffer(buf.get())
 	return quantumfs.OverlayVeryLargeFile(
 		encoding.ReadRootVeryLargeFile(segment))
 
 }
 
 func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
-	segment := capn.NewBuffer(buf.get_())
+	segment := capn.NewBuffer(buf.get())
 	return quantumfs.OverlayExtendedAttributes(
 		encoding.ReadRootExtendedAttributes(segment))
 
 }
 
 func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
-	segment := capn.NewBuffer(buf.get_())
+	segment := capn.NewBuffer(buf.get())
 	return quantumfs.OverlayHardlinkEntry(
 		encoding.ReadRootHardlinkEntry(segment))
 
