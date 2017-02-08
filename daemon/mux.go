@@ -326,6 +326,9 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 		}
 	} else {
 		dirtyNode = dirtyElement.Value.(*dirtyInode)
+		c.vlog("Inode was already in the dirty queue %s",
+			dirtyNode.expiryTime.String())
+		dirtyNode.expiryTime = time.Now()
 	}
 
 	if shouldUninstantiate {
