@@ -158,7 +158,7 @@ func (buf *buffer) padWithZeros(newLength int) {
 // instead of what append does, which is increase by 25% after 1KB
 func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 	dataLen := len(arrA)
-	newLen := len(arrA)+len(arrB)
+	newLen := len(arrA) + len(arrB)
 	oldCap := cap(arrA)
 	newCap := oldCap
 	for ; newLen > newCap; newCap += newCap {
@@ -177,7 +177,7 @@ func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 		// taking a subslice should result in just capacity increasing
 		rtn := append(arrA, zeros[:toAppendLen]...)
 		copy(rtn[dataLen:], arrB)
-		
+
 		// Take the subslice here so length is correct and cap is larger
 		return rtn[:newLen]
 	}
