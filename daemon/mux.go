@@ -1378,7 +1378,6 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
-	qfs.c.elog("Unhandled request Init")
 }
 
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
