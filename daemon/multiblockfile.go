@@ -69,8 +69,7 @@ func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buff
 		// Because multiblock files can be so large and consume many blocks,
 		// we anticipate filling blocks fully and don't want to have to grow
 		// individual blocks ever. This gives huge performance gains.
-		return c.dataStore.GetSized(&c.Ctx, fi.metadata.Blocks[blockIdx],
-			quantumfs.MaxBlockSize)
+		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
 	}
 
 	return block
