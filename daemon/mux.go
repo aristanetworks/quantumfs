@@ -367,7 +367,7 @@ func (qfs *QuantumFs) adjustKernelKnobs() {
 }
 
 func adjustBdi(c *ctx, mountId int) {
-	c.funcIn("adjustBdi").out()
+	defer c.funcIn("adjustBdi").out()
 
 	// /sys/class/bdi/<mount>/read_ahead_kb indicates how much data, up to the
 	// end of the file, should be speculatively read by the kernel. Setting this
@@ -381,7 +381,7 @@ func adjustBdi(c *ctx, mountId int) {
 	value := fmt.Sprintf("%d", quantumfs.MaxBlockSize/1024)
 	err := ioutil.WriteFile(filename, []byte(value), 000)
 	if err != nil {
-		c.wlog("Unable to set read_ahead_kb: %v", err)
+		c.wlog("Unable to set read_ahead_kb: %s", err.Error())
 	}
 
 	// /sys/class/bdi/<mount>/max_ratio indicates the percentage of the
@@ -394,7 +394,7 @@ func adjustBdi(c *ctx, mountId int) {
 	filename = fmt.Sprintf("/sys/class/bdi/0:%d/max_ratio", mountId)
 	err = ioutil.WriteFile(filename, []byte("100"), 000)
 	if err != nil {
-		c.wlog("Unable to set bdi max_ratio: %v", err)
+		c.wlog("Unable to set bdi max_ratio: %s", err.Error())
 	}
 }
 
