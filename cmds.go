@@ -150,16 +150,20 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	size := 4096
 	result := make([]byte, 0)
 	buf = make([]byte, 4096)
-
-	for size == 4096 {
+	for size >= 4096 {
+		// In partial read, the quantumfs returns new data in each iteration,
+		// so the file descriptor has to be reset to the 0 offset
 		api.fd.Seek(0, 0)
 		size, err = api.fd.Read(buf)
-		if err != nil {
+
+		/*if size == 4096 {
+			return nil, fmt.Errorf("CMD size %d  %d capacity %d", size, len(buf), cap(buf))
+		}*/
+		if err != nil && size != 0 {
 			return nil, err
 		}
 		result = append(result, buf[:size]...)
 	}
-
 	return result, nil
 }
 
@@ -237,6 +241,7 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 		return nil, err
 	}
 
+	printAccessList(accesslistResponse.AccessList)
 	return accesslistResponse.AccessList, nil
 }
 
@@ -352,4 +357,26 @@ func isKeyValid(key string) bool {
 		return false
 	}
 	return true
+}
+
+func printAccessList(list map[string]bool) {
+	fmt.Println("------ Created Files ------")
+	create := 0
+	for key, val := range list {
+		if val {
+			fmt.Println(key)
+			create += 1
+		}
+	}
+	fmt.Println("Total Created Files: ", create)
+
+	fmt.Println("------ Accessed Files ------")
+	access := 0
+	for key, val := range list {
+		if !val {
+			fmt.Println(key)
+			access += 1
+		}
+	}
+	fmt.Println("Total Accessed Files: ", access)
 }

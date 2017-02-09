@@ -120,7 +120,7 @@ func TestApiAccessListEmpty(t *testing.T) {
 
 func TestApiAccessListLargeSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 100, "testfiletestfiletestfiletestfile"+
+		testApiAccessList(test, 200, "testfiletestfiletestfiletestfile"+
 			"testfiletestfiletestfiletestfiletestfiletestfile", false)
 	})
 }
