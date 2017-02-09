@@ -14,7 +14,7 @@ import capn "github.com/glycerine/go-capnproto"
 var zeros []byte
 
 func init() {
-	zeros = make([]byte, quantumfs.MaxBlockSize*4)
+	zeros = make([]byte, quantumfs.MaxBlockSize)
 }
 
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
@@ -169,6 +169,9 @@ func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 		// We need to more than double the capacity in order to trick
 		// append into using our capacity instead of just adding 25%
 		newCap += newCap
+		if newCap > quantumfs.MaxBlockSize {
+			newCap = quantumfs.MaxBlockSize
+		}
 
 		// We need to fill arrA and then double it to add capacity
 		toAppendLen := newCap - dataLen
