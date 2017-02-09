@@ -34,10 +34,10 @@ type ApiInode struct {
 	InodeCommon
 }
 
-func fillApiAttr(attr *fuse.Attr, size uint64) {
+func fillApiAttr(c *ctx, attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
-	attr.Size = size
-	attr.Blocks = BlocksRoundUp(attr.Size, 4096)
+	attr.Size = uint64(atomic.LoadInt64(&c.qfs.apiFileSize))
+	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 
 	now := time.Now()
 	attr.Atime = uint64(now.Unix())
@@ -76,7 +76,7 @@ func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
-	fillApiAttr(&out.Attr, uint64(atomic.LoadInt64(&c.qfs.apiFileSize)))
+	fillApiAttr(c, &out.Attr)
 	return fuse.OK
 }
 
@@ -112,7 +112,7 @@ func (api *ApiInode) Rmdir(c *ctx, name string) fuse.Status {
 func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	out.OpenFlags = 0
+	out.OpenFlags = flags
 	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = uint64(handle.FileHandleCommon.id)
@@ -266,6 +266,7 @@ func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 			treeLock_: treeLock,
 		},
 		responses: make(chan fuse.ReadResult, 10),
+		initRead:  true,
 	}
 	assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
 	return &api
@@ -277,8 +278,10 @@ type ApiHandle struct {
 	FileHandleCommon
 	outstandingRequests int32
 	responses           chan fuse.ReadResult
-	// The is temporary memory for the remain after the first parial-read
+	// This is a temporary memory for the remain after the first parial-read
 	partialRead []byte
+	// Used to indicate whether the memory has been read
+	initRead bool
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -292,36 +295,45 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-
+	c.vlog("API Buffer size: %d %d %d %d %d", offset, size, len(buf), cap(buf), len(api.partialRead))
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
+		if offset != 0 && api.initRead {
+			c.vlog("Api response: %d",
+				len(api.partialRead[offset:]))
+			return fuse.ReadResultData(api.partialRead[offset : offset+uint64(size)]), fuse.OK
+		}
+
 		if nonblocking {
 			return nil, fuse.Status(syscall.EAGAIN)
 		}
 
 		c.vlog("No outstanding requests, returning early")
 		return nil, fuse.OK
-	}
 
-	atomic.AddInt32(&api.outstandingRequests, -1)
+	}
 	var bytes []byte
-	if len(api.partialRead) == 0 {
+	if api.initRead {
 		response := <-api.responses
 		debug := make([]byte, response.Size())
 		bytes, _ = response.Bytes(debug)
-
+		api.partialRead = bytes
 	} else {
-		bytes = api.partialRead
+		bytes = api.partialRead[offset : offset+uint64(size)]
 	}
 
-	c.vlog("API Response %s", string(bytes))
 	chunk := len(bytes)
-	if chunk > 4096 {
-		chunk = 4096
-		api.partialRead = bytes[chunk:]
+	bufSize := len(buf)
+	if chunk > bufSize {
+		api.initRead = false
+		chunk = bufSize
+	} else {
+		api.initRead = true
+		atomic.AddInt32(&api.outstandingRequests, -1)
 	}
 	c.qfs.decreaseApiFileSize(c, chunk)
 
-	return fuse.ReadResultData(bytes[:chunk]), fuse.OK
+	c.vlog("API response size: %d", chunk)
+	return fuse.ReadResultData(bytes), fuse.OK
 }
 
 func makeErrorResponse(code uint32, message string) []byte {
@@ -417,7 +429,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	c.vlog("done writing to file")
 	c.qfs.increaseApiFileSize(c, responseSize)
 	// Long response needs multiple reads to complete the data communication
-	atomic.AddInt32(&api.outstandingRequests, int32(1+responseSize/4096))
+	atomic.AddInt32(&api.outstandingRequests, 1)
 	return size, fuse.OK
 }
 

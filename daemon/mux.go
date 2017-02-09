@@ -1079,6 +1079,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	}
 
 	defer fileHandle.RLockTree().RUnlock()
+	c.vlog("Mux::Read buffer size: %d  %d", input.Size, len(buf))
 	return fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
