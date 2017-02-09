@@ -31,10 +31,10 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
-	return store.GetExt(c, key, quantumfs.InitBlockSize)
+	return store.GetSized(c, key, quantumfs.InitBlockSize)
 }
 
-func (store *dataStore) GetExt(c *quantumfs.Ctx,
+func (store *dataStore) GetSized(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, sizeHint int) quantumfs.Buffer {
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
