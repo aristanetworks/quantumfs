@@ -101,13 +101,9 @@ func newEmptyBuffer() buffer {
 	}
 }
 
+// Does not obey the initBlockSize capacity, so only for use with buffers that
+// are very unlikely to be written to
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	// ensure our buffer meets min capacity
-	if cap(in) < quantumfs.InitBlockSize {
-		newData := make([]byte, len(in), quantumfs.InitBlockSize)
-		copy(newData, in)
-		in = newData
-	}
 
 	return &buffer{
 		data:      in,
@@ -154,13 +150,18 @@ type buffer struct {
 	lruElement *list.Element
 }
 
+func (buf *buffer) padWithZeros(newLength int) {
+	buf.data = appendAndExtendCap(buf.data, zeros[:(newLength-len(buf.data))])
+}
+
 // this gives us append functionality, while doubling capacity on reallocation
 // instead of what append does, which is increase by 25% after 1KB
-func appendDbl(arrA []byte, arrB []byte) []byte {
+func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 	dataLen := len(arrA)
+	newLen := len(arrA)+len(arrB)
 	oldCap := cap(arrA)
 	newCap := oldCap
-	for ; len(arrA)+len(arrB) > newCap; newCap += newCap {
+	for ; newLen > newCap; newCap += newCap {
 		// double the capacity until everything fits
 	}
 
@@ -169,14 +170,16 @@ func appendDbl(arrA []byte, arrB []byte) []byte {
 		// append into using our capacity instead of just adding 25%
 		newCap += newCap
 
-		// we need to fill arrA and then double it to add capacity
+		// We need to fill arrA and then double it to add capacity
 		toAppendLen := newCap - dataLen
 
-		// use the zeros array instead of making our data. Using append and
+		// Use the zeros array instead of making our data. Using append and
 		// taking a subslice should result in just capacity increasing
-		rtn := append(arrA, zeros[:toAppendLen]...)[:dataLen]
-
-		return append(rtn, arrB...)
+		rtn := append(arrA, zeros[:toAppendLen]...)
+		copy(rtn[dataLen:], arrB)
+		
+		// Take the subslice here so length is correct and cap is larger
+		return rtn[:newLen]
 	}
 
 	return append(arrA, arrB...)
@@ -195,15 +198,15 @@ func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset_ uint32) uint32 {
 	}
 
 	if offset > len(buf.data) {
-		// expand a hole of zeros
-		buf.data = appendDbl(buf.data, zeros[:(offset-len(buf.data))])
+		// Expand a hole of zeros
+		buf.padWithZeros(offset)
 	}
 
-	// at this point there is data leading up to the offset (and maybe past)
+	// At this point there is data leading up to the offset (and maybe past)
 	var copied int
 	if offset+len(in) > len(buf.data) {
-		// we know we have to increase the buffer size... so append!
-		buf.data = appendDbl(buf.data[:offset], in)
+		// We know we have to increase the buffer size... so append!
+		buf.data = appendAndExtendCap(buf.data[:offset], in)
 		copied = len(in)
 	} else {
 		// This is the easy case. No buffer enlargement
@@ -266,7 +269,7 @@ func (buf *buffer) SetSize(size int) {
 
 	if size > len(buf.data) {
 		// we have to increase our capacity first
-		buf.data = appendDbl(buf.data, zeros[:(size-len(buf.data))])
+		buf.padWithZeros(size)
 	}
 
 	buf.dirty = true

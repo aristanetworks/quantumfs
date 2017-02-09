@@ -66,9 +66,6 @@ func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buff
 	defer c.vlog("MultiBlockFile::retrieveDataBlock Exit")
 	block, exists := fi.toSync[blockIdx]
 	if !exists {
-		// Because multiblock files can be so large and consume many blocks,
-		// we anticipate filling blocks fully and don't want to have to grow
-		// individual blocks ever. This gives huge performance gains.
 		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
 	}
 
