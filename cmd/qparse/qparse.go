@@ -8,7 +8,6 @@ import "flag"
 import "fmt"
 import "io/ioutil"
 import "os"
-import "runtime"
 import "sort"
 import "strconv"
 import "strings"
@@ -443,28 +442,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 		}
 	}
 
-	// Structures during this process can be massive. Throw them away asap
-
-	var logs []qlog.LogOutput
-	{
-		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
-		logs = qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
-			maxThreads, true)
-
-		dataArray = nil
-		strMap = nil
-	}
-	fmt.Println("Garbage Collecting...")
-	runtime.GC()
-
-	var trackerMap map[uint64][]qlog.SequenceTracker
-	var trackerCount int
-	{
-		trackerCount, trackerMap = qlog.ExtractTrackerMap(logs, maxThreads)
-		logs = nil
-	}
-	fmt.Println("Garbage Collecting...")
-	runtime.GC()
+	trackerCount, trackerMap := qlog.GetTrackerMap(inFile, maxThreads)
 
 	// now we just need to output the contents of the tracker maps we match
 	trackerIdx := 0
