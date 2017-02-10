@@ -467,7 +467,7 @@ func PacketStats(filepath string, statusBar bool, fn writeFn) {
 
 	var status LogStatus
 	readCount := uint64(0)
-	
+
 	if statusBar {
 		status = NewLogStatus(50)
 		fmt.Println("Grabbing sizes from log file...")
@@ -497,7 +497,7 @@ func PacketStats(filepath string, statusBar bool, fn writeFn) {
 			status.Process(float32(readCountClip) / float32(len(data)))
 		}
 
-		histogram[packetLen] = histogram[packetLen]+1
+		histogram[packetLen] = histogram[packetLen] + 1
 		if packetLen > maxPacketLen {
 			maxPacketLen = packetLen
 		}
