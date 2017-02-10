@@ -390,6 +390,12 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
 	} else {
+		// clean up any remaining response queue size from the apiFileSize
+		fileHandle = qfs.fileHandles[id]
+		if api, exists := fileHandle.(*ApiHandle); exists {
+			qfs.decreaseApiFileSize(c,
+				len(api.partialRead))
+		}
 		delete(qfs.fileHandles, id)
 	}
 }
