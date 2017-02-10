@@ -485,6 +485,9 @@ func initOrphanedFileExtendedAttributes(test *testHelper) (fd int) {
 		test.assert(err == nil, "Error setting initial attributes: %v", err)
 	}
 
+	err = syscall.Unlink(filename)
+	test.assert(err == nil, "Error unlinking file: %v", err)
+
 	return fd
 }
 
