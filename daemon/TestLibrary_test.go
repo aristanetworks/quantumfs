@@ -216,7 +216,8 @@ func (th *testHelper) endTest() {
 					"instance after aborting: %s", err.Error())
 			}
 			th.log("ERROR: Failed to unmount quantumfs instance, "+
-				"are you leaking a file descriptor?: %s", err.Error())
+				"are you leaking a file descriptor?: %s",
+				err.Error())
 		}
 	}
 
