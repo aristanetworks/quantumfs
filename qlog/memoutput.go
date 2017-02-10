@@ -297,9 +297,9 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 
 	strMap.mapLock.RLock()
-	defer strMap.mapLock.RUnlock()
-
 	entry, ok := strMap.data[format]
+	strMap.mapLock.RUnlock()
+
 	if ok {
 		return entry, true
 	}
@@ -311,21 +311,37 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
 	strMap.mapLock.Lock()
-	defer strMap.mapLock.Unlock()
-
-	// Re-check for existing key now that we have the lock to avoid races
 	existingId, ok := strMap.data[format]
+	// The vast majority of the time the string will already exist.
+	// Optimize our locking for this scenario
+	strMap.mapLock.Unlock()
+
 	if ok {
 		return existingId, nil
 	}
 
+	// Construct the new log string we *may* use outside of the critical region
+	// because it can be slow to make
+	newLog, err := newLogStr(idx, level, format)
+
+	// we may need to add a new log. lock and check again
+	strMap.mapLock.Lock()
+
+	// Check again to avoid a race condition
+	existingId, ok = strMap.data[format]
+	if ok {
+		strMap.mapLock.Unlock()
+		return existingId, nil
+	}
+
+	// format string still doesn't exist, so create it with the same lock
 	newIdx := strMap.freeIdx
 	strMap.freeIdx++
 
 	strMap.data[format] = newIdx
-	var err error
-	strMap.buffer[newIdx], err = newLogStr(idx, level, format)
+	strMap.buffer[newIdx] = newLog
 
+	strMap.mapLock.Unlock()
 	return newIdx, err
 }
 
