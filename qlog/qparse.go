@@ -459,6 +459,63 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	FormatLogs(logs, tabSpaces, statusBar, fn)
 }
 
+func PacketStats(filepath string, statusBar bool, fn writeFn) {
+	pastEndIdx, data, _ := ExtractFields(filepath)
+
+	histogram := make(map[uint16]uint64)
+	maxPacketLen := uint16(0)
+
+	var status LogStatus
+	readCount := uint64(0)
+	
+	if statusBar {
+		status = NewLogStatus(50)
+		fmt.Println("Grabbing sizes from log file...")
+	}
+
+	for readCount < uint64(len(data)) {
+		var packetLen uint16
+		readBack(&pastEndIdx, data, packetLen, &packetLen)
+
+		// If we read a packet of zero length, that means our buffer wasn't
+		// full and we've hit the unused area
+		if packetLen == 0 {
+			break
+		}
+
+		// clear the completion bit
+		packetLen &= ^(uint16(entryCompleteBit))
+
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		readCount += uint64(packetLen) + 2
+
+		if statusBar {
+			readCountClip := uint64(readCount)
+			if readCountClip > uint64(len(data)) {
+				readCountClip = uint64(len(data))
+			}
+			status.Process(float32(readCountClip) / float32(len(data)))
+		}
+
+		histogram[packetLen] = histogram[packetLen]+1
+		if packetLen > maxPacketLen {
+			maxPacketLen = packetLen
+		}
+
+		if readCount > uint64(len(data)) {
+			// We've read everything, and this last packet isn't valid
+			break
+		}
+	}
+	if statusBar {
+		status.Process(1)
+	}
+
+	for i := 0; i < int(maxPacketLen); i++ {
+		fn("%d, %d\n", i, histogram[uint16(i)])
+	}
+}
+
 func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
 	indentMap := make(map[uint64]int)
 	// Now that we have the logs in correct order, we can indent them
