@@ -374,35 +374,37 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 
 // Requires InodeCommon.parentLock
 func (fi *File) parseExtendedAttributes_(c *ctx) {
-	if fi.unlinkXAttr == nil {
-		// Download and parse the extended attributes
-		fi.unlinkXAttr = make(map[string][]byte)
+	if fi.unlinkXAttr != nil {
+		return
+	}
 
-		key := fi.unlinkRecord.ExtendedAttributes()
-		if key.IsEqualTo(quantumfs.EmptyBlockKey) {
-			return
-		}
+	// Download and parse the extended attributes
+	fi.unlinkXAttr = make(map[string][]byte)
 
-		buffer := c.dataStore.Get(&c.Ctx, key)
+	key := fi.unlinkRecord.ExtendedAttributes()
+	if key.IsEqualTo(quantumfs.EmptyBlockKey) {
+		return
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		c.elog("Failed to retrieve extended attribute list")
+		return
+	}
+
+	attributes := buffer.AsExtendedAttributes()
+
+	for i := 0; i < attributes.NumAttributes(); i++ {
+		name, attrKey := attributes.Attribute(i)
+
+		c.vlog("Found attribute key: %s", attrKey.String())
+		buffer := c.dataStore.Get(&c.Ctx, attrKey)
 		if buffer == nil {
-			c.elog("Failed to retrieve extended attribute list")
-			return
+			c.elog("Failed to retrieve attribute datablock")
+			continue
 		}
 
-		attributes := buffer.AsExtendedAttributes()
-
-		for i := 0; i < attributes.NumAttributes(); i++ {
-			name, attrKey := attributes.Attribute(i)
-
-			c.vlog("Found attribute key: %s", attrKey.String())
-			buffer := c.dataStore.Get(&c.Ctx, attrKey)
-			if buffer == nil {
-				c.elog("Failed to retrieve attribute datablock")
-				continue
-			}
-
-			fi.unlinkXAttr[name] = buffer.Get()
-		}
+		fi.unlinkXAttr[name] = buffer.Get()
 	}
 }
 
