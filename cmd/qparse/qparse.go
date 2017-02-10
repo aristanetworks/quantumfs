@@ -38,6 +38,7 @@ var tabSpaces int
 var logOut bool
 var patternsOut bool
 var stats bool
+var sizeStats bool
 var topTotal int
 var topAvg int
 var minTimeslicePct int
@@ -117,6 +118,8 @@ func init() {
 		"Show patterns given in a stat file. Works with -id.")
 	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
 		"a stats file (-out). Default stats filename is logfile.stats")
+	flag.BoolVar(&sizeStats, "sizes", false, "Parse a log file and output "+
+		"a histogram of log packet sizes. Works with -out.")
 	flag.IntVar(&topTotal, "byTotal", 0, "Parse a stat file (-in) and "+
 		"print top <byTotal> functions by total time usage in logs")
 	flag.IntVar(&topAvg, "byAvg", 0, "Parse a stat file (-in) and "+
@@ -300,6 +303,30 @@ func main() {
 		defer file.Close()
 		qlog.SaveToStat(file, patterns)
 		fmt.Printf("Stats file created: %s\n", outFilename)
+	case sizeStats:
+		if inFile == "" {
+			fmt.Println("To -sizes you must specify a log file with -in")
+			os.Exit(1)
+		}
+
+		if outFile == "" {
+			// Print to stdout, no status bar
+			qlog.PacketStats(inFile, false, fmt.Printf)
+		} else {
+			outFh, err := os.Create(outFile)
+			if err != nil {
+				fmt.Printf("Unable to create output file: %s\n", err)
+				os.Exit(1)
+			}
+			defer outFh.Close()
+
+			qlog.PacketStats(inFile, true, func(format string,
+				args ...interface{}) (int, error) {
+
+				toWrite := fmt.Sprintf(format, args...)
+				return outFh.WriteString(toWrite)
+			})
+		}
 	case topTotal != 0:
 		if inFile == "" {
 			fmt.Println("To -topTotal, you must specify a stat file " +
