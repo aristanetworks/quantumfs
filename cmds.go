@@ -226,7 +226,7 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return nil, fmt.Errorf("The length of result: %d", len(buf))
+		return nil, err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)

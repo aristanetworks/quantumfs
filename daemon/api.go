@@ -276,7 +276,8 @@ type ApiHandle struct {
 	FileHandleCommon
 	outstandingRequests int32
 	responses           chan fuse.ReadResult
-	partialRead         []byte
+	// The is temporary memory for the remain after the first parial-read
+	partialRead []byte
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -290,7 +291,6 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	c.vlog("API buffer size %d %d %d", len(buf), size, offset)
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
 		// In case of read request after pre-fetching at the first read
 		if offset > 0 {
@@ -319,6 +319,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	responseSize := uint64(len(bytes))
 	c.vlog("API Response %d", responseSize)
 	if responseSize < offset {
+		// In case of slice out of boundary due to the pre-fetching
 		return nil, fuse.OK
 	}
 	if responseSize <= bufSize {
