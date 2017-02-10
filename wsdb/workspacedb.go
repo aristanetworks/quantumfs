@@ -29,9 +29,11 @@ const (
 	// from different cluster nodes
 	ErrWorkspaceOutOfDate = iota
 
-	// ErrInvalidArgs means invalid arguments to the API
-	// more details are available in the error message
-	ErrInvalidArgs = iota
+	// ErrLocked means that typespace or namespace or workspace
+	// is locked for mutable operations like Branch or Advance.
+	// Example: a Locked typespace implies that it cannot be
+	// use as a destination typespace in Branch operation.
+	ErrLocked = iota
 )
 
 // Error represents the error returned from workspace DB APIs
@@ -58,8 +60,8 @@ func (err *Error) ErrorCode() string {
 		return "Fatal workspaceDB error"
 	case ErrWorkspaceOutOfDate:
 		return "Workspace changed remotely"
-	case ErrInvalidArgs:
-		return "Invalid arguments"
+	case ErrLocked:
+		return "Lock error"
 	}
 }
 
