@@ -4,11 +4,8 @@
 package qlog
 
 // This file contains all quantumfs logging shared memory support
-import "bytes"
-import "encoding/binary"
 import "errors"
 import "fmt"
-import "io"
 import "math"
 import "os"
 import "reflect"
@@ -120,23 +117,18 @@ func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
 }
 
-func (circ *CircMemLogs) reserveMem(dataLen uint16,
-	dataRaw []byte) (dataStartIdx uint64, lenStartIdx uint64) {
+func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 
+	// Minimize the size of the critical section, don't use defer
 	circ.writeMutex.Lock()
-	defer circ.writeMutex.Unlock()
 
 	dataStart := circ.header.PastEndIdx
-	circBufLen := uint64(len(circ.buffer))
-
 	circ.header.PastEndIdx += uint64(dataLen)
-	lenStart := uint64(circ.header.PastEndIdx) % circBufLen
-	circ.wrapWrite_(lenStart, dataRaw)
+	circ.header.PastEndIdx %= uint64(len(circ.buffer))
 
-	circ.header.PastEndIdx += 2
-	circ.header.PastEndIdx %= circBufLen
+	circ.writeMutex.Unlock()
 
-	return dataStart, lenStart
+	return dataStart
 }
 
 // Note: in development code, you should never provide a True partialWrite
@@ -146,14 +138,17 @@ func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 		return
 	}
 
-	// we only want to use the lower 2 bytes, but need all 4 to use sync/atomic
+	// We only want to use the lower 2 bytes, but need all 4 to use sync/atomic
 	dataLen := uint32(len(data))
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
+	// Append the data field to the packet
+	data = append(data, dataRaw[:]...)
 
-	dataStart, lenStart := circ.reserveMem(uint16(dataLen), (*dataRaw)[:])
+	dataStart := circ.reserveMem(uint64(len(data)))
 
 	// Now that we know we have space, write in the entry
 	circ.wrapWrite_(dataStart, data)
+	lenStart := (dataStart + uint64(dataLen)) % uint64(len(circ.buffer))
 
 	// For testing purposes only: if we need to generate some partially written
 	// packets, then do so by not finishing this one.
@@ -299,9 +294,9 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 
 	strMap.mapLock.RLock()
-	defer strMap.mapLock.RUnlock()
-
 	entry, ok := strMap.data[format]
+	strMap.mapLock.RUnlock()
+
 	if ok {
 		return entry, true
 	}
@@ -313,21 +308,37 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
 	strMap.mapLock.Lock()
-	defer strMap.mapLock.Unlock()
-
-	// Re-check for existing key now that we have the lock to avoid races
 	existingId, ok := strMap.data[format]
+	// The vast majority of the time the string will already exist.
+	// Optimize our locking for this scenario
+	strMap.mapLock.Unlock()
+
 	if ok {
 		return existingId, nil
 	}
 
+	// Construct the new log string we *may* use outside of the critical region
+	// because it can be slow to make
+	newLog, err := newLogStr(idx, level, format)
+
+	// we may need to add a new log. lock and check again
+	strMap.mapLock.Lock()
+
+	// Check again to avoid a race condition
+	existingId, ok = strMap.data[format]
+	if ok {
+		strMap.mapLock.Unlock()
+		return existingId, nil
+	}
+
+	// format string still doesn't exist, so create it with the same lock
 	newIdx := strMap.freeIdx
 	strMap.freeIdx++
 
 	strMap.data[format] = newIdx
-	var err error
-	strMap.buffer[newIdx], err = newLogStr(idx, level, format)
+	strMap.buffer[newIdx] = newLog
 
+	strMap.mapLock.Unlock()
 	return newIdx, err
 }
 
@@ -371,9 +382,11 @@ const (
 	TypeBoolean       = 19
 )
 
-// Writes the data, with a type prefix field two bytes long
-func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format string) {
-	data := input
+// Writes the data, with a type prefix field two bytes long, to output. We pass in a
+// pointer to the output array instead of returning one to append so that we can
+// take advantage of output having a larger capacity and reducing memmoves
+func (mem *SharedMemory) binaryWrite(data interface{}, format string,
+	output *[]byte) {
 
 	// Handle primitive aliases first
 	if prim, ok := data.(LogPrimitive); ok {
@@ -383,138 +396,141 @@ func (mem *SharedMemory) binaryWrite(w io.Writer, input interface{}, format stri
 		data = prim.Primitive()
 	}
 
-	needDataWrite := true
-	var byteType uint16
 	switch v := data.(type) {
 	case *int8:
-		byteType = TypeInt8Pointer
+		*output = append(*output, toBinaryUint16(TypeInt8Pointer)...)
+		*output = append(*output, toBinaryUint8(uint8(*v))...)
 	case int8:
-		byteType = TypeInt8
+		*output = append(*output, toBinaryUint16(TypeInt8)...)
+		*output = append(*output, toBinaryUint8(uint8(v))...)
 	case *uint8:
-		byteType = TypeUint8Pointer
+		*output = append(*output, toBinaryUint16(TypeUint8Pointer)...)
+		*output = append(*output, toBinaryUint8(*v)...)
 	case uint8:
-		byteType = TypeUint8
+		*output = append(*output, toBinaryUint16(TypeUint8)...)
+		*output = append(*output, toBinaryUint8(v)...)
 	case *int16:
-		byteType = TypeInt16Pointer
+		*output = append(*output, toBinaryUint16(TypeInt16Pointer)...)
+		*output = append(*output, toBinaryUint16(uint16(*v))...)
 	case int16:
-		byteType = TypeInt16
+		*output = append(*output, toBinaryUint16(TypeInt16)...)
+		*output = append(*output, toBinaryUint16(uint16(v))...)
 	case *uint16:
-		byteType = TypeUint16Pointer
+		*output = append(*output, toBinaryUint16(TypeUint16Pointer)...)
+		*output = append(*output, toBinaryUint16(*v)...)
 	case uint16:
-		byteType = TypeUint16
+		*output = append(*output, toBinaryUint16(TypeUint16)...)
+		*output = append(*output, toBinaryUint16(v)...)
 	case *int32:
-		byteType = TypeInt32Pointer
+		*output = append(*output, toBinaryUint16(TypeInt32Pointer)...)
+		*output = append(*output, toBinaryUint32(uint32(*v))...)
 	case int32:
-		byteType = TypeInt32
+		*output = append(*output, toBinaryUint16(TypeInt32)...)
+		*output = append(*output, toBinaryUint32(uint32(v))...)
 	case *uint32:
-		byteType = TypeUint32Pointer
+		*output = append(*output, toBinaryUint16(TypeUint32Pointer)...)
+		*output = append(*output, toBinaryUint32(*v)...)
 	case uint32:
-		byteType = TypeUint32
+		*output = append(*output, toBinaryUint16(TypeUint32)...)
+		*output = append(*output, toBinaryUint32(v)...)
 	case int:
-		byteType = TypeInt64
-		data = interface{}(int64(v))
+		*output = append(*output, toBinaryUint16(TypeInt64)...)
+		*output = append(*output, toBinaryUint64(uint64(v))...)
 	case uint:
-		byteType = TypeUint64
-		data = interface{}(uint64(v))
+		*output = append(*output, toBinaryUint16(TypeUint64)...)
+		*output = append(*output, toBinaryUint64(uint64(v))...)
 	case *int64:
-		byteType = TypeInt64Pointer
+		*output = append(*output, toBinaryUint16(TypeInt64Pointer)...)
+		*output = append(*output, toBinaryUint64(uint64(*v))...)
 	case int64:
-		byteType = TypeInt64
+		*output = append(*output, toBinaryUint16(TypeInt64)...)
+		*output = append(*output, toBinaryUint64(uint64(v))...)
 	case *uint64:
-		byteType = TypeUint64Pointer
+		*output = append(*output, toBinaryUint16(TypeUint64Pointer)...)
+		*output = append(*output, toBinaryUint64(*v)...)
 	case uint64:
-		byteType = TypeUint64
+		*output = append(*output, toBinaryUint16(TypeUint64)...)
+		*output = append(*output, toBinaryUint64(v)...)
 	case string:
-		writeArray(w, format, []byte(v), TypeString)
-		return
+		writeArray(output, format, []byte(v), TypeString)
 	case []byte:
-		writeArray(w, format, v, TypeByteArray)
-		return
+		writeArray(output, format, v, TypeByteArray)
 	case bool:
-		byteType = TypeBoolean
+		*output = append(*output, toBinaryUint16(TypeBoolean)...)
 		if v {
-			data = interface{}(uint8(1))
+			*output = append(*output, toBinaryUint8(1)...)
 		} else {
-			data = interface{}(uint8(0))
+			*output = append(*output, toBinaryUint8(0)...)
 		}
 	default:
-		needDataWrite = false
-	}
-
-	if needDataWrite {
-		err := binary.Write(w, binary.LittleEndian, byteType)
-		if err != nil {
-			panic("Unable to write basic type to memory")
-		}
-
-		err = binary.Write(w, binary.LittleEndian, data)
-		if err != nil {
-			panic(fmt.Sprintf("Unable to write basic type data : %v",
-				err))
-		}
-	} else {
 		errorPrefix := "ERROR: LogConverter needed for %s:\n%s\n"
 		checkRecursion(errorPrefix, format)
 
 		str := fmt.Sprintf("%v", data)
-		writeArray(w, format, []byte(str), 17)
+		writeArray(output, format, []byte(str), TypeString)
 		mem.errOut.Log(LogQlog, QlogReqId, 1, errorPrefix,
 			reflect.ValueOf(data).String(), string(debug.Stack()))
 	}
 }
 
-func writeArray(w io.Writer, format string, output []byte, byteType uint16) {
-	if len(output) > math.MaxUint16 {
+func writeArray(output *[]byte, format string, data []byte, byteType uint16) {
+	if len(data) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: "+
 			"%s", format))
 	}
-	err := binary.Write(w, binary.LittleEndian, byteType)
-	if err != nil {
-		panic("Unable to write array type to memory")
-	}
 
-	byteLen := uint16(len(output))
-	err = binary.Write(w, binary.LittleEndian, byteLen)
-	if err != nil {
-		panic("Unable to write array length to memory")
-	}
+	*output = append(*output, toBinaryUint16(byteType)...)
 
-	err = binary.Write(w, binary.LittleEndian, output)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to write array to mem: "+
-			"%v", err))
-	}
+	*output = append(*output, toBinaryUint16(uint16(len(data)))...)
+
+	*output = append(*output, data...)
+}
+
+// Don't use interfaces where possible because they're slow
+func toBinaryUint8(input uint8) []byte {
+	return (*[1]byte)(unsafe.Pointer(&input))[:]
+}
+
+func toBinaryUint16(input uint16) []byte {
+	return (*[2]byte)(unsafe.Pointer(&input))[:]
+}
+
+func toBinaryUint32(input uint32) []byte {
+	return (*[4]byte)(unsafe.Pointer(&input))[:]
+}
+
+func toBinaryUint64(input uint64) []byte {
+	return (*[8]byte)(unsafe.Pointer(&input))[:]
 }
 
 func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	timestamp int64, format string, args ...interface{}) []byte {
 
-	buf := new(bytes.Buffer)
-	// give the buffer some initial safe memory allocation
-	buf.Grow(128)
+	// Ensure we provide a sensible initial capacity
+	buf := make([]byte, 0, 128)
 
 	// Two bytes prefix for the total packet length, before the num of args.
 	// Write the log entry header with no prefixes
-	binary.Write(buf, binary.LittleEndian, uint16(len(args)))
-	binary.Write(buf, binary.LittleEndian, strMapId)
-	binary.Write(buf, binary.LittleEndian, reqId)
-	binary.Write(buf, binary.LittleEndian, timestamp)
+	buf = append(buf, toBinaryUint16(uint16(len(args)))...)
+	buf = append(buf, toBinaryUint16(strMapId)...)
+	buf = append(buf, toBinaryUint64(reqId)...)
+	buf = append(buf, toBinaryUint64(uint64(timestamp))...)
 
 	for i := 0; i < len(args); i++ {
-		mem.binaryWrite(buf, args[i], format)
+		mem.binaryWrite(args[i], format, &buf)
 	}
 
 	// Make sure length isn't too long, excluding the size bytes
-	if buf.Len() > MaxPacketLen {
+	if len(buf) > MaxPacketLen {
 		errorPrefix := "Log data exceeds allowable length: %s\n"
 		checkRecursion(errorPrefix, format)
 
 		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
 
-		buf.Truncate(MaxPacketLen)
+		buf = buf[:MaxPacketLen]
 	}
 
-	return buf.Bytes()
+	return buf
 }
 
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
