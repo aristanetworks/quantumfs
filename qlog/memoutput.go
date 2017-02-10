@@ -386,7 +386,7 @@ const (
 // pointer to the output array instead of returning one to append so that we can
 // take advantage of output having a larger capacity and reducing memmoves
 func (mem *SharedMemory) binaryWrite(data interface{}, format string,
-	output *[]byte){
+	output *[]byte) {
 
 	// Handle primitive aliases first
 	if prim, ok := data.(LogPrimitive); ok {
