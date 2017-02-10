@@ -217,7 +217,7 @@ func (s *wsdbCommonUnitTest) TestTypespaceNotExist() {
 	s.req.False(exists, "Unexpected typespace exists in empty DB")
 }
 
-func (s *wsdbCommonUnitTest) TestInvalidArgsBranchWorkspace() {
+func (s *wsdbCommonUnitTest) TestLockedBranchWorkspace() {
 
 	err := s.wsdb.BranchWorkspace("_null", "_null", "null",
 		"_null", "ns1", "ws1")
@@ -240,7 +240,7 @@ func (s *wsdbCommonUnitTest) TestInvalidArgsBranchWorkspace() {
 	s.req.NoError(err, "Failed in branching to ts1/ns1/null")
 }
 
-func (s *wsdbCommonUnitTest) TestInvalidArgsAdvanceWorkspace() {
+func (s *wsdbCommonUnitTest) TestLockedAdvanceWorkspace() {
 
 	_, err := s.wsdb.AdvanceWorkspace("_null", "ns1", "ws1",
 		[]byte{1, 2, 3}, []byte{4, 5, 6})
@@ -261,4 +261,18 @@ func (s *wsdbCommonUnitTest) TestInvalidArgsAdvanceWorkspace() {
 	_, err = s.wsdb.AdvanceWorkspace("ts1", "ns1", "null",
 		[]byte{1, 2, 3}, []byte{4, 5, 6})
 	s.req.NoError(err, "Failed in advancing ts1/ns1/null")
+}
+
+// verifies write once property of _null/_null/null workspace
+func (s *wsdbCommonUnitTest) TestInitialAdvanceWorkspace() {
+	mockWsdbKeyGet(s.mockSess, "_null", "_null", "null", nil, nil)
+	mockWsdbKeyPut(s.mockSess, "_null", "_null", "null", []byte{1, 2, 3}, nil)
+	_, err := s.wsdb.AdvanceWorkspace("_null", "_null", "null",
+		nil, []byte{1, 2, 3})
+	s.req.NoError(err, "Failed in initial advance _null/_null/null")
+
+	_, err = s.wsdb.AdvanceWorkspace("_null", "_null", "null",
+		[]byte{1, 2, 3}, []byte{4, 5, 6})
+	s.req.Error(err,
+		"Succeeded in advancing _null/_null/null after initial set")
 }

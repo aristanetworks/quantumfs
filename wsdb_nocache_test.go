@@ -72,12 +72,16 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheTypespaceNotExist() {
 	suite.common.TestTypespaceNotExist()
 }
 
-func (suite *wsdbNoCacheTestSuite) TestNoCacheInvalidArgsBranching() {
-	suite.common.TestInvalidArgsBranchWorkspace()
+func (suite *wsdbNoCacheTestSuite) TestNoCacheLockedBranching() {
+	suite.common.TestLockedBranchWorkspace()
 }
 
-func (suite *wsdbNoCacheTestSuite) TestNoCacheInvalidArgsAdvance() {
-	suite.common.TestInvalidArgsAdvanceWorkspace()
+func (suite *wsdbNoCacheTestSuite) TestNoCacheLockedAdvance() {
+	suite.common.TestLockedAdvanceWorkspace()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheInitialAdvanceWorkspace() {
+	suite.common.TestInitialAdvanceWorkspace()
 }
 
 func (suite *wsdbNoCacheTestSuite) TearDownTest() {

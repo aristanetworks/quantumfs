@@ -153,8 +153,8 @@ func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
 	dstTypespace string, dstNamespace string, dstWorkspace string) error {
 
 	if isTypespaceReserved(dstTypespace) {
-		return wsdb.NewError(wsdb.ErrInvalidArgs,
-			"Branch failed: cannot use reserved _null typespace")
+		return wsdb.NewError(wsdb.ErrLocked,
+			"Branch failed: _null typespace is locked")
 	}
 
 	key, present, err := nc.wsdbKeyGet(srcTypespace, srcNamespace,
@@ -220,9 +220,9 @@ func (nc *noCacheWsdb) AdvanceWorkspace(typespace string,
 	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
-	if isTypespaceReserved(typespace) {
-		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrInvalidArgs,
-			"Branch failed: cannot use reserved _null typespace")
+	if isTypespaceReserved(typespace) && currentRootID != nil {
+		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrLocked,
+			"Branch failed: _null typespace is locked")
 	}
 
 	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)

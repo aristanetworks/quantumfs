@@ -646,12 +646,16 @@ func (suite *wsdbCacheTestSuite) TestCacheChildDeleteDuringRefresh() {
 		"namespace list has elements")
 }
 
-func (suite *wsdbCacheTestSuite) TestCacheInvalidArgsBranching() {
-	suite.common.TestInvalidArgsBranchWorkspace()
+func (suite *wsdbCacheTestSuite) TestCacheLockedBranching() {
+	suite.common.TestLockedBranchWorkspace()
 }
 
-func (suite *wsdbCacheTestSuite) TestCacheInvalidArgsAdvance() {
-	suite.common.TestInvalidArgsAdvanceWorkspace()
+func (suite *wsdbCacheTestSuite) TestCacheLockedAdvance() {
+	suite.common.TestLockedAdvanceWorkspace()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheInitialAdvanceWorkspace() {
+	suite.common.TestInitialAdvanceWorkspace()
 }
 
 // TODO: once the APIs return errors, add appropriate test cases
