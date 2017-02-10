@@ -572,3 +572,40 @@ func TestOrphanFileXAttrSet(t *testing.T) {
 			string(data))
 	})
 }
+
+func TestOrphanFileXAttrRemove(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		fd := initOrphanedFileExtendedAttributes(test)
+		defer syscall.Close(fd)
+
+		err := fSetXattr(fd, "user.new", []byte("new"), 0)
+		test.assert(err == nil, "Error creating XAttr: %v", err)
+
+		err = fRemoveXattr(fd, "user.new")
+		test.assert(err == nil, "Error removing new XAttr: %v", err)
+
+		err = fRemoveXattr(fd, initialXAttrNames[0])
+		test.assert(err == nil, "Error removing existing XAttr: %v", err)
+
+		_, err, list := fListXattr(fd, 1024)
+		test.assert(err == nil, "Error listing XAttrs: %v", err)
+
+		for _, name := range initialXAttrNames {
+
+			if name == initialXAttrNames[0] {
+				test.assert(!bytes.Contains(list, []byte(name)),
+					"XAttr list contain %s", name)
+			} else {
+				test.assert(bytes.Contains(list, []byte(name)),
+					"XAttr list did not contain name %s", name)
+			}
+		}
+
+		test.assert(!bytes.Contains(list, []byte("user.new")),
+			"XAttr list contains user.new")
+
+		err = fRemoveXattr(fd, "user.doesnotexist")
+		test.assert(err != nil && err == syscall.ENODATA,
+			"Successed removing non-existant XAttr")
+	})
+}
