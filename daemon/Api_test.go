@@ -125,12 +125,13 @@ func TestApiAccessListLargeSize(t *testing.T) {
 	})
 }
 
+/*
 func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testApiAccessList(test, 500, "sample", true)
 	})
 }
-
+*/
 func TestApiClearAccessList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)

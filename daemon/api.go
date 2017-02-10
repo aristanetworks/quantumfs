@@ -36,7 +36,8 @@ type ApiInode struct {
 
 func fillApiAttr(c *ctx, attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
-	attr.Size = uint64(atomic.LoadInt64(&c.qfs.apiFileSize))
+	//tmp := uint64(atomic.LoadInt64(&c.qfs.apiFileSize))
+	attr.Size = 12288
 	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 
 	now := time.Now()
@@ -295,11 +296,11 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	c.vlog("API Buffer size: %d %d %d %d %d", offset, size, len(buf), cap(buf), len(api.partialRead))
+	c.vlog("API Buffer size: %d %d %d", offset, size, len(buf))
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
 		if offset != 0 && api.initRead {
 			c.vlog("Api response: %d",
-				len(api.partialRead[offset:]))
+				atomic.LoadInt64(&c.qfs.apiFileSize))
 			return fuse.ReadResultData(api.partialRead[offset : offset+uint64(size)]), fuse.OK
 		}
 
