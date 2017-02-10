@@ -78,7 +78,7 @@ const (
 	WSDB_WORKSPACE_NOT_FOUND             = iota // The workspace didn't exist
 	WSDB_WORKSPACE_EXISTS                = iota // The workspace already exists
 	WSDB_FATAL_DB_ERROR                  = iota // Fatal error in workspace DB
-
+	WSDB_LOCKED                          = iota // workspace is locked
 	// The operation was based off out of date information
 	WSDB_OUT_OF_DATE = iota
 )
@@ -99,5 +99,7 @@ func (err *WorkspaceDbErr) ErrorCode() string {
 		return "Fatal error in workspace DB"
 	case WSDB_OUT_OF_DATE:
 		return "Workspace changed remotely"
+	case WSDB_LOCKED:
+		return "Workspace lock error"
 	}
 }
