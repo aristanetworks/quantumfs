@@ -36,8 +36,7 @@ type ApiInode struct {
 
 func fillApiAttr(c *ctx, attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
-	//tmp := uint64(atomic.LoadInt64(&c.qfs.apiFileSize))
-	attr.Size = 12288
+	attr.Size = uint64(atomic.LoadInt64(&c.qfs.apiFileSize))
 	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 
 	now := time.Now()
@@ -76,7 +75,6 @@ func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,
 func (api *ApiInode) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
-
 	fillApiAttr(c, &out.Attr)
 	return fuse.OK
 }
@@ -113,7 +111,7 @@ func (api *ApiInode) Rmdir(c *ctx, name string) fuse.Status {
 func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	out.OpenFlags = flags
+	out.OpenFlags = 0
 	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = uint64(handle.FileHandleCommon.id)
@@ -267,7 +265,6 @@ func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 			treeLock_: treeLock,
 		},
 		responses: make(chan fuse.ReadResult, 10),
-		initRead:  true,
 	}
 	assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
 	return &api
@@ -279,10 +276,7 @@ type ApiHandle struct {
 	FileHandleCommon
 	outstandingRequests int32
 	responses           chan fuse.ReadResult
-	// This is a temporary memory for the remain after the first parial-read
-	partialRead []byte
-	// Used to indicate whether the memory has been read
-	initRead bool
+	partialRead         []byte
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -296,45 +290,42 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	c.vlog("API Buffer size: %d %d %d", offset, size, len(buf))
+	c.vlog("API buffer size %d %d %d", len(buf), size, offset)
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
-		if offset != 0 && api.initRead {
-			c.vlog("Api response: %d",
-				atomic.LoadInt64(&c.qfs.apiFileSize))
-			return fuse.ReadResultData(api.partialRead[offset : offset+uint64(size)]), fuse.OK
+		// In case of read request after pre-fetching at the first read
+		if offset > 0 {
+			atomic.AddInt32(&api.outstandingRequests, 1)
+		} else {
+			if nonblocking {
+				return nil, fuse.Status(syscall.EAGAIN)
+			}
+
+			c.vlog("No outstanding requests, returning early")
+			return nil, fuse.OK
 		}
-
-		if nonblocking {
-			return nil, fuse.Status(syscall.EAGAIN)
-		}
-
-		c.vlog("No outstanding requests, returning early")
-		return nil, fuse.OK
-
 	}
-	var bytes []byte
-	if api.initRead {
+
+	if offset == 0 {
+		// Subtract the file size of last time read
+		c.qfs.decreaseApiFileSize(c, len(api.partialRead))
 		response := <-api.responses
 		debug := make([]byte, response.Size())
-		bytes, _ = response.Bytes(debug)
+		bytes, _ := response.Bytes(debug)
 		api.partialRead = bytes
-	} else {
-		bytes = api.partialRead[offset : offset+uint64(size)]
 	}
 
-	chunk := len(bytes)
-	bufSize := len(buf)
-	if chunk > bufSize {
-		api.initRead = false
-		chunk = bufSize
-	} else {
-		api.initRead = true
+	bytes := api.partialRead
+	bufSize := offset + uint64(size)
+	responseSize := uint64(len(bytes))
+	c.vlog("API Response %d", responseSize)
+	if responseSize < offset {
+		return nil, fuse.OK
+	}
+	if responseSize <= bufSize {
 		atomic.AddInt32(&api.outstandingRequests, -1)
+		return fuse.ReadResultData(bytes[offset:responseSize]), fuse.OK
 	}
-	c.qfs.decreaseApiFileSize(c, chunk)
-
-	c.vlog("API response size: %d", chunk)
-	return fuse.ReadResultData(bytes), fuse.OK
+	return fuse.ReadResultData(bytes[offset:bufSize]), fuse.OK
 }
 
 func makeErrorResponse(code uint32, message string) []byte {
@@ -429,7 +420,6 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	c.vlog("done writing to file")
 	c.qfs.increaseApiFileSize(c, responseSize)
-	// Long response needs multiple reads to complete the data communication
 	atomic.AddInt32(&api.outstandingRequests, 1)
 	return size, fuse.OK
 }
@@ -448,9 +438,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
 		dst[0], dst[1], dst[2]); err != nil {
 
-		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			err.Error())
-
+		return api.queueErrorResponse(
+			quantumfs.ErrorCommandFailed, err.Error())
 	}
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
