@@ -11,6 +11,7 @@ import "os"
 import "strings"
 import "syscall"
 import "testing"
+import "unsafe"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -371,5 +372,133 @@ func TestXAttrTypeKeyList(t *testing.T) {
 			bytes.Contains(dst, []byte(quantumfs.XAttrTypeKey)),
 			"Error listing XAttr: %v with content of %s",
 			err, dst)
+	})
+}
+
+func fSetXattr(fd int, attr string, data []byte, flags int) (err error) {
+	var attr_str_ptr *byte
+	attr_str_ptr, err = syscall.BytePtrFromString(attr)
+	if err != nil {
+		return
+	}
+	var data_buf_ptr unsafe.Pointer
+	if len(data) > 0 {
+		data_buf_ptr = unsafe.Pointer(&data[0])
+	} else {
+		data_buf_ptr = unsafe.Pointer(&_zero)
+	}
+	_, _, e1 := syscall.Syscall6(syscall.SYS_FSETXATTR,
+		uintptr(fd),
+		uintptr(unsafe.Pointer(attr_str_ptr)),
+		uintptr(data_buf_ptr), uintptr(len(data)), uintptr(flags), 0)
+
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}
+
+func fGetXattr(fd int, attr string,
+	size int) (sz int, err error, output []byte) {
+
+	var attr_str_ptr *byte
+	attr_str_ptr, err = syscall.BytePtrFromString(attr)
+	if err != nil {
+		return
+	}
+	var dest_buf_ptr unsafe.Pointer
+	dest := make([]byte, size, size*2)
+	if size > 0 {
+		dest_buf_ptr = unsafe.Pointer(&dest[0])
+	} else {
+		dest_buf_ptr = unsafe.Pointer(&_zero)
+	}
+	r0, _, e1 := syscall.Syscall6(syscall.SYS_FGETXATTR,
+		uintptr(fd), uintptr(unsafe.Pointer(attr_str_ptr)),
+		uintptr(dest_buf_ptr), uintptr(len(dest)), 0, 0)
+
+	sz = int(r0)
+	if e1 != 0 {
+		err = e1
+	}
+	output = dest
+	return
+}
+
+func fListXattr(fd int, size int) (sz int, err error, output []byte) {
+	var dest_buf_ptr unsafe.Pointer
+	dest := make([]byte, size, size*2)
+	if size > 0 {
+		dest_buf_ptr = unsafe.Pointer(&dest[0])
+	} else {
+		dest_buf_ptr = unsafe.Pointer(&_zero)
+	}
+	r0, _, e1 := syscall.Syscall(syscall.SYS_FLISTXATTR,
+		uintptr(fd), uintptr(dest_buf_ptr), uintptr(len(dest)))
+	sz = int(r0)
+	if e1 != 0 {
+		err = e1
+	}
+	output = dest
+	return
+}
+
+func fRemoveXattr(fd int, attr string) (err error) {
+	var attr_str_ptr *byte
+	attr_str_ptr, err = syscall.BytePtrFromString(attr)
+	if err != nil {
+		return
+	}
+	_, _, e1 := syscall.Syscall(syscall.SYS_FREMOVEXATTR,
+		uintptr(fd), uintptr(unsafe.Pointer(attr_str_ptr)), 0)
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}
+
+var initialXAttrNames []string
+var initialXAttrValues []string
+
+func init() {
+	for _, name := range [...]string{"user.a1", "user.a2", "user.a3"} {
+		initialXAttrNames = append(initialXAttrNames, name)
+	}
+
+	for _, value := range [...]string{"one", "two", "three"} {
+		initialXAttrValues = append(initialXAttrValues, value)
+	}
+}
+
+func initOrphanedFileExtendedAttributes(test *testHelper) (fd int) {
+	// Create the file
+	workspace := test.newWorkspace()
+	filename := workspace + "/file"
+	fd, err := syscall.Creat(filename, 0777)
+	test.assert(err == nil, "Error creating file: %v", err)
+
+	// Add some initial attributes
+	for i, name := range initialXAttrNames {
+		value := initialXAttrValues[i]
+
+		err := syscall.Setxattr(filename, name, []byte(value), 0)
+		test.assert(err == nil, "Error setting initial attributes: %v", err)
+	}
+
+	return fd
+}
+
+func TestOrphanedFileXAttrList(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		fd := initOrphanedFileExtendedAttributes(test)
+		defer syscall.Close(fd)
+		_, err, list := fListXattr(fd, 1024)
+
+		test.assert(err == nil, "Error listing XAttrs: %v", err)
+
+		for _, name := range initialXAttrNames {
+			test.assert(bytes.Contains(list, []byte(name)),
+				"List doesn't contain attribute: %s", name)
+		}
 	})
 }
