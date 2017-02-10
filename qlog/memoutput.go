@@ -120,23 +120,18 @@ func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
 }
 
-func (circ *CircMemLogs) reserveMem(dataLen uint16,
-	dataRaw []byte) (dataStartIdx uint64, lenStartIdx uint64) {
+func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 
+	// Minimize the size of the critical section, don't use defer
 	circ.writeMutex.Lock()
-	defer circ.writeMutex.Unlock()
 
 	dataStart := circ.header.PastEndIdx
-	circBufLen := uint64(len(circ.buffer))
-
 	circ.header.PastEndIdx += uint64(dataLen)
-	lenStart := uint64(circ.header.PastEndIdx) % circBufLen
-	circ.wrapWrite_(lenStart, dataRaw)
+	circ.header.PastEndIdx %= uint64(len(circ.buffer))
 
-	circ.header.PastEndIdx += 2
-	circ.header.PastEndIdx %= circBufLen
+	circ.writeMutex.Unlock()
 
-	return dataStart, lenStart
+	return dataStart
 }
 
 // Note: in development code, you should never provide a True partialWrite
@@ -149,11 +144,14 @@ func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 	// we only want to use the lower 2 bytes, but need all 4 to use sync/atomic
 	dataLen := uint32(len(data))
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
+	data = append(data, dataRaw[:]...)
 
-	dataStart, lenStart := circ.reserveMem(uint16(dataLen), (*dataRaw)[:])
+	// add 2 for the length field
+	dataStart := circ.reserveMem(uint64(len(data)))
 
 	// Now that we know we have space, write in the entry
 	circ.wrapWrite_(dataStart, data)
+	lenStart := (dataStart + uint64(dataLen)) % uint64(len(circ.buffer))
 
 	// For testing purposes only: if we need to generate some partially written
 	// packets, then do so by not finishing this one.
