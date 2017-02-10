@@ -146,20 +146,20 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	size := 4096
+	api.fd.Seek(0, 0)
+	api.fd.Seek(0, 1)
+	size := 8192
 	result := make([]byte, 0)
-	buf = make([]byte, 4096)
-	for size >= 4096 {
+	buf = make([]byte, 8192)
+	for size >= 8192 {
 		// In partial read, the quantumfs returns new data in each iteration,
 		// so the file descriptor has to be reset to the 0 offset
-		api.fd.Seek(0, 0)
 		size, err = api.fd.Read(buf)
-
-		/*if size == 4096 {
-			return nil, fmt.Errorf("CMD size %d  %d capacity %d", size, len(buf), cap(buf))
-		}*/
-		if err != nil && size != 0 {
+		if size >= 4096 {
+			size2, _ := api.fd.Read(buf)
+			return nil, fmt.Errorf("CMD size %d  %d ", size, size2)
+		}
+		if err != nil {
 			return nil, err
 		}
 		result = append(result, buf[:size]...)
