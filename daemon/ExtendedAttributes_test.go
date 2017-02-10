@@ -421,6 +421,9 @@ func fGetXattr(fd int, attr string,
 	if e1 != 0 {
 		err = e1
 	}
+	if sz > 0 {
+		dest = dest[:sz]
+	}
 	output = dest
 	return
 }
@@ -438,6 +441,9 @@ func fListXattr(fd int, size int) (sz int, err error, output []byte) {
 	sz = int(r0)
 	if e1 != 0 {
 		err = e1
+	}
+	if sz > 0 {
+		dest = dest[:sz]
 	}
 	output = dest
 	return
@@ -503,5 +509,66 @@ func TestOrphanedFileXAttrList(t *testing.T) {
 			test.assert(bytes.Contains(list, []byte(name)),
 				"List doesn't contain attribute: %s", name)
 		}
+	})
+}
+
+func TestOrphanedFileXAttrGet(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		fd := initOrphanedFileExtendedAttributes(test)
+		defer syscall.Close(fd)
+
+		for i, name := range initialXAttrNames {
+			value := initialXAttrValues[i]
+
+			_, err, data := fGetXattr(fd, name, 1024)
+			test.assert(err == nil, "Error retrieving attr: %v", err)
+
+			str := string(data)
+			test.assert(str == value, "Invalid value %s (%s) for %s",
+				str, value, name)
+		}
+
+		_, err, _ := fGetXattr(fd, "user.doesnotexist", 1024)
+		test.assert(err != nil && err == syscall.ENODATA,
+			"Succeeded retrieving non-existant XAttr")
+	})
+}
+
+func TestOrphanFileXAttrSet(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		fd := initOrphanedFileExtendedAttributes(test)
+		defer syscall.Close(fd)
+
+		err := fSetXattr(fd, "user.new", []byte("new"), 0)
+		test.assert(err == nil, "Error creating XAttr: %v", err)
+
+		err = fSetXattr(fd, "user.a1", []byte("overwritten"), 0)
+		test.assert(err == nil, "Error overwriting XAttr: %v", err)
+
+		_, err, list := fListXattr(fd, 1024)
+		test.assert(err == nil, "Error listing XAttrs: %v", err)
+
+		for i, name := range initialXAttrNames {
+			value := initialXAttrValues[i]
+
+			if name == initialXAttrNames[0] {
+				value = "overwritten"
+			}
+
+			test.assert(bytes.Contains(list, []byte(name)),
+				"XAttr list did not contain name %s", name)
+
+			_, err, data := fGetXattr(fd, name, 1024)
+			test.assert(err == nil, "Error fetching XAttr: %v", err)
+			test.assert(string(data) == value, "Value mismatch %s - %s",
+				string(data), value)
+		}
+
+		test.assert(bytes.Contains(list, []byte("user.new")),
+			"New XAttr not present")
+		_, err, data := fGetXattr(fd, "user.new", 1024)
+		test.assert(err == nil, "Error fetching new XAttr: %v", err)
+		test.assert(string(data) == "new", "New attribute value wrong %s",
+			string(data))
 	})
 }
