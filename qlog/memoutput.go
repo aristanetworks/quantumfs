@@ -138,12 +138,12 @@ func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 		return
 	}
 
-	// we only want to use the lower 2 bytes, but need all 4 to use sync/atomic
+	// We only want to use the lower 2 bytes, but need all 4 to use sync/atomic
 	dataLen := uint32(len(data))
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
+	// Append the data field to the packet
 	data = append(data, dataRaw[:]...)
 
-	// add 2 for the length field
 	dataStart := circ.reserveMem(uint64(len(data)))
 
 	// Now that we know we have space, write in the entry
