@@ -1363,14 +1363,6 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
 		len(data)).out()
-	// The self-defined extended attribute is not able to be set
-	// it is the combination of two attributes
-	if attr == quantumfs.XAttrTypeKey {
-		c.elog("Illegal action to set extended attribute: typeKey")
-		return fuse.EPERM
-	}
-
-	defer c.vlog("Directory::setChildXAttr Exit")
 
 	defer dir.Lock().Unlock()
 
@@ -1446,14 +1438,6 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	defer c.FuncIn("Directory::removeChildXAttr", "%d, %s", inodeNum, attr).out()
-	// The self-defined extended attribute is not able to be removed
-	// it is the combination of two attributes
-	if attr == quantumfs.XAttrTypeKey {
-		c.elog("Illegal action to remove extended attribute: typeKey")
-		return fuse.EPERM
-	}
-
-	defer c.vlog("Directory::removeChildXAttr Exit")
 
 	defer dir.Lock().Unlock()
 

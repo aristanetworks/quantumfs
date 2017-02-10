@@ -1128,6 +1128,11 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 		return fuse.ENOENT
 	}
 
+	if attr == quantumfs.XAttrTypeKey {
+		// quantumfs.key is immutable from userspace
+		return fuse.EPERM
+	}
+
 	defer inode.RLockTree().RUnlock()
 	return inode.SetXAttr(c, attr, data)
 }
@@ -1144,6 +1149,11 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if attr == quantumfs.XAttrTypeKey {
+		// quantumfs.key is immutable from userspace
+		return fuse.EPERM
 	}
 
 	defer inode.RLockTree().RUnlock()
