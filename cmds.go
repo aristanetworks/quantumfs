@@ -146,24 +146,20 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	api.fd.Seek(0, 0)
-	api.fd.Seek(0, 1)
-	size := 8192
+	size := 5000
 	result := make([]byte, 0)
-	buf = make([]byte, 8192)
-	for size >= 8192 {
-		// In partial read, the quantumfs returns new data in each iteration,
-		// so the file descriptor has to be reset to the 0 offset
+	buf = make([]byte, 5000)
+	for size == 5000 {
 		size, err = api.fd.Read(buf)
-		if size >= 4096 {
-			size2, _ := api.fd.Read(buf)
-			return nil, fmt.Errorf("CMD size %d  %d ", size, size2)
-		}
 		if err != nil {
 			return nil, err
 		}
+
 		result = append(result, buf[:size]...)
 	}
+
 	return result, nil
 }
 
@@ -205,10 +201,11 @@ func (api *Api) Branch(src string, dst string) error {
 	return nil
 }
 
+// Get the list of accessed file from workspaceroot
 func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return nil,
-			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
+		return nil, fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
+			wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -229,7 +226,7 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("The length of result: %d", len(buf))
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
@@ -361,22 +358,15 @@ func isKeyValid(key string) bool {
 
 func printAccessList(list map[string]bool) {
 	fmt.Println("------ Created Files ------")
-	create := 0
 	for key, val := range list {
 		if val {
 			fmt.Println(key)
-			create += 1
 		}
 	}
-	fmt.Println("Total Created Files: ", create)
-
 	fmt.Println("------ Accessed Files ------")
-	access := 0
 	for key, val := range list {
 		if !val {
 			fmt.Println(key)
-			access += 1
 		}
 	}
-	fmt.Println("Total Accessed Files: ", access)
 }
