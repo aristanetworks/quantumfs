@@ -224,10 +224,8 @@ func SeqMapToList(sequenceMap map[string]SequenceData) []SequenceData {
 	return sequences
 }
 
-func GetStatPatterns(inFile string, maxThreads int,
-	maxLenWildcards int) []PatternData {
-
-	// Structures during this process can be massive. Throw them away asap
+func GetTrackerMap(inFile string, maxThreads int) (int,
+	map[uint64][]SequenceTracker) {
 
 	var logs []LogOutput
 	{
@@ -249,6 +247,15 @@ func GetStatPatterns(inFile string, maxThreads int,
 	}
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
+
+	return trackerCount, trackerMap
+}
+
+func GetStatPatterns(inFile string, maxThreads int,
+	maxLenWildcards int) []PatternData {
+
+	// Structures during this process can be massive. Throw them away asap
+	trackerCount, trackerMap := GetTrackerMap(inFile, maxThreads)
 
 	var sequenceMap map[string]SequenceData
 	{
