@@ -320,12 +320,12 @@ func main() {
 			}
 			defer outFh.Close()
 
-			qlog.PacketStats(inFile, true, func (format string,
+			qlog.PacketStats(inFile, true, func(format string,
 				args ...interface{}) (int, error) {
 
 				toWrite := fmt.Sprintf(format, args...)
 				return outFh.WriteString(toWrite)
-				})
+			})
 		}
 	case topTotal != 0:
 		if inFile == "" {
