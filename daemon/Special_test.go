@@ -22,7 +22,7 @@ func specialCreate(test *testHelper, filetype uint32) {
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
 
 		if filetype == syscall.S_IFREG {
-			test.assert(stat.Nlink == 2, "Incorrect Nlink: %d",
+			test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
 				stat.Nlink)
 		} else {
 			test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
