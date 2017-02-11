@@ -55,6 +55,8 @@ func fillApiAttr(attr *fuse.Attr) {
 }
 
 func (api *ApiInode) dirty(c *ctx) {
+	// Override the InodeCommon dirty because the Api can never be changed on the
+	// filesystem itself.
 }
 
 func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,

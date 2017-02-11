@@ -93,12 +93,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	return &wsr, uninstantiated
 }
 
-// Mark this workspace dirty
-func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	c.qfs.activateWorkspace(c,
-		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
-}
-
 func (wsr *WorkspaceRoot) checkHardlink(inodeId InodeId) (isHardlink bool,
 	id HardlinkId) {
 
@@ -443,8 +437,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 		if err != nil {
 			msg := fmt.Sprintf("Unexpected workspace rootID update "+
-				"failure, current %s: %s", rootId.String(),
-				err.Error())
+				"failure, wsdb %s, new %s, wsr %s: %s",
+				rootId.String(), newRootId.String(),
+				wsr.rootId.String(), err.Error())
 			panic(msg)
 		}
 
@@ -452,8 +447,6 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			rootId.String())
 		wsr.rootId = rootId
 	}
-	c.qfs.deactivateWorkspace(c,
-		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {

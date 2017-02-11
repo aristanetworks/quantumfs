@@ -172,6 +172,10 @@ func (df *DeferableMutex) Lock() *sync.Mutex {
 	return &df.lock
 }
 
+func (df *DeferableMutex) Unlock() {
+	df.lock.Unlock()
+}
+
 // Return the lock via a tiny interface to prevent read/write lock/unlock mismatch
 type NeedReadUnlock interface {
 	RUnlock()

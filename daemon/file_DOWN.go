@@ -18,23 +18,27 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush_DOWN", "%s", fi.name_).out()
 
+	defer fi.Lock().Unlock()
+
+	if fi.isOrphaned() {
+		c.vlog("Not flushing orphaned file")
+		return quantumfs.EmptyBlockKey
+	}
+
 	key := fi.accessor.sync(c)
-	fi.setDirty(false)
+	fi.parent(c).syncChild(c, fi.inodeNum(), key)
 	return key
 }
 
 func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
+	fi.flush_DOWN(c)
 	return fuse.OK
 }
 
 func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.funcIn("File::Sync_DOWN").out()
 
-	defer fd.file.Lock().Unlock()
-	if fd.file.isDirty() {
-		key := fd.file.flush_DOWN(c)
-		fd.file.parent(c).syncChild(c, fd.file.InodeCommon.id, key)
-	}
+	fd.file.flush_DOWN(c)
 
 	return fuse.OK
 }

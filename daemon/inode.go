@@ -4,10 +4,10 @@
 // The basic Inode and FileHandle structures
 package daemon
 
+import "container/list"
 import "fmt"
 import "sync"
 import "sync/atomic"
-import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -75,8 +75,7 @@ type Inode interface {
 
 	getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error)
 
-	// Update the key for only this child and then notify all the grandparents of
-	// the cascading changes.
+	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
 	getChildXAttrSize(c *ctx, inodeNum InodeId,
@@ -110,15 +109,24 @@ type Inode interface {
 	// orphaned from the directory tree and cannot be accessed except directly by
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
+	orphan(c *ctx)
 
 	dirty(c *ctx) // Mark this Inode dirty
+	markClean()   // Mark this Inode as cleaned
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child InodeId)
-	isDirty() bool // Is this Inode dirty?
 
-	// Compute a new object key, possibly schedule the sync the object data
-	// itself to the datastore
+	// The kernel has forgotten about this Inode. Add yourself to the list to be
+	// flushed and forgotten.
+	queueToForget(c *ctx)
+
+	// Returns this inode's place in the dirtyQueue
+	dirtyElement() *list.Element
+
+	// Compute a new object key, schedule the object data to be uploaded to the
+	// datastore and update the parent with the new key.
 	flush_DOWN(c *ctx) quantumfs.ObjectKey
+
 	Sync_DOWN(c *ctx) fuse.Status
 	link_DOWN(c *ctx, srcInode Inode, newName string,
 		out *fuse.EntryOut) fuse.Status
@@ -127,7 +135,6 @@ type Inode interface {
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
-	LockTreeWaitAtMost(ms time.Duration) *sync.RWMutex
 	RLockTree() *sync.RWMutex
 
 	isWorkspaceRoot() bool
@@ -159,42 +166,57 @@ type InodeCommon struct {
 	treeLock_ *sync.RWMutex
 
 	// This field is accessed using atomic instructions
-	dirty_ uint32 // 1 if this Inode or any children are dirty
+	dirty_           uint32 // 1 if this Inode or any children are dirty
+	dirtyElementLock DeferableMutex
+	dirtyElement_    *list.Element
 }
 
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
 }
 
-func (inode *InodeCommon) isDirty() bool {
-	if atomic.LoadUint32(&inode.dirty_) == 1 {
-		return true
-	} else {
-		return false
+// Add this Inode to the dirty list
+func (inode *InodeCommon) dirty(c *ctx) {
+	if inode.isOrphaned() {
+		c.vlog("Not dirtying inode %d because it is orphaned", inode.id)
+		return
+	}
+
+	de := inode.dirtyElement()
+
+	if de == nil {
+		c.vlog("Queueing inode %d on dirty list", inode.id)
+		de = c.qfs.queueDirtyInode(c, inode.self)
+
+		// queueDirtyInode requests the dirtyElement so we cannot hold the
+		// dirtyElementLock over that call.
+		defer inode.dirtyElementLock.Lock().Unlock()
+		inode.dirtyElement_ = de
 	}
 }
 
-// Returns if this Inode was already dirty or not
-func (inode *InodeCommon) setDirty(dirty bool) bool {
-	var val uint32
-	if dirty {
-		val = 1
-	} else {
-		val = 0
-	}
-
-	old := atomic.SwapUint32(&inode.dirty_, val)
-	if old == 1 {
-		return true
-	} else {
-		return false
-	}
+// Mark this Inode as having been cleaned
+func (inode *InodeCommon) markClean() {
+	defer inode.dirtyElementLock.Lock().Unlock()
+	inode.dirtyElement_ = nil
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
 		inode)
 	panic(msg)
+}
+
+func (inode *InodeCommon) queueToForget(c *ctx) {
+	de := c.qfs.queueInodeToForget(c, inode.self)
+
+	defer inode.dirtyElementLock.Lock().Unlock()
+	inode.dirtyElement_ = de
+}
+
+func (inode *InodeCommon) dirtyElement() *list.Element {
+	defer inode.dirtyElementLock.Lock().Unlock()
+	return inode.dirtyElement_
 }
 
 func (inode *InodeCommon) name() string {
@@ -245,6 +267,13 @@ func (inode *InodeCommon) isOrphaned() bool {
 	return inode.inodeNum() == inode.parentId()
 }
 
+func (inode *InodeCommon) orphan(c *ctx) {
+	inode.parentLock.Lock()
+	inode.parent_ = inode.id
+	inode.parentLock.Unlock()
+	c.vlog("Orphaned inode %d", inode.id)
+}
+
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
 	return inode.treeLock_
 }
@@ -252,34 +281,6 @@ func (inode *InodeCommon) treeLock() *sync.RWMutex {
 func (inode *InodeCommon) LockTree() *sync.RWMutex {
 	inode.treeLock_.Lock()
 	return inode.treeLock_
-}
-
-// Attempt to exclusively grab the TreeLock. Wait at most the duration given. If the
-// lock is successfully grabbed, return the lock so "defer lock.Unlock()" may be
-// written. If the lock is not successfully grabbed, nil is returned.
-func (inode *InodeCommon) LockTreeWaitAtMost(wait time.Duration) *sync.RWMutex {
-	var lock *sync.RWMutex
-	waitForTreeLock := make(chan *sync.RWMutex)
-	go func() {
-		waitForTreeLock <- inode.LockTree()
-	}()
-
-	select {
-	case <-time.After(wait):
-		// Since we've timed out we need to launch a receiver for the lock.
-		// Should the lock ever eventually be acquired if we don't have
-		// something waiting to release it we'll indefinitely block that
-		// tree.
-		go func() {
-			lock := <-waitForTreeLock
-			lock.Unlock()
-		}()
-		return nil
-
-	case lock = <-waitForTreeLock:
-	}
-
-	return lock
 }
 
 func (inode *InodeCommon) RLockTree() *sync.RWMutex {
