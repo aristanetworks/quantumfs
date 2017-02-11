@@ -126,6 +126,33 @@ func TestApiAccessListLargeSize(t *testing.T) {
 	})
 }
 
+func TestApiAccessListApiFileSizeResidue(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		filename := "testfiletestfiletestfiletestfiletestfiletesti" +
+			"filetestfiletestfiletestfiletestfile"
+
+		accessList, expectedSize := generateFile(test, 200, workspace, filename)
+
+		api := test.getApi()
+		relpath := test.relPath(workspace)
+
+		responselist, _ := api.GetAccessed(relpath)
+		queueSize1 := test.qfs.apiFileSize
+		test.assert(mapSize(responselist) == expectedSize,
+			"Error getting unequal sizes %d != %d",
+			mapSize(responselist), expectedSize)
+
+		test.assertAccessList(accessList, responselist,
+			"Error two maps different")
+		test.qfs.setFileHandle(&test.qfs.c, 7, nil)
+		queueSize2 := test.qfs.apiFileSize
+		test.assert(queueSize1 >= int64(expectedSize) && queueSize2 == 0,
+			"The apiFileSize: %d %d, the actual response size: %d)",
+			queueSize1, queueSize2, expectedSize)
+	})
+}
+
 func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testApiAccessList(test, 500, "sample", true)
