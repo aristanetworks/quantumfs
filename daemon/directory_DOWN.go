@@ -13,29 +13,45 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	origRecord, err := srcInode.parent(c).getChildRecord(c, srcInode.inodeNum())
-	if err != nil {
-		c.elog("QuantumFs::Link Failed to get srcInode record %v:", err)
-		return fuse.EIO
+	// Grab the source parent as a Directory
+	var srcParent *Directory
+	switch v := srcInode.parent(c).(type) {
+	case *Directory:
+		srcParent = v
+	case *WorkspaceRoot:
+		srcParent = &(v.Directory)
+	default:
+		c.elog("Source directory is not a directory: %d",
+			srcInode.inodeNum())
+		return fuse.EINVAL
+	}
+
+	// Ensure the source and dest are in the same workspace
+	if srcParent.wsr != dir.wsr {
+		c.elog("Source and dest are not different workspaces.")
+		return fuse.EPERM
+	}
+
+	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
+	if err != fuse.OK {
+		c.elog("QuantumFs::Link Failed with srcInode record")
+		return err
 	}
 	srcInode.markSelfAccessed(c, false)
 
-	newRecord := cloneDirectoryRecord(origRecord)
 	newRecord.SetFilename(newName)
-	newRecord.SetID(srcInode.flush(c))
 
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.newChild(c, newRecord)
+		return dir.children.loadChild(c, newRecord)
 	}()
 
 	dir.self.markAccessed(c, newName, true)
 
-	c.dlog("CoW linked %d to %s as inode %d", srcInode.inodeNum(), newName,
-		inodeNum)
+	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -43,12 +59,24 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		newRecord)
 
 	dir.self.dirty(c)
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
+	// Hardlinks aren't tracked by the uninstantiated list, they need a more
+	// complicated reference counting system handled by workspaceroot
 
 	return fuse.OK
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
+	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum())
+
+	children := dir.childInodes()
+	for _, child := range children {
+		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
+			inode.Sync_DOWN(c)
+		}
+	}
+
+	dir.flush(c)
+
 	return fuse.OK
 }
 
@@ -62,15 +90,15 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 
 	// Update the Hash value before generating the key
 	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
-		// Since the child is instantiated it may be modified, flush is to be
-		// sure
-		childInode.flush(c)
+		// Since the child is instantiated it may be modified, flush it
+		// synchronously and recusively to be sure.
+		childInode.Sync_DOWN(c)
 	}
 
-	// flush_DOWN already acquired an Inode lock exclusively. In case of the
-	// dead lock, the Inode lock for reading should be required after releasing
-	// its exclusive lock. The gap between two locks, other threads cannot come
-	// in because the function holds the exclusive tree lock, so it is the only
+	// flush already acquired an Inode lock exclusively. In case of the dead
+	// lock, the Inode lock for reading should be required after releasing its
+	// exclusive lock. The gap between two locks, other threads cannot come in
+	// because the function holds the exclusive tree lock, so it is the only
 	// thread accessing this Inode. Also, recursive lock requiring won't occur.
 	defer dir.RLock().RUnlock()
 	record, err := dir.getChildRecord(c, inodeNum)
@@ -102,4 +130,26 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	}
 
 	return currDir, nil
+}
+
+func (dir *Directory) makeHardlink_DOWN(c *ctx,
+	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
+
+	defer c.funcIn("Directory::makeHardlink_DOWN").out()
+
+	// If the file isn't a hardlink, then we must flush it first. It's unlikely
+	// we'll be linking many hardlinks several times and it is somewhat tedious
+	// to determine if toLink is a hardlink or not. Instead we simply flush all
+	// inodes we are going to hardlink.
+	toLink.Sync_DOWN(c)
+
+	defer dir.Lock().Unlock()
+	defer dir.childRecordLock.Lock().Unlock()
+
+	record := dir.children.record(toLink.inodeNum())
+	if record == nil {
+		return nil, fuse.ENOENT
+	}
+
+	return dir.children.makeHardlink(c, record.Filename())
 }
