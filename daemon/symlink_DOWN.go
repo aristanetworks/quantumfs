@@ -16,13 +16,12 @@ func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (link *Symlink) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	link.setDirty(false)
+	link.parent(c).syncChild(c, link.inodeNum(), link.key)
 	return link.key
 }
 
 func (link *Symlink) Sync_DOWN(c *ctx) fuse.Status {
-	key := link.flush_DOWN(c)
-	link.parent(c).syncChild(c, link.InodeCommon.id, key)
+	link.flush_DOWN(c)
 
 	return fuse.OK
 }

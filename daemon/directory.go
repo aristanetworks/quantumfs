@@ -169,6 +169,9 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 func (dir *Directory) updateSize_(c *ctx) {
 	defer c.funcIn("Directory::updateSize_").out()
 
+	// We think we've made a change to this directory, so we should mark it dirty
+	dir.self.dirty(c)
+
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
 	if !dir.self.isWorkspaceRoot() {
@@ -219,29 +222,15 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 
 	dir.self.markAccessed(c, record.Filename(), false)
 
-	if record.Type() == quantumfs.ObjectTypeSmallFile ||
-		record.Type() == quantumfs.ObjectTypeMediumFile ||
-		record.Type() == quantumfs.ObjectTypeLargeFile ||
-		record.Type() == quantumfs.ObjectTypeVeryLargeFile {
-
-		inode := c.qfs.inodeNoInstantiate(c, inodeNum)
-		if inode != nil {
-			if file, isFile := inode.(*File); isFile {
-				file.setChildRecord(c, record)
-				file.setParent(file.inodeNum())
-			}
+	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+		if file, isFile := inode.(*File); isFile {
+			file.setChildRecord(c, record)
 		}
+		inode.orphan(c)
 	}
 
 	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	dir.updateSize_(c)
-}
-
-func (dir *Directory) dirty(c *ctx) {
-	if !dir.setDirty(true) {
-		// Only go recursive if we aren't already dirty
-		dir.parent(c).dirtyChild(c, dir.inodeNum())
-	}
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
@@ -410,6 +399,8 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 func publishDirectoryRecordIfs(c *ctx,
 	records []DirectoryRecordIf) quantumfs.ObjectKey {
 
+	defer c.funcIn("publishDirectoryRecordIfs").out()
+
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
 	newBaseLayerId := quantumfs.EmptyDirKey
@@ -440,21 +431,14 @@ func publishDirectoryRecordIfs(c *ctx,
 }
 
 // Must hold the dir.childRecordsLock
-func (dir *Directory) publish_(c *ctx) quantumfs.ObjectKey {
-	defer c.FuncIn("Directory::publish", "%s", dir.name_).out()
+func (dir *Directory) publish_(c *ctx) {
+	defer c.FuncIn("Directory::publish_", "%s", dir.name_).out()
 
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecordIfs(c, dir.children.records())
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
-
-	if !dir.self.isWorkspaceRoot() {
-		// TODO This violates layering and is ugly
-		dir.setDirty(false)
-	}
-
-	return dir.baseLayerId
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
@@ -606,6 +590,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
+	newEntity.dirty(c)
 	newEntity.markSelfAccessed(c, true)
 
 	return newEntity
@@ -1027,7 +1012,6 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		}
 
 		dir.updateSize_(c)
-		dir.self.dirty(c)
 
 		return fuse.OK
 	}()
@@ -1191,14 +1175,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.deleteEntry_(c, oldName)
 
 			parent.updateSize_(c)
-			parent.self.dirty(c)
 
 			return fuse.OK
 		}()
 
 		if result == fuse.OK {
 			child.updateSize_(c)
-			child.self.dirty(c)
 		}
 		return result
 	}()
@@ -1260,25 +1242,18 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	defer c.FuncIn("Directory::syncChild", "(%d %d) %s", dir.inodeNum(),
 		inodeNum, newKey.String()).out()
 
-	ok, key := func() (bool, quantumfs.ObjectKey) {
-		defer dir.Lock().Unlock()
-		dir.self.dirty(c)
-		defer dir.childRecordLock.Lock().Unlock()
+	defer dir.Lock().Unlock()
+	dir.self.dirty(c)
+	defer dir.childRecordLock.Lock().Unlock()
 
-		entry := dir.children.record(inodeNum)
-		if entry == nil {
-			c.elog("Directory::syncChild inode %d not a valid child",
-				inodeNum)
-			return false, quantumfs.ObjectKey{}
-		}
-
-		entry.SetID(newKey)
-		return true, dir.publish_(c)
-	}()
-
-	if ok && !dir.self.isWorkspaceRoot() {
-		dir.parent(c).syncChild(c, dir.InodeCommon.id, key)
+	entry := dir.children.record(inodeNum)
+	if entry == nil {
+		c.elog("Directory::syncChild inode %d not a valid child",
+			inodeNum)
+		return
 	}
+
+	entry.SetID(newKey)
 }
 
 // Get the extended attributes object. The status is EIO on error or ENOENT if there

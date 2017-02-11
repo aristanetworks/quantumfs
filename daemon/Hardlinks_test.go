@@ -10,6 +10,7 @@ import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
+import "time"
 import "github.com/aristanetworks/quantumfs"
 
 func TestHardlinkReload(t *testing.T) {
@@ -148,7 +149,11 @@ func TestHardlinkRelay(t *testing.T) {
 }
 
 func TestHardlinkForget(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.DirtyFlushDelay = 100 * time.Millisecond
+		test.startQuantumFs(config)
+
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
@@ -171,8 +176,10 @@ func TestHardlinkForget(t *testing.T) {
 		test.qfs.Forget(uint64(linkInode), 1)
 
 		// Check that it's uninstantiated
-		inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
-		test.assert(inode == nil, "hardlink inode not forgotten")
+		test.waitFor("hardlink inode to be forgotten", func() bool {
+			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
+			return inode == nil
+		})
 	})
 }
 

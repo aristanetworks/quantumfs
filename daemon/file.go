@@ -77,14 +77,6 @@ type File struct {
 	unlinkRecord DirectoryRecordIf
 }
 
-// Mark this file dirty and notify your paent
-func (fi *File) dirty(c *ctx) {
-	defer c.funcIn("File::dirty").out()
-
-	fi.setDirty(true)
-	fi.parent(c).dirtyChild(c, fi.inodeNum())
-}
-
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	if child != fi.inodeNum() {
 		panic("Unsupported dirtyChild() call on File")

@@ -16,14 +16,15 @@ func (special *Special) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (special *Special) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	special.setDirty(false)
+	key := special.embedDataIntoKey_(c)
 
-	return special.embedDataIntoKey_(c)
+	special.parent(c).syncChild(c, special.inodeNum(), key)
+
+	return key
 }
 
 func (special *Special) Sync_DOWN(c *ctx) fuse.Status {
-	key := special.flush_DOWN(c)
-	special.parent(c).syncChild(c, special.InodeCommon.id, key)
+	special.flush_DOWN(c)
 
 	return fuse.OK
 }

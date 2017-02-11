@@ -36,6 +36,8 @@ type TypespaceList struct {
 }
 
 func (tsl *TypespaceList) dirty(c *ctx) {
+	// Override InodeCommon.dirty() because namespaces don't get dirty in the
+	// traditional manner
 }
 
 func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
@@ -486,6 +488,8 @@ type NamespaceList struct {
 }
 
 func (nsl *NamespaceList) dirty(c *ctx) {
+	// Override InodeCommon.dirty() because namespaces don't get dirty in the
+	// traditional manner
 }
 
 func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
@@ -781,6 +785,8 @@ type WorkspaceList struct {
 }
 
 func (wsl *WorkspaceList) dirty(c *ctx) {
+	// Override InodeCommon.dirty() because workspaces don't get dirty in the
+	// traditional manner.
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
