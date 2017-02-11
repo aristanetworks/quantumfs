@@ -228,6 +228,8 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (tsl *TypespaceList) childInodes() []InodeId {
+	defer tsl.Lock().Unlock()
+
 	rtn := make([]InodeId, 0, len(tsl.typespacesById))
 	for k, _ := range tsl.typespacesById {
 		rtn = append(rtn, k)
@@ -239,6 +241,8 @@ func (tsl *TypespaceList) childInodes() []InodeId {
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	defer tsl.Lock().Unlock()
 
 	updateChildren(c, "", "", list, &tsl.typespacesByName,
 		&tsl.typespacesById, tsl, newNamespaceList)
@@ -274,6 +278,8 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	var list []string
 	list, err = c.workspaceDB.TypespaceList(&c.Ctx)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	defer tsl.Lock().Unlock()
 
 	updateChildren(c, "", "", list,
 		&tsl.typespacesByName, &tsl.typespacesById, tsl, newNamespaceList)
@@ -438,8 +444,8 @@ func (tsl *TypespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (tsl *TypespaceList) instantiateChild(c *ctx,
 	inodeNum InodeId) (Inode, []InodeId) {
 
-	c.vlog("TypespaceList::instantiateChild Enter")
-	defer c.vlog("TypespaceList::instantiateChild Exit")
+	defer c.funcIn("TypespaceList::instantiateChild").out()
+	defer tsl.Lock().Unlock()
 
 	// The api file will never be truly forgotten (see QuantumFs.Forget()) and so
 	// doesn't need to ever be re-instantiated.
@@ -522,6 +528,8 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) childInodes() []InodeId {
+	defer nsl.Lock().Unlock()
+
 	rtn := make([]InodeId, 0, len(nsl.namespacesById))
 	for k, _ := range nsl.namespacesById {
 		rtn = append(rtn, k)
@@ -533,6 +541,8 @@ func (nsl *NamespaceList) childInodes() []InodeId {
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	defer nsl.Lock().Unlock()
 
 	updateChildren(c, "", nsl.typespaceName, list,
 		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
@@ -555,6 +565,8 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	var list []string
 	list, err = c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	defer nsl.Lock().Unlock()
 
 	updateChildren(c, "", nsl.typespaceName, list,
 		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
@@ -719,8 +731,8 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (nsl *NamespaceList) instantiateChild(c *ctx,
 	inodeNum InodeId) (Inode, []InodeId) {
 
-	c.vlog("NamespaceList::instantiateChild Enter")
-	defer c.vlog("NamespaceList::instantiateChild Exit")
+	defer c.funcIn("NamespaceList::instantiateChild").out()
+	defer nsl.Lock().Unlock()
 
 	name, exists := nsl.namespacesById[inodeNum]
 	if exists {
@@ -813,6 +825,8 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (wsl *WorkspaceList) childInodes() []InodeId {
+	defer wsl.Lock().Unlock()
+
 	rtn := make([]InodeId, 0, len(wsl.workspacesById))
 	for k, _ := range wsl.workspacesById {
 		rtn = append(rtn, k)
@@ -825,6 +839,8 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	defer wsl.Lock().Unlock()
 
 	updateChildren(c, wsl.typespaceName, wsl.namespaceName, list,
 		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
@@ -849,6 +865,8 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	list, err = c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+
+	defer wsl.Lock().Unlock()
 
 	updateChildren(c, wsl.typespaceName, wsl.namespaceName, list,
 		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
@@ -1013,8 +1031,8 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (wsl *WorkspaceList) instantiateChild(c *ctx,
 	inodeNum InodeId) (Inode, []InodeId) {
 
-	c.vlog("WorkspaceList::instantiateChild Enter")
-	defer c.vlog("WorkspaceList::instantiateChild Exit")
+	defer c.funcIn("WorkspaceList::instantiateChild").out()
+	defer wsl.Lock().Unlock()
 
 	name, exists := wsl.workspacesById[inodeNum]
 	if exists {

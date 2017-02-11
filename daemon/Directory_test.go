@@ -25,7 +25,8 @@ func TestDirectoryCreation(t *testing.T) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
 		test.assert(err == nil, "Error stat'ing test dir: %v", err)
-		test.assert(stat.Size == int64(qfsBlockSize), "Incorrect Size: %d",
+		test.assert(stat.Size > 0, "Size too small: %d", stat.Size)
+		test.assert(stat.Size <= int64(qfsBlockSize), "Size too big: %d",
 			stat.Size)
 		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
@@ -49,7 +50,8 @@ func TestRecursiveDirectoryCreation(t *testing.T) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(dirName, &stat)
 		test.assert(err == nil, "Error stat'ing test dir: %v", err)
-		test.assert(stat.Size == int64(qfsBlockSize), "Incorrect Size: %d",
+		test.assert(stat.Size > 0, "Size too small: %d", stat.Size)
+		test.assert(stat.Size <= int64(qfsBlockSize), "Size too big: %d",
 			stat.Size)
 		test.assert(stat.Nlink == 2, "Incorrect Nlink: %d", stat.Nlink)
 
