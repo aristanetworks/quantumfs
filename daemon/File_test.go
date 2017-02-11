@@ -40,6 +40,25 @@ func TestFileCreation(t *testing.T) {
 	})
 }
 
+func TestFileWriteBlockSize(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		testFilename := workspace + "/" + "testwsize"
+		file, err := os.Create(testFilename)
+		test.assert(file != nil && err == nil,
+			"Error creating file: %v", err)
+		defer file.Close()
+
+		data := genData(131072)
+
+		_, err = file.Write(data)
+		test.assert(err == nil, "Error writing to new fd: %v", err)
+		test.assertLogContains("operateOnBlocks offset 0 size 131072",
+			"Write block size not expected")
+	})
+}
+
 func TestFileReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		//length of test Text should be 37, and not a multiple of readBuf len
