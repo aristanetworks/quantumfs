@@ -1272,7 +1272,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 
 	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
 		c.vlog("Directory::getExtendedAttributes_ returning new object")
-		return quantumfs.NewExtendedAttributes(), fuse.ENOENT
+		return nil, fuse.ENOENT
 	}
 
 	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
@@ -1363,11 +1363,13 @@ func (dir *Directory) listChildXAttr(c *ctx,
 	}
 
 	var nameBuffer bytes.Buffer
-	for i := 0; i < attributeList.NumAttributes(); i++ {
-		name, _ := attributeList.Attribute(i)
-		c.vlog("Appending %s", name)
-		nameBuffer.WriteString(name)
-		nameBuffer.WriteByte(0)
+	if ok != fuse.ENOENT {
+		for i := 0; i < attributeList.NumAttributes(); i++ {
+			name, _ := attributeList.Attribute(i)
+			c.vlog("Appending %s", name)
+			nameBuffer.WriteString(name)
+			nameBuffer.WriteByte(0)
+		}
 	}
 
 	// append our self-defined extended attribute XAttrTypeKey
@@ -1399,6 +1401,14 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
 	if ok == fuse.EIO {
 		return fuse.EIO
+	}
+
+	if ok == fuse.ENOENT {
+		// getExtendedAttributes_() returns a shared
+		// quantumfs.ExtendedAttributes instance when the file has no
+		// extended attributes for performance reasons. Thus we need to
+		// instantiate our own before we modify it.
+		attributeList = quantumfs.NewExtendedAttributes()
 	}
 
 	var dataKey quantumfs.ObjectKey
