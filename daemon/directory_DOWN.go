@@ -65,28 +65,6 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.OK
 }
 
-func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.FuncIn("Directory::flush_DOWN", "%d %s", dir.inodeNum(),
-		dir.name_).out()
-
-	defer dir.Lock().Unlock()
-
-	parent := dir.parent(c)
-
-	if parent == dir {
-		c.vlog("Not flushing orphaned directory")
-		return dir.baseLayerId
-	}
-
-	defer dir.childRecordLock.Lock().Unlock()
-
-	dir.publish_(c)
-
-	parent.syncChild(c, dir.inodeNum(), dir.baseLayerId)
-
-	return dir.baseLayerId
-}
-
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum())
 
@@ -97,7 +75,7 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 		}
 	}
 
-	dir.flush_DOWN(c)
+	dir.flush(c)
 
 	return fuse.OK
 }
@@ -117,10 +95,10 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 		childInode.Sync_DOWN(c)
 	}
 
-	// flush_DOWN already acquired an Inode lock exclusively. In case of the
-	// dead lock, the Inode lock for reading should be required after releasing
-	// its exclusive lock. The gap between two locks, other threads cannot come
-	// in because the function holds the exclusive tree lock, so it is the only
+	// flush already acquired an Inode lock exclusively. In case of the dead
+	// lock, the Inode lock for reading should be required after releasing its
+	// exclusive lock. The gap between two locks, other threads cannot come in
+	// because the function holds the exclusive tree lock, so it is the only
 	// thread accessing this Inode. Also, recursive lock requiring won't occur.
 	defer dir.RLock().RUnlock()
 	record, err := dir.getChildRecord(c, inodeNum)

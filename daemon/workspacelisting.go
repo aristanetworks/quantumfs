@@ -460,6 +460,11 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 	return newNamespaceList(c, name, "", "", tsl, inodeNum)
 }
 
+func (tsl *TypespaceList) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("TypespaceList::flush").out()
+	return quantumfs.EmptyBlockKey
+}
+
 func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
@@ -753,6 +758,11 @@ func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
 func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
 	c.elog("Invalid markAccessed on NamespaceList")
 	return
+}
+
+func (nsl *NamespaceList) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("NamespaceList::flush").out()
+	return quantumfs.EmptyBlockKey
 }
 
 func newWorkspaceList(c *ctx, typespace string, namespace string, workspace string,
@@ -1062,4 +1072,8 @@ func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
 func (wsl *WorkspaceList) markAccessed(c *ctx, path string, created bool) {
 	c.elog("Invalid markAccessed on WorkspaceList")
 	return
+}
+func (wsl *WorkspaceList) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("WorkspaceList::flush").out()
+	return quantumfs.EmptyBlockKey
 }
