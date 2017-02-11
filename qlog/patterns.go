@@ -4,6 +4,8 @@
 // qparse is the shared memory log parser for the qlog quantumfs subsystem
 package qlog
 
+import "crypto/md5"
+import "encoding/binary"
 import "fmt"
 import "math"
 import "runtime"
@@ -222,10 +224,8 @@ func SeqMapToList(sequenceMap map[string]SequenceData) []SequenceData {
 	return sequences
 }
 
-func GetStatPatterns(inFile string, maxThreads int,
-	maxLenWildcards int) []PatternData {
-
-	// Structures during this process can be massive. Throw them away asap
+func GetTrackerMap(inFile string, maxThreads int) (int,
+	map[uint64][]SequenceTracker) {
 
 	var logs []LogOutput
 	{
@@ -239,7 +239,7 @@ func GetStatPatterns(inFile string, maxThreads int,
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
 
-	var trackerMap map[uint64][]sequenceTracker
+	var trackerMap map[uint64][]SequenceTracker
 	var trackerCount int
 	{
 		trackerCount, trackerMap = ExtractTrackerMap(logs, maxThreads)
@@ -247,6 +247,15 @@ func GetStatPatterns(inFile string, maxThreads int,
 	}
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
+
+	return trackerCount, trackerMap
+}
+
+func GetStatPatterns(inFile string, maxThreads int,
+	maxLenWildcards int) []PatternData {
+
+	// Structures during this process can be massive. Throw them away asap
+	trackerCount, trackerMap := GetTrackerMap(inFile, maxThreads)
 
 	var sequenceMap map[string]SequenceData
 	{
@@ -298,7 +307,7 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 		// recurseGenPatterns will overlook the "no wildcards" sequence,
 		// so we must add that ourselves
 		newEntry := newWildcardedSeq(seq, []bool{})
-		patterns.Set(genSeqStr(seq), matchStr, &newEntry)
+		patterns.Set(GenSeqStr(seq), matchStr, &newEntry)
 
 		// make sure that we at least call the "wrapper" pattern
 		wildcardFilled := make([]bool, len(seq), len(seq))
@@ -324,7 +333,7 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 		status.Process(float32(mapIdx) / float32(len(patterns.dataByList)))
 
 		var newResult PatternData
-		newResult.SeqStrRaw = genSeqStr(wcseq.sequence)
+		newResult.SeqStrRaw = GenSeqStr(wcseq.sequence)
 		newResult.Wildcards = wcseq.wildcards
 		newResult.Data = collectData(wcseq.wildcards, wcseq.sequence,
 			sequences)
@@ -346,7 +355,10 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 			deviationSum += float64(deviation * deviation)
 		}
 		newResult.Stddev = int64(math.Sqrt(deviationSum))
-		newResult.Id = mapIdx
+		// We need an ID that's unique but deterministic
+		hash := md5.Sum([]byte(newResult.SeqStrRaw))
+		hashTrimmed := hash[:8]
+		newResult.Id = binary.BigEndian.Uint64(hashTrimmed[:])
 
 		rawResults[mapIdx] = newResult
 		mapIdx++
