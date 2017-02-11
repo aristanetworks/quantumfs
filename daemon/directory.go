@@ -254,7 +254,12 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	fileType := objectTypeToFileType(c, entry.Type())
 	switch fileType {
 	case fuse.S_IFDIR:
-		attr.Size = qfsBlockSize
+		// Approximate the read size of the Directory objects in the
+		// datastore. Accurately summing the size might require looking at
+		// the size of several blocks for not much gain over this simple
+		// linear approximately based upon the design document fixed field
+		// sizes, even though the real encoding is variable length.
+		attr.Size = 25 + 331*entry.Size()
 		attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 		attr.Nlink = uint32(entry.Size()) + 2
 	case fuse.S_IFIFO:
@@ -266,6 +271,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFREG,
 		fuse.S_IFLNK:
 
+		// This ignore the datablocks containing the file metadata, which is
+		// relevant for medium, large and very large files.
 		attr.Size = entry.Size()
 		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
 		attr.Nlink = entry.Nlinks()
