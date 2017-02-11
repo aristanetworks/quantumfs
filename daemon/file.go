@@ -639,6 +639,21 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	return writeCount, fuse.OK
 }
 
+func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.FuncIn("File::flush", "%s", fi.name_).out()
+
+	defer fi.Lock().Unlock()
+
+	if fi.isOrphaned() {
+		c.vlog("Not flushing orphaned file")
+		return quantumfs.EmptyBlockKey
+	}
+
+	key := fi.accessor.sync(c)
+	fi.parent(c).syncChild(c, fi.inodeNum(), key)
+	return key
+}
+
 func newFileDescriptor(file *File, inodeNum InodeId,
 	fileHandleId FileHandleId, treeLock *sync.RWMutex) FileHandle {
 

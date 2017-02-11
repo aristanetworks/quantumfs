@@ -1677,6 +1677,28 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }
 
+func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
+		dir.name_).out()
+
+	defer dir.Lock().Unlock()
+
+	parent := dir.parent(c)
+
+	if parent == dir {
+		c.vlog("Not flushing orphaned directory")
+		return dir.baseLayerId
+	}
+
+	defer dir.childRecordLock.Lock().Unlock()
+
+	dir.publish_(c)
+
+	parent.syncChild(c, dir.inodeNum(), dir.baseLayerId)
+
+	return dir.baseLayerId
+}
+
 type directoryContents struct {
 	// All immutable after creation
 	filename string

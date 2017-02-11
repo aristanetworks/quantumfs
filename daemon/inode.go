@@ -125,7 +125,7 @@ type Inode interface {
 
 	// Compute a new object key, schedule the object data to be uploaded to the
 	// datastore and update the parent with the new key.
-	flush_DOWN(c *ctx) quantumfs.ObjectKey
+	flush(c *ctx) quantumfs.ObjectKey
 
 	Sync_DOWN(c *ctx) fuse.Status
 	link_DOWN(c *ctx, srcInode Inode, newName string,

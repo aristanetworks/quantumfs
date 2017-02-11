@@ -557,3 +557,30 @@ func (wsr *WorkspaceRoot) clearList() {
 func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
 	return true
 }
+
+func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("WorkspaceRoot::flush").out()
+
+	wsr.Directory.flush(c)
+	wsr.flushHardlinks(c)
+	wsr.publish(c)
+	return wsr.rootId
+}
+
+func (wsr *WorkspaceRoot) flushHardlinks(c *ctx) {
+	defer wsr.linkLock.RLock().RUnlock()
+
+	for inodeId, hardlinkId := range wsr.dirtyLinks {
+		child := c.qfs.inodeNoInstantiate(c, inodeId)
+		if child == nil {
+			c.elog("Uninstantiated dirty hardlink? %d %d", inodeId,
+				hardlinkId)
+			continue
+		}
+
+		newKey := child.flush(c)
+		wsr.hardlinks[hardlinkId].record.SetID(newKey)
+	}
+
+	wsr.dirtyLinks = make(map[InodeId]HardlinkId, 0)
+}

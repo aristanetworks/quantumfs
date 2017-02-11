@@ -269,6 +269,16 @@ func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 }
 
+func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("Special::flush").out()
+
+	key := special.embedDataIntoKey_(c)
+
+	special.parent(c).syncChild(c, special.inodeNum(), key)
+
+	return key
+}
+
 func specialOverrideAttr(entry DirectoryRecordIf, attr *fuse.Attr) uint32 {
 	attr.Size = 0
 	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)

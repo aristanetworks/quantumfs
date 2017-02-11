@@ -256,6 +256,10 @@ func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeI
 	return nil, nil
 }
 
+func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
+}
+
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 	c.vlog("newApiHandle Enter")
 	defer c.vlog("newApiHandle Exit")

@@ -5,7 +5,6 @@ package daemon
 
 // This is the _DOWN counterpart to file.go
 
-import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -15,30 +14,15 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (fi *File) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.FuncIn("File::flush_DOWN", "%s", fi.name_).out()
-
-	defer fi.Lock().Unlock()
-
-	if fi.isOrphaned() {
-		c.vlog("Not flushing orphaned file")
-		return quantumfs.EmptyBlockKey
-	}
-
-	key := fi.accessor.sync(c)
-	fi.parent(c).syncChild(c, fi.inodeNum(), key)
-	return key
-}
-
 func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
-	fi.flush_DOWN(c)
+	fi.flush(c)
 	return fuse.OK
 }
 
 func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.funcIn("File::Sync_DOWN").out()
 
-	fd.file.flush_DOWN(c)
+	fd.file.flush(c)
 
 	return fuse.OK
 }
