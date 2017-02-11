@@ -216,7 +216,7 @@ func (th *testHelper) endTest() {
 					"instance after aborting: %v", err)
 			}
 			th.log("ERROR: Failed to unmount, "+
-				"are you leaking a file descriptor?: %v", err)
+				"leaking a file descriptor?: %v", err.Error())
 		}
 	}
 
