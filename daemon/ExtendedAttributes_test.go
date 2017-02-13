@@ -373,3 +373,37 @@ func TestXAttrTypeKeyList(t *testing.T) {
 			err, dst)
 	})
 }
+
+func TestExtendedKeyDirtyChild(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		dirName := workspace + "/dir"
+		fileName := dirName + "/file"
+
+		data := genData(500)
+
+		err := os.Mkdir(dirName, 0777)
+		test.assert(err == nil, "Failed to create directory: %v", err)
+
+		file, err := os.Create(fileName)
+		test.assert(err == nil, "Failed to create file: %v", err)
+
+		test.syncAllWorkspaces()
+
+		buf := make([]byte, quantumfs.ExtendedKeyLength)
+		_, err = syscall.Getxattr(dirName, quantumfs.XAttrTypeKey, buf)
+		test.assert(err == nil, "Failed fetching extended key: %v", err)
+		dirKey1 := string(buf)
+
+		written, err := file.Write(data)
+		test.assert(err == nil, "Failed writing data: %v", err)
+		test.assert(written == len(data), "Didn't write enough %d", written)
+		file.Close()
+
+		_, err = syscall.Getxattr(dirName, quantumfs.XAttrTypeKey, buf)
+		test.assert(err == nil, "Failed fetching extended key: %v", err)
+		dirKey2 := string(buf)
+
+		test.assert(dirKey1 != dirKey2, "Dirty child not synced!")
+	})
+}

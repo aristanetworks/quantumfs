@@ -77,14 +77,6 @@ type File struct {
 	unlinkRecord DirectoryRecordIf
 }
 
-// Mark this file dirty and notify your paent
-func (fi *File) dirty(c *ctx) {
-	defer c.funcIn("File::dirty").out()
-
-	fi.setDirty(true)
-	fi.parent(c).dirtyChild(c, fi.inodeNum())
-}
-
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	if child != fi.inodeNum() {
 		panic("Unsupported dirtyChild() call on File")
@@ -461,21 +453,6 @@ func resize(buffer []byte, size int) []byte {
 	return buffer
 }
 
-func fetchDataSized(c *ctx, key quantumfs.ObjectKey,
-	targetSize int) quantumfs.Buffer {
-
-	orig := c.dataStore.Get(&c.Ctx, key)
-	if orig == nil {
-		c.elog("Data for key missing from datastore")
-		return nil
-	}
-
-	// Before we return the buffer, make sure it's the size it needs to be
-	rtn := newBuffer(c, resize(orig.Get(), targetSize), key.Type())
-
-	return rtn
-}
-
 func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
 	key, err := buffer.Key(&c.Ctx)
 	if err != nil {
@@ -660,6 +637,21 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	fi.dirty(c)
 
 	return writeCount, fuse.OK
+}
+
+func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.FuncIn("File::flush", "%s", fi.name_).out()
+
+	defer fi.Lock().Unlock()
+
+	if fi.isOrphaned() {
+		c.vlog("Not flushing orphaned file")
+		return quantumfs.EmptyBlockKey
+	}
+
+	key := fi.accessor.sync(c)
+	fi.parent(c).syncChild(c, fi.inodeNum(), key)
+	return key
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,

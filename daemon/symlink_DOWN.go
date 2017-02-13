@@ -5,7 +5,6 @@ package daemon
 
 // This is the _DOWN counterpart to symlink.go
 
-import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -15,14 +14,8 @@ func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (link *Symlink) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	link.setDirty(false)
-	return link.key
-}
-
 func (link *Symlink) Sync_DOWN(c *ctx) fuse.Status {
-	key := link.flush_DOWN(c)
-	link.parent(c).syncChild(c, link.InodeCommon.id, key)
+	link.flush(c)
 
 	return fuse.OK
 }

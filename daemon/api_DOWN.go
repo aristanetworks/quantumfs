@@ -5,7 +5,6 @@ package daemon
 
 // _DOWN counterpart to api.go
 
-import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (api *ApiInode) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -13,10 +12,6 @@ func (api *ApiInode) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.elog("Invalid Link on ApiInode")
 	return fuse.ENOTDIR
-}
-
-func (api *ApiInode) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (api *ApiInode) Sync_DOWN(c *ctx) fuse.Status {
