@@ -164,9 +164,6 @@ func updateChildren(c *ctx, rootName string, parentName string, names []string,
 				newInode = newNullWorkspaceRoot
 			}
 
-			c.vlog("Instantiating workspace %s/%s/%s", input[0],
-				input[1], input[2])
-
 			input[indx] = name
 			inode, uninstantiated := newInode(c, input[0], input[1],
 				input[2], parent, inodeId)
