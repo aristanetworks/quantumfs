@@ -55,6 +55,8 @@ func fillApiAttr(c *ctx, attr *fuse.Attr) {
 }
 
 func (api *ApiInode) dirty(c *ctx) {
+	// Override the InodeCommon dirty because the Api can never be changed on the
+	// filesystem itself.
 }
 
 func (api *ApiInode) Access(c *ctx, mask uint32, uid uint32,
@@ -252,6 +254,10 @@ func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 	c.elog("Invalid instantiateChild on ApiInode")
 	return nil, nil
+}
+
+func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
+	return quantumfs.EmptyBlockKey
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {

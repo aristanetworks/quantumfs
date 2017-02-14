@@ -5,7 +5,6 @@ package daemon
 
 // This is the _DOWN counterpart to workspacelisting.go
 
-import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (wsl *WorkspaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -13,10 +12,6 @@ func (wsl *WorkspaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.elog("Invalid Link on WorkspaceList")
 	return fuse.ENOTDIR
-}
-
-func (wsl *WorkspaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (wsl *WorkspaceList) Sync_DOWN(c *ctx) fuse.Status {
@@ -30,10 +25,6 @@ func (nsl *NamespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.ENOTDIR
 }
 
-func (nsl *NamespaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
-}
-
 func (nsl *NamespaceList) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
@@ -43,10 +34,6 @@ func (tsl *TypespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.elog("Invalid Link on TypespaceList")
 	return fuse.ENOTDIR
-}
-
-func (tsl *TypespaceList) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	return quantumfs.EmptyBlockKey
 }
 
 func (tsl *TypespaceList) Sync_DOWN(c *ctx) fuse.Status {

@@ -65,38 +65,18 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	return fuse.OK
 }
 
-func (dir *Directory) flush_DOWN(c *ctx) quantumfs.ObjectKey {
-	defer c.FuncIn("Directory::flush_DOWN", "%d %s", dir.inodeNum(),
-		dir.name_).out()
-
-	if !dir.isDirty() {
-		c.vlog("directory %s not dirty", dir.name_)
-		return dir.baseLayerId
-	}
-
-	defer dir.Lock().Unlock()
-	defer dir.childRecordLock.Lock().Unlock()
-
-	dir.updateRecords_DOWN_(c)
-	return dir.publish_(c)
-}
-
-// Walk the list of children which are dirty and have them recompute their new key
-// wsr can update its new key.
-//
-// Requires the Inode lock and childRecordLock
-func (dir *Directory) updateRecords_DOWN_(c *ctx) {
-	defer c.funcIn("Directory::updateRecords_DOWN_").out()
-
-	dirtyIds := dir.children.popDirty()
-	for _, childId := range dirtyIds {
-		child := c.qfs.inodeNoInstantiate(c, childId)
-		newKey := child.flush_DOWN(c)
-		dir.children.record(childId).SetID(newKey)
-	}
-}
-
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
+	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum())
+
+	children := dir.childInodes()
+	for _, child := range children {
+		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
+			inode.Sync_DOWN(c)
+		}
+	}
+
+	dir.flush(c)
+
 	return fuse.OK
 }
 
@@ -109,12 +89,16 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	fuse.Status) {
 
 	// Update the Hash value before generating the key
-	dir.flush_DOWN(c)
+	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
+		// Since the child is instantiated it may be modified, flush it
+		// synchronously and recusively to be sure.
+		childInode.Sync_DOWN(c)
+	}
 
-	// flush_DOWN already acquired an Inode lock exclusively. In case of the
-	// dead lock, the Inode lock for reading should be required after releasing
-	// its exclusive lock. The gap between two locks, other threads cannot come
-	// in because the function holds the exclusive tree lock, so it is the only
+	// flush already acquired an Inode lock exclusively. In case of the dead
+	// lock, the Inode lock for reading should be required after releasing its
+	// exclusive lock. The gap between two locks, other threads cannot come in
+	// because the function holds the exclusive tree lock, so it is the only
 	// thread accessing this Inode. Also, recursive lock requiring won't occur.
 	defer dir.RLock().RUnlock()
 	record, err := dir.getChildRecord(c, inodeNum)
@@ -151,6 +135,14 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 func (dir *Directory) makeHardlink_DOWN(c *ctx,
 	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
 
+	defer c.funcIn("Directory::makeHardlink_DOWN").out()
+
+	// If the file isn't a hardlink, then we must flush it first. It's unlikely
+	// we'll be linking many hardlinks several times and it is somewhat tedious
+	// to determine if toLink is a hardlink or not. Instead we simply flush all
+	// inodes we are going to hardlink.
+	toLink.Sync_DOWN(c)
+
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
@@ -159,13 +151,5 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 		return nil, fuse.ENOENT
 	}
 
-	// if the file isn't a hardlink, then we must flush it first
-	if record.Type() != quantumfs.ObjectTypeHardlink {
-		newKey := toLink.flush_DOWN(c)
-		dir.children.recordByName(c, record.Filename()).SetID(newKey)
-		dir.children.clearDirty(toLink.inodeNum())
-	}
-
-	dir.self.dirty(c)
 	return dir.children.makeHardlink(c, record.Filename())
 }
