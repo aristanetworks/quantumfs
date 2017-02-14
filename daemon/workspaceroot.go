@@ -93,12 +93,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	return &wsr, uninstantiated
 }
 
-// Mark this workspace dirty
-func (wsr *WorkspaceRoot) dirty(c *ctx) {
-	c.qfs.activateWorkspace(c,
-		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
-}
-
 func (wsr *WorkspaceRoot) checkHardlink(inodeId InodeId) (isHardlink bool,
 	id HardlinkId) {
 
@@ -443,8 +437,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 		if err != nil {
 			msg := fmt.Sprintf("Unexpected workspace rootID update "+
-				"failure, current %s: %s", rootId.String(),
-				err.Error())
+				"failure, wsdb %s, new %s, wsr %s: %s",
+				rootId.String(), newRootId.String(),
+				wsr.rootId.String(), err.Error())
 			panic(msg)
 		}
 
@@ -452,8 +447,6 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			rootId.String())
 		wsr.rootId = rootId
 	}
-	c.qfs.deactivateWorkspace(c,
-		wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace, wsr)
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
@@ -563,4 +556,31 @@ func (wsr *WorkspaceRoot) clearList() {
 
 func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
 	return true
+}
+
+func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("WorkspaceRoot::flush").out()
+
+	wsr.Directory.flush(c)
+	wsr.flushHardlinks(c)
+	wsr.publish(c)
+	return wsr.rootId
+}
+
+func (wsr *WorkspaceRoot) flushHardlinks(c *ctx) {
+	defer wsr.linkLock.RLock().RUnlock()
+
+	for inodeId, hardlinkId := range wsr.dirtyLinks {
+		child := c.qfs.inodeNoInstantiate(c, inodeId)
+		if child == nil {
+			c.elog("Uninstantiated dirty hardlink? %d %d", inodeId,
+				hardlinkId)
+			continue
+		}
+
+		newKey := child.flush(c)
+		wsr.hardlinks[hardlinkId].record.SetID(newKey)
+	}
+
+	wsr.dirtyLinks = make(map[InodeId]HardlinkId, 0)
 }

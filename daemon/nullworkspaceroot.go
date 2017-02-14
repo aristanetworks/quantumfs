@@ -67,3 +67,10 @@ func (nwsr *NullWorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	defer c.vlog("NullWorkspaceRoot::syncChild Exit")
 	nwsr.Directory.syncChild(c, inodeNum, newKey)
 }
+
+func (nwsr *NullWorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("NullWorkspaceRoot::flush").out()
+
+	nwsr.WorkspaceRoot.flush(c)
+	return nwsr.rootId
+}

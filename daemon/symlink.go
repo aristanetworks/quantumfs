@@ -235,7 +235,8 @@ func (link *Symlink) getChildRecord(c *ctx,
 	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
-func (link *Symlink) dirty(c *ctx) {
-	link.setDirty(true)
-	link.parent(c).dirtyChild(c, link.inodeNum())
+func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("Symlink::flush").out()
+	link.parent(c).syncChild(c, link.inodeNum(), link.key)
+	return link.key
 }
