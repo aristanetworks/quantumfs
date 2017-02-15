@@ -618,7 +618,7 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 		fileHandle = qfs.fileHandles[id]
 		if api, ok := fileHandle.(*ApiHandle); ok {
 			qfs.decreaseApiFileSize(c,
-				len(api.partialRead))
+				len(api.responseBuffer))
 		}
 		delete(qfs.fileHandles, id)
 	}
