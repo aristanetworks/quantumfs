@@ -141,6 +141,8 @@ type InsertInodeRequest struct {
 	Permissions uint32
 }
 
+const BufferSize = 5000
+
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
 	if err != nil {
@@ -148,10 +150,11 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	}
 
 	api.fd.Seek(0, 0)
-	size := 5000
+
+	size := BufferSize
 	result := make([]byte, 0)
-	buf = make([]byte, 5000)
-	for size == 5000 {
+	buf = make([]byte, BufferSize)
+	for size == BufferSize {
 		size, err = api.fd.Read(buf)
 		if err != nil {
 			return nil, err
