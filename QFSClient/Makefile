@@ -17,7 +17,7 @@ TEST_OBJS := $(TEST_SRCS:.cc=.o)
 
 CXX_FLAGS      := -xc++ -I$(d) -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -shared -Wl,-rpath,$(d)
-TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest
+TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson
 
 all: $(TARGET) test
 
