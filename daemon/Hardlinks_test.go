@@ -297,18 +297,18 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 		linkname := workspace + "/link"
 
 		file, err := os.Create(filename)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.assertNoErr(err)
 		defer file.Close()
 
 		file.WriteString("stuff")
 
 		err = os.Link(filename, linkname)
-		test.assert(err == nil, "Error linking: %v", err)
+		test.assertNoErr(err)
 
 		err = os.Remove(filename)
-		test.assert(err == nil, "Error removing file: %v", err)
+		test.assertNoErr(err)
 
 		err = os.Remove(linkname)
-		test.assert(err == nil, "Error removing link: %v", err)
+		test.assertNoErr(err)
 	})
 }
