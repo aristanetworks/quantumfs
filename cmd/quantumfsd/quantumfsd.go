@@ -6,6 +6,7 @@ package main
 
 import "flag"
 import "fmt"
+import "time"
 import "os"
 import "runtime/pprof"
 
@@ -163,6 +164,7 @@ func processArgs() {
 	}
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
 	config.MemLogBytes = uint64(memLogMegabytes) * 1024 * 1024
+	config.DirtyFlushDelay = 30 * time.Second
 
 	loadDatastore()
 	loadWorkspaceDB()

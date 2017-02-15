@@ -185,11 +185,6 @@ func TestMultipleLookupCount(t *testing.T) {
 	})
 }
 
-// QuantumFS doesn't currently implement hardlinks correctly. Instead of returning
-// the original inode in the Link() call, it returns a new inode. This doesn't seem
-// to bother the kernel and it distributes the lookup counts between those two inodes
-// as one would expect. However, this may change and this test should start failing
-// if that happens.
 func TestLookupCountHardlinks(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
@@ -201,18 +196,19 @@ func TestLookupCountHardlinks(t *testing.T) {
 		testFilename := workspace + "/test"
 		linkFilename := workspace + "/link"
 
+		// First lookup
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
+		file.Close()
 
+		// Second lookup
 		err = os.Link(testFilename, linkFilename)
 		test.assert(err == nil, "Error creating hardlink")
-
-		file.Close()
 
 		// Forget Inodes
 		remountFilesystem(test)
 
-		test.assertLogDoesNotContain("Looked up 2 Times",
+		test.assertLogContains("Looked up 2 Times",
 			"Failed to cause a second lookup")
 	})
 }
@@ -235,6 +231,8 @@ func TestForgetMarking(t *testing.T) {
 		childIdA := test.getInodeNum(workspace + "/testdir/a")
 		childIdB := test.getInodeNum(workspace + "/testdir/b")
 
+		test.syncAllWorkspaces()
+
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
 		parent := test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
@@ -251,6 +249,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// Now start Forgetting
 		test.qfs.Forget(uint64(parentId), 1)
+		test.syncAllWorkspaces()
 
 		// Parent should still be loaded
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
@@ -259,6 +258,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// Forget one child, not enough to forget the parent
 		test.qfs.Forget(uint64(childIdA), 1)
+		test.syncAllWorkspaces()
 
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
 		test.assert(parent != nil,
@@ -269,16 +269,17 @@ func TestForgetMarking(t *testing.T) {
 
 		// Now forget the last child, which should unload the parent also
 		test.qfs.Forget(uint64(childIdB), 1)
-
-		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent == nil,
-			"Parent %d not forgotten when all children unloaded",
-			parentId)
+		test.syncAllWorkspaces()
 
 		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
 		test.assert(childA == nil, "ChildA not forgotten when requested")
 
 		childB = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
 		test.assert(childB == nil, "ChildB not forgotten when requested")
+
+		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
+		test.assert(parent == nil,
+			"Parent %d not forgotten when all children unloaded",
+			parentId)
 	})
 }

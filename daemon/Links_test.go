@@ -11,6 +11,8 @@ import "os"
 import "syscall"
 import "testing"
 
+import "github.com/aristanetworks/quantumfs"
+
 func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testData := []byte("arstarst")
@@ -29,12 +31,39 @@ func TestHardlink(t *testing.T) {
 		test.assert(err == nil, "Error reading linked file: %v", err)
 		test.assert(bytes.Equal(data, testData), "Data corrupt!")
 
+		// Take note of the nextHardlinkId
+		nextHardlinkId := test.getWorkspaceRoot(workspace).nextHardlinkId
+
 		// Branch and confirm the hardlink is still there
 		workspace = test.absPath(test.branchWorkspace(workspace))
+		file1 = workspace + "/orig_file"
 		file2 = workspace + "/hardlink"
 		data, err = ioutil.ReadFile(file2)
 		test.assert(err == nil, "Error reading linked file: %v", err)
 		test.assert(bytes.Equal(data, testData), "Data corrupt!")
+
+		wsr := test.getWorkspaceRoot(workspace)
+		test.assert(len(wsr.hardlinks) == 1, "Wsr hardlink link len is %d",
+			len(wsr.hardlinks))
+
+		nextHardlinkId_ := test.getWorkspaceRoot(workspace).nextHardlinkId
+		test.assert(nextHardlinkId == nextHardlinkId_ && nextHardlinkId != 0,
+			"nextHardlinkId unset or not saved/loaded")
+
+		// Ensure that hardlinks are now in place
+		file1InodeNum := test.getInodeNum(file1)
+		file2InodeNum := test.getInodeNum(file2)
+
+		parentInode := test.getInode(workspace)
+		parentDir := parentInode.(*WorkspaceRoot).Directory
+		defer parentDir.childRecordLock.Lock().Unlock()
+		test.assert(parentDir.children.record(file1InodeNum).Type() ==
+			quantumfs.ObjectTypeHardlink,
+			"file1 not replaced with hardlink %d %v", file1InodeNum,
+			parentDir.children.childrenRecords)
+		test.assert(parentDir.children.record(file2InodeNum).Type() ==
+			quantumfs.ObjectTypeHardlink,
+			"file2 not created as hardlink")
 	})
 }
 
