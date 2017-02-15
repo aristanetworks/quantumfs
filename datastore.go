@@ -15,6 +15,9 @@ import capn "github.com/glycerine/go-capnproto"
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
 
+// This number empirically derived by looking at file sizes
+const InitBlockSize = 8192
+
 // Maximum length of a filename
 const MaxFilenameLength = int(encoding.MaxFilenameLength)
 const MaxXAttrnameLength = int(encoding.MaxXAttrnameLength)
@@ -650,8 +653,12 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
 	return &record
 }
 
-func (record *DirectoryRecord) Record() *DirectoryRecord {
-	return record
+func (record *DirectoryRecord) Record() DirectoryRecord {
+	return *record
+}
+
+func (record *DirectoryRecord) Nlinks() uint32 {
+	return 1
 }
 
 func (record *DirectoryRecord) Filename() string {

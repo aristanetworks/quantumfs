@@ -4,12 +4,15 @@
 // tests of qfs chroot tool
 package main
 
+import "fmt"
 import "io/ioutil"
 import "os"
 import "os/exec"
 import "runtime"
+import "strings"
 import "syscall"
 import "testing"
+import "time"
 
 var commandsInUsrBin = []string{
 	umount,
@@ -19,24 +22,40 @@ var commandsInUsrBin = []string{
 	"/usr/bin/ls",
 }
 
-var libsToCopy = []string{
-	"/usr/lib64/libtinfo.so.5",
-	"/usr/lib64/libdl.so.2",
-	"/usr/lib64/libc.so.6",
-	"/usr/lib64/librt.so.1",
-	"/usr/lib64/libpcre.so.1",
-	"/usr/lib64/ld-linux-x86-64.so.2",
-	"/usr/lib64/libpthread.so.0",
-	"/usr/lib64/libcap.so.2",
-	"/usr/lib64/libacl.so.1",
-	"/usr/lib64/libattr.so.1",
-	"/usr/lib64/libselinux.so.1",
-}
+var libsToCopy map[string]bool
 
 var testqfs string
 
 func init() {
 	testqfs = os.Getenv("GOPATH") + "/bin/qfs"
+
+	libsToCopy = make(map[string]bool)
+	libsToCopy["/usr/lib64/ld-linux-x86-64.so.2"] = true
+
+	for _, binary := range commandsInUsrBin {
+		ldd := exec.Command("ldd", binary)
+		output, err := ldd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Failed to get libraries for binary %s: %v\n",
+				binary, err)
+			continue
+		}
+
+		lines := strings.Split(string(output), "\n")
+
+		for _, line := range lines {
+			if !strings.Contains(line, "=>") ||
+				!strings.Contains(line, "/lib") {
+
+				// This line doesn't contain a library we can copy
+				continue
+			}
+
+			tokens := strings.Split(line, " ")
+			library := tokens[2]
+			libsToCopy[library] = true
+		}
+	}
 }
 
 // setup a minimal workspace
@@ -77,7 +96,7 @@ func setupWorkspace(t *testing.T) string {
 
 	}
 
-	for _, lib := range libsToCopy {
+	for lib := range libsToCopy {
 		if err := runCommand("cp", lib, dirUsrLib64); err != nil {
 			t.Fatal(err.Error())
 		}
@@ -136,8 +155,17 @@ func setupWorkspace(t *testing.T) string {
 }
 
 func cleanupWorkspace(workspace string, t *testing.T) {
-	if err := os.RemoveAll(workspace); err != nil {
-		t.Fatalf("Error cleanning up testing workspace: %s", err.Error())
+	var err error
+
+	for i := 0; i < 10; i++ {
+		if err = os.RemoveAll(workspace); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err != nil {
+		t.Fatalf("Error cleaning up testing workspace: %s", err.Error())
 	}
 }
 
@@ -148,6 +176,8 @@ func terminateNetnsdServer(rootdir string, t *testing.T) {
 		if err := runCommand(sudo, netns, "-k", svrName); err != nil {
 			t.Fatal(err.Error())
 		}
+		// Wait for the chroot to no longer be used
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -251,11 +281,15 @@ func testPersistentChroot(t *testing.T, dirTest string) {
 }
 
 func TestPersistentChroot(t *testing.T) {
+	cleanup := func(t *testing.T, dirTest string) {
+		terminateNetnsdServer(dirTest, t)
+		cleanupWorkspace(dirTest, t)
+	}
+
 	func() {
 		dirTest := setupWorkspace(t)
 
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		testPersistentChroot(t, dirTest)
 	}()
@@ -263,8 +297,7 @@ func TestPersistentChroot(t *testing.T) {
 	func() {
 		dirTest := setupWorkspace(t)
 
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		setUidGid(99, 99, t)
 		defer setUidGidToDefault(t)
@@ -347,20 +380,21 @@ func testNetnsPersistency(t *testing.T, dirTest string) {
 }
 
 func TestNetnsPersistency(t *testing.T) {
+	cleanup := func(t *testing.T, dirTest string) {
+		terminateNetnsdServer(dirTest, t)
+		cleanupWorkspace(dirTest, t)
+	}
+
 	func() {
 		dirTest := setupWorkspace(t)
-
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		testNetnsPersistency(t, dirTest)
 	}()
 
 	func() {
 		dirTest := setupWorkspace(t)
-
-		defer cleanupWorkspace(dirTest, t)
-		defer terminateNetnsdServer(dirTest, t)
+		defer cleanup(t, dirTest)
 
 		setUidGid(99, 99, t)
 		defer setUidGidToDefault(t)

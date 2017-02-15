@@ -15,6 +15,7 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
+	fi.flush(c)
 	return fuse.OK
 }
 
