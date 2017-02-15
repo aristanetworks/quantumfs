@@ -53,28 +53,32 @@ func testApiAccessList(test *testHelper, size int, filename string,
 	relpath := test.relPath(workspace)
 
 	if concurrent {
+		start := make(chan struct{})
+
 		workspace2 := test.newWorkspace()
 		size2 := 100
 		filename2 := "concurrentconcurrentconcurrentconcurrentconcurrent"
 		generateFile(test, size2, workspace2, filename2)
 
 		relpath2 := test.relPath(workspace2)
+		path := workspace2 + "/" + filename2 + "0"
+		api2 := test.getUniqueApi(path)
+		test.assert(api != api2,
+			"Error getting the same file descriptor")
 		go func() {
-			path := workspace2 + "/" + filename2 + "0"
-			api2 := test.getNewApi(path)
-			test.assert(api != api2,
-				"Error getting the same file descriptor")
 			defer api2.Close()
+			<-start
 			api2.GetAccessed(relpath2)
 		}()
+		close(start)
 	}
 
 	responselist, err := api.GetAccessed(relpath)
 	test.assert(err == nil, "Error getting accessList with api %v", err)
 
-	test.assert(mapSize(responselist) == expectedSize,
+	test.assert(mapKeySizeSum(responselist) == expectedSize,
 		"Error getting unequal sizes %d != %d",
-		mapSize(responselist), expectedSize)
+		mapKeySizeSum(responselist), expectedSize)
 
 	test.assertAccessList(accessList, responselist, "Error two maps different")
 }
@@ -104,7 +108,7 @@ func generateFile(test *testHelper, size int, workspace,
 	return accessList, expectedSize
 }
 
-func mapSize(list map[string]bool) int {
+func mapKeySizeSum(list map[string]bool) int {
 	size := 0
 	for key, _ := range list {
 		size += len(key)
@@ -132,16 +136,17 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 		filename := "testfiletestfiletestfiletestfiletestfiletesti" +
 			"filetestfiletestfiletestfiletestfile"
 
-		accessList, expectedSize := generateFile(test, 200, workspace, filename)
+		accessList, expectedSize := generateFile(test,
+			200, workspace, filename)
 
 		api := test.getApi()
 		relpath := test.relPath(workspace)
 
 		responselist, _ := api.GetAccessed(relpath)
 		queueSize1 := test.qfs.apiFileSize
-		test.assert(mapSize(responselist) == expectedSize,
+		test.assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
-			mapSize(responselist), expectedSize)
+			mapKeySizeSum(responselist), expectedSize)
 
 		test.assertAccessList(accessList, responselist,
 			"Error two maps different")

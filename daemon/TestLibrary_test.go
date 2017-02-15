@@ -465,7 +465,7 @@ func (th *testHelper) getApi() *quantumfs.Api {
 	return th.api
 }
 
-func (th *testHelper) getNewApi(fdPath string) *quantumfs.Api {
+func (th *testHelper) getUniqueApi(fdPath string) *quantumfs.Api {
 	api := quantumfs.NewApiWithPath(fdPath)
 	return api
 }
