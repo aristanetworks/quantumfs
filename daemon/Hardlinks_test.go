@@ -288,3 +288,27 @@ func TestHardlinkInterWorkspace(t *testing.T) {
 			"qfs not returning EPERM for link across wsrs")
 	})
 }
+
+func TestHardlinkOpenUnlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		filename := workspace + "/file"
+		linkname := workspace + "/link"
+
+		file, err := os.Create(filename)
+		test.assert(err == nil, "Error creating file: %v", err)
+
+		file.WriteString("stuff")
+
+		err = os.Link(filename, linkname)
+		test.assert(err == nil, "Error linking: %v", err)
+
+		err = os.Remove(filename)
+		test.assert(err == nil, "Error removing file: %v", err)
+
+		err = os.Remove(linkname)
+		test.assert(err == nil, "Error removing link: %v", err)
+
+	})
+}
