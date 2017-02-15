@@ -573,11 +573,13 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 		return true
 	}
 
-	lookupCount -= count
-	if lookupCount < 0 {
+	if lookupCount < count {
 		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
 		panic(msg)
-	} else if lookupCount == 0 {
+	}
+
+	lookupCount -= count
+	if lookupCount == 0 {
 		// Don't leave the zero entry in the map at this moment. Do it with
 		// qfs.makeLookupCountZero(inodeId) after trying to grab the treelock
 		// in case of the race condition
