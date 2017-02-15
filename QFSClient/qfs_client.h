@@ -4,20 +4,22 @@
 #ifndef QFS_CLIENT_H_
 #define QFS_CLIENT_H_
 
-#include <gtest/gtest_prod.h>
-#include <fstream>
-#include <vector>
-#include <sys/types.h>
 #include <stdint.h>
+#include <sys/types.h>
+
+#include <fstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include <gtest/gtest_prod.h>
 
 namespace qfsclient {
 
-class Api;
-
 typedef uint8_t byte;
 
-const int kCmdBufferSize = 4096;
-const char *kApiPath = "api";
+const size_t kCmdBufferSize = 4096;
+const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
 
 // Potential error values that may be returned by methods of the Api class
@@ -53,15 +55,57 @@ enum ErrorCode {
 	kApiFileFlushFail = 7,
 
 	// Reading a command from the API file failed
-	kApiFileReadFail = 8
-};
+	kApiFileReadFail = 8,
 
+	// The given workspace was not valid
+	kWorkspacePathInvalid = 9,
+
+	// Error encoding a request to JSON
+	kJsonEncodingError = 10,
+
+	// Error parsing JSON received from quantumfs
+	kJsonDecodingError = 11,
+
+	// An expected JSON object was missing
+	kMissingJsonObject = 12,
+
+	// The quantumfs API returned an error
+	kApiError = 13,
+
+	// The JSON data was too large to fit into the command buffer
+	kJsonTooBig = 14,
+
+	// An internal buffer is getting too big to increase in size
+	kBufferTooBig = 15,
+};
+wibbles
 // An error object returned by many member functions of the Api class. The possible
 // error code values are defined above in the ErrorCode enum, and the message
 // member contains a human-readable error message, possibly with further information.
 struct Error {
 	ErrorCode code;
 	std::string message;
+};
+
+// Class used for holding internal context about an in-flight API call. It may be
+// passed between functions used to handle an API call and could (for example)
+// hold an object representing a parsed JSON response string to avoid having to
+// parse that string more than once.
+class ApiContext {
+ public:
+	ApiContext();
+	virtual ~ApiContext() = 0;
+};
+
+// Class to be implemented by tests ONLY that a test can supply; if an instance
+// of this class is supplied, then its SendTestHook() method will be called
+// by SendCommand() in between writing a command and reading the
+// response. This allows a test to check exactly what got written to the
+// api file by WriteCommand() and to place a test response in the same
+// file to be read back by ReadCommand().
+class SendCommandHook {
+ public:
+	virtual Error SendTestHook() = 0;
 };
 
 // Api (except for its private members) provides the public interface to QuantumFS
@@ -90,11 +134,46 @@ class Api {
 	Error GetAccessed(const char *workspace_root);
 
  private:
-	// CommandBuffer is used internally to store the raw content of commands to be
-	// sent to (or received from) the API - typically in JSON format.
-	struct CommandBuffer {
-		byte data[kCmdBufferSize];
-		size_t size;
+	// CommandBuffer is used internally to store the raw content of a command to
+	// send to (or a response received from) the API - typically in JSON format.
+	class CommandBuffer {
+	 public:
+		CommandBuffer();
+		virtual ~CommandBuffer();
+
+		// Return a const pointer to the data in the buffer
+		const byte *Data() const;
+
+		// Return the size of the data stored in the buffer
+		size_t Size() const;
+
+		// Reset the buffer such that it will contain no data and will
+		// have a zero size
+		void Reset();
+
+		// Add one byte to the buffer and grow its internal data store if
+		// necessary. Returns an ErrorCode if the buffer would have to be
+		// grown too large to add this byte
+		ErrorCode Add(byte datum);
+
+		// copy a string up to the maximum buffer size (including NUL
+		// terminator) into the buffer. Note that if the string is larger
+		// than will fit in the buffer, only the first kCmdBufferSize - 1
+		// characters will be copied, but the number of characters actaully
+		// copied will be returned.
+		ErrorCode CopyString(const char * s);
+
+	 private:
+		static const size_t kBufferSizeIncrement;
+		std::vector<byte> data;
+
+		FRIEND_TEST(QfsClientApiTest, CheckCommonApiResponseBadJsonTest);
+		FRIEND_TEST(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest);
+
+		FRIEND_TEST(QfsClientCommandBufferTest, AddTest);
+		FRIEND_TEST(QfsClientCommandBufferTest, AddAndCopyLotsTest);
+		FRIEND_TEST(QfsClientCommandBufferTest, AddAndResizeTest);
+		FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
 	};
 
 	// Work out the location of the api file (which must be called 'api'
@@ -106,7 +185,7 @@ class Api {
 	// Writes the given command to the api file and immediately tries to
 	// read a response form the same file. Returns an error object to
 	// indicate the outcome.
-	Error SendCommand(const CommandBuffer &command, CommandBuffer *result);
+	Error SendCommand(const CommandBuffer &command, CommandBuffer *response);
 
 	// Writes the given command to the api file. Returns an error object to
 	// indicate the outcome.
@@ -115,6 +194,10 @@ class Api {
 	// Attempts to read a response from the api file. Returns an error object to
 	// indicate the outcome.
 	Error ReadResponse(CommandBuffer *command);
+
+	// Given a workspace path, test it for validity, returning an error to
+	// indicate the path's validity.
+	Error CheckWorkspacePathValid(const char *workspace_root);
 
 	std::fstream file;
 
@@ -133,14 +216,65 @@ class Api {
 	// advance)
 	ino_t api_inode_id;
 
+	// Pointer to a SendCommandHook instance (used for testing ONLY). The
+	// purpose of the SendCommandHook class is described along with its
+	// definition.
+	SendCommandHook *send_test_hook;
+
+	// Internal member function to perform processing common to all API calls,
+	// such as parsing JSON and checking for response errors
+	Error CheckCommonApiResponse(const CommandBuffer &response,
+				     ApiContext *context);
+
+	// Send the JSON representation of the command to the API file and parse the
+	// response, then check the response for an error. The context object will
+	// be used to carry the parsed JSON response for use by the next stage.
+	// note: the parameter request_json_ptr is a void pointer because it's not
+	// possible to forward-declare json_t in Jansson versions before 2.5;
+	// in previous versions of Jansson, json_t is a typedef to an anonymous
+	// C struct, which can't be forward declared.
+	Error SendJson(const void *request_json_ptr, ApiContext *context);
+
+	// Convert the JSON response received for the GetAccessed() API call into
+	// a structure ready for formatting and then writing to stdout. Returns
+	// an Error struct to indicate success or otherwise
+	Error PrepareAccessedListResponse(
+		const ApiContext *context,
+		std::unordered_map<std::string, bool> *accessed_list);
+
+	// Convert the response to the GetAccessed() API call for a string to be
+	// pretty-printed to stdout
+	std::string FormatAccessedList(
+		const std::unordered_map<std::string, bool> &accessed);
+
 	friend class QfsClientTest;
 	FRIEND_TEST(QfsClientTest, SendCommandTest);
+	FRIEND_TEST(QfsClientTest, SendLargeCommandTest);
 	FRIEND_TEST(QfsClientTest, SendCommandFileRemovedTest);
 	FRIEND_TEST(QfsClientTest, SendCommandNoFileTest);
 	FRIEND_TEST(QfsClientTest, SendCommandCantOpenFileTest);
 	FRIEND_TEST(QfsClientTest, WriteCommandFileNotOpenTest);
 	FRIEND_TEST(QfsClientTest, OpenTest);
+	FRIEND_TEST(QfsClientTest, CheckWorkspacePathValidTest);
+
+	friend class QfsClientApiTest;
+	FRIEND_TEST(QfsClientApiTest, CheckCommonApiResponseTest);
+	FRIEND_TEST(QfsClientApiTest, CheckCommonApiResponseBadJsonTest);
+	FRIEND_TEST(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest);
+	FRIEND_TEST(QfsClientApiTest, PrepareAccessedListResponseTest);
+	FRIEND_TEST(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest);
+	FRIEND_TEST(QfsClientApiTest, FormatAccessedListTest);
+	FRIEND_TEST(QfsClientApiTest, SendJsonTest);
+	FRIEND_TEST(QfsClientApiTest, SendJsonTestJsonTooBig);
+
 	FRIEND_TEST(QfsClientDeterminePathTest, DeterminePathTest);
+
+	FRIEND_TEST(QfsClientCommandBufferTest, FreshBufferTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, ResetTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, AddTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, AddAndCopyLotsTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, AddAndResizeTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
 };
 
 } // namespace qfsclient
