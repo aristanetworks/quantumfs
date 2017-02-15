@@ -188,7 +188,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
 		if cmap.wsr.hardlinkDec(link.linkId) {
-			// If the refcount is still greater than one we shouldn't
+			// If the refcount was greater than one we shouldn't
 			// reparent.
 			return nil
 		}
