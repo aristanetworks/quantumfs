@@ -306,6 +306,7 @@ func TestAccessListHardLink(t *testing.T) {
 		err = syscall.Link(path1, path2)
 		test.assert(err == nil, "Create hard link error:%v", err)
 		accessList[dirname] = false
+		accessList[filename1] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
 		wsrlist := test.getAccessList(absbworkspace)
