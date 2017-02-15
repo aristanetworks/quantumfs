@@ -213,15 +213,17 @@ func (th *testHelper) endTest() {
 
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.log("ERROR: Failed to unmount quantumfs "+
-					"instance after aborting: %v", err)
+					"instance after aborting: %s", err.Error())
 			}
 			th.log("ERROR: Failed to unmount quantumfs instance, "+
-				"are you leaking a file descriptor?: %v", err)
+				"are you leaking a file descriptor?: %s",
+				err.Error())
 		}
 	}
 
 	if th.tempDir != "" {
 		th.waitToBeUnmounted()
+		th.waitForQuantumFsToFinish()
 		time.Sleep(1 * time.Second)
 
 		if testFailed := th.logscan(); !testFailed {
@@ -350,6 +352,7 @@ type testHelper struct {
 	t                 *testing.T
 	testName          string
 	qfs               *QuantumFs
+	qfsWait           sync.WaitGroup
 	cachePath         string
 	logger            *qlog.Qlog
 	tempDir           string
@@ -379,6 +382,7 @@ func (th *testHelper) defaultConfig() QuantumFsConfig {
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
+		DirtyFlushDelay:  30 * time.Second,
 		MemLogBytes:      uint64(qlog.DefaultMmapSize),
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
@@ -417,6 +421,8 @@ func serveSafely(th *testHelper) {
 	mountOptions.Options = append(mountOptions.Options, "suid")
 	mountOptions.Options = append(mountOptions.Options, "dev")
 
+	th.qfsWait.Add(1)
+	defer th.qfsWait.Done()
 	th.qfs.Serve(mountOptions)
 }
 
@@ -436,6 +442,10 @@ func (th *testHelper) startQuantumFs(config QuantumFsConfig) {
 	th.fuseConnection = findFuseConnection(th.testCtx(), config.MountPath)
 	th.assert(th.fuseConnection != -1, "Failed to find mount")
 	th.log("QuantumFs instance started")
+}
+
+func (th *testHelper) waitForQuantumFsToFinish() {
+	th.qfsWait.Wait()
 }
 
 func (th *testHelper) log(format string, args ...interface{}) error {
