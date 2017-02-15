@@ -54,6 +54,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 	out.NodeId = uint64(inodeNum)
+	c.qfs.increaseLookupCount(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		newRecord)
