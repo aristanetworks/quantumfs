@@ -81,11 +81,11 @@ type QuantumFs struct {
 	c             ctx
 
 	// We present the sum of the size of all responses waiting on the api file as
-	// the size of that file because the kernel will clear any reads past the end
-	// of the file. Thus the file length needs to be at least as long as the
-	// largest response and using the sum of all response lengths is more
-	// efficient than computing the maximum response length over a large number
-	// of ApiHandles.
+	// the size of that file because the kernel will clear any reads beyond what
+	// is believed the file length. Thus the file length needs to be at least as
+	// long as the largest response and using the sum of all response lengths is
+	// more efficient than computing the maximum response length over a large
+	// number of ApiHandles.
 	apiFileSize int64
 
 	mapMutex    DeferableRwMutex
@@ -616,7 +616,7 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 	} else {
 		// clean up any remaining response queue size from the apiFileSize
 		fileHandle = qfs.fileHandles[id]
-		if api, exists := fileHandle.(*ApiHandle); exists {
+		if api, ok := fileHandle.(*ApiHandle); ok {
 			qfs.decreaseApiFileSize(c,
 				len(api.partialRead))
 		}

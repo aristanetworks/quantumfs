@@ -282,7 +282,7 @@ type ApiHandle struct {
 	FileHandleCommon
 	outstandingRequests int32
 	responses           chan fuse.ReadResult
-	// The is temporary memory for the remain after the first parial-read
+	// The temporary memory for the remains after the first parial-read
 	partialRead []byte
 }
 
@@ -315,8 +315,8 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		// Subtract the file size of last time read
 		c.qfs.decreaseApiFileSize(c, len(api.partialRead))
 		response := <-api.responses
-		debug := make([]byte, response.Size())
-		bytes, _ := response.Bytes(debug)
+		buffer := make([]byte, response.Size())
+		bytes, _ := response.Bytes(buffer)
 		api.partialRead = bytes
 	}
 
