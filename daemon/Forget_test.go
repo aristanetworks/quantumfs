@@ -196,13 +196,14 @@ func TestLookupCountHardlinks(t *testing.T) {
 		testFilename := workspace + "/test"
 		linkFilename := workspace + "/link"
 
+		// First lookup
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
+		file.Close()
 
+		// Second lookup
 		err = os.Link(testFilename, linkFilename)
 		test.assert(err == nil, "Error creating hardlink")
-
-		file.Close()
 
 		// Forget Inodes
 		remountFilesystem(test)
