@@ -260,12 +260,6 @@ func (special *Special) getChildRecord(c *ctx,
 	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
 }
 
-func (special *Special) dirty(c *ctx) {
-	special.setDirty(true)
-
-	special.parent(c).dirtyChild(c, special.inodeNum())
-}
-
 func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
 	var hash [quantumfs.ObjectKeyLength - 1]byte
 
@@ -273,6 +267,16 @@ func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
 	binary.LittleEndian.PutUint32(hash[4:8], special.device)
 
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
+}
+
+func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
+	defer c.funcIn("Special::flush").out()
+
+	key := special.embedDataIntoKey_(c)
+
+	special.parent(c).syncChild(c, special.inodeNum(), key)
+
+	return key
 }
 
 func specialOverrideAttr(entry DirectoryRecordIf, attr *fuse.Attr) uint32 {

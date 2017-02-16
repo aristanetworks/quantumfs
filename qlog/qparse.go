@@ -99,7 +99,7 @@ type PatternData struct {
 	Avg       int64
 	Sum       int64
 	Stddev    int64
-	Id        int
+	Id        uint64
 }
 
 type logStack []LogOutput
@@ -127,7 +127,7 @@ func (s *logStack) Peek() (LogOutput, error) {
 	return (*s)[len(*s)-1], nil
 }
 
-type sequenceTracker struct {
+type SequenceTracker struct {
 	stack logStack
 
 	ready       bool
@@ -135,8 +135,16 @@ type sequenceTracker struct {
 	startLogIdx int
 }
 
-func newSequenceTracker(startIdx int) sequenceTracker {
-	return sequenceTracker{
+func (s *SequenceTracker) Ready() bool {
+	return s.ready
+}
+
+func (s *SequenceTracker) Seq() []LogOutput {
+	return s.seq
+}
+
+func newSequenceTracker(startIdx int) SequenceTracker {
+	return SequenceTracker{
 		stack:       newLogStack(),
 		ready:       false,
 		seq:         make([]LogOutput, 0),
@@ -144,7 +152,7 @@ func newSequenceTracker(startIdx int) sequenceTracker {
 	}
 }
 
-func (s *sequenceTracker) Process(log LogOutput) error {
+func (s *SequenceTracker) Process(log LogOutput) error {
 	// Nothing more to do
 	if s.ready {
 		return nil
@@ -170,7 +178,7 @@ func (s *sequenceTracker) Process(log LogOutput) error {
 	return nil
 }
 
-func genSeqStr(seq []LogOutput) string {
+func GenSeqStr(seq []LogOutput) string {
 	return genSeqStrExt(seq, []bool{}, false)
 }
 
@@ -199,18 +207,18 @@ func genSeqStrExt(seq []LogOutput, wildcardMask []bool,
 }
 
 func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []LogOutput,
-	trackerMap map[uint64][]sequenceTracker, trackerCount *int,
+	trackerMap map[uint64][]SequenceTracker, trackerCount *int,
 	mutex *sync.Mutex) {
 
 	for i := range jobs {
 		log := logs[i]
 		reqId := log.ReqId
 
-		// Grab the sequenceTracker list for this request.
+		// Grab the SequenceTracker list for this request.
 		// Note: it is safe for us to not lock the entire region only
 		// because we're guaranteed that we're the only thread for this
 		// request Id, and hence this tracker is only ours
-		var trackers []sequenceTracker
+		var trackers []SequenceTracker
 		mutex.Lock()
 		trackers, exists := trackerMap[reqId]
 		mutex.Unlock()
@@ -240,7 +248,7 @@ func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []LogOutput,
 		if abortRequest {
 			// Mark the request as bad
 			mutex.Lock()
-			trackerMap[reqId] = make([]sequenceTracker, 0)
+			trackerMap[reqId] = make([]SequenceTracker, 0)
 			mutex.Unlock()
 			continue
 		}
@@ -261,9 +269,9 @@ func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []LogOutput,
 // Because Golang is a horrible language and doesn't support maps with slice keys,
 // we need to construct long string keys and save the slices in the value for later
 func ExtractTrackerMap(logs []LogOutput, maxThreads int) (count int,
-	rtnMap map[uint64][]sequenceTracker) {
+	rtnMap map[uint64][]SequenceTracker) {
 
-	trackerMap := make(map[uint64][]sequenceTracker)
+	trackerMap := make(map[uint64][]SequenceTracker)
 	trackerCount := 0
 	var outputMutex sync.Mutex
 
@@ -309,7 +317,7 @@ func ExtractTrackerMap(logs []LogOutput, maxThreads int) (count int,
 }
 
 func ExtractSeqMap(trackerCount int,
-	trackerMap map[uint64][]sequenceTracker) map[string]SequenceData {
+	trackerMap map[uint64][]SequenceTracker) map[string]SequenceData {
 
 	fmt.Printf("Collating subsequence time data into map with %d entries...\n",
 		trackerCount)
@@ -338,7 +346,7 @@ func ExtractSeqMap(trackerCount int,
 			}
 
 			rawSeq := trackers[k].seq
-			seq := genSeqStr(rawSeq)
+			seq := GenSeqStr(rawSeq)
 			data := rtn[seq]
 			// For this sequence, append the time it took
 			if data.Seq == nil {
@@ -473,6 +481,63 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
 
 	FormatLogs(logs, tabSpaces, statusBar, fn)
+}
+
+func PacketStats(filepath string, statusBar bool, fn writeFn) {
+	pastEndIdx, data, _ := ExtractFields(filepath)
+
+	histogram := make(map[uint16]uint64)
+	maxPacketLen := uint16(0)
+
+	var status LogStatus
+	readCount := uint64(0)
+
+	if statusBar {
+		status = NewLogStatus(50)
+		fmt.Println("Grabbing sizes from log file...")
+	}
+
+	for readCount < uint64(len(data)) {
+		var packetLen uint16
+		readBack(&pastEndIdx, data, packetLen, &packetLen)
+
+		// If we read a packet of zero length, that means our buffer wasn't
+		// full and we've hit the unused area
+		if packetLen == 0 {
+			break
+		}
+
+		// clear the completion bit
+		packetLen &= ^(uint16(entryCompleteBit))
+
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		readCount += uint64(packetLen) + 2
+
+		if statusBar {
+			readCountClip := uint64(readCount)
+			if readCountClip > uint64(len(data)) {
+				readCountClip = uint64(len(data))
+			}
+			status.Process(float32(readCountClip) / float32(len(data)))
+		}
+
+		histogram[packetLen] = histogram[packetLen] + 1
+		if packetLen > maxPacketLen {
+			maxPacketLen = packetLen
+		}
+
+		if readCount > uint64(len(data)) {
+			// We've read everything, and this last packet isn't valid
+			break
+		}
+	}
+	if statusBar {
+		status.Process(1)
+	}
+
+	for i := 0; i < int(maxPacketLen); i++ {
+		fn("%d, %d\n", i, histogram[uint16(i)])
+	}
 }
 
 func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
