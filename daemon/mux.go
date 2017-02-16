@@ -1465,6 +1465,7 @@ func (qfs *QuantumFs) increaseApiFileSize(c *ctx, offset int) {
 
 func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
 	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
+	c.vlog("QuantumFs::APIFileSize subtract %d downto %d", offset, result)
 	if result < 0 {
 		c.elog("ERROR: PANIC Global variable %d should"+
 			" be greater than zero", result)
