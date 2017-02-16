@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+
 #include <gtest/gtest.h>
 
 #include "qfs_client_util.h"
@@ -10,7 +11,7 @@
 namespace qfsclient {
 
 class QfsClientUtilTest : public testing::Test {
-protected:
+ protected:
 	static void SetUpTestCase();
 	static void TearDownTestCase();
 };

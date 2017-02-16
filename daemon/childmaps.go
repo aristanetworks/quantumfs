@@ -184,11 +184,16 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 		return nil
 	}
 
-	if link, isHardlink := record.(*Hardlink); isHardlink {
-		cmap.wsr.hardlinkDec(link.linkId)
-	}
+	result := cmap.delRecord(inodeId, name)
 
-	return cmap.delRecord(inodeId, name)
+	if link, isHardlink := record.(*Hardlink); isHardlink {
+		if cmap.wsr.hardlinkDec(link.linkId) {
+			// If the refcount was greater than one we shouldn't
+			// reparent.
+			return nil
+		}
+	}
+	return result
 }
 
 func (cmap *ChildMap) renameChild(c *ctx, oldName string,
