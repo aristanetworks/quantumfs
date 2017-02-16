@@ -8,6 +8,7 @@ package daemon
 import "fmt"
 import "os"
 import "syscall"
+import "sync/atomic"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
@@ -52,35 +53,47 @@ func testApiAccessList(test *testHelper, size int, filename string,
 	api := test.getApi()
 	relpath := test.relPath(workspace)
 
+	initFileSize, endFileSize, initFileSize1, endFileSize1 := 0, 0, 0, 0
 	if concurrent {
+		// Make sure two goroutines start at the same time
 		start := make(chan struct{})
-
+		start1 := make(chan struct{})
 		workspace2 := test.newWorkspace()
 		size2 := 100
 		filename2 := "concurrentconcurrentconcurrentconcurrentconcurrent"
 		generateFile(test, size2, workspace2, filename2)
-
 		relpath2 := test.relPath(workspace2)
-		path := workspace2 + "/" + filename2 + "0"
+		path := workspace2 + "/api"
 		api2 := test.getUniqueApi(path)
 		test.assert(api != api2,
 			"Error getting the same file descriptor")
 		go func() {
 			defer api2.Close()
+			close(start1)
 			<-start
+			initFileSize1 = int(atomic.LoadInt64(&test.qfs.apiFileSize))
 			api2.GetAccessed(relpath2)
+			endFileSize1 = int(atomic.LoadInt64(&test.qfs.apiFileSize))
 		}()
+		<-start1
 		close(start)
 	}
 
+	initFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
 	responselist, err := api.GetAccessed(relpath)
-	test.assert(err == nil, "Error getting accessList with api %v", err)
+	endFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
+
+	test.assert(err == nil, "Error getting accessList with api: %v  %v",
+		err, responselist)
 
 	test.assert(mapKeySizeSum(responselist) == expectedSize,
 		"Error getting unequal sizes %d != %d",
 		mapKeySizeSum(responselist), expectedSize)
 
 	test.assertAccessList(accessList, responselist, "Error two maps different")
+
+	test.assert(!concurrent || false, "The size is: %d  %d %d %d", initFileSize,
+		endFileSize, initFileSize1, endFileSize1)
 }
 
 func generateFile(test *testHelper, size int, workspace,
@@ -92,7 +105,7 @@ func generateFile(test *testHelper, size int, workspace,
 		filename := fmt.Sprintf("/%s%d", filename, i)
 		expectedSize += len(filename)
 		path := workspace + filename
-		fd, err := syscall.Creat(path, 666)
+		fd, err := syscall.Creat(path, 0666)
 		test.assert(err == nil, "Create file error: %v at %s",
 			err, filename)
 		accessList[filename] = true
@@ -160,7 +173,8 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 
 func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 500, "sample", true)
+		testApiAccessList(test, 100, "samplesamplesamplesamplesample"+
+			"samplesamplesamplesamplesample", true)
 	})
 }
 

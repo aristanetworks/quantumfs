@@ -141,7 +141,7 @@ type InsertInodeRequest struct {
 	Permissions uint32
 }
 
-const BufferSize = 5000
+const BufferSize = 4096
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
@@ -223,22 +223,26 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 
 	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
-		return nil, err
+		//return nil, err
+		return nil, fmt.Errorf("the worng json: %d", len(buf))
 	}
 
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the worng json: %d", len(buf))
+		//return nil, err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+		//return nil, err
+		return nil, fmt.Errorf("the worng json: %d", len(buf))
 	}
 
 	var accesslistResponse AccessListResponse
 	err = json.Unmarshal(buf, &accesslistResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the worng json: %d", len(buf))
+		//return nil, err
 	}
 
 	printAccessList(accesslistResponse.AccessList)

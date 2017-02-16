@@ -296,8 +296,14 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
+	c.vlog("Received offset %d size %d responseBuffer %d outstand %d ",
+		offset, size, len(api.responseBuffer),
+		atomic.LoadInt32(&api.outstandingRequests))
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
-		// In case of read request after pre-fetching at the first read
+		// Sometime the kernel may request the whole response, but the client
+		// does not get all from kernel, so it will send other read request.
+		// In this case, offset is non-zero, it indicate that the read has
+		// not done, so the outstanding Requests should be put back by 1.
 		if offset > 0 {
 			atomic.AddInt32(&api.outstandingRequests, 1)
 		} else {
@@ -322,14 +328,14 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	bytes := api.responseBuffer
 	bufSize := offset + uint64(size)
 	responseSize := uint64(len(bytes))
-	c.vlog("API Response %d", responseSize)
-	if responseSize < offset {
-		// In case of slice out of boundary due to the pre-fetching
+	c.vlog("API Response %d   %d", responseSize, offset)
+	if responseSize <= offset {
+		// In case of slice out of boundary
 		return nil, fuse.OK
 	}
 	if responseSize <= bufSize {
 		atomic.AddInt32(&api.outstandingRequests, -1)
-		return fuse.ReadResultData(bytes[offset:responseSize]), fuse.OK
+		return fuse.ReadResultData(bytes[offset:]), fuse.OK
 	}
 	return fuse.ReadResultData(bytes[offset:bufSize]), fuse.OK
 }
