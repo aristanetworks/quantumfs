@@ -578,8 +578,7 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 	}
 
 	if lookupCount < count {
-		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
-		panic(msg)
+		qfs.c.elog("lookupCount less than zero %d %d", lookupCount, count)
 	}
 
 	lookupCount -= count
