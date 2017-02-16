@@ -5,6 +5,7 @@ package daemon
 
 // This file holds the File type, which represents regular files
 
+import "bytes"
 import "errors"
 import "sync"
 import "syscall"
@@ -75,6 +76,7 @@ type File struct {
 	InodeCommon
 	accessor     blockAccessor
 	unlinkRecord DirectoryRecordIf
+	unlinkXAttr  map[string][]byte
 }
 
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
@@ -345,9 +347,9 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 
 	defer c.funcIn("File::setChildAttr").out()
 
-	if inodeNum != fi.inodeNum() {
+	if !fi.isOrphaned() {
 		c.elog("Invalid setChildAttr on File")
-		return fuse.ENOSYS
+		return fuse.EIO
 	}
 
 	c.dlog("File::setChildAttr Enter")
@@ -370,46 +372,172 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 	return fuse.OK
 }
 
+// Requires InodeCommon.parentLock
+func (fi *File) parseExtendedAttributes_(c *ctx) {
+	if fi.unlinkXAttr != nil {
+		return
+	}
+
+	// Download and parse the extended attributes
+	fi.unlinkXAttr = make(map[string][]byte)
+
+	key := fi.unlinkRecord.ExtendedAttributes()
+	if key.IsEqualTo(quantumfs.EmptyBlockKey) {
+		return
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		c.elog("Failed to retrieve extended attribute list")
+		return
+	}
+
+	attributes := buffer.AsExtendedAttributes()
+
+	for i := 0; i < attributes.NumAttributes(); i++ {
+		name, attrKey := attributes.Attribute(i)
+
+		c.vlog("Found attribute key: %s", attrKey.String())
+		buffer := c.dataStore.Get(&c.Ctx, attrKey)
+		if buffer == nil {
+			c.elog("Failed to retrieve attribute datablock")
+			continue
+		}
+
+		fi.unlinkXAttr[name] = buffer.Get()
+	}
+}
+
+func (fi *File) getExtendedAttribute(c *ctx, attr string) ([]byte, bool) {
+	defer c.FuncIn("File::getExtendedAttribute", "Attr: %s", attr).out()
+
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	fi.parseExtendedAttributes_(c)
+
+	data, ok := fi.unlinkXAttr[attr]
+	return data, ok
+}
+
 func (fi *File) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid getChildXAttrSize on File")
-	return 0, fuse.ENODATA
+	defer c.funcIn("File::getChildXAttrSize").out()
+
+	if !fi.isOrphaned() {
+		c.elog("Invalid getChildXAttrSize on File")
+		return 0, fuse.EIO
+	}
+
+	value, ok := fi.getExtendedAttribute(c, attr)
+	if !ok {
+		// No such attribute
+		return 0, fuse.ENODATA
+	} else {
+		return len(value), fuse.OK
+	}
 }
 
 func (fi *File) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid getChildXAttrData on File")
-	return nil, fuse.ENODATA
+	defer c.funcIn("File::getChildXAttrData").out()
+
+	if !fi.isOrphaned() {
+		c.elog("Invalid getChildXAttrData on File")
+		return nil, fuse.EIO
+	}
+
+	value, ok := fi.getExtendedAttribute(c, attr)
+	if !ok {
+		// No such attribute
+		return nil, fuse.ENODATA
+	} else {
+		return value, fuse.OK
+	}
 }
 
 func (fi *File) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
-	c.elog("Invalid listChildXAttr on File")
-	return []byte{}, fuse.OK
+	defer c.funcIn("File::listChildXAttr").out()
+
+	if !fi.isOrphaned() {
+		c.elog("Invalid listChildXAttr on File")
+		return nil, fuse.EIO
+	}
+
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	fi.parseExtendedAttributes_(c)
+
+	var nameBuffer bytes.Buffer
+	for name := range fi.unlinkXAttr {
+		c.vlog("Appending %s", name)
+		nameBuffer.WriteString(name)
+		nameBuffer.WriteByte(0)
+	}
+
+	c.vlog("Appending %s", quantumfs.XAttrTypeKey)
+	nameBuffer.WriteString(quantumfs.XAttrTypeKey)
+	nameBuffer.WriteByte(0)
+
+	c.vlog("Returning %d bytes", nameBuffer.Len())
+
+	return nameBuffer.Bytes(), fuse.OK
 }
 
 func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	c.elog("Invalid setChildXAttr on File")
-	return fuse.Status(syscall.ENOSPC)
+	defer c.funcIn("File::setChildXAttr").out()
+
+	if !fi.isOrphaned() {
+		c.elog("Invalid setChildXAttr on File")
+		return fuse.EIO
+	}
+
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	fi.parseExtendedAttributes_(c)
+
+	fi.unlinkXAttr[attr] = data
+
+	return fuse.OK
 }
 
 func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	c.elog("Invalid removeChildXAttr on File")
-	return fuse.ENODATA
+	defer c.funcIn("File::setChildXAttr").out()
+
+	if !fi.isOrphaned() {
+		c.elog("Invalid setChildXAttr on File")
+		return fuse.EIO
+	}
+
+	fi.parentLock.Lock()
+	defer fi.parentLock.Unlock()
+
+	fi.parseExtendedAttributes_(c)
+
+	if _, ok := fi.unlinkXAttr[attr]; !ok {
+		return fuse.ENODATA
+	}
+
+	delete(fi.unlinkXAttr, attr)
+
+	return fuse.OK
 }
 
 func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	defer c.funcIn("File::getChildRecord").out()
 
-	if inodeNum != fi.inodeNum() {
+	if !fi.isOrphaned() {
 		c.elog("Unsupported record fetch on file")
 		return &quantumfs.DirectoryRecord{},
 			errors.New("Unsupported record fetch")

@@ -16,6 +16,7 @@ import "os"
 import "reflect"
 import "runtime"
 import "runtime/debug"
+import "sort"
 import "strings"
 import "strconv"
 import "sync"
@@ -213,10 +214,11 @@ func (th *testHelper) endTest() {
 
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.log("ERROR: Failed to unmount quantumfs "+
-					"instance after aborting: %v", err)
+					"instance after aborting: %s", err.Error())
 			}
-			th.log("ERROR: Failed to unmount, "+
-				"leaking a file descriptor?: %v", err.Error())
+			th.log("ERROR: Failed to unmount quantumfs instance, "+
+				"are you leaking a file descriptor?: %s",
+				err.Error())
 		}
 	}
 
@@ -306,12 +308,16 @@ func (th *testHelper) logscan() (foundErrors bool) {
 
 func outputLogError(errInfo logscanError) (summary string) {
 	errors := make([]string, 0, 10)
-	testOutput := qlog.ParseLogs(errInfo.logFile)
+	testOutputRaw := qlog.ParseLogsRaw(errInfo.logFile)
+	sort.Sort(qlog.SortByTimePtr(testOutputRaw))
 
-	lines := strings.Split(testOutput, "\n")
+	var buffer bytes.Buffer
 
 	extraLines := 0
-	for _, line := range lines {
+	for _, rawLine := range testOutputRaw {
+		line := rawLine.ToString()
+		buffer.WriteString(line)
+
 		if strings.Contains(line, "PANIC") ||
 			strings.Contains(line, "WARN") ||
 			strings.Contains(line, "ERROR") {
@@ -332,14 +338,14 @@ func outputLogError(errInfo logscanError) (summary string) {
 
 	if !errInfo.shouldFailLogscan {
 		fmt.Printf("Test %s FAILED due to ERROR. Dumping Logs:\n%s\n"+
-			"--- Test %s FAILED\n\n\n", errInfo.testName, testOutput,
-			errInfo.testName)
+			"--- Test %s FAILED\n\n\n", errInfo.testName,
+			buffer.String(), errInfo.testName)
 		return fmt.Sprintf("--- Test %s FAILED due to errors:\n%s\n",
 			errInfo.testName, strings.Join(errors, "\n"))
 	} else {
 		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
 			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
-			errInfo.testName, testOutput, errInfo.testName)
+			errInfo.testName, buffer.String(), errInfo.testName)
 		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
 			" none.\n", errInfo.testName)
 	}
@@ -756,11 +762,22 @@ func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
 
 func (th *testHelper) assertTestLog(logs []TLA) {
 	logFile := th.tempDir + "/ramfs/qlog"
-	logOutput := qlog.ParseLogs(logFile)
+	logLines := qlog.ParseLogsRaw(logFile)
 
-	for _, tla := range logs {
-		exists := strings.Contains(logOutput, tla.text)
-		th.assert(exists == tla.mustContain, tla.failMsg)
+	containChecker := make([]bool, len(logs))
+
+	for _, rawlog := range logLines {
+		logOutput := rawlog.ToString()
+		for idx, tla := range logs {
+			exists := strings.Contains(logOutput, tla.text)
+			if exists {
+				containChecker[idx] = true
+			}
+		}
+	}
+
+	for idx, tla := range logs {
+		th.assert(containChecker[idx] == tla.mustContain, tla.failMsg)
 	}
 }
 
