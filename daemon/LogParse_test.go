@@ -40,7 +40,7 @@ func TestMaxStringFail_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		longStr := string(genData(math.MaxUint16))
 
-		test.qfs.c.elog("%s %d", longStr, 255)
+		test.qfs.c.wlog("%s %d", longStr, 255)
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
 		test.assert(strings.Contains(testLogs,
@@ -53,7 +53,7 @@ func TestMaxStringLast_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		longStr := string(genData(math.MaxUint16))
 
-		test.qfs.c.elog("%s", longStr)
+		test.qfs.c.wlog("%s", longStr)
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
 		test.assert(strings.Contains(testLogs,
@@ -79,7 +79,7 @@ func TestQParse(t *testing.T) {
 		test.qfs.c.Qlog.LogLevels--
 
 		testLogBoundary := "TestQParseComparing12345"
-		test.qfs.c.elog(testLogBoundary)
+		test.qfs.c.wlog(testLogBoundary)
 
 		// Do some stuff that should generate some logs
 		workspace := test.newWorkspace()
@@ -100,7 +100,7 @@ func TestQParse(t *testing.T) {
 		_, err = ioutil.ReadFile(testFilename)
 		test.assert(err == nil, "Unable to read file contents")
 
-		test.qfs.c.elog(testLogBoundary)
+		test.qfs.c.wlog(testLogBoundary)
 
 		// Now grab the log file and compare against std out. Since logOut
 		// started being appended to a bit late, and we sample it first, it
@@ -215,7 +215,7 @@ func TestQParsePartials_test(t *testing.T) {
 func TestBooleanLogType(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		test.qfs.c.elog("booleans %t %t", true, false)
+		test.qfs.c.wlog("booleans %t %t", true, false)
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
 		test.assert(strings.Contains(testLogs, "booleans true false"),
