@@ -1232,8 +1232,8 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.FuncIn("Directory::syncChild", "(%d %d) %s", dir.inodeNum(),
-		inodeNum, newKey.String()).out()
+	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
+		dir.inodeNum(), inodeNum, newKey.String()).out()
 
 	defer dir.Lock().Unlock()
 	dir.self.dirty(c)
