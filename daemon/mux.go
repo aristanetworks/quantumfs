@@ -566,6 +566,10 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 
 // Returns true if the count became zero or was previously zero
 func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
+	if inodeId == quantumfs.InodeIdApi || inodeId == quantumfs.InodeIdRoot {
+		return false
+	}
+
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
