@@ -1795,6 +1795,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
+		c.qfs.increaseLookupCount(InodeId(child.attr.Ino))
 		fillEntryOutCacheData(c, details)
 		details.Attr = child.attr
 
