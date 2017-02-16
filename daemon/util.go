@@ -214,7 +214,7 @@ func findFuseConnection(c *ctx, mountPath string) int {
 		c.dlog("Waiting for mount try %d...", i)
 		file, err := os.Open("/proc/self/mountinfo")
 		if err != nil {
-			c.dlog("Failed opening mountinfo: %v", err.Error())
+			c.dlog("Failed opening mountinfo: %s", err.Error())
 			return -1
 		}
 		defer file.Close()
