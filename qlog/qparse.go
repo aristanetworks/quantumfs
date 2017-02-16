@@ -44,6 +44,12 @@ func newLog(s LogSubsystem, r uint64, t int64, f string,
 	}
 }
 
+func (rawlog *LogOutput) ToString() string {
+	t := time.Unix(0, rawlog.T)
+	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
+		rawlog.Format), rawlog.Args...)
+}
+
 type SortString []string
 
 func (s SortString) Len() int {
@@ -69,6 +75,20 @@ func (s SortByTime) Swap(i, j int) {
 }
 
 func (s SortByTime) Less(i, j int) bool {
+	return s[i].T < s[j].T
+}
+
+type SortByTimePtr []*LogOutput
+
+func (s SortByTimePtr) Len() int {
+	return len(s)
+}
+
+func (s SortByTimePtr) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortByTimePtr) Less(i, j int) bool {
 	return s[i].T < s[j].T
 }
 
@@ -441,6 +461,16 @@ func LogscanSkim(filepath string) bool {
 	}
 
 	return false
+}
+
+// A faster parse without any flair: logs may be out of order, no tabbing. For use
+// in the test suite predominantly. Returns LogOutput* which need to be Sprintf'd
+func ParseLogsRaw(filepath string) []*LogOutput {
+
+	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+
+	return OutputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
+		false)
 }
 
 func ParseLogs(filepath string) string {
@@ -971,8 +1001,8 @@ type logJob struct {
 	out        *LogOutput
 }
 
-func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers int,
-	printStatus bool) []LogOutput {
+func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers int,
+	printStatus bool) []*LogOutput {
 
 	var logPtrs []*LogOutput
 	readCount := uint64(0)
@@ -1051,6 +1081,14 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 		status.Process(1)
 	}
 
+	return logPtrs
+}
+
+func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers int,
+	printStatus bool) []LogOutput {
+
+	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
+
 	// Go through the logs and fix any missing timestamps. Use the last entry's,
 	// and de-pointer-ify them.
 	rtn := make([]LogOutput, len(logPtrs))
@@ -1059,7 +1097,7 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	if printStatus {
 		fmt.Println("Fixing missing timestamps...")
 	}
-	status = NewLogStatus(50)
+	status := NewLogStatus(50)
 	for i := 0; i < len(logPtrs); i++ {
 		if printStatus {
 			status.Process(float32(i) / float32(len(logPtrs)))
