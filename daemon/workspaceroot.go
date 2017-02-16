@@ -31,7 +31,6 @@ type WorkspaceRoot struct {
 	hardlinks      map[HardlinkId]linkEntry
 	nextHardlinkId HardlinkId
 	inodeToLink    map[InodeId]HardlinkId
-	dirtyLinks     map[InodeId]HardlinkId
 }
 
 type linkEntry struct {
@@ -108,12 +107,9 @@ func (wsr *WorkspaceRoot) checkHardlink(inodeId InodeId) (isHardlink bool,
 func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("WorkspaceRoot::dirtyChild").out()
 
-	isHardlink, linkId := wsr.checkHardlink(childId)
+	isHardlink, _ := wsr.checkHardlink(childId)
 
 	if isHardlink {
-		defer wsr.linkLock.Lock().Unlock()
-
-		wsr.dirtyLinks[childId] = linkId
 		wsr.self.dirty(c)
 	} else {
 		wsr.Directory.dirtyChild(c, childId)
@@ -175,7 +171,6 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 
 	if inodeId != quantumfs.InodeIdInvalid {
 		delete(wsr.inodeToLink, inodeId)
-		delete(wsr.dirtyLinks, inodeId)
 	}
 }
 
@@ -277,8 +272,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) quantumfs.DirectoryReco
 }
 
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
-	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId,
-	wasDirty bool) {
+	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId) {
 
 	defer c.FuncIn("Removing Hardlink", "%d for new parent %d", linkId,
 		newParent).out()
@@ -292,17 +286,14 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 
 	if link.nlink > 1 {
 		// Not ready to remove hardlink yet
-		return nil, quantumfs.InodeIdInvalid, false
+		return nil, quantumfs.InodeIdInvalid
 	}
 
 	// our return variables
 	inodeId = link.inodeId
-	wasDirty = false
 
 	// ensure we have a valid inodeId to return
-	if inodeId != quantumfs.InodeIdInvalid {
-		_, wasDirty = wsr.dirtyLinks[inodeId]
-	} else {
+	if inodeId == quantumfs.InodeIdInvalid {
 		// hardlink was never given an inodeId
 		inodeId = c.qfs.newInodeId()
 	}
@@ -320,7 +311,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 
 	wsr.dirty(c)
 
-	return link.record, inodeId, wasDirty
+	return link.record, inodeId
 }
 
 // We need the wsr lock to cover setting safely
@@ -341,7 +332,6 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 
 	wsr.hardlinks = make(map[HardlinkId]linkEntry)
 	wsr.inodeToLink = make(map[InodeId]HardlinkId)
-	wsr.dirtyLinks = make(map[InodeId]HardlinkId)
 	wsr.nextHardlinkId = 0
 
 	for {
@@ -563,25 +553,6 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("WorkspaceRoot::flush").out()
 
 	wsr.Directory.flush(c)
-	wsr.flushHardlinks(c)
 	wsr.publish(c)
 	return wsr.rootId
-}
-
-func (wsr *WorkspaceRoot) flushHardlinks(c *ctx) {
-	defer wsr.linkLock.RLock().RUnlock()
-
-	for inodeId, hardlinkId := range wsr.dirtyLinks {
-		child := c.qfs.inodeNoInstantiate(c, inodeId)
-		if child == nil {
-			c.elog("Uninstantiated dirty hardlink? %d %d", inodeId,
-				hardlinkId)
-			continue
-		}
-
-		newKey := child.flush(c)
-		wsr.hardlinks[hardlinkId].record.SetID(newKey)
-	}
-
-	wsr.dirtyLinks = make(map[InodeId]HardlinkId, 0)
 }
