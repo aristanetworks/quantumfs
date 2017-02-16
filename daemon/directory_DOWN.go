@@ -149,6 +149,7 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 
 	record := dir.children.record(toLink.inodeNum())
 	if record == nil {
+		c.dlog("Child record not found")
 		return nil, fuse.ENOENT
 	}
 

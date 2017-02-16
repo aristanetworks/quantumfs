@@ -507,6 +507,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		return dir.children.inodeNum(name)
 	}()
 	if inodeNum == quantumfs.InodeIdInvalid {
+		c.vlog("Inode not found")
 		return fuse.ENOENT
 	}
 
