@@ -78,6 +78,20 @@ func (s SortByTime) Less(i, j int) bool {
 	return s[i].T < s[j].T
 }
 
+type SortByTimePtr []*LogOutput
+
+func (s SortByTimePtr) Len() int {
+	return len(s)
+}
+
+func (s SortByTimePtr) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortByTimePtr) Less(i, j int) bool {
+	return s[i].T < s[j].T
+}
+
 type TimeData struct {
 	// how long the sequence took
 	Delta int64

@@ -16,6 +16,7 @@ import "os"
 import "reflect"
 import "runtime"
 import "runtime/debug"
+import "sort"
 import "strings"
 import "strconv"
 import "sync"
@@ -308,6 +309,8 @@ func (th *testHelper) logscan() (foundErrors bool) {
 func outputLogError(errInfo logscanError) (summary string) {
 	errors := make([]string, 0, 10)
 	testOutputRaw := qlog.ParseLogsRaw(errInfo.logFile)
+	sort.Sort(qlog.SortByTimePtr(testOutputRaw))
+
 	var buffer bytes.Buffer
 
 	extraLines := 0
@@ -761,7 +764,7 @@ func (th *testHelper) assertTestLog(logs []TLA) {
 	logFile := th.tempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
-	containChecker := make([]bool, len(logs), len(logs))
+	containChecker := make([]bool, len(logs))
 
 	for _, rawlog := range logLines {
 		logOutput := rawlog.ToString()
