@@ -181,6 +181,8 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	record DirectoryRecordIf) *Hardlink {
 
+	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).out()
+
 	if _, isLink := record.(*Hardlink); isLink {
 		panic("newHardlink called on existing hardlink")
 	}

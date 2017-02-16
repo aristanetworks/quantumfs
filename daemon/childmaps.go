@@ -316,6 +316,8 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*Hardlink); isLink {
+		c.vlog("Already a hardlink")
+
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
@@ -341,6 +343,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	}
 
 	// It needs to become a hardlink now. Hand it off to wsr
+	c.vlog("Converting into a hardlink")
 	newLink := cmap.wsr.newHardlink(c, childId, child)
 
 	cmap.setRecord(childId, newLink)
