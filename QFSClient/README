@@ -3,6 +3,12 @@ QFSClient is a C++ library for making API calls to QuantumFS.
 Instructions for development on Arora 18 / Fedora 18
 ----------------------------------------------------
 * to setup:
-  sudo yum install gtest-devel
+  sudo yum install gtest-devel jansson-devel
 * to build (and test):
   make, or, if you are using gut: gut check
+
+Notes for the curious
+---------------------
+* We're using Jansson 2.4-1 as a JSON library. Documentation for
+  this version of Jansson is available here:
+	http://jansson.readthedocs.io/en/2.4/
