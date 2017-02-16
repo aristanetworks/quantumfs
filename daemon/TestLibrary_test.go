@@ -306,12 +306,12 @@ func (th *testHelper) logscan() (foundErrors bool) {
 func outputLogError(errInfo logscanError) (summary string) {
 	errors := make([]string, 0, 10)
 	testOutputRaw := qlog.ParseLogsRaw(errInfo.logFile)
-	testOutput := ""
+	var buffer bytes.Buffer
 
 	extraLines := 0
 	for _, rawLine := range testOutputRaw {
 		line := rawLine.ToString()
-		testOutput += line
+		buffer.WriteString(line)
 
 		if strings.Contains(line, "PANIC") ||
 			strings.Contains(line, "WARN") ||
@@ -333,14 +333,14 @@ func outputLogError(errInfo logscanError) (summary string) {
 
 	if !errInfo.shouldFailLogscan {
 		fmt.Printf("Test %s FAILED due to ERROR. Dumping Logs:\n%s\n"+
-			"--- Test %s FAILED\n\n\n", errInfo.testName, testOutput,
-			errInfo.testName)
+			"--- Test %s FAILED\n\n\n", errInfo.testName,
+			buffer.String(), errInfo.testName)
 		return fmt.Sprintf("--- Test %s FAILED due to errors:\n%s\n",
 			errInfo.testName, strings.Join(errors, "\n"))
 	} else {
 		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
 			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
-			errInfo.testName, testOutput, errInfo.testName)
+			errInfo.testName, buffer.String(), errInfo.testName)
 		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
 			" none.\n", errInfo.testName)
 	}
