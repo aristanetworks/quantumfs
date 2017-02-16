@@ -1201,9 +1201,8 @@ func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum Ino
 	// being inserted means you're dirty and need to be synced
 	if childInode != nil {
 		childInode.dirty(c)
-	} else {
-		dir.self.dirty(c)
 	}
+	dir.self.dirty(c)
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
