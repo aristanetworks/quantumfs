@@ -136,14 +136,14 @@ func insertInode() {
 		fmt.Println("Invalid Uid:", err)
 		os.Exit(exitBadArgs)
 	}
-	uid := uint16(Uid)
+	uid := uint32(Uid)
 
 	Gid, err := strconv.ParseUint(flag.Arg(4), 10, 16)
 	if err != nil {
 		fmt.Println("Invalid Gid:", err)
 		os.Exit(exitBadArgs)
 	}
-	gid := uint16(Gid)
+	gid := uint32(Gid)
 
 	Permission, err := strconv.ParseUint(flag.Arg(5), 10, 32)
 	if err != nil {
