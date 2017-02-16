@@ -5,6 +5,8 @@
 
 package daemon
 
+import "time"
+
 import "github.com/aristanetworks/quantumfs"
 
 type QuantumFsConfig struct {
@@ -21,6 +23,9 @@ type QuantumFsConfig struct {
 	// How long the kernel is allowed to cache values
 	CacheTimeSeconds uint64
 	CacheTimeNsecs   uint32
+
+	// How long before dirty data should be flushed
+	DirtyFlushDelay time.Duration
 
 	// How many bytes to allocate to the shared memory logs
 	MemLogBytes uint64

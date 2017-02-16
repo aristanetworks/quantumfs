@@ -235,5 +235,8 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	wsdb.cacheMutex.Unlock()
 
+	c.Vlog(qlog.LogWorkspaceDb, "Advanced rootID for %s/%s from %s to %s",
+		namespace, workspace, currentRootId.String(), newRootId.String())
+
 	return newRootId, nil
 }
