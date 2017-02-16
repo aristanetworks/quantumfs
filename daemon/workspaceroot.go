@@ -143,7 +143,7 @@ func (wsr *WorkspaceRoot) hardlinkInc(linkId HardlinkId) {
 	wsr.hardlinks[linkId] = entry
 }
 
-func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) {
+func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) bool {
 	defer wsr.linkLock.Lock().Unlock()
 
 	entry, exists := wsr.hardlinks[linkId]
@@ -160,12 +160,13 @@ func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) {
 	// Normally, nlink should still be at least 1
 	if entry.nlink > 0 {
 		wsr.hardlinks[linkId] = entry
-		return
+		return true
 	}
 
 	// But via races, it's possible nlink could be zero here, at which point
 	// all references to this hardlink are gone and we must remove it
 	wsr.removeHardlink_(linkId, entry.inodeId)
+	return false
 }
 
 // Must hold the linkLock for writing
