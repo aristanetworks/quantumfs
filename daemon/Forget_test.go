@@ -185,11 +185,6 @@ func TestMultipleLookupCount(t *testing.T) {
 	})
 }
 
-// QuantumFS doesn't currently implement hardlinks correctly. Instead of returning
-// the original inode in the Link() call, it returns a new inode. This doesn't seem
-// to bother the kernel and it distributes the lookup counts between those two inodes
-// as one would expect. However, this may change and this test should start failing
-// if that happens.
 func TestLookupCountHardlinks(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		config := test.defaultConfig()
@@ -201,18 +196,19 @@ func TestLookupCountHardlinks(t *testing.T) {
 		testFilename := workspace + "/test"
 		linkFilename := workspace + "/link"
 
+		// First lookup
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
+		file.Close()
 
+		// Second lookup
 		err = os.Link(testFilename, linkFilename)
 		test.assert(err == nil, "Error creating hardlink")
-
-		file.Close()
 
 		// Forget Inodes
 		remountFilesystem(test)
 
-		test.assertLogDoesNotContain("Looked up 2 Times",
+		test.assertLogContains("Looked up 2 Times",
 			"Failed to cause a second lookup")
 	})
 }

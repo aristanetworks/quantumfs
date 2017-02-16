@@ -101,6 +101,17 @@ type QuantumFs struct {
 	// Notify whoever used flushAll that flushing is complete
 	flushComplete chan struct{}
 
+	// We must prevent instantiation of Inodes while we are uninstantiating an
+	// Inode. This prevents a race between a Directory being uninstantiated as
+	// one of its children is just being instantiated.
+	//
+	// If you are instantiating an Inode you only need to grab this lock for
+	// reading. If you are uninstantiating you must grab it exclusively.
+	//
+	// This lock must always be grabbed before the mapMutex to ensure consistent
+	// lock ordering.
+	instantiationLock DeferableRwMutex
+
 	// Uninstantiated Inodes are inode numbers which have been reserved for a
 	// particular inode, but the corresponding Inode has not yet been
 	// instantiated. The Inode this map points to is the parent Inode which
@@ -279,6 +290,8 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).out()
 
+	defer qfs.instantiationLock.Lock().Unlock()
+
 	toRemove := qfs.forgetChain_(c, inodeNum)
 
 	if toRemove != nil {
@@ -325,6 +338,9 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 		}
 	} else {
 		dirtyNode = dirtyElement.Value.(*dirtyInode)
+		c.vlog("Inode was already in the dirty queue %s",
+			dirtyNode.expiryTime.String())
+		dirtyNode.expiryTime = time.Now()
 	}
 
 	if shouldUninstantiate {
@@ -439,6 +455,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
+	defer qfs.instantiationLock.RLock().RUnlock()
 	defer qfs.mapMutex.Lock().Unlock()
 
 	inode = qfs.inode_(c, id)
@@ -1128,6 +1145,11 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 		return fuse.ENOENT
 	}
 
+	if attr == quantumfs.XAttrTypeKey {
+		// quantumfs.key is immutable from userspace
+		return fuse.EPERM
+	}
+
 	defer inode.RLockTree().RUnlock()
 	return inode.SetXAttr(c, attr, data)
 }
@@ -1144,6 +1166,11 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if attr == quantumfs.XAttrTypeKey {
+		// quantumfs.key is immutable from userspace
+		return fuse.EPERM
 	}
 
 	defer inode.RLockTree().RUnlock()
