@@ -1241,7 +1241,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
-		c.elog("Directory::syncChild inode %d not a valid child",
+		c.wlog("Directory::syncChild inode %d not a valid child",
 			inodeNum)
 		return
 	}
