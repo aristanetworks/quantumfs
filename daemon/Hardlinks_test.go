@@ -6,6 +6,7 @@ package daemon
 // Test that different parts of Hardlink support are working
 
 import "bytes"
+import "fmt"
 import "io/ioutil"
 import "os"
 import "syscall"
@@ -173,10 +174,12 @@ func TestHardlinkForget(t *testing.T) {
 
 		// Forget it
 		linkInode := test.getInodeNum(linkFile)
-		test.qfs.Forget(uint64(linkInode), 1)
+
+		remountFilesystem(test)
 
 		// Check that it's uninstantiated
-		test.waitFor("hardlink inode to be forgotten", func() bool {
+		msg := fmt.Sprintf("hardlink inode %d to be forgotten", linkInode)
+		test.waitFor(msg, func() bool {
 			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
 			return inode == nil
 		})
