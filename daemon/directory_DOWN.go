@@ -34,7 +34,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
 	if err != fuse.OK {
-		c.elog("QuantumFs::Link Failed with srcInode record")
+		c.elog("QuantumFs::Link Failed with srcInode record: %s",
+			err.Error())
 		return err
 	}
 	srcInode.markSelfAccessed(c, false)
