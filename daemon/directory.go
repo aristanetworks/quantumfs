@@ -1145,12 +1145,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
 
-			// Delete the target InodeId, before (possibly) overwriting
-			// it.
-			dst.deleteEntry_(c, newName)
-
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
+
+				// Delete the target InodeId, before (possibly)
+				// overwriting it.
+				dst.deleteEntry_(c, newName)
 
 				overwrittenRecord := dst.children.recordByName(c,
 					newName)
@@ -1162,6 +1162,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 				dst.insertEntry_(c, newEntry, oldInodeId,
 					child != nil)
+
+				// Remove entry in old directory
+				dir.deleteEntry_(c, oldName)
 			}()
 
 			// Set entry in new directory. If the renamed inode is
@@ -1170,9 +1173,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
 			}
-
-			// Remove entry in old directory
-			dir.deleteEntry_(c, oldName)
 
 			parent.updateSize_(c)
 
@@ -1188,7 +1188,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	return result
 }
 
-// Must hold childmap lock for writing
+// Must hold childrecord lock for writing
 func (dir *Directory) deleteEntry_(c *ctx, name string) {
 	if record := dir.children.recordByName(c, name); record == nil {
 		// Nothing to do

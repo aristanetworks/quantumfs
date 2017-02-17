@@ -34,8 +34,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
 	if err != fuse.OK {
-		c.elog("QuantumFs::Link Failed with srcInode record: %s",
-			err.Error())
+		c.elog("QuantumFs::Link Failed with srcInode record")
 		return err
 	}
 	srcInode.markSelfAccessed(c, false)
@@ -138,6 +137,15 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 
 	defer c.funcIn("Directory::makeHardlink_DOWN").out()
 
+	// If someone is trying to link a hardlink, we just need to return a copy
+	if isHardlink, id := dir.wsr.checkHardlink(toLink.inodeNum()); isHardlink {
+		// Update the reference count
+		dir.wsr.hardlinkInc(id)
+
+		linkCopy := newHardlink(toLink.name(), id, dir.wsr)
+		return linkCopy, fuse.OK
+	}
+
 	// If the file isn't a hardlink, then we must flush it first. It's unlikely
 	// we'll be linking many hardlinks several times and it is somewhat tedious
 	// to determine if toLink is a hardlink or not. Instead we simply flush all
@@ -147,10 +155,5 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	record := dir.children.record(toLink.inodeNum())
-	if record == nil {
-		return nil, fuse.ENOENT
-	}
-
-	return dir.children.makeHardlink(c, record.Filename())
+	return dir.children.makeHardlink(c, toLink.inodeNum())
 }
