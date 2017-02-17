@@ -419,7 +419,7 @@ func serveSafely(th *testHelper) {
 		AllowOther:    true,
 		MaxBackground: 1024,
 		MaxWrite:      quantumfs.MaxBlockSize,
-		FsName:        "cluster",
+		FsName:        "QuantumFS",
 		Name:          th.testName,
 		Options:       make([]string, 0),
 	}
