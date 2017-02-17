@@ -240,7 +240,7 @@ func TestHardlinkSubdirChain(t *testing.T) {
 
 		data := genData(2000)
 
-		err := os.Mkdir(workspace + "/dir", 0777)
+		err := os.Mkdir(workspace+"/dir", 0777)
 		test.assertNoErr(err)
 
 		testFile := workspace + "/dir/testFile"
