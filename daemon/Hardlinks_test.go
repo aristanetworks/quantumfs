@@ -234,7 +234,39 @@ func TestHardlinkConversion(t *testing.T) {
 	})
 }
 
-func TestHardlinkChain(t *testing.T) {
+func TestHardlinkSubdirChain(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		err := os.Mkdir(workspace + "/dir", 0777)
+		test.assertNoErr(err)
+
+		testFile := workspace + "/dir/testFile"
+		err = printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/dir/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		linkFile2 := workspace + "/dir/testLink2"
+		err = syscall.Link(linkFile, linkFile2)
+		test.assertNoErr(err)
+
+		linkFile3 := workspace + "/dir/testLink3"
+		err = syscall.Link(linkFile2, linkFile3)
+		test.assertNoErr(err)
+
+		// Now link again from the original
+		linkFile4 := workspace + "/dir/testLink4"
+		err = syscall.Link(linkFile, linkFile4)
+		test.assertNoErr(err)
+	})
+}
+
+func TestHardlinkWsrChain(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
@@ -250,6 +282,15 @@ func TestHardlinkChain(t *testing.T) {
 
 		linkFile2 := workspace + "/testLink2"
 		err = syscall.Link(linkFile, linkFile2)
+		test.assertNoErr(err)
+
+		linkFile3 := workspace + "/testLink3"
+		err = syscall.Link(linkFile2, linkFile3)
+		test.assertNoErr(err)
+
+		// Now link again from the original
+		linkFile4 := workspace + "/testLink4"
+		err = syscall.Link(linkFile, linkFile4)
 		test.assertNoErr(err)
 	})
 }
@@ -310,26 +351,5 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 
 		err = os.Remove(linkname)
 		test.assertNoErr(err)
-	})
-}
-
-func TestHardlinkOnOrphan(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-
-		filename := workspace + "/file"
-		linkname := workspace + "/link"
-
-		file, err := os.Create(filename)
-		test.assertNoErr(err)
-		defer file.Close()
-
-		file.WriteString("testData")
-
-		err = os.Remove(filename)
-		test.assertNoErr(err)
-
-		err = os.Link(filename, linkname)
-		test.assert(false, "Check this out")
 	})
 }
