@@ -246,7 +246,9 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 	// Ensure the linkId is valid
 	hardlink, exists := wsr.hardlinks[linkId]
 	if !exists {
-		panic("Invalid hardlinkId in system")
+		// It should be possible, via races, that someone could check
+		// on a link which has *just* been deleted
+		return quantumfs.InodeIdInvalid
 	}
 
 	if hardlink.inodeId != quantumfs.InodeIdInvalid {
@@ -263,17 +265,17 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 }
 
 // Return a snapshot / instance so that it's concurrency safe
-func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) quantumfs.DirectoryRecord {
+func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
+	record quantumfs.DirectoryRecord) {
+
 	defer wsr.linkLock.RLock().RUnlock()
 
 	link, exists := wsr.hardlinks[linkId]
 	if exists {
-		return *(link.record)
+		return true, *(link.record)
 	}
 
-	// This function should only be called from Hardlink objects, meaning the
-	// linkId really should never be invalid
-	panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+	return false, quantumfs.DirectoryRecord{}
 }
 
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
