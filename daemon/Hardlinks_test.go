@@ -353,3 +353,67 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 		test.assertNoErr(err)
 	})
 }
+
+func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
+	test *testHelper, Type quantumfs.ObjectType) {
+
+	key, type_, size, err := decodeExtendedKey(string(extendedKey))
+	test.assert(err == nil, "Error decompressing the packet")
+
+	// Extract the internal ObjectKey from QuantumFS
+	var stat syscall.Stat_t
+	err = syscall.Stat(path, &stat)
+	test.assert(err == nil, "Error stat'ing test type %d: %v", Type, err)
+	var id InodeId
+	id = InodeId(stat.Ino)
+	inode := test.qfs.inodes[id]
+	parent := inode.parent(&test.qfs.c)
+	// parent should be the workspace root
+	wsr := parent.(*WorkspaceRoot)
+	isHardlink, linkId := wsr.checkHardlink(id)
+	test.assert(isHardlink, "Expected hardlink isn't one.")
+
+	valid, record := wsr.getHardlink(linkId)
+	test.assert(valid, "Unable to get hardlink from wsr")
+
+	// Verify the type and key matching
+	test.assert(type_ == Type && size == record.Size() &&
+		bytes.Equal(key.Value(), record.ID().Value()),
+		"Error getting the key: %v with size of %d-%d, keys of %v-%v",
+		err, Type, type_, key.Value(), record.ID().Value())
+}
+
+func TestHardlinkExtraction(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+	
+		filename := workspace + "/file"
+		linkname := workspace + "/link"
+
+		file, err := os.Create(filename)
+		test.assertNoErr(err)
+		file.WriteString("stuff")
+		file.Close()
+
+		err = os.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		dst := make([]byte, quantumfs.ExtendedKeyLength)
+		sz, err := syscall.Getxattr(filename, quantumfs.XAttrTypeKey, dst)
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
+			"Error getting the file key: %v with a size of %d",
+			err, sz)
+
+		matchXAttrHardlinkExtendedKey(filename, dst, test,
+			quantumfs.ObjectTypeSmallFile)
+
+		dst = make([]byte, quantumfs.ExtendedKeyLength)
+		sz, err = syscall.Getxattr(filename, quantumfs.XAttrTypeKey, dst)
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
+			"Error getting the file key: %v with a size of %d",
+			err, sz)
+
+		matchXAttrHardlinkExtendedKey(filename, dst, test,
+			quantumfs.ObjectTypeSmallFile)
+	})
+}
