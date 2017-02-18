@@ -386,7 +386,7 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 func TestHardlinkExtraction(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
-	
+
 		filename := workspace + "/file"
 		linkname := workspace + "/link"
 

@@ -35,4 +35,3 @@ func (wsr *WorkspaceRoot) generateHardlinkTypeKey_DOWN_(c *ctx,
 
 	return typeKey, fuse.OK
 }
-
