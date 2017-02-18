@@ -47,7 +47,13 @@ func newHardlink(name string, linkId HardlinkId, wsr *WorkspaceRoot) *Hardlink {
 }
 
 func (link *Hardlink) get() *quantumfs.DirectoryRecord {
-	link_ := link.wsr.getHardlink(link.linkId)
+	valid, link_ := link.wsr.getHardlink(link.linkId)
+	if !valid {
+		// This class shouldn't even exist if the hardlink's invalid
+		panic(fmt.Sprintf("Unable to get record for existing link %d",
+			link.linkId))
+	}
+
 	return &link_
 }
 

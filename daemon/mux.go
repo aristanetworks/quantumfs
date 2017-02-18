@@ -1094,6 +1094,13 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	var dir *Directory
 	parent := inode.parent(c)
 	if parent.isWorkspaceRoot() {
+		wsr := parent.(*WorkspaceRoot)
+		key, status := wsr.generateHardlinkTypeKey_DOWN_(c, inode.inodeNum())
+		if key != nil {
+			// This is a hardlink, so just return was wsr gave us
+			return key, status
+		}
+
 		dir = &parent.(*WorkspaceRoot).Directory
 	} else {
 		dir = parent.(*Directory)
