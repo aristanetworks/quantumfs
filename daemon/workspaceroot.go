@@ -96,7 +96,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 func (wsr *WorkspaceRoot) checkHardlink(inodeId InodeId) (isHardlink bool,
 	id HardlinkId) {
 
-	defer wsr.linkLock.Lock().Unlock()
+	defer wsr.linkLock.RLock().RUnlock()
 	linkId, exists := wsr.inodeToLink[inodeId]
 	if !exists {
 		return false, 0
@@ -121,7 +121,7 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 }
 
 func (wsr *WorkspaceRoot) nlinks(hardlinkId HardlinkId) uint32 {
-	defer wsr.linkLock.Lock().Unlock()
+	defer wsr.linkLock.RLock().RUnlock()
 
 	entry, exists := wsr.hardlinks[hardlinkId]
 	if !exists {
@@ -222,7 +222,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 	defer c.vlog("Directory::instantiateChild Exit")
 
 	hardlinkRecord := func() *quantumfs.DirectoryRecord {
-		defer wsr.linkLock.Lock().Unlock()
+		defer wsr.linkLock.RLock().RUnlock()
 
 		id, exists := wsr.inodeToLink[inodeNum]
 		if !exists {
@@ -241,7 +241,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 }
 
 func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId {
-	defer wsr.linkLock.RLock().RUnlock()
+	defer wsr.linkLock.Lock().Unlock()
 
 	// Ensure the linkId is valid
 	hardlink, exists := wsr.hardlinks[linkId]
@@ -262,6 +262,25 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 	wsr.inodeToLink[inodeId] = linkId
 
 	return inodeId
+}
+
+func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
+	record quantumfs.DirectoryRecord) {
+	
+	defer wsr.linkLock.RLock().RUnlock()
+	rtn := quantumfs.DirectoryRecord{}
+
+	linkId, exists := wsr.inodeToLink[inodeId]
+	if !exists {
+		return false, rtn
+	}
+
+	link, exists := wsr.hardlinks[linkId]
+	if !exists {
+		return false, rtn
+	}
+
+	return true, *(link.record)
 }
 
 // Return a snapshot / instance so that it's concurrency safe
@@ -571,7 +590,7 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (wsr *WorkspaceRoot) flushHardlinks(c *ctx) {
-	defer wsr.linkLock.RLock().RUnlock()
+	defer wsr.linkLock.Lock().Unlock()
 
 	for inodeId, hardlinkId := range wsr.dirtyLinks {
 		child := c.qfs.inodeNoInstantiate(c, inodeId)
