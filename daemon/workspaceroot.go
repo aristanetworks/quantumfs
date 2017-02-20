@@ -266,7 +266,7 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 
 func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 	record quantumfs.DirectoryRecord) {
-	
+
 	defer wsr.linkLock.RLock().RUnlock()
 	rtn := quantumfs.DirectoryRecord{}
 
