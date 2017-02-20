@@ -699,24 +699,19 @@ func (dir *Directory) getChildRecord(c *ctx,
 	inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	defer c.funcIn("Directory::getChildRecord").out()
+
 	defer dir.RLock().RUnlock()
-
-	// check if someone's asking for a hardlink first
-	isHardlink, linkId := dir.wsr.checkHardlink(inodeNum)
-	if isHardlink {
-		valid, record := dir.wsr.getHardlink(linkId)
-		if !valid {
-			return &quantumfs.DirectoryRecord{},
-				errors.New("Hardlink removed during get")
-		}
-
-		return &record, nil
-	}
-
 	defer dir.childRecordLock.Lock().Unlock()
 
-	if record := dir.children.record(inodeNum); record != nil {
+	record := dir.children.record(inodeNum)
+	if record != nil {
 		return record, nil
+	}
+
+	// if we don't have the child, maybe we're wsr and it's a hardlink
+	valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+	if valid {
+		return &linkRecord, nil
 	}
 
 	return &quantumfs.DirectoryRecord{},
