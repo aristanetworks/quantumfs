@@ -238,11 +238,6 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("Directory::dirtyChild").out()
 
-	func() {
-		defer dir.Lock().Unlock()
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.setDirty(c, childId)
-	}()
 	dir.self.dirty(c)
 }
 
@@ -1160,8 +1155,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 						[]InodeId{overwrittenId})
 				}
 
-				dst.insertEntry_(c, newEntry, oldInodeId,
-					child != nil)
+				dst.insertEntry_(c, newEntry, oldInodeId, child)
 			}()
 
 			// Set entry in new directory. If the renamed inode is
@@ -1200,16 +1194,15 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 
 // Needs to hold childRecordLock
 func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum InodeId,
-	inodeLoaded bool) {
+	childInode Inode) {
 
 	dir.children.setChild(c, entry, inodeNum)
 
 	// being inserted means you're dirty and need to be synced
-	if inodeLoaded {
-		dir.children.setDirty(c, inodeNum)
-	} else {
-		dir.self.dirty(c)
+	if childInode != nil {
+		childInode.dirty(c)
 	}
+	dir.self.dirty(c)
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
@@ -1239,8 +1232,8 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.FuncIn("Directory::syncChild", "(%d %d) %s", dir.inodeNum(),
-		inodeNum, newKey.String()).out()
+	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
+		dir.inodeNum(), inodeNum, newKey.String()).out()
 
 	defer dir.Lock().Unlock()
 	dir.self.dirty(c)
@@ -1248,7 +1241,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
-		c.elog("Directory::syncChild inode %d not a valid child",
+		c.wlog("Directory::syncChild inode %d not a valid child",
 			inodeNum)
 		return
 	}
