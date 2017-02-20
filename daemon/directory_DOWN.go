@@ -28,7 +28,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	// Ensure the source and dest are in the same workspace
 	if srcParent.wsr != dir.wsr {
-		c.elog("Source and dest are not different workspaces.")
+		c.dlog("Source and dest are different workspaces.")
 		return fuse.EPERM
 	}
 

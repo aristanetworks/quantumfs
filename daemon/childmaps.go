@@ -14,8 +14,7 @@ type ChildMap struct {
 	dir *Directory
 
 	// can be many to one
-	children      map[string]InodeId
-	dirtyChildren map[InodeId]InodeId // a set
+	children map[string]InodeId
 
 	childrenRecords map[InodeId][]DirectoryRecordIf
 }
@@ -25,7 +24,6 @@ func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMa
 		wsr:             wsr_,
 		dir:             owner,
 		children:        make(map[string]InodeId, numEntries),
-		dirtyChildren:   make(map[InodeId]InodeId, 0),
 		childrenRecords: make(map[InodeId][]DirectoryRecordIf, numEntries),
 	}
 }
@@ -133,7 +131,7 @@ func (cmap *ChildMap) checkForReplace(c *ctx,
 	link := record.(*Hardlink)
 
 	// This needs to be turned back into a normal file
-	newRecord, inodeId, dirty := cmap.wsr.removeHardlink(c, link.linkId,
+	newRecord, inodeId := cmap.wsr.removeHardlink(c, link.linkId,
 		cmap.dir.inodeNum())
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
@@ -147,9 +145,6 @@ func (cmap *ChildMap) checkForReplace(c *ctx,
 
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
 	cmap.setRecord(inodeId, newRecord)
-	if dirty {
-		cmap.dirtyChildren[inodeId] = inodeId
-	}
 	cmap.dir.dirty(c)
 
 	return newRecord
@@ -175,7 +170,6 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 
 	inodeId, exists := cmap.children[name]
 	if exists {
-		delete(cmap.dirtyChildren, inodeId)
 		delete(cmap.children, name)
 	}
 
@@ -184,11 +178,16 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 		return nil
 	}
 
-	if link, isHardlink := record.(*Hardlink); isHardlink {
-		cmap.wsr.hardlinkDec(link.linkId)
-	}
+	result := cmap.delRecord(inodeId, name)
 
-	return cmap.delRecord(inodeId, name)
+	if link, isHardlink := record.(*Hardlink); isHardlink {
+		if cmap.wsr.hardlinkDec(link.linkId) {
+			// If the refcount was greater than one we shouldn't
+			// reparent.
+			return nil
+		}
+	}
+	return result
 }
 
 func (cmap *ChildMap) renameChild(c *ctx, oldName string,
@@ -215,7 +214,6 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 		// rename a hardlink to an existing one with the same inode
 		cmap.delRecord(cleanupInodeId, newName)
 		delete(cmap.children, newName)
-		delete(cmap.dirtyChildren, cleanupInodeId)
 	}
 
 	delete(cmap.children, oldName)
@@ -227,30 +225,6 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	}
 
 	return quantumfs.InodeIdInvalid
-}
-
-func (cmap *ChildMap) popDirty() map[InodeId]InodeId {
-	rtn := cmap.dirtyChildren
-	cmap.dirtyChildren = make(map[InodeId]InodeId, 0)
-
-	return rtn
-}
-
-func (cmap *ChildMap) setDirty(c *ctx, inodeNum InodeId) {
-	entry := cmap.firstRecord(inodeNum)
-	if entry == nil {
-		panic(fmt.Sprintf("setDirty on empty record for %d",
-			inodeNum))
-	} else if entry.Type() == quantumfs.ObjectTypeHardlink {
-		// we don't need to track dirty hardlinks
-		return
-	}
-
-	cmap.dirtyChildren[inodeNum] = inodeNum
-}
-
-func (cmap *ChildMap) clearDirty(inodeNum InodeId) {
-	delete(cmap.dirtyChildren, inodeNum)
 }
 
 func (cmap *ChildMap) inodeNum(name string) InodeId {
@@ -334,12 +308,6 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 
 		c.dlog("Cannot hardlink %s - not a file", childName)
 		return nil, fuse.EINVAL
-	}
-
-	// If the file hasn't been synced already, then we can't link it yet
-	if _, exists = cmap.dirtyChildren[childId]; exists {
-		c.elog("makeHardlink called on dirty child %d", childId)
-		return nil, fuse.EIO
 	}
 
 	// It needs to become a hardlink now. Hand it off to wsr
