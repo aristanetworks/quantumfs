@@ -6,6 +6,7 @@ package daemon
 // Test that different parts of Hardlink support are working
 
 import "bytes"
+import "fmt"
 import "io/ioutil"
 import "os"
 import "syscall"
@@ -34,7 +35,6 @@ func TestHardlinkReload(t *testing.T) {
 		for i := uint64(0); i < uint64(len(files)); i++ {
 			record := files[i].(*quantumfs.DirectoryRecord)
 			wsr.hardlinks[HardlinkId(i)] = newLinkEntry(record)
-			wsr.dirtyLinks[InodeId(i)] = HardlinkId(i)
 		}
 
 		// Write another file to ensure the wsr is dirty
@@ -55,8 +55,6 @@ func TestHardlinkReload(t *testing.T) {
 		test.assert(len(wsr.hardlinks) == len(wsrB.hardlinks),
 			"Hardlink map length not preserved: %v %v", wsr.hardlinks,
 			wsrB.hardlinks)
-		test.assert(len(wsrB.dirtyLinks) == 0,
-			"Dirty state not clean after branch: %d", wsrB.dirtyLinks)
 
 		for k, l := range wsr.hardlinks {
 			v := l.record
@@ -173,10 +171,12 @@ func TestHardlinkForget(t *testing.T) {
 
 		// Forget it
 		linkInode := test.getInodeNum(linkFile)
-		test.qfs.Forget(uint64(linkInode), 1)
+
+		remountFilesystem(test)
 
 		// Check that it's uninstantiated
-		test.waitFor("hardlink inode to be forgotten", func() bool {
+		msg := fmt.Sprintf("hardlink inode %d to be forgotten", linkInode)
+		test.waitFor(msg, func() bool {
 			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
 			return inode == nil
 		})
