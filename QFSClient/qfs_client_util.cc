@@ -75,7 +75,9 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 	case kApiFileReadFail:
 		return "couldn't read from API file " + details;
 	case kWorkspacePathInvalid:
-		return "there must be exactly one '/' in '" + details + "'";
+		return "there must be at least two '/' in '" + details + "'";
+	case kWorkspaceNameInvalid:
+		return "there must be exactly two '/' in '" + details + "'";
 	case kJsonEncodingError:
 		return "couldn't encode the request into JSON (" +
 		details + ")";
@@ -86,9 +88,6 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 		return "an expected JSON object was missing: " + details;
 	case kApiError:
 		return "the API returned an error: " + details;
-	case kJsonTooBig:
-		return "there's more JSON data than will fit in a command buffer (" +
-			details + " bytes too much)";
 	case kBufferTooBig:
 		return "An internal buffer is getting too big";
 	}
