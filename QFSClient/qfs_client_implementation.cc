@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#include "qfs_client.h"
+#include "qfs_client_implementation.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +14,7 @@
 
 #include <jansson.h>
 
+#include "qfs_client.h"
 #include "qfs_client_data.h"
 #include "qfs_client_test.h"
 #include "qfs_client_util.h"
@@ -28,48 +29,35 @@ ApiContext::~ApiContext() {
 
 }
 
-Api::CommandBuffer::CommandBuffer() {
+ApiImpl::CommandBuffer::CommandBuffer() {
 
 }
 
-Api::CommandBuffer::~CommandBuffer() {
+ApiImpl::CommandBuffer::~CommandBuffer() {
 
 }
-
-const size_t Api::CommandBuffer::kBufferSizeIncrement = 4096;
 
 // Return a const pointer to the data in the buffer
-const byte *Api::CommandBuffer::Data() const {
+const byte *ApiImpl::CommandBuffer::Data() const {
 	return this->data.data();
 }
 
 // Return the size of the data stored in the buffer
-size_t Api::CommandBuffer::Size() const {
+size_t ApiImpl::CommandBuffer::Size() const {
 	return this->data.size();
 }
 
 // Reset the buffer such that it will contain no data and will
 // have a zero size
-void Api::CommandBuffer::Reset() {
+void ApiImpl::CommandBuffer::Reset() {
 	this->data.clear();
 }
 
-// Add one byte to the buffer and grow its internal data store if
-// necessary. Returns an error if the store could not be grown larger
-// to fit the byte.
-ErrorCode Api::CommandBuffer::Add(byte datum) {
+// Append a block of data to the buffer. Returns an error if the
+// buffer would have to be grown too large to add this block
+ErrorCode ApiImpl::CommandBuffer::Append(const byte *data, size_t size) {
 	try {
-		// if the data vector's capacity is about to be exceeded, then
-		// reserve more storage (it's entirely possible (but not guaranteed)
-		// that the implementation of std::vector already does something
-		// similar to this)
-		if ((this->data.capacity() - this->data.size()) < 1) {
-			size_t new_capacity = this->data.capacity() +
-					      kBufferSizeIncrement;
-			this->data.reserve(new_capacity);
-		}
-
-		this->data.push_back(datum);
+		this->data.insert(this->data.end(), data, data + size);
 	}
 	catch (...) {
 		return kBufferTooBig;
@@ -78,35 +66,47 @@ ErrorCode Api::CommandBuffer::Add(byte datum) {
 	return kSuccess;
 }
 
-ErrorCode Api::CommandBuffer::CopyString(const char *s) {
-	try {
-		size_t string_length = 1 + strlen(s);
-		this->data.assign(s, s + string_length);
-	}
-	catch (...) {
-		return kBufferTooBig;
-	}
+// copy a string into the buffer. An error will be returned if
+// the buffer would have to be grown too large to fit the string.
+ErrorCode ApiImpl::CommandBuffer::CopyString(const char *s) {
+	this->data.clear();
 
-	return kSuccess;
+	return this->Append((const byte *)s, 1 + strlen(s));
 }
 
-Api::Api()
+Error GetApi(Api **api) {
+	*api = new ApiImpl();
+	return util::getError(kSuccess);
+}
+
+Error GetApi(const char *path, Api **api) {
+	*api = new ApiImpl(path);
+	return util::getError(kSuccess);
+}
+
+void ReleaseApi(Api *api) {
+	if (api != NULL) {
+		delete (ApiImpl*)api;
+	}
+}
+
+ApiImpl::ApiImpl()
 	: path(""),
 	  api_inode_id(kInodeIdApi),
 	  send_test_hook(NULL) {
 }
 
-Api::Api(const char *path)
+ApiImpl::ApiImpl(const char *path)
 	: path(path),
 	  api_inode_id(kInodeIdApi),
 	  send_test_hook(NULL) {
 }
 
-Api::~Api() {
+ApiImpl::~ApiImpl() {
 	Close();
 }
 
-Error Api::Open() {
+Error ApiImpl::Open() {
 	if (this->path.length() == 0) {
 		// Path was not passed to constructor: determine path
 		Error err = this->DeterminePath();
@@ -127,13 +127,13 @@ Error Api::Open() {
 	return util::getError(kSuccess);
 }
 
-void Api::Close() {
+void ApiImpl::Close() {
 	if (this->file.is_open()) {
 		this->file.close();
 	}
 }
 
-Error Api::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
+Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
 	Error err = this->Open();
 	if (err.code != kSuccess) {
 		return err;
@@ -154,7 +154,7 @@ Error Api::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
 	return this->ReadResponse(response);
 }
 
-Error Api::WriteCommand(const CommandBuffer &command) {
+Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 	if (!this->file.is_open()) {
 		return util::getError(kApiFileNotOpen);
 	}
@@ -177,7 +177,9 @@ Error Api::WriteCommand(const CommandBuffer &command) {
 	return util::getError(kSuccess);
 }
 
-Error Api::ReadResponse(CommandBuffer *command) {
+Error ApiImpl::ReadResponse(CommandBuffer *command) {
+	ErrorCode err = kSuccess;
+
 	if (!this->file.is_open()) {
 		return util::getError(kApiFileNotOpen);
 	}
@@ -187,25 +189,34 @@ Error Api::ReadResponse(CommandBuffer *command) {
 		return util::getError(kApiFileSeekFail);
 	}
 
-	int datum = this->file.get();
-	while(datum != EOF) {
-		command->Add(datum);
-		datum = this->file.get();
-	}
+	// read up to 4k at a time, stopping on EOF
+	command->Reset();
 
-	if (this->file.fail() && !(this->file.rdstate() & std::ios_base::eofbit)) {
-		// any read failure *except* an EOF is a failure
-		return util::getError(kApiFileReadFail, this->path);
+	byte data[4096];
+	while(!this->file.eof()) {
+		this->file.read((char *)data, sizeof(data));
+
+		if (this->file.fail() && !(this->file.eof())) {
+			// any read failure *except* an EOF is a failure
+			return util::getError(kApiFileReadFail, this->path);
+		}
+
+		size_t size = this->file.gcount();
+		err = command->Append(data, size);
+
+		if (err != kSuccess) {
+			return util::getError(err);
+		}
 	}
 
 	// clear the file stream's state, because it will remain in an error state
 	// after hitting an EOF
 	this->file.clear();
 
-	return util::getError(kSuccess);
+	return util::getError(err);
 }
 
-Error Api::DeterminePath() {
+Error ApiImpl::DeterminePath() {
 	// getcwd() with a NULL first parameter results in a buffer of whatever size
 	// is required being allocated, which we must then free. PATH_MAX isn't
 	// known at compile time (and it is possible for paths to be longer than
@@ -257,30 +268,40 @@ Error Api::DeterminePath() {
 	return util::getError(kCantFindApiFile, currentDir);
 }
 
-Error Api::CheckWorkspacePathValid(const char *workspace_root) {
+Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_root) {
 	std::string str(workspace_root);
+	std::vector<std::string> tokens;
 
-	// path must have TWO '/' characters...
-	size_t first = str.find('/');
-	if (first == std::string::npos) {
-		return util::getError(kWorkspacePathInvalid, workspace_root);
-	}
+	util::Split(str, "/", &tokens);
 
-	// ...but no more than two
-	size_t second = str.find('/', first + 1);
-	if (second == std::string::npos) {
-		return util::getError(kWorkspacePathInvalid, workspace_root);
-	}
-	size_t third = str.find('/', second + 1);
-	if (third != std::string::npos) {
-		return util::getError(kWorkspacePathInvalid, workspace_root);
+	// path must have exactly TWO '/' characters (in which case it will have
+	// three tokens if split by '/'
+	if (tokens.size() != 3) {
+		return util::getError(kWorkspaceNameInvalid, workspace_root);
+
 	}
 
 	return util::getError(kSuccess);
 }
 
-Error Api::CheckCommonApiResponse(const CommandBuffer &response,
-				  ApiContext *context) {
+Error ApiImpl::CheckWorkspacePathValid(const char *workspace_path) {
+	std::string str(workspace_path);
+	std::vector<std::string> tokens;
+
+	util::Split(str, "/", &tokens);
+
+	// path must have exactly TWO '/' characters (in which case it will have
+	// three or more tokens if split by '/'
+	if (tokens.size() < 3) {
+		return util::getError(kWorkspacePathInvalid, workspace_path);
+
+	}
+
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
+				      ApiContext *context) {
 	json_error_t json_error;
 
 	// parse JSON in response into a std::unordered_map<std::string, bool>
@@ -348,7 +369,7 @@ Error Api::CheckCommonApiResponse(const CommandBuffer &response,
 	return util::getError(kSuccess);
 }
 
-Error Api::SendJson(const void *request_json_ptr, ApiContext *context) {
+Error ApiImpl::SendJson(const void *request_json_ptr, ApiContext *context) {
 	json_t *request_json = (json_t *)request_json_ptr;
 
 	// we pass these flags to json_dumps() because:
@@ -359,13 +380,6 @@ Error Api::SendJson(const void *request_json_ptr, ApiContext *context) {
 					    JSON_COMPACT | JSON_SORT_KEYS);
 
 	CommandBuffer command;
-	size_t json_size = strlen(request_json_str) + 1;
-
-	if (json_size >= kCmdBufferSize) {
-		free(request_json_str);
-		return util::getError(kJsonTooBig,
-				      std::to_string((json_size - kCmdBufferSize)));
-	}
 
 	command.CopyString(request_json_str);
 
@@ -386,8 +400,8 @@ Error Api::SendJson(const void *request_json_ptr, ApiContext *context) {
 	return util::getError(kSuccess);
 }
 
-Error Api::GetAccessed(const char *workspace_root) {
-	Error err = this->CheckWorkspacePathValid(workspace_root);
+Error ApiImpl::GetAccessed(const char *workspace_root) {
+	Error err = this->CheckWorkspaceNameValid(workspace_root);
 	if (err.code != kSuccess) {
 		return err;
 	}
@@ -427,7 +441,22 @@ Error Api::GetAccessed(const char *workspace_root) {
 	return util::getError(kSuccess);
 }
 
-Error Api::PrepareAccessedListResponse(
+Error ApiImpl::InsertInode(const char *destination,
+			   const char *key,
+			   uint32_t permissions,
+			   uint32_t uid,
+			   uint32_t gid) {
+	Error err = this->CheckWorkspacePathValid(destination);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+
+
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::PrepareAccessedListResponse(
 	const ApiContext *context,
 	std::unordered_map<std::string, bool> *accessed_list) {
 
@@ -460,7 +489,7 @@ Error Api::PrepareAccessedListResponse(
 	return util::getError(kSuccess);
 }
 
-std::string Api::FormatAccessedList(
+std::string ApiImpl::FormatAccessedList(
 	const std::unordered_map<std::string, bool> &accessed) {
 
 	std::string result = "------ Created Files ------\n";
