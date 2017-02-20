@@ -383,7 +383,7 @@ func (qfs *QuantumFs) adjustKernelKnobs() {
 }
 
 func adjustBdi(c *ctx, mountId int) {
-	c.funcIn("adjustBdi").out()
+	defer c.funcIn("adjustBdi").out()
 
 	// /sys/class/bdi/<mount>/read_ahead_kb indicates how much data, up to the
 	// end of the file, should be speculatively read by the kernel. Setting this
@@ -397,7 +397,7 @@ func adjustBdi(c *ctx, mountId int) {
 	value := fmt.Sprintf("%d", quantumfs.MaxBlockSize/1024)
 	err := ioutil.WriteFile(filename, []byte(value), 000)
 	if err != nil {
-		c.wlog("Unable to set read_ahead_kb: %v", err)
+		c.wlog("Unable to set read_ahead_kb: %s", err.Error())
 	}
 
 	// /sys/class/bdi/<mount>/max_ratio indicates the percentage of the
@@ -410,7 +410,7 @@ func adjustBdi(c *ctx, mountId int) {
 	filename = fmt.Sprintf("/sys/class/bdi/0:%d/max_ratio", mountId)
 	err = ioutil.WriteFile(filename, []byte("100"), 000)
 	if err != nil {
-		c.wlog("Unable to set bdi max_ratio: %v", err)
+		c.wlog("Unable to set bdi max_ratio: %s", err.Error())
 	}
 }
 
@@ -566,6 +566,10 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 
 // Returns true if the count became zero or was previously zero
 func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
+	if inodeId == quantumfs.InodeIdApi || inodeId == quantumfs.InodeIdRoot {
+		return false
+	}
+
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
@@ -573,11 +577,12 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 		return true
 	}
 
+	if lookupCount < count {
+		qfs.c.elog("lookupCount less than zero %d %d", lookupCount, count)
+	}
+
 	lookupCount -= count
-	if lookupCount < 0 {
-		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
-		panic(msg)
-	} else if lookupCount == 0 {
+	if lookupCount == 0 {
 		// Don't leave the zero entry in the map at this moment. Do it with
 		// qfs.makeLookupCountZero(inodeId) after trying to grab the treelock
 		// in case of the race condition
@@ -1418,7 +1423,6 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
-	qfs.c.elog("Unhandled request Init")
 }
 
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,

@@ -86,9 +86,8 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 		return "an expected JSON object was missing: " + details;
 	case kApiError:
 		return "the API returned an error: " + details;
-	case kJsonTooBig:
-		return "there's more JSON data than will fit in a command buffer (" +
-			details + " bytes too much)";
+	case kBufferTooBig:
+		return "An internal buffer is getting too big";
 	}
 
 	std::string result("unknown error (");

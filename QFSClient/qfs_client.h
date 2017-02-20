@@ -18,7 +18,6 @@ namespace qfsclient {
 
 typedef uint8_t byte;
 
-const size_t kCmdBufferSize = 4096;
 const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
 
@@ -72,8 +71,8 @@ enum ErrorCode {
 	// The quantumfs API returned an error
 	kApiError = 13,
 
-	// The JSON data was too large to fit into the command buffer
-	kJsonTooBig = 14,
+	// An internal buffer is getting too big to increase in size
+	kBufferTooBig = 14,
 };
 
 // An error object returned by many member functions of the Api class. The possible
@@ -133,18 +132,38 @@ class Api {
  private:
 	// CommandBuffer is used internally to store the raw content of a command to
 	// send to (or a response received from) the API - typically in JSON format.
-	struct CommandBuffer {
-		// copy a string up to the maximum buffer size (including NUL
-		// terminator) into the buffer. Note that if the string is larger
-		// than will fit in the buffer, only the first kCmdBufferSize - 1
-		// characters will be copied, but the number of characters actaully
-		// copied will be returned.
-		// TODO: if and when we support artbitarily-sized command buffers,
-		// we won't need to return a length any more
-		size_t CopyString(const char * s);
+	class CommandBuffer {
+	 public:
+		CommandBuffer();
+		virtual ~CommandBuffer();
 
-		byte data[kCmdBufferSize];
-		size_t size;
+		// Return a const pointer to the data in the buffer
+		const byte *Data() const;
+
+		// Return the size of the data stored in the buffer
+		size_t Size() const;
+
+		// Reset the buffer such that it will contain no data and will
+		// have a zero size
+		void Reset();
+
+		// Append a block of data to the buffer. Returns an error if the
+		// buffer would have to be grown too large to add this block
+		ErrorCode Append(const byte *data, size_t size);
+
+		// copy a string into the buffer. An error will be returned if
+		// the buffer would have to be grown too large to fit the string.
+		ErrorCode CopyString(const char * s);
+
+	 private:
+		std::vector<byte> data;
+
+		FRIEND_TEST(QfsClientApiTest, CheckCommonApiResponseBadJsonTest);
+		FRIEND_TEST(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest);
+
+		FRIEND_TEST(QfsClientCommandBufferTest, AppendTest);
+		FRIEND_TEST(QfsClientCommandBufferTest, AppendAndCopyLotsTest);
+		FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
 	};
 
 	// Work out the location of the api file (which must be called 'api'
@@ -220,6 +239,7 @@ class Api {
 
 	friend class QfsClientTest;
 	FRIEND_TEST(QfsClientTest, SendCommandTest);
+	FRIEND_TEST(QfsClientTest, SendLargeCommandTest);
 	FRIEND_TEST(QfsClientTest, SendCommandFileRemovedTest);
 	FRIEND_TEST(QfsClientTest, SendCommandNoFileTest);
 	FRIEND_TEST(QfsClientTest, SendCommandCantOpenFileTest);
@@ -238,6 +258,12 @@ class Api {
 	FRIEND_TEST(QfsClientApiTest, SendJsonTestJsonTooBig);
 
 	FRIEND_TEST(QfsClientDeterminePathTest, DeterminePathTest);
+
+	FRIEND_TEST(QfsClientCommandBufferTest, FreshBufferTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, ResetTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, AppendTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, AppendAndCopyLotsTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
 };
 
 } // namespace qfsclient

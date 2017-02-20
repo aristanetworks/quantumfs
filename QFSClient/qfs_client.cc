@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <ios>
+#include <vector>
 
 #include <jansson.h>
 
@@ -27,18 +28,49 @@ ApiContext::~ApiContext() {
 
 }
 
-size_t Api::CommandBuffer::CopyString(const char *s) {
-	size_t data_length = 1 + strlen(s);
-	size_t can_copy = std::min(data_length, kCmdBufferSize);
+Api::CommandBuffer::CommandBuffer() {
 
-	strncpy((char*)this->data, s, can_copy);
+}
 
-	// strncpy doesn't copy a NUL-terminator if the source string is longer
-	// than the number of characters to copy, so set one here
-	this->data[kCmdBufferSize - 1] = '\0';
-	this->size = can_copy;
+Api::CommandBuffer::~CommandBuffer() {
 
-	return can_copy;
+}
+
+// Return a const pointer to the data in the buffer
+const byte *Api::CommandBuffer::Data() const {
+	return this->data.data();
+}
+
+// Return the size of the data stored in the buffer
+size_t Api::CommandBuffer::Size() const {
+	return this->data.size();
+}
+
+// Reset the buffer such that it will contain no data and will
+// have a zero size
+void Api::CommandBuffer::Reset() {
+	this->data.clear();
+}
+
+// Append a block of data to the buffer. Returns an error if the
+// buffer would have to be grown too large to add this block
+ErrorCode Api::CommandBuffer::Append(const byte *data, size_t size) {
+	try {
+		this->data.insert(this->data.end(), data, data + size);
+	}
+	catch (...) {
+		return kBufferTooBig;
+	}
+
+	return kSuccess;
+}
+
+// copy a string into the buffer. An error will be returned if
+// the buffer would have to be grown too large to fit the string.
+ErrorCode Api::CommandBuffer::CopyString(const char *s) {
+	this->data.clear();
+
+	return this->Append((const byte *)s, 1 + strlen(s));
 }
 
 Api::Api()
@@ -115,7 +147,7 @@ Error Api::WriteCommand(const CommandBuffer &command) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
-	this->file.write((const char *)command.data, command.size);
+	this->file.write((const char *)command.Data(), command.Size());
 	if (this->file.fail()) {
 		return util::getError(kApiFileWriteFail, this->path);
 	}
@@ -129,6 +161,8 @@ Error Api::WriteCommand(const CommandBuffer &command) {
 }
 
 Error Api::ReadResponse(CommandBuffer *command) {
+	ErrorCode err = kSuccess;
+
 	if (!this->file.is_open()) {
 		return util::getError(kApiFileNotOpen);
 	}
@@ -138,22 +172,31 @@ Error Api::ReadResponse(CommandBuffer *command) {
 		return util::getError(kApiFileSeekFail);
 	}
 
-	// TODO: deal with the case where there may be more data in the api
-	// file than will fit in the command buffer
-	this->file.read((char *)command->data, sizeof(command->data));
+	// read up to 4k at a time, stopping on EOF
+	command->Reset();
 
-	if (this->file.fail() && !(this->file.rdstate() & std::ios_base::eofbit)) {
-		// any read failure *except* an EOF is a failure
-		return util::getError(kApiFileReadFail, this->path);
+	byte data[4096];
+	while(!this->file.eof()) {
+		this->file.read((char *)data, sizeof(data));
+
+		if (this->file.fail() && !(this->file.eof())) {
+			// any read failure *except* an EOF is a failure
+			return util::getError(kApiFileReadFail, this->path);
+		}
+
+		size_t size = this->file.gcount();
+		err = command->Append(data, size);
+
+		if (err != kSuccess) {
+			return util::getError(err);
+		}
 	}
 
 	// clear the file stream's state, because it will remain in an error state
 	// after hitting an EOF
 	this->file.clear();
 
-	command->size = this->file.gcount();
-
-	return util::getError(kSuccess);
+	return util::getError(err);
 }
 
 Error Api::DeterminePath() {
@@ -235,15 +278,15 @@ Error Api::CheckCommonApiResponse(const CommandBuffer &response,
 	json_error_t json_error;
 
 	// parse JSON in response into a std::unordered_map<std::string, bool>
-	json_t *response_json = json_loads((const char *)response.data,
-					   response.size,
+	json_t *response_json = json_loads((const char *)response.Data(),
+					   response.Size(),
 					   &json_error);
 
 	((util::JsonApiContext*)context)->SetJsonObject(response_json);
 
 	if (response_json == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			json_error.text, (char *)response.data);
+			json_error.text, (const char *)response.Data());
 		return util::getError(kJsonDecodingError, details);
 	}
 
@@ -258,28 +301,28 @@ Error Api::CheckCommonApiResponse(const CommandBuffer &response,
 
 	if (success != 0) {
 		std::string details = util::buildJsonErrorDetails(
-			json_error.text, (char *)response.data);
+			json_error.text, (const char *)response.Data());
 		return util::getError(kJsonDecodingError, details);
 	}
 
 	json_t *error_json_obj = json_object_get(response_json_obj, kErrorCode);
 	if (error_json_obj == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			kErrorCode, (char *)response.data);
+			kErrorCode, (const char *)response.Data());
 		return util::getError(kMissingJsonObject, details);
 	}
 
 	json_t *message_json_obj = json_object_get(response_json_obj, kMessage);
 	if (message_json_obj == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			kMessage, (char *)response.data);
+			kMessage, (const char *)response.Data());
 		return util::getError(kMissingJsonObject, details);
 	}
 
 	if (!json_is_integer(error_json_obj)) {
 		std::string details = util::buildJsonErrorDetails(
 			"error code in response JSON is not valid",
-			(char *)response.data);
+			(const char *)response.Data());
 		return util::getError(kJsonDecodingError,
 				      details);
 	}
@@ -291,7 +334,7 @@ Error Api::CheckCommonApiResponse(const CommandBuffer &response,
 			json_string_value(message_json_obj));
 
 		std::string details = util::buildJsonErrorDetails(
-			api_error, (char *)response.data);
+			api_error, (const char *)response.Data());
 
 		return util::getError(kApiError, details);
 	}
@@ -310,13 +353,6 @@ Error Api::SendJson(const void *request_json_ptr, ApiContext *context) {
 					    JSON_COMPACT | JSON_SORT_KEYS);
 
 	CommandBuffer command;
-	size_t json_size = strlen(request_json_str) + 1;
-
-	if (json_size >= kCmdBufferSize) {
-		free(request_json_str);
-		return util::getError(kJsonTooBig,
-				      std::to_string((json_size - kCmdBufferSize)));
-	}
 
 	command.CopyString(request_json_str);
 
