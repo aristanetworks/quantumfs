@@ -183,7 +183,7 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
 			link.linkId))
 	}
-	
+
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
 		realRecord.Size())
 }
