@@ -502,6 +502,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		return dir.children.inodeNum(name)
 	}()
 	if inodeNum == quantumfs.InodeIdInvalid {
+		c.vlog("Inode not found")
 		return fuse.ENOENT
 	}
 
@@ -1772,6 +1773,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
+		c.qfs.increaseLookupCount(InodeId(child.attr.Ino))
 		fillEntryOutCacheData(c, details)
 		details.Attr = child.attr
 
