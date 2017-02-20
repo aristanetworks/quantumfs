@@ -5,6 +5,7 @@
 package quantumfs
 
 import "crypto/sha1"
+import "encoding/base64"
 import "encoding/binary"
 import "fmt"
 import "time"
@@ -739,6 +740,21 @@ func (record *DirectoryRecord) ExtendedAttributes() ObjectKey {
 
 func (record *DirectoryRecord) SetExtendedAttributes(key ObjectKey) {
 	record.record.SetExtendedAttributes(key.key)
+}
+
+func (record *DirectoryRecord) EncodeExtendedKey() []byte {
+	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
+}
+
+func EncodeExtendedKey(key ObjectKey, type_ ObjectType,
+	size uint64) []byte {
+
+	append_ := make([]byte, 9)
+	append_[0] = uint8(type_)
+	binary.LittleEndian.PutUint64(append_[1:], size)
+
+	data := append(key.Value(), append_...)
+	return []byte(base64.StdEncoding.EncodeToString(data))
 }
 
 func NewMultiBlockFile(maxBlocks int) *MultiBlockFile {

@@ -48,6 +48,8 @@ type DirectoryRecordIf interface {
 
 	Record() quantumfs.DirectoryRecord
 	Nlinks() uint32
+
+	EncodeExtendedKey() []byte
 }
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
@@ -1572,17 +1574,6 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
-}
-
-func encodeExtendedKey(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
-	size uint64) []byte {
-
-	append_ := make([]byte, 9)
-	append_[0] = uint8(type_)
-	binary.LittleEndian.PutUint64(append_[1:], size)
-
-	data := append(key.Value(), append_...)
-	return []byte(base64.StdEncoding.EncodeToString(data))
 }
 
 func decodeExtendedKey(packet string) (quantumfs.ObjectKey, quantumfs.ObjectType,
