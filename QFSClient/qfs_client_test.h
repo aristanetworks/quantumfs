@@ -52,6 +52,12 @@ class QfsClientDeterminePathTest : public QfsClientTest {
 	virtual void TearDown();
 };
 
+class QfsClientCommandBufferTest : public testing::Test {
+ protected:
+	virtual void SetUp();
+	virtual void TearDown();
+};
+
 } // namespace qfsclient
 
 #endif // QFS_CLIENT_TEST_H_
