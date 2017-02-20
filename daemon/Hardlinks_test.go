@@ -361,16 +361,11 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 	test.assert(err == nil, "Error decompressing the packet")
 
 	// Extract the internal ObjectKey from QuantumFS
-	var stat syscall.Stat_t
-	err = syscall.Stat(path, &stat)
-	test.assert(err == nil, "Error stat'ing test type %d: %v", Type, err)
-	var id InodeId
-	id = InodeId(stat.Ino)
-	inode := test.qfs.inodes[id]
+	inode := test.getInode(path)
 	parent := inode.parent(&test.qfs.c)
 	// parent should be the workspace root
 	wsr := parent.(*WorkspaceRoot)
-	isHardlink, linkId := wsr.checkHardlink(id)
+	isHardlink, linkId := wsr.checkHardlink(inode.inodeNum())
 	test.assert(isHardlink, "Expected hardlink isn't one.")
 
 	valid, record := wsr.getHardlink(linkId)
@@ -413,7 +408,7 @@ func TestHardlinkExtraction(t *testing.T) {
 			"Error getting the file key: %v with a size of %d",
 			err, sz)
 
-		matchXAttrHardlinkExtendedKey(filename, dst, test,
+		matchXAttrHardlinkExtendedKey(linkname, dst, test,
 			quantumfs.ObjectTypeSmallFile)
 	})
 }
