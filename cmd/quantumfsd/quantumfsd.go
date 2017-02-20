@@ -186,8 +186,8 @@ func main() {
 		AllowOther:    true,
 		MaxBackground: 1024,
 		MaxWrite:      quantumfs.MaxBlockSize,
-		FsName:        "cluster",
-		Name:          "quantumfs",
+		FsName:        "QuantumFS",
+		Name:          "QuantumFS",
 		Options:       make([]string, 0),
 	}
 	mountOptions.Options = append(mountOptions.Options, "suid")

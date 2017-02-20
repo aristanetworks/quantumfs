@@ -176,29 +176,24 @@ func (api *ApiInode) MvChild(c *ctx, dstInode Inode, oldName string,
 func (api *ApiInode) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on ApiInode")
 	return 0, fuse.ENODATA
 }
 
 func (api *ApiInode) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on ApiInode")
 	return nil, fuse.ENODATA
 }
 
 func (api *ApiInode) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on ApiInode")
 	return []byte{}, fuse.OK
 }
 
 func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on ApiInode")
 	return fuse.Status(syscall.ENOSPC)
 }
 
 func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on ApiInode")
 	return fuse.ENODATA
 }
 
@@ -261,8 +256,7 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
-	c.vlog("newApiHandle Enter")
-	defer c.vlog("newApiHandle Exit")
+	defer c.funcIn("newApiHandle Enter").out()
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
