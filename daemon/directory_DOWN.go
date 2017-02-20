@@ -106,7 +106,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
 		return nil, fuse.EIO
 	}
-	typeKey := encodeExtendedKey(record.ID(), record.Type(), record.Size())
+	typeKey := record.EncodeExtendedKey()
 
 	return typeKey, fuse.OK
 }

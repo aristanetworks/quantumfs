@@ -175,3 +175,15 @@ func (link *Hardlink) Record() quantumfs.DirectoryRecord {
 func (link *Hardlink) Nlinks() uint32 {
 	return link.wsr.nlinks(link.linkId)
 }
+
+func (link *Hardlink) EncodeExtendedKey() []byte {
+	valid, realRecord := link.wsr.getHardlink(link.linkId)
+	if !valid {
+		// This class shouldn't even exist if the hardlink's invalid
+		panic(fmt.Sprintf("Unable to get record for existing link %d",
+			link.linkId))
+	}
+	
+	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
+		realRecord.Size())
+}
