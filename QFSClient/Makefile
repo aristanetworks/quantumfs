@@ -9,7 +9,7 @@ d           := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 TARGET      := $(d)/libqfsclient.so
 TEST_TARGET := $(d)/qfsclient_test
 
-SRCS      := $(d)/qfs_client.cc $(d)/qfs_client_util.cc
+SRCS      := $(d)/qfs_client_implementation.cc $(d)/qfs_client_util.cc
 OBJS      := $(SRCS:.cc=.o)
 DEPS      := $(SRCS:.cc=.d)
 TEST_SRCS := $(d)/qfs_client_test.cc $(d)/qfs_client_util_test.cc
@@ -17,7 +17,7 @@ TEST_OBJS := $(TEST_SRCS:.cc=.o)
 
 CXX_FLAGS      := -xc++ -I$(d) -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -shared -Wl,-rpath,$(d)
-TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest
+TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson
 
 all: $(TARGET) test
 
