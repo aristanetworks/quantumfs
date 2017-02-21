@@ -477,7 +477,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	}
 
 	dst := strings.Split(cmd.DstPath, "/")
-	key, type_, size, err := decodeExtendedKey(cmd.Key)
+	key, type_, size, err := quantumfs.DecodeExtendedKey(cmd.Key)
 	permissions := cmd.Permissions
 	uid := quantumfs.ObjectUid(c.Ctx, uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(c.Ctx, uint32(cmd.Gid), uint32(cmd.Gid))

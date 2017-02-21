@@ -357,7 +357,7 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 	test *testHelper, Type quantumfs.ObjectType) {
 
-	key, type_, size, err := decodeExtendedKey(string(extendedKey))
+	key, type_, size, err := quantumfs.DecodeExtendedKey(string(extendedKey))
 	test.assert(err == nil, "Error decompressing the packet")
 
 	// Extract the internal ObjectKey from QuantumFS
