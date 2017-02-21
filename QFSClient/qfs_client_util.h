@@ -10,6 +10,7 @@
 #include <jansson.h>
 
 #include "qfs_client.h"
+#include "qfs_client_implementation.h"
 #include "qfs_client_data.h"
 
 namespace qfsclient {

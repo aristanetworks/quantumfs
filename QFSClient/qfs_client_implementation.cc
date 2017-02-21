@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#include "qfs_client.h"
+#include "qfs_client_implementation.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +14,7 @@
 
 #include <jansson.h>
 
+#include "qfs_client.h"
 #include "qfs_client_data.h"
 #include "qfs_client_test.h"
 #include "qfs_client_util.h"
@@ -28,33 +29,33 @@ ApiContext::~ApiContext() {
 
 }
 
-Api::CommandBuffer::CommandBuffer() {
+ApiImpl::CommandBuffer::CommandBuffer() {
 
 }
 
-Api::CommandBuffer::~CommandBuffer() {
+ApiImpl::CommandBuffer::~CommandBuffer() {
 
 }
 
 // Return a const pointer to the data in the buffer
-const byte *Api::CommandBuffer::Data() const {
+const byte *ApiImpl::CommandBuffer::Data() const {
 	return this->data.data();
 }
 
 // Return the size of the data stored in the buffer
-size_t Api::CommandBuffer::Size() const {
+size_t ApiImpl::CommandBuffer::Size() const {
 	return this->data.size();
 }
 
 // Reset the buffer such that it will contain no data and will
 // have a zero size
-void Api::CommandBuffer::Reset() {
+void ApiImpl::CommandBuffer::Reset() {
 	this->data.clear();
 }
 
 // Append a block of data to the buffer. Returns an error if the
 // buffer would have to be grown too large to add this block
-ErrorCode Api::CommandBuffer::Append(const byte *data, size_t size) {
+ErrorCode ApiImpl::CommandBuffer::Append(const byte *data, size_t size) {
 	try {
 		this->data.insert(this->data.end(), data, data + size);
 	}
@@ -67,29 +68,45 @@ ErrorCode Api::CommandBuffer::Append(const byte *data, size_t size) {
 
 // copy a string into the buffer. An error will be returned if
 // the buffer would have to be grown too large to fit the string.
-ErrorCode Api::CommandBuffer::CopyString(const char *s) {
+ErrorCode ApiImpl::CommandBuffer::CopyString(const char *s) {
 	this->data.clear();
 
 	return this->Append((const byte *)s, 1 + strlen(s));
 }
 
-Api::Api()
+Error GetApi(Api **api) {
+	*api = new ApiImpl();
+	return util::getError(kSuccess);
+}
+
+Error GetApi(const char *path, Api **api) {
+	*api = new ApiImpl(path);
+	return util::getError(kSuccess);
+}
+
+void ReleaseApi(Api *api) {
+	if (api != NULL) {
+		delete (ApiImpl*)api;
+	}
+}
+
+ApiImpl::ApiImpl()
 	: path(""),
 	  api_inode_id(kInodeIdApi),
 	  send_test_hook(NULL) {
 }
 
-Api::Api(const char *path)
+ApiImpl::ApiImpl(const char *path)
 	: path(path),
 	  api_inode_id(kInodeIdApi),
 	  send_test_hook(NULL) {
 }
 
-Api::~Api() {
+ApiImpl::~ApiImpl() {
 	Close();
 }
 
-Error Api::Open() {
+Error ApiImpl::Open() {
 	if (this->path.length() == 0) {
 		// Path was not passed to constructor: determine path
 		Error err = this->DeterminePath();
@@ -110,13 +127,13 @@ Error Api::Open() {
 	return util::getError(kSuccess);
 }
 
-void Api::Close() {
+void ApiImpl::Close() {
 	if (this->file.is_open()) {
 		this->file.close();
 	}
 }
 
-Error Api::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
+Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
 	Error err = this->Open();
 	if (err.code != kSuccess) {
 		return err;
@@ -137,7 +154,7 @@ Error Api::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
 	return this->ReadResponse(response);
 }
 
-Error Api::WriteCommand(const CommandBuffer &command) {
+Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 	if (!this->file.is_open()) {
 		return util::getError(kApiFileNotOpen);
 	}
@@ -160,7 +177,7 @@ Error Api::WriteCommand(const CommandBuffer &command) {
 	return util::getError(kSuccess);
 }
 
-Error Api::ReadResponse(CommandBuffer *command) {
+Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	ErrorCode err = kSuccess;
 
 	if (!this->file.is_open()) {
@@ -199,7 +216,7 @@ Error Api::ReadResponse(CommandBuffer *command) {
 	return util::getError(err);
 }
 
-Error Api::DeterminePath() {
+Error ApiImpl::DeterminePath() {
 	// getcwd() with a NULL first parameter results in a buffer of whatever size
 	// is required being allocated, which we must then free. PATH_MAX isn't
 	// known at compile time (and it is possible for paths to be longer than
@@ -251,7 +268,7 @@ Error Api::DeterminePath() {
 	return util::getError(kCantFindApiFile, currentDir);
 }
 
-Error Api::CheckWorkspacePathValid(const char *workspace_root) {
+Error ApiImpl::CheckWorkspacePathValid(const char *workspace_root) {
 	std::string str(workspace_root);
 
 	// path must have TWO '/' characters...
@@ -273,8 +290,8 @@ Error Api::CheckWorkspacePathValid(const char *workspace_root) {
 	return util::getError(kSuccess);
 }
 
-Error Api::CheckCommonApiResponse(const CommandBuffer &response,
-				  ApiContext *context) {
+Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
+				      ApiContext *context) {
 	json_error_t json_error;
 
 	// parse JSON in response into a std::unordered_map<std::string, bool>
@@ -342,7 +359,7 @@ Error Api::CheckCommonApiResponse(const CommandBuffer &response,
 	return util::getError(kSuccess);
 }
 
-Error Api::SendJson(const void *request_json_ptr, ApiContext *context) {
+Error ApiImpl::SendJson(const void *request_json_ptr, ApiContext *context) {
 	json_t *request_json = (json_t *)request_json_ptr;
 
 	// we pass these flags to json_dumps() because:
@@ -373,7 +390,7 @@ Error Api::SendJson(const void *request_json_ptr, ApiContext *context) {
 	return util::getError(kSuccess);
 }
 
-Error Api::GetAccessed(const char *workspace_root) {
+Error ApiImpl::GetAccessed(const char *workspace_root) {
 	Error err = this->CheckWorkspacePathValid(workspace_root);
 	if (err.code != kSuccess) {
 		return err;
@@ -414,7 +431,7 @@ Error Api::GetAccessed(const char *workspace_root) {
 	return util::getError(kSuccess);
 }
 
-Error Api::PrepareAccessedListResponse(
+Error ApiImpl::PrepareAccessedListResponse(
 	const ApiContext *context,
 	std::unordered_map<std::string, bool> *accessed_list) {
 
@@ -447,7 +464,7 @@ Error Api::PrepareAccessedListResponse(
 	return util::getError(kSuccess);
 }
 
-std::string Api::FormatAccessedList(
+std::string ApiImpl::FormatAccessedList(
 	const std::unordered_map<std::string, bool> &accessed) {
 
 	std::string result = "------ Created Files ------\n";
