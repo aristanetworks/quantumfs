@@ -28,7 +28,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	// Ensure the source and dest are in the same workspace
 	if srcParent.wsr != dir.wsr {
-		c.elog("Source and dest are not different workspaces.")
+		c.dlog("Source and dest are different workspaces.")
 		return fuse.EPERM
 	}
 
@@ -54,6 +54,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 	out.NodeId = uint64(inodeNum)
+	c.qfs.increaseLookupCount(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		newRecord)
@@ -148,6 +149,7 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 
 	record := dir.children.record(toLink.inodeNum())
 	if record == nil {
+		c.dlog("Child record not found")
 		return nil, fuse.ENOENT
 	}
 
