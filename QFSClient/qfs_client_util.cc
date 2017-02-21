@@ -89,7 +89,7 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 	case kApiError:
 		return "the API returned an error: " + details;
 	case kBufferTooBig:
-		return "An internal buffer is getting too big";
+		return "an internal buffer is getting too big";
 	}
 
 	std::string result("unknown error (");

@@ -8,11 +8,11 @@
 // definitions in quantumfs/cmds.go
 enum CommandID {
 	kCmdError = 0,
-	kCmdBranchRequest,
-	kCmdGetAccessed,	// not in aid/3015
-	kCmdClearAccessed,	// not in aid/3015
-	kCmdSyncAll,		// not in aid/3015
-	kCmdInsertInode,
+	kCmdBranchRequest = 1,
+	kCmdGetAccessed = 2,	// not in aid/3015
+	kCmdClearAccessed = 3,	// not in aid/3015
+	kCmdSyncAll = 4,	// not in aid/3015
+	kCmdInsertInode = 5,
 	// missing: Merge, Freeze, Checkout, WorkspaceDelete, GetBlock, SetBlock
 };
 
@@ -42,6 +42,22 @@ static const char kWorkspaceRoot[] = "WorkspaceRoot";
 static const char kErrorCode[] = "ErrorCode";
 static const char kMessage[] = "Message";
 static const char kAccessList[] = "AccessList";
+static const char kDstPath[] = "DstPath";
+static const char kKey[] = "Key";
+static const char kUid[] = "Uid";
+static const char kGid[] = "Gid";
+static const char kPermissions[] = "Permissions";
+
+// from datastore.go:
+// base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
+const int kExtendedKeyLength = 40;
+
+// format strings (as used by json_pack_ex() for building JSON) used whenever we
+// need to build a JSON string.
+// See http://jansson.readthedocs.io/en/2.4/apiref.html#building-values for
+// an explanation of the format strings that json_pack_ex() can take.
+static const char kGetAccessedJSON[] = "{s:i,s:s}";
+static const char kInsertInodeJSON[] = "{s:i,s:s,s:s,s:i,s:i,s:i}";
 
 #endif // QFS_CLIENT_DATA_H
 

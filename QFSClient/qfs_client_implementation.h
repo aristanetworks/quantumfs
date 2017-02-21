@@ -66,6 +66,7 @@ class ApiImpl: public Api {
 
 	// implemented API functions
 	Error GetAccessed(const char *workspace_root);
+
 	Error InsertInode(const char *destination,
 			  const char *key,
 			  uint32_t permissions,

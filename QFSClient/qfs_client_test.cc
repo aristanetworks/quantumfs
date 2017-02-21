@@ -300,6 +300,75 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 		     (char*)this->expected_written_command.Data());
 }
 
+// This test covers ApiImpl::InsertInode(). There are no negative tests for
+// ApiImpl::InsertInode() because the Jansson calls it makes should be covered by
+// Jansson's own unit tests, and our functions that InsertInode() calls all have
+// their own tests, including negative tests.
+TEST_F(QfsClientApiTest, InsertInodeTest) {
+	ASSERT_FALSE(this->api == NULL);
+
+	Error err = this->api->Open();
+	ASSERT_EQ(err.code, kSuccess);
+
+	// set up expected written JSON:
+	std::string expected_written_command_json =
+		"{'CommandId':5,"
+		 "'DstPath':'/path/to/some/place/',"
+		 "'Gid':3001,"
+		 "'Key':'thisisadummyextendedkey01234567890123456',"
+		 "'Permissions':501,"
+		 "'Uid':2001}";
+	util::requote(expected_written_command_json);
+	this->expected_written_command.CopyString(
+		expected_written_command_json.c_str());
+
+	err = this->api->InsertInode("/path/to/some/place/",
+				     "thisisadummyextendedkey01234567890123456",
+				     0765, 2001, 3001);
+	ASSERT_EQ(err.code, kSuccess);
+
+	// compare what the API function actually wrote with what we expected
+	ASSERT_EQ(this->actual_written_command.Size(),
+		  this->expected_written_command.Size());
+	ASSERT_STREQ((char*)this->actual_written_command.Data(),
+		     (char*)this->expected_written_command.Data());
+}
+
+// Negative test for ApiImpl::InsertInode(), where we simulate the call returning
+// an error, to check that the error gets handled properly
+TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
+	ASSERT_FALSE(this->api == NULL);
+
+	Error err = this->api->Open();
+	ASSERT_EQ(err.code, kSuccess);
+
+	// set up expected written JSON:
+	std::string expected_written_command_json =
+		"{'CommandId':5,}";
+	util::requote(expected_written_command_json);
+	this->expected_written_command.CopyString(
+		expected_written_command_json.c_str());
+
+	// set up JSON to be returned as a response to InsertInode()
+	std::string error_message = "some random bad thing";
+	std::string expected_read_command_json =
+		"{'ErrorCode':1,'Message':'" + error_message + "'}";
+	util::requote(expected_read_command_json);
+	this->read_command.CopyString(expected_read_command_json.c_str());
+
+	err = this->api->InsertInode("/path/to/some/place/",
+				     "thisisadummyextendedkey01234567890123456",
+				     0765, 2001, 3001);
+	ASSERT_EQ(err.code, kApiError);
+
+	std::string expected_error_message_begin =
+		"the API returned an error: the argument is wrong (" +
+		error_message + ")";
+	std::string actual_error_message_begin = err.message;
+	actual_error_message_begin.resize(expected_error_message_begin.length());
+	ASSERT_EQ(expected_error_message_begin, actual_error_message_begin);
+}
+
 // Test ApiImpl::SendJson(), which is shared by all API handlers
 TEST_F(QfsClientApiTest, SendJsonTest) {
 	ASSERT_FALSE(this->api == NULL);

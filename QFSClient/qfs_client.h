@@ -6,7 +6,8 @@
 
 namespace qfsclient {
 
-// Potential error values that may be returned by methods of the Api class
+/// Potential error values that may be returned in an ErrorCode object
+/// by methods of the Api class
 enum ErrorCode {
 	// Success
 	kSuccess = 0,
@@ -63,18 +64,40 @@ enum ErrorCode {
 	kWorkspaceNameInvalid = 15,
 };
 
-// An error object returned by many member functions of the Api class. The possible
-// error code values are defined above in the ErrorCode enum, and the message
-// member contains a human-readable error message, possibly with further information.
+/// An `Error` object is returned by many member functions of the Api class. The
+/// possible error code values are defined above in the `ErrorCode` enum, and the
+/// message member contains a human-readable error message, possibly with further
+/// information.
 struct Error {
 	ErrorCode code;
 	std::string message;
 };
 
-// Api provides the public interface to QuantumFS API calls.
+/// `Api` provides the public interface to QuantumFS API calls.
 class Api {
  public:
+	/// Retrieve the list of accessed and created files for a specified
+	/// workspace. This list will be written to standard output.
+	///
+	/// @param [in] `workspace_root` A string contain the workspace root name
+	/// whose list of accessed files is to be retrieved.
+	///
+	/// @return An` Error` object that indicates success or failure.
 	virtual Error GetAccessed(const char *workspace_root) = 0;
+
+	/// Takes an extended key along with other file metadata (permissions,
+	/// UID and GID) and inserts it into the given destination directory.
+	///
+	/// @param [in] destination A string containing a path to the intended
+	/// location of the file, which should include the typespace, namespace and
+	/// workspace names. For example: `user/joe/myworkspace/usr/lib/destfile`.
+	/// @param [in] key A base64 string containing the extended key of the file
+	/// that comes from the file's `quantumfs.key` extended attribute.
+	/// @param [in] permissions The the unix permissions for the file
+	/// @param [in] uid The user ID of the file.
+	/// @param [in] gid The group ID of the file.
+	///
+	/// @return An `Error` object that indicates success or failure.
 	virtual Error InsertInode(const char *destination,
 				  const char *key,
 				  uint32_t permissions,
@@ -82,20 +105,29 @@ class Api {
 				  uint32_t gid) = 0;
 };
 
-// Get an instance of an Api object that can be used to call QuantumFS API
-// functions. Takes a pointer to an Api pointer that will be modified on success
-// and returns an Error object that indicates success or failure.
+/// Get an instance of an `Api` object that can be used to call QuantumFS API
+/// functions. The API file is searched for starting in the current working
+/// directory and walking up the directory tree from there.
+///
+/// @param [out] `api` A pointer to an `Api` pointer that will be modified.
+///
+/// @return An` Error` object that indicates success or failure.
 Error GetApi(Api **api);
 
-// Get an instance of an Api object that can be used to call QuantumFS API
-// functions. This version takes a path to a directory in the filesystem that
-// will be used as the start point from which to look for an api file. Takes a
-// pointer to an Api pointer that will be modified on success, and returns an
-// Error object that indicates success or failure.
+/// Get an instance of an `Api` object that can be used to call QuantumFS API
+/// functions. The API file is searched for starting in the given directory and
+/// walking up the directory tree from there.
+///
+/// @param [in] A path to a directory where the search for the API file will begin.
+/// @param [out] `api` A pointer to an `Api` pointer that will be modified.
+///
+/// @return An `Error` object that indicates success or failure.
 Error GetApi(const char *path, Api **api);
 
-// Release an Api object and any resources (such as open files) associated
-// with it. The pointer will no longer be valid after it has been released.
+/// Release an Api object and any resources (such as open files) associated
+/// with it. The pointer will no longer be valid after it has been released.
+///
+/// @param [in] `api` A pointer to an `Api` object that will be released.
 void ReleaseApi(Api *api);
 
 } // namespace qfsclient
