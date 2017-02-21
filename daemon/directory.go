@@ -238,11 +238,6 @@ func (dir *Directory) delChild_(c *ctx, name string) {
 func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 	defer c.funcIn("Directory::dirtyChild").out()
 
-	func() {
-		defer dir.Lock().Unlock()
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.setDirty(c, childId)
-	}()
 	dir.self.dirty(c)
 }
 
@@ -507,6 +502,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		return dir.children.inodeNum(name)
 	}()
 	if inodeNum == quantumfs.InodeIdInvalid {
+		c.vlog("Inode not found")
 		return fuse.ENOENT
 	}
 
@@ -1160,8 +1156,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 						[]InodeId{overwrittenId})
 				}
 
-				dst.insertEntry_(c, newEntry, oldInodeId,
-					child != nil)
+				dst.insertEntry_(c, newEntry, oldInodeId, child)
 			}()
 
 			// Set entry in new directory. If the renamed inode is
@@ -1200,16 +1195,15 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 
 // Needs to hold childRecordLock
 func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum InodeId,
-	inodeLoaded bool) {
+	childInode Inode) {
 
 	dir.children.setChild(c, entry, inodeNum)
 
 	// being inserted means you're dirty and need to be synced
-	if inodeLoaded {
-		dir.children.setDirty(c, inodeNum)
-	} else {
-		dir.self.dirty(c)
+	if childInode != nil {
+		childInode.dirty(c)
 	}
+	dir.self.dirty(c)
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
@@ -1239,8 +1233,8 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.FuncIn("Directory::syncChild", "(%d %d) %s", dir.inodeNum(),
-		inodeNum, newKey.String()).out()
+	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
+		dir.inodeNum(), inodeNum, newKey.String()).out()
 
 	defer dir.Lock().Unlock()
 	dir.self.dirty(c)
@@ -1248,7 +1242,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
-		c.elog("Directory::syncChild inode %d not a valid child",
+		c.wlog("Directory::syncChild inode %d not a valid child",
 			inodeNum)
 		return
 	}
@@ -1387,14 +1381,6 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
 		len(data)).out()
-	// The self-defined extended attribute is not able to be set
-	// it is the combination of two attributes
-	if attr == quantumfs.XAttrTypeKey {
-		c.elog("Illegal action to set extended attribute: typeKey")
-		return fuse.EPERM
-	}
-
-	defer c.vlog("Directory::setChildXAttr Exit")
 
 	defer dir.Lock().Unlock()
 
@@ -1470,14 +1456,6 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	defer c.FuncIn("Directory::removeChildXAttr", "%d, %s", inodeNum, attr).out()
-	// The self-defined extended attribute is not able to be removed
-	// it is the combination of two attributes
-	if attr == quantumfs.XAttrTypeKey {
-		c.elog("Illegal action to remove extended attribute: typeKey")
-		return fuse.EPERM
-	}
-
-	defer c.vlog("Directory::removeChildXAttr Exit")
 
 	defer dir.Lock().Unlock()
 
@@ -1795,6 +1773,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
+		c.qfs.increaseLookupCount(InodeId(child.attr.Ino))
 		fillEntryOutCacheData(c, details)
 		details.Attr = child.attr
 
