@@ -237,7 +237,7 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 		return nil, err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		return nil, err
+		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
 	var accesslistResponse AccessListResponse
