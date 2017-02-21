@@ -4,8 +4,6 @@
 package daemon
 
 import "bytes"
-import "encoding/base64"
-import "encoding/binary"
 import "errors"
 import "fmt"
 import "syscall"
@@ -80,10 +78,6 @@ type Directory struct {
 	childRecordLock DeferableMutex
 	children        *ChildMap
 }
-
-// The size of the ObjectKey: 21 + 1 + 8
-// The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
-const sourceDataLength = 30
 
 func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
@@ -1568,20 +1562,6 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
-}
-
-func decodeExtendedKey(packet string) (quantumfs.ObjectKey, quantumfs.ObjectType,
-	uint64, error) {
-
-	bDec, err := base64.StdEncoding.DecodeString(packet)
-	if err != nil {
-		return quantumfs.ZeroKey, 0, 0, err
-	}
-
-	key := quantumfs.NewObjectKeyFromBytes(bDec[:sourceDataLength-9])
-	type_ := quantumfs.ObjectType(bDec[sourceDataLength-9])
-	size := binary.LittleEndian.Uint64(bDec[sourceDataLength-8:])
-	return key, type_, size, nil
 }
 
 // Do a similar work like  Lookup(), but it does not interact with fuse, and return

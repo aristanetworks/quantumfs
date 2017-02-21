@@ -19,6 +19,10 @@ const MaxBlockSize = int(encoding.MaxBlockSize)
 // This number empirically derived by looking at file sizes
 const InitBlockSize = 8192
 
+// The size of the ObjectKey: 21 + 1 + 8
+// The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
+const sourceDataLength = 30
+
 // Maximum length of a filename
 const MaxFilenameLength = int(encoding.MaxFilenameLength)
 const MaxXAttrnameLength = int(encoding.MaxXAttrnameLength)
@@ -755,6 +759,19 @@ func EncodeExtendedKey(key ObjectKey, type_ ObjectType,
 
 	data := append(key.Value(), append_...)
 	return []byte(base64.StdEncoding.EncodeToString(data))
+}
+
+func DecodeExtendedKey(packet string) (ObjectKey, ObjectType, uint64, error) {
+
+	bDec, err := base64.StdEncoding.DecodeString(packet)
+	if err != nil {
+		return ZeroKey, 0, 0, err
+	}
+
+	key := NewObjectKeyFromBytes(bDec[:sourceDataLength-9])
+	type_ := ObjectType(bDec[sourceDataLength-9])
+	size := binary.LittleEndian.Uint64(bDec[sourceDataLength-8:])
+	return key, type_, size, nil
 }
 
 func NewMultiBlockFile(maxBlocks int) *MultiBlockFile {
