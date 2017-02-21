@@ -8,6 +8,7 @@ package daemon
 import "fmt"
 import "os"
 import "syscall"
+import "sync"
 import "sync/atomic"
 import "testing"
 
@@ -53,26 +54,31 @@ func testApiAccessList(test *testHelper, size int, filename string,
 	api := test.getApi()
 	relpath := test.relPath(workspace)
 
+	var wg sync.WaitGroup
+	var err1 error
 	initFileSize, endFileSize, initFileSize1, endFileSize1 := 0, 0, 0, 0
 	if concurrent {
-		// Make sure two goroutines start at the same time
+		wg.Add(1)
 		start := make(chan struct{})
 		start1 := make(chan struct{})
+
 		workspace2 := test.newWorkspace()
+
 		size2 := 100
 		filename2 := "concurrentconcurrentconcurrentconcurrentconcurrent"
 		generateFile(test, size2, workspace2, filename2)
+
 		relpath2 := test.relPath(workspace2)
-		path := workspace2 + "/api"
-		api2 := test.getUniqueApi(path)
+		api2 := test.getUniqueApi(workspace2 + "/api")
 		test.assert(api != api2,
 			"Error getting the same file descriptor")
+
 		go func() {
-			defer api2.Close()
+			defer wg.Done()
 			close(start1)
 			<-start
 			initFileSize1 = int(atomic.LoadInt64(&test.qfs.apiFileSize))
-			api2.GetAccessed(relpath2)
+			_, err1 = api2.GetAccessed(relpath2)
 			endFileSize1 = int(atomic.LoadInt64(&test.qfs.apiFileSize))
 		}()
 		<-start1
@@ -83,8 +89,9 @@ func testApiAccessList(test *testHelper, size int, filename string,
 	responselist, err := api.GetAccessed(relpath)
 	endFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
 
-	test.assert(err == nil, "Error getting accessList with api: %v  %v",
-		err, responselist)
+	wg.Wait()
+
+	test.assert(err == nil, "Error getting accessList with api")
 
 	test.assert(mapKeySizeSum(responselist) == expectedSize,
 		"Error getting unequal sizes %d != %d",
@@ -92,8 +99,13 @@ func testApiAccessList(test *testHelper, size int, filename string,
 
 	test.assertAccessList(accessList, responselist, "Error two maps different")
 
-	test.assert(!concurrent || false, "The size is: %d  %d %d %d", initFileSize,
-		endFileSize, initFileSize1, endFileSize1)
+	// In order to prove two api goroutines runs in concurrent. Two conditions
+	// have to be satisfied. Only when two api goroutines starts at the same
+	// point, they will share the same prior apiFileSize. Only if their partial
+	// reads interleave, will the posterior apiFileSizes be the same
+	test.assert(!concurrent || (initFileSize == initFileSize1 &&
+		endFileSize == endFileSize1),
+		"Error two api's aren't running in concurrent")
 }
 
 func generateFile(test *testHelper, size int, workspace,

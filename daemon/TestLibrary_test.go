@@ -197,6 +197,10 @@ func (th *testHelper) endTest() {
 		th.api.Close()
 	}
 
+	if th.apiBackup != nil {
+		th.apiBackup.Close()
+	}
+
 	if th.qfs != nil && th.qfs.server != nil {
 		if exception != nil {
 			th.t.Logf("Failed with exception, forcefully unmounting: %v",
@@ -358,6 +362,7 @@ type testHelper struct {
 	tempDir           string
 	fuseConnection    int
 	api               *quantumfs.Api
+	apiBackup         *quantumfs.Api
 	testResult        chan string
 	startTime         time.Time
 	shouldFail        bool
@@ -467,8 +472,12 @@ func (th *testHelper) getApi() *quantumfs.Api {
 }
 
 func (th *testHelper) getUniqueApi(fdPath string) *quantumfs.Api {
-	api := quantumfs.NewApiWithPath(fdPath)
-	return api
+	if th.apiBackup == nil {
+		th.apiBackup = quantumfs.NewApiWithPath(fdPath)
+		return th.apiBackup
+	}
+
+	return th.apiBackup
 }
 
 // Make the given path absolute to the mount root

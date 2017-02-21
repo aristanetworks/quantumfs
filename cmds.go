@@ -5,6 +5,7 @@ package quantumfs
 
 import "fmt"
 import "encoding/json"
+import "encoding/binary"
 import "os"
 import "strings"
 import "syscall"
@@ -150,20 +151,24 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	}
 
 	api.fd.Seek(0, 0)
-
 	size := BufferSize
-	result := make([]byte, 0)
 	buf = make([]byte, BufferSize)
-	for size == BufferSize {
+	result := make([]byte, 0, 16384)
+	var totalSize int
+	for size == BufferSize && len(result) <= totalSize {
 		size, err = api.fd.Read(buf)
 		if err != nil {
 			return nil, err
 		}
 
 		result = append(result, buf[:size]...)
+		if totalSize == 0 {
+			totalSize = int(binary.LittleEndian.Uint32(buf[0:4]))
+		}
+
 	}
 
-	return result, nil
+	return result[4:totalSize], nil
 }
 
 // branch the src workspace into a new workspace called dst.
@@ -223,26 +228,22 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 
 	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
-		//return nil, err
-		return nil, fmt.Errorf("the worng json: %d", len(buf))
+		return nil, err
 	}
 
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return nil, fmt.Errorf("the worng json: %d", len(buf))
-		//return nil, err
+		return nil, err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		//return nil, err
-		return nil, fmt.Errorf("the worng json: %d", len(buf))
+		return nil, err
 	}
 
 	var accesslistResponse AccessListResponse
 	err = json.Unmarshal(buf, &accesslistResponse)
 	if err != nil {
-		return nil, fmt.Errorf("the worng json: %d", len(buf))
-		//return nil, err
+		return nil, err
 	}
 
 	printAccessList(accesslistResponse.AccessList)
