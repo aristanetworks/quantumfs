@@ -970,8 +970,8 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn("Mux::Link", "Enter inode %d to name %s in dstDir %d",
-		input.NodeId, filename, input.Oldnodeid).out()
+	defer c.FuncIn("Mux::Link", "inode %d to name %s in dstDir %d",
+		input.Oldnodeid, filename, input.NodeId).out()
 
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
 	if srcInode == nil {
@@ -983,6 +983,8 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		return fuse.ENOENT
 	}
 
+	// Via races, srcInode and dstInode can be forgotten here
+
 	if srcInode.treeLock() == dstInode.treeLock() {
 		// If src and dst live in the same workspace, we only need one lock
 		defer dstInode.LockTree().Unlock()
@@ -992,6 +994,17 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		firstLock, lastLock := getLockOrder(dstInode, srcInode)
 		defer firstLock.LockTree().Unlock()
 		defer lastLock.LockTree().Unlock()
+	}
+
+	// We need to re-get these to ensure they're instantiated while we're locked
+	srcInode = qfs.inode(c, InodeId(input.Oldnodeid))
+	if srcInode == nil {
+		return fuse.ENOENT
+	}
+
+	dstInode = qfs.inode(c, InodeId(input.NodeId))
+	if dstInode == nil {
+		return fuse.ENOENT
 	}
 
 	return dstInode.link_DOWN(c, srcInode, filename, out)

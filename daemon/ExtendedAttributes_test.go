@@ -209,7 +209,7 @@ func TestExtendedAttrRemove(t *testing.T) {
 func matchXAttrExtendedKey(path string, extendedKey []byte,
 	test *testHelper, Type quantumfs.ObjectType) {
 
-	key, type_, size, err := decodeExtendedKey(string(extendedKey))
+	key, type_, size, err := quantumfs.DecodeExtendedKey(string(extendedKey))
 	test.assert(err == nil, "Error decompressing the packet")
 
 	// Extract the internal ObjectKey from QuantumFS
@@ -293,7 +293,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 			"Error getting the symlink key: %v with a size of %d",
 			err, sz)
 
-		key, type_, size, err := decodeExtendedKey(string(dst))
+		key, type_, size, err := quantumfs.DecodeExtendedKey(string(dst))
 		test.assert(err == nil, "Error decompressing the packet")
 
 		// Extract the internal ObjectKey from QuantumFS
