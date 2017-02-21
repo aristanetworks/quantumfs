@@ -177,24 +177,29 @@ func (api *ApiInode) MvChild(c *ctx, dstInode Inode, oldName string,
 func (api *ApiInode) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
+	c.elog("Invalid GetXAttrSize on ApiInode")
 	return 0, fuse.ENODATA
 }
 
 func (api *ApiInode) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
+	c.elog("Invalid GetXAttrData on ApiInode")
 	return nil, fuse.ENODATA
 }
 
 func (api *ApiInode) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.elog("Invalid ListXAttr on ApiInode")
 	return []byte{}, fuse.OK
 }
 
 func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.elog("Invalid SetXAttr on ApiInode")
 	return fuse.Status(syscall.ENOSPC)
 }
 
 func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.elog("Invalid RemoveXAttr on ApiInode")
 	return fuse.ENODATA
 }
 
@@ -257,7 +262,8 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
-	defer c.funcIn("newApiHandle Enter").out()
+	c.vlog("newApiHandle Enter")
+	defer c.vlog("newApiHandle Exit")
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
@@ -332,7 +338,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	bytes := api.responseBuffer
 	bufSize := offset + uint64(size)
 	responseSize := uint64(len(bytes))
-	c.vlog("API Response %d   %d", responseSize, offset)
+	c.vlog("API Response szie %d with offset  %d", responseSize, offset)
 	if responseSize <= offset {
 		// In case of slice out of boundary
 		return nil, fuse.OK
