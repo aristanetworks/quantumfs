@@ -5,6 +5,7 @@ package daemon
 
 // This file contains all the interaction with the quantumfs API file.
 import "encoding/json"
+import "encoding/binary"
 import "errors"
 import "fmt"
 import "strings"
@@ -296,9 +297,6 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	c.vlog("Received offset %d size %d responseBuffer %d outstand %d ",
-		offset, size, len(api.responseBuffer),
-		atomic.LoadInt32(&api.outstandingRequests))
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
 		// Sometime the kernel may request the whole response, but the client
 		// does not get all from kernel, so it will send other read request.
@@ -320,8 +318,20 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		// Subtract the file size of last time read
 		c.qfs.decreaseApiFileSize(c, len(api.responseBuffer))
 		response := <-api.responses
+
+		// The kernel is supposed to be able to pass the correct size and
+		// response back to the client. However, when it tries to deal with
+		// multiple partial reads in parallel, it is unble to pass the right
+		// size to each of the request clients and I cannot find out why. The
+		// current solution is to append 4 more byte, indicating the actual
+		// size of the response, in front of the actual response. When the
+		// client receives the response, they know the size of the response
 		buffer := make([]byte, response.Size())
-		bytes, _ := response.Bytes(buffer)
+		tmp, _ := response.Bytes(buffer)
+		bytes := make([]byte, 4)
+		length := len(tmp) + 4
+		binary.LittleEndian.PutUint32(bytes, uint32(length))
+		bytes = append(bytes, tmp...)
 		api.responseBuffer = bytes
 	}
 

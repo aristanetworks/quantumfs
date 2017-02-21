@@ -1459,7 +1459,8 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 }
 
 func (qfs *QuantumFs) increaseApiFileSize(c *ctx, offset int) {
-	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset))
+	// For every response, we append 4 more bytes to indicate its length
+	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset+4))
 	c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
 }
 
