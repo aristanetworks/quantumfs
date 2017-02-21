@@ -566,6 +566,10 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 
 // Returns true if the count became zero or was previously zero
 func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
+	if inodeId == quantumfs.InodeIdApi || inodeId == quantumfs.InodeIdRoot {
+		return false
+	}
+
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
@@ -573,11 +577,12 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 		return true
 	}
 
+	if lookupCount < count {
+		qfs.c.elog("lookupCount less than zero %d %d", lookupCount, count)
+	}
+
 	lookupCount -= count
-	if lookupCount < 0 {
-		msg := fmt.Sprintf("lookupCount less than zero %d", lookupCount)
-		panic(msg)
-	} else if lookupCount == 0 {
+	if lookupCount == 0 {
 		// Don't leave the zero entry in the map at this moment. Do it with
 		// qfs.makeLookupCountZero(inodeId) after trying to grab the treelock
 		// in case of the race condition
