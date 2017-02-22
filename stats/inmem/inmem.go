@@ -6,10 +6,11 @@ package inmem
 
 import (
 	"fmt"
-	hist "github.com/VividCortex/gohistogram"
-	"github.com/aristanetworks/ether/utils/stats"
 	"sync"
 	"time"
+
+	hist "github.com/VividCortex/gohistogram"
+	"github.com/aristanetworks/ether/utils/stats"
 )
 
 type opStatsInMem struct {
@@ -17,7 +18,8 @@ type opStatsInMem struct {
 	mutex         sync.RWMutex
 	hist          hist.Histogram
 	totalOps      int64
-	totalNanosecs int64
+	firstStatTime time.Time
+	lastStatTime  time.Time
 }
 
 // NewOpStatsInMem creates an instance of in-memory
@@ -35,7 +37,16 @@ func (s *opStatsInMem) RecordOp(latency time.Duration) {
 
 	s.hist.Add(float64(latency.Nanoseconds()))
 	s.totalOps++
-	s.totalNanosecs += latency.Nanoseconds()
+	// when multiple concurrent callers record
+	// operations or stats, to calculate operations
+	// per second, we should know the time period
+	// between first recorded stat and last recorded
+	// stat
+	if s.firstStatTime.Equal(time.Time{}) {
+		s.firstStatTime = time.Now()
+	}
+
+	s.lastStatTime = time.Now()
 }
 
 func (s *opStatsInMem) ReportOpStats() {
@@ -50,10 +61,11 @@ func (s *opStatsInMem) ReportOpStats() {
 	fmt.Printf("  99 percentile: %.2f\n", s.hist.Quantile(0.99)/1000)
 	fmt.Printf("  99.9 percentile: %.2f\n", s.hist.Quantile(0.999)/1000)
 	fmt.Println(" Rate")
-	if secs := s.totalNanosecs / 1000000000; secs != 0 {
+	dur := s.lastStatTime.Sub(s.firstStatTime)
+	if secs := int64(dur.Seconds()); secs != 0 {
 		fmt.Printf("  %d ops/sec\n", s.totalOps/secs)
 	} else {
 		fmt.Printf("  Operations: %d Nanoseconds: %d\n",
-			s.totalOps, s.totalNanosecs)
+			s.totalOps, dur.Nanoseconds())
 	}
 }
