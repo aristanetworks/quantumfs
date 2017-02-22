@@ -130,25 +130,11 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 }
 
 // Update the internal namespaces list with the most recent available listing
-func updateChildren(c *ctx, rootName string, parentName string, names []string,
-	inodeMap *map[string]InodeId, nameMap *map[InodeId]string, parent Inode,
-	newInode func(c *ctx, typespace string, namespace string, workspace string,
-		parent Inode, inodeId InodeId) (Inode, []InodeId)) {
+func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
+	nameMap *map[InodeId]string, parent Inode) {
 
-	defer c.FuncIn("updateChildren", "%s/%s", rootName, parentName).out()
-
-	// Re-arrange the order of rootName/parentName/names by a proper order of
-	// typespace/namespace/workspace in the constructor newInode
-	indx := 0
-	input := make([]string, 3)
-	if rootName != "" {
-		input[indx] = rootName
-		indx += 1
-	}
-	if parentName != "" {
-		input[indx] = parentName
-		indx += 1
-	}
+	defer c.FuncIn("updateChildren", "Enter Parent Inode %d",
+		parent.inodeNum()).out()
 
 	touched := make(map[string]bool)
 	// First add any new entries
@@ -157,19 +143,10 @@ func updateChildren(c *ctx, rootName string, parentName string, names []string,
 			inodeId := c.qfs.newInodeId()
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
-			if rootName == quantumfs.NullTypespaceName &&
-				parentName == quantumfs.NullNamespaceName &&
-				name == quantumfs.NullWorkspaceName {
 
-				newInode = newNullWorkspaceRoot
-			}
-
-			input[indx] = name
-			inode, uninstantiated := newInode(c, input[0], input[1],
-				input[2], parent, inodeId)
-
-			c.qfs.setInode(c, inodeId, inode)
-			c.qfs.addUninstantiated(c, uninstantiated, inodeId)
+			c.qfs.setInode(c, inodeId, nil)
+			c.qfs.addUninstantiated(c, []InodeId{inodeId},
+				parent.inodeNum())
 		}
 		touched[name] = true
 	}
@@ -241,8 +218,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer tsl.Lock().Unlock()
 
-	updateChildren(c, "", "", list, &tsl.typespacesByName,
-		&tsl.typespacesById, tsl, newNamespaceList)
+	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
 	children := snapshotChildren(c, &tsl.typespacesByName, "", fillTypespaceAttr)
 
 	api := directoryContents{
@@ -278,8 +254,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	defer tsl.Lock().Unlock()
 
-	updateChildren(c, "", "", list,
-		&tsl.typespacesByName, &tsl.typespacesById, tsl, newNamespaceList)
+	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
 
 	inodeNum := tsl.typespacesByName[name]
 	c.qfs.increaseLookupCount(inodeNum)
@@ -544,8 +519,7 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer nsl.Lock().Unlock()
 
-	updateChildren(c, "", nsl.typespaceName, list,
-		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
+	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
 	children := snapshotChildren(c, &nsl.namespacesByName, nsl.typespaceName,
 		fillNamespaceAttr)
 
@@ -568,8 +542,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	defer nsl.Lock().Unlock()
 
-	updateChildren(c, "", nsl.typespaceName, list,
-		&nsl.namespacesByName, &nsl.namespacesById, nsl, newWorkspaceList)
+	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
 
 	inodeNum := nsl.namespacesByName[name]
 	c.qfs.increaseLookupCount(inodeNum)
@@ -845,8 +818,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer wsl.Lock().Unlock()
 
-	updateChildren(c, wsl.typespaceName, wsl.namespaceName, list,
-		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
+	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)
 	children := snapshotChildren(c, &wsl.workspacesByName,
 		"", fillWorkspaceAttrFake)
 
@@ -871,8 +843,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	defer wsl.Lock().Unlock()
 
-	updateChildren(c, wsl.typespaceName, wsl.namespaceName, list,
-		&wsl.workspacesByName, &wsl.workspacesById, wsl, newWorkspaceRoot)
+	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)
 
 	inodeNum := wsl.workspacesByName[name]
 	c.qfs.increaseLookupCount(inodeNum)
