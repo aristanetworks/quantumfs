@@ -50,7 +50,7 @@ func NewApi() *Api {
 func NewApiWithPath(path string) *Api {
 	api := Api{}
 
-	fd, err := os.OpenFile(path, os.O_RDWR|syscall.O_DIRECT|os.O_SYNC, 0)
+	fd, err := os.OpenFile(path, os.O_RDWR|syscall.O_DIRECT, 0)
 	api.fd = fd
 	if err != nil {
 		panic(err)
