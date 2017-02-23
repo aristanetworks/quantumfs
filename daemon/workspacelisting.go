@@ -155,15 +155,11 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 		if _, exists := touched[name]; !exists {
 			id := (*inodeMap)[name]
 
-			func() {
-				defer c.qfs.mapMutex.Lock().Unlock()
-				_, uninstantiated := c.qfs.parentOfUninstantiated[id]
-				if uninstantiated {
-					c.qfs.removeUninstantiated_(c, []InodeId{id})
-				} else {
-					c.qfs.setInode_(c, id, nil)
-				}
-			}()
+			if c.qfs.inodeNoInstantiate(c, id) == nil {
+				c.qfs.removeUninstantiated(c, []InodeId{id})
+			} else {
+				c.qfs.setInode(c, id, nil)
+			}
 
 			delete(*inodeMap, name)
 			delete(*nameMap, id)
