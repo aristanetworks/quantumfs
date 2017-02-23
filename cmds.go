@@ -5,7 +5,6 @@ package quantumfs
 
 import "fmt"
 import "encoding/json"
-import "encoding/binary"
 import "os"
 import "strings"
 import "syscall"
@@ -51,7 +50,7 @@ func NewApi() *Api {
 func NewApiWithPath(path string) *Api {
 	api := Api{}
 
-	fd, err := os.OpenFile(path, os.O_RDWR, 0)
+	fd, err := os.OpenFile(path, os.O_RDWR|syscall.O_DIRECT|os.O_SYNC, 0)
 	api.fd = fd
 	if err != nil {
 		panic(err)
@@ -142,7 +141,7 @@ type InsertInodeRequest struct {
 	Permissions uint32
 }
 
-const BufferSize = 4096
+const BufferSize = 5000
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
@@ -153,22 +152,17 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	api.fd.Seek(0, 0)
 	size := BufferSize
 	buf = make([]byte, BufferSize)
-	result := make([]byte, 0, 16384)
-	var totalSize int
-	for size == BufferSize && len(result) <= totalSize {
+	result := make([]byte, 0)
+	for size == BufferSize {
 		size, err = api.fd.Read(buf)
 		if err != nil {
 			return nil, err
 		}
 
 		result = append(result, buf[:size]...)
-		if totalSize == 0 {
-			totalSize = int(binary.LittleEndian.Uint32(buf[0:4]))
-		}
-
 	}
 
-	return result[4:totalSize], nil
+	return result, nil
 }
 
 // branch the src workspace into a new workspace called dst.
