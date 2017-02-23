@@ -29,6 +29,7 @@ func verifyResult(c *ctx, test *testHelper, name string, space string,
 
 func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 	runTest(t, func(test *testHelper) {
+
 		c := test.newCtx()
 		tslInode, _ := test.qfs.getInode(c, quantumfs.InodeIdRoot)
 		tsl := tslInode.(*TypespaceList)
