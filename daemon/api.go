@@ -292,12 +292,20 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	c.vlog("Received read request on Api")
 	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
-		if nonblocking {
-			return nil, fuse.Status(syscall.EAGAIN)
-		}
+		// Sometime the kernel may request the whole response, but the client
+		// does not get all from kernel, so it will send other read request.
+		// In this case, offset is non-zero, it indicate that the read has
+		// not done, so the outstanding Requests should be put back by 1.
+		if offset > 0 {
+			atomic.AddInt32(&api.outstandingRequests, 1)
+		} else {
+			if nonblocking {
+				return nil, fuse.Status(syscall.EAGAIN)
+			}
 
-		c.vlog("No outstanding requests, returning early")
-		return nil, fuse.OK
+			c.vlog("No outstanding requests, returning early")
+			return nil, fuse.OK
+		}
 	}
 
 	if offset == 0 {
