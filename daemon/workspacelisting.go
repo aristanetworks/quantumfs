@@ -144,7 +144,6 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
 
-			c.qfs.setInode(c, inodeId, nil)
 			c.qfs.addUninstantiated(c, []InodeId{inodeId},
 				parent.inodeNum())
 		}
@@ -154,10 +153,21 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 	// Then delete entries which no longer exist
 	for name, _ := range *inodeMap {
 		if _, exists := touched[name]; !exists {
-			inodeNum := (*inodeMap)[name]
-			c.qfs.setInode(c, inodeNum, nil)
+			id := (*inodeMap)[name]
+
+			func() {
+				defer c.qfs.mapMutex.Lock().Unlock()
+				_, uninstantiated := c.qfs.parentOfUninstantiated[id]
+				if uninstantiated {
+					c.qfs.removeUninstantiated_(c, []InodeId{id})
+				} else {
+					c.qfs.setInode_(c, id, nil)
+				}
+			}()
+
 			delete(*inodeMap, name)
-			delete(*nameMap, inodeNum)
+			delete(*nameMap, id)
+
 		}
 	}
 }

@@ -498,7 +498,11 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 // Set an inode in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	defer qfs.mapMutex.Lock().Unlock()
+	qfs.setInode_(c, id, inode)
+}
 
+// Require the mapMutex for writing
+func (qfs *QuantumFs) setInode_(c *ctx, id InodeId, inode Inode) {
 	if inode != nil {
 		qfs.inodes[id] = inode
 	} else {
@@ -534,7 +538,11 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
 // Remove a list of inode numbers from the parentOfUninstantiated list
 func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	defer qfs.mapMutex.Lock().Unlock()
+	qfs.removeUninstantiated_(c, uninstantiated)
+}
 
+// Requires the mapMutex for writing
+func (qfs *QuantumFs) removeUninstantiated_(c *ctx, uninstantiated []InodeId) {
 	for _, inodeNum := range uninstantiated {
 		delete(qfs.parentOfUninstantiated, inodeNum)
 		c.vlog("Removing uninstantiated %d (%d)", inodeNum,
