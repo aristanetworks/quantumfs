@@ -414,6 +414,11 @@ func adjustBdi(c *ctx, mountId int) {
 	}
 }
 
+func (qfs *QuantumFs) getInode(c *ctx, id InodeId) (Inode, bool) {
+	defer qfs.mapMutex.RLock().RUnlock()
+	return qfs.getInode_(c, id)
+}
+
 // Must hold the mapMutex
 func (qfs *QuantumFs) getInode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, instantiated := qfs.inodes[id]

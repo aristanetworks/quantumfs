@@ -532,6 +532,16 @@ func (th *testHelper) nullWorkspace() string {
 //
 // Returns the absolute path of the workspace
 func (th *testHelper) newWorkspace() string {
+	dst, _, _, _ := th.newWorkspaceWithNames()
+	return dst
+}
+
+// Create a new workspace to test within
+//
+// Returns the absolute path of the workspace
+//
+// As well as the names of typespace, namespace, workspace
+func (th *testHelper) newWorkspaceWithNames() (string, string, string, string) {
 	api := th.getApi()
 
 	type_ := randomNamespaceName(8)
@@ -544,7 +554,7 @@ func (th *testHelper) newWorkspace() string {
 	err := api.Branch(src, dst)
 	th.assert(err == nil, "Failed to branch workspace: %v", err)
 
-	return th.absPath(dst)
+	return th.absPath(dst), type_, name_, work_
 }
 
 // Branch existing workspace into new random name
