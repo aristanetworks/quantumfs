@@ -442,18 +442,18 @@ func TestHardlinkRename(t *testing.T) {
 		newLink = workspace + "/dir/linkC"
 		err = os.Rename(linkname, newLink)
 		test.assertNoErr(err)
-		linkName = newLink
+		linkname = newLink
 		files = append(files, linkname)
 
-		err = os.Link(filename, workspace + "/dir/linkC")
+		err = os.Link(filename, workspace + "/dir/linkE")
 		test.assertNoErr(err)
-		files = append(files, workspace + "/dir/linkC")
+		files = append(files, workspace + "/dir/linkE")
 
 		err = os.Rename(filename, workspace + "/linkD")
 		test.assertNoErr(err)
 		files = append(files, workspace + "/linkD")
 
-		for i, v in range files {
+		for _, v := range files {
 			readback, err := ioutil.ReadFile(v)
 			test.assertNoErr(err)
 			test.assert(bytes.Equal(readback, data),
