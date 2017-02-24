@@ -412,3 +412,52 @@ func TestHardlinkExtraction(t *testing.T) {
 			quantumfs.ObjectTypeSmallFile)
 	})
 }
+
+func TestHardlinkRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		filename := workspace + "/file"
+		linkname := workspace + "/link"
+
+		files := make([]string, 0)
+
+		data := genData(2000)
+		file, err := os.Create(filename)
+		test.assertNoErr(err)
+		file.WriteString(string(data))
+		file.Close()
+
+		err = os.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		newLink := workspace + "/linkB"
+		err = os.Rename(linkname, newLink)
+		test.assertNoErr(err)
+		linkname = newLink
+
+		err = os.Mkdir(workspace + "/dir", 0777)
+		test.assertNoErr(err)
+
+		newLink = workspace + "/dir/linkC"
+		err = os.Rename(linkname, newLink)
+		test.assertNoErr(err)
+		linkName = newLink
+		files = append(files, linkname)
+
+		err = os.Link(filename, workspace + "/dir/linkC")
+		test.assertNoErr(err)
+		files = append(files, workspace + "/dir/linkC")
+
+		err = os.Rename(filename, workspace + "/linkD")
+		test.assertNoErr(err)
+		files = append(files, workspace + "/linkD")
+
+		for i, v in range files {
+			readback, err := ioutil.ReadFile(v)
+			test.assertNoErr(err)
+			test.assert(bytes.Equal(readback, data),
+				"file %s data not preserved", v)
+		}
+	})
+}
