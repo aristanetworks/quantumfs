@@ -31,11 +31,12 @@ func TestHardlinkReload(t *testing.T) {
 		// artificially insert some hardlinks into the map
 		wsr := test.getWorkspaceRoot(workspace)
 
-		files := wsr.children.records()
-		for i := uint64(0); i < uint64(len(files)); i++ {
-			record := files[i].(*quantumfs.DirectoryRecord)
-			wsr.hardlinks[HardlinkId(i)] = newLinkEntry(record)
-		}
+		err = syscall.Link(testFileA, workspace+"/linkFileA")
+		test.assertNoErr(err)
+		err = syscall.Link(testFileA, workspace+"/linkFileA2")
+		test.assertNoErr(err)
+		err = syscall.Link(testFileB, workspace+"/linkFileB")
+		test.assertNoErr(err)
 
 		// Write another file to ensure the wsr is dirty
 		testFileC := workspace + "/testFileC"
@@ -57,9 +58,13 @@ func TestHardlinkReload(t *testing.T) {
 			wsrB.hardlinks)
 
 		for k, l := range wsr.hardlinks {
-			v := l.record
 			linkBPtr, exists := wsrB.hardlinks[k]
+
+			test.assert(l.nlink == linkBPtr.nlink,
+				"link reference count not preserved")
+
 			linkB := *(linkBPtr.record)
+			v := l.record
 			test.assert(exists, "link not reloaded in new wsr")
 			test.assert(v.Filename() == linkB.Filename(),
 				"Filename not preserved")
