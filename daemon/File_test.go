@@ -6,6 +6,7 @@ package daemon
 // Test the various operations on files such as creation, read and write
 
 import "bytes"
+import "fmt"
 import "io"
 import "io/ioutil"
 import "os"
@@ -599,5 +600,28 @@ func TestFileStatBlockCount(t *testing.T) {
 			uint64(512)),
 			"Blocks is not in terms of 512B blocks. Blocks %v Size %v",
 			stat.Blocks, stat.Size)
+	})
+}
+
+func TestFileReparentRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		var stat syscall.Stat_t
+		iterations := 100
+		for i := 0; i < iterations; i++ {
+			filename := fmt.Sprintf(workspace + "/file%d", i)
+			file, err := os.Create(filename)
+			test.assertNoErr(err)
+
+			file.WriteString("this is file data")
+			
+			// Leave the file handle open so it gets orphaned. We now
+			// want to race the parent change with getting the parent
+			go syscall.Stat(filename, &stat)
+			go os.Remove(filename)
+
+			file.Close()
+		}
 	})
 }
