@@ -1135,12 +1135,19 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// fix the name on the copy
 			newEntry.SetFilename(newName)
 
-			// Update the inode to point to the new name and mark as
-			// accessed in both parents.
-			child := c.qfs.inodeNoInstantiate(c, oldInodeId)
-			if child != nil {
-				child.setParent(dst.inodeNum())
-				child.setName(newName)
+			isHardlink, _ := dir.wsr.checkHardlink(oldInodeId)
+			// In theory, perhaps, all inode accesses should be done
+			// through the record for that inode so we can safely lock
+			// an inode's parent and allow the record to dictate this if
+			var childInode Inode
+			if !isHardlink {
+				// Update the inode to point to the new name and
+				// mark as accessed in both parents.
+				childInode = c.qfs.inodeNoInstantiate(c, oldInodeId)
+				if childInode != nil {
+					childInode.setParent(dst.inodeNum())
+					childInode.setName(newName)
+				}
 			}
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
@@ -1160,7 +1167,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 						[]InodeId{overwrittenId})
 				}
 
-				dst.insertEntry_(c, newEntry, oldInodeId, child)
+				dst.insertEntry_(c, newEntry, oldInodeId)
+
+				// being inserted means you're dirty and need
+				// to be synced
+				if childInode != nil {
+					childInode.dirty(c)
+				}
 
 				// Remove entry in old directory
 				dir.deleteEntry_(c, oldName)
@@ -1168,7 +1181,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
-			if child == nil {
+			if childInode == nil {
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
 			}
@@ -1198,15 +1211,11 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 }
 
 // Needs to hold childRecordLock
-func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum InodeId,
-	childInode Inode) {
+func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf,
+	inodeNum InodeId) {
 
 	dir.children.setChild(c, entry, inodeNum)
 
-	// being inserted means you're dirty and need to be synced
-	if childInode != nil {
-		childInode.dirty(c)
-	}
 	dir.self.dirty(c)
 }
 
