@@ -297,8 +297,8 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId) {
 
-	defer c.FuncIn("WorkspaceRoot::RemoveHardlink", "%d for new parent %d", linkId,
-		newParent).out()
+	defer c.FuncIn("WorkspaceRoot::RemoveHardlink", "%d for new parent %d",
+		linkId, newParent).out()
 
 	defer wsr.linkLock.Lock().Unlock()
 
