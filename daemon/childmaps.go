@@ -28,16 +28,6 @@ func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMa
 	}
 }
 
-func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf) InodeId {
-
-	return cmap.setChild_(c, entry, quantumfs.InodeIdInvalid)
-}
-
-func (cmap *ChildMap) setChild(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
-
-	cmap.setChild_(c, entry, inodeId)
-}
-
 func (cmap *ChildMap) setRecord(inodeId InodeId, record DirectoryRecordIf) {
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(inodeId, record.Filename())
@@ -136,7 +126,7 @@ func (cmap *ChildMap) checkForReplace(c *ctx,
 }
 
 // Returns the inodeId used for the child
-func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf,
+func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf,
 	inodeId InodeId) InodeId {
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
