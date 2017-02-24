@@ -115,7 +115,8 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := func() InodeId {
 				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.loadChild(c, baseLayer.Entry(i))
+				return dir.children.loadChild(c, baseLayer.Entry(i),
+					quantumfs.InodeIdInvalid)
 			}()
 			c.vlog("initDirectory %d getting child %d", inodeNum,
 				childInodeNum)
@@ -189,7 +190,7 @@ func (dir *Directory) addChild_(c *ctx, inode InodeId, child DirectoryRecordIf) 
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.setChild(c, child, inode)
+		dir.children.loadChild(c, child, inode)
 	}()
 	dir.updateSize_(c)
 }
@@ -1136,9 +1137,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			newEntry.SetFilename(newName)
 
 			isHardlink, _ := dir.wsr.checkHardlink(oldInodeId)
-			// In theory, perhaps, all inode accesses should be done
-			// through the record for that inode so we can safely lock
-			// an inode's parent and allow the record to dictate this if
 			var childInode Inode
 			if !isHardlink {
 				// Update the inode to point to the new name and
@@ -1167,13 +1165,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 						[]InodeId{overwrittenId})
 				}
 
-				dst.insertEntry_(c, newEntry, oldInodeId)
-
-				// being inserted means you're dirty and need
-				// to be synced
-				if childInode != nil {
-					childInode.dirty(c)
-				}
+				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
 
 				// Remove entry in old directory
 				dir.deleteEntry_(c, oldName)
@@ -1211,11 +1203,15 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 }
 
 // Needs to hold childRecordLock
-func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf,
-	inodeNum InodeId) {
+func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum InodeId,
+	childInode Inode) {
 
-	dir.children.setChild(c, entry, inodeNum)
+	dir.children.loadChild(c, entry, inodeNum)
 
+	// being inserted means you're dirty and need to be synced
+	if childInode != nil {
+		childInode.dirty(c)
+	}
 	dir.self.dirty(c)
 }
 
@@ -1648,7 +1644,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		uid, gid, type_, key)
 
 	defer dir.childRecordLock.Lock().Unlock()
-	inodeNum := dir.children.loadChild(c, entry)
+	inodeNum := dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 }
