@@ -141,7 +141,7 @@ type InsertInodeRequest struct {
 	Permissions uint32
 }
 
-const BufferSize = 5000
+const BufferSize = 4096
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
