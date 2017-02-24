@@ -361,6 +361,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 		for i := 0; i < entry.NumEntries(); i++ {
 			hardlink := entry.Entry(i)
 			newLink := newLinkEntry(hardlink.Record())
+			newLink.nlink = hardlink.Nlinks()
 			id := HardlinkId(hardlink.HardlinkID())
 			wsr.hardlinks[id] = newLink
 
@@ -412,6 +413,7 @@ func publishHardlinkMap(c *ctx,
 		newRecord := quantumfs.NewHardlinkRecord()
 		newRecord.SetHardlinkID(uint64(hardlinkID))
 		newRecord.SetRecord(record)
+		newRecord.SetNlinks(entry.nlink)
 		baseLayer.SetEntry(entryIdx, newRecord)
 
 		entryIdx++
