@@ -297,7 +297,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId) {
 
-	defer c.FuncIn("Removing Hardlink", "%d for new parent %d", linkId,
+	defer c.FuncIn("WorkspaceRoot::RemoveHardlink", "%d for new parent %d", linkId,
 		newParent).out()
 
 	defer wsr.linkLock.Lock().Unlock()
@@ -309,6 +309,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 
 	if link.nlink > 1 {
 		// Not ready to remove hardlink yet
+		c.vlog("Hardlink count %d, not ready to remove", link.nlink)
 		return nil, quantumfs.InodeIdInvalid
 	}
 
