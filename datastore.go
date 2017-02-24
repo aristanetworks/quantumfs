@@ -508,6 +508,14 @@ func (r *HardlinkRecord) SetRecord(v *DirectoryRecord) {
 	r.record.SetRecord(v.record)
 }
 
+func (r *HardlinkRecord) Nlinks() uint32 {
+	return r.record.Nlinks()
+}
+
+func (r *HardlinkRecord) SetNlinks(n uint32) {
+	r.record.SetNlinks(n)
+}
+
 type HardlinkEntry struct {
 	entry encoding.HardlinkEntry
 }
