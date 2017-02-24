@@ -256,8 +256,7 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
-	c.vlog("newApiHandle Enter")
-	defer c.vlog("newApiHandle Exit")
+	defer c.funcIn("newApiHandle Enter").out()
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
@@ -275,9 +274,8 @@ func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 // synchronized with other api handles.
 type ApiHandle struct {
 	FileHandleCommon
-	outstandingRequests int32
-	responses           chan fuse.ReadResult
-	responseBuffer      []byte
+	responses  chan fuse.ReadResult
+	toResponse []byte
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -291,40 +289,36 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	if atomic.LoadInt32(&api.outstandingRequests) == 0 {
-		// Sometime the kernel may request the whole response, but the client
-		// does not get all from kernel, so it will send other read request.
-		// In this case, offset is non-zero, it indicate that the read has
-		// not done, so the outstanding Requests should be put back by 1.
-		if offset > 0 {
-			atomic.AddInt32(&api.outstandingRequests, 1)
-		} else {
-			if nonblocking {
-				return nil, fuse.Status(syscall.EAGAIN)
-			}
+	// Read() only return response either 1. when offset is zero and channel
+	// api.responses is not nil OR 2. when offset is greater than zero and buffer
+	// api.toResponse is not nil. It returns in all of the other conditions
+	if (offset != 0 || len(api.responses) == 0) &&
+		(offset <= 0 || offset >= uint64(len(api.toResponse))) {
 
-			c.vlog("No outstanding requests, returning early")
-			return nil, fuse.OK
+		if nonblocking {
+			return nil, fuse.Status(syscall.EAGAIN)
 		}
+
+		c.vlog("No outstanding requests, returning early")
+		return nil, fuse.OK
 	}
 
 	if offset == 0 {
 		// Subtract the file size of last time read
-		c.qfs.decreaseApiFileSize(c, len(api.responseBuffer))
+		c.qfs.decreaseApiFileSize(c, len(api.toResponse))
 		response := <-api.responses
 
 		buffer := make([]byte, response.Size())
 		bytes, _ := response.Bytes(buffer)
-		api.responseBuffer = bytes
+		api.toResponse = bytes
 	}
 
-	bytes := api.responseBuffer
+	bytes := api.toResponse
 	bufSize := offset + uint64(size)
 	responseSize := uint64(len(bytes))
-	c.vlog("API Response szie %d with offset  %d", responseSize, offset)
+	c.vlog("API Response size %d with offset  %d", responseSize, offset)
 
 	if responseSize <= bufSize {
-		atomic.AddInt32(&api.outstandingRequests, -1)
 		return fuse.ReadResultData(bytes[offset:]), fuse.OK
 	}
 	return fuse.ReadResultData(bytes[offset:bufSize]), fuse.OK
@@ -422,7 +416,6 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	c.vlog("done writing to file")
 	c.qfs.increaseApiFileSize(c, responseSize)
-	atomic.AddInt32(&api.outstandingRequests, 1)
 	return size, fuse.OK
 }
 

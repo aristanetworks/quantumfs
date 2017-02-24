@@ -45,70 +45,7 @@ func TestWorkspaceBranching(t *testing.T) {
 	})
 }
 
-func testApiAccessList(test *testHelper, size int, filename string,
-	concurrent bool) {
-
-	workspace := test.newWorkspace()
-	accessList, expectedSize := generateFile(test, size, workspace, filename)
-
-	api := test.getApi()
-	relpath := test.relPath(workspace)
-
-	var wg sync.WaitGroup
-	var err1 error
-	initFileSize, endFileSize, initFileSize1, endFileSize1 := 0, 0, 0, 0
-	if concurrent {
-		wg.Add(1)
-		start := make(chan struct{})
-		start1 := make(chan struct{})
-
-		workspace2 := test.newWorkspace()
-
-		size2 := 100
-		filename2 := "concurrentconcurrentconcurrentconcurrentconcurrent"
-		generateFile(test, size2, workspace2, filename2)
-
-		relpath2 := test.relPath(workspace2)
-		api2 := test.getUniqueApi(workspace2 + "/api")
-		test.assert(api != api2,
-			"Error getting the same file descriptor")
-
-		go func() {
-			defer wg.Done()
-			close(start1)
-			<-start
-			initFileSize1 = int(atomic.LoadInt64(&test.qfs.apiFileSize))
-			_, err1 = api2.GetAccessed(relpath2)
-			endFileSize1 = int(atomic.LoadInt64(&test.qfs.apiFileSize))
-		}()
-		<-start1
-		close(start)
-	}
-
-	initFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
-	responselist, err := api.GetAccessed(relpath)
-	endFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
-
-	wg.Wait()
-
-	test.assert(err == nil, "Error getting accessList with api")
-
-	test.assert(mapKeySizeSum(responselist) == expectedSize,
-		"Error getting unequal sizes %d != %d",
-		mapKeySizeSum(responselist), expectedSize)
-
-	test.assertAccessList(accessList, responselist, "Error two maps different")
-
-	// In order to prove two api goroutines runs in concurrent. Two conditions
-	// have to be satisfied. Only when two api goroutines starts at the same
-	// point, they will share the same prior apiFileSize. Only if their partial
-	// reads interleave, will the posterior apiFileSizes be the same
-	test.assert(!concurrent || (initFileSize == initFileSize1 &&
-		endFileSize == endFileSize1),
-		"Error two api's aren't running in concurrent")
-}
-
-func generateFile(test *testHelper, size int, workspace,
+func generateFiles(test *testHelper, size int, workspace,
 	filename string) (map[string]bool, int) {
 
 	accessList := make(map[string]bool)
@@ -144,14 +81,46 @@ func mapKeySizeSum(list map[string]bool) int {
 
 func TestApiAccessListEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 0, "", false)
+		workspace := test.newWorkspace()
+
+		api := test.getApi()
+		relpath := test.relPath(workspace)
+
+		responselist, err := api.GetAccessed(relpath)
+		test.assert(err == nil, "Error getting accessList with api")
+
+		expectedSize := 0
+		test.assert(mapKeySizeSum(responselist) == expectedSize,
+			"Error getting unequal sizes %d != %d",
+			mapKeySizeSum(responselist), expectedSize)
+
+		accessList := make(map[string]bool)
+		test.assertAccessList(accessList, responselist,
+			"Error two maps different")
 	})
 }
 
 func TestApiAccessListLargeSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 200, "testfiletestfiletestfiletestfile"+
-			"testfiletestfiletestfiletestfiletestfiletestfile", false)
+		filename := "testfiletestfiletestfiletestfile" +
+			"testfiletestfiletestfiletestfiletestfiletestfile"
+
+		workspace := test.newWorkspace()
+		accessList, expectedSize := generateFiles(test, 200,
+			workspace, filename)
+
+		api := test.getApi()
+		relpath := test.relPath(workspace)
+
+		responselist, err := api.GetAccessed(relpath)
+		test.assert(err == nil, "Error getting accessList with api")
+
+		test.assert(mapKeySizeSum(responselist) == expectedSize,
+			"Error getting unequal sizes %d != %d",
+			mapKeySizeSum(responselist), expectedSize)
+
+		test.assertAccessList(accessList, responselist,
+			"Error two maps different")
 	})
 }
 
@@ -161,7 +130,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 		filename := "testfiletestfiletestfiletestfiletestfiletesti" +
 			"filetestfiletestfiletestfiletestfile"
 
-		accessList, expectedSize := generateFile(test,
+		accessList, expectedSize := generateFiles(test,
 			200, workspace, filename)
 
 		api := test.getApi()
@@ -175,6 +144,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 
 		test.assertAccessList(accessList, responselist,
 			"Error two maps different")
+
 		test.qfs.setFileHandle(&test.qfs.c, 7, nil)
 		queueSize2 := test.qfs.apiFileSize
 		test.assert(queueSize1 >= int64(expectedSize) && queueSize2 == 0,
@@ -185,8 +155,72 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 
 func TestApiAccessListConcurrent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testApiAccessList(test, 100, "samplesamplesamplesamplesample"+
-			"samplesamplesamplesamplesample", true)
+		size := 100
+		filename := "samplesamplesamplesamplesample" +
+			"samplesamplesamplesamplesample"
+		workspace := test.newWorkspace()
+		accessList, expectedSize := generateFiles(test,
+			size, workspace, filename)
+
+		api := test.getApi()
+		relpath := test.relPath(workspace)
+
+		var wg sync.WaitGroup
+		var err1 error
+		initFileSize, endFileSize, initFileSize1, endFileSize1 := 0, 0, 0, 0
+
+		wg.Add(1)
+		startApi := make(chan struct{})
+		startApi2 := make(chan struct{})
+
+		workspace2 := test.newWorkspace()
+
+		filename2 := "concurrentconcurrentconcurrent" +
+			"concurrentconcurrent"
+		generateFiles(test, size, workspace2, filename2)
+
+		relpath2 := test.relPath(workspace2)
+		api2 := test.getUniqueApi(workspace2 + "/api")
+		defer api2.Close()
+		test.assert(api != api2,
+			"Error getting the same file descriptor")
+
+		go func() {
+			defer wg.Done()
+			close(startApi)
+			<-startApi2
+			initFileSize1 = int(
+				atomic.LoadInt64(&test.qfs.apiFileSize))
+			_, err1 = api2.GetAccessed(relpath2)
+			endFileSize1 = int(
+				atomic.LoadInt64(&test.qfs.apiFileSize))
+		}()
+		<-startApi
+		close(startApi2)
+
+		initFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
+		responselist, err := api.GetAccessed(relpath)
+		endFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
+
+		wg.Wait()
+
+		test.assert(err == nil, "Error getting accessList with api")
+
+		test.assert(mapKeySizeSum(responselist) == expectedSize,
+			"Error getting unequal sizes %d != %d",
+			mapKeySizeSum(responselist), expectedSize)
+
+		test.assertAccessList(accessList, responselist,
+			"Error two maps different")
+
+		// In order to prove two api goroutines runs concurrently. Two
+		// conditions have to be satisfied. Only when two api goroutines
+		// starts at the same point, they will share the same prior
+		// apiFileSize. Only if their partial reads interleave, will the
+		// posterior apiFileSizes be the same
+		test.assert(initFileSize == initFileSize1 &&
+			endFileSize == endFileSize1,
+			"Error two api's aren't running in concurrent")
 	})
 }
 
