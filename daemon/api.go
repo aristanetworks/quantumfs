@@ -289,11 +289,11 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	// Read() only return response either 1. when offset is zero and channel
-	// api.responses is not nil OR 2. when offset is greater than zero and buffer
-	// api.toResponse is not nil. It returns in all of the other conditions
-	if (offset != 0 || len(api.responses) == 0) &&
-		(offset <= 0 || offset >= uint64(len(api.toResponse))) {
+	// Read() only return nil only if there is no response. There are two cases:
+	// 1. The offset is zero and channel api.responses is nil;
+	// 2. Buffer api.toResponse finishes reading.
+	if (offset == 0 && len(api.responses) == 0) ||
+		(offset > 0 && offset >= uint64(len(api.toResponse))) {
 
 		if nonblocking {
 			return nil, fuse.Status(syscall.EAGAIN)
