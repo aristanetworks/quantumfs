@@ -166,8 +166,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		relpath := test.relPath(workspace)
 
 		var wg sync.WaitGroup
-		var err1 error
-		initFileSize, endFileSize, initFileSize1, endFileSize1 := 0, 0, 0, 0
+		initFileSize, endFileSize, initFileSize2, endFileSize2 := 0, 0, 0, 0
 
 		wg.Add(1)
 		startApi := make(chan struct{})
@@ -189,10 +188,10 @@ func TestApiAccessListConcurrent(t *testing.T) {
 			defer wg.Done()
 			close(startApi)
 			<-startApi2
-			initFileSize1 = int(
+			initFileSize2 = int(
 				atomic.LoadInt64(&test.qfs.apiFileSize))
-			_, err1 = api2.GetAccessed(relpath2)
-			endFileSize1 = int(
+			api2.GetAccessed(relpath2)
+			endFileSize2 = int(
 				atomic.LoadInt64(&test.qfs.apiFileSize))
 		}()
 		<-startApi
@@ -204,7 +203,8 @@ func TestApiAccessListConcurrent(t *testing.T) {
 
 		wg.Wait()
 
-		test.assert(err == nil, "Error getting accessList with api")
+		test.assert(err == nil,
+			"Error getting accessList with api")
 
 		test.assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
@@ -218,9 +218,10 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		// starts at the same point, they will share the same prior
 		// apiFileSize. Only if their partial reads interleave, will the
 		// posterior apiFileSizes be the same
-		test.assert(initFileSize == initFileSize1 &&
-			endFileSize == endFileSize1,
-			"Error two api's aren't running in concurrent")
+		test.assert(initFileSize == initFileSize2 &&
+			endFileSize == endFileSize2,
+			"Error two api's aren't running in concurrent %d %d %d %d",
+			initFileSize, initFileSize2, endFileSize, endFileSize2)
 	})
 }
 
