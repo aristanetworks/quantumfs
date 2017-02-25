@@ -178,7 +178,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 			return dir.children.count()
 		}()
 
-		dir.parent(c).setChildAttr(c, dir.id, nil, &attr, nil, true)
+		dir.parent.setChildAttr(c, dir.id, nil, &attr, nil, true)
 	}
 }
 
@@ -475,7 +475,7 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("Directory::GetAttr").out()
 
-	record, err := dir.parent(c).getChildRecord(c, dir.InodeCommon.id)
+	record, err := dir.parent.getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", dir.id)
 		return fuse.EIO
@@ -650,7 +650,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
 		attr.Size).out()
 
-	return dir.parent(c).setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
+	return dir.parent.setChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
 }
 
@@ -730,7 +730,7 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	}
 
 	owner := c.fuseCtx.Owner
-	dirRecord, err := dir.parent(c).getChildRecord(c, dir.InodeCommon.id)
+	dirRecord, err := dir.parent.getChildRecord(c, dir.InodeCommon.id)
 	if err != nil {
 		c.wlog("Failed to find directory record in parent")
 		return fuse.ENOENT
@@ -1022,43 +1022,13 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	childDir *Directory) {
 
-	// Determine if a parent-child relationship between the
-	// directories exist
-	var parent *Directory
-	var child *Directory
-
-	upwardsParent := a.parent(c)
-	for ; upwardsParent != nil; upwardsParent = upwardsParent.parent(c) {
-		if upwardsParent.inodeNum() == b.inodeNum() {
-
-			// a is a (grand-)child of b
-			parent = b
-			child = a
-			break
-		}
+	if a.parent.hasAncestor(c, b) {
+		return b, a
 	}
 
-	if upwardsParent == nil {
-		upwardsParent = b.parent(c)
-		for ; upwardsParent != nil; upwardsParent = upwardsParent.parent(c) {
-
-			if upwardsParent.inodeNum() == a.inodeNum() {
-
-				// b is a (grand-)child of a
-				parent = a
-				child = b
-				break
-			}
-		}
-	}
-
-	if upwardsParent == nil {
-		// No relationship, choose arbitrarily
-		parent = a
-		child = b
-	}
-
-	return parent, child
+	// If b isn't an ancestor of a, then either a is an ancestor of b or there's
+	// no relationship in which case we can return the same result
+	return a, b
 }
 
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
@@ -1213,25 +1183,25 @@ func (dir *Directory) insertEntry_(c *ctx, entry DirectoryRecordIf, inodeNum Ino
 func (dir *Directory) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	return dir.parent(c).getChildXAttrSize(c, dir.inodeNum(), attr)
+	return dir.parent.getChildXAttrSize(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	return dir.parent(c).getChildXAttrData(c, dir.inodeNum(), attr)
+	return dir.parent.getChildXAttrData(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	return dir.parent(c).listChildXAttr(c, dir.inodeNum())
+	return dir.parent.listChildXAttr(c, dir.inodeNum())
 }
 
 func (dir *Directory) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	return dir.parent(c).setChildXAttr(c, dir.inodeNum(), attr, data)
+	return dir.parent.setChildXAttr(c, dir.inodeNum(), attr, data)
 }
 
 func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	return dir.parent(c).removeChildXAttr(c, dir.inodeNum(), attr)
+	return dir.parent.removeChildXAttr(c, dir.inodeNum(), attr)
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
@@ -1649,19 +1619,12 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 		dir.name_).out()
 
 	defer dir.Lock().Unlock()
-
-	parent := dir.parent(c)
-
-	if parent == dir {
-		c.vlog("Not flushing orphaned directory")
-		return dir.baseLayerId
-	}
-
 	defer dir.childRecordLock.Lock().Unlock()
 
-	dir.publish_(c)
-
-	parent.syncChild(c, dir.inodeNum(), dir.baseLayerId)
+	dir.parent.syncChild(c, dir.inodeNum(), func () quantumfs.ObjectKey {
+		dir.publish_(c)
+		return dir.baseLayerId
+	})
 
 	return dir.baseLayerId
 }

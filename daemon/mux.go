@@ -745,20 +745,9 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
 			key := inode.flush(c)
 
-			parentId := inode.parentId()
-			parent := qfs.inodeNoInstantiate(c, parentId)
-			if parent == nil {
-				panic(fmt.Sprintf("Parent was unloaded before child"+
-					"! %d %d", parentId, inode.inodeNum()))
-			}
-
-			parent.syncChild(c, inode.inodeNum(), key)
-
-			qfs.addUninstantiated(c, []InodeId{inode.inodeNum()},
-				parent.inodeNum())
-
 			// Then check our parent and iterate again
-			inode = parent
+			inode = inode.lockedParent().uninstantiateChild(c,
+				inode.inodeNum(), key, qfs)
 			continue
 		}
 		break
@@ -1096,15 +1085,7 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 		return nil, fuse.ENOATTR
 	}
 
-	var dir *Directory
-	parent := inode.parent(c)
-	if parent.isWorkspaceRoot() {
-		dir = &parent.(*WorkspaceRoot).Directory
-	} else {
-		dir = parent.(*Directory)
-	}
-	msg, status := dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
-	return msg, status
+	return inode.lockedParent().generateChildTypeKey_DOWN(c, inode.inodeNum())
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
