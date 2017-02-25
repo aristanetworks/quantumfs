@@ -101,8 +101,7 @@ type Inode interface {
 	markAccessed(c *ctx, path string, created bool)
 	markSelfAccessed(c *ctx, created bool)
 
-	parentId() InodeId
-	parent(c *ctx) Inode
+	lockedParent() *lockedParent
 	setParent(newParent InodeId)
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -154,8 +153,7 @@ type InodeCommon struct {
 
 	accessed_ uint32
 
-	parentLock sync.Mutex // Protects parent_
-	parent_    InodeId
+	parent	lockedParent
 
 	lock sync.RWMutex
 
@@ -241,36 +239,21 @@ func (inode *InodeCommon) accessed() bool {
 	}
 }
 
-func (inode *InodeCommon) parent(c *ctx) Inode {
-	inode.parentLock.Lock()
-	p := inode.parent_
-	inode.parentLock.Unlock()
-
-	return c.qfs.inode(c, p)
-}
-
-func (inode *InodeCommon) parentId() InodeId {
-	inode.parentLock.Lock()
-	p := inode.parent_
-	inode.parentLock.Unlock()
-
-	return p
+// Must return a pointer to the locked parent so the mutex is shared
+func (inode *InodeCommon) lockedParent() *lockedParent {
+	return &inode.parent
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
-	inode.parentLock.Lock()
-	inode.parent_ = newParent
-	inode.parentLock.Unlock()
+	inode.parent.setParent(newParent)
 }
 
 func (inode *InodeCommon) isOrphaned() bool {
-	return inode.inodeNum() == inode.parentId()
+	return inode.parent.childIsOrphaned(inode.inodeNum())
 }
 
 func (inode *InodeCommon) orphan(c *ctx) {
-	inode.parentLock.Lock()
-	inode.parent_ = inode.id
-	inode.parentLock.Unlock()
+	inode.parent.setParent(inode.id)
 	c.vlog("Orphaned inode %d", inode.id)
 }
 
@@ -312,8 +295,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	} else {
 		path = inode.name() + "/" + path
 	}
-	parent := inode.parent(c)
-	parent.markAccessed(c, path, created)
+	inode.parent.markAccessed(c, path, created)
 }
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {

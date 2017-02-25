@@ -13,30 +13,12 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	// Grab the source parent as a Directory
-	var srcParent *Directory
-	switch v := srcInode.parent(c).(type) {
-	case *Directory:
-		srcParent = v
-	case *WorkspaceRoot:
-		srcParent = &(v.Directory)
-	default:
-		c.elog("Source directory is not a directory: %d",
-			srcInode.inodeNum())
-		return fuse.EINVAL
-	}
-
-	// Ensure the source and dest are in the same workspace
-	if srcParent.wsr != dir.wsr {
-		c.dlog("Source and dest are different workspaces.")
-		return fuse.EPERM
-	}
-
-	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
+	newRecord, err := srcInode.lockedParent().makeHardlink_DOWN(c, srcInode,
+		dir.wsr)
 	if err != fuse.OK {
-		c.elog("QuantumFs::Link Failed with srcInode record")
 		return err
 	}
+
 	srcInode.markSelfAccessed(c, false)
 
 	newRecord.SetFilename(newName)
