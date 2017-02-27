@@ -39,6 +39,9 @@ func (lp *lockedParent) makeHardlink_DOWN(c *ctx, srcInode Inode,
 		return nil, err
 	}
 
+	// We need to reparent under the lp lock
+	lp.parentId = destWsr.inodeNum()
+
 	return newRecord, fuse.OK
 }
 
