@@ -199,14 +199,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	wsr.hardlinks[newId] = newEntry
 	wsr.inodeToLink[inodeId] = newId
 
-	// Fix the inode to use the wsr as direct parent
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
-	if inode == nil {
-		c.qfs.addUninstantiated(c, []InodeId{inodeId}, wsr.inodeNum())
-	} else {
-		inode.setParent(wsr.inodeNum())
-	}
-
+	// Don't reparent the inode, the caller must with the inode's parent lock
 	wsr.dirty(c)
 
 	return newHardlink(record.Filename(), newId, wsr)
