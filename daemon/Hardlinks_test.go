@@ -31,11 +31,12 @@ func TestHardlinkReload(t *testing.T) {
 		// artificially insert some hardlinks into the map
 		wsr := test.getWorkspaceRoot(workspace)
 
-		files := wsr.children.records()
-		for i := uint64(0); i < uint64(len(files)); i++ {
-			record := files[i].(*quantumfs.DirectoryRecord)
-			wsr.hardlinks[HardlinkId(i)] = newLinkEntry(record)
-		}
+		err = syscall.Link(testFileA, workspace+"/linkFileA")
+		test.assertNoErr(err)
+		err = syscall.Link(testFileA, workspace+"/linkFileA2")
+		test.assertNoErr(err)
+		err = syscall.Link(testFileB, workspace+"/linkFileB")
+		test.assertNoErr(err)
 
 		// Write another file to ensure the wsr is dirty
 		testFileC := workspace + "/testFileC"
@@ -57,9 +58,13 @@ func TestHardlinkReload(t *testing.T) {
 			wsrB.hardlinks)
 
 		for k, l := range wsr.hardlinks {
-			v := l.record
 			linkBPtr, exists := wsrB.hardlinks[k]
+
+			test.assert(l.nlink == linkBPtr.nlink,
+				"link reference count not preserved")
+
 			linkB := *(linkBPtr.record)
+			v := l.record
 			test.assert(exists, "link not reloaded in new wsr")
 			test.assert(v.Filename() == linkB.Filename(),
 				"Filename not preserved")
@@ -234,7 +239,39 @@ func TestHardlinkConversion(t *testing.T) {
 	})
 }
 
-func TestHardlinkChain(t *testing.T) {
+func TestHardlinkSubdirChain(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		err := os.Mkdir(workspace+"/dir", 0777)
+		test.assertNoErr(err)
+
+		testFile := workspace + "/dir/testFile"
+		err = printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/dir/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		linkFile2 := workspace + "/dir/testLink2"
+		err = syscall.Link(linkFile, linkFile2)
+		test.assertNoErr(err)
+
+		linkFile3 := workspace + "/dir/testLink3"
+		err = syscall.Link(linkFile2, linkFile3)
+		test.assertNoErr(err)
+
+		// Now link again from the original
+		linkFile4 := workspace + "/dir/testLink4"
+		err = syscall.Link(linkFile, linkFile4)
+		test.assertNoErr(err)
+	})
+}
+
+func TestHardlinkWsrChain(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
@@ -250,6 +287,15 @@ func TestHardlinkChain(t *testing.T) {
 
 		linkFile2 := workspace + "/testLink2"
 		err = syscall.Link(linkFile, linkFile2)
+		test.assertNoErr(err)
+
+		linkFile3 := workspace + "/testLink3"
+		err = syscall.Link(linkFile2, linkFile3)
+		test.assertNoErr(err)
+
+		// Now link again from the original
+		linkFile4 := workspace + "/testLink4"
+		err = syscall.Link(linkFile, linkFile4)
 		test.assertNoErr(err)
 	})
 }
@@ -310,5 +356,64 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 
 		err = os.Remove(linkname)
 		test.assertNoErr(err)
+	})
+}
+
+func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
+	test *testHelper, Type quantumfs.ObjectType) {
+
+	key, type_, size, err := quantumfs.DecodeExtendedKey(string(extendedKey))
+	test.assert(err == nil, "Error decompressing the packet")
+
+	// Extract the internal ObjectKey from QuantumFS
+	inode := test.getInode(path)
+	parent := inode.parent(&test.qfs.c)
+	// parent should be the workspace root
+	wsr := parent.(*WorkspaceRoot)
+	isHardlink, linkId := wsr.checkHardlink(inode.inodeNum())
+	test.assert(isHardlink, "Expected hardlink isn't one.")
+
+	valid, record := wsr.getHardlink(linkId)
+	test.assert(valid, "Unable to get hardlink from wsr")
+
+	// Verify the type and key matching
+	test.assert(type_ == Type && size == record.Size() &&
+		bytes.Equal(key.Value(), record.ID().Value()),
+		"Error getting the key: %v with size of %d-%d, keys of %v-%v",
+		err, Type, type_, key.Value(), record.ID().Value())
+}
+
+func TestHardlinkExtraction(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		filename := workspace + "/file"
+		linkname := workspace + "/link"
+
+		file, err := os.Create(filename)
+		test.assertNoErr(err)
+		file.WriteString("stuff")
+		file.Close()
+
+		err = os.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		dst := make([]byte, quantumfs.ExtendedKeyLength)
+		sz, err := syscall.Getxattr(filename, quantumfs.XAttrTypeKey, dst)
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
+			"Error getting the file key: %v with a size of %d",
+			err, sz)
+
+		matchXAttrHardlinkExtendedKey(filename, dst, test,
+			quantumfs.ObjectTypeSmallFile)
+
+		dst = make([]byte, quantumfs.ExtendedKeyLength)
+		sz, err = syscall.Getxattr(filename, quantumfs.XAttrTypeKey, dst)
+		test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
+			"Error getting the file key: %v with a size of %d",
+			err, sz)
+
+		matchXAttrHardlinkExtendedKey(linkname, dst, test,
+			quantumfs.ObjectTypeSmallFile)
 	})
 }
