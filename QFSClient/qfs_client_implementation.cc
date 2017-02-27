@@ -268,23 +268,33 @@ Error ApiImpl::DeterminePath() {
 	return util::getError(kCantFindApiFile, currentDir);
 }
 
-Error ApiImpl::CheckWorkspacePathValid(const char *workspace_root) {
+Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_root) {
 	std::string str(workspace_root);
+	std::vector<std::string> tokens;
 
-	// path must have TWO '/' characters...
-	size_t first = str.find('/');
-	if (first == std::string::npos) {
-		return util::getError(kWorkspacePathInvalid, workspace_root);
+	util::Split(str, "/", &tokens);
+
+	// path must have *exactly* two '/' characters (in which case it will have
+	// three tokens if split by '/'
+	if (tokens.size() != 3) {
+		return util::getError(kWorkspaceNameInvalid, workspace_root);
+
 	}
 
-	// ...but no more than two
-	size_t second = str.find('/', first + 1);
-	if (second == std::string::npos) {
-		return util::getError(kWorkspacePathInvalid, workspace_root);
-	}
-	size_t third = str.find('/', second + 1);
-	if (third != std::string::npos) {
-		return util::getError(kWorkspacePathInvalid, workspace_root);
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::CheckWorkspacePathValid(const char *workspace_path) {
+	std::string str(workspace_path);
+	std::vector<std::string> tokens;
+
+	util::Split(str, "/", &tokens);
+
+	// path must have *at least* two '/' characters (in which case it will have
+	// three or more tokens if split by '/'
+	if (tokens.size() < 3) {
+		return util::getError(kWorkspacePathInvalid, workspace_path);
+
 	}
 
 	return util::getError(kSuccess);
@@ -391,7 +401,7 @@ Error ApiImpl::SendJson(const void *request_json_ptr, ApiContext *context) {
 }
 
 Error ApiImpl::GetAccessed(const char *workspace_root) {
-	Error err = this->CheckWorkspacePathValid(workspace_root);
+	Error err = this->CheckWorkspaceNameValid(workspace_root);
 	if (err.code != kSuccess) {
 		return err;
 	}
@@ -399,11 +409,9 @@ Error ApiImpl::GetAccessed(const char *workspace_root) {
 	// create JSON in a CommandBuffer with:
 	//	CommandId = kGetAccessed and
 	//	WorkspaceRoot = workspace_root
-	// See http://jansson.readthedocs.io/en/2.4/apiref.html#building-values for
-	// an explanation of the format strings that json_pack_ex can take.
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
-					    "{s:i,s:s}",
+					    kGetAccessedJSON,
 					    kCommandId, kCmdGetAccessed,
 					    kWorkspaceRoot, workspace_root);
 	if (request_json == NULL) {
@@ -427,6 +435,48 @@ Error ApiImpl::GetAccessed(const char *workspace_root) {
 	// call printAccessList using parsed response
 	std::string formattedAccessedList = this->FormatAccessedList(accessed);
 	printf("%s", formattedAccessedList.c_str());
+
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::InsertInode(const char *destination,
+			   const char *key,
+			   uint32_t permissions,
+			   uint32_t uid,
+			   uint32_t gid) {
+	Error err = this->CheckWorkspacePathValid(destination);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	// create JSON in a CommandBuffer with:
+	//	CommandId = kCmdInsertInode and
+	//	DstPath = destination
+	//	Key = key
+	//	Uid = uid
+	//	Gid = gid
+	//	Permissions = permissions
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kInsertInodeJSON,
+					    kCommandId, kCmdInsertInode,
+					    kDstPath, destination,
+					    kKey, key,
+					    kUid, uid,
+					    kGid, gid,
+					    kPermissions, permissions);
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	util::JsonApiContext context;
+
+	// SendJson will call CheckCommonApiResponse to check for response errors
+	err = this->SendJson(request_json, &context);
+	json_decref(request_json); // release the JSON object
+	if (err.code != kSuccess) {
+		return err;
+	}
 
 	return util::getError(kSuccess);
 }
