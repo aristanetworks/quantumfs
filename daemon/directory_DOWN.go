@@ -107,7 +107,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
 		return nil, fuse.EIO
 	}
-	typeKey := encodeExtendedKey(record.ID(), record.Type(), record.Size())
+	typeKey := record.EncodeExtendedKey()
 
 	return typeKey, fuse.OK
 }
@@ -138,6 +138,15 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 
 	defer c.funcIn("Directory::makeHardlink_DOWN").out()
 
+	// If someone is trying to link a hardlink, we just need to return a copy
+	if isHardlink, id := dir.wsr.checkHardlink(toLink.inodeNum()); isHardlink {
+		// Update the reference count
+		dir.wsr.hardlinkInc(id)
+
+		linkCopy := newHardlink(toLink.name(), id, dir.wsr)
+		return linkCopy, fuse.OK
+	}
+
 	// If the file isn't a hardlink, then we must flush it first. It's unlikely
 	// we'll be linking many hardlinks several times and it is somewhat tedious
 	// to determine if toLink is a hardlink or not. Instead we simply flush all
@@ -147,11 +156,5 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	record := dir.children.record(toLink.inodeNum())
-	if record == nil {
-		c.dlog("Child record not found")
-		return nil, fuse.ENOENT
-	}
-
-	return dir.children.makeHardlink(c, record.Filename())
+	return dir.children.makeHardlink(c, toLink.inodeNum())
 }
