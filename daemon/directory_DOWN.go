@@ -57,6 +57,11 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 
 	children := dir.childInodes()
 	for _, child := range children {
+
+		// Only when we know we're not being called from a child, we can &
+		// must check if the child is a hardlink due for replacement
+		dir.children.checkLinkAndAlone_DOWN(c, child)
+
 		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
 			inode.Sync_DOWN(c)
 		}
