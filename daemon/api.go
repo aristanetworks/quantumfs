@@ -274,8 +274,8 @@ func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 // synchronized with other api handles.
 type ApiHandle struct {
 	FileHandleCommon
-	responses  chan fuse.ReadResult
-	toResponse []byte
+	responses       chan fuse.ReadResult
+	currentResponse []byte
 }
 
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -289,11 +289,11 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	c.vlog("Received read request on Api")
-	// Read() only return nil only if there is no response. There are two cases:
+	// Read() returns nil only if there is no response. There are two cases:
 	// 1. The offset is zero and channel api.responses is nil;
-	// 2. Buffer api.toResponse finishes reading.
+	// 2. Buffer api.currentResponse finishes reading.
 	if (offset == 0 && len(api.responses) == 0) ||
-		(offset > 0 && offset >= uint64(len(api.toResponse))) {
+		(offset > 0 && offset >= uint64(len(api.currentResponse))) {
 
 		if nonblocking {
 			return nil, fuse.Status(syscall.EAGAIN)
@@ -304,16 +304,16 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 
 	if offset == 0 {
-		// Subtract the file size of last time read
-		c.qfs.decreaseApiFileSize(c, len(api.toResponse))
+		// Subtract the file size of last response
+		c.qfs.decreaseApiFileSize(c, len(api.currentResponse))
 		response := <-api.responses
 
 		buffer := make([]byte, response.Size())
 		bytes, _ := response.Bytes(buffer)
-		api.toResponse = bytes
+		api.currentResponse = bytes
 	}
 
-	bytes := api.toResponse
+	bytes := api.currentResponse
 	bufSize := offset + uint64(size)
 	responseSize := uint64(len(bytes))
 	c.vlog("API Response size %d with offset  %d", responseSize, offset)
@@ -322,6 +322,16 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return fuse.ReadResultData(bytes[offset:]), fuse.OK
 	}
 	return fuse.ReadResultData(bytes[offset:bufSize]), fuse.OK
+}
+
+func (api *ApiHandle) cleanupResidueInApiFileSize(c *ctx) {
+	c.qfs.decreaseApiFileSize(c, len(api.currentResponse))
+
+	// In case the queue is not empty
+	for len(api.responses) > 0 {
+		response := <-api.responses
+		c.qfs.decreaseApiFileSize(c, response.Size())
+	}
 }
 
 func makeErrorResponse(code uint32, message string) []byte {
