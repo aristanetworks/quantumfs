@@ -893,9 +893,9 @@ func (s DirectoryEntry_List) Set(i int, item DirectoryEntry) { C.PointerList(s).
 
 type HardlinkRecord C.Struct
 
-func NewHardlinkRecord(s *C.Segment) HardlinkRecord      { return HardlinkRecord(s.NewStruct(8, 1)) }
-func NewRootHardlinkRecord(s *C.Segment) HardlinkRecord  { return HardlinkRecord(s.NewRootStruct(8, 1)) }
-func AutoNewHardlinkRecord(s *C.Segment) HardlinkRecord  { return HardlinkRecord(s.NewStructAR(8, 1)) }
+func NewHardlinkRecord(s *C.Segment) HardlinkRecord      { return HardlinkRecord(s.NewStruct(16, 1)) }
+func NewRootHardlinkRecord(s *C.Segment) HardlinkRecord  { return HardlinkRecord(s.NewRootStruct(16, 1)) }
+func AutoNewHardlinkRecord(s *C.Segment) HardlinkRecord  { return HardlinkRecord(s.NewStructAR(16, 1)) }
 func ReadRootHardlinkRecord(s *C.Segment) HardlinkRecord { return HardlinkRecord(s.Root(0).ToStruct()) }
 func (s HardlinkRecord) HardlinkID() uint64              { return C.Struct(s).Get64(0) }
 func (s HardlinkRecord) SetHardlinkID(v uint64)          { C.Struct(s).Set64(0, v) }
@@ -903,6 +903,8 @@ func (s HardlinkRecord) Record() DirectoryRecord {
 	return DirectoryRecord(C.Struct(s).GetObject(0).ToStruct())
 }
 func (s HardlinkRecord) SetRecord(v DirectoryRecord) { C.Struct(s).SetObject(0, C.Object(v)) }
+func (s HardlinkRecord) Nlinks() uint32              { return C.Struct(s).Get32(8) }
+func (s HardlinkRecord) SetNlinks(v uint32)          { C.Struct(s).Set32(8, v) }
 func (s HardlinkRecord) WriteJSON(w io.Writer) error {
 	b := bufio.NewWriter(w)
 	var err error
@@ -938,6 +940,25 @@ func (s HardlinkRecord) WriteJSON(w io.Writer) error {
 	{
 		s := s.Record()
 		err = s.WriteJSON(b)
+		if err != nil {
+			return err
+		}
+	}
+	err = b.WriteByte(',')
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("\"nlinks\":")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Nlinks()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
 		if err != nil {
 			return err
 		}
@@ -993,6 +1014,25 @@ func (s HardlinkRecord) WriteCapLit(w io.Writer) error {
 			return err
 		}
 	}
+	_, err = b.WriteString(", ")
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteString("nlinks = ")
+	if err != nil {
+		return err
+	}
+	{
+		s := s.Nlinks()
+		buf, err = json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = b.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
 	err = b.WriteByte(')')
 	if err != nil {
 		return err
@@ -1009,7 +1049,7 @@ func (s HardlinkRecord) MarshalCapLit() ([]byte, error) {
 type HardlinkRecord_List C.PointerList
 
 func NewHardlinkRecordList(s *C.Segment, sz int) HardlinkRecord_List {
-	return HardlinkRecord_List(s.NewCompositeList(8, 1, sz))
+	return HardlinkRecord_List(s.NewCompositeList(16, 1, sz))
 }
 func (s HardlinkRecord_List) Len() int { return C.PointerList(s).Len() }
 func (s HardlinkRecord_List) At(i int) HardlinkRecord {
