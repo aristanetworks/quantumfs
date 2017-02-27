@@ -287,11 +287,10 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 	return false, quantumfs.DirectoryRecord{}
 }
 
-func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
-	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId) {
+func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
+	linkId HardlinkId) (record DirectoryRecordIf, inodeId InodeId) {
 
-	defer c.FuncIn("Removing Hardlink", "%d for new parent %d", linkId,
-		newParent).out()
+	defer c.FuncIn("WorkspaceRoot::removeHardlink", "link %d", linkId).out()
 
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -318,12 +317,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
 
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
-	if inode == nil {
-		c.qfs.addUninstantiated(c, []InodeId{inodeId}, newParent)
-	} else {
-		inode.setParent(newParent)
-	}
+	// Do not reparent here. It must be done safety in a DOWN function
 
 	wsr.dirty(c)
 

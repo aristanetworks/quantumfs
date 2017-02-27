@@ -112,42 +112,11 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 
 	for _, v := range list {
 		if v.Filename() == name {
-			return cmap.checkForReplace(c, v)
+			return v
 		}
 	}
 
 	return nil
-}
-
-// We need to check a record when we're returning it so that if a hardlink has nlink
-// of 1, that we turn it back into a normal file again
-func (cmap *ChildMap) checkForReplace(c *ctx,
-	record DirectoryRecordIf) DirectoryRecordIf {
-
-	if record.Type() != quantumfs.ObjectTypeHardlink {
-		return record
-	}
-
-	link := record.(*Hardlink)
-
-	// This needs to be turned back into a normal file
-	newRecord, inodeId := cmap.wsr.removeHardlink(c, link.linkId,
-		cmap.dir.inodeNum())
-
-	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
-		// wsr says hardlink isn't ready for removal yet
-		return record
-	}
-
-	// Ensure that we update this version of the record with this instance
-	// of the hardlink's information
-	newRecord.SetFilename(link.Filename())
-
-	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	cmap.setRecord(inodeId, newRecord)
-	cmap.dir.dirty(c)
-
-	return newRecord
 }
 
 func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
