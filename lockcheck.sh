@@ -36,11 +36,6 @@ do
 			while [ $ITER -ge 0 ]; do
 				LINE=${FILEDATA[$ITER]}
 				if [[ "$LINE" =~ "_DOWN" ]]; then
-					if [ "$LOCKLINE" -ne "-1" ]; then
-						echo "$WARNTEXT, line $LOCKLINE"
-						((FAILED++))
-						LOCKLINE=-1
-					fi
 					LOCKLINE=$((ITER+1))
 				fi
 				if [[ ( "$LINE" =~ ".LockTree().Unlock()" ) || \
