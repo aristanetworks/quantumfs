@@ -56,7 +56,25 @@ func NewApiWithPath(path string) *Api {
 		panic(err)
 	}
 
+	// Verify that ODIRECT is actually set
+	fileDescriptor := fd.Fd()
+	flags, err := fcntl(fileDescriptor, syscall.F_GETFL, 0)
+	if err != nil {
+		fmt.Println("Fail to get flags of file descriptor")
+	} else if flags&syscall.O_DIRECT == 0 {
+		fmt.Println("Fail to set O_DIRECT")
+	}
+
 	return &api
+}
+
+func fcntl(fd uintptr, cmd int, arg int) (val int, err error) {
+	r, _, e := syscall.Syscall(syscall.SYS_FCNTL, fd, uintptr(cmd), uintptr(arg))
+	val = int(r)
+	if e != 0 {
+		err = e
+	}
+	return
 }
 
 type Api struct {
