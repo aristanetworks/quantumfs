@@ -200,13 +200,48 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	return nil
 }
 
+func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string) error {
+
+	wsdb.cacheMutex.Lock()
+	defer wsdb.cacheMutex.Unlock()
+
+	// Through all these checks, if the workspace could not exist, we return
+	// success. The caller wanted that workspace to not exist and it doesn't.
+	_, ok := wsdb.cache[typespace]
+	if !ok {
+		return nil
+	}
+
+	_, ok = wsdb.cache[typespace][namespace]
+	if !ok {
+		return nil
+	}
+
+	delete(wsdb.cache[typespace][namespace], workspace)
+
+	if len(wsdb.cache[typespace][namespace]) == 0 {
+		delete(wsdb.cache[typespace], namespace)
+	}
+
+	if len(wsdb.cache[typespace]) == 0 {
+		delete(wsdb.cache, typespace)
+	}
+
+	return nil
+}
+
 func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
 	wsdb.cacheMutex.RLock()
-	rootid, _ := wsdb.workspace(c, typespace, namespace, workspace)
+	rootid, exists := wsdb.workspace(c, typespace, namespace, workspace)
 	wsdb.cacheMutex.RUnlock()
 
+	if !exists {
+		return rootid, quantumfs.NewWorkspaceDbErr(
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "No such workspace")
+	}
 	return rootid, nil
 }
 
