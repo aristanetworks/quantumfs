@@ -1085,6 +1085,9 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 		return nil, fuse.ENOATTR
 	}
 
+	// Update the Hash value before generating the key
+	inode.Sync_DOWN(c)
+
 	return inode.lockedParent().generateChildTypeKey_DOWN(c, inode.inodeNum())
 }
 

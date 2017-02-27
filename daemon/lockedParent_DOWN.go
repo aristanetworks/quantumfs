@@ -4,6 +4,8 @@
 package daemon
 
 // This is _DOWN counterpart to lockedParent.go
+// We must be careful not to call anything that calls Sync_DOWN on a child,
+// since that will require coming here and doubly locking the parent
 
 import "github.com/hanwen/go-fuse/fuse"
 
