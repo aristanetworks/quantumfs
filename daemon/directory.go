@@ -4,8 +4,6 @@
 package daemon
 
 import "bytes"
-import "encoding/base64"
-import "encoding/binary"
 import "errors"
 import "fmt"
 import "syscall"
@@ -48,6 +46,8 @@ type DirectoryRecordIf interface {
 
 	Record() quantumfs.DirectoryRecord
 	Nlinks() uint32
+
+	EncodeExtendedKey() []byte
 }
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
@@ -78,10 +78,6 @@ type Directory struct {
 	childRecordLock DeferableMutex
 	children        *ChildMap
 }
-
-// The size of the ObjectKey: 21 + 1 + 8
-// The length decides the length in datastore.go: quantumfs.ExtendedKeyLength
-const sourceDataLength = 30
 
 func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
@@ -695,11 +691,19 @@ func (dir *Directory) getChildRecord(c *ctx,
 	inodeNum InodeId) (DirectoryRecordIf, error) {
 
 	defer c.funcIn("Directory::getChildRecord").out()
+
 	defer dir.RLock().RUnlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	if record := dir.children.record(inodeNum); record != nil {
+	record := dir.children.record(inodeNum)
+	if record != nil {
 		return record, nil
+	}
+
+	// if we don't have the child, maybe we're wsr and it's a hardlink
+	valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+	if valid {
+		return &linkRecord, nil
 	}
 
 	return &quantumfs.DirectoryRecord{},
@@ -1141,12 +1145,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dir.self.markAccessed(c, oldName, false)
 			dst.self.markAccessed(c, newName, true)
 
-			// Delete the target InodeId, before (possibly) overwriting
-			// it.
-			dst.deleteEntry_(c, newName)
-
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
+
+				// Delete the target InodeId, before (possibly)
+				// overwriting it.
+				dst.deleteEntry_(c, newName)
 
 				overwrittenRecord := dst.children.recordByName(c,
 					newName)
@@ -1157,6 +1161,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 				}
 
 				dst.insertEntry_(c, newEntry, oldInodeId, child)
+
+				// Remove entry in old directory
+				dir.deleteEntry_(c, oldName)
 			}()
 
 			// Set entry in new directory. If the renamed inode is
@@ -1165,9 +1172,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 				c.qfs.addUninstantiated(c, []InodeId{oldInodeId},
 					dst.inodeNum())
 			}
-
-			// Remove entry in old directory
-			dir.deleteEntry_(c, oldName)
 
 			parent.updateSize_(c)
 
@@ -1183,7 +1187,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	return result
 }
 
-// Must hold childmap lock for writing
+// Must hold childrecord lock for writing
 func (dir *Directory) deleteEntry_(c *ctx, name string) {
 	if record := dir.children.recordByName(c, name); record == nil {
 		// Nothing to do
@@ -1558,31 +1562,6 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
-}
-
-func encodeExtendedKey(key quantumfs.ObjectKey, type_ quantumfs.ObjectType,
-	size uint64) []byte {
-
-	append_ := make([]byte, 9)
-	append_[0] = uint8(type_)
-	binary.LittleEndian.PutUint64(append_[1:], size)
-
-	data := append(key.Value(), append_...)
-	return []byte(base64.StdEncoding.EncodeToString(data))
-}
-
-func decodeExtendedKey(packet string) (quantumfs.ObjectKey, quantumfs.ObjectType,
-	uint64, error) {
-
-	bDec, err := base64.StdEncoding.DecodeString(packet)
-	if err != nil {
-		return quantumfs.ZeroKey, 0, 0, err
-	}
-
-	key := quantumfs.NewObjectKeyFromBytes(bDec[:sourceDataLength-9])
-	type_ := quantumfs.ObjectType(bDec[sourceDataLength-9])
-	size := binary.LittleEndian.Uint64(bDec[sourceDataLength-8:])
-	return key, type_, size, nil
 }
 
 // Do a similar work like  Lookup(), but it does not interact with fuse, and return

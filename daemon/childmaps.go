@@ -275,17 +275,12 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx,
-	childName string) (copy DirectoryRecordIf, err fuse.Status) {
+	childId InodeId) (copy DirectoryRecordIf, err fuse.Status) {
 
-	childId, exists := cmap.children[childName]
-	if !exists {
-		c.elog("No child record for %s in childmap", childName)
-		return nil, fuse.ENOENT
-	}
-
-	child := cmap.getRecord(c, childId, childName)
+	child := cmap.firstRecord(childId)
 	if child == nil {
-		panic("Mismatched childId and record")
+		c.elog("No child record for inode id %d in childmap", childId)
+		return nil, fuse.ENOENT
 	}
 
 	// If it's already a hardlink, great no more work is needed
@@ -306,7 +301,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 		child.Type() != quantumfs.ObjectTypeLargeFile &&
 		child.Type() != quantumfs.ObjectTypeVeryLargeFile {
 
-		c.dlog("Cannot hardlink %s - not a file", childName)
+		c.dlog("Cannot hardlink %s - not a file", child.Filename())
 		return nil, fuse.EINVAL
 	}
 

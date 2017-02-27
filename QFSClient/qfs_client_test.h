@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "qfs_client.h"
+#include "qfs_client_implementation.h"
 
 namespace qfsclient {
 
@@ -19,7 +20,7 @@ class QfsClientTest : public testing::Test {
 
 	std::string api_path;
 	ino_t api_inode_id;
-	Api *api;
+	ApiImpl *api;
 
  protected:
 	// path of temporary directory tree created by CreateTempDirTree()
@@ -42,9 +43,9 @@ class QfsClientApiTest : public QfsClientTest, SendCommandHook {
 	virtual Error SendTestHook();
 
  protected:
-	Api::CommandBuffer expected_written_command;
-	Api::CommandBuffer actual_written_command;
-	Api::CommandBuffer read_command;
+	ApiImpl::CommandBuffer expected_written_command;
+	ApiImpl::CommandBuffer actual_written_command;
+	ApiImpl::CommandBuffer read_command;
 };
 
 class QfsClientDeterminePathTest : public QfsClientTest {

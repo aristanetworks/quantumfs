@@ -9,7 +9,7 @@ d           := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 TARGET      := $(d)/libqfsclient.so
 TEST_TARGET := $(d)/qfsclient_test
 
-SRCS      := $(d)/qfs_client.cc $(d)/qfs_client_util.cc
+SRCS      := $(d)/qfs_client_implementation.cc $(d)/qfs_client_util.cc
 OBJS      := $(SRCS:.cc=.o)
 DEPS      := $(SRCS:.cc=.d)
 TEST_SRCS := $(d)/qfs_client_test.cc $(d)/qfs_client_util_test.cc

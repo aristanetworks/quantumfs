@@ -45,6 +45,7 @@ struct DirectoryEntry {
 struct HardlinkRecord {
 	hardlinkID @0 :UInt64;
 	record     @1 :DirectoryRecord;
+	nlinks     @2 :UInt32;
 }
 
 struct HardlinkEntry {
