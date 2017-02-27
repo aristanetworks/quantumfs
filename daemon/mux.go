@@ -742,10 +742,12 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 
 		c.vlog("Set inode %d to nil", inode.inodeNum())
 
-		if inode.inodeNum() != quantumfs.InodeIdRoot {
+		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
+			key := inode.flush(c)
+
 			// Then check our parent and iterate again
-			inode = inode.lockedParent().uninstantiateChild(c, inode,
-				qfs)
+			inode = inode.lockedParent().uninstantiateChild(c,
+				inode.inodeNum(), key, qfs)
 			continue
 		}
 		break

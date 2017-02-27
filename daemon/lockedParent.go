@@ -37,19 +37,15 @@ func (lp *lockedParent) markAccessed(c *ctx, path string, created bool) {
 // For use only with uninstantiateChain in mux. In almost all cases we should not
 // allow direct access to the parent inode because it could change outside this lock.
 // Uninstantiate chain is only okay because of the treeLock
-func (lp *lockedParent) uninstantiateChild(c *ctx, inode Inode,
-	qfs *QuantumFs) (parent Inode) {
+func (lp *lockedParent) uninstantiateChild(c *ctx, inodeNum InodeId,
+	key quantumfs.ObjectKey, qfs *QuantumFs) (parent Inode) {
 
 	defer lp.lock.Lock().Unlock()
-
-	inodeNum := inode.inodeNum()
 
 	// Do nothing if we're orphaned
 	if inodeNum == lp.parentId {
 		return nil
 	}
-
-	key := inode.flush(c)
 
 	parent = qfs.inodeNoInstantiate(c, lp.parentId)
 	if parent == nil {
