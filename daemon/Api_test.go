@@ -287,3 +287,21 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 			"Non-blocking read api without requests error:%v", err)
 	})
 }
+
+func TestWorkspaceDeletion(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		ws1 := test.newWorkspace()
+		ws2 := test.newWorkspace()
+
+		api.DeleteWorkspace(ws1)
+
+		var stat syscall.Stat_t
+		err := syscall.Stat(ws1, &stat)
+		test.assert(err != nil, "Workspace1 not deleted")
+
+		err = syscall.Stat(ws2, &stat)
+		test.assert(err == nil, "Workspace2 deleted: %v", err)
+	})
+}
