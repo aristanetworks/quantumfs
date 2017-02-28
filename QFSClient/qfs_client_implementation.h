@@ -67,6 +67,12 @@ class ApiImpl: public Api {
 	// implemented API functions
 	Error GetAccessed(const char *workspace_root);
 
+	Error InsertInode(const char *destination,
+			  const char *key,
+			  uint32_t permissions,
+			  uint32_t uid,
+			  uint32_t gid);
+
  private:
 	// CommandBuffer is used internally to store the raw content of a command to
 	// send to (or a response received from) the API - typically in JSON format.
@@ -89,9 +95,9 @@ class ApiImpl: public Api {
 		// buffer would have to be grown too large to add this block
 		ErrorCode Append(const byte *data, size_t size);
 
-		// copy a string into the buffer. An error will be returned if
+		// Copy a string into the buffer. An error will be returned if
 		// the buffer would have to be grown too large to fit the string.
-		ErrorCode CopyString(const char * s);
+		ErrorCode CopyString(const char *s);
 
 	 private:
 		std::vector<byte> data;
@@ -123,9 +129,13 @@ class ApiImpl: public Api {
 	// indicate the outcome.
 	Error ReadResponse(CommandBuffer *command);
 
+	// Given a workspace name, test it for validity, returning an error to
+	// indicate the name's validity.
+	Error CheckWorkspaceNameValid(const char *workspace_root);
+
 	// Given a workspace path, test it for validity, returning an error to
 	// indicate the path's validity.
-	Error CheckWorkspacePathValid(const char *workspace_root);
+	Error CheckWorkspacePathValid(const char *workspace_path);
 
 	std::fstream file;
 
@@ -183,6 +193,7 @@ class ApiImpl: public Api {
 	FRIEND_TEST(QfsClientTest, SendCommandCantOpenFileTest);
 	FRIEND_TEST(QfsClientTest, WriteCommandFileNotOpenTest);
 	FRIEND_TEST(QfsClientTest, OpenTest);
+	FRIEND_TEST(QfsClientTest, CheckWorkspaceNameValidTest);
 	FRIEND_TEST(QfsClientTest, CheckWorkspacePathValidTest);
 
 	friend class QfsClientApiTest;
