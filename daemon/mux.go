@@ -866,8 +866,42 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 		return fuse.ENOENT
 	}
 
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
+	}
+
 	defer inode.RLockTree().RUnlock()
 	return inode.Mknod(c, name, input, out)
+}
+
+func getLocalWorkspaceWritePermission(c *ctx, inode Inode) bool {
+	// Grab the workspaceroot of the inode
+	var wsr *WorkspaceRoot
+	switch v := inode.(type) {
+	// The default cases will be inode such as file, symlink, hardlink etc, they
+	// get workspaceroots from their parents
+	default:
+		wsr = inode.parent(c).(*Directory).wsr
+	case *WorkspaceRoot:
+		wsr = v
+	case *Directory:
+		wsr = v.wsr
+
+		// If the inode is typespace/namespace/workspace/api, return true
+		// immediately since workspaceroot should not have control over them
+	case *TypespaceList:
+		return true
+	case *NamespaceList:
+		return true
+	case *WorkspaceList:
+		return true
+	case *ApiInode:
+		return true
+	}
+
+	defer wsr.writePermLock.RLock().RUnlock()
+	return wsr.rootWritePerm
+
 }
 
 func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
@@ -883,6 +917,10 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
 	}
 
 	defer inode.RLockTree().RUnlock()
@@ -902,6 +940,10 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
 	}
 
 	defer inode.RLockTree().RUnlock()
@@ -1023,6 +1065,10 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
 	}
 
 	defer inode.RLockTree().RUnlock()
@@ -1211,6 +1257,10 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 		return fuse.EACCES // TODO Confirm this is correct
 	}
 
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
+	}
+
 	defer inode.RLockTree().RUnlock()
 	return inode.Create(c, input, name, out)
 }
@@ -1277,6 +1327,16 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 	if fileHandle == nil {
 		c.elog("Write failed")
 		return 0, fuse.ENOENT
+	}
+
+	// Verify the write permission of the inode
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return 0, fuse.ENOENT
+	}
+
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return 0, fuse.EPERM
 	}
 
 	defer fileHandle.RLockTree().RUnlock()

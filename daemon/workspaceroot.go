@@ -22,6 +22,10 @@ type WorkspaceRoot struct {
 	listLock   sync.Mutex
 	accessList map[string]bool
 
+	// Write permission for all inodes in local workspace
+	writePermLock DeferableRwMutex
+	rootWritePerm bool
+
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
 	realTreeLock sync.RWMutex
@@ -76,6 +80,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	defer wsr.Lock().Unlock()
 
+	wsr.rootWritePerm = true
 	wsr.self = &wsr
 	wsr.typespace = typespace
 	wsr.namespace = namespace
