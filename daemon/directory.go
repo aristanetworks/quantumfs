@@ -194,7 +194,7 @@ func (dir *Directory) addChild_(c *ctx, inode InodeId, child DirectoryRecordIf) 
 	dir.updateSize_(c)
 }
 
-// Needs inode lock for write
+// Needs inode lock for write, must be called from within Child's lockedParent
 func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf) {
 	defer c.funcIn("Directory::delChild_").out()
 
@@ -203,6 +203,26 @@ func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf
 	// If this is a file we need to reparent it to itself
 	record := func() DirectoryRecordIf {
 		defer dir.childRecordLock.Lock().Unlock()
+
+		childRecord := dir.children.recordByName(c, name)
+
+		// This may be a hardlink that is due to be converted. To avoid
+		// having to call the DOWN check function, we can use the fact that
+		// we're orphaning the file and have it completely locked
+		// to do the equivalent ourselves, with similar but more minimal code
+		if hardlink, isHardlink := childRecord.(*Hardlink); isHardlink {
+			newRecord, inodeId := dir.wsr.removeHardlink(c,
+				hardlink.linkId)
+
+			// Wsr says we're about to orphan the last hardlink copy
+			if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
+				newRecord.SetFilename(hardlink.Filename())
+				childRecord = newRecord
+				dir.children.setChild(c, newRecord,
+					dir.children.inodeNum(name))
+			}
+		}
+
 		return dir.children.deleteChild(c, name)
 	}()
 	if record == nil {
