@@ -501,28 +501,52 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	defer c.funcIn("Directory::Lookup").out()
 
-	defer dir.RLock().RUnlock()
+	checkInodeId, result := func () (InodeId, fuse.Status) {
+		defer dir.RLock().RUnlock()
 
-	inodeNum := func() InodeId {
+		checkLink, inodeNum := func() (bool, InodeId) {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.children.recordByName(c, name)
+			_, isHardlink := record.(*Hardlink)
+			return isHardlink, dir.children.inodeNum(name)
+		}()
+		if inodeNum == quantumfs.InodeIdInvalid {
+			c.vlog("Inode not found")
+			return inodeNum, fuse.ENOENT
+		}
+
+		c.vlog("Directory::Lookup found inode %d", inodeNum)
+		dir.self.markAccessed(c, name, false)
+		c.qfs.increaseLookupCount(inodeNum)
+
+		out.NodeId = uint64(inodeNum)
+		fillEntryOutCacheData(c, out)
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.inodeNum(name)
-	}()
-	if inodeNum == quantumfs.InodeIdInvalid {
-		c.vlog("Inode not found")
-		return fuse.ENOENT
+		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+			dir.children.recordByName(c, name))
+
+		if !checkLink {
+			// If we don't need to check the hardlink state, don't return
+			// the inode number
+			inodeNum = quantumfs.InodeIdInvalid
+		}
+
+		return inodeNum, fuse.OK
+	} ()
+
+	if checkInodeId != quantumfs.InodeIdInvalid {
+		// check outside of the directory lock
+		dir.checkHardlink(c, checkInodeId)
 	}
 
-	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	dir.self.markAccessed(c, name, false)
-	c.qfs.increaseLookupCount(inodeNum)
+	return result
+}
 
-	out.NodeId = uint64(inodeNum)
-	fillEntryOutCacheData(c, out)
-	defer dir.childRecordLock.Lock().Unlock()
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
-		dir.children.recordByName(c, name))
-
-	return fuse.OK
+func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
+	child := c.qfs.inode(c, childId)
+	if child != nil {
+		child.checkLinkAndAlone(c, dir)
+	}
 }
 
 func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
