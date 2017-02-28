@@ -301,6 +301,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 
 	if link.nlink > 1 {
 		// Not ready to remove hardlink yet
+		c.vlog("Hardlink count %d, not ready to remove", link.nlink)
 		return nil, quantumfs.InodeIdInvalid
 	}
 
