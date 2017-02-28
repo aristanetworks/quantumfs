@@ -219,7 +219,7 @@ func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf
 			if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
 				newRecord.SetFilename(hardlink.Filename())
 				childRecord = newRecord
-				dir.children.setChild(c, newRecord,
+				dir.children.loadChild(c, newRecord,
 					dir.children.inodeNum(name))
 			}
 		}
