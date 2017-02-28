@@ -180,3 +180,40 @@ func (lp *lockedParent) deleteChild(c *ctx, toDelete Inode,
 
 	return fuse.OK
 }
+
+func (lp *lockedParent) checkLinkAndAlone(c *ctx, childId InodeId,
+	parent *Directory) {
+
+	defer lp.lock.Lock().Unlock()
+	parent.lock.Lock()
+	defer parent.lock.Unlock()
+	defer parent.childRecordLock.Lock().Unlock()
+	
+	// Check again, now with the locks, if this is still a child
+	record := parent.children.record(childId)
+	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
+		// no hardlink record here, nothing to do
+		return
+	}
+
+	link := record.(*Hardlink)
+
+	// This may need to be turned back into a normal file
+	newRecord, inodeId := parent.wsr.removeHardlink(c, link.linkId)
+
+	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
+		// wsr says hardlink isn't ready for removal yet
+		return
+	}
+
+	// reparent the child, the owner of lp, to the given parent
+	lp.parentId = parent.inodeNum()
+
+	// Ensure that we update this version of the record with this instance
+	// of the hardlink's information
+	newRecord.SetFilename(link.Filename())
+
+	// Here we do the opposite of makeHardlink DOWN - we re-insert it
+	parent.children.loadChild(c, newRecord, inodeId)
+	parent.dirty(c)
+}

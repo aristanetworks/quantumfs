@@ -216,8 +216,10 @@ func TestHardlinkConversion(t *testing.T) {
 		test.assertNoErr(err)
 
 		// Ensure it's converted by performing an operation on linkFile
-		// that would trigger recordByName (Sync)
-		err = printToFile(linkFile, string(data[0]))
+		// that would trigger checking if the hardlink needs conversion
+		remountFilesystem(test)
+
+		_, err = os.Stat(linkFile)
 		test.assertNoErr(err)
 		test.syncAllWorkspaces()
 
