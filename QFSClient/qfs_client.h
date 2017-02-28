@@ -79,10 +79,10 @@ class Api {
 	/// Retrieve the list of accessed and created files for a specified
 	/// workspace. This list will be written to standard output.
 	///
-	/// @param [in] `workspace_root` A string contain the workspace root name
+	/// @param [in] `workspace_root` A string containing the workspace root name
 	/// whose list of accessed files is to be retrieved.
 	///
-	/// @return An` Error` object that indicates success or failure.
+	/// @return An `Error` object that indicates success or failure.
 	virtual Error GetAccessed(const char *workspace_root) = 0;
 
 	/// Takes an extended key along with other file metadata (permissions,
@@ -103,6 +103,17 @@ class Api {
 				  uint32_t permissions,
 				  uint32_t uid,
 				  uint32_t gid) = 0;
+
+	/// Branch a given workspace into a new workspace with the supplied name.
+	///
+	/// @param [in] `source` A string containing the root name of the workspace
+	/// that is to be branched.
+	/// @param [in] `destination` A string containing the new root name of the
+	/// workspace that should result from the branch operation.
+	///
+	/// @return An `Error` object that indicates success or failure.
+	virtual Error Branch(const char *source,
+			     const char *destination) = 0;
 };
 
 /// Get an instance of an `Api` object that can be used to call QuantumFS API

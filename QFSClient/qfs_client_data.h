@@ -47,6 +47,8 @@ static const char kKey[] = "Key";
 static const char kUid[] = "Uid";
 static const char kGid[] = "Gid";
 static const char kPermissions[] = "Permissions";
+static const char kSource[] = "Src";
+static const char kDestination[] = "Dst";
 
 // from datastore.go:
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
@@ -58,6 +60,7 @@ const int kExtendedKeyLength = 40;
 // an explanation of the format strings that json_pack_ex() can take.
 static const char kGetAccessedJSON[] = "{s:i,s:s}";
 static const char kInsertInodeJSON[] = "{s:i,s:s,s:s,s:i,s:i,s:i}";
+static const char kBranchJSON[] = "{s:i,s:s,s:s}";
 
 #endif // QFS_CLIENT_DATA_H
 
