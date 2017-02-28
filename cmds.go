@@ -88,12 +88,13 @@ type CommandCommon struct {
 
 // The various command ID constants
 const (
-	CmdError         = iota
-	CmdBranchRequest = iota
-	CmdGetAccessed   = iota
-	CmdClearAccessed = iota
-	CmdSyncAll       = iota
-	CmdInsertInode   = iota
+	CmdError           = iota
+	CmdBranchRequest   = iota
+	CmdGetAccessed     = iota
+	CmdClearAccessed   = iota
+	CmdSyncAll         = iota
+	CmdInsertInode     = iota
+	CmdEnableRootWrite = iota
 )
 
 // The various error codes
@@ -139,6 +140,11 @@ type InsertInodeRequest struct {
 	Uid         uint32
 	Gid         uint32
 	Permissions uint32
+}
+
+type EnableRootWriteRequest struct {
+	CommandCommon
+	Workspace string
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -306,6 +312,37 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 		Uid:           uid,
 		Gid:           gid,
 		Permissions:   permissions,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
+func (api *Api) EnableRootWrite(dst string) error {
+	if !isWorkspaceNameValid(dst) {
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
+	}
+
+	cmd := EnableRootWriteRequest{
+		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
+		Workspace:     dst,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)

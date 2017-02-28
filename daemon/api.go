@@ -390,8 +390,11 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.syncAll(c)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
-		c.vlog("Recieved InsertInode request")
+		c.vlog("Received InsertInode request")
 		api.insertInode(c, buf)
+	case quantumfs.CmdEnableRootWrite:
+		c.vlog("Received EnableRootWrite request")
+		api.enableRootWrite(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -539,4 +542,33 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 		type_, key)
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
+}
+
+func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
+	c.vlog("Api::enableRootWrite Enter")
+	defer c.vlog("Api::enableRootWrite Exit")
+
+	var cmd quantumfs.EnableRootWriteRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	dst := strings.Split(cmd.Workspace, "/")
+	if len(dst) != 3 {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"WorkspaceRoot is in a wrong format")
+		return
+	}
+
+	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	if !ok {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"WorkspaceRoot %s does not exist or is not active", wsr)
+		return
+	}
+
+	defer workspace.writePermLock.Lock().Unlock()
+	workspace.rootWritePerm = true
 }

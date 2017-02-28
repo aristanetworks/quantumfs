@@ -544,6 +544,9 @@ func (th *testHelper) newWorkspace() string {
 	err := api.Branch(src, dst)
 	th.assert(err == nil, "Failed to branch workspace: %v", err)
 
+	/*	err = api.EnableRootWrite(dst)
+		th.assert(err == nil, "Failed to enable write permission in workspace: %v",
+			err)*/
 	return th.absPath(dst)
 }
 
