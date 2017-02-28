@@ -113,6 +113,12 @@ func (api *ApiInode) Rmdir(c *ctx, name string) fuse.Status {
 func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	// Verify that ODIRECT is actually set
+	if !BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
+		c.elog("FAIL setting O_DIRECT in File descriptor")
+		return fuse.EINVAL
+	}
+
 	out.OpenFlags = 0
 	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
@@ -314,17 +320,17 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	}
 
 	bytes := api.currentResponse
-	bufSize := offset + uint64(size)
+	maxReturnIndx := offset + uint64(size)
 	responseSize := uint64(len(bytes))
 	c.vlog("API Response size %d with offset  %d", responseSize, offset)
 
-	if responseSize <= bufSize {
+	if responseSize <= maxReturnIndx {
 		return fuse.ReadResultData(bytes[offset:]), fuse.OK
 	}
-	return fuse.ReadResultData(bytes[offset:bufSize]), fuse.OK
+	return fuse.ReadResultData(bytes[offset:maxReturnIndx]), fuse.OK
 }
 
-func (api *ApiHandle) cleanupResidueInApiFileSize(c *ctx) {
+func (api *ApiHandle) drainResponseData(c *ctx) {
 	c.qfs.decreaseApiFileSize(c, len(api.currentResponse))
 
 	// In case the queue is not empty

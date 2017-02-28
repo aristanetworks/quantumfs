@@ -446,7 +446,8 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 
 func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		api, err := os.Open(test.absPath(quantumfs.ApiPath))
+		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
+			syscall.O_DIRECT, 0)
 		test.assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
 
@@ -459,11 +460,13 @@ func TestApiNoRequestBlockingRead(t *testing.T) {
 func TestApiNoRequestNonBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
-			syscall.O_NONBLOCK, 0)
+			syscall.O_DIRECT|syscall.O_NONBLOCK, 0)
 		test.assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
 
-		buf := make([]byte, 0, 256)
+		buf := make([]byte, 1, 256)
+		buf[0] = 'a'
+		api.Write(buf)
 		n, err := api.Read(buf)
 		test.assert(n == 0, "Wrong number of bytes read: %d", n)
 		test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
