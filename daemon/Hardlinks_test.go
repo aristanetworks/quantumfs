@@ -216,12 +216,10 @@ func TestHardlinkConversion(t *testing.T) {
 		test.assertNoErr(err)
 
 		// Ensure it's converted by performing an operation on linkFile
-		// that would trigger recordByName
-		err = os.Rename(linkFile, linkFile+"_newname")
+		// that would trigger recordByName (Sync)
+		err = printToFile(linkFile, string(data[0]))
 		test.assertNoErr(err)
-		test.assertLogContains("ChildMap::recordByName",
-			"recordByName not triggered by Rename")
-		linkFile += "_newname"
+		test.syncAllWorkspaces()
 
 		// ensure we can still use the file as normal
 		err = printToFile(linkFile, string(data[1000:]))
