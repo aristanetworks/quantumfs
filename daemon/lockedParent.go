@@ -157,3 +157,26 @@ func (lp *lockedParent) hasAncestor(c *ctx, ancestor Inode) bool {
 
 	return lp.parent_(c).lockedParent().hasAncestor(c, ancestor)
 }
+
+func (lp *lockedParent) deleteChild(c *ctx, toDelete Inode,
+	deleteFromParent func() (toOrphan DirectoryRecordIf,
+	err fuse.Status)) fuse.Status {
+
+	defer lp.lock.Lock().Unlock()
+	
+	// After we've locked the child, we can safely go UP and lock our parent
+	toOrphan, err := deleteFromParent()
+	if toOrphan == nil {
+		// no orphan-ing desired here (hardlink or error)
+		return err
+	}
+
+	if file, isFile := toDelete.(*File); isFile {
+		file.setChildRecord(c, toOrphan)
+	}
+	// orphan ourselves
+	lp.parentId = toDelete.inodeNum()
+	c.vlog("Orphaned inode %d", toDelete.inodeNum())
+
+	return fuse.OK
+}

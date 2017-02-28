@@ -317,21 +317,8 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 	inode.lock.Lock()
 	defer inode.lock.Unlock()
 
-	// After we've locked the child, we can safely go UP and lock our parent
-	toOrphan, err := deleteFromParent()
-	if toOrphan == nil {
-		// no orphan-ing desired here (hardlink or error)
-		return err
-	}
-
-	if file, isFile := toDelete.(*File); isFile {
-		file.setChildRecord(c, toOrphan)
-	}
-	// orphan ourselves
-	inode.parent.setParent(inode.id)
-	c.vlog("Orphaned inode %d", inode.id)
-
-	return fuse.OK
+	// We must perform the deletion with the lockedParent lock
+	return inode.parent.deleteChild(c, toDelete, deleteFromParent)
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
