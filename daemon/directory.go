@@ -195,38 +195,27 @@ func (dir *Directory) addChild_(c *ctx, inode InodeId, child DirectoryRecordIf) 
 }
 
 // Needs inode lock for write
-func (dir *Directory) delChild_(c *ctx, name string) {
+func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf) {
 	defer c.funcIn("Directory::delChild_").out()
 
 	c.dlog("Unlinking inode %s", name)
 
 	// If this is a file we need to reparent it to itself
-	record, inodeNum := func() (DirectoryRecordIf, InodeId) {
+	record := func() DirectoryRecordIf {
 		defer dir.childRecordLock.Lock().Unlock()
-		inodeNum := dir.children.inodeNum(name)
-		return dir.children.deleteChild(c, name), inodeNum
+		return dir.children.deleteChild(c, name)
 	}()
 	if record == nil {
 		// This can happen if the child is already deleted or it's a hardlink
-		c.dlog("Child delete doesn't need reparent: %d", inodeNum)
-		return
-	}
-
-	if inodeNum == quantumfs.InodeIdInvalid {
-		panic("InodeId and record mismatch in childmap")
+		c.dlog("Child delete doesn't need reparent: %s", name)
+		return nil
 	}
 
 	dir.self.markAccessed(c, record.Filename(), false)
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
-		if file, isFile := inode.(*File); isFile {
-			file.setChildRecord(c, record)
-		}
-		inode.orphan(c)
-	}
-
-	c.qfs.removeUninstantiated(c, []InodeId{inodeNum})
 	dir.updateSize_(c)
+
+	return record
 }
 
 // Record that a specific child is dirty and when syncing heirarchically, sync them
@@ -792,12 +781,23 @@ func (dir *Directory) childInodes() []InodeId {
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Unlink", "%s", name).out()
 
-	result := func() fuse.Status {
+	childId := func () InodeId {
+		defer dir.childRecordLock.Lock().Unlock()
+		return dir.children.inodeNum(name)
+	} ()
+	child := c.qfs.inode(c, childId)
+
+	if child == nil {
+		return fuse.ENOENT
+	}
+
+	result := child.deleteSelf(c, child, func() (DirectoryRecordIf,
+		fuse.Status) {
+
 		defer dir.Lock().Unlock()
 
 		var recordType quantumfs.ObjectType
 		var owner quantumfs.UID
-		var inode InodeId
 		err := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 
@@ -808,11 +808,10 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 			recordType = record.Type()
 			owner = record.Owner()
-			inode = dir.children.inodeNum(record.Filename())
 			return fuse.OK
 		}()
 		if err != fuse.OK {
-			return err
+			return nil, err
 		}
 
 		type_ := objectTypeToFileType(c, recordType)
@@ -820,17 +819,16 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		if type_ == fuse.S_IFDIR {
 			c.vlog("Directory::Unlink directory")
-			return fuse.Status(syscall.EISDIR)
+			return nil, fuse.Status(syscall.EISDIR)
 		}
 
 		err = dir.hasWritePermission(c, fileOwner, true)
 		if err != fuse.OK {
-			return err
+			return nil, err
 		}
 
-		dir.delChild_(c, name)
-		return fuse.OK
-	}()
+		return dir.delChild_(c, name), fuse.OK
+	})
 
 	if result == fuse.OK {
 		dir.self.dirty(c)
@@ -842,7 +840,19 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Rmdir", "%s", name).out()
 
-	result := func() fuse.Status {
+	childId := func () InodeId {
+		defer dir.childRecordLock.Lock().Unlock()
+		return dir.children.inodeNum(name)
+	} ()
+	child := c.qfs.inode(c, childId)
+
+	if child == nil {
+		return fuse.ENOENT
+	}
+
+	result := child.deleteSelf(c, child, func() (DirectoryRecordIf,
+		fuse.Status) {
+
 		defer dir.Lock().Unlock()
 
 		var inode InodeId
@@ -862,12 +872,11 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			return fuse.OK
 		}()
 		if result != fuse.OK {
-			return result
+			return nil, result
 		}
 
-		dir.delChild_(c, name)
-		return fuse.OK
-	}()
+		return dir.delChild_(c, name), fuse.OK
+	})
 
 	if result == fuse.OK {
 		dir.self.dirty(c)

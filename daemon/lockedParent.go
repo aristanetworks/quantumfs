@@ -16,7 +16,7 @@ type lockedParent struct {
 	parentId	InodeId
 }
 
-// Must have the lockedParent.lock Lock()-ed.
+// Must have the lockedParent.lock RLock()-ed.
 func (lp *lockedParent) parent_(c *ctx) Inode {
 	parent := c.qfs.inodeNoInstantiate(c, lp.parentId)
 	if parent == nil {
@@ -29,7 +29,7 @@ func (lp *lockedParent) parent_(c *ctx) Inode {
 }
 
 func (lp *lockedParent) markAccessed(c *ctx, path string, created bool) {
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	
 	lp.parent_(c).markAccessed(c, path, created)
 }
@@ -40,7 +40,7 @@ func (lp *lockedParent) markAccessed(c *ctx, path string, created bool) {
 func (lp *lockedParent) uninstantiateChild(c *ctx, inodeNum InodeId,
 	key quantumfs.ObjectKey, qfs *QuantumFs) (parent Inode) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 
 	// Do nothing if we're orphaned
 	if inodeNum == lp.parentId {
@@ -63,7 +63,7 @@ func (lp *lockedParent) uninstantiateChild(c *ctx, inodeNum InodeId,
 func (lp *lockedParent) syncChild(c *ctx, childId InodeId,
 	publishFn func() quantumfs.ObjectKey) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
@@ -94,7 +94,7 @@ func (lp *lockedParent) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
 		updateMtime)
 }
@@ -102,42 +102,42 @@ func (lp *lockedParent) setChildAttr(c *ctx, inodeNum InodeId,
 func (lp *lockedParent) getChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).getChildXAttrSize(c, inodeNum, attr)
 }
 
 func (lp *lockedParent) getChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).getChildXAttrData(c, inodeNum, attr)
 }
 
 func (lp *lockedParent) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).listChildXAttr(c, inodeNum)
 }
 
 func (lp *lockedParent) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).setChildXAttr(c, inodeNum, attr, data)
 }
 
 func (lp *lockedParent) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).removeChildXAttr(c, inodeNum, attr)
 }
 
 func (lp *lockedParent) getChildRecord(c *ctx,
 	inodeNum InodeId) (DirectoryRecordIf, error) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 	return lp.parent_(c).getChildRecord(c, inodeNum)
 }
 
@@ -145,7 +145,7 @@ func (lp *lockedParent) getChildRecord(c *ctx,
 // otherwise part of the chain we've iterated past could be moved and change
 // what we should have returned here
 func (lp *lockedParent) hasAncestor(c *ctx, ancestor Inode) bool {
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 
 	if ancestor.inodeNum() == lp.parentId {
 		return true

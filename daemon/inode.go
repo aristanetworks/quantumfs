@@ -108,7 +108,9 @@ type Inode interface {
 	// orphaned from the directory tree and cannot be accessed except directly by
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
-	orphan(c *ctx)
+	deleteSelf(c *ctx, toDelete Inode,
+		deleteFromParent func() (toOrphan DirectoryRecordIf,
+		err fuse.Status)) fuse.Status
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean()   // Mark this Inode as cleaned
@@ -252,11 +254,6 @@ func (inode *InodeCommon) isOrphaned() bool {
 	return inode.parent.childIsOrphaned(inode.inodeNum())
 }
 
-func (inode *InodeCommon) orphan(c *ctx) {
-	inode.parent.setParent(inode.id)
-	c.vlog("Orphaned inode %d", inode.id)
-}
-
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
 	return inode.treeLock_
 }
@@ -308,6 +305,33 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
 
 func (inode *InodeCommon) isWorkspaceRoot() bool {
 	return false
+}
+
+// Deleting a child may require that we orphan it, and because we *must* lock from
+// a child up to its parent outside of a DOWN function, deletion in the parent
+// must be done after the child's lock has been acquired.
+func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
+	deleteFromParent func() (toOrphan DirectoryRecordIf,
+	err fuse.Status)) fuse.Status {
+
+	inode.lock.Lock()
+	defer inode.lock.Unlock()
+
+	// After we've locked the child, we can safely go UP and lock our parent
+	toOrphan, err := deleteFromParent()
+	if toOrphan == nil {
+		// no orphan-ing desired here (hardlink or error)
+		return err
+	}
+
+	if file, isFile := toDelete.(*File); isFile {
+		file.setChildRecord(c, toOrphan)
+	}
+	// orphan ourselves
+	inode.parent.setParent(inode.id)
+	c.vlog("Orphaned inode %d", inode.id)
+
+	return fuse.OK
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
