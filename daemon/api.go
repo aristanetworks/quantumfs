@@ -555,12 +555,6 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	}
 
 	dst := strings.Split(cmd.Workspace, "/")
-	if len(dst) != 3 {
-		api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"WorkspaceRoot is in a wrong format")
-		return
-	}
-
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
@@ -571,4 +565,6 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 
 	defer workspace.writePermLock.Lock().Unlock()
 	workspace.rootWritePerm = true
+	api.queueErrorResponse(quantumfs.ErrorOK,
+		"Enable Workspace Write Permission Succeeded")
 }

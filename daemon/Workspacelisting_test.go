@@ -5,7 +5,6 @@ package daemon
 
 // Test some special properties of workspacelisting type
 
-import "syscall"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
 
@@ -35,19 +34,16 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		tslInode := test.qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
 		tsl := tslInode.(*TypespaceList)
 
-		workspace := test.newWorkspace()
+		workspace := test.newWorkspaceWithoutWritePerm()
 		type_, name_, work_ := test.getWorkspaceComponents(workspace)
 		_, exists := tsl.typespacesByName[type_]
 		test.assert(!exists,
 			"Error getting a non-existing inodeId of typespace")
 
-		// Creating a file in the new workspace can trigger updateChildren
-		// in workspacelisting. Map within will be updated, so inodes in
-		// the proceeding workspace will be valid right now.
-		workspace1 := test.newWorkspace()
-		testFilename := workspace1 + "/" + "test"
-		err := syscall.Mkdir(testFilename, 0124)
-		test.assert(err == nil, "Error creating directories: %v", err)
+		// Enabling the write permission in the new workspace can trigger
+		// updateChildren in workspacelisting. Map within will be updated,
+		// so inodes in the proceeding workspace will be valid right now.
+		test.newWorkspace()
 
 		// Verify that the typespace has been assigned an ID to but not
 		// instantiated yet. If the inode is not created, there is no
@@ -55,10 +51,12 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		verifyWorkspacelistingInodeStatus(c, test, type_, "typespace",
 			false, &tsl.typespacesByName)
 
+		// Enabling write permission can also update workspacelisting
 		// Instantiate the three inodes and verify the existence
-		testFilename = workspace + "/" + "test"
-		err = syscall.Mkdir(testFilename, 0124)
-		test.assert(err == nil, "Error creating directories: %v", err)
+		api := test.getApi()
+		err := api.EnableRootWrite(test.relPath(workspace))
+		test.assert(err == nil, "Failed to enable write permission in "+
+			"workspace: %v", err)
 
 		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
 			"typespace", true, &tsl.typespacesByName)
