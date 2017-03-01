@@ -300,10 +300,7 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 		     (char*)this->expected_written_command.Data());
 }
 
-// This test covers ApiImpl::InsertInode(). There are no negative tests for
-// ApiImpl::InsertInode() because the Jansson calls it makes should be covered by
-// Jansson's own unit tests, and our functions that InsertInode() calls all have
-// their own tests, including negative tests.
+// This test covers ApiImpl::InsertInode().
 TEST_F(QfsClientApiTest, InsertInodeTest) {
 	ASSERT_FALSE(this->api == NULL);
 
@@ -369,16 +366,41 @@ TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
 	ASSERT_EQ(expected_error_message_begin, actual_error_message_begin);
 }
 
+// This test covers ApiImpl::Branch().
+TEST_F(QfsClientApiTest, BranchTest) {
+	ASSERT_FALSE(this->api == NULL);
+
+	Error err = this->api->Open();
+	ASSERT_EQ(err.code, kSuccess);
+
+	// set up expected written JSON:
+	std::string expected_written_command_json =
+	"{'CommandId':1,"
+	 "'Dst':'test/destination/workspace',"
+	 "'Src':'test/source/workspace'}";
+	util::requote(expected_written_command_json);
+	this->expected_written_command.CopyString(
+		expected_written_command_json.c_str());
+
+	err = this->api->Branch("test/source/workspace",
+				"test/destination/workspace");
+	ASSERT_EQ(err.code, kSuccess);
+
+	// compare what the API function actually wrote with what we expected
+	ASSERT_EQ(this->actual_written_command.Size(),
+		  this->expected_written_command.Size());
+	ASSERT_STREQ((char*)this->actual_written_command.Data(),
+		     (char*)this->expected_written_command.Data());
+}
+
 // Test ApiImpl::SendJson(), which is shared by all API handlers
 TEST_F(QfsClientApiTest, SendJsonTest) {
 	ASSERT_FALSE(this->api == NULL);
 
 	// create JSON for request
-	// See http://jansson.readthedocs.io/en/2.4/apiref.html#building-values for
-	// an explanation of the format strings that json_pack_ex can take.
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
-					    "{s:i,s:s}",
+					    kGetAccessedJSON,
 					    "CommandId", kCmdGetAccessed,
 					    "WorkspaceRoot", "one/two/three");
 	ASSERT_FALSE(request_json == NULL);
@@ -390,8 +412,9 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 	this->expected_written_command.CopyString(
 	       expected_written_command_json.c_str());
 
-	util::JsonApiContext context;
-	Error err = this->api->SendJson(request_json, &context);
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+	Error err = this->api->SendJson(&context);
 	json_decref(request_json); // release the JSON object
 	ASSERT_EQ(err.code, kSuccess);
 
@@ -406,7 +429,7 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 TEST_F(QfsClientApiTest, CheckCommonApiResponseTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	util::JsonApiContext context;
+	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
 	ASSERT_EQ(err.code, kSuccess);
 }
@@ -424,7 +447,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiResponseBadJsonTest) {
 	this->read_command.data.resize(this->read_command.Size() / 2);
 	this->read_command.data[read_command.Size()] = '\0';
 
-	util::JsonApiContext context;
+	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
 	ASSERT_EQ(err.code, kJsonDecodingError);
 }
@@ -445,7 +468,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest) {
 		error_code_loc[1] = 'Q';
 	}
 
-	util::JsonApiContext context;
+	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
 	ASSERT_EQ(err.code, kMissingJsonObject);
 }
@@ -455,7 +478,7 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 
 	std::unordered_map<std::string, bool> accessed_list;
 
-	util::JsonApiContext context;
+	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
 	ASSERT_EQ(err.code, kSuccess);
 
@@ -484,7 +507,7 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 		access_list_loc[1] = 'Q';
 	}
 
-	util::JsonApiContext context;
+	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
 	ASSERT_EQ(err.code, kSuccess);
 
