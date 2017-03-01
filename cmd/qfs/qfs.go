@@ -175,7 +175,7 @@ func sync() {
 
 func deleteWorkspace() {
 	if flag.NArg() != 2 {
-		fmt.Println("Too few arguments for branch command")
+		fmt.Println("Too few arguments for delete workspace command")
 		os.Exit(exitBadArgs)
 	}
 
