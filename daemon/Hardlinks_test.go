@@ -13,6 +13,7 @@ import "syscall"
 import "testing"
 import "time"
 import "github.com/aristanetworks/quantumfs"
+import "github.com/hanwen/go-fuse/fuse"
 
 func TestHardlinkReload(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -462,6 +463,42 @@ func TestHardlinkRename(t *testing.T) {
 			test.assertNoErr(err)
 			test.assert(bytes.Equal(readback, data),
 				"file %s data not preserved", v)
+		}
+	})
+}
+
+func ManualLookup(c *ctx, parent Inode, childName string) {
+	var dummy fuse.EntryOut
+	defer parent.RLockTree().RUnlock()
+	parent.Lookup(c, childName, &dummy)
+}
+
+func TestHardlinkReparentRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		var stat syscall.Stat_t
+		iterations := 100
+		for i := 0; i < iterations; i++ {
+			filename := fmt.Sprintf(workspace + "/file%d", i)
+			linkname := fmt.Sprintf(workspace + "/link%d", i)
+			file, err := os.Create(filename)
+			test.assertNoErr(err)
+
+			err = syscall.Link(filename, linkname)
+			test.assertNoErr(err)
+
+			file.WriteString("this is file data")
+			file.Close()
+			
+			parent := test.getInode(workspace)
+
+			// Leave the file handle open so it gets orphaned. We now
+			// want to race the parent change with getting the parent
+			go os.Remove(filename)
+			go ManualLookup(&test.qfs.c, parent, filename)
+			go syscall.Stat(filename, &stat)
+			go os.Remove(linkname)
 		}
 	})
 }
