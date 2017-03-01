@@ -847,6 +847,10 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 		return fuse.ENOENT
 	}
 
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
+	}
+
 	defer inode.RLockTree().RUnlock()
 	return inode.SetAttr(c, input, out)
 }
@@ -875,20 +879,20 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 }
 
 func getLocalWorkspaceWritePermission(c *ctx, inode Inode) bool {
-	// Grab the workspaceroot of the inode
 	var wsr *WorkspaceRoot
-	switch v := inode.(type) {
+	switch inode.(type) {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
-	// get workspaceroots from their parents
+	// get workspaceroots from their parents.
 	default:
-		wsr = inode.parent(c).(*Directory).wsr
-	case *WorkspaceRoot:
-		wsr = v
-	case *Directory:
-		wsr = v.wsr
+		// if inode is already forgotton, the workspace doesn't process it.
+		if inode.isOrphaned() {
+			return true
+		}
+		// Otherwise, go up to its parent  which must be a directory
+		return getLocalWorkspaceWritePermission(c, inode.parent(c))
 
 		// If the inode is typespace/namespace/workspace/api, return true
-		// immediately since workspaceroot should not have control over them
+	// immediately since workspaceroot should not have control over them
 	case *TypespaceList:
 		return true
 	case *NamespaceList:
@@ -897,6 +901,10 @@ func getLocalWorkspaceWritePermission(c *ctx, inode Inode) bool {
 		return true
 	case *ApiInode:
 		return true
+	case *WorkspaceRoot:
+		wsr = inode.(*WorkspaceRoot)
+	case *Directory:
+		wsr = inode.(*Directory).wsr
 	}
 
 	defer wsr.writePermLock.RLock().RUnlock()
@@ -979,29 +987,28 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	defer c.FuncIn("Mux::Rename", "Enter Inode %d newdir %d %s -> %s",
 		input.NodeId, input.Newdir, oldName, newName).out()
 
-	if input.NodeId == input.Newdir {
-		inode := qfs.inode(c, InodeId(input.NodeId))
-		if inode == nil {
-			return fuse.ENOENT
-		}
+	inode := qfs.inode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
 
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
+	}
+
+	if input.NodeId == input.Newdir {
 		defer inode.RLockTree().RUnlock()
 		return inode.RenameChild(c, oldName, newName)
 	} else {
-		srcInode := qfs.inode(c, InodeId(input.NodeId))
-		if srcInode == nil {
-			return fuse.ENOENT
-		}
-
 		dstInode := qfs.inode(c, InodeId(input.Newdir))
 		if dstInode == nil {
 			return fuse.ENOENT
 		}
 
-		defer srcInode.RLockTree().RUnlock()
+		defer inode.RLockTree().RUnlock()
 		defer dstInode.RLockTree().RUnlock()
 
-		return srcInode.MvChild(c, dstInode, oldName, newName)
+		return inode.MvChild(c, dstInode, oldName, newName)
 	}
 }
 
@@ -1018,6 +1025,10 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
 	if srcInode == nil {
 		return fuse.ENOENT
+	}
+
+	if !getLocalWorkspaceWritePermission(c, srcInode) {
+		return fuse.EPERM
 	}
 
 	dstInode := qfs.inode(c, InodeId(input.NodeId))
@@ -1209,6 +1220,10 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 		return fuse.ENOENT
 	}
 
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
+	}
+
 	if attr == quantumfs.XAttrTypeKey {
 		// quantumfs.key is immutable from userspace
 		return fuse.EPERM
@@ -1230,6 +1245,10 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	inode := qfs.inode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !getLocalWorkspaceWritePermission(c, inode) {
+		return fuse.EPERM
 	}
 
 	if attr == quantumfs.XAttrTypeKey {

@@ -80,7 +80,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	defer wsr.Lock().Unlock()
 
-	wsr.rootWritePerm = true
 	wsr.self = &wsr
 	wsr.typespace = typespace
 	wsr.namespace = namespace

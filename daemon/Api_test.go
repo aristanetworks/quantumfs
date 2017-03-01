@@ -27,6 +27,11 @@ func TestWorkspaceBranching(t *testing.T) {
 		err = api.Branch(src, dst)
 		test.assert(err == nil, "Failed to branch workspace: %v", err)
 
+		// Enable the write permission of this workspace
+		err = api.EnableRootWrite(dst)
+		test.assert(err == nil, "Failed to enable write permission in "+
+			"workspace: %v", err)
+
 		// Then create a file
 		testFilename := test.absPath(dst + "/" + "test")
 		fd, _ := os.Create(testFilename)

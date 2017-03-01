@@ -528,10 +528,7 @@ func (th *testHelper) nullWorkspace() string {
 	return th.absPath(th.nullWorkspaceRel())
 }
 
-// Create a new workspace to test within
-//
-// Returns the absolute path of the workspace
-func (th *testHelper) newWorkspace() string {
+func (th *testHelper) newWorkspaceWithoutWritePerm() string {
 	api := th.getApi()
 
 	type_ := randomNamespaceName(8)
@@ -544,24 +541,45 @@ func (th *testHelper) newWorkspace() string {
 	err := api.Branch(src, dst)
 	th.assert(err == nil, "Failed to branch workspace: %v", err)
 
-	/*	err = api.EnableRootWrite(dst)
-		th.assert(err == nil, "Failed to enable write permission in workspace: %v",
-			err)*/
 	return th.absPath(dst)
 }
 
-// Branch existing workspace into new random name
+// Create a new workspace to test within
 //
-// Returns the relative path of the new workspace.
-func (th *testHelper) branchWorkspace(original string) string {
+// Returns the absolute path of the workspace
+func (th *testHelper) newWorkspace() string {
+	path := th.newWorkspaceWithoutWritePerm()
+
+	api := th.getApi()
+	err := api.EnableRootWrite(th.relPath(path))
+	th.assert(err == nil, "Failed to enable write permission in workspace: %v",
+		err)
+
+	return path
+}
+
+func (th *testHelper) branchWorkspaceWithoutWritePerm(original string) string {
 	src := th.relPath(original)
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10) +
 		"/" + randomNamespaceName(8)
 
 	api := th.getApi()
 	err := api.Branch(src, dst)
-
 	th.assert(err == nil, "Failed to branch workspace: %s -> %s: %v", src, dst,
+		err)
+
+	return dst
+}
+
+// Branch existing workspace into new random name
+//
+// Returns the relative path of the new workspace.
+func (th *testHelper) branchWorkspace(original string) string {
+	dst := th.branchWorkspaceWithoutWritePerm(original)
+
+	api := th.getApi()
+	err := api.EnableRootWrite(dst)
+	th.assert(err == nil, "Failed to enable write permission in workspace: %v",
 		err)
 
 	return dst
