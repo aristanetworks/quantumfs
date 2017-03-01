@@ -54,20 +54,6 @@ std::string buildJsonErrorDetails(const std::string &error, const char *json);
 // characters are very common in JSON but need to be escaped in string literals.
 void requote(std::string &s);
 
-// Implementation of ApiContext. Instances of this class should be created on the
-// stack so that useful cleanup happens automatically.
-class JsonApiContext: public ApiContext {
- public:
-	JsonApiContext();
-	~JsonApiContext();
-
-	void SetJsonObject(json_t *json_object);
-	json_t *GetJsonObject() const;
-
- private:
-	json_t *json_object;
-};
-
 } // namespace util
 } // namespace qfsclient
 
