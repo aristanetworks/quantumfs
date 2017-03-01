@@ -464,10 +464,18 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		test.assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
 
-		buf := make([]byte, 1, 256)
-		buf[0] = 'a'
-		api.Write(buf)
+		// The file has set O_DIRECT flag, so the kernel won't trigger
+		// Read() if the client buffer is zero
+		buf := make([]byte, 0, 256)
 		n, err := api.Read(buf)
+		test.assert(n == 0, "Wrong number of bytes read: %d", n)
+		test.assert(err == nil,
+			"Non-blocking read api without requests error:%v", err)
+
+		// Give the client buffer space to read from QuantumFs server
+		buf = make([]byte, 256)
+		api.Write(buf)
+		n, err = api.Read(buf)
 		test.assert(n == 0, "Wrong number of bytes read: %d", n)
 		test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
 			"Non-blocking read api without requests error:%v", err)
