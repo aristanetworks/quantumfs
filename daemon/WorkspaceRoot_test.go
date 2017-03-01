@@ -60,11 +60,13 @@ func TestWorkspaceRootWriteNoPermission(t *testing.T) {
 
 		fileName := workspace + "/file2"
 		fd, err := syscall.Creat(fileName, 0777)
-		test.assert(err == syscall.EPERM, "Error creating a small file: %v", err)
+		test.assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
 		syscall.Close(fd)
 
 		nodeName := workspace + "/node"
-		err = syscall.Mknod(nodeName, syscall.S_IFBLK|syscall.S_IRWXU, 0x12345678)
+		err = syscall.Mknod(nodeName,
+			syscall.S_IFBLK|syscall.S_IRWXU, 0x12345678)
 		test.assert(err == syscall.EPERM, "Error creating node: %v", err)
 
 		targetFile := workspace + "/file"
