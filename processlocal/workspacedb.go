@@ -203,6 +203,9 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
+	c.Vlog(qlog.LogWorkspaceDb, "processlocal::DeleteWorkspace %s/%s/%s",
+		typespace, namespace, workspace)
+
 	wsdb.cacheMutex.Lock()
 	defer wsdb.cacheMutex.Unlock()
 
@@ -210,21 +213,28 @@ func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	// success. The caller wanted that workspace to not exist and it doesn't.
 	_, ok := wsdb.cache[typespace]
 	if !ok {
+		c.Vlog(qlog.LogWorkspaceDb, "typespace %s not found, success",
+			typespace)
 		return nil
 	}
 
 	_, ok = wsdb.cache[typespace][namespace]
 	if !ok {
+		c.Vlog(qlog.LogWorkspaceDb, "namespace %s not found, success",
+			namespace)
 		return nil
 	}
 
+	c.Vlog(qlog.LogWorkspaceDb, "Deleting workspace %s", workspace)
 	delete(wsdb.cache[typespace][namespace], workspace)
 
 	if len(wsdb.cache[typespace][namespace]) == 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Deleting namespace %s", namespace)
 		delete(wsdb.cache[typespace], namespace)
 	}
 
 	if len(wsdb.cache[typespace]) == 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Deleting typespace %s", typespace)
 		delete(wsdb.cache, typespace)
 	}
 
