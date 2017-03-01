@@ -46,7 +46,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, newRecord)
+		return dir.children.loadChild(c, newRecord, quantumfs.InodeIdInvalid)
 	}()
 
 	dir.self.markAccessed(c, newName, true)
