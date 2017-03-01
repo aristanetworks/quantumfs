@@ -28,31 +28,6 @@ func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMa
 	}
 }
 
-func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf) InodeId {
-
-	inodeId := InodeId(quantumfs.InodeIdInvalid)
-	if entry.Type() == quantumfs.ObjectTypeHardlink {
-		linkId := decodeHardlinkKey(entry.ID())
-		entry = newHardlink(entry.Filename(), linkId, cmap.wsr)
-		inodeId = cmap.wsr.getHardlinkInodeId(c, linkId)
-	} else {
-		inodeId = c.qfs.newInodeId()
-	}
-
-	cmap.setChild_(c, entry, inodeId)
-
-	return inodeId
-}
-
-func (cmap *ChildMap) setChild(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
-	if entry.Type() == quantumfs.ObjectTypeHardlink {
-		panic(fmt.Sprintf("Hardlink inodeId manually set, not naturally "+
-			"loaded %d", inodeId))
-	}
-
-	cmap.setChild_(c, entry, inodeId)
-}
-
 func (cmap *ChildMap) setRecord(inodeId InodeId, record DirectoryRecordIf) {
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(inodeId, record.Filename())
@@ -150,7 +125,29 @@ func (cmap *ChildMap) checkForReplace(c *ctx,
 	return newRecord
 }
 
-func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId) {
+// Returns the inodeId used for the child
+func (cmap *ChildMap) loadChild(c *ctx, entry DirectoryRecordIf,
+	inodeId InodeId) InodeId {
+
+	if entry.Type() == quantumfs.ObjectTypeHardlink {
+		linkId := decodeHardlinkKey(entry.ID())
+		entry = newHardlink(entry.Filename(), linkId, cmap.wsr)
+		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, linkId)
+
+		// If you try to load a hardlink and provide a real inodeId, it
+		// should match the actual inodeId for the hardlink or else
+		// something is really wrong in the system
+		if inodeId != quantumfs.InodeIdInvalid &&
+			inodeId != establishedInodeId {
+
+			c.elog("Attempt to set hardlink with mismatched inodeId, "+
+				"%d vs %d", inodeId, establishedInodeId)
+		}
+		inodeId = establishedInodeId
+	} else if inodeId == quantumfs.InodeIdInvalid {
+		inodeId = c.qfs.newInodeId()
+	}
+
 	if entry == nil {
 		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
 	}
@@ -159,6 +156,8 @@ func (cmap *ChildMap) setChild_(c *ctx, entry DirectoryRecordIf, inodeId InodeId
 	// child is not dirty by default
 
 	cmap.setRecord(inodeId, entry)
+
+	return inodeId
 }
 
 func (cmap *ChildMap) count() uint64 {

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <gtest/gtest_prod.h>
+#include <jansson.h>
 
 #include "qfs_client.h"
 
@@ -24,13 +25,22 @@ const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
 
 // Class used for holding internal context about an in-flight API call. It may be
-// passed between functions used to handle an API call and could (for example)
-// hold an object representing a parsed JSON response string to avoid having to
-// parse that string more than once.
+// passed between functions used to handle an API call and should should be created
+// on the stack so that useful cleanup happens automatically.
 class ApiContext {
- public:
+public:
 	ApiContext();
-	virtual ~ApiContext() = 0;
+	~ApiContext();
+
+	void SetRequestJsonObject(json_t *request_json_object);
+	json_t *GetRequestJsonObject() const;
+
+	void SetResponseJsonObject(json_t *response_json_object);
+	json_t *GetResponseJsonObject() const;
+
+private:
+	json_t *request_json_object;
+	json_t *response_json_object;
 };
 
 // Class to be implemented by tests ONLY that a test can supply; if an instance
@@ -72,6 +82,8 @@ class ApiImpl: public Api {
 			  uint32_t permissions,
 			  uint32_t uid,
 			  uint32_t gid);
+
+	Error Branch(const char *source, const char *destination);
 
  private:
 	// CommandBuffer is used internally to store the raw content of a command to
@@ -131,7 +143,7 @@ class ApiImpl: public Api {
 
 	// Given a workspace name, test it for validity, returning an error to
 	// indicate the name's validity.
-	Error CheckWorkspaceNameValid(const char *workspace_root);
+	Error CheckWorkspaceNameValid(const char *workspace_name);
 
 	// Given a workspace path, test it for validity, returning an error to
 	// indicate the path's validity.
@@ -166,12 +178,9 @@ class ApiImpl: public Api {
 
 	// Send the JSON representation of the command to the API file and parse the
 	// response, then check the response for an error. The context object will
-	// be used to carry the parsed JSON response for use by the next stage.
-	// note: the parameter request_json_ptr is a void pointer because it's not
-	// possible to forward-declare json_t in Jansson versions before 2.5;
-	// in previous versions of Jansson, json_t is a typedef to an anonymous
-	// C struct, which can't be forward declared.
-	Error SendJson(const void *request_json_ptr, ApiContext *context);
+	// be used to carry the request JSON object so that it gets released
+	// properly and the parsed JSON response object for use by the next stage.
+	Error SendJson(ApiContext *context);
 
 	// Convert the JSON response received for the GetAccessed() API call into
 	// a structure ready for formatting and then writing to stdout. Returns
