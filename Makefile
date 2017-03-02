@@ -22,7 +22,7 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' github.com/aristanetworks/quantumfs/cmd/$@
-	go install github.com/aristanetworks/quantumfs/cmd/$@
+	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go
