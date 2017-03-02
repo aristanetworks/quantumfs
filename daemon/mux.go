@@ -987,28 +987,28 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	defer c.FuncIn("Mux::Rename", "Enter Inode %d newdir %d %s -> %s",
 		input.NodeId, input.Newdir, oldName, newName).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
-	if inode == nil {
+	srcInode := qfs.inode(c, InodeId(input.NodeId))
+	if srcInode == nil {
 		return fuse.ENOENT
 	}
 
-	if !getLocalWorkspaceWritePermission(c, inode) {
+	if !getLocalWorkspaceWritePermission(c, srcInode) {
 		return fuse.EPERM
 	}
 
 	if input.NodeId == input.Newdir {
-		defer inode.RLockTree().RUnlock()
-		return inode.RenameChild(c, oldName, newName)
+		defer srcInode.RLockTree().RUnlock()
+		return srcInode.RenameChild(c, oldName, newName)
 	} else {
 		dstInode := qfs.inode(c, InodeId(input.Newdir))
 		if dstInode == nil {
 			return fuse.ENOENT
 		}
 
-		defer inode.RLockTree().RUnlock()
+		defer srcInode.RLockTree().RUnlock()
 		defer dstInode.RLockTree().RUnlock()
 
-		return inode.MvChild(c, dstInode, oldName, newName)
+		return srcInode.MvChild(c, dstInode, oldName, newName)
 	}
 }
 

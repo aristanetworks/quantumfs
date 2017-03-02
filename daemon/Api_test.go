@@ -8,6 +8,7 @@ package daemon
 import "os"
 import "syscall"
 import "testing"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 
@@ -290,5 +291,31 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		test.assert(n == 0, "Wrong number of bytes read: %d", n)
 		test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
 			"Non-blocking read api without requests error:%v", err)
+	})
+}
+
+func TestWorkspaceDeletion(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		api := test.getApi()
+
+		ws1 := test.newWorkspace()
+		ws2 := test.newWorkspace()
+
+		err := api.DeleteWorkspace(test.relPath(ws1))
+		test.assert(err == nil, "Failed to delete workspace: %v", err)
+
+		time.Sleep(200 * time.Millisecond)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(ws1, &stat)
+		test.assert(err != nil, "Workspace1 not deleted")
+
+		err = syscall.Stat(ws2, &stat)
+		test.assert(err == nil, "Workspace2 deleted: %v", err)
 	})
 }
