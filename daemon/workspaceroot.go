@@ -135,7 +135,7 @@ func (wsr *WorkspaceRoot) hardlinkInc(linkId HardlinkId) {
 	if !exists {
 		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
 	}
-	
+
 	// Linking updates ctime
 	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
 
