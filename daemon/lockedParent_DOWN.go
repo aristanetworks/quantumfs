@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package daemon
@@ -15,7 +15,7 @@ func (lp *lockedParent) makeHardlink_DOWN(c *ctx, srcInode Inode,
 	defer lp.lock.Lock().Unlock()
 
 	// ensure we're not orphaned
-	if lp.parentId == srcInode.inodeNum() {
+	if lp.childIsOrphaned_(srcInode.inodeNum()) {
 		c.wlog("Can't hardlink an orphaned file")
 		return nil, fuse.EPERM
 	}
@@ -54,7 +54,7 @@ func (lp *lockedParent) makeHardlink_DOWN(c *ctx, srcInode Inode,
 func (lp *lockedParent) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
 
-	defer lp.lock.Lock().Unlock()
+	defer lp.lock.RLock().RUnlock()
 
 	var dir *Directory
 	parent := lp.parent_(c)
