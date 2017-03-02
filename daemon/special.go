@@ -274,7 +274,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := special.embedDataIntoKey_(c)
 
-	special.parent.syncChild(c, special.inodeNum(), func () quantumfs.ObjectKey {
+	special.parent.syncChild(c, special.inodeNum(), func() quantumfs.ObjectKey {
 		return key
 	})
 

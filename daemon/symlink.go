@@ -237,7 +237,7 @@ func (link *Symlink) getChildRecord(c *ctx,
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Symlink::flush").out()
-	link.parent.syncChild(c, link.inodeNum(), func () quantumfs.ObjectKey {
+	link.parent.syncChild(c, link.inodeNum(), func() quantumfs.ObjectKey {
 		return link.key
 	})
 

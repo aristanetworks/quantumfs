@@ -501,7 +501,7 @@ func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	defer c.funcIn("Directory::Lookup").out()
 
-	checkInodeId, result := func () (InodeId, fuse.Status) {
+	checkInodeId, result := func() (InodeId, fuse.Status) {
 		defer dir.RLock().RUnlock()
 
 		checkLink, inodeNum := func() (bool, InodeId) {
@@ -532,7 +532,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		}
 
 		return inodeNum, fuse.OK
-	} ()
+	}()
 
 	if checkInodeId != quantumfs.InodeIdInvalid {
 		// check outside of the directory lock
@@ -826,10 +826,10 @@ func (dir *Directory) childInodes() []InodeId {
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Unlink", "%s", name).out()
 
-	childId := func () InodeId {
+	childId := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.inodeNum(name)
-	} ()
+	}()
 	child := c.qfs.inode(c, childId)
 
 	if child == nil {
@@ -885,10 +885,10 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Rmdir", "%s", name).out()
 
-	childId := func () InodeId {
+	childId := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.inodeNum(name)
-	} ()
+	}()
 	child := c.qfs.inode(c, childId)
 
 	if child == nil {
@@ -1679,7 +1679,7 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	dir.parent.syncChild(c, dir.inodeNum(), func () quantumfs.ObjectKey {
+	dir.parent.syncChild(c, dir.inodeNum(), func() quantumfs.ObjectKey {
 		dir.publish_(c)
 		return dir.baseLayerId
 	})

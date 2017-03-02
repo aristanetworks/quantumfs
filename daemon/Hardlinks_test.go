@@ -480,8 +480,8 @@ func TestHardlinkReparentRace(t *testing.T) {
 		var stat syscall.Stat_t
 		iterations := 100
 		for i := 0; i < iterations; i++ {
-			filename := fmt.Sprintf(workspace + "/file%d", i)
-			linkname := fmt.Sprintf(workspace + "/link%d", i)
+			filename := fmt.Sprintf(workspace+"/file%d", i)
+			linkname := fmt.Sprintf(workspace+"/link%d", i)
 			file, err := os.Create(filename)
 			test.assertNoErr(err)
 
@@ -490,7 +490,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 
 			file.WriteString("this is file data")
 			file.Close()
-			
+
 			parent := test.getInode(workspace)
 
 			// Leave the file handle open so it gets orphaned. We now
