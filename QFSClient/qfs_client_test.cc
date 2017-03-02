@@ -674,7 +674,7 @@ TEST_F(QfsClientCommandBufferTest, CopyStringTest) {
 class GoLikePrinter : public ::testing::EmptyTestEventListener {
 	// Called after a failed assertion or a SUCCEED() invocation.
 	virtual void OnTestPartResult(
-				      const ::testing::TestPartResult& test_part_result) {
+				const ::testing::TestPartResult& test_part_result) {
 		if (!test_part_result.failed()) {
 			return;
 		}
