@@ -390,8 +390,11 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		api.syncAll(c)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
-		c.vlog("Recieved InsertInode request")
+		c.vlog("Received InsertInode request")
 		api.insertInode(c, buf)
+	case quantumfs.CmdDeleteWorkspace:
+		c.vlog("Received DeleteWorkspace request")
+		api.deleteWorkspace(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -539,4 +542,23 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 		type_, key)
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
+}
+
+func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
+	var cmd quantumfs.DeleteWorkspaceRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	parts := strings.Split(cmd.WorkspacePath, "/")
+
+	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
+		parts[2]); err != nil {
+
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return
+	}
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
 }
