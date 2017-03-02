@@ -395,6 +395,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdEnableRootWrite:
 		c.vlog("Received EnableRootWrite request")
 		api.enableRootWrite(c, buf)
+	case quantumfs.CmdDeleteWorkspace:
+		c.vlog("Received DeleteWorkspace request")
+		api.deleteWorkspace(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -549,17 +552,12 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	defer c.vlog("Api::enableRootWrite Exit")
 
 	var cmd quantumfs.EnableRootWriteRequest
-	if err := json.Unmarshal(buf, &cmd); err != nil {
-		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
-		return
-	}
 
 	dst := strings.Split(cmd.Workspace, "/")
-	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"WorkspaceRoot %s does not exist or is not active", wsr)
+			"WorkspaceRoot %s does not exist or is not active", cmd.Workspace)
 		return
 	}
 
@@ -567,4 +565,23 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	workspace.rootWritePerm = true
 	api.queueErrorResponse(quantumfs.ErrorOK,
 		"Enable Workspace Write Permission Succeeded")
+}
+
+func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
+	var cmd quantumfs.DeleteWorkspaceRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	parts := strings.Split(cmd.WorkspacePath, "/")
+
+	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
+		parts[2]); err != nil {
+
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return
+	}
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
 }

@@ -95,6 +95,7 @@ const (
 	CmdSyncAll         = iota
 	CmdInsertInode     = iota
 	CmdEnableRootWrite = iota
+	CmdDeleteWorkspace = iota
 )
 
 // The various error codes
@@ -145,6 +146,11 @@ type InsertInodeRequest struct {
 type EnableRootWriteRequest struct {
 	CommandCommon
 	Workspace string
+}
+
+type DeleteWorkspaceRequest struct {
+	CommandCommon
+	WorkspacePath string
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -297,7 +303,7 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	uid uint32, gid uint32) error {
 
 	if !isWorkspacePathValid(dst) {
-		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n", dst)
 	}
 
 	if !isKeyValid(key) {
@@ -361,7 +367,42 @@ func (api *Api) EnableRootWrite(dst string) error {
 		return err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Delete the given workspace.
+//
+// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
+func (api *Api) DeleteWorkspace(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := DeleteWorkspaceRequest{
+		CommandCommon: CommandCommon{CommandId: CmdDeleteWorkspace},
+		WorkspacePath: workspacepath,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
 	}
 	return nil
 }

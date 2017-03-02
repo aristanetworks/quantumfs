@@ -41,6 +41,8 @@ func main() {
 			" key under the location of dstPath with specifications of" +
 			" user <uid>, group <gid>, and RWX permission <permission>" +
 			" in octal format")
+		fmt.Println("  deleteWorkspace <workspace>")
+		fmt.Println("         - delete <workspace> from the WorkspaceDB")
 		os.Exit(exitBadCmd)
 	}
 
@@ -62,6 +64,8 @@ func main() {
 		insertInode()
 	case "sync":
 		sync()
+	case "deleteWorkspace":
+		deleteWorkspace()
 	}
 }
 
@@ -167,4 +171,21 @@ func sync() {
 
 	api.SyncAll()
 	fmt.Println("Synced.")
+}
+
+func deleteWorkspace() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for delete workspace command")
+		os.Exit(exitBadArgs)
+	}
+
+	workspace := flag.Arg(1)
+
+	fmt.Printf("Deleting workspace \"%s\"\n", workspace)
+	api := quantumfs.NewApi()
+
+	if err := api.DeleteWorkspace(workspace); err != nil {
+		fmt.Println("Delete failed:", err)
+		os.Exit(exitBadArgs)
+	}
 }
