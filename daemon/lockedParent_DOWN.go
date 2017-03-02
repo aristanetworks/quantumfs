@@ -14,6 +14,12 @@ func (lp *lockedParent) makeHardlink_DOWN(c *ctx, srcInode Inode,
 
 	defer lp.lock.Lock().Unlock()
 
+	// ensure we're not orphaned
+	if lp.parentId == srcInode.inodeNum() {
+		c.wlog("Can't hardlink an orphaned file")
+		return nil, fuse.EPERM
+	}
+
 	// Grab the source parent as a Directory
 	var srcParent *Directory
 	switch v := lp.parent_(c).(type) {
