@@ -702,7 +702,5 @@ int main(int argc, char **argv) {
 	// Adds a listener to the end.  Google Test takes the ownership.
 	listeners.Append(new GoLikePrinter);
 	return RUN_ALL_TESTS();
-
-	return 0;
 }
 
