@@ -110,7 +110,7 @@ type Inode interface {
 	isOrphaned() bool
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan DirectoryRecordIf,
-		err fuse.Status)) fuse.Status
+			err fuse.Status)) fuse.Status
 	checkLinkAndAlone(c *ctx, parent *Directory)
 
 	dirty(c *ctx) // Mark this Inode dirty
@@ -156,7 +156,7 @@ type InodeCommon struct {
 
 	accessed_ uint32
 
-	parent	lockedParent
+	parent lockedParent
 
 	lock sync.RWMutex
 
@@ -313,7 +313,7 @@ func (inode *InodeCommon) isWorkspaceRoot() bool {
 // must be done after the child's lock has been acquired.
 func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 	deleteFromParent func() (toOrphan DirectoryRecordIf,
-	err fuse.Status)) fuse.Status {
+		err fuse.Status)) fuse.Status {
 
 	inode.lock.Lock()
 	defer inode.lock.Unlock()

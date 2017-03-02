@@ -610,12 +610,12 @@ func TestFileReparentRace(t *testing.T) {
 		var stat syscall.Stat_t
 		iterations := 100
 		for i := 0; i < iterations; i++ {
-			filename := fmt.Sprintf(workspace + "/file%d", i)
+			filename := fmt.Sprintf(workspace+"/file%d", i)
 			file, err := os.Create(filename)
 			test.assertNoErr(err)
 
 			file.WriteString("this is file data")
-			
+
 			// Leave the file handle open so it gets orphaned. We now
 			// want to race the parent change with getting the parent
 			go syscall.Stat(filename, &stat)

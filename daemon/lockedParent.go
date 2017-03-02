@@ -10,10 +10,9 @@ import "fmt"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
-
 type lockedParent struct {
-	lock	 	DeferableRwMutex // Protects parent_
-	parentId	InodeId
+	lock     DeferableRwMutex // Protects parent_
+	parentId InodeId
 }
 
 // Must have the lockedParent.lock RLock()-ed.
@@ -30,7 +29,7 @@ func (lp *lockedParent) parent_(c *ctx) Inode {
 
 func (lp *lockedParent) markAccessed(c *ctx, path string, created bool) {
 	defer lp.lock.RLock().RUnlock()
-	
+
 	lp.parent_(c).markAccessed(c, path, created)
 }
 
@@ -160,10 +159,10 @@ func (lp *lockedParent) hasAncestor(c *ctx, ancestor Inode) bool {
 
 func (lp *lockedParent) deleteChild(c *ctx, toDelete Inode,
 	deleteFromParent func() (toOrphan DirectoryRecordIf,
-	err fuse.Status)) fuse.Status {
+		err fuse.Status)) fuse.Status {
 
 	defer lp.lock.Lock().Unlock()
-	
+
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
 	if toOrphan == nil {
@@ -188,7 +187,7 @@ func (lp *lockedParent) checkLinkAndAlone(c *ctx, childId InodeId,
 	parent.lock.Lock()
 	defer parent.lock.Unlock()
 	defer parent.childRecordLock.Lock().Unlock()
-	
+
 	// Check again, now with the locks, if this is still a child
 	record := parent.children.record(childId)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
