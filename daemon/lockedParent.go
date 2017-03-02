@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // This class is to provide inodes with a concurrency safe way to access their parent
@@ -42,7 +42,7 @@ func (lp *lockedParent) uninstantiateChild(c *ctx, inodeNum InodeId,
 	defer lp.lock.RLock().RUnlock()
 
 	// Do nothing if we're orphaned
-	if inodeNum == lp.parentId {
+	if lp.childIsOrphaned_(inodeNum) {
 		return nil
 	}
 
@@ -66,7 +66,7 @@ func (lp *lockedParent) syncChild(c *ctx, childId InodeId,
 
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
-	if childId == lp.parentId {
+	if lp.childIsOrphaned_(childId) {
 		c.vlog("Not flushing orphaned inode")
 		return
 	}
@@ -80,6 +80,11 @@ func (lp *lockedParent) syncChild(c *ctx, childId InodeId,
 func (lp *lockedParent) childIsOrphaned(childId InodeId) bool {
 	defer lp.lock.RLock().RUnlock()
 
+	return lp.childIsOrphaned_(childId)
+}
+
+// lp lock must be RLocked
+func (lp *lockedParent) childIsOrphaned_(childId InodeId) bool {
 	return childId == lp.parentId
 }
 
