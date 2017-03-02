@@ -232,3 +232,66 @@ func TestTimeOrphanedFile(t *testing.T) {
 		test.assert(ctimeOrig < ctime, "ctime unchanged")
 	})
 }
+
+func TestTimeHardlinkFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		filename := workspace + "/test"
+
+		// First create a file with some data
+		data := genData(2000)
+		err := printToFile(filename, string(data))
+		test.assertNoErr(err)
+
+		mtimeOrig, ctimeOrig := getTimes(filename)
+		test.assert(ctimeOrig != 0, "ctime invalid: %d", ctimeOrig)
+		test.assert(mtimeOrig != 0, "mtime invalid: %d", mtimeOrig)
+
+		// Link to ensure ctime and not mtime is changed
+		linkname := workspace + "/testlink"
+		err = syscall.Link(filename, linkname)
+		test.assert(err == nil, "Error linking file: %v", err)
+		mtime, ctime := getTimes(filename)
+		test.assert(mtimeOrig == mtime, "mtime changed")
+		test.assert(ctimeOrig < ctime, "ctime unchanged")
+
+		// Ensure the link shares the same times
+		mtimelink, ctimelink := getTimes(linkname)
+		test.assert(mtimelink == mtime, "link mtime changed")
+		test.assert(ctimelink == ctime, "link ctime changed")
+
+		// Change the data to ensure both ctime and mtime are changed
+		mtimeOrig = mtime
+		ctimeOrig = ctime
+		err = printToFile(linkname, string(data))
+		test.assertNoErr(err)
+
+		mtime, ctime = getTimes(filename)
+		test.assert(mtimeOrig < mtime, "mtime unchanged")
+		test.assert(ctimeOrig < ctime, "ctime unchanged")
+
+		// Ensure the link matches
+		mtimelink, ctimelink = getTimes(linkname)
+		test.assert(mtimelink == mtime, "link mtime changed")
+		test.assert(ctimelink == ctime, "link ctime changed")
+		mtimeOrig = mtime
+		ctimeOrig = ctime
+
+		// Change the attributes to ensure ctime and not mtime is changed
+		err = os.Chmod(filename, 0777)
+		test.assertNoErr(err)
+		mtime, ctime = getTimes(filename)
+		test.assert(mtimeOrig == mtime, "mtime changed")
+		test.assert(ctimeOrig < ctime, "ctime unchanged")
+		mtimeOrig = mtime
+		ctimeOrig = ctime
+
+		// Remove the link, and ensure that still changes ctime
+		err = os.Remove(linkname)
+		test.assertNoErr(err)
+
+		mtime, ctime = getTimes(filename)
+		test.assert(mtimeOrig == mtime, "mtime changed")
+		test.assert(ctimeOrig < ctime, "ctime unchanged")
+	})
+}
