@@ -671,11 +671,36 @@ TEST_F(QfsClientCommandBufferTest, CopyStringTest) {
 
 } // namespace qfsclient
 
+class GoLikePrinter : public ::testing::EmptyTestEventListener {
+	// Called after a failed assertion or a SUCCEED() invocation.
+	virtual void OnTestPartResult(
+				const ::testing::TestPartResult& test_part_result) {
+		if (!test_part_result.failed()) {
+			return;
+		}
+
+		printf("***Failure in %s:%d\n%s\n",
+		       test_part_result.file_name(),
+		       test_part_result.line_number(),
+		       test_part_result.summary());
+	}
+
+	// Called after a test ends.
+	virtual void OnTestProgramEnd(const ::testing::UnitTest& unit_test) {
+		printf("%s\tgithub.com/aristanetworks/quantumfs/QFSClient\t%gs\n",
+			unit_test.Failed() ? "FAIL" : "ok",
+			((double)unit_test.elapsed_time())/1000);
+	}
+};
+
 int main(int argc, char **argv) {
 
 	::testing::InitGoogleTest(&argc, argv);
+	::testing::TestEventListeners& listeners =
+		::testing::UnitTest::GetInstance()->listeners();
+	delete listeners.Release(listeners.default_result_printer());
+	// Adds a listener to the end.  Google Test takes the ownership.
+	listeners.Append(new GoLikePrinter);
 	return RUN_ALL_TESTS();
-
-	return 0;
 }
 
