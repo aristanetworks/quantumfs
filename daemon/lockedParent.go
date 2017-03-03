@@ -185,7 +185,7 @@ func (lp *lockedParent) deleteChild(c *ctx, toDelete Inode,
 	return fuse.OK
 }
 
-func (lp *lockedParent) checkLinkAndAlone(c *ctx, childId InodeId,
+func (lp *lockedParent) checkLinkReparent(c *ctx, childId InodeId,
 	parent *Directory) {
 
 	defer lp.lock.Lock().Unlock()

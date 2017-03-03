@@ -340,9 +340,6 @@ func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) 
 // properties. Since the file cannot be accessed from the directory tree any longer
 // we do not need to upload it or any of its content. When being unlinked we'll
 // orphan the File by making it its own parent.
-//
-// Sometimes a File will access its own parent with or without its lock held. To
-// protect the internal DirectoryRecord we'll abuse the InodeCommon.unlinkLock.
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
@@ -373,7 +370,7 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 	return fuse.OK
 }
 
-// Requires InodeCommon.unlinkLock
+// Requires unlinkLock
 func (fi *File) parseExtendedAttributes_(c *ctx) {
 	if fi.unlinkXAttr != nil {
 		return

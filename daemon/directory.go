@@ -204,26 +204,6 @@ func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf
 	// If this is a file we need to reparent it to itself
 	record := func() DirectoryRecordIf {
 		defer dir.childRecordLock.Lock().Unlock()
-
-		childRecord := dir.children.recordByName(c, name)
-
-		// This may be a hardlink that is due to be converted. To avoid
-		// having to call the DOWN check function, we can use the fact that
-		// we're orphaning the file and have it completely locked
-		// to do the equivalent ourselves, with similar but more minimal code
-		if hardlink, isHardlink := childRecord.(*Hardlink); isHardlink {
-			newRecord, inodeId := dir.wsr.removeHardlink(c,
-				hardlink.linkId)
-
-			// Wsr says we're about to orphan the last hardlink copy
-			if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
-				newRecord.SetFilename(hardlink.Filename())
-				childRecord = newRecord
-				dir.children.loadChild(c, newRecord,
-					dir.children.inodeNum(name))
-			}
-		}
-
 		return dir.children.deleteChild(c, name)
 	}()
 	if record == nil {
@@ -545,7 +525,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 	child := c.qfs.inode(c, childId)
 	if child != nil {
-		child.checkLinkAndAlone(c, dir)
+		child.checkLinkReparent(c, dir)
 	}
 }
 
