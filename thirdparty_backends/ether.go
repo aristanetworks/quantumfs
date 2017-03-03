@@ -233,6 +233,13 @@ func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 	return nil
 }
 
+func (w *EtherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string) error {
+
+	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
+		"Ether does not support deleting workspaces")
+}
+
 func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
