@@ -5,6 +5,7 @@ package daemon
 
 // Test some special properties of workspaceroot type
 
+import "bytes"
 import "os"
 import "syscall"
 import "strings"
@@ -36,7 +37,7 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 	})
 }
 
-func TestWorkspaceRootWriteNoPermission(t *testing.T) {
+func TestWorkspaceWriteNoRootWritePermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		baseWorkspace := test.newWorkspace()
 
@@ -50,19 +51,29 @@ func TestWorkspaceRootWriteNoPermission(t *testing.T) {
 		err = syscall.Setxattr(baseFileName, attrData, attrDataData, 0)
 		test.assert(err == nil, "Error setting data XAttr: %v", err)
 
+		baseDirName := baseWorkspace + "/dir"
+		err = os.Mkdir(baseDirName, 0666)
+		test.assert(err == nil, "Error creating a directory: %v", err)
+
 		wsr := test.branchWorkspaceWithoutWritePerm(baseWorkspace)
 		workspace := test.absPath(wsr)
 
-		dirName := workspace + "/dir"
+		dirName := workspace + "/dir1"
 		err = os.Mkdir(dirName, 0666)
 		test.assert(strings.Contains(err.Error(), "operation not permitted"),
 			"Error creating directories: %s", err.Error())
 
 		fileName := workspace + "/file2"
 		fd, err := syscall.Creat(fileName, 0777)
+		syscall.Close(fd)
 		test.assert(err == syscall.EPERM,
 			"Error creating a small file: %v", err)
+
+		fileName = workspace + "/dir" + "/file"
+		fd, err = syscall.Creat(fileName, 0777)
 		syscall.Close(fd)
+		test.assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
 
 		nodeName := workspace + "/node"
 		err = syscall.Mknod(nodeName,
@@ -82,6 +93,11 @@ func TestWorkspaceRootWriteNoPermission(t *testing.T) {
 		err = os.RemoveAll(targetFile)
 		test.assert(strings.Contains(err.Error(), "operation not permitted"),
 			"Error unlinking file: %v", err)
+
+		targetDir := workspace + "/dir"
+		err = os.RemoveAll(targetDir)
+		test.assert(strings.Contains(err.Error(), "operation not permitted"),
+			"Error unlinking directory: %v", err)
 
 		file, err = os.OpenFile(targetFile, os.O_RDWR, 0)
 		defer file.Close()
@@ -109,4 +125,69 @@ func TestWorkspaceRootWriteNoPermission(t *testing.T) {
 		test.assert(strings.Contains(err.Error(), "operation not permitted"),
 			"Error Set file permission attribute: %v", err)
 	})
+}
+
+func TestWorkspaceReadNoRootWritePermission(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		baseWorkspace := test.newWorkspace()
+
+		content := []byte("This is a test")
+		baseFileName := baseWorkspace + "/file"
+		file, err := os.Create(baseFileName)
+		test.assert(err == nil, "Error creating a small file: %v", err)
+
+		n, err := file.Write(content)
+		test.assert(err == nil && n == len(content),
+			"Error writing to the small file: %v", err)
+		file.Close()
+
+		attrData := "user.data"
+		attrDataData := []byte("sampleData")
+		err = syscall.Setxattr(baseFileName, attrData, attrDataData, 0)
+		test.assert(err == nil, "Error setting data XAttr: %v", err)
+
+		baseDirName := baseWorkspace + "/dir"
+		err = os.Mkdir(baseDirName, 0666)
+		test.assert(err == nil, "Error creating a directory: %v", err)
+
+		baseFileName = baseDirName + "/file1"
+		file, err = os.Create(baseFileName)
+		file.Close()
+		test.assert(err == nil, "Error creating a small file: %v", err)
+
+		wsr := test.branchWorkspaceWithoutWritePerm(baseWorkspace)
+		workspace := test.absPath(wsr)
+
+		targetFile := workspace + "/file"
+		file, err = os.OpenFile(targetFile, os.O_RDWR, 0)
+		defer file.Close()
+		test.assert(err == nil, "Error openning the file: %v", err)
+
+		buf := make([]byte, 256)
+		n, err = file.Read(buf)
+		test.assert(err == nil && bytes.Equal(buf[:n], content),
+			"Error reading the exact content: %s with error: %v",
+			string(buf[:n]), err)
+
+		targetDir := workspace + "/dir"
+		dir, err := os.Open(targetDir)
+		defer dir.Close()
+		test.assert(err == nil, "Error openning the file: %v", err)
+
+		names, err := dir.Readdirnames(0)
+		test.assert(err == nil && len(names) == 1 && names[0] == "file1",
+			"Error reading directory: %v with error: %v", names, err)
+
+		stat, err := os.Lstat(targetFile)
+		test.assert(err == nil && stat.Name() == "file" &&
+			stat.Mode() == 0666, "List target file:%s, 0%o "+
+			"with error: %v", stat.Name(), stat.Mode(), err)
+
+		n, err = syscall.Getxattr(targetFile, attrData, buf)
+		test.assert(err == nil && bytes.Equal(buf[:n], attrDataData),
+			"Error reading the exact extended attribute: %s "+
+				"with error %v", string(buf[:n]), err)
+
+	})
+
 }

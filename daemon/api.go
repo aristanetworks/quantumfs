@@ -438,7 +438,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	parts := strings.Split(wsr, "/")
 	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
@@ -458,7 +458,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	parts := strings.Split(wsr, "/")
 	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
@@ -491,7 +491,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
@@ -552,12 +552,17 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	defer c.vlog("Api::enableRootWrite Exit")
 
 	var cmd quantumfs.EnableRootWriteRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
 
 	dst := strings.Split(cmd.Workspace, "/")
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"WorkspaceRoot %s does not exist or is not active", cmd.Workspace)
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.Workspace)
 		return
 	}
 
