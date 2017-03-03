@@ -100,12 +100,13 @@ const (
 
 // The various error codes
 const (
-	ErrorOK            = iota // Command Successful
-	ErrorBadArgs       = iota // The argument is wrong
-	ErrorBadJson       = iota // Failed to parse command
-	ErrorBadCommandId  = iota // Unknown command ID
-	ErrorCommandFailed = iota // The Command failed, see the error for more info
-	ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
+	ErrorOK                = iota // Command Successful
+	ErrorBadArgs           = iota // The argument is wrong
+	ErrorBadJson           = iota // Failed to parse command
+	ErrorBadCommandId      = iota // Unknown command ID
+	ErrorCommandFailed     = iota // The Command failed, see the error for more info
+	ErrorKeyNotFound       = iota // The extended key is not stored in the datastore
+	ErrorWorkspaceNotFound = iota // The workspace cannot be found in QuantumFS
 )
 
 type ErrorResponse struct {
