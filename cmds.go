@@ -95,6 +95,8 @@ const (
 	CmdSyncAll         = iota
 	CmdInsertInode     = iota
 	CmdDeleteWorkspace = iota
+	CmdSetBlock        = iota
+	CmdGetBlock        = iota
 )
 
 // The various error codes
@@ -105,6 +107,7 @@ const (
 	ErrorBadCommandId  = iota // Unknown command ID
 	ErrorCommandFailed = iota // The Command failed, see the error for more info
 	ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
+	ErrorBlockTooLarge = iota // SetBlock was passed a block that was too large
 )
 
 type ErrorResponse struct {
@@ -145,6 +148,22 @@ type InsertInodeRequest struct {
 type DeleteWorkspaceRequest struct {
 	CommandCommon
 	WorkspacePath string
+}
+
+type SetBlockRequest struct {
+	CommandCommon
+	Key  []byte
+	Data []byte
+}
+
+type GetBlockRequest struct {
+	CommandCommon
+	Key []byte
+}
+
+type GetBlockResponse struct {
+	ErrorResponse
+	Data []byte
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
