@@ -503,7 +503,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 	})
 }
 
-func TestHardlinkUninstanted(t *testing.T) {
+func TestHardlinkUninstantiated(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
