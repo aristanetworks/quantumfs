@@ -1529,6 +1529,11 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
 	defer c.vlog("Directory::instantiateChild Exit")
 
+	// check if the child is a hardlink first
+	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
+		return dir.wsr.instantiateChild(c, inodeNum)
+	}
+
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.children.record(inodeNum)
