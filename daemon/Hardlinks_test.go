@@ -478,7 +478,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 		workspace := test.newWorkspace()
 
 		var stat syscall.Stat_t
-		iterations := 100
+		iterations := 50
 		for i := 0; i < iterations; i++ {
 			filename := fmt.Sprintf(workspace+"/file%d", i)
 			linkname := fmt.Sprintf(workspace+"/link%d", i)
