@@ -21,12 +21,39 @@
 
 namespace qfsclient {
 
-ApiContext::ApiContext() {
+ApiContext::ApiContext() : request_json_object(NULL), response_json_object(NULL) {
 
-};
+}
 
 ApiContext::~ApiContext() {
+	SetRequestJsonObject(NULL);
+	SetResponseJsonObject(NULL);
+}
 
+void ApiContext::SetRequestJsonObject(json_t *request_json_object) {
+	if (this->request_json_object) {
+		json_decref(this->request_json_object);
+		this->request_json_object = NULL;
+	}
+
+	this->request_json_object = request_json_object;
+}
+
+json_t *ApiContext::GetRequestJsonObject() const {
+	return request_json_object;
+}
+
+void ApiContext::SetResponseJsonObject(json_t *response_json_object) {
+	if (this->response_json_object) {
+		json_decref(this->response_json_object);
+		this->response_json_object = NULL;
+	}
+
+	this->response_json_object = response_json_object;
+}
+
+json_t *ApiContext::GetResponseJsonObject() const {
+	return response_json_object;
 }
 
 ApiImpl::CommandBuffer::CommandBuffer() {
@@ -268,16 +295,16 @@ Error ApiImpl::DeterminePath() {
 	return util::getError(kCantFindApiFile, currentDir);
 }
 
-Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_root) {
-	std::string str(workspace_root);
+Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_name) {
+	std::string str(workspace_name);
 	std::vector<std::string> tokens;
 
 	util::Split(str, "/", &tokens);
 
-	// path must have *exactly* two '/' characters (in which case it will have
+	// name must have *exactly* two '/' characters (in which case it will have
 	// three tokens if split by '/'
 	if (tokens.size() != 3) {
-		return util::getError(kWorkspaceNameInvalid, workspace_root);
+		return util::getError(kWorkspaceNameInvalid, workspace_name);
 
 	}
 
@@ -309,7 +336,7 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 					   response.Size(),
 					   &json_error);
 
-	((util::JsonApiContext*)context)->SetJsonObject(response_json);
+	context->SetResponseJsonObject(response_json);
 
 	if (response_json == NULL) {
 		std::string details = util::buildJsonErrorDetails(
@@ -369,9 +396,8 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 	return util::getError(kSuccess);
 }
 
-Error ApiImpl::SendJson(const void *request_json_ptr, ApiContext *context) {
-	json_t *request_json = (json_t *)request_json_ptr;
-
+Error ApiImpl::SendJson(ApiContext *context) {
+	json_t *request_json = context->GetRequestJsonObject();
 	// we pass these flags to json_dumps() because:
 	//	JSON_COMPACT: there's no good reason for verbose JSON
 	//	JSON_SORT_KEYS: so that the tests can get predictable JSON and will
@@ -418,9 +444,9 @@ Error ApiImpl::GetAccessed(const char *workspace_root) {
 		return util::getError(kJsonEncodingError, json_error.text);
 	}
 
-	util::JsonApiContext context;
-	err = this->SendJson(request_json, &context);
-	json_decref(request_json); // release the JSON object
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+	err = this->SendJson(&context);
 	if (err.code != kSuccess) {
 		return err;
 	}
@@ -449,7 +475,7 @@ Error ApiImpl::InsertInode(const char *destination,
 		return err;
 	}
 
-	// create JSON in a CommandBuffer with:
+	// create JSON with:
 	//	CommandId = kCmdInsertInode and
 	//	DstPath = destination
 	//	Key = key
@@ -469,11 +495,46 @@ Error ApiImpl::InsertInode(const char *destination,
 		return util::getError(kJsonEncodingError, json_error.text);
 	}
 
-	util::JsonApiContext context;
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
 
-	// SendJson will call CheckCommonApiResponse to check for response errors
-	err = this->SendJson(request_json, &context);
-	json_decref(request_json); // release the JSON object
+	err = this->SendJson(&context);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::Branch(const char *source, const char *destination) {
+	Error err = this->CheckWorkspaceNameValid(source);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	err = this->CheckWorkspaceNameValid(destination);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	// create JSON with:
+	//	CommandId = kCmdBranchRequest and
+	//	Src = source
+	//	Dst = destination
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kBranchJSON,
+					    kCommandId, kCmdBranchRequest,
+					    kSource, source,
+					    kDestination, destination);
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+
+	err = this->SendJson(&context);
 	if (err.code != kSuccess) {
 		return err;
 	}
@@ -486,7 +547,7 @@ Error ApiImpl::PrepareAccessedListResponse(
 	std::unordered_map<std::string, bool> *accessed_list) {
 
 	json_error_t json_error;
-	json_t *response_json = ((util::JsonApiContext*)context)->GetJsonObject();
+	json_t *response_json = context->GetResponseJsonObject();
 
 	// if we get to this point, there was no error response; the object field
 	// 'AccessList' is a Go JSON mapping of a Go map[string]bool - an

@@ -45,6 +45,9 @@ type WorkspaceDB interface {
 		srcWorkspace string, dstTypespace string, dstNamespace string,
 		dstWorkspace string) error
 
+	DeleteWorkspace(c *Ctx, typespace string, namespace string,
+		workspace string) error
+
 	// AdvanceWorkspace changes the workspace rootID. If the current rootID
 	// doesn't match what the client considers the current rootID then no changes
 	// are made and the current rootID is returned such that the client can merge
