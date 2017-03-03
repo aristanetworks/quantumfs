@@ -502,3 +502,36 @@ func TestHardlinkReparentRace(t *testing.T) {
 		}
 	})
 }
+
+func TestHardlinkUninstanted(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		err := os.MkdirAll(workspace + "/subdir/grandchild", 0777)
+		test.assertNoErr(err)
+
+		filename := workspace + "/subdir/fileA"
+		linkname := workspace + "/subdir/grandchild/fileB"
+		data := genData(2000)
+
+		err = printToFile(filename, string(data))
+		test.assertNoErr(err)
+
+		err = syscall.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		// trigger a sync so the workspace is published
+		test.syncAllWorkspaces()
+
+		workspaceB := "branch/copyWorkspace/test"
+		api := test.getApi()
+		err = api.Branch(test.relPath(workspace), workspaceB)
+		test.assertNoErr(err)
+
+		readData, err := ioutil.ReadFile(test.absPath(workspaceB +
+			"/subdir/grandchild/fileB"))
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(readData, data),
+			"data mismatch after Branch")
+	})
+}
