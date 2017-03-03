@@ -507,7 +507,7 @@ func TestHardlinkUninstanted(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		err := os.MkdirAll(workspace + "/subdir/grandchild", 0777)
+		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
 		test.assertNoErr(err)
 
 		filename := workspace + "/subdir/fileA"
