@@ -88,14 +88,15 @@ type CommandCommon struct {
 
 // The various command ID constants
 const (
-	CmdError         = iota
-	CmdBranchRequest = iota
-	CmdGetAccessed   = iota
-	CmdClearAccessed = iota
-	CmdSyncAll       = iota
-	CmdInsertInode   = iota
-	CmdSetBlock      = iota
-	CmdGetBlock      = iota
+	CmdError           = iota
+	CmdBranchRequest   = iota
+	CmdGetAccessed     = iota
+	CmdClearAccessed   = iota
+	CmdSyncAll         = iota
+	CmdInsertInode     = iota
+	CmdDeleteWorkspace = iota
+	CmdSetBlock        = iota
+	CmdGetBlock        = iota
 )
 
 // The various error codes
@@ -142,6 +143,11 @@ type InsertInodeRequest struct {
 	Uid         uint32
 	Gid         uint32
 	Permissions uint32
+}
+
+type DeleteWorkspaceRequest struct {
+	CommandCommon
+	WorkspacePath string
 }
 
 type SetBlockRequest struct {
@@ -310,7 +316,7 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	uid uint32, gid uint32) error {
 
 	if !isWorkspacePathValid(dst) {
-		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n", dst)
 	}
 
 	if !isKeyValid(key) {
@@ -344,6 +350,41 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Delete the given workspace.
+//
+// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
+func (api *Api) DeleteWorkspace(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := DeleteWorkspaceRequest{
+		CommandCommon: CommandCommon{CommandId: CmdDeleteWorkspace},
+		WorkspacePath: workspacepath,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
 	}
 	return nil
 }
