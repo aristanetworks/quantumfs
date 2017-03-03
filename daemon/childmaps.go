@@ -137,14 +137,31 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	name string) (needsReparent DirectoryRecordIf) {
 
 	inodeId, exists := cmap.children[name]
-	if exists {
-		delete(cmap.children, name)
+	if !exists {
+		return nil
 	}
 
 	record := cmap.getRecord(c, inodeId, name)
 	if record == nil {
 		return nil
 	}
+
+	// This may be a hardlink that is due to be converted. To avoid
+	// having to call the DOWN check function, we can use the fact that
+	// we're orphaning the file and have it completely locked
+	// to do the equivalent ourselves, with similar but more minimal code
+	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
+		newRecord, inodeId := cmap.wsr.removeHardlink(c,
+			hardlink.linkId)
+
+		// Wsr says we're about to orphan the last hardlink copy
+		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
+			newRecord.SetFilename(hardlink.Filename())
+			record = newRecord
+			cmap.loadChild(c, newRecord, inodeId)
+		}
+	}
+	delete(cmap.children, name)
 
 	result := cmap.delRecord(inodeId, name)
 

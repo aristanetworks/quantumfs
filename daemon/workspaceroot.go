@@ -209,7 +209,8 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	wsr.hardlinks[newId] = newEntry
 	wsr.inodeToLink[inodeId] = newId
 
-	// Don't reparent the inode, the caller must with the inode's parent lock
+	// Don't reparent the inode, the caller must do so while holding the inode's
+	// parent lock
 	wsr.dirty(c)
 
 	return newHardlink(record.Filename(), newId, wsr)
@@ -331,7 +332,8 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
 
-	// Do not reparent here. It must be done safety in a DOWN function
+	// Do not reparent here. It must be done safety with either the treeLock or
+	// the child, parent, and lockedParent locks locked in an UP order
 
 	wsr.dirty(c)
 

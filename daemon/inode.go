@@ -111,7 +111,7 @@ type Inode interface {
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan DirectoryRecordIf,
 			err fuse.Status)) fuse.Status
-	checkLinkAndAlone(c *ctx, parent *Directory)
+	checkLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean()   // Mark this Inode as cleaned
@@ -325,12 +325,12 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 // Checking that a hardlink needs to be converted back into a file has to be done
 // frequently, without a tree lock. To do this, we have to lock both parent and child
 // in an UP order
-func (inode *InodeCommon) checkLinkAndAlone(c *ctx, parent *Directory) {
+func (inode *InodeCommon) checkLinkReparent(c *ctx, parent *Directory) {
 
 	inode.lock.Lock()
 	defer inode.lock.Unlock()
 
-	inode.parent.checkLinkAndAlone(c, inode.id, parent)
+	inode.parent.checkLinkReparent(c, inode.id, parent)
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
