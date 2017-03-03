@@ -147,29 +147,6 @@ void requote(std::string &s) {
 	std::replace(s.begin(), s.end(), '\'', '"');
 }
 
-// Implementation of ApiContext. Instances of this class should be created on the
-// stack so that useful cleanup happens automatically.
-JsonApiContext::JsonApiContext() : ApiContext(), json_object(NULL) {
-
-}
-
-JsonApiContext::~JsonApiContext() {
-	SetJsonObject(NULL);
-}
-
-void JsonApiContext::SetJsonObject(json_t *json_object) {
-	if (this->json_object) {
-		json_decref(this->json_object);
-		this->json_object = NULL;
-	}
-
-	this->json_object = json_object;
-}
-
-json_t *JsonApiContext::GetJsonObject() const {
-	return json_object;
-}
-
 } // namespace util
 } // namespace qfsclient
 
