@@ -19,7 +19,7 @@ func init() {
 	typespacesBucket = []byte("Namespaces")
 }
 
-// The database underlying the system local WorkspaceDB has two levels of buckets.
+// The database underlying the system local WorkspaceDB has three levels of buckets.
 //
 // The first level bucket are all the typespaces. Keys into this bucket are typespace
 // names and are mapped to the second level bucket.
@@ -332,16 +332,70 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	})
 }
 
+func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string) error {
+
+	return wsdb.db.Update(func(tx *bolt.Tx) error {
+		typespaces := tx.Bucket(typespacesBucket)
+		namespaces := typespaces.Bucket([]byte(typespace))
+		if namespaces == nil {
+			// No such typespace indicates no such workspace. Success.
+			return nil
+		}
+
+		workspaces := namespaces.Bucket([]byte(namespace))
+		if workspaces == nil {
+			// No such namespace indicates no such workspace. Success.
+			return nil
+		}
+
+		err := workspaces.Delete([]byte(workspace))
+		if err != nil {
+			return err
+		}
+
+		var count int
+		workspaces.ForEach(func(k []byte, v []byte) error {
+			count++
+			return nil
+		})
+
+		if count == 0 {
+			err = namespaces.DeleteBucket([]byte(namespace))
+			if err != nil {
+				return err
+			}
+		}
+
+		count = 0
+		namespaces.ForEach(func(k []byte, v []byte) error {
+			count++
+			return nil
+		})
+
+		if count == 0 {
+			err = typespaces.DeleteBucket([]byte(typespace))
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
 	var rootid quantumfs.ObjectKey
 
-	wsdb.db.View(func(tx *bolt.Tx) error {
+	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		key := getWorkspaceKey_(tx, typespace, namespace, workspace)
 
 		if key == nil {
-			panic("Got nil rootid")
+			return quantumfs.NewWorkspaceDbErr(
+				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+				"workspace does not exist")
 		}
 
 		rootid = quantumfs.NewObjectKeyFromBytes(key)
@@ -349,7 +403,7 @@ func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 		return nil
 	})
 
-	return rootid, nil
+	return rootid, err
 }
 
 func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
