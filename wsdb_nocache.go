@@ -286,7 +286,7 @@ FROM %s.workspacedb`, nc.keyspace)
 	iter := query.Iter()
 	count := 0
 	var tempTypespace string
-	typespaceList := make([]string, 0)
+	var typespaceList []string
 	for iter.Scan(&tempTypespace) {
 		typespaceList = append(typespaceList, tempTypespace)
 		count++
@@ -335,7 +335,7 @@ WHERE typespace = ?`, nc.keyspace)
 	iter := query.Iter()
 	count := 0
 	var tempNamespace string
-	namespaceList := make([]string, 0)
+	var namespaceList []string
 	found := make(map[string]bool)
 	for iter.Scan(&tempNamespace) {
 		if _, exists := found[tempNamespace]; !exists {
@@ -365,7 +365,7 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace)
 	iter := query.Iter()
 	count := 0
 	var tempWorkspace string
-	workspaceList := make([]string, 0)
+	var workspaceList []string
 	for iter.Scan(&tempWorkspace) {
 		workspaceList = append(workspaceList, tempWorkspace)
 		count++

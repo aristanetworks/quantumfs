@@ -6,8 +6,6 @@ package cql
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 )
 
 const testKey = "Hello"
@@ -30,9 +28,7 @@ func EtherConfFile() (string, error) {
 			return "", fmt.Errorf("Env varibale ETHER_CQL_CONFIG should be set to a config" +
 				" file name in directory ether/cluster_configs")
 		}
-		_, path, _, _ := runtime.Caller(0)
-		path = filepath.Join(filepath.Dir(path), "..", "cluster_configs", etherEnv)
-		etherConfFile = path
+		etherConfFile = etherEnv
 	}
 	return etherConfFile, nil
 }
