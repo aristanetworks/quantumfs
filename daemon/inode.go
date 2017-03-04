@@ -179,7 +179,7 @@ type InodeCommon struct {
 
 	// Note: parentId must not be accessed or changed without the parentLock
 	parentLock DeferableRwMutex
-	parentId    InodeId
+	parentId   InodeId
 
 	lock sync.RWMutex
 
