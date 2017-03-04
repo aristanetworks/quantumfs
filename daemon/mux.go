@@ -745,7 +745,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 			key := inode.flush(c)
 
 			// Then check our parent and iterate again
-			inode = func () (parent Inode) {
+			inode = func() (parent Inode) {
 				inodeCommon := inode.inodeCommon()
 				defer inodeCommon.parentLock.RLock().RUnlock()
 
@@ -768,7 +768,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 					inodeCommon.parentId)
 
 				return parent
-			} ()
+			}()
 			continue
 		}
 		break
@@ -1109,7 +1109,7 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	// Update the Hash value before generating the key
 	inode.Sync_DOWN(c)
 
-	return func () ([]byte, fuse.Status) {
+	return func() ([]byte, fuse.Status) {
 		inodeCommon := inode.inodeCommon()
 		defer inodeCommon.parentLock.RLock().RUnlock()
 
@@ -1123,7 +1123,7 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 
 		// Don't need inode.LockTree().Unlock() because we're still covered
 		return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
-	} ()
+	}()
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,

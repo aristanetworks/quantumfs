@@ -17,7 +17,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// this inside the lockedParent call since Sync locks the parent as well.
 	srcInode.Sync_DOWN(c)
 
-	newRecord, err := func () (DirectoryRecordIf, fuse.Status) {
+	newRecord, err := func() (DirectoryRecordIf, fuse.Status) {
 		defer srcInode.inodeCommon().parentLock.Lock().Unlock()
 
 		// ensure we're not orphaned
@@ -55,7 +55,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		srcInode.inodeCommon().parentId = dir.wsr.inodeNum()
 
 		return newRecord, fuse.OK
-	} ()
+	}()
 	if err != fuse.OK {
 		return err
 	}
