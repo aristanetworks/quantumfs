@@ -17,8 +17,45 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// this inside the lockedParent call since Sync locks the parent as well.
 	srcInode.Sync_DOWN(c)
 
-	newRecord, err := srcInode.lockedParent().makeHardlink_DOWN(c, srcInode,
-		dir.wsr)
+	newRecord, err := func() (DirectoryRecordIf, fuse.Status) {
+		defer srcInode.inodeCommon().parentLock.Lock().Unlock()
+
+		// ensure we're not orphaned
+		if srcInode.inodeCommon().isOrphaned_() {
+			c.wlog("Can't hardlink an orphaned file")
+			return nil, fuse.EPERM
+		}
+
+		// Grab the source parent as a Directory
+		var srcParent *Directory
+		switch v := srcInode.parent_(c).(type) {
+		case *Directory:
+			srcParent = v
+		case *WorkspaceRoot:
+			srcParent = &(v.Directory)
+		default:
+			c.elog("Source directory is not a directory: %d",
+				srcInode.inodeNum())
+			return nil, fuse.EINVAL
+		}
+
+		// Ensure the source and dest are in the same workspace
+		if srcParent.wsr != dir.wsr {
+			c.dlog("Source and dest are different workspaces.")
+			return nil, fuse.EPERM
+		}
+
+		newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
+		if err != fuse.OK {
+			c.elog("Link Failed with srcInode record")
+			return nil, err
+		}
+
+		// We need to reparent under the srcInode lock
+		srcInode.inodeCommon().parentId = dir.wsr.inodeNum()
+
+		return newRecord, fuse.OK
+	}()
 	if err != fuse.OK {
 		return err
 	}

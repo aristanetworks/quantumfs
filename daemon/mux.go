@@ -732,21 +732,21 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 
 // Needs treelock for read
 func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
-	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d",
-		inode.inodeNum()).out()
+	inodeNum := inode.inodeNum()
+	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d", inodeNum).out()
 
 	rtn := make([]InodeId, 0)
 	initial := true
 	for {
-		lookupCount, exists := qfs.lookupCount(inode.inodeNum())
+		lookupCount, exists := qfs.lookupCount(inodeNum)
 		if lookupCount != 0 {
-			c.vlog("No forget called on inode %d yet", inode.inodeNum())
+			c.vlog("No forget called on inode %d yet", inodeNum)
 			break
 		}
 
 		if dirtyElement := inode.dirtyElement(); dirtyElement != nil {
 			c.vlog("Inode %d dirty, not uninstantiating yet",
-				inode.inodeNum())
+				inodeNum)
 			func() {
 				defer qfs.dirtyQueueLock.Lock().Unlock()
 				dirtyNode := dirtyElement.Value.(*dirtyInode)
@@ -760,7 +760,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 		// if-statement
 		if !exists && !initial {
 			c.vlog("A inode %d with nil lookupCount "+
-				"is uninstantiated by its child", inode.inodeNum())
+				"is uninstantiated by its child", inodeNum)
 			break
 		}
 		initial = false
@@ -778,32 +778,53 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 
 					// Not ready to forget, no more to do
 					c.dlog("Not all children unloaded, %d in %d",
-						i, inode.inodeNum())
+						i, inodeNum)
 					return rtn
 				}
-				c.dlog("Child %d of %d not loaded", i,
-					inode.inodeNum())
+				c.dlog("Child %d of %d not loaded", i, inodeNum)
 			}
 
 			rtn = append(rtn, children...)
 		}
 
 		// Great, we want to forget this so proceed
-		qfs.setInode(c, inode.inodeNum(), nil)
+		qfs.setInode(c, inodeNum, nil)
 
 		func() {
 			defer qfs.lookupCountLock.Lock().Unlock()
-			delete(qfs.lookupCounts, inode.inodeNum())
+			delete(qfs.lookupCounts, inodeNum)
 		}()
 
-		c.vlog("Set inode %d to nil", inode.inodeNum())
+		c.vlog("Set inode %d to nil", inodeNum)
 
-		if !inode.isOrphaned() && inode.inodeNum() != quantumfs.InodeIdRoot {
+		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
 			key := inode.flush(c)
 
 			// Then check our parent and iterate again
-			inode = inode.lockedParent().uninstantiateChild(c,
-				inode.inodeNum(), key, qfs)
+			inode = func() (parent Inode) {
+				inodeCommon := inode.inodeCommon()
+				defer inodeCommon.parentLock.RLock().RUnlock()
+
+				// Do nothing if we're orphaned
+				if inodeCommon.isOrphaned_() {
+					return nil
+				}
+
+				parent = qfs.inodeNoInstantiate(c,
+					inodeCommon.parentId)
+				if parent == nil {
+					panic(fmt.Sprintf("Parent was unloaded "+
+						"before child! %d %d",
+						inodeCommon.parentId, inodeNum))
+				}
+
+				parent.syncChild(c, inodeNum, key)
+
+				qfs.addUninstantiated(c, []InodeId{inodeNum},
+					inodeCommon.parentId)
+
+				return parent
+			}()
 			continue
 		}
 		break
@@ -1152,7 +1173,21 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 	// Update the Hash value before generating the key
 	inode.Sync_DOWN(c)
 
-	return inode.lockedParent().generateChildTypeKey_DOWN(c, inode.inodeNum())
+	return func() ([]byte, fuse.Status) {
+		inodeCommon := inode.inodeCommon()
+		defer inodeCommon.parentLock.RLock().RUnlock()
+
+		var dir *Directory
+		parent := inodeCommon.parent_(c)
+		if parent.isWorkspaceRoot() {
+			dir = &parent.(*WorkspaceRoot).Directory
+		} else {
+			dir = parent.(*Directory)
+		}
+
+		// Don't need inode.LockTree().Unlock() because we're still covered
+		return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
+	}()
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,

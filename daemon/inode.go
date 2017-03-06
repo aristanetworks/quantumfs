@@ -101,7 +101,9 @@ type Inode interface {
 	markAccessed(c *ctx, path string, created bool)
 	markSelfAccessed(c *ctx, created bool)
 
-	lockedParent() *lockedParent
+	// Note: parent_ must only be called with the parentLock RLock-ed, and the
+	// parent Inode returned must only be used while that lock is held
+	parent_(c *ctx) Inode
 	setParent(newParent InodeId)
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -111,7 +113,25 @@ type Inode interface {
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan DirectoryRecordIf,
 			err fuse.Status)) fuse.Status
-	checkLinkReparent(c *ctx, parent *Directory)
+
+	parentMarkAccessed(c *ctx, path string, created bool)
+	parentSyncChild(c *ctx, childId InodeId,
+		publishFn func() quantumfs.ObjectKey)
+	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
+		attr *fuse.SetAttrIn, out *fuse.AttrOut,
+		updateMtime bool) fuse.Status
+	parentGetChildXAttrSize(c *ctx, inodeNum InodeId, attr string) (size int,
+		result fuse.Status)
+	parentGetChildXAttrData(c *ctx, inodeNum InodeId, attr string) (data []byte,
+		result fuse.Status)
+	parentListChildXAttr(c *ctx, inodeNum InodeId) (attributes []byte,
+		result fuse.Status)
+	parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
+		data []byte) fuse.Status
+	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
+	parentGetChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error)
+	parentHasAncestor(c *ctx, ancestor Inode) bool
+	parentCheckLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean()   // Mark this Inode as cleaned
@@ -134,6 +154,7 @@ type Inode interface {
 		out *fuse.EntryOut) fuse.Status
 
 	inodeNum() InodeId
+	inodeCommon() *InodeCommon
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
@@ -156,7 +177,9 @@ type InodeCommon struct {
 
 	accessed_ uint32
 
-	parent lockedParent
+	// Note: parentId must not be accessed or changed without the parentLock
+	parentLock DeferableRwMutex
+	parentId   InodeId
 
 	lock sync.RWMutex
 
@@ -172,8 +195,169 @@ type InodeCommon struct {
 	dirtyElement_    *list.Element
 }
 
+// Must have the parentLock RLock()-ed.
+func (inode *InodeCommon) parent_(c *ctx) Inode {
+	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	if parent == nil {
+		c.elog("Parent was unloaded before child"+"! %d", inode.parentId)
+		parent = c.qfs.inode(c, inode.parentId)
+	}
+
+	return parent
+}
+
+func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string, created bool) {
+	defer inode.parentLock.RLock().RUnlock()
+
+	inode.parent_(c).markAccessed(c, path, created)
+}
+
+func (inode *InodeCommon) parentSyncChild(c *ctx, childId InodeId,
+	publishFn func() quantumfs.ObjectKey) {
+
+	defer inode.parentLock.RLock().RUnlock()
+
+	// We want to ensure that the orphan check and the parent sync are done
+	// under the same lock
+	if inode.isOrphaned_() {
+		c.vlog("Not flushing orphaned inode")
+		return
+	}
+
+	// publish before we sync, once we know it's safe
+	baseLayerId := publishFn()
+
+	inode.parent_(c).syncChild(c, childId, baseLayerId)
+}
+
+func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
+		updateMtime)
+}
+
+func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
+	attr string) (size int, result fuse.Status) {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).getChildXAttrSize(c, inodeNum, attr)
+}
+
+func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
+	attr string) (data []byte, result fuse.Status) {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).getChildXAttrData(c, inodeNum, attr)
+}
+
+func (inode *InodeCommon) parentListChildXAttr(c *ctx,
+	inodeNum InodeId) (attributes []byte, result fuse.Status) {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).listChildXAttr(c, inodeNum)
+}
+
+func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
+	data []byte) fuse.Status {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
+}
+
+func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
+	attr string) fuse.Status {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
+}
+
+func (inode *InodeCommon) parentGetChildRecord(c *ctx,
+	inodeNum InodeId) (DirectoryRecordIf, error) {
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.parent_(c).getChildRecord(c, inodeNum)
+}
+
+// When iterating up the directory tree, we need to lock parents as we go,
+// otherwise part of the chain we've iterated past could be moved and change
+// what we should have returned here
+func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
+	defer inode.parentLock.RLock().RUnlock()
+
+	if ancestor.inodeNum() == inode.parentId {
+		return true
+	}
+
+	if inode.parentId == quantumfs.InodeIdInvalid {
+		return false
+	}
+
+	return inode.parent_(c).parentHasAncestor(c, ancestor)
+}
+
+func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
+
+	// Ensure we lock in the UP direction
+	defer inode.parentLock.Lock().Unlock()
+	parent.lock.Lock()
+	defer parent.lock.Unlock()
+	defer parent.childRecordLock.Lock().Unlock()
+
+	// Check again, now with the locks, if this is still a child
+	record := parent.children.record(inode.id)
+	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
+		// no hardlink record here, nothing to do
+		return
+	}
+
+	link := record.(*Hardlink)
+
+	// This may need to be turned back into a normal file
+	newRecord, inodeId := parent.wsr.removeHardlink(c, link.linkId)
+
+	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
+		// wsr says hardlink isn't ready for removal yet
+		return
+	}
+
+	// reparent the child to the given parent
+	inode.parentId = parent.inodeNum()
+
+	// Ensure that we update this version of the record with this instance
+	// of the hardlink's information
+	newRecord.SetFilename(link.Filename())
+
+	// Here we do the opposite of makeHardlink DOWN - we re-insert it
+	parent.children.loadChild(c, newRecord, inodeId)
+	parent.dirty(c)
+}
+
+func (inode *InodeCommon) setParent(newParent InodeId) {
+	defer inode.parentLock.Lock().Unlock()
+
+	inode.parentId = newParent
+}
+
+func (inode *InodeCommon) isOrphaned() bool {
+	defer inode.parentLock.RLock().RUnlock()
+
+	return inode.isOrphaned_()
+}
+
+// parentLock must be RLocked
+func (inode *InodeCommon) isOrphaned_() bool {
+	return inode.id == inode.parentId
+}
+
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
+}
+
+func (inode *InodeCommon) inodeCommon() *InodeCommon {
+	return inode
 }
 
 // Add this Inode to the dirty list
@@ -242,19 +426,6 @@ func (inode *InodeCommon) accessed() bool {
 	}
 }
 
-// Must return a pointer to the locked parent so the mutex is shared
-func (inode *InodeCommon) lockedParent() *lockedParent {
-	return &inode.parent
-}
-
-func (inode *InodeCommon) setParent(newParent InodeId) {
-	inode.parent.setParent(newParent)
-}
-
-func (inode *InodeCommon) isOrphaned() bool {
-	return inode.parent.childIsOrphaned(inode.inodeNum())
-}
-
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
 	return inode.treeLock_
 }
@@ -293,7 +464,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	} else {
 		path = inode.name() + "/" + path
 	}
-	inode.parent.markAccessed(c, path, created)
+	inode.parentMarkAccessed(c, path, created)
 }
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
@@ -319,18 +490,23 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 	defer inode.lock.Unlock()
 
 	// We must perform the deletion with the lockedParent lock
-	return inode.parent.deleteChild(c, toDelete, deleteFromParent)
-}
+	defer inode.parentLock.Lock().Unlock()
 
-// Checking that a hardlink needs to be converted back into a file has to be done
-// frequently, without a tree lock. To do this, we have to lock both parent and child
-// in an UP order
-func (inode *InodeCommon) checkLinkReparent(c *ctx, parent *Directory) {
+	// After we've locked the child, we can safely go UP and lock our parent
+	toOrphan, err := deleteFromParent()
+	if toOrphan == nil {
+		// no orphan-ing desired here (hardlink or error)
+		return err
+	}
 
-	inode.lock.Lock()
-	defer inode.lock.Unlock()
+	if file, isFile := toDelete.(*File); isFile {
+		file.setChildRecord(c, toOrphan)
+	}
+	// orphan ourselves
+	inode.parentId = toDelete.inodeNum()
+	c.vlog("Orphaned inode %d", toDelete.inodeNum())
 
-	inode.parent.checkLinkReparent(c, inode.id, parent)
+	return fuse.OK
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
