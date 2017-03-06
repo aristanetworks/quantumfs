@@ -1108,13 +1108,13 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		return fuse.ENOENT
 	}
 
-	if !qfs.workspaceIsMutable(c, srcInode) {
-		return fuse.EPERM
-	}
-
 	dstInode := qfs.inode(c, InodeId(input.NodeId))
 	if dstInode == nil {
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutable(c, dstInode) {
+		return fuse.EPERM
 	}
 
 	// Via races, srcInode and dstInode can be forgotten here
