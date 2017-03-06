@@ -95,6 +95,8 @@ const (
 	CmdSyncAll         = iota
 	CmdInsertInode     = iota
 	CmdDeleteWorkspace = iota
+	CmdSetBlock        = iota
+	CmdGetBlock        = iota
 	CmdEnableRootWrite = iota
 )
 
@@ -106,6 +108,7 @@ const (
 	ErrorBadCommandId      = iota // Unknown command ID
 	ErrorCommandFailed     = iota // The Command failed, see the error for more info
 	ErrorKeyNotFound       = iota // The extended key is not stored in the datastore
+	ErrorBlockTooLarge     = iota // SetBlock was passed a block that was too large
 	ErrorWorkspaceNotFound = iota // The workspace cannot be found in QuantumFS
 )
 
@@ -152,6 +155,22 @@ type EnableRootWriteRequest struct {
 type DeleteWorkspaceRequest struct {
 	CommandCommon
 	WorkspacePath string
+}
+
+type SetBlockRequest struct {
+	CommandCommon
+	Key  []byte
+	Data []byte
+}
+
+type GetBlockRequest struct {
+	CommandCommon
+	Key []byte
+}
+
+type GetBlockResponse struct {
+	ErrorResponse
+	Data []byte
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -212,7 +231,7 @@ func (api *Api) Branch(src string, dst string) error {
 // Get the list of accessed file from workspaceroot
 func (api *Api) GetAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -252,7 +271,7 @@ func (api *Api) GetAccessed(wsr string) error {
 // clear the list of accessed files in workspaceroot
 func (api *Api) ClearAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{

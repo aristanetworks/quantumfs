@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 import "github.com/hanwen/go-fuse/fuse"
-import "github.com/pivotal-golang/bytefmt"
+import "code.cloudfoundry.org/bytefmt"
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (
