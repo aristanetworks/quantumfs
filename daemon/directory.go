@@ -1526,20 +1526,26 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
-	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
-	defer c.vlog("Directory::instantiateChild Exit")
 
-	// check if the child is a hardlink first
-	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
-		return dir.wsr.instantiateChild(c, inodeNum)
-	}
-
+	defer c.FuncIn("Directory::instantiateChild", "Inode %d", inodeNum)
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
 		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
 			inodeNum))
+	}
+
+	// check if the child is a hardlink
+	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
+		return dir.wsr.instantiateChild(c, inodeNum)
+	}
+
+	// add a failsafe incase there's an inconsistency
+	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
+		c.elog("Hardlink not recognized by workspaceroot?: %d, %d",
+			inodeNum, hardlink.linkId)
+		return dir.wsr.instantiateChild(c, inodeNum)
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)
