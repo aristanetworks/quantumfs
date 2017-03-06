@@ -43,6 +43,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		flushComplete:          make(chan struct{}),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
+		workspaceMutability:    make(map[InodeId]bool),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -127,6 +128,11 @@ type QuantumFs struct {
 	// its lookup count, we must keep an entirely separate table.
 	lookupCountLock DeferableMutex
 	lookupCounts    map[InodeId]uint64
+
+	// The workspaceMutability defines whether all inodes in each of the local
+	// workspace is mutalbe(write-permitted).
+	mutabilityLock      DeferableRwMutex
+	workspaceMutability map[InodeId]bool
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -798,8 +804,8 @@ func (qfs *QuantumFs) makeLookupCountZero(inodeId InodeId) {
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
 	workspace string) (*WorkspaceRoot, bool) {
 
-	c.vlog("QuantumFs::getWorkspaceRoot %s/%s/%s",
-		typespace, namespace, workspace)
+	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Enter Workspace %s/%s/%s",
+		typespace, namespace, workspace).out()
 
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
@@ -830,7 +836,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	return wsr.(*WorkspaceRoot), wsr != nil
 }
 
-func workspaceIsMutable(c *ctx, inode Inode) bool {
+func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	c.vlog("QuantumFs::workspaceIsMutable %d", inode.inodeNum())
 
 	var wsr *WorkspaceRoot
@@ -871,9 +877,28 @@ func workspaceIsMutable(c *ctx, inode Inode) bool {
 		wsr = inode.(*Directory).wsr
 	}
 
-	defer wsr.writePermLock.RLock().RUnlock()
-	return wsr.rootWritePerm
+	defer qfs.mutabilityLock.RLock().RUnlock()
 
+	rootMutability, exists := qfs.workspaceMutability[wsr.inodeNum()]
+	if !exists {
+		panic(fmt.Sprintf("The mutable state of workspace %s/%s/%s "+
+			"is missing", wsr.typespace, wsr.namespace, wsr.workspace))
+	}
+
+	return rootMutability
+
+}
+
+func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
+	flags uint32) bool {
+
+	// Only if the Open() requires write permission, is it blocked by the
+	// read-only workspace
+	if flags&syscall.O_ACCMODE == syscall.O_RDONLY {
+		return true
+	}
+
+	return qfs.workspaceIsMutable(c, inode)
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
@@ -929,7 +954,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -952,7 +977,7 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -975,7 +1000,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -998,7 +1023,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -1021,7 +1046,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -1044,7 +1069,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, srcInode) {
+	if !qfs.workspaceIsMutable(c, srcInode) {
 		return fuse.EPERM
 	}
 
@@ -1055,6 +1080,10 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		dstInode := qfs.inode(c, InodeId(input.Newdir))
 		if dstInode == nil {
 			return fuse.ENOENT
+		}
+
+		if !qfs.workspaceIsMutable(c, dstInode) {
+			return fuse.EPERM
 		}
 
 		defer srcInode.RLockTree().RUnlock()
@@ -1079,7 +1108,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, srcInode) {
+	if !qfs.workspaceIsMutable(c, srcInode) {
 		return fuse.EPERM
 	}
 
@@ -1130,7 +1159,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -1272,7 +1301,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -1299,7 +1328,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -1328,7 +1357,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 		return fuse.EACCES // TODO Confirm this is correct
 	}
 
-	if !workspaceIsMutable(c, inode) {
+	if !qfs.workspaceIsMutable(c, inode) {
 		return fuse.EPERM
 	}
 
@@ -1349,6 +1378,10 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 	if inode == nil {
 		c.elog("Open failed Inode %d", input.NodeId)
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutableAtOpen(c, inode, input.Flags) {
+		return fuse.EPERM
 	}
 
 	defer inode.RLockTree().RUnlock()
@@ -1404,10 +1437,6 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 	inode := qfs.inode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return 0, fuse.ENOENT
-	}
-
-	if !workspaceIsMutable(c, inode) {
-		return 0, fuse.EPERM
 	}
 
 	defer fileHandle.RLockTree().RUnlock()

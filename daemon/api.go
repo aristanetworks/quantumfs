@@ -392,12 +392,13 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdInsertInode:
 		c.vlog("Received InsertInode request")
 		api.insertInode(c, buf)
-	case quantumfs.CmdEnableRootWrite:
-		c.vlog("Received EnableRootWrite request")
-		api.enableRootWrite(c, buf)
 	case quantumfs.CmdDeleteWorkspace:
 		c.vlog("Received DeleteWorkspace request")
 		api.deleteWorkspace(c, buf)
+	case quantumfs.CmdEnableRootWrite:
+		c.vlog("Received EnableRootWrite request")
+		api.enableRootWrite(c, buf)
+
 	}
 
 	c.vlog("done writing to file")
@@ -548,8 +549,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 }
 
 func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
-	c.vlog("Api::enableRootWrite Enter")
-	defer c.vlog("Api::enableRootWrite Exit")
+	defer c.funcIn("Api::enableRootWrite Enter").out()
 
 	var cmd quantumfs.EnableRootWriteRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -566,8 +566,9 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 		return
 	}
 
-	defer workspace.writePermLock.Lock().Unlock()
-	workspace.rootWritePerm = true
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	c.qfs.workspaceMutability[workspace.inodeNum()] = true
+
 	api.queueErrorResponse(quantumfs.ErrorOK,
 		"Enable Workspace Write Permission Succeeded")
 }

@@ -5,6 +5,7 @@ package daemon
 
 // Test some special properties of workspacelisting type
 
+import "syscall"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
 
@@ -40,10 +41,13 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		test.assert(!exists,
 			"Error getting a non-existing inodeId of typespace")
 
-		// Enabling the write permission in the new workspace can trigger
-		// updateChildren in workspacelisting. Map within will be updated,
-		// so inodes in the proceeding workspace will be valid right now.
-		test.newWorkspace()
+		// Creating a file in the new workspace can trigger updateChildren
+		// in workspacelisting. Map within will be updated, so inodes in the
+		// proceeding workspace will be valid right now.
+		workspace1 := test.newWorkspace()
+		testFilename := workspace1 + "/" + "test"
+		err := syscall.Mkdir(testFilename, 0124)
+		test.assert(err == nil, "Error creating directories: %v", err)
 
 		// Verify that the typespace has been assigned an ID to but not
 		// instantiated yet. If the inode is not created, there is no
@@ -51,12 +55,16 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		verifyWorkspacelistingInodeStatus(c, test, type_, "typespace",
 			false, &tsl.typespacesByName)
 
-		// Enabling write permission can also update workspacelisting
+		// In order to make changes in workspace, make it writable first
 		// Instantiate the three inodes and verify the existence
 		api := test.getApi()
-		err := api.EnableRootWrite(test.relPath(workspace))
+		err = api.EnableRootWrite(test.relPath(workspace))
 		test.assert(err == nil, "Failed to enable write permission in "+
 			"workspace: %v", err)
+
+		testFilename = workspace + "/" + "test"
+		err = syscall.Mkdir(testFilename, 0124)
+		test.assert(err == nil, "Failed creating files: %v", err)
 
 		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
 			"typespace", true, &tsl.typespacesByName)
