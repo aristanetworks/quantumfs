@@ -94,8 +94,8 @@ const (
 	CmdClearAccessed   = iota
 	CmdSyncAll         = iota
 	CmdInsertInode     = iota
-	CmdEnableRootWrite = iota
 	CmdDeleteWorkspace = iota
+	CmdEnableRootWrite = iota
 )
 
 // The various error codes

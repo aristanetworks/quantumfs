@@ -22,10 +22,6 @@ type WorkspaceRoot struct {
 	listLock   sync.Mutex
 	accessList map[string]bool
 
-	// Write permission for all inodes in local workspace
-	writePermLock DeferableRwMutex
-	rootWritePerm bool
-
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
 	realTreeLock sync.RWMutex
@@ -92,6 +88,10 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
+
+	// All workspaces start with the default read-only
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	c.qfs.workspaceMutability[inodeNum] = false
 
 	return &wsr, uninstantiated
 }
