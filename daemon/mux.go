@@ -425,6 +425,62 @@ func (qfs *QuantumFs) getInode_(c *ctx, id InodeId) (Inode, bool) {
 	return nil, uninstantiated
 }
 
+// Often we need to grab an inode and lock the tree. We need the inode to lock its
+// tree, however by the time we lock the tree the inode may be forgotten and the
+// inode we grabbed invalid. This is a worker function to handle that case correctly.
+func (qfs *QuantumFs) RLockTreeGetInode(c *ctx, inodeId InodeId) Inode {
+	inode := qfs.inode(c, inodeId)
+	if inode == nil {
+		return nil
+	}
+
+	inode.RLockTree()
+
+	// once we have the lock, re-grab (and possibly reinstantiate) the inode
+	// since it may have been just forgotten
+	inode = qfs.inode(c, inodeId)
+	return inode
+}
+
+// Same as the RlockTreeGetInode, but for writes
+func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) Inode {
+	inode := qfs.inode(c, inodeId)
+	if inode == nil {
+		return nil
+	}
+
+	inode.LockTree()
+
+	inode = qfs.inode(c, inodeId)
+	return inode
+}
+
+func (qfs *QuantumFs) RLockTreeGetHandle(c *ctx, fh FileHandleId) FileHandle {
+	fileHandle := qfs.fileHandle(c, fh)
+	if fileHandle == nil {
+		return nil
+	}
+
+	fileHandle.RLockTree()
+
+	// once we have the lock, re-grab
+	fileHandle = qfs.fileHandle(c, fh)
+	return fileHandle
+}
+
+func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) FileHandle {
+	fileHandle := qfs.fileHandle(c, fh)
+	if fileHandle == nil {
+		return nil
+	}
+
+	fileHandle.LockTree()
+
+	// once we have the lock, re-grab
+	fileHandle = qfs.fileHandle(c, fh)
+	return fileHandle
+}
+
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
 	defer qfs.mapMutex.RLock().RUnlock()
 	inode, _ := qfs.getInode_(c, id)
@@ -664,13 +720,13 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 	c.vlog("QuantumFs::lookupCommon Enter Inode %d Name %s", inodeId, name)
 	defer c.vlog("QuantumFs::lookupCommon Exit")
 
-	inode := qfs.inode(c, inodeId)
+	inode := qfs.RLockTreeGetInode(c, inodeId)
 	if inode == nil {
 		c.elog("Lookup failed", name)
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Lookup(c, name, out)
 }
 
@@ -813,12 +869,12 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::GetAttr", "Enter Inode %d", input.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.GetAttr(c, out)
 }
 
@@ -831,12 +887,12 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::SetAttr", "Enter Inode %d", input.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.SetAttr(c, input, out)
 }
 
@@ -850,12 +906,12 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	defer c.FuncIn("Mux::Mknod", "Enter Inode %d Name %s", input.NodeId,
 		name).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Mknod(c, name, input, out)
 }
 
@@ -869,12 +925,12 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	defer c.FuncIn("Mux::Mkdir", "Enter Inode %d Name %s", input.NodeId,
 		name).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Mkdir(c, name, input, out)
 }
 
@@ -888,12 +944,12 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 	defer c.FuncIn("Mux::Unlink", "Enter Inode %d Name %s", header.NodeId,
 		name).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Unlink(c, name)
 }
 
@@ -907,12 +963,12 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 	defer c.FuncIn("Mux::Rmdir", "Enter Inode %d Name %s", header.NodeId,
 		name).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Rmdir(c, name)
 }
 
@@ -927,26 +983,25 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		input.NodeId, input.Newdir, oldName, newName).out()
 
 	if input.NodeId == input.Newdir {
-		inode := qfs.inode(c, InodeId(input.NodeId))
+		inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 		if inode == nil {
 			return fuse.ENOENT
 		}
+		defer inode.treeLock().RUnlock()
 
-		defer inode.RLockTree().RUnlock()
 		return inode.RenameChild(c, oldName, newName)
 	} else {
-		srcInode := qfs.inode(c, InodeId(input.NodeId))
+		srcInode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 		if srcInode == nil {
 			return fuse.ENOENT
 		}
+		defer srcInode.treeLock().RUnlock()
 
-		dstInode := qfs.inode(c, InodeId(input.Newdir))
+		dstInode := qfs.RLockTreeGetInode(c, InodeId(input.Newdir))
 		if dstInode == nil {
 			return fuse.ENOENT
 		}
-
-		defer srcInode.RLockTree().RUnlock()
-		defer dstInode.RLockTree().RUnlock()
+		defer dstInode.treeLock().RUnlock()
 
 		return srcInode.MvChild(c, dstInode, oldName, newName)
 	}
@@ -1009,12 +1064,12 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	defer c.FuncIn("Mux::Symlink", "Enter Inode %d Name %s", header.NodeId,
 		linkName).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Symlink(c, pointedTo, linkName, out)
 }
 
@@ -1028,12 +1083,12 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Readlink", "Enter Inode %d", header.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return nil, fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Readlink(c)
 }
 
@@ -1044,12 +1099,12 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Access", "Enter Inode %d", input.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Access(c, input.Mask, input.Uid, input.Gid)
 }
 
@@ -1063,23 +1118,32 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::GetXAttrSize", "Enter Inode %d", header.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
-	if inode == nil {
-		return 0, fuse.ENOENT
-	}
 	if attr == quantumfs.XAttrTypeKey {
-		_, status := getQuantumfsExtendedKey(c, inode)
+		_, status := getQuantumfsExtendedKey(c, qfs, InodeId(header.NodeId))
 		if status != fuse.OK {
 			return 0, status
 		}
 		return quantumfs.ExtendedKeyLength, status
 	}
-	defer inode.RLockTree().RUnlock()
+
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return 0, fuse.ENOENT
+	}
+	defer inode.treeLock().RUnlock()
+
 	return inode.GetXAttrSize(c, attr)
 }
 
-func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
-	defer inode.LockTree().Unlock()
+func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
+	fuse.Status) {
+
+	inode := qfs.LockTreeGetInode(c, inodeId)
+	if inode == nil {
+		return nil, fuse.ENOENT
+	}
+	defer inode.treeLock().Unlock()
+
 	if inode.isWorkspaceRoot() {
 		c.vlog("Parent is workspaceroot, returning")
 		return nil, fuse.ENOATTR
@@ -1101,16 +1165,16 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::GetXAttrData", "Enter Inode %d", header.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	if attr == quantumfs.XAttrTypeKey {
+		return getQuantumfsExtendedKey(c, qfs, InodeId(header.NodeId))
+	}
+
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return nil, fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	if attr == quantumfs.XAttrTypeKey {
-		return getQuantumfsExtendedKey(c, inode)
-	}
-
-	defer inode.RLockTree().RUnlock()
 	return inode.GetXAttrData(c, attr)
 }
 
@@ -1124,12 +1188,12 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::ListXAttr", "Enter Inode %d", header.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	if inode == nil {
 		return nil, fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.ListXAttr(c)
 }
 
@@ -1142,17 +1206,17 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::SetXAttr", "Enter Inode %d", input.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
-	if inode == nil {
-		return fuse.ENOENT
-	}
-
 	if attr == quantumfs.XAttrTypeKey {
 		// quantumfs.key is immutable from userspace
 		return fuse.EPERM
 	}
 
-	defer inode.RLockTree().RUnlock()
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+	defer inode.treeLock().RUnlock()
+
 	return inode.SetXAttr(c, attr, data)
 }
 
@@ -1165,17 +1229,17 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::RemoveXAttr", "Enter Inode %d", header.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(header.NodeId))
-	if inode == nil {
-		return fuse.ENOENT
-	}
-
 	if attr == quantumfs.XAttrTypeKey {
 		// quantumfs.key is immutable from userspace
 		return fuse.EPERM
 	}
 
-	defer inode.RLockTree().RUnlock()
+	inode := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
+	if inode == nil {
+		return fuse.ENOENT
+	}
+	defer inode.treeLock().RUnlock()
+
 	return inode.RemoveXAttr(c, attr)
 }
 
@@ -1189,13 +1253,13 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	defer c.FuncIn("Mux::Create", "Enter Inode %d Name %s", input.NodeId,
 		name).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		c.elog("Create failed", input)
 		return fuse.EACCES // TODO Confirm this is correct
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Create(c, input, name, out)
 }
 
@@ -1208,13 +1272,13 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Open", "Enter Inode %d", input.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		c.elog("Open failed Inode %d", input.NodeId)
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.Open(c, input.Flags, input.Mode, out)
 }
 
@@ -1228,13 +1292,13 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Read", "Enter Fh: %d", input.Fh).out()
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	fileHandle := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("Read failed", fileHandle)
 		return nil, fuse.ENOENT
 	}
+	defer fileHandle.treeLock().RUnlock()
 
-	defer fileHandle.RLockTree().RUnlock()
 	return fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
@@ -1257,13 +1321,13 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Write", "Enter Fh: %d", input.Fh).out()
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	fileHandle := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("Write failed")
 		return 0, fuse.ENOENT
 	}
+	defer fileHandle.treeLock().RUnlock()
 
-	defer fileHandle.RLockTree().RUnlock()
 	return fileHandle.Write(c, input.Offset, input.Size,
 		input.Flags, data)
 }
@@ -1286,13 +1350,13 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Fsync", "Enter Fh %d", input.Fh).out()
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	fileHandle := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("Fsync failed")
 		return fuse.EIO
 	}
+	defer fileHandle.treeLock().Unlock()
 
-	defer fileHandle.LockTree().Unlock()
 	return fileHandle.Sync_DOWN(c)
 }
 
@@ -1316,13 +1380,13 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::OpenDir", "Enter Inode %d", input.NodeId).out()
 
-	inode := qfs.inode(c, InodeId(input.NodeId))
+	inode := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	if inode == nil {
 		c.elog("OpenDir failed", input)
 		return fuse.ENOENT
 	}
+	defer inode.treeLock().RUnlock()
 
-	defer inode.RLockTree().RUnlock()
 	return inode.OpenDir(c, input.Flags, input.Mode, out)
 }
 
@@ -1350,13 +1414,13 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	defer c.FuncIn("Mux::ReadDirPlus", "ReadDirPlus Enter Fh: %d offset %d",
 		input.Fh, input.Offset).out()
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	fileHandle := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
 	}
+	defer fileHandle.treeLock().RUnlock()
 
-	defer fileHandle.RLockTree().RUnlock()
 	return fileHandle.ReadDirPlus(c, input, out)
 }
 
@@ -1375,13 +1439,13 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::FsyncDir", "Enter Fh %d", input.Fh).out()
 
-	fileHandle := qfs.fileHandle(c, FileHandleId(input.Fh))
+	fileHandle := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
 	if fileHandle == nil {
 		c.elog("FsyncDir failed")
 		return fuse.EIO
 	}
+	defer fileHandle.treeLock().Unlock()
 
-	defer fileHandle.LockTree().Unlock()
 	return fileHandle.Sync_DOWN(c)
 }
 
