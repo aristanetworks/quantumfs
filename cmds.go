@@ -224,7 +224,7 @@ func (api *Api) Branch(src string, dst string) error {
 // Get the list of accessed file from workspaceroot
 func (api *Api) GetAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -264,7 +264,7 @@ func (api *Api) GetAccessed(wsr string) error {
 // clear the list of accessed files in workspaceroot
 func (api *Api) ClearAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely one \"/\"\n", wsr)
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
