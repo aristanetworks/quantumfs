@@ -302,7 +302,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 		if toCheck.parentId == quantumfs.InodeIdInvalid {
 			return false
 		}
-		
+
 		toCheck = toCheck.parent_(c).inodeCommon()
 	}
 }
