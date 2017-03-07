@@ -353,8 +353,7 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 
 	c.dlog("File::setChildAttr Enter")
 	defer c.dlog("File::setChildAttr Exit")
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
 		panic("setChildAttr on self file before unlinking")
@@ -410,8 +409,7 @@ func (fi *File) parseExtendedAttributes_(c *ctx) {
 func (fi *File) getExtendedAttribute(c *ctx, attr string) ([]byte, bool) {
 	defer c.FuncIn("File::getExtendedAttribute", "Attr: %s", attr).out()
 
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -467,8 +465,7 @@ func (fi *File) listChildXAttr(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -498,8 +495,7 @@ func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		return fuse.EIO
 	}
 
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -518,8 +514,7 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 		return fuse.EIO
 	}
 
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -544,8 +539,7 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, err
 
 	c.dlog("File::getChildRecord Enter")
 	defer c.dlog("File::getChildRecord Exit")
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
 		panic("getChildRecord on self file before unlinking")
@@ -557,8 +551,7 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, err
 func (fi *File) setChildRecord(c *ctx, record DirectoryRecordIf) {
 	defer c.funcIn("File::setChildRecord").out()
 
-	fi.unlinkLock.Lock()
-	defer fi.unlinkLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord != nil {
 		panic("setChildRecord on self file after unlinking")
