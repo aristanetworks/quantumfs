@@ -192,6 +192,9 @@ func TestHardlinkForget(t *testing.T) {
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
+	// BUG 190827: Re-enable this test when that is fixed
+	t.Skip()
+
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
@@ -493,8 +496,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 
 			parent := test.getInode(workspace)
 
-			// Leave the file handle open so it gets orphaned. We now
-			// want to race the parent change with getting the parent
+			// We want to race the parent change with getting the parent
 			go os.Remove(filename)
 			go ManualLookup(&test.qfs.c, parent, filename)
 			go syscall.Stat(filename, &stat)
