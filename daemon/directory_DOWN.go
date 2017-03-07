@@ -14,7 +14,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	defer c.funcIn("Directory::link_DOWN").out()
 
 	// Make sure the file's flushed before we try to hardlink it. We can't do
-	// this inside the lockedParent call since Sync locks the parent as well.
+	// this with the inode parentLock locked since Sync locks the parent as well.
 	srcInode.Sync_DOWN(c)
 
 	newRecord, err := func() (DirectoryRecordIf, fuse.Status) {
@@ -45,7 +45,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 			return nil, fuse.EPERM
 		}
 
-		newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
+		newRecord, err := srcParent.makeHardlink_DOWN_(c, srcInode)
 		if err != fuse.OK {
 			c.elog("Link Failed with srcInode record")
 			return nil, err
@@ -149,7 +149,8 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	return currDir, nil
 }
 
-func (dir *Directory) makeHardlink_DOWN(c *ctx,
+// the toLink parentLock must be locked
+func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
 
 	defer c.funcIn("Directory::makeHardlink_DOWN").out()

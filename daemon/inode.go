@@ -101,7 +101,7 @@ type Inode interface {
 	markAccessed(c *ctx, path string, created bool)
 	markSelfAccessed(c *ctx, created bool)
 
-	// Note: parent_ must only be called with the parentLock RLock-ed, and the
+	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
 	parent_(c *ctx) Inode
 	setParent(newParent InodeId)
@@ -195,11 +195,11 @@ type InodeCommon struct {
 	dirtyElement_    *list.Element
 }
 
-// Must have the parentLock RLock()-ed.
+// Must have the parentLock R/W Lock()-ed.
 func (inode *InodeCommon) parent_(c *ctx) Inode {
 	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
-		c.elog("Parent was unloaded before child"+"! %d", inode.parentId)
+		c.elog("Parent was unloaded before child! %d", inode.parentId)
 		parent = c.qfs.inode(c, inode.parentId)
 	}
 
@@ -214,6 +214,9 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string, created bool) 
 
 func (inode *InodeCommon) parentSyncChild(c *ctx, childId InodeId,
 	publishFn func() quantumfs.ObjectKey) {
+
+	defer c.FuncIn("InodeCommon::parentSyncChild", "%d of %d", childId,
+		inode.id).out()
 
 	defer inode.parentLock.RLock().RUnlock()
 
@@ -285,20 +288,28 @@ func (inode *InodeCommon) parentGetChildRecord(c *ctx,
 // otherwise part of the chain we've iterated past could be moved and change
 // what we should have returned here
 func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
-	defer inode.parentLock.RLock().RUnlock()
+	defer c.FuncIn("InodeCommon::parentHadAncestor", "%d %d", inode.inodeNum(),
+		ancestor.inodeNum())
 
-	if ancestor.inodeNum() == inode.parentId {
-		return true
+	toCheck := inode
+	for {
+		defer toCheck.parentLock.RLock().RUnlock()
+
+		if ancestor.inodeNum() == toCheck.parentId {
+			return true
+		}
+
+		if toCheck.parentId == quantumfs.InodeIdInvalid {
+			return false
+		}
+
+		toCheck = toCheck.parent_(c).inodeCommon()
 	}
-
-	if inode.parentId == quantumfs.InodeIdInvalid {
-		return false
-	}
-
-	return inode.parent_(c).parentHasAncestor(c, ancestor)
 }
 
+// Locks the parent
 func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
+	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).out()
 
 	// Ensure we lock in the UP direction
 	defer inode.parentLock.Lock().Unlock()
@@ -306,7 +317,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.lock.Unlock()
 	defer parent.childRecordLock.Lock().Unlock()
 
-	// Check again, now with the locks, if this is still a child
+	// Check if this is still a child
 	record := parent.children.record(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
@@ -485,6 +496,8 @@ func (inode *InodeCommon) isWorkspaceRoot() bool {
 func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 	deleteFromParent func() (toOrphan DirectoryRecordIf,
 		err fuse.Status)) fuse.Status {
+
+	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).out()
 
 	inode.lock.Lock()
 	defer inode.lock.Unlock()

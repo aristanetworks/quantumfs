@@ -1109,21 +1109,19 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 	// Update the Hash value before generating the key
 	inode.Sync_DOWN(c)
 
-	return func() ([]byte, fuse.Status) {
-		inodeCommon := inode.inodeCommon()
-		defer inodeCommon.parentLock.RLock().RUnlock()
+	inodeCommon := inode.inodeCommon()
+	defer inodeCommon.parentLock.RLock().RUnlock()
 
-		var dir *Directory
-		parent := inodeCommon.parent_(c)
-		if parent.isWorkspaceRoot() {
-			dir = &parent.(*WorkspaceRoot).Directory
-		} else {
-			dir = parent.(*Directory)
-		}
+	var dir *Directory
+	parent := inodeCommon.parent_(c)
+	if parent.isWorkspaceRoot() {
+		dir = &parent.(*WorkspaceRoot).Directory
+	} else {
+		dir = parent.(*Directory)
+	}
 
-		// Don't need inode.LockTree().Unlock() because we're still covered
-		return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
-	}()
+	// Don't need inode.LockTree().Unlock() because we're still covered
+	return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
 }
 
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,

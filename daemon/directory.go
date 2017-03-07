@@ -195,7 +195,7 @@ func (dir *Directory) addChild_(c *ctx, inode InodeId, child DirectoryRecordIf) 
 	dir.updateSize_(c)
 }
 
-// Needs inode lock for write, must be called from within Child's lockedParent
+// Needs inode lock and parentLock for write
 func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf) {
 	defer c.funcIn("Directory::delChild_").out()
 
@@ -515,7 +515,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	}()
 
 	if checkInodeId != quantumfs.InodeIdInvalid {
-		// check outside of the directory lock
+		// check outside of the directory lock because we're calling DOWN and
+		// the child might call UP and lock us
 		dir.checkHardlink(c, checkInodeId)
 	}
 
