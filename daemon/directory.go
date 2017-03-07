@@ -266,8 +266,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
-	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %o", fileType,
-		entry.Permissions())
+	c.dlog("fillAttrWithDirectoryRecord type %x permissions %o links %d",
+		fileType, entry.Permissions(), attr.Nlink)
 
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
@@ -715,9 +715,11 @@ func (dir *Directory) getChildRecord(c *ctx,
 	}
 
 	// if we don't have the child, maybe we're wsr and it's a hardlink
-	valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
-	if valid {
-		return &linkRecord, nil
+	if dir.self.isWorkspaceRoot() {
+		valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+		if valid {
+			return linkRecord, nil
+		}
 	}
 
 	return &quantumfs.DirectoryRecord{},
@@ -1527,7 +1529,8 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 
-	defer c.FuncIn("Directory::instantiateChild", "Inode %d", inodeNum)
+	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
+		dir.inodeNum()).out()
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.children.record(inodeNum)
@@ -1541,11 +1544,10 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		return dir.wsr.instantiateChild(c, inodeNum)
 	}
 
-	// add a failsafe incase there's an inconsistency
+	// add a check incase there's an inconsistency
 	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
-		c.elog("Hardlink not recognized by workspaceroot?: %d, %d",
-			inodeNum, hardlink.linkId)
-		return dir.wsr.instantiateChild(c, inodeNum)
+		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
+			inodeNum, hardlink.linkId))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)

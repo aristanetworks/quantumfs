@@ -116,10 +116,11 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 }
 
 func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
-	defer c.funcIn("File::openPermission").out()
+	defer c.FuncIn("File::openPermission", "%d", fi.inodeNum()).out()
 
 	record, error := fi.parentGetChildRecord(c, fi.id)
 	if error != nil {
+		c.elog("%s", error.Error())
 		return false
 	}
 
