@@ -75,15 +75,19 @@ class ApiImpl: public Api {
 	void Close();
 
 	// implemented API functions
-	Error GetAccessed(const char *workspace_root);
+	virtual Error GetAccessed(const char *workspace_root);
 
-	Error InsertInode(const char *destination,
-			  const char *key,
-			  uint32_t permissions,
-			  uint32_t uid,
-			  uint32_t gid);
+	virtual Error InsertInode(const char *destination,
+				  const char *key,
+				  uint32_t permissions,
+				  uint32_t uid,
+				  uint32_t gid);
 
-	Error Branch(const char *source, const char *destination);
+	virtual Error Branch(const char *source, const char *destination);
+
+	virtual Error SetBlock(const char *key,  const char *data);
+
+	virtual Error GetBlock(const char *key, std::string *data);
 
  private:
 	// CommandBuffer is used internally to store the raw content of a command to

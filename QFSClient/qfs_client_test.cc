@@ -393,6 +393,67 @@ TEST_F(QfsClientApiTest, BranchTest) {
 		     (char*)this->expected_written_command.Data());
 }
 
+// This test covers ApiImpl::SetBlock().
+TEST_F(QfsClientApiTest, SetBlockTest) {
+	ASSERT_FALSE(this->api == NULL);
+
+	Error err = this->api->Open();
+	ASSERT_EQ(err.code, kSuccess);
+
+	// set up expected written JSON:
+	std::string expected_written_command_json =
+	"{'CommandId':7,"
+	 "'Data':'bG9va2JlaGluZHlvdQo=',"
+	 "'Key':'somearbitrarykeyvalue03423278'}";
+	util::requote(expected_written_command_json);
+	this->expected_written_command.CopyString(
+		expected_written_command_json.c_str());
+
+	err = this->api->SetBlock("somearbitrarykeyvalue03423278",
+				  "bG9va2JlaGluZHlvdQo=");
+	ASSERT_EQ(err.code, kSuccess);
+
+	// compare what the API function actually wrote with what we expected
+	ASSERT_EQ(this->actual_written_command.Size(),
+		  this->expected_written_command.Size());
+	ASSERT_STREQ((char*)this->actual_written_command.Data(),
+		     (char*)this->expected_written_command.Data());
+}
+
+// This test covers ApiImpl::GetBlock().
+TEST_F(QfsClientApiTest, GetBlockTest) {
+	ASSERT_FALSE(this->api == NULL);
+
+	Error err = this->api->Open();
+	ASSERT_EQ(err.code, kSuccess);
+
+	// set up expected written JSON:
+	std::string expected_written_command_json =
+	"{'CommandId':8,'Key':'somearbitrarykeyvalue03423278'}";
+	util::requote(expected_written_command_json);
+	this->expected_written_command.CopyString(
+		expected_written_command_json.c_str());
+
+	// set up JSON to be returned as a response to GetBlock()
+	std::string expected_read_command_json =
+	"{'Data':'bG9va2JlaGluZHlvdQo=','ErrorCode':0,'Message':'success'}";
+	util::requote(expected_read_command_json);
+	this->read_command.CopyString(expected_read_command_json.c_str());
+
+	std::string data;
+	err = this->api->GetBlock("somearbitrarykeyvalue03423278", &data);
+	ASSERT_EQ(err.code, kSuccess);
+
+	// compare what the API function actually wrote with what we expected
+	ASSERT_EQ(this->actual_written_command.Size(),
+		  this->expected_written_command.Size());
+	ASSERT_STREQ((char*)this->actual_written_command.Data(),
+		     (char*)this->expected_written_command.Data());
+
+	// also check that GetBlock() returned what we expected
+	ASSERT_STREQ(data.c_str(), "bG9va2JlaGluZHlvdQo=");
+}
+
 // Test ApiImpl::SendJson(), which is shared by all API handlers
 TEST_F(QfsClientApiTest, SendJsonTest) {
 	ASSERT_FALSE(this->api == NULL);
@@ -694,7 +755,6 @@ class GoLikePrinter : public ::testing::EmptyTestEventListener {
 };
 
 int main(int argc, char **argv) {
-
 	::testing::InitGoogleTest(&argc, argv);
 	::testing::TestEventListeners& listeners =
 		::testing::UnitTest::GetInstance()->listeners();
