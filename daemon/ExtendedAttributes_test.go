@@ -643,18 +643,17 @@ func TestOrphanFileXAttrRemove(t *testing.T) {
 }
 
 func TestHardlinkXAttr(t *testing.T) {
-t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		err := os.MkdirAll(workspace + "/subdir", 0777)
 		test.assertNoErr(err)
 
-		err = printToFile(workspace + "/file", string(genData(2000)))
+		err = printToFile(workspace + "/subdir/file", string(genData(2000)))
 		test.assertNoErr(err)
 
 		linkFile := workspace + "/subdir/link"
-		err = syscall.Link(workspace + "/file", linkFile)
+		err = syscall.Link(workspace + "/subdir/file", linkFile)
 		test.assertNoErr(err)
 
 		attrNoData := "user.nodata"
