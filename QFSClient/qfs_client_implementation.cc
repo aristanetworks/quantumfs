@@ -542,6 +542,69 @@ Error ApiImpl::Branch(const char *source, const char *destination) {
 	return util::getError(kSuccess);
 }
 
+Error ApiImpl::SetBlock(const char *key,  const char *data) {
+	// create JSON with:
+	//	CommandId = kCmdSetBlock and
+	//	Key = key
+	//	Data = data
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kSetBlockJSON,
+					    kCommandId, kCmdSetBlock,
+					    kKey, key,
+					    kData, data);
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+
+	Error err = this->SendJson(&context);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::GetBlock(const char *key, std::string *data) {
+	// create JSON with:
+	//	CommandId = kCmdGetBlock and
+	//	Key = key
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kGetBlockJSON,
+					    kCommandId, kCmdGetBlock,
+					    kKey, key);
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+
+	Error err = this->SendJson(&context);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	json_t *response_json = context.GetResponseJsonObject();
+
+	json_t *data_json_obj = json_object_get(response_json, kData);
+	if (data_json_obj == NULL) {
+		return util::getError(kMissingJsonObject, kData);
+	}
+	if (!json_is_string(data_json_obj)) {
+		return util::getError(kJsonObjectWrongType,
+				      "expected string for " + std::string(kData));
+	}
+
+	*data = json_string_value(data_json_obj);
+
+	return util::getError(kSuccess);
+}
+
 Error ApiImpl::PrepareAccessedListResponse(
 	const ApiContext *context,
 	std::unordered_map<std::string, bool> *accessed_list) {
@@ -556,10 +619,9 @@ Error ApiImpl::PrepareAccessedListResponse(
 	// key is the name of a file that has been created, whereas a false
 	// value in the map means that the value's corresponding key is the name
 	// of a file that has been accessed.
-	json_t *accessed_list_json_obj = json_object_get(response_json,
-							 kAccessList);
+	json_t *accessed_list_json_obj = json_object_get(response_json, kAccessList);
 	if (accessed_list_json_obj == NULL) {
-		return util::getError(kMissingJsonObject, "AccessList");
+		return util::getError(kMissingJsonObject, kAccessList);
 	}
 
 	const char *k;

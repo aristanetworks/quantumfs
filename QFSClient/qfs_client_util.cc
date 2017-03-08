@@ -90,6 +90,8 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 		return "the API returned an error: " + details;
 	case kBufferTooBig:
 		return "an internal buffer is getting too big";
+	case kJsonObjectWrongType:
+		return "a JSON object had the wrong type: " + details;
 	}
 
 	std::string result("unknown error (");
@@ -117,6 +119,9 @@ std::string getApiError(CommandError code, std::string message) {
 		return "command failed (" + message + ")";
 	case kCmdKeyNotFound:
 		return "extended key not found in datastore (" + message + ")";
+	case kErrorBlockTooLarge:
+		return "SetBlock was passed a block that was too large: (" +
+			message + ")";
 	}
 
 	std::string result("unrecognised error code (");
