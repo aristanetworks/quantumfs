@@ -54,6 +54,9 @@ std::string buildJsonErrorDetails(const std::string &error, const char *json);
 // characters are very common in JSON but need to be escaped in string literals.
 void requote(std::string &s);
 
+void base64_encode(const std::vector<byte> &data, std::string *b64);
+void base64_decode(const std::string &b64, std::vector<byte> *data);
+
 } // namespace util
 } // namespace qfsclient
 

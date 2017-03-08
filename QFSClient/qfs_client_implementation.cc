@@ -22,7 +22,6 @@
 namespace qfsclient {
 
 ApiContext::ApiContext() : request_json_object(NULL), response_json_object(NULL) {
-
 }
 
 ApiContext::~ApiContext() {
@@ -542,7 +541,14 @@ Error ApiImpl::Branch(const char *source, const char *destination) {
 	return util::getError(kSuccess);
 }
 
-Error ApiImpl::SetBlock(const char *key,  const char *data) {
+Error ApiImpl::SetBlock(const std::vector<byte> &key,
+			const std::vector<byte> &data) {
+	// convert key and data to base64 before stuffing into JSON
+	std::string base64_key;
+	std::string base64_data;
+	util::base64_encode(key, &base64_key);
+	util::base64_encode(data, &base64_data);
+
 	// create JSON with:
 	//	CommandId = kCmdSetBlock and
 	//	Key = key
@@ -551,8 +557,8 @@ Error ApiImpl::SetBlock(const char *key,  const char *data) {
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kSetBlockJSON,
 					    kCommandId, kCmdSetBlock,
-					    kKey, key,
-					    kData, data);
+					    kKey, base64_key.c_str(),
+					    kData, base64_data.c_str());
 	if (request_json == NULL) {
 		return util::getError(kJsonEncodingError, json_error.text);
 	}
@@ -568,7 +574,11 @@ Error ApiImpl::SetBlock(const char *key,  const char *data) {
 	return util::getError(kSuccess);
 }
 
-Error ApiImpl::GetBlock(const char *key, std::string *data) {
+Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
+	// convert key to base64 before stuffing into JSON
+	std::string base64_key;
+	util::base64_encode(key, &base64_key);
+
 	// create JSON with:
 	//	CommandId = kCmdGetBlock and
 	//	Key = key
@@ -576,7 +586,7 @@ Error ApiImpl::GetBlock(const char *key, std::string *data) {
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kGetBlockJSON,
 					    kCommandId, kCmdGetBlock,
-					    kKey, key);
+					    kKey, base64_key.c_str());
 	if (request_json == NULL) {
 		return util::getError(kJsonEncodingError, json_error.text);
 	}
@@ -600,7 +610,10 @@ Error ApiImpl::GetBlock(const char *key, std::string *data) {
 				      "expected string for " + std::string(kData));
 	}
 
-	*data = json_string_value(data_json_obj);
+	const char *data_base64 = json_string_value(data_json_obj);
+
+	// convert data_base64 from base64 to binary before setting value in data
+	util::base64_decode(data_base64, data);
 
 	return util::getError(kSuccess);
 }
