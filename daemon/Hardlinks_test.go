@@ -18,25 +18,33 @@ import "github.com/hanwen/go-fuse/fuse"
 func TestHardlinkReload(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
+		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		test.assertNoErr(err)
 
 		// Create a couple files so we can copy its directory record
 		data := genData(2000)
-		testFileA := workspace + "/testFile"
-		err := printToFile(testFileA, string(data[:1000]))
+		testFileA := workspace + "/subdir/testFile"
+		err = printToFile(testFileA, string(data[:1000]))
 		test.assertNoErr(err)
 
-		testFileB := workspace + "/testFileB"
+		testFileB := workspace + "/subdir/testFileB"
 		err = printToFile(testFileB, string(data))
 		test.assertNoErr(err)
 
 		// artificially insert some hardlinks into the map
 		wsr := test.getWorkspaceRoot(workspace)
 
-		err = syscall.Link(testFileA, workspace+"/linkFileA")
+		err = syscall.Link(testFileA, workspace+"/subdir/linkFileA")
 		test.assertNoErr(err)
-		err = syscall.Link(testFileA, workspace+"/linkFileA2")
+		err = syscall.Link(testFileA,
+			workspace+"/subdir/grandchild/linkFileA2")
 		test.assertNoErr(err)
-		err = syscall.Link(testFileB, workspace+"/linkFileB")
+		err = syscall.Link(testFileB, workspace+"/subdir/linkFileB")
+		test.assertNoErr(err)
+
+		// Write data to the hardlink to ensure it's syncChild function works
+		err = printToFile(workspace+"/subdir/grandchild/linkFileA2",
+			string(data[1000:]))
 		test.assertNoErr(err)
 
 		// Write another file to ensure the wsr is dirty
@@ -53,6 +61,17 @@ func TestHardlinkReload(t *testing.T) {
 		test.assert(err == nil, "Unable to branch")
 
 		wsrB := test.getWorkspaceRoot(workspaceB)
+
+		// ensure that the hardlink was able to sync
+		wsrBFileA := test.absPath(workspaceB+"/subdir/grandchild/linkFileA2")
+		readData, err := ioutil.ReadFile(wsrBFileA)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(readData, data),
+			"Data not synced via hardlink")
+
+		stat, err := os.Stat(wsrBFileA)
+		test.assertNoErr(err)
+		test.assert(stat.Size() == int64(len(data)), "file length mismatch")
 
 		test.assert(len(wsr.hardlinks) == len(wsrB.hardlinks),
 			"Hardlink map length not preserved: %v %v", wsr.hardlinks,
