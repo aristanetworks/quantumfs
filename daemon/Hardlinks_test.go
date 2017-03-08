@@ -63,7 +63,8 @@ func TestHardlinkReload(t *testing.T) {
 		wsrB := test.getWorkspaceRoot(workspaceB)
 
 		// ensure that the hardlink was able to sync
-		wsrBFileA := test.absPath(workspaceB+"/subdir/grandchild/linkFileA2")
+		wsrBFileA := test.absPath(workspaceB +
+			"/subdir/grandchild/linkFileA2")
 		readData, err := ioutil.ReadFile(wsrBFileA)
 		test.assertNoErr(err)
 		test.assert(bytes.Equal(readData, data),
