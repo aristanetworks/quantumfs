@@ -160,7 +160,8 @@ func (th *testHelper) execute(test quantumFsTest) {
 			result += "\nStack Trace:\n" + trace
 		}
 
-		// Somehow this can hang if the channel isn't buffered
+		// This can hang if the channel isn't buffered because in some rare
+		// situations the other side isn't there to read from the channel
 		th.testResult <- result
 	}(th)
 
