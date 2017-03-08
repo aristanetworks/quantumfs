@@ -87,6 +87,8 @@ type CommandCommon struct {
 }
 
 // The various command ID constants
+// IMPORTANT: please do not change the order/values of the above constants, QFSClient
+// depends on the fact that the values should not change !!!!!
 const (
 	CmdError           = iota
 	CmdBranchRequest   = iota
@@ -101,6 +103,8 @@ const (
 )
 
 // The various error codes
+// IMPORTANT: please do not change the order/values of the above constants, QFSClient
+// depends on the fact that the values should not change !!!!!
 const (
 	ErrorOK                = iota // Command Successful
 	ErrorBadArgs           = iota // The argument is wrong
