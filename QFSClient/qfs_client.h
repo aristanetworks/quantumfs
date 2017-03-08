@@ -6,6 +6,8 @@
 
 namespace qfsclient {
 
+typedef uint8_t byte;
+
 /// Potential error values that may be returned in an ErrorCode object
 /// by methods of the Api class
 enum ErrorCode {
@@ -127,8 +129,8 @@ class Api {
 	/// block of data to store.
 	///
 	/// @return An `Error` object that indicates success or failure.
-	virtual Error SetBlock(const char *key,
-			       const char *data) = 0;
+	virtual Error SetBlock(const std::vector<byte> &key,
+			       const std::vector<byte> &data) = 0;
 
 	/// Retrieve a block of data from the persistent data store.
 	///
@@ -138,8 +140,8 @@ class Api {
 	/// base64 representation of the data block.
 	///
 	/// @return An `Error` object that indicates success or failure.
-	virtual Error GetBlock(const char *key,
-			       std::string *data) = 0;
+	virtual Error GetBlock(const std::vector<byte> &key,
+			       std::vector<byte> *data) = 0;
 };
 
 /// Get an instance of an `Api` object that can be used to call QuantumFS API
