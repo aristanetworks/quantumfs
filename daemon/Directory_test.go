@@ -554,7 +554,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 			string(data))
 	})
 }
-
+ToRemove
 func TestLargeDirectory(t *testing.T) {
 	runExpensiveTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
