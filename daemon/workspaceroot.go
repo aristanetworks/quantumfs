@@ -5,6 +5,7 @@ package daemon
 
 import "fmt"
 import "sync"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -135,6 +136,9 @@ func (wsr *WorkspaceRoot) hardlinkInc(linkId HardlinkId) {
 		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
 	}
 
+	// Linking updates ctime
+	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+
 	entry.nlink++
 	wsr.hardlinks[linkId] = entry
 }
@@ -152,6 +156,9 @@ func (wsr *WorkspaceRoot) hardlinkDec(linkId HardlinkId) bool {
 	} else {
 		panic("over decrement in hardlink ref count")
 	}
+
+	// Unlinking updates ctime
+	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
 
 	// Normally, nlink should still be at least 1
 	if entry.nlink > 0 {
@@ -196,17 +203,14 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
 	newEntry := newLinkEntry(dirRecord)
 	newEntry.inodeId = inodeId
+	// Linking updates ctime
+	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+
 	wsr.hardlinks[newId] = newEntry
 	wsr.inodeToLink[inodeId] = newId
 
-	// Fix the inode to use the wsr as direct parent
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
-	if inode == nil {
-		c.qfs.addUninstantiated(c, []InodeId{inodeId}, wsr.inodeNum())
-	} else {
-		inode.setParent(wsr.inodeNum())
-	}
-
+	// Don't reparent the inode, the caller must do so while holding the inode's
+	// parent lock
 	wsr.dirty(c)
 
 	return newHardlink(record.Filename(), newId, wsr)
@@ -294,11 +298,10 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 	return false, quantumfs.DirectoryRecord{}
 }
 
-func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
-	newParent InodeId) (record DirectoryRecordIf, inodeId InodeId) {
+func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
+	linkId HardlinkId) (record DirectoryRecordIf, inodeId InodeId) {
 
-	defer c.FuncIn("WorkspaceRoot::RemoveHardlink", "%d for new parent %d",
-		linkId, newParent).out()
+	defer c.FuncIn("WorkspaceRoot::removeHardlink", "link %d", linkId).out()
 
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -313,6 +316,9 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 		return nil, quantumfs.InodeIdInvalid
 	}
 
+	// Unlinking updates ctime
+	link.record.SetContentTime(quantumfs.NewTime(time.Now()))
+
 	// our return variables
 	inodeId = link.inodeId
 
@@ -326,12 +332,8 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx, linkId HardlinkId,
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
 
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
-	if inode == nil {
-		c.qfs.addUninstantiated(c, []InodeId{inodeId}, newParent)
-	} else {
-		inode.setParent(newParent)
-	}
+	// Do not reparent here. It must be done safety with either the treeLock or
+	// the child, parent, and lockedParent locks locked in an UP order
 
 	wsr.dirty(c)
 
