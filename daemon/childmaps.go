@@ -146,10 +146,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 		return nil
 	}
 
-	// This may be a hardlink that is due to be converted. To avoid
-	// having to call the DOWN check function, we can use the fact that
-	// we're orphaning the file and have it completely locked
-	// to do the equivalent ourselves, with similar but more minimal code
+	// This may be a hardlink that is due to be converted.
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
 		newRecord, inodeId := cmap.wsr.removeHardlink(c,
 			hardlink.linkId)
