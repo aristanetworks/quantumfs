@@ -18,10 +18,10 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	srcInode.Sync_DOWN(c)
 
 	newRecord, err := func() (DirectoryRecordIf, fuse.Status) {
-		defer srcInode.inodeCommon().parentLock.Lock().Unlock()
+		defer srcInode.getParentLock().Lock().Unlock()
 
 		// ensure we're not orphaned
-		if srcInode.inodeCommon().isOrphaned_() {
+		if srcInode.isOrphaned_() {
 			c.wlog("Can't hardlink an orphaned file")
 			return nil, fuse.EPERM
 		}
@@ -52,7 +52,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		}
 
 		// We need to reparent under the srcInode lock
-		srcInode.inodeCommon().parentId = dir.wsr.inodeNum()
+		srcInode.setParent_(dir.wsr.inodeNum())
 
 		return newRecord, fuse.OK
 	}()
