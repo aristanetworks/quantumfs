@@ -103,13 +103,17 @@ type Inode interface {
 
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
+	parentId_() InodeId
 	parent_(c *ctx) Inode
 	setParent(newParent InodeId)
+	setParent_(newParent InodeId)
+	getParentLock() *DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
 	// orphaned from the directory tree and cannot be accessed except directly by
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
+	isOrphaned_() bool
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan DirectoryRecordIf,
 			err fuse.Status)) fuse.Status
@@ -154,7 +158,6 @@ type Inode interface {
 		out *fuse.EntryOut) fuse.Status
 
 	inodeNum() InodeId
-	inodeCommon() *InodeCommon
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
@@ -195,7 +198,14 @@ type InodeCommon struct {
 	dirtyElement_    *list.Element
 }
 
-// Must have the parentLock R/W Lock()-ed.
+// Must have the parentLock R/W Lock()-ed during the call and for the duration the
+// id is used
+func (inode *InodeCommon) parentId_() InodeId {
+	return inode.parentId
+}
+
+// Must have the parentLock R/W Lock()-ed during the call and for the duration the
+// returned Inode is used
 func (inode *InodeCommon) parent_(c *ctx) Inode {
 	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
@@ -291,19 +301,28 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	defer c.FuncIn("InodeCommon::parentHadAncestor", "%d %d", inode.inodeNum(),
 		ancestor.inodeNum())
 
-	toCheck := inode
-	for {
-		defer toCheck.parentLock.RLock().RUnlock()
+	defer inode.parentLock.RLock().RUnlock()
+	if ancestor.inodeNum() == inode.parentId_() {
+		return true
+	}
 
-		if ancestor.inodeNum() == toCheck.parentId {
+	if inode.parentId_() == quantumfs.InodeIdInvalid {
+		return false
+	}
+
+	toCheck := inode.parent_(c)
+	for {
+		defer toCheck.getParentLock().RLock().RUnlock()
+
+		if ancestor.inodeNum() == toCheck.parentId_() {
 			return true
 		}
 
-		if toCheck.parentId == quantumfs.InodeIdInvalid {
+		if toCheck.parentId_() == quantumfs.InodeIdInvalid {
 			return false
 		}
 
-		toCheck = toCheck.parent_(c).inodeCommon()
+		toCheck = toCheck.parent_(c)
 	}
 }
 
@@ -352,6 +371,15 @@ func (inode *InodeCommon) setParent(newParent InodeId) {
 	inode.parentId = newParent
 }
 
+// Must be called with parentLock locked for writing
+func (inode *InodeCommon) setParent_(newParent InodeId) {
+	inode.parentId = newParent
+}
+
+func (inode *InodeCommon) getParentLock() *DeferableRwMutex {
+	return &inode.parentLock
+}
+
 func (inode *InodeCommon) isOrphaned() bool {
 	defer inode.parentLock.RLock().RUnlock()
 
@@ -365,10 +393,6 @@ func (inode *InodeCommon) isOrphaned_() bool {
 
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
-}
-
-func (inode *InodeCommon) inodeCommon() *InodeCommon {
-	return inode
 }
 
 // Add this Inode to the dirty list
