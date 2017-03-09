@@ -266,8 +266,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
-	c.dlog("fillAttrWithDirectoryRecord type %x permissions %o links %d",
-		fileType, entry.Permissions(), attr.Nlink)
+	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %o", fileType,
+		entry.Permissions())
 
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
@@ -716,11 +716,9 @@ func (dir *Directory) getChildRecord(c *ctx,
 	}
 
 	// if we don't have the child, maybe we're wsr and it's a hardlink
-	if dir.self.isWorkspaceRoot() {
-		valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
-		if valid {
-			return linkRecord, nil
-		}
+	valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+	if valid {
+		return &linkRecord, nil
 	}
 
 	return &quantumfs.DirectoryRecord{},
@@ -1537,26 +1535,20 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
+	defer c.vlog("Directory::instantiateChild Exit")
 
-	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
-		dir.inodeNum()).out()
+	// check if the child is a hardlink first
+	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
+		return dir.wsr.instantiateChild(c, inodeNum)
+	}
+
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
 		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
 			inodeNum))
-	}
-
-	// check if the child is a hardlink
-	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
-		return dir.wsr.instantiateChild(c, inodeNum)
-	}
-
-	// add a check incase there's an inconsistency
-	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
-		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
-			inodeNum, hardlink.linkId))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)
