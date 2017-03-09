@@ -184,7 +184,7 @@ type InodeCommon struct {
 	parentLock DeferableRwMutex
 	parentId   InodeId
 
-	lock sync.RWMutex
+	lock DeferableRwMutex
 
 	// The treeLock is used to lock the entire workspace tree when certain
 	// tree-wide operations are being performed. Primarily this is done with all
@@ -332,8 +332,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 
 	// Ensure we lock in the UP direction
 	defer inode.parentLock.Lock().Unlock()
-	parent.lock.Lock()
-	defer parent.lock.Unlock()
+	defer parent.lock.Lock().Unlock()
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
@@ -475,14 +474,12 @@ func (inode *InodeCommon) RLockTree() *sync.RWMutex {
 	return inode.treeLock_
 }
 
-func (inode *InodeCommon) Lock() *sync.RWMutex {
-	inode.lock.Lock()
-	return &inode.lock
+func (inode *InodeCommon) Lock() NeedWriteUnlock {
+	return inode.lock.Lock()
 }
 
-func (inode *InodeCommon) RLock() *sync.RWMutex {
-	inode.lock.RLock()
-	return &inode.lock
+func (inode *InodeCommon) RLock() NeedReadUnlock {
+	return inode.lock.RLock()
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
@@ -523,8 +520,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).out()
 
-	inode.lock.Lock()
-	defer inode.lock.Unlock()
+	defer inode.lock.Lock().Unlock()
 
 	// We must perform the deletion with the lockedParent lock
 	defer inode.parentLock.Lock().Unlock()

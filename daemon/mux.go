@@ -1118,7 +1118,6 @@ func getQuantumfsExtendedKey(c *ctx, inode Inode) ([]byte, fuse.Status) {
 		dir = parent.(*Directory)
 	}
 
-	// Don't need inode.LockTree().Unlock() because we're still covered
 	return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
 }
 
