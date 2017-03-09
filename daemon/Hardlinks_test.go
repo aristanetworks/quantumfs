@@ -47,16 +47,16 @@ func TestHardlinkReload(t *testing.T) {
 			string(data[1000:]))
 		test.assertNoErr(err)
 
-		var stat syscall.Stat_t
-		err = syscall.Stat(testFileA, &stat)
+		var nstat syscall.Stat_t
+		err = syscall.Stat(testFileA, &nstat)
 		test.assertNoErr(err)
-		test.assert(stat.Nlink == 3,
-			"Nlink incorrect: %d", stat.Nlink)
+		test.assert(nstat.Nlink == 3,
+			"Nlink incorrect: %d", nstat.Nlink)
 
-		err = syscall.Stat(testFileB, &stat)
+		err = syscall.Stat(testFileB, &nstat)
 		test.assertNoErr(err)
-		test.assert(stat.Nlink == 2,
-			"Nlink incorrect: %d", stat.Nlink)
+		test.assert(nstat.Nlink == 2,
+			"Nlink incorrect: %d", nstat.Nlink)
 
 		// Write another file to ensure the wsr is dirty
 		testFileC := workspace + "/testFileC"
