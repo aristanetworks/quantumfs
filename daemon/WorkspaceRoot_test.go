@@ -37,28 +37,42 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 	})
 }
 
-func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) {
+func testPreparation(test *testHelper, subdirectory string) (string, string,
+	[]byte, []byte) {
+
 	baseWorkspace := test.newWorkspace()
 
 	baseDirName := baseWorkspace + subdirectory + "/dir"
 	err := os.MkdirAll(baseDirName, 0666)
 	test.assert(err == nil, "Error creating a directory: %v", err)
 
+	content := []byte("This is a test")
 	baseFileName := baseWorkspace + subdirectory + "/file"
 	file, err := os.Create(baseFileName)
-	file.Close()
 	test.assert(err == nil, "Error creating a small file: %v", err)
+
+	n, err := file.Write(content)
+	defer file.Close()
+	test.assert(err == nil && n == len(content),
+		"Error writing to the small file: %v", err)
 
 	attrData := "user.data"
 	attrDataData := []byte("sampleData")
 	err = syscall.Setxattr(baseFileName, attrData, attrDataData, 0)
 	test.assert(err == nil, "Error setting data XAttr: %v", err)
 
+	return baseWorkspace, attrData, attrDataData, content
+}
+
+func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) {
+	baseWorkspace, attrData, attrDataData, _ :=
+		testPreparation(test, subdirectory)
+
 	wsr := test.branchWorkspaceWithoutWritePerm(baseWorkspace)
 	workspace := test.absPath(wsr)
 
 	dirName := workspace + subdirectory + "/dir1"
-	err = os.Mkdir(dirName, 0666)
+	err := os.Mkdir(dirName, 0666)
 	test.assert(strings.Contains(err.Error(), "operation not permitted"),
 		"Error creating directories: %s", err.Error())
 
@@ -98,15 +112,10 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 	test.assert(strings.Contains(err.Error(), "operation not permitted"),
 		"Error unlinking directory: %v", err)
 
-	file, err = os.OpenFile(targetFile, os.O_RDWR, 0)
+	file, err := os.OpenFile(targetFile, os.O_RDWR, 0)
 	file.Close()
 	test.assert(strings.Contains(err.Error(), "operation not permitted"),
-		"Error openning the file: %v", err)
-
-	file, err = os.OpenFile(targetFile, os.O_RDWR, 0)
-	file.Close()
-	test.assert(strings.Contains(err.Error(), "operation not permitted"),
-		"Error openning the file: %v", err)
+		"Error opening the file: %v", err)
 
 	err = os.Rename(targetFile, workspace+"/newFile")
 	test.assert(strings.Contains(err.Error(), "operation not permitted"),
@@ -127,33 +136,15 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 }
 
 func testWorkspaceReadNoWritePermission(test *testHelper, subdirectory string) {
-	baseWorkspace := test.newWorkspace()
-
-	baseDirName := baseWorkspace + subdirectory + "/dir"
-	err := os.MkdirAll(baseDirName, 0666)
-	test.assert(err == nil, "Error creating a directory: %v", err)
-
-	content := []byte("This is a test")
-	baseFileName := baseWorkspace + subdirectory + "/file"
-	file, err := os.Create(baseFileName)
-	test.assert(err == nil, "Error creating a small file: %v", err)
-
-	n, err := file.Write(content)
-	test.assert(err == nil && n == len(content),
-		"Error writing to the small file: %v", err)
-	file.Close()
-
-	attrData := "user.data"
-	attrDataData := []byte("sampleData")
-	err = syscall.Setxattr(baseFileName, attrData, attrDataData, 0)
-	test.assert(err == nil, "Error setting data XAttr: %v", err)
+	baseWorkspace, attrData, attrDataData, content :=
+		testPreparation(test, subdirectory)
 
 	baseLinkName := baseWorkspace + subdirectory + "/link"
-	err = syscall.Link(baseFileName, baseLinkName)
+	err := syscall.Link(baseWorkspace+subdirectory+"/file", baseLinkName)
 	test.assert(err == nil, "Error creating hardlink: %v", err)
 
-	baseFileName = baseDirName + "/file1"
-	file, err = os.Create(baseFileName)
+	baseFileName := baseWorkspace + subdirectory + "/dir/file1"
+	file, err := os.Create(baseFileName)
 	file.Close()
 	test.assert(err == nil, "Error creating a small file: %v", err)
 
@@ -166,7 +157,7 @@ func testWorkspaceReadNoWritePermission(test *testHelper, subdirectory string) {
 	test.assert(err == nil, "Error opening the file: %v", err)
 
 	buf := make([]byte, 256)
-	n, err = file.Read(buf)
+	n, err := file.Read(buf)
 	test.assert(err == nil && bytes.Equal(buf[:n], content),
 		"Error reading the exact content: %s with error: %v",
 		string(buf[:n]), err)
@@ -174,7 +165,7 @@ func testWorkspaceReadNoWritePermission(test *testHelper, subdirectory string) {
 	targetDir := workspace + subdirectory + "/dir"
 	dir, err := os.Open(targetDir)
 	defer dir.Close()
-	test.assert(err == nil, "Error openning the directory: %v", err)
+	test.assert(err == nil, "Error opening the directory: %v", err)
 
 	names, err := dir.Readdirnames(0)
 	test.assert(err == nil && len(names) == 1 && names[0] == "file1",
@@ -219,10 +210,32 @@ func TestWorkspaceReadNoWritePermissionAtRoot(t *testing.T) {
 		testWorkspaceReadNoWritePermission(test, "")
 	})
 }
+
 func TestWorkspaceReadNoWritePermissionAtSubdirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// BUG 190845: Re-enable this test when that is fixed
 		t.Skip()
 		testWorkspaceReadNoWritePermission(test, "/test")
+	})
+}
+
+func TestWorkspaceDeleteAndRecreate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		api := test.getApi()
+		err := api.DeleteWorkspace(workspaceName)
+		test.assert(err == nil, "Failed deleting the workspace %s",
+			workspaceName)
+
+		// Create a new workspace with the same name
+		api.Branch(test.nullWorkspaceRel(), workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
 	})
 }

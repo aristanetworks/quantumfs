@@ -89,10 +89,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
 
-	// All workspaces start with the default read-only
-	defer c.qfs.mutabilityLock.Lock().Unlock()
-	c.qfs.workspaceMutability[inodeNum] = false
-
 	return &wsr, uninstantiated
 }
 
