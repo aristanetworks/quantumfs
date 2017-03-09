@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gocql/gocql"
 )
@@ -33,7 +34,7 @@ func setupCluster(cfg ClusterConfig) *gocql.ClusterConfig {
 
 // use GoCQL APIs to benchmark wsdb writes
 func benchWsdbWrites(b *testing.B, cluster *gocql.ClusterConfig,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	db, err := cluster.CreateSession()
 	if err != nil {
@@ -41,12 +42,13 @@ func benchWsdbWrites(b *testing.B, cluster *gocql.ClusterConfig,
 	}
 	defer db.Close()
 
-	b.ResetTimer()
-	b.ReportAllocs()
-
+	// ttl is unused
 	qryStr := fmt.Sprintf("insert into %s.workspacedb("+
 		"typespace, namespace, workspace, key) values (?,?,?,?)",
 		keyspace)
+
+	b.ReportAllocs()
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -61,7 +63,7 @@ func benchWsdbWrites(b *testing.B, cluster *gocql.ClusterConfig,
 
 // use GoCQL APIs to benchmark wsdb cached reads
 func benchWsdbCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	db, err := cluster.CreateSession()
 	if err != nil {
@@ -70,6 +72,7 @@ func benchWsdbCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 	defer db.Close()
 
 	// setup the data to be read
+	// ttl is unused
 	wQryStr := fmt.Sprintf("insert into %s.workspacedb("+
 		"typespace, namespace, workspace, key) values (?,?,?,?)",
 		keyspace)
@@ -79,14 +82,14 @@ func benchWsdbCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 		return
 	}
 
-	b.ResetTimer()
-	b.ReportAllocs()
-
 	// must use the index in the table else the query takes too long
 	// since all the nodes are checked for data
 	rQryStr := fmt.Sprintf("select typespace, namespace, workspace, key "+
 		"from %s.workspacedb where typespace='wsdb' and namespace='bench' "+
 		"and workspace='test'", keyspace)
+
+	b.ReportAllocs()
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		var typespace, workspace, namespace string
@@ -111,7 +114,7 @@ func benchWsdbCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 // use GoCQL APIs to benchmark blob cached reads
 func benchBlobCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 	key string, check []byte, writeBuf []byte,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	db, err := cluster.CreateSession()
 	if err != nil {
@@ -119,26 +122,52 @@ func benchBlobCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 	}
 	defer db.Close()
 
-	wQryStr := fmt.Sprintf("insert into %s.blobStore (key, value)"+
-		"values (?,?)", keyspace)
+	var wQryStr string
+	if ttl < 0 {
+		wQryStr = fmt.Sprintf("insert into %s.blobStore (key, value)"+
+			"values (?,?)", keyspace)
+	} else {
+		wQryStr = fmt.Sprintf("insert into %s.blobStore (key, value)"+
+			"values (?,?) using ttl %d", keyspace, ttl)
+	}
+
 	err = db.Query(wQryStr, key, writeBuf).Exec()
 	if err != nil {
 		b.Fatal(err)
 		return
 	}
 
-	b.ResetTimer()
-	b.ReportAllocs()
-
 	// must use the index in the table else the query takes too long
 	// since all the nodes are checked for data
-	rQryStr := fmt.Sprintf("select value from %s.blobStore "+
-		"where key='%s'", keyspace, key)
+	var rQryStr string
+	if ttl < 0 {
+		rQryStr = fmt.Sprintf("select value from %s.blobStore "+
+			"where key='%s'", keyspace, key)
+	} else {
+		rQryStr = fmt.Sprintf("select value,ttl(value) from %s.blobStore "+
+			"where key='%s'", keyspace, key)
+	}
+
+	// ensure that reads see curTTL < ttl when ttl > 0
+	// benchmark time isn't affected due to following ResetTimer
+	if ttl > 0 {
+		time.Sleep(1 * time.Second)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		var value []byte
+		var curTTL int
+		var err error
 		for pb.Next() {
-			err := db.Query(rQryStr).Scan(&value)
+			// the if check impacts all benchmarks so not a concern
+			if ttl < 0 {
+				err = db.Query(rQryStr).Scan(&value)
+			} else {
+				err = db.Query(rQryStr).Scan(&value, &curTTL)
+			}
 			if err != nil {
 				b.Fatal(err)
 				return
@@ -149,13 +178,21 @@ func benchBlobCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 					value[:len(check)], check)
 				return
 			}
+			// This check is needed but it shouldn't
+			//   add any overhead to skew the with-TTL and
+			//   without-TTL comparisons
+			if (ttl == 0 && curTTL != 0) ||
+				(ttl > 0 && (curTTL == 0 || curTTL >= ttl)) {
+				b.Fatalf("curTTL: %d ttl: %d", curTTL, ttl)
+				return
+			}
 		}
 	})
 }
 
 // use GoCQL APIs to benchmark blob writes
 func benchBlobWrites(b *testing.B, cluster *gocql.ClusterConfig,
-	key string, value []byte, keyspace string) {
+	key string, value []byte, keyspace string, ttl int) {
 
 	db, err := cluster.CreateSession()
 	if err != nil {
@@ -163,11 +200,17 @@ func benchBlobWrites(b *testing.B, cluster *gocql.ClusterConfig,
 	}
 	defer db.Close()
 
-	b.ResetTimer()
-	b.ReportAllocs()
+	var qryStr string
+	if ttl < 0 {
+		qryStr = fmt.Sprintf("insert into %s.blobStore (key, value)"+
+			"values (?,?)", keyspace)
+	} else {
+		qryStr = fmt.Sprintf("insert into %s.blobStore (key, value)"+
+			"values (?,?) using ttl %d", keyspace, ttl)
+	}
 
-	qryStr := fmt.Sprintf("insert into %s.blobStore (key, value)"+
-		"values (?,?)", keyspace)
+	b.ReportAllocs()
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -181,37 +224,37 @@ func benchBlobWrites(b *testing.B, cluster *gocql.ClusterConfig,
 }
 
 func benchBlob1MBWrites(b *testing.B, cluster *gocql.ClusterConfig,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	buf := make([]byte, 1024*1024)
-	benchBlobWrites(b, cluster, "benchBlob1MBWrites", buf, keyspace)
+	benchBlobWrites(b, cluster, "benchBlob1MBWrites", buf, keyspace, ttl)
 }
 
 func benchBlob1MBCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	buf := make([]byte, 1024*1024)
 	check := []byte{0xde, 0xad, 0xbe, 0xef}
 	copy(buf, check)
 
-	benchBlobCachedReads(b, cluster, "deadbeef", check, buf, keyspace)
+	benchBlobCachedReads(b, cluster, "deadbeef", check, buf, keyspace, ttl)
 }
 
 // benchmark to get latency information for a small write
 func benchBlob4BWrites(b *testing.B, cluster *gocql.ClusterConfig,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	buf := []byte{0xde, 0xad, 0xbe, 0xef}
-	benchBlobWrites(b, cluster, "benchBlob4BWrites", buf, keyspace)
+	benchBlobWrites(b, cluster, "benchBlob4BWrites", buf, keyspace, ttl)
 }
 
 // benchmark to get latency information for a small cached read
 func benchBlob4BCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
-	keyspace string) {
+	keyspace string, ttl int) {
 
 	check := []byte{0xde, 0xad, 0xbe, 0xef}
 
-	benchBlobCachedReads(b, cluster, "deadbeef", check, check, keyspace)
+	benchBlobCachedReads(b, cluster, "deadbeef", check, check, keyspace, ttl)
 }
 
 func BenchmarkGoCQL(b *testing.B) {
@@ -226,13 +269,32 @@ func BenchmarkGoCQL(b *testing.B) {
 	}
 	cluster := setupCluster(cfg.Cluster)
 
-	bmarks := map[string]func(*testing.B, *gocql.ClusterConfig, string){
-		"Wsdb-Writes":          benchWsdbWrites,
-		"Wsdb-CachedReads":     benchWsdbCachedReads,
-		"Blob-1MB-Writes":      benchBlob1MBWrites,
-		"Blob-1MB-CachedReads": benchBlob1MBCachedReads,
-		"Blob-4B-Writes":       benchBlob4BWrites,
-		"Blob-4B-CachedReads":  benchBlob4BCachedReads,
+	// The benchmarks themselves aren't dependent
+	// on each other but the benchmark report looks more readable
+	// when the output is in order
+	bmarks := []struct {
+		name     string
+		testFunc func(*testing.B, *gocql.ClusterConfig, string, int)
+		ttl      int
+	}{
+		{"Wsdb-Writes", benchWsdbWrites, -1},
+		{"Wsdb-CachedReads", benchWsdbCachedReads, -1},
+
+		// large blob io: no TTL, TTL=0, TTL > 0
+		{"Blob-1MB-Writes", benchBlob1MBWrites, -1},
+		{"Blob-1MB-Writes-TTL0", benchBlob1MBWrites, 0},
+		{"Blob-1MB-Writes-TTL", benchBlob1MBWrites, 3600},
+		{"Blob-1MB-CachedReads", benchBlob1MBCachedReads, -1},
+		{"Blob-1MB-CachedReads-TTL0", benchBlob1MBCachedReads, 0},
+		{"Blob-1MB-CachedReads-TTL", benchBlob1MBCachedReads, 3600},
+
+		// small blob io: no TTL, TTL=0, TTL > 0
+		{"Blob-4B-Writes", benchBlob4BWrites, -1},
+		{"Blob-4B-Writes-TTL0", benchBlob4BWrites, 0},
+		{"Blob-4B-Writes-TTL", benchBlob4BWrites, 3600},
+		{"Blob-4B-CachedReads", benchBlob4BCachedReads, -1},
+		{"Blob-4B-CachedReads-TTL0", benchBlob4BCachedReads, 0},
+		{"Blob-4B-CachedReads-TTL", benchBlob4BCachedReads, 3600},
 	}
 
 	// ensure a clean state
@@ -243,16 +305,17 @@ func BenchmarkGoCQL(b *testing.B) {
 	// clean up upon any b.Run failures
 	defer TearDownTestSchema(confFile)
 
-	for subBmarkName, subBmarkFunc := range bmarks {
+	for _, subBmark := range bmarks {
 		// setup and teardown of schema for each kind of
 		// benchmark to enable a clean state
 		if err = SetupTestSchema(confFile); err != nil {
 			b.Fatalf("SetupSchema returned an error: %s", err)
 		}
 
-		b.Run(fmt.Sprintf("%s", subBmarkName),
+		b.Run(fmt.Sprintf("%s", subBmark.name),
 			func(b *testing.B) {
-				subBmarkFunc(b, cluster, cfg.Cluster.KeySpace)
+				subBmark.testFunc(b, cluster, cfg.Cluster.KeySpace,
+					subBmark.ttl)
 			})
 
 		if err = TearDownTestSchema(confFile); err != nil {
