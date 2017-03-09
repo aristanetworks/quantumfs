@@ -251,7 +251,37 @@ func TestApiInsertOverExisting(t *testing.T) {
 	})
 }
 
-func testApiInsertOverExisting(test *testHelper, tamper1 func(), tamper2 func()) {
+func TestApiInsertOverExistingOpenInodes(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		var dir2 *os.File
+		var file2 *os.File
+
+		defer file2.Close()
+		defer dir2.Close()
+
+		openInodes := func(workspace string) {
+			var err error
+			dir2, err = os.Open(workspace + "/dir1/dir2")
+			test.assertNoErr(err)
+			file2, err = os.Open(workspace + "/dir1/dir2/file2")
+			test.assertNoErr(err)
+		}
+
+		checkInodes := func(workspace string) {
+			_, err := dir2.Readdirnames(2)
+			test.assertNoErr(err)
+
+			_, err = file2.WriteString("arstarstarst")
+			test.assertNoErr(err)
+		}
+
+		testApiInsertOverExisting(test, openInodes, checkInodes)
+	})
+}
+
+func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
+	tamper2 func(workspace string)) {
+
 	config := test.defaultConfig()
 	config.CacheTimeSeconds = 0
 	config.CacheTimeNsecs = 100000
@@ -281,7 +311,7 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(), tamper2 func())
 	test.assertNoErr(err)
 
 	if tamper1 != nil {
-		tamper1()
+		tamper1(dstWorkspace)
 	}
 
 	dir1Key := getExtendedKeyHelper(test, dir1, "dir1 key")
@@ -303,7 +333,7 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(), tamper2 func())
 	defer file.Close()
 
 	if tamper2 != nil {
-		tamper2()
+		tamper2(dstWorkspace)
 	}
 }
 
