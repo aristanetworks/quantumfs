@@ -581,6 +581,7 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 	}
 
 	parts := strings.Split(cmd.WorkspacePath, "/")
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 
 	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
 		parts[2]); err != nil {
@@ -589,5 +590,10 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 		return
 	}
 
+	// Remove the record of the removed workspace from workspaceMutability map
+	if ok {
+		defer c.qfs.mutabilityLock.Lock().Unlock()
+		delete(c.qfs.workspaceMutability, workspace.inodeNum())
+	}
 	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
 }

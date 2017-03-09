@@ -13,6 +13,8 @@ import "syscall"
 import "testing"
 import "time"
 
+import "github.com/aristanetworks/quantumfs"
+
 func remountFilesystem(test *testHelper) {
 	test.log("Remounting filesystem")
 	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
@@ -79,6 +81,64 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 				"File contents not preserved after Forget")
 			test.assert(err == nil, "Unable to read file after Forget")
 		}
+	})
+}
+
+func TestFogetOnWorkspaceMutability(t *testing.T) {
+	// BUG 191332: Re-enable this test when that is fixed
+	t.Skip()
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		fileName := workspace + "/file"
+		file, err := os.Create(fileName)
+		file.Close()
+		test.assert(err == nil, "Error creating a small file: %v", err)
+
+		// Get inodeId of workspace and namespace
+		c := test.newCtx()
+		tslInode := test.qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+		tsl := tslInode.(*TypespaceList)
+
+		type_, name_, work_ := test.getWorkspaceComponents(workspace)
+
+		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
+			"typespace", true, &tsl.typespacesByName)
+		nslInode := test.qfs.inodeNoInstantiate(c, nslId)
+		nsl := nslInode.(*NamespaceList)
+
+		wslId := verifyWorkspacelistingInodeStatus(c, test, name_,
+			"namespace", true, &nsl.namespacesByName)
+		wslInode := test.qfs.inodeNoInstantiate(c, wslId)
+		wsl := wslInode.(*WorkspaceList)
+
+		wsrId := verifyWorkspacelistingInodeStatus(c, test, work_,
+			"workspace", true, &wsl.workspacesByName)
+
+		fileId := test.getInodeNum(fileName)
+
+		// Now force the kernel to drop all cached inodes
+		remountFilesystem(test)
+
+		test.assertLogContains("Forget called",
+			"No inode forget triggered during dentry drop.")
+
+		// Make sure that the workspace has already been forgotton
+		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
+		test.assert(fileInode == nil,
+			"Failed to forgot file inode")
+
+		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
+		test.assert(wsrInode == nil,
+			"Failed to forgot workspace inode")
+
+		wslInode = test.qfs.inodeNoInstantiate(&test.qfs.c, wslId)
+		test.assert(wslInode == nil,
+			"Failed to forgot namespace inode")
+
+		fd, err := syscall.Creat(workspace+"/file1", 0124)
+		defer syscall.Close(fd)
+		test.assert(err == nil, "Error opening the file: %v", err)
 	})
 }
 
