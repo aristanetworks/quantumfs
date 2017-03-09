@@ -802,26 +802,25 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) []InodeId {
 
 			// Then check our parent and iterate again
 			inode = func() (parent Inode) {
-				inodeCommon := inode.inodeCommon()
-				defer inodeCommon.parentLock.RLock().RUnlock()
+				defer inode.getParentLock().RLock().RUnlock()
 
 				// Do nothing if we're orphaned
-				if inodeCommon.isOrphaned_() {
+				if inode.isOrphaned_() {
 					return nil
 				}
 
 				parent = qfs.inodeNoInstantiate(c,
-					inodeCommon.parentId)
+					inode.parentId_())
 				if parent == nil {
 					panic(fmt.Sprintf("Parent was unloaded "+
 						"before child! %d %d",
-						inodeCommon.parentId, inodeNum))
+						inode.parentId_(), inodeNum))
 				}
 
 				parent.syncChild(c, inodeNum, key)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
-					inodeCommon.parentId)
+					inode.parentId_())
 
 				return parent
 			}()
@@ -1173,18 +1172,16 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 	// Update the Hash value before generating the key
 	inode.Sync_DOWN(c)
 
-	inodeCommon := inode.inodeCommon()
-	defer inodeCommon.parentLock.RLock().RUnlock()
+	defer inode.getParentLock().RLock().RUnlock()
 
 	var dir *Directory
-	parent := inodeCommon.parent_(c)
+	parent := inode.parent_(c)
 	if parent.isWorkspaceRoot() {
 		dir = &parent.(*WorkspaceRoot).Directory
 	} else {
 		dir = parent.(*Directory)
 	}
 
-	// Don't need inode.LockTree().Unlock() because we're still covered
 	return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
 }
 
