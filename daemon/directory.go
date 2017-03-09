@@ -886,10 +886,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.inodeNum(name)
 	}()
-	if childId == quantumfs.InodeIdInvalid {
-		return fuse.ENOENT
-	}
-
 	child := c.qfs.inode(c, childId)
 
 	if child == nil {
