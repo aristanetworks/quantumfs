@@ -149,7 +149,7 @@ func insertInode() {
 	}
 	gid := uint32(Gid)
 
-	Permission, err := strconv.ParseUint(flag.Arg(5), 10, 32)
+	Permission, err := strconv.ParseUint(flag.Arg(5), 8, 32)
 	if err != nil {
 		fmt.Println("Invalid Permission:", err)
 		os.Exit(exitBadArgs)
