@@ -103,13 +103,17 @@ type Inode interface {
 
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
+	parentId_() InodeId
 	parent_(c *ctx) Inode
 	setParent(newParent InodeId)
+	setParent_(newParent InodeId)
+	getParentLock() *DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
 	// orphaned from the directory tree and cannot be accessed except directly by
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
+	isOrphaned_() bool
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan DirectoryRecordIf,
 			err fuse.Status)) fuse.Status
@@ -154,7 +158,6 @@ type Inode interface {
 		out *fuse.EntryOut) fuse.Status
 
 	inodeNum() InodeId
-	inodeCommon() *InodeCommon
 
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
@@ -181,7 +184,7 @@ type InodeCommon struct {
 	parentLock DeferableRwMutex
 	parentId   InodeId
 
-	lock sync.RWMutex
+	lock DeferableRwMutex
 
 	// The treeLock is used to lock the entire workspace tree when certain
 	// tree-wide operations are being performed. Primarily this is done with all
@@ -195,7 +198,14 @@ type InodeCommon struct {
 	dirtyElement_    *list.Element
 }
 
-// Must have the parentLock R/W Lock()-ed.
+// Must have the parentLock R/W Lock()-ed during the call and for the duration the
+// id is used
+func (inode *InodeCommon) parentId_() InodeId {
+	return inode.parentId
+}
+
+// Must have the parentLock R/W Lock()-ed during the call and for the duration the
+// returned Inode is used
 func (inode *InodeCommon) parent_(c *ctx) Inode {
 	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
@@ -291,19 +301,28 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	defer c.FuncIn("InodeCommon::parentHadAncestor", "%d %d", inode.inodeNum(),
 		ancestor.inodeNum())
 
-	toCheck := inode
-	for {
-		defer toCheck.parentLock.RLock().RUnlock()
+	defer inode.parentLock.RLock().RUnlock()
+	if ancestor.inodeNum() == inode.parentId_() {
+		return true
+	}
 
-		if ancestor.inodeNum() == toCheck.parentId {
+	if inode.parentId_() == quantumfs.InodeIdInvalid {
+		return false
+	}
+
+	toCheck := inode.parent_(c)
+	for {
+		defer toCheck.getParentLock().RLock().RUnlock()
+
+		if ancestor.inodeNum() == toCheck.parentId_() {
 			return true
 		}
 
-		if toCheck.parentId == quantumfs.InodeIdInvalid {
+		if toCheck.parentId_() == quantumfs.InodeIdInvalid {
 			return false
 		}
 
-		toCheck = toCheck.parent_(c).inodeCommon()
+		toCheck = toCheck.parent_(c)
 	}
 }
 
@@ -313,8 +332,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 
 	// Ensure we lock in the UP direction
 	defer inode.parentLock.Lock().Unlock()
-	parent.lock.Lock()
-	defer parent.lock.Unlock()
+	defer parent.lock.Lock().Unlock()
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
@@ -352,6 +370,15 @@ func (inode *InodeCommon) setParent(newParent InodeId) {
 	inode.parentId = newParent
 }
 
+// Must be called with parentLock locked for writing
+func (inode *InodeCommon) setParent_(newParent InodeId) {
+	inode.parentId = newParent
+}
+
+func (inode *InodeCommon) getParentLock() *DeferableRwMutex {
+	return &inode.parentLock
+}
+
 func (inode *InodeCommon) isOrphaned() bool {
 	defer inode.parentLock.RLock().RUnlock()
 
@@ -365,10 +392,6 @@ func (inode *InodeCommon) isOrphaned_() bool {
 
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
-}
-
-func (inode *InodeCommon) inodeCommon() *InodeCommon {
-	return inode
 }
 
 // Add this Inode to the dirty list
@@ -451,14 +474,12 @@ func (inode *InodeCommon) RLockTree() *sync.RWMutex {
 	return inode.treeLock_
 }
 
-func (inode *InodeCommon) Lock() *sync.RWMutex {
-	inode.lock.Lock()
-	return &inode.lock
+func (inode *InodeCommon) Lock() NeedWriteUnlock {
+	return inode.lock.Lock()
 }
 
-func (inode *InodeCommon) RLock() *sync.RWMutex {
-	inode.lock.RLock()
-	return &inode.lock
+func (inode *InodeCommon) RLock() NeedReadUnlock {
+	return inode.lock.RLock()
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
@@ -499,8 +520,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).out()
 
-	inode.lock.Lock()
-	defer inode.lock.Unlock()
+	defer inode.lock.Lock().Unlock()
 
 	// We must perform the deletion with the lockedParent lock
 	defer inode.parentLock.Lock().Unlock()
