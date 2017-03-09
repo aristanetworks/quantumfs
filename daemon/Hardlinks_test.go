@@ -39,13 +39,24 @@ func TestHardlinkReload(t *testing.T) {
 		err = syscall.Link(testFileA,
 			workspace+"/subdir/grandchild/linkFileA2")
 		test.assertNoErr(err)
-		err = syscall.Link(testFileB, workspace+"/subdir/linkFileB")
+		err = syscall.Link(testFileB, workspace+"/linkFileB")
 		test.assertNoErr(err)
 
 		// Write data to the hardlink to ensure it's syncChild function works
 		err = printToFile(workspace+"/subdir/grandchild/linkFileA2",
 			string(data[1000:]))
 		test.assertNoErr(err)
+
+		var stat syscall.Stat_t
+		err = syscall.Stat(testFileA, &stat)
+		test.assertNoErr(err)
+		test.assert(stat.Nlink == 3,
+			"Nlink incorrect: %d", stat.Nlink)
+
+		err = syscall.Stat(testFileB, &stat)
+		test.assertNoErr(err)
+		test.assert(stat.Nlink == 2,
+			"Nlink incorrect: %d", stat.Nlink)
 
 		// Write another file to ensure the wsr is dirty
 		testFileC := workspace + "/testFileC"
