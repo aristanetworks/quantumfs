@@ -144,12 +144,6 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		"Unexpected success creating non-existing intermediate"+
 			" Inode")
 
-	// Ensure the target node does not exist
-	err = api.InsertInode(dst+"/test/a", string(keyF),
-		PermissionA, uid, gid)
-	test.assert(err != nil,
-		"Error having the target node already")
-
 	// Duplicate the file in the given path
 	err = api.InsertInode(dst+"/test/a/file", string(keyF),
 		PermissionA, uid, gid)
@@ -206,12 +200,6 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	err = syscall.Stat(workspaceDst+"/test/a/dirtest/test", &stat)
 	test.assert(err == nil, "Error getting status of child file: %v",
 		err)
-
-	// Ensure the no intermediate inode is a file
-	err = api.InsertInode(dst+"/test/a/dirtest/test", string(keyF),
-		PermissionA, uid, gid)
-	test.assert(err != nil,
-		"Unexpected success creating a file inside of a file")
 
 	// check the child is a file
 	expectedMode = syscall.S_IFREG | PermissionB
