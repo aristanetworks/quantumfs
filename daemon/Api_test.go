@@ -245,6 +245,56 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 	})
 }
 
+func TestApiInsertOverExisting(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		config.CacheTimeSeconds = 0
+		config.CacheTimeNsecs = 100000
+		test.startQuantumFs(config)
+
+		srcWorkspace := test.newWorkspace()
+		dir1 := srcWorkspace + "/dir1"
+		dir2 := dir1 + "/dir2"
+		dir3 := dir2 + "/dir3"
+
+		err := os.MkdirAll(srcWorkspace+"/dir1/dir2/dir3", 0777)
+		test.assertNoErr(err)
+
+		err = printToFile(dir1+"/file1", "")
+		test.assertNoErr(err)
+		err = printToFile(dir2+"/file2", "")
+		test.assertNoErr(err)
+		err = printToFile(dir3+"/file3", "")
+		test.assertNoErr(err)
+
+		dstWorkspace := test.absPath(test.branchWorkspace(srcWorkspace))
+
+		// Create one marker file in srcWorkspace and dstWorkspace
+		err = printToFile(dir1+"/srcMarker", "")
+		test.assertNoErr(err)
+		err = printToFile(dstWorkspace+"/dir1/dstMarker", "")
+		test.assertNoErr(err)
+
+		dir1Key := getExtendedKeyHelper(test, dir1, "dir1 key")
+
+		api := test.getApi()
+
+		err = api.InsertInode(test.relPath(dstWorkspace)+"/dir1", dir1Key,
+			0777, 0, 0)
+		test.assertNoErr(err)
+
+		time.Sleep(200 * time.Millisecond)
+
+		// Now dir1/dstMarker should not exist and dir1/srcMarker should
+		file, err := os.Open(dstWorkspace + "/dir1/dstMarker")
+		test.assert(err != nil, "dstMarker still exists!")
+
+		file, err = os.Open(srcWorkspace + "/dir1/srcMarker")
+		test.assertNoErr(err)
+		defer file.Close()
+	})
+}
+
 func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.Open(test.absPath(quantumfs.ApiPath))
