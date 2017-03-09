@@ -219,8 +219,8 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 	[]InodeId) {
 
-	c.vlog("WorkspaceRoot::instantiateChild Enter %d", inodeNum)
-	defer c.vlog("WorkspaceRoot::instantiateChild Exit")
+	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
+	defer c.vlog("Directory::instantiateChild Exit")
 
 	hardlinkRecord := func() *quantumfs.DirectoryRecord {
 		defer wsr.linkLock.RLock().RUnlock()
@@ -265,24 +265,23 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 	return inodeId
 }
 
-// Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
-// that the wrapper can correctly pick and choose attributes like nlink
 func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
-	record DirectoryRecordIf) {
+	record quantumfs.DirectoryRecord) {
 
 	defer wsr.linkLock.RLock().RUnlock()
+	rtn := quantumfs.DirectoryRecord{}
 
 	linkId, exists := wsr.inodeToLink[inodeId]
 	if !exists {
-		return false, nil
+		return false, rtn
 	}
 
 	link, exists := wsr.hardlinks[linkId]
 	if !exists {
-		return false, nil
+		return false, rtn
 	}
 
-	return true, newHardlink(link.record.Filename(), linkId, wsr)
+	return true, *(link.record)
 }
 
 // Return a snapshot / instance so that it's concurrency safe
