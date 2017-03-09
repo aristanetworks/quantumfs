@@ -70,12 +70,12 @@ func TestApiClearAccessList(t *testing.T) {
 	})
 }
 
-func getExtendedKeyHelper(test *testHelper, dst string, type_ string) []byte {
+func getExtendedKeyHelper(test *testHelper, dst string, type_ string) string {
 	key := make([]byte, quantumfs.ExtendedKeyLength)
 	sz, err := syscall.Getxattr(dst, quantumfs.XAttrTypeKey, key)
 	test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 		"Error getting the key of %s: %v with a size of %d", type_, err, sz)
-	return key
+	return string(key)
 }
 
 func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
@@ -133,20 +133,18 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	test.assert(err == nil, "Error creating target directories: %v", err)
 
 	// Ensure the workspace root cannot be duplicated
-	err = api.InsertInode(dst, string(keyF), PermissionA, uid, gid)
+	err = api.InsertInode(dst, keyF, PermissionA, uid, gid)
 	test.assert(err != nil,
 		"Unexpected success duplicating workspace root")
 
 	// Ensure the non-existing intermediate Inode not be created
-	err = api.InsertInode(dst+"/nonExist/b", string(keyF),
-		PermissionA, uid, gid)
+	err = api.InsertInode(dst+"/nonExist/b", keyF, PermissionA, uid, gid)
 	test.assert(err != nil,
 		"Unexpected success creating non-existing intermediate"+
 			" Inode")
 
 	// Duplicate the file in the given path
-	err = api.InsertInode(dst+"/test/a/file", string(keyF),
-		PermissionA, uid, gid)
+	err = api.InsertInode(dst+"/test/a/file", keyF, PermissionA, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a file to target workspace: %v", err)
 
@@ -180,8 +178,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		stat.Gid, expectedGid)
 
 	// Duplicate the directory in the given path
-	err = api.InsertInode(dst+"/test/a/dirtest", string(keyD),
-		PermissionA, uid, gid)
+	err = api.InsertInode(dst+"/test/a/dirtest", keyD, PermissionA, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a directory to target workspace: %v",
 		err)
@@ -208,8 +205,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		expectedMode, stat.Mode)
 
 	// Ensure the symlink in the given path
-	err = api.InsertInode(dst+"/symlink", string(keyS),
-		PermissionB, uid, gid)
+	err = api.InsertInode(dst+"/symlink", string(keyS), PermissionB, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a symlink to workspace: %v", err)
 
@@ -223,8 +219,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		expectedMode, stat.Mode, stat.Size)
 
 	// Ensure the pipe file in the given path
-	err = api.InsertInode(dst+"/Pipe", string(keyP),
-		PermissionB, uid, gid)
+	err = api.InsertInode(dst+"/Pipe", keyP, PermissionB, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a pipe file to workspace: %v", err)
 
