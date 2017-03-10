@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#include "qfs_client_test.h"
+#include "QFSClient/qfs_client_test.h"
 
 #include <fcntl.h>
 #include <limits.h>
@@ -10,15 +10,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <iostream>
-#include <vector>
-
 #include <gtest/gtest.h>
 #include <jansson.h>
 
-#include "qfs_client.h"
-#include "qfs_client_implementation.h"
-#include "qfs_client_util.h"
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <string>
+
+#include "QFSClient/qfs_client.h"
+#include "QFSClient/qfs_client_implementation.h"
+#include "QFSClient/qfs_client_util.h"
 
 namespace qfsclient {
 
@@ -49,7 +51,7 @@ void QfsClientTest::CreateTempDirTree(const std::vector<std::string> &path) {
 
 // create a test API file
 void QfsClientTest::CreateTestApiFile() {
-	CreateTempDirTree( { "one", "two", "three", "four", "five" } );
+	CreateTempDirTree({"one", "two", "three", "four", "five"});
 
 	if (this->tree.length() == 0) {
 		return;
@@ -98,7 +100,7 @@ void QfsClientTest::SetUp() {
 		return;
 	}
 
-	Error err = GetApi((Api**)&this->api);
+	Error err = GetApi(reinterpret_cast<Api**>(&this->api));
 	ASSERT_EQ(err.code, kSuccess);
 	this->api->api_inode_id = api_inode_id;
 }
@@ -120,7 +122,7 @@ TEST_F(QfsClientTest, OpenTest) {
 	// Test again with path passed to constructor
 	std::string path = this->api->path;
 	ReleaseApi(this->api);
-	err = GetApi((Api**)&this->api);
+	err = GetApi(reinterpret_cast<Api**>(&this->api));
 	ASSERT_EQ(err.code, kSuccess);
 	this->api->api_inode_id = this->api_inode_id;
 
@@ -163,7 +165,7 @@ TEST_F(QfsClientTest, SendLargeCommandTest) {
 	ASSERT_EQ(err.code, kSuccess);
 	ASSERT_EQ(send.Size(), result.Size());
 	ASSERT_EQ(memcmp(send.Data(), result.Data(), size), 0);
- }
+}
 
 TEST_F(QfsClientTest, SendCommandNoFileTest) {
 	ASSERT_FALSE(this->api == NULL);
@@ -415,7 +417,7 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 	ApiContext context;
 	context.SetRequestJsonObject(request_json);
 	Error err = this->api->SendJson(&context);
-	json_decref(request_json); // release the JSON object
+	json_decref(request_json);  // release the JSON object
 	ASSERT_EQ(err.code, kSuccess);
 
 	// compare what the API function actually wrote with what we expected
@@ -442,7 +444,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiResponseBadJsonTest) {
 	ApiImpl::CommandBuffer test_response;
 
 	// corrupt the JSON that CheckCommonApiResponse will try to parse
-	ASSERT_TRUE(this->read_command.Size() > 0);	// fail if no JSON
+	ASSERT_GP(this->read_command.Size(), 0);  // fail if no JSON
 
 	this->read_command.data.resize(this->read_command.Size() / 2);
 	this->read_command.data[read_command.Size()] = '\0';
@@ -461,8 +463,9 @@ TEST_F(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest) {
 
 	// corrupt ErrorCode in the JSON that CheckCommonApiResponse will try
 	// to parse
-	char *error_code_loc = strstr((char*)this->read_command.Data(), kErrorCode);
-	ASSERT_TRUE(error_code_loc != NULL);	// fail if no ErrorCode field
+	char *error_code_loc = strstr(reinterpret_cast<char*>(
+	                                this->read_command.Data()), kErrorCode);
+	ASSERT_TRUE(error_code_loc != NULL);  // fail if no ErrorCode field
 
 	if (error_code_loc != NULL) {
 		error_code_loc[1] = 'Q';
@@ -500,8 +503,9 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 
 	// corrupt AccessList in the JSON that CheckCommonApiResponse will try
 	// to parse
-	char *access_list_loc = strstr((char*)this->read_command.Data(), kAccessList);
-	ASSERT_TRUE(access_list_loc != NULL);	// fail if no AccessList field
+	char *access_list_loc = strstr(reinterpret_cast<char*>(
+	                                 this->read_command.Data()), kAccessList);
+	ASSERT_TRUE(access_list_loc != NULL);  // fail if no AccessList field
 
 	if (access_list_loc != NULL) {
 		access_list_loc[1] = 'Q';
@@ -666,10 +670,10 @@ TEST_F(QfsClientCommandBufferTest, CopyStringTest) {
 
 	const std::vector<byte> &data = buffer.data;
 	ASSERT_EQ(buffer.Size(), 1 + test_str.length());
-	ASSERT_STREQ(((char*)data.data()), test_str.c_str());
+	ASSERT_STREQ((reinterpret_cast<char*>(data.data())), test_str.c_str());
 }
 
-} // namespace qfsclient
+}  // namespace qfsclient
 
 class GoLikePrinter : public ::testing::EmptyTestEventListener {
 	// Called after a failed assertion or a SUCCEED() invocation.
@@ -689,12 +693,11 @@ class GoLikePrinter : public ::testing::EmptyTestEventListener {
 	virtual void OnTestProgramEnd(const ::testing::UnitTest& unit_test) {
 		printf("%s\tgithub.com/aristanetworks/quantumfs/QFSClient\t%gs\n",
 			unit_test.Failed() ? "FAIL" : "ok",
-			((double)unit_test.elapsed_time())/1000);
+			(reinterpret_cast<double>(unit_test.elapsed_time())/1000);
 	}
 };
 
 int main(int argc, char **argv) {
-
 	::testing::InitGoogleTest(&argc, argv);
 	::testing::TestEventListeners& listeners =
 		::testing::UnitTest::GetInstance()->listeners();
