@@ -4,7 +4,6 @@
 package daemon
 
 import "container/list"
-import "crypto/sha1"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
@@ -244,7 +243,7 @@ func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
 }
 
 func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
-	return sha1.Sum(buf.data)
+	return quantumfs.Hash(buf.data)
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
