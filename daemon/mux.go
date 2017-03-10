@@ -470,30 +470,33 @@ func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 	return inode, inode.treeLock()
 }
 
-func (qfs *QuantumFs) RLockTreeGetHandle(c *ctx, fh FileHandleId) FileHandle {
+func (qfs *QuantumFs) RLockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
+	NeedReadUnlock) {
+
 	fileHandle := qfs.fileHandle(c, fh)
 	if fileHandle == nil {
-		return nil
+		return nil, &emptyUnlocker{}
 	}
 
 	fileHandle.RLockTree()
 
 	// once we have the lock, re-grab
 	fileHandle = qfs.fileHandle(c, fh)
-	return fileHandle
+	return fileHandle, fileHandle.treeLock()
 }
 
-func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) FileHandle {
+func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
+	NeedWriteUnlock) {
 	fileHandle := qfs.fileHandle(c, fh)
 	if fileHandle == nil {
-		return nil
+		return nil, &emptyUnlocker{}
 	}
 
 	fileHandle.LockTree()
 
 	// once we have the lock, re-grab
 	fileHandle = qfs.fileHandle(c, fh)
-	return fileHandle
+	return fileHandle, fileHandle.treeLock()
 }
 
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
@@ -1337,12 +1340,12 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Read", "Enter Fh: %d", input.Fh).out()
 
-	fileHandle := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
+	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
+	defer unlock.RUnlock()
 	if fileHandle == nil {
 		c.elog("Read failed", fileHandle)
 		return nil, fuse.ENOENT
 	}
-	defer fileHandle.treeLock().RUnlock()
 
 	return fileHandle.Read(c, input.Offset, input.Size,
 		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
@@ -1366,12 +1369,12 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Write", "Enter Fh: %d", input.Fh).out()
 
-	fileHandle := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
+	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
+	defer unlock.RUnlock()
 	if fileHandle == nil {
 		c.elog("Write failed")
 		return 0, fuse.ENOENT
 	}
-	defer fileHandle.treeLock().RUnlock()
 
 	return fileHandle.Write(c, input.Offset, input.Size,
 		input.Flags, data)
@@ -1395,12 +1398,12 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Fsync", "Enter Fh %d", input.Fh).out()
 
-	fileHandle := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
+	fileHandle, unlock := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
+	defer unlock.Unlock()
 	if fileHandle == nil {
 		c.elog("Fsync failed")
 		return fuse.EIO
 	}
-	defer fileHandle.treeLock().Unlock()
 
 	return fileHandle.Sync_DOWN(c)
 }
@@ -1459,12 +1462,12 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	defer c.FuncIn("Mux::ReadDirPlus", "ReadDirPlus Enter Fh: %d offset %d",
 		input.Fh, input.Offset).out()
 
-	fileHandle := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
+	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
+	defer unlock.RUnlock()
 	if fileHandle == nil {
 		c.elog("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
 	}
-	defer fileHandle.treeLock().RUnlock()
 
 	return fileHandle.ReadDirPlus(c, input, out)
 }
@@ -1484,12 +1487,12 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::FsyncDir", "Enter Fh %d", input.Fh).out()
 
-	fileHandle := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
+	fileHandle, unlock := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
+	defer unlock.Unlock()
 	if fileHandle == nil {
 		c.elog("FsyncDir failed")
 		return fuse.EIO
 	}
-	defer fileHandle.treeLock().Unlock()
 
 	return fileHandle.Sync_DOWN(c)
 }
