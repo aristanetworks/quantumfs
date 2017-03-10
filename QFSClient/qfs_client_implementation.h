@@ -4,7 +4,7 @@
 #ifndef QFSCLIENT_QFS_CLIENT_IMPLEMENTATION_H_
 #define QFSCLIENT_QFS_CLIENT_IMPLEMENTATION_H_
 
-#include "QFSCLient/qfs_client.h"
+#include "QFSClient/qfs_client.h"
 
 #include <stdint.h>
 #include <sys/types.h>

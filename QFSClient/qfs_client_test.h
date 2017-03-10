@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "QFSCLient/qfs_client.h"
-#include "QFSCLient/qfs_client_implementation.h"
+#include "QFSClient/qfs_client.h"
+#include "QFSClient/qfs_client_implementation.h"
 
 namespace qfsclient {
 
