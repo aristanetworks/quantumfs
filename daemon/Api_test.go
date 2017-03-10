@@ -247,13 +247,23 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 }
 
 func TestApiInsertOverExisting(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		config.DirtyFlushDelay = 100 * time.Millisecond
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
 		testApiInsertOverExisting(test, nil, nil)
 	})
 }
 
 func TestApiInsertOverExistingOpenInodes(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		config.DirtyFlushDelay = 100 * time.Millisecond
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
 		var dir2 *os.File
 		var file2 int
 
@@ -297,7 +307,12 @@ func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 }
 
 func TestApiInsertOverExistingForget(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		config.DirtyFlushDelay = 100 * time.Millisecond
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
 		messages := make([]TLA, 0, 10)
 
 		findInodes := func(workspace string) {
@@ -328,12 +343,6 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 
 func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
-
-	config := test.defaultConfig()
-	config.CacheTimeSeconds = 0
-	config.CacheTimeNsecs = 100000
-	config.DirtyFlushDelay = 100 * time.Millisecond
-	test.startQuantumFs(config)
 
 	srcWorkspace := test.newWorkspace()
 	dir1 := srcWorkspace + "/dir1"
