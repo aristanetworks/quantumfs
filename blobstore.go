@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether/blobstore"
@@ -12,6 +13,14 @@ import (
 	"github.com/aristanetworks/ether/utils/stats/inmem"
 	"github.com/gocql/gocql"
 )
+
+// Currently CQL blobstore ignores any non-CQL store specific
+//  metadata.
+
+// TimeToLive is a CQL store specific metadata.
+// It represents the time after which the blob
+// will be automatically cleaned up the store.
+const TimeToLive = "cql.TTL"
 
 type cqlBlobStore struct {
 	store    *cqlStore
@@ -50,15 +59,26 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 	return cbs, nil
 }
 
-// Insert method has an semaphore limiting the number of
-// concurrent Inserts to 100. This limits the number of concurrent
-// insert queries to scyllaDB which is currently causing timeouts.
-// This workaround should be removed when get a fix from ScyllaDB.
-// The number 100, has been emperically determined.
+// Insert is the CQL implementation of blobstore.Insert()
 func (b *cqlBlobStore) Insert(key string, value []byte,
 	metadata map[string]string) error {
 
-	queryStr := fmt.Sprintf("INSERT into %s.blobStore (key, value) VALUES (?, ?)", b.keyspace)
+	//TODO(krishna): after adjusting ether adapter in QFS
+	//  make metadata mandatory
+	keyExists := false
+	ttl := "0"
+	if metadata != nil {
+		ttl, keyExists = metadata[TimeToLive]
+		if !keyExists {
+			return blobstore.NewError(blobstore.ErrBadArguments,
+				"metadata is invalid: %v", metadata)
+		}
+	}
+
+	queryStr := fmt.Sprintf(`INSERT
+INTO %s.blobStore (key, value)
+VALUES (?, ?)
+USING TTL %s`, b.keyspace, ttl)
 	query := b.store.session.Query(queryStr, key, value)
 
 	b.store.sem.P()
@@ -79,13 +99,16 @@ func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
 
 	// Session.Query() does not return error
 	var value []byte
-	queryStr := fmt.Sprintf("SELECT value FROM %s.blobStore WHERE key = ?", b.keyspace)
+	var ttl int
+	queryStr := fmt.Sprintf(`SELECT value, ttl(value)
+FROM %s.blobStore
+WHERE key = ?`, b.keyspace)
 	query := b.store.session.Query(queryStr, key)
 
 	start := time.Now()
 	defer func() { b.getStats.RecordOp(time.Since(start)) }()
 
-	err := query.Scan(&value)
+	err := query.Scan(&value, &ttl)
 	if err != nil {
 		if err == gocql.ErrNotFound {
 			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get %s",
@@ -94,22 +117,51 @@ func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
 		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get %s",
 			err.Error())
 	}
-	return value, nil, nil
+
+	mdata := make(map[string]string)
+	mdata[TimeToLive] = strconv.Itoa(ttl)
+	return value, mdata, nil
 }
 
 // Delete is the CQL implementation of blobstore.Delete()
 func (b *cqlBlobStore) Delete(key string) error {
-	panic("Delete not implemented")
+	return blobstore.NewError(blobstore.ErrOperationFailed,
+		"Delete operation is not implemented")
 }
 
 // Metadata is the CQL implementation of blobstore.Metadata()
 func (b *cqlBlobStore) Metadata(key string) (map[string]string, error) {
-	panic("Metadata not implemented")
+	var ttl int
+	queryStr := fmt.Sprintf(`SELECT ttl(value)
+FROM %s.blobStore
+WHERE key = ?`, b.keyspace)
+	query := b.store.session.Query(queryStr, key)
+
+	b.store.sem.P()
+	defer b.store.sem.V()
+
+	start := time.Now()
+	// getStats includes both get and metadata API stats
+	defer func() { b.getStats.RecordOp(time.Since(start)) }()
+
+	err := query.Scan(&ttl)
+	if err != nil {
+		if err == gocql.ErrNotFound {
+			return nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Metadata %s",
+				err.Error())
+		}
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Metadata %s",
+			err.Error())
+	}
+	mdata := make(map[string]string)
+	mdata[TimeToLive] = strconv.Itoa(ttl)
+	return mdata, nil
 }
 
 // Update is the CQL implementation of blobstore.Update()
 func (b *cqlBlobStore) Update(key string, metadata map[string]string) error {
-	panic("Update not implemented")
+	return blobstore.NewError(blobstore.ErrOperationFailed,
+		"Update operation is not implemented")
 }
 
 func (b *cqlBlobStore) ReportAPIStats() {

@@ -57,7 +57,8 @@ var globalCqlStore cqlStoreGlobal
 type cqlStore struct {
 	cluster Cluster
 	session Session
-	sem     *utils.Semaphore
+
+	sem *utils.Semaphore
 }
 
 // Note: This routine is called by Init/New APIs
@@ -73,6 +74,11 @@ func initCqlStore(cluster Cluster) (cqlStore, error) {
 	globalCqlStore.initOnce.Do(func() {
 		globalCqlStore.cluster = cluster
 		globalCqlStore.resetOnce = sync.Once{}
+		// The semaphore limits the number of concurrent
+		// inserts and queries to scyllaDB, otherwise we get timeouts
+		// from ScyllaDB. Timeouts are unavoidable since its possible
+		// to generate much faster rate of traffic than Scylla can handle.
+		// The number 100, has been emperically determined.
 		globalCqlStore.sem = make(utils.Semaphore, 100)
 		globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
 		if err != nil {
