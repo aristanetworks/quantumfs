@@ -144,12 +144,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 }
 
 func TestMultipleLookupCount(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -179,12 +174,7 @@ func TestMultipleLookupCount(t *testing.T) {
 }
 
 func TestLookupCountHardlinks(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 		linkFilename := workspace + "/link"

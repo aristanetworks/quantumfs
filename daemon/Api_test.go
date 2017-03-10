@@ -422,12 +422,7 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 }
 
 func TestWorkspaceDeletion(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		api := test.getApi()
 
 		ws1 := test.newWorkspace()
