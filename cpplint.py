@@ -4257,9 +4257,10 @@ def CheckStyle(filename, clean_lines, linenum, file_extension, nesting_state,
   line = raw_lines[linenum]
   prev = raw_lines[linenum - 1] if linenum > 0 else ''
 
-  if line.find('\t') != -1:
-    error(filename, linenum, 'whitespace/tab', 1,
-          'Tab found; better to use spaces')
+  # QuantumFS style mandates tab indentation
+  #if line.find('\t') != -1:
+  #  error(filename, linenum, 'whitespace/tab', 1,
+  #        'Tab found; better to use spaces')
 
   # One or three blank spaces at the beginning of the line is weird; it's
   # hard to reconcile that with 2-space indents.
@@ -4292,6 +4293,10 @@ def CheckStyle(filename, clean_lines, linenum, file_extension, nesting_state,
     error(filename, linenum, 'whitespace/indent', 3,
           'Weird number of spaces at line-start.  '
           'Are you using a 2-space indent?')
+
+  if initial_spaces > 3:
+    error(filename, linenum, 'whitespace/indent', 5,
+          'Using spaces for indentation')
 
   if line and line[-1].isspace():
     error(filename, linenum, 'whitespace/end_of_line', 4,
