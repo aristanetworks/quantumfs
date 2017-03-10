@@ -1053,3 +1053,9 @@ func (test *testHelper) assertNoErr(err error) {
 		test.assert(false, err.Error())
 	}
 }
+
+func (test *testHelper) remountFilesystem() {
+	test.log("Remounting filesystem")
+	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
+	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
+}

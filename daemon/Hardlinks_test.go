@@ -177,7 +177,7 @@ func TestHardlinkForget(t *testing.T) {
 		// Forget it
 		linkInode := test.getInodeNum(linkFile)
 
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		// Check that it's uninstantiated
 		msg := fmt.Sprintf("hardlink inode %d to be forgotten", linkInode)
