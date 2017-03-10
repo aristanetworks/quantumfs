@@ -254,25 +254,41 @@ func TestApiInsertOverExisting(t *testing.T) {
 func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
 		var dir2 *os.File
-		var file2 *os.File
+		var file2 int
 
-		defer file2.Close()
-		defer dir2.Close()
+		defer func() {
+			syscall.Close(file2)
+			dir2.Close()
+		}()
 
 		openInodes := func(workspace string) {
 			var err error
 			dir2, err = os.Open(workspace + "/dir1/dir2")
 			test.assertNoErr(err)
-			file2, err = os.Open(workspace + "/dir1/dir2/file2")
+			_, err = dir2.Readdirnames(2)
+			test.assertNoErr(err)
+
+			file2, err = syscall.Open(workspace+"/dir1/dir2/file2",
+				os.O_RDWR, 0)
 			test.assertNoErr(err)
 		}
 
 		checkInodes := func(workspace string) {
-			_, err := dir2.Readdirnames(2)
+			_, err := dir2.Seek(0, os.SEEK_SET)
+			test.assertNoErr(err)
+			_, err = dir2.Readdirnames(-1)
 			test.assertNoErr(err)
 
-			_, err = file2.WriteString("arstarstarst")
+			test.log("Reading from file")
+			buf := make([]byte, 100, 100)
+			n, err := syscall.Read(file2, buf)
 			test.assertNoErr(err)
+			test.assert(n > 0, "Read no bytes from deleted file: %d", n)
+
+			test.log("Writing to file")
+			n, err = syscall.Write(file2, []byte("arstarstarst"))
+			test.assertNoErr(err)
+			test.assert(n > 0, "Wrote no bytes to deleted file: %d", n)
 		}
 
 		testApiInsertOverExisting(test, openInodes, checkInodes)
