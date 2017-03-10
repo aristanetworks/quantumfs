@@ -641,3 +641,67 @@ func TestOrphanFileXAttrRemove(t *testing.T) {
 			"Successed removing non-existant XAttr")
 	})
 }
+
+func TestHardlinkXAttr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		attrNoData := "user.nodata"
+		attrPrevData := "user.prevdata"
+		attrData := "user.data"
+		attrDataData := []byte("extendedattributedata")
+
+		err := os.MkdirAll(workspace+"/subdir", 0777)
+		test.assertNoErr(err)
+
+		filename := workspace + "/subdir/file"
+		err = printToFile(filename, string(genData(2000)))
+		test.assertNoErr(err)
+
+		err = syscall.Setxattr(filename, attrPrevData, attrDataData, 0)
+		test.assertNoErr(err)
+
+		linkFile := workspace + "/subdir/link"
+		err = syscall.Link(workspace+"/subdir/file", linkFile)
+		test.assertNoErr(err)
+
+		// Write
+		err = syscall.Setxattr(linkFile, attrNoData, []byte{}, 0)
+		test.assertNoErr(err)
+
+		err = syscall.Setxattr(linkFile, attrData, attrDataData, 0)
+		test.assertNoErr(err)
+
+		// Read
+		data := make([]byte, 100)
+		size, err := syscall.Getxattr(linkFile, attrNoData, data)
+		test.assertNoErr(err)
+		test.assert(size == 0, "nodata XAttr size not zero: %d", size)
+
+		size, err = syscall.Getxattr(linkFile, attrData, data)
+		test.assertNoErr(err)
+		test.assert(size == len(attrDataData),
+			"data XAttr size incorrect: %d", size)
+		test.assert(bytes.Equal(data[:size], attrDataData),
+			"Didn't get the same data back '%s' '%s'", data,
+			attrDataData)
+
+		// List
+		size, err = syscall.Listxattr(linkFile, data)
+		test.assertNoErr(err)
+		test.assert(bytes.Contains(data, []byte(attrNoData)),
+			"Empty xattr missing")
+		test.assert(bytes.Contains(data, []byte(attrPrevData)),
+			"Previous xattr missing")
+		test.assert(bytes.Contains(data, []byte(attrData)),
+			"Xattr missing")
+		test.assert(bytes.Contains(data, []byte("quantumfs.key")),
+			"Quantumfs key missing")
+
+		// Linked
+		dataFile := make([]byte, 100)
+		sizeFile, err := syscall.Listxattr(filename, dataFile)
+		test.assert(bytes.Equal(dataFile[:sizeFile], data[:size]),
+			"Xattrs aren't shared between links")
+	})
+}
