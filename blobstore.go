@@ -52,7 +52,12 @@ type BlobStore interface {
 
 	// Insert stores the given value and metadata for the key
 	// Calling Insert with a pre-existing key will overwrite the
-	// previous value and metadata.
+	// previous value and metadata. Metadata items are namespaced to
+	// distinguish between store specific metadata and application
+	// specific metadata. Example: "cql.TimeToLive" is a CQL store
+	// specific metadata which represents the seconds after which
+	// the blob should be cleaned up by the system. Refer to store
+	// specific documentation to see the store specific metadata items.
 	Insert(key string, value []byte, metadata map[string]string) error
 
 	// Delete removes both the value and metadata for a given key from the
