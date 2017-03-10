@@ -934,7 +934,8 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 			return true
 		}
 		// Otherwise, go up to its parent which must be a directory/workspace
-		parent := inode.parent(c)
+		defer inode.getParentLock().RLock().RUnlock()
+		parent := inode.parent_(c)
 		switch parent.(type) {
 		default:
 			panic(fmt.Sprintf("The inode type is unexpected: %v",
@@ -1159,7 +1160,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 	if input.NodeId == input.Newdir {
 		defer unlock.RUnlock()
-		return inode.RenameChild(c, oldName, newName)
+		return srcInode.RenameChild(c, oldName, newName)
 	} else {
 		dstInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.Newdir))
 		defer unlock.RUnlock()
