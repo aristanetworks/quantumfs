@@ -1,15 +1,16 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#ifndef QFS_CLIENT_TEST_H_
-#define QFS_CLIENT_TEST_H_
-
-#include <string>
+#ifndef QFSCLIENT_QFS_CLIENT_TEST_H_
+#define QFSCLIENT_QFS_CLIENT_TEST_H_
 
 #include <gtest/gtest.h>
 
-#include "qfs_client.h"
-#include "qfs_client_implementation.h"
+#include <string>
+#include <vector>
+
+#include "QFSCLient/qfs_client.h"
+#include "QFSCLient/qfs_client_implementation.h"
 
 namespace qfsclient {
 
@@ -59,6 +60,6 @@ class QfsClientCommandBufferTest : public testing::Test {
 	virtual void TearDown();
 };
 
-} // namespace qfsclient
+}  // namespace qfsclient
 
-#endif // QFS_CLIENT_TEST_H_
+#endif  // QFSCLIENT_QFS_CLIENT_TEST_H_
