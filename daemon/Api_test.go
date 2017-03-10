@@ -249,7 +249,7 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 func TestApiInsertOverExisting(t *testing.T) {
 	configModifier := func(test *testHelper, config *QuantumFsConfig) {
 		cacheTimeout100Ms(test, config)
-		config.DirtyFlushDelay = 100 * time.Millisecond
+		dirtyDelay100Ms(test, config)
 	}
 
 	runTestCustomConfig(t, configModifier, func(test *testHelper) {
@@ -260,7 +260,7 @@ func TestApiInsertOverExisting(t *testing.T) {
 func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 	configModifier := func(test *testHelper, config *QuantumFsConfig) {
 		cacheTimeout100Ms(test, config)
-		config.DirtyFlushDelay = 100 * time.Millisecond
+		dirtyDelay100Ms(test, config)
 	}
 
 	runTestCustomConfig(t, configModifier, func(test *testHelper) {
@@ -309,7 +309,7 @@ func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 func TestApiInsertOverExistingForget(t *testing.T) {
 	configModifier := func(test *testHelper, config *QuantumFsConfig) {
 		cacheTimeout100Ms(test, config)
-		config.DirtyFlushDelay = 100 * time.Millisecond
+		dirtyDelay100Ms(test, config)
 	}
 
 	runTestCustomConfig(t, configModifier, func(test *testHelper) {
