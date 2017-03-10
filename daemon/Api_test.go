@@ -5,6 +5,7 @@ package daemon
 
 // Test the various Api calls
 
+import "fmt"
 import "os"
 import "syscall"
 import "testing"
@@ -295,12 +296,42 @@ func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 	})
 }
 
+func TestApiInsertOverExistingForget(t *testing.T) {
+	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+		messages := make([]TLA, 0, 10)
+
+		findInodes := func(workspace string) {
+			for _, file := range []string{"/dir1/file1",
+				"/dir1/dir2/file2", "/dir1/dir2/dir3/file3"} {
+
+				inodeNum := test.getInodeNum(workspace + file)
+				msg := fmt.Sprintf("Forget called on inode %d", inodeNum)
+				tla := TLA{
+					mustContain: true,
+					text:        msg,
+					failMsg:     "Subtree inode not forgotten",
+				}
+				messages = append(messages, tla)
+			}
+		}
+
+		triggerForget := func(workspace string) {
+			test.remountFilesystem()
+		}
+
+		testApiInsertOverExisting(test, findInodes, triggerForget)
+
+		test.assertTestLog(messages)
+	})
+}
+
 func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
 	config := test.defaultConfig()
 	config.CacheTimeSeconds = 0
 	config.CacheTimeNsecs = 100000
+	config.DirtyFlushDelay = 100 * time.Millisecond
 	test.startQuantumFs(config)
 
 	srcWorkspace := test.newWorkspace()
