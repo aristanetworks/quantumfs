@@ -39,21 +39,24 @@ func TestHardlinkReload(t *testing.T) {
 		err = syscall.Link(testFileA,
 			workspace+"/subdir/grandchild/linkFileA2")
 		test.assertNoErr(err)
-		err = syscall.Link(testFileB, workspace+"/subdir/linkFileB")
-		test.assertNoErr(err)
 		err = syscall.Link(testFileB, workspace+"/linkFileB")
 		test.assertNoErr(err)
 
-		var stat syscall.Stat_t
-		err = syscall.Stat(testFileA, &stat)
+		// Write data to the hardlink to ensure it's syncChild function works
+		err = printToFile(workspace+"/subdir/grandchild/linkFileA2",
+			string(data[1000:]))
 		test.assertNoErr(err)
-		test.assert(stat.Nlink == 3,
-			"Nlink incorrect: %d", stat.Nlink)
 
-		err = syscall.Stat(testFileB, &stat)
+		var nstat syscall.Stat_t
+		err = syscall.Stat(testFileA, &nstat)
 		test.assertNoErr(err)
-		test.assert(stat.Nlink == 3,
-			"Nlink incorrect: %d", stat.Nlink)
+		test.assert(nstat.Nlink == 3,
+			"Nlink incorrect: %d", nstat.Nlink)
+
+		err = syscall.Stat(testFileB, &nstat)
+		test.assertNoErr(err)
+		test.assert(nstat.Nlink == 2,
+			"Nlink incorrect: %d", nstat.Nlink)
 
 		// Write another file to ensure the wsr is dirty
 		testFileC := workspace + "/testFileC"
@@ -69,6 +72,18 @@ func TestHardlinkReload(t *testing.T) {
 		test.assert(err == nil, "Unable to branch")
 
 		wsrB := test.getWorkspaceRoot(workspaceB)
+
+		// ensure that the hardlink was able to sync
+		wsrBFileA := test.absPath(workspaceB +
+			"/subdir/grandchild/linkFileA2")
+		readData, err := ioutil.ReadFile(wsrBFileA)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(readData, data),
+			"Data not synced via hardlink")
+
+		stat, err := os.Stat(wsrBFileA)
+		test.assertNoErr(err)
+		test.assert(stat.Size() == int64(len(data)), "file length mismatch")
 
 		test.assert(len(wsr.hardlinks) == len(wsrB.hardlinks),
 			"Hardlink map length not preserved: %v %v", wsr.hardlinks,
