@@ -4225,11 +4225,19 @@ def GetLineWidth(line):
     for uc in unicodedata.normalize('NFC', line):
       if unicodedata.east_asian_width(uc) in ('W', 'F'):
         width += 2
+      elif uc == u'\u0009':
+        width += 8
       elif not unicodedata.combining(uc):
         width += 1
     return width
   else:
-    return len(line)
+    width = 0
+    for c in line:
+      if c == '\t':
+        width += 8
+      else:
+        width += 1
+    return width
 
 
 def CheckStyle(filename, clean_lines, linenum, file_extension, nesting_state,
