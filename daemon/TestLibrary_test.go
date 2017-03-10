@@ -596,7 +596,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 func (th *testHelper) getInodeNum(path string) InodeId {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
-	th.assert(err == nil, "Error grabbing file inode: %v", err)
+	th.assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
 
 	return InodeId(stat.Ino)
 }
