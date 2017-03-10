@@ -313,7 +313,7 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 
 	err = printToFile(dir1+"/file1", "")
 	test.assertNoErr(err)
-	err = printToFile(dir2+"/file2", "")
+	err = printToFile(dir2+"/file2", "oienoenoienoin")
 	test.assertNoErr(err)
 	err = printToFile(dir3+"/file3", "")
 	test.assertNoErr(err)
