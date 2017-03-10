@@ -1748,9 +1748,15 @@ def GetIndentLevel(line):
   Returns:
     An integer count of leading spaces, possibly zero.
   """
-  indent = Match(r'^( *)\S', line)
+  indent = Match(r'^([ \t]*)\S', line)
   if indent:
-    return len(indent.group(1))
+    indent_len = 0
+    for c in indent.group(1):
+      if c == '\t':
+        indent_len += 8
+      else:
+        indent_len += 1
+    return indent_len
   else:
     return 0
 
@@ -2595,7 +2601,14 @@ class NestingState(object):
         # Check that access keywords are indented +1 space.  Skip this
         # check if the keywords are not preceded by whitespaces.
         indent = access_match.group(1)
-        if (len(indent) != classinfo.class_indent + 1 and
+        indent_len = 0
+        for c in indent:
+          if c == '\t':
+            indent_len += 8
+          else:
+            indent_len += 1
+
+        if (indent_len != classinfo.class_indent + 1 and
             Match(r'^\s*$', indent)):
           if classinfo.is_struct:
             parent = 'struct ' + classinfo.name
