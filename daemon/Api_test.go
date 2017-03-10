@@ -305,7 +305,8 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 				"/dir1/dir2/file2", "/dir1/dir2/dir3/file3"} {
 
 				inodeNum := test.getInodeNum(workspace + file)
-				msg := fmt.Sprintf("Forget called on inode %d", inodeNum)
+				msg := fmt.Sprintf("Forget called on inode %d",
+					inodeNum)
 				tla := TLA{
 					mustContain: true,
 					text:        msg,
