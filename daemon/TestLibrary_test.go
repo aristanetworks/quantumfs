@@ -1086,3 +1086,8 @@ func cacheTimeout100Ms(test *testHelper, config *QuantumFsConfig) {
 	config.CacheTimeSeconds = 0
 	config.CacheTimeNsecs = 100000
 }
+
+// Modify the QuantumFS flush delay to 100 milliseconds
+func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
+	config.DirtyFlushDelay = 100 * time.Millisecond
+}

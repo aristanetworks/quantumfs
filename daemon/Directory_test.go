@@ -993,12 +993,7 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 
 // Trigger GetAttr on a directory in order to confirm that it works correctly
 func TestDirectoryGetAttr(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/dir"
 
