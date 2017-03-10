@@ -266,8 +266,8 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
-	c.dlog("fillAttrWithDirectoryRecord fileType %x permissions %o", fileType,
-		entry.Permissions())
+	c.dlog("fillAttrWithDirectoryRecord type %x permissions %o links %d",
+		fileType, entry.Permissions(), attr.Nlink)
 
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
@@ -432,7 +432,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		entry := dir.children.record(inodeNum)
+		entry := dir.getRecordChildCall_(c, inodeNum)
 		if entry == nil {
 			return fuse.ENOENT
 		}
@@ -702,27 +702,43 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return result
 }
 
-func (dir *Directory) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (dir *Directory) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf,
+	error) {
 
 	defer c.funcIn("Directory::getChildRecord").out()
 
 	defer dir.RLock().RUnlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	record := dir.children.record(inodeNum)
+	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
 		return record, nil
 	}
 
-	// if we don't have the child, maybe we're wsr and it's a hardlink
-	valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
-	if valid {
-		return &linkRecord, nil
-	}
-
 	return &quantumfs.DirectoryRecord{},
 		errors.New("Inode given is not a child of this directory")
+}
+
+// must have childRecordLock, fetches the child for calls that come UP from a child.
+// Should not be used by functions which aren't routed from a child, as even if dir
+// is wsr it should not accommodate getting hardlink records in those situations
+func (dir *Directory) getRecordChildCall_(c *ctx,
+	inodeNum InodeId) DirectoryRecordIf {
+
+	record := dir.children.record(inodeNum)
+	if record != nil {
+		return record
+	}
+
+	// if we don't have the child, maybe we're wsr and it's a hardlink
+	if dir.self.isWorkspaceRoot() {
+		valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+		if valid {
+			return linkRecord
+		}
+	}
+
+	return nil
 }
 
 func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
@@ -1257,7 +1273,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	dir.self.dirty(c)
 	defer dir.childRecordLock.Lock().Unlock()
 
-	entry := dir.children.record(inodeNum)
+	entry := dir.getRecordChildCall_(c, inodeNum)
 	if entry == nil {
 		c.wlog("Directory::syncChild inode %d not a valid child",
 			inodeNum)
@@ -1275,7 +1291,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 	defer c.funcIn("Directory::getExtendedAttributes_").out()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	record := dir.children.record(inodeNum)
+	record := dir.getRecordChildCall_(c, inodeNum)
 	if record == nil {
 		c.vlog("Child not found")
 		return nil, fuse.EIO
@@ -1462,7 +1478,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.record(inodeNum).SetExtendedAttributes(key)
+		dir.getRecordChildCall_(c, inodeNum).SetExtendedAttributes(key)
 	}()
 	dir.self.dirty(c)
 
@@ -1523,7 +1539,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.record(inodeNum).SetExtendedAttributes(key)
+		dir.getRecordChildCall_(c, inodeNum).SetExtendedAttributes(key)
 	}()
 	dir.self.dirty(c)
 
@@ -1531,20 +1547,26 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
-	c.vlog("Directory::instantiateChild Enter %d", inodeNum)
-	defer c.vlog("Directory::instantiateChild Exit")
 
-	// check if the child is a hardlink first
-	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
-		return dir.wsr.instantiateChild(c, inodeNum)
-	}
-
+	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
+		dir.inodeNum()).out()
 	defer dir.childRecordLock.Lock().Unlock()
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
 		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
 			inodeNum))
+	}
+
+	// check if the child is a hardlink
+	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
+		return dir.wsr.instantiateChild(c, inodeNum)
+	}
+
+	// add a check incase there's an inconsistency
+	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
+		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
+			inodeNum, hardlink.linkId))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)
