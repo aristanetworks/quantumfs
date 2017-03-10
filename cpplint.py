@@ -3176,9 +3176,12 @@ def CheckSpacing(filename, clean_lines, linenum, nesting_state, error):
         # or colon (for initializer lists) we assume that it is the last line of
         # a function header.  If we have a colon indented 4 spaces, it is an
         # initializer list.
-        exception = (Match(r' {4}\w[^\(]*\)\s*(const\s*)?(\{\s*$|:)',
+        #
+        # QuantumFS: Instead of looking for four spaces, we simply look for a single
+        # tab indentation.
+        exception = (Match(r'\t\w[^\(]*\)\s*(const\s*)?(\{\s*$|:)',
                            prev_line)
-                     or Match(r' {4}:', prev_line))
+                     or Match(r'\t:', prev_line))
 
       if not exception:
         error(filename, linenum, 'whitespace/blank_line', 2,
