@@ -557,17 +557,17 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 		return
 	}
 
-	dst := strings.Split(cmd.Workspace, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
-	if !ok {
+	workspacePath := cmd.Workspace
+	dst := strings.Split(workspacePath, "/")
+	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
+	if !exists {
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist or is not active",
-			cmd.Workspace)
+			"WorkspaceRoot %s does not exist", workspacePath)
 		return
 	}
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
-	c.qfs.workspaceMutability[workspace.inodeNum()] = true
+	c.qfs.workspaceMutability[workspacePath] = true
 
 	api.queueErrorResponse(quantumfs.ErrorOK,
 		"Enable Workspace Write Permission Succeeded")
@@ -580,9 +580,8 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 		return
 	}
 
-	parts := strings.Split(cmd.WorkspacePath, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
-
+	workspacePath := cmd.WorkspacePath
+	parts := strings.Split(workspacePath, "/")
 	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
 		parts[2]); err != nil {
 
@@ -591,9 +590,9 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 	}
 
 	// Remove the record of the removed workspace from workspaceMutability map
-	if ok {
-		defer c.qfs.mutabilityLock.Lock().Unlock()
-		delete(c.qfs.workspaceMutability, workspace.inodeNum())
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	if _, exist := c.qfs.workspaceMutability[workspacePath]; exist {
+		delete(c.qfs.workspaceMutability, workspacePath)
 	}
 	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
 }
