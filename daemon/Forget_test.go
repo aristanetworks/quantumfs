@@ -83,7 +83,6 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 }
 
 func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
-	// BUG 191332: Re-enable this test when that is fixed
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
