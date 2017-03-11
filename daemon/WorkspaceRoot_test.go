@@ -213,8 +213,6 @@ func TestWorkspaceReadNoWritePermissionAtRoot(t *testing.T) {
 
 func TestWorkspaceReadNoWritePermissionAtSubdirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		// BUG 190845: Re-enable this test when that is fixed
-		t.Skip()
 		testWorkspaceReadNoWritePermission(test, "/test")
 	})
 }

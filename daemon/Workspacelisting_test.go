@@ -35,7 +35,7 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		tslInode := test.qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
 		tsl := tslInode.(*TypespaceList)
 
-		workspace := test.newWorkspaceWithoutWritePerm()
+		workspace := test.newWorkspace()
 		type_, name_, work_ := test.getWorkspaceComponents(workspace)
 		_, exists := tsl.typespacesByName[type_]
 		test.assert(!exists,
@@ -55,16 +55,10 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		verifyWorkspacelistingInodeStatus(c, test, type_, "typespace",
 			false, &tsl.typespacesByName)
 
-		// In order to make changes in workspace, make it writable first
 		// Instantiate the three inodes and verify the existence
-		api := test.getApi()
-		err = api.EnableRootWrite(test.relPath(workspace))
-		test.assert(err == nil, "Failed to enable write permission in "+
-			"workspace: %v", err)
-
 		testFilename = workspace + "/" + "test"
 		err = syscall.Mkdir(testFilename, 0124)
-		test.assert(err == nil, "Failed creating files: %v", err)
+		test.assert(err == nil, "Failed creating directories: %v", err)
 
 		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
 			"typespace", true, &tsl.typespacesByName)

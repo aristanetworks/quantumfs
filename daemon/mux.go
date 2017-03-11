@@ -43,7 +43,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		flushComplete:          make(chan struct{}),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
-		workspaceMutability:    make(map[InodeId]bool),
+		workspaceMutability:    make(map[string]bool),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -131,10 +131,10 @@ type QuantumFs struct {
 
 	// The workspaceMutability defines whether all inodes in each of the local
 	// workspace is mutable(write-permitted). Once if a workspace is set to be
-	// mutalbe, should it be put into the map, and all others are default to
+	// mutable, should it be put into the map, and all others are default to
 	// false
 	mutabilityLock      DeferableRwMutex
-	workspaceMutability map[InodeId]bool
+	workspaceMutability map[string]bool
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -929,7 +929,7 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
 	// get workspaceroots from their parents.
 	default:
-		// if inode is already forgotton, the workspace doesn't process it.
+		// if inode is already forgotten, the workspace doesn't process it.
 		if inode.isOrphaned() {
 			return true
 		}
@@ -947,9 +947,13 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 		case *Directory:
 			wsr = parent.(*Directory).wsr
 		}
-		// If the inode is typespace/namespace/workspace/api, return true
-	// immediately since workspaceroot should not have control over them
+	case *WorkspaceRoot:
+		wsr = inode.(*WorkspaceRoot)
+	case *Directory:
+		wsr = inode.(*Directory).wsr
 	case *TypespaceList:
+		// If the inode is typespace/namespace/workspace/api, return true
+		// immediately since workspaceroot shouldn't have authority over them
 		return true
 	case *NamespaceList:
 		return true
@@ -957,15 +961,12 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 		return true
 	case *ApiInode:
 		return true
-	case *WorkspaceRoot:
-		wsr = inode.(*WorkspaceRoot)
-	case *Directory:
-		wsr = inode.(*Directory).wsr
 	}
 
 	defer qfs.mutabilityLock.RLock().RUnlock()
 
-	rootMutability, exists := qfs.workspaceMutability[wsr.inodeNum()]
+	key := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
+	rootMutability, exists := qfs.workspaceMutability[key]
 	if !exists {
 		return false
 	}
