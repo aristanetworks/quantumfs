@@ -238,7 +238,7 @@ void QfsClientApiTest::SetUp() {
 		"'ErrorCode':0,"
 		"'Message':'success',"
 		"'AccessList':{'file1':true,'file2':false,'file3':true}}";
-	util::requote(read_command_json);
+	util::requote(&read_command_json);
 	this->read_command.CopyString(read_command_json.c_str());
 }
 
@@ -283,7 +283,7 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 	// set up expected written JSON:
 	std::string expected_written_command_json =
 		"{'CommandId':2,'WorkspaceRoot':'test/workspace/root'}";
-	util::requote(expected_written_command_json);
+	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 	       expected_written_command_json.c_str());
 
@@ -317,7 +317,7 @@ TEST_F(QfsClientApiTest, InsertInodeTest) {
 		 "'Key':'thisisadummyextendedkey01234567890123456',"
 		 "'Permissions':501,"
 		 "'Uid':2001}";
-	util::requote(expected_written_command_json);
+	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 		expected_written_command_json.c_str());
 
@@ -344,7 +344,7 @@ TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
 	// set up expected written JSON:
 	std::string expected_written_command_json =
 		"{'CommandId':5,}";
-	util::requote(expected_written_command_json);
+	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 		expected_written_command_json.c_str());
 
@@ -352,7 +352,7 @@ TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
 	std::string error_message = "some random bad thing";
 	std::string expected_read_command_json =
 		"{'ErrorCode':1,'Message':'" + error_message + "'}";
-	util::requote(expected_read_command_json);
+	util::requote(&expected_read_command_json);
 	this->read_command.CopyString(expected_read_command_json.c_str());
 
 	err = this->api->InsertInode("/path/to/some/place/",
@@ -380,7 +380,7 @@ TEST_F(QfsClientApiTest, BranchTest) {
 	"{'CommandId':1,"
 	 "'Dst':'test/destination/workspace',"
 	 "'Src':'test/source/workspace'}";
-	util::requote(expected_written_command_json);
+	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 		expected_written_command_json.c_str());
 
@@ -410,7 +410,7 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 	// create expected JSON string to have been written
 	std::string expected_written_command_json =
 		"{'CommandId':2,'WorkspaceRoot':'one/two/three'}";
-	util::requote(expected_written_command_json);
+	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 	       expected_written_command_json.c_str());
 
@@ -444,7 +444,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiResponseBadJsonTest) {
 	ApiImpl::CommandBuffer test_response;
 
 	// corrupt the JSON that CheckCommonApiResponse will try to parse
-	ASSERT_GP(this->read_command.Size(), 0);  // fail if no JSON
+	ASSERT_GT(this->read_command.Size(), 0);  // fail if no JSON
 
 	this->read_command.data.resize(this->read_command.Size() / 2);
 	this->read_command.data[read_command.Size()] = '\0';
@@ -463,8 +463,8 @@ TEST_F(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest) {
 
 	// corrupt ErrorCode in the JSON that CheckCommonApiResponse will try
 	// to parse
-	char *error_code_loc = strstr(reinterpret_cast<char*>(
-	                                this->read_command.Data()), kErrorCode);
+	char *error_code_loc = strstr(reinterpret_cast<char*>(const_cast<byte*>(
+	                                this->read_command.Data())), kErrorCode);
 	ASSERT_TRUE(error_code_loc != NULL);  // fail if no ErrorCode field
 
 	if (error_code_loc != NULL) {
@@ -503,8 +503,8 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 
 	// corrupt AccessList in the JSON that CheckCommonApiResponse will try
 	// to parse
-	char *access_list_loc = strstr(reinterpret_cast<char*>(
-	                                 this->read_command.Data()), kAccessList);
+	char *access_list_loc = strstr(reinterpret_cast<char*>(const_cast<byte*>(
+	                                 this->read_command.Data())), kAccessList);
 	ASSERT_TRUE(access_list_loc != NULL);  // fail if no AccessList field
 
 	if (access_list_loc != NULL) {
@@ -670,7 +670,7 @@ TEST_F(QfsClientCommandBufferTest, CopyStringTest) {
 
 	const std::vector<byte> &data = buffer.data;
 	ASSERT_EQ(buffer.Size(), 1 + test_str.length());
-	ASSERT_STREQ((reinterpret_cast<char*>(data.data())), test_str.c_str());
+	ASSERT_STREQ((reinterpret_cast<const char*>(data.data())), test_str.c_str());
 }
 
 }  // namespace qfsclient
@@ -693,7 +693,7 @@ class GoLikePrinter : public ::testing::EmptyTestEventListener {
 	virtual void OnTestProgramEnd(const ::testing::UnitTest& unit_test) {
 		printf("%s\tgithub.com/aristanetworks/quantumfs/QFSClient\t%gs\n",
 			unit_test.Failed() ? "FAIL" : "ok",
-			(reinterpret_cast<double>(unit_test.elapsed_time())/1000);
+			static_cast<double>(unit_test.elapsed_time())/1000);
 	}
 };
 

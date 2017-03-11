@@ -144,7 +144,7 @@ std::string buildJsonErrorDetails(const std::string &error, const char *json) {
 // to make string literals containing JSON more readable, since double quote
 // characters are very common in JSON but need to be escaped in string literals.
 void requote(std::string *s) {
-	std::replace(s.begin(), s.end(), '\'', '"');
+	std::replace(s->begin(), s->end(), '\'', '"');
 }
 
 }  // namespace util
