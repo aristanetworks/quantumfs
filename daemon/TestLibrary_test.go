@@ -52,20 +52,34 @@ func noStdOut(format string, args ...interface{}) error {
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test, true)
+	runTestCommon(t, test, true, nil)
 }
 
 // If you need to initialize the QuantumFS instance in some special way, then use
 // this variant.
 func runTestNoQfs(t *testing.T, test quantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test, false)
+	runTestCommon(t, test, false, nil)
+}
+
+type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
+
+// If you need to initialize QuantumFS with a special configuration, but not poke
+// into its internals before the test proper begins, use this.
+//
+// configModifier is a function which is given the default configuration and should
+// make whichever modifications the test requires in place.
+func runTestCustomConfig(t *testing.T, configModifier configModifierFunc,
+	test quantumFsTest) {
+
+	t.Parallel()
+	runTestCommon(t, test, true, configModifier)
 }
 
 // If you need to initialize the QuantumFS instance in some special way and the test
 // is relatively expensive, then use this variant.
 func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, false)
+	runTestCommon(t, test, false, nil)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -73,10 +87,12 @@ func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
 func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, true)
+	runTestCommon(t, test, true, nil)
 }
 
-func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
+func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
+	configModifier configModifierFunc) {
+
 	// Since we grab the test name from the backtrace, it must always be an
 	// identical number of frames back to the name of the test. Otherwise
 	// multiple tests will end up using the same temporary directory and nothing
@@ -109,7 +125,12 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
 	// failures due to timeouts caused by system slowness as we try to mount
 	// dozens of FUSE filesystems at once.
 	if startDefaultQfs {
-		th.startDefaultQuantumFs()
+		config := th.defaultConfig()
+		if configModifier != nil {
+			configModifier(th, &config)
+		}
+
+		th.startQuantumFs(config)
 	}
 
 	th.log("Finished test preamble, starting test proper")
@@ -1060,4 +1081,15 @@ func (test *testHelper) remountFilesystem() {
 	test.log("Remounting filesystem")
 	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
 	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
+}
+
+// Modify the QuantumFS cache time to 100 milliseconds
+func cacheTimeout100Ms(test *testHelper, config *QuantumFsConfig) {
+	config.CacheTimeSeconds = 0
+	config.CacheTimeNsecs = 100000
+}
+
+// Modify the QuantumFS flush delay to 100 milliseconds
+func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
+	config.DirtyFlushDelay = 100 * time.Millisecond
 }
