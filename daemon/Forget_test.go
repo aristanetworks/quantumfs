@@ -9,15 +9,8 @@ import "bytes"
 import "io/ioutil"
 import "os"
 import "strconv"
-import "syscall"
 import "testing"
 import "time"
-
-func remountFilesystem(test *testHelper) {
-	test.log("Remounting filesystem")
-	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
-	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
-}
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -34,7 +27,7 @@ func TestForgetOnDirectory(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -65,7 +58,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -128,7 +121,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -174,7 +167,7 @@ func TestMultipleLookupCount(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Forget Inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertTestLog([]TLA{
 			TLA{true, "Looked up 2 Times",
@@ -206,7 +199,7 @@ func TestLookupCountHardlinks(t *testing.T) {
 		test.assert(err == nil, "Error creating hardlink")
 
 		// Forget Inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Looked up 2 Times",
 			"Failed to cause a second lookup")

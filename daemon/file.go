@@ -723,6 +723,8 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return fuse.ReadResult(nil), fuse.EIO
 	}
 
+	c.vlog("Returning %d bytes", readCount)
+
 	return fuse.ReadResultData(buf[:readCount]), fuse.OK
 }
 
