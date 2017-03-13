@@ -1,8 +1,10 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#ifndef QFS_CLIENT_H_
-#define QFS_CLIENT_H_
+#ifndef QFSCLIENT_QFS_CLIENT_H_
+#define QFSCLIENT_QFS_CLIENT_H_
+
+#include <string>
 
 namespace qfsclient {
 
@@ -141,7 +143,7 @@ Error GetApi(const char *path, Api **api);
 /// @param [in] `api` A pointer to an `Api` object that will be released.
 void ReleaseApi(Api *api);
 
-} // namespace qfsclient
+}  // namespace qfsclient
 
-#endif // QFS_CLIENT_H_
+#endif  // QFSCLIENT_QFS_CLIENT_H_
 

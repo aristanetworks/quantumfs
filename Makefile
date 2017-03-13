@@ -3,7 +3,7 @@ PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
-all: lockcheck $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -16,6 +16,9 @@ fetch:
 
 lockcheck:
 	./lockcheck.sh
+
+cppstyle:
+	./cpplint.py QFSClient/*.cc QFSClient/*.h
 
 encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
