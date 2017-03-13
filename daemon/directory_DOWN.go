@@ -13,30 +13,53 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	defer c.funcIn("Directory::link_DOWN").out()
 
-	// Grab the source parent as a Directory
-	var srcParent *Directory
-	switch v := srcInode.parent(c).(type) {
-	case *Directory:
-		srcParent = v
-	case *WorkspaceRoot:
-		srcParent = &(v.Directory)
-	default:
-		c.elog("Source directory is not a directory: %d",
-			srcInode.inodeNum())
-		return fuse.EINVAL
-	}
+	// Make sure the file's flushed before we try to hardlink it. We can't do
+	// this with the inode parentLock locked since Sync locks the parent as well.
+	srcInode.Sync_DOWN(c)
 
-	// Ensure the source and dest are in the same workspace
-	if srcParent.wsr != dir.wsr {
-		c.dlog("Source and dest are different workspaces.")
-		return fuse.EPERM
-	}
+	newRecord, err := func() (DirectoryRecordIf, fuse.Status) {
+		defer srcInode.getParentLock().Lock().Unlock()
 
-	newRecord, err := srcParent.makeHardlink_DOWN(c, srcInode)
+		// ensure we're not orphaned
+		if srcInode.isOrphaned_() {
+			c.wlog("Can't hardlink an orphaned file")
+			return nil, fuse.EPERM
+		}
+
+		// Grab the source parent as a Directory
+		var srcParent *Directory
+		switch v := srcInode.parent_(c).(type) {
+		case *Directory:
+			srcParent = v
+		case *WorkspaceRoot:
+			srcParent = &(v.Directory)
+		default:
+			c.elog("Source directory is not a directory: %d",
+				srcInode.inodeNum())
+			return nil, fuse.EINVAL
+		}
+
+		// Ensure the source and dest are in the same workspace
+		if srcParent.wsr != dir.wsr {
+			c.dlog("Source and dest are different workspaces.")
+			return nil, fuse.EPERM
+		}
+
+		newRecord, err := srcParent.makeHardlink_DOWN_(c, srcInode)
+		if err != fuse.OK {
+			c.elog("Link Failed with srcInode record")
+			return nil, err
+		}
+
+		// We need to reparent under the srcInode lock
+		srcInode.setParent_(dir.wsr.inodeNum())
+
+		return newRecord, fuse.OK
+	}()
 	if err != fuse.OK {
-		c.elog("QuantumFs::Link Failed with srcInode record")
 		return err
 	}
+
 	srcInode.markSelfAccessed(c, false)
 
 	newRecord.SetFilename(newName)
@@ -89,13 +112,6 @@ func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
 
-	// Update the Hash value before generating the key
-	if childInode := c.qfs.inodeNoInstantiate(c, inodeNum); childInode != nil {
-		// Since the child is instantiated it may be modified, flush it
-		// synchronously and recusively to be sure.
-		childInode.Sync_DOWN(c)
-	}
-
 	// flush already acquired an Inode lock exclusively. In case of the dead
 	// lock, the Inode lock for reading should be required after releasing its
 	// exclusive lock. The gap between two locks, other threads cannot come in
@@ -133,7 +149,8 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	return currDir, nil
 }
 
-func (dir *Directory) makeHardlink_DOWN(c *ctx,
+// the toLink parentLock must be locked
+func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
 
 	defer c.funcIn("Directory::makeHardlink_DOWN").out()
@@ -146,12 +163,6 @@ func (dir *Directory) makeHardlink_DOWN(c *ctx,
 		linkCopy := newHardlink(toLink.name(), id, dir.wsr)
 		return linkCopy, fuse.OK
 	}
-
-	// If the file isn't a hardlink, then we must flush it first. It's unlikely
-	// we'll be linking many hardlinks several times and it is somewhat tedious
-	// to determine if toLink is a hardlink or not. Instead we simply flush all
-	// inodes we are going to hardlink.
-	toLink.Sync_DOWN(c)
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
