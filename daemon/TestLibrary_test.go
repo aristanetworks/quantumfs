@@ -598,7 +598,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 func (th *testHelper) getInodeNum(path string) InodeId {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
-	th.assert(err == nil, "Error grabbing file inode: %v", err)
+	th.assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
 
 	return InodeId(stat.Ino)
 }
@@ -1054,4 +1054,10 @@ func (test *testHelper) assertNoErr(err error) {
 	if err != nil {
 		test.assert(false, err.Error())
 	}
+}
+
+func (test *testHelper) remountFilesystem() {
+	test.log("Remounting filesystem")
+	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
+	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
 }

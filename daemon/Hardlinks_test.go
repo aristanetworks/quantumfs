@@ -209,7 +209,7 @@ func TestHardlinkForget(t *testing.T) {
 		// Forget it
 		linkInode := test.getInodeNum(linkFile)
 
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		// Check that it's uninstantiated
 		msg := fmt.Sprintf("hardlink inode %d to be forgotten", linkInode)
@@ -252,7 +252,7 @@ func TestHardlinkConversion(t *testing.T) {
 
 		// Ensure it's converted by performing an operation on linkFile
 		// that would trigger checking if the hardlink needs conversion
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		_, err = os.Stat(linkFile)
 		test.assertNoErr(err)
