@@ -50,7 +50,7 @@ func TestLargeFileRead(t *testing.T) {
 }
 
 func TestLargeFileExpansion(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
