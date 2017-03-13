@@ -329,6 +329,8 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
+	test.t.Skipf("BUG190827")
+
 	config := test.defaultConfig()
 	config.CacheTimeSeconds = 0
 	config.CacheTimeNsecs = 100000
