@@ -283,3 +283,27 @@ func TestForgetMarking(t *testing.T) {
 			parentId)
 	})
 }
+
+func TestForgetLookupRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data[:1000]))
+		test.assertNoErr(err)
+
+		test.syncAllWorkspaces()
+
+		remountFilesystem(test)
+
+		_, err = os.Stat(testFile)
+		test.assertNoErr(err)
+
+		test.syncAllWorkspaces()
+
+		// This test will fail here with the error "Unknown inodeId %d" or
+		// "lookupCount less than zero"if the race happened.
+	})
+}
