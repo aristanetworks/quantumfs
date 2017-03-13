@@ -297,7 +297,16 @@ func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 
 	defer qfs.instantiationLock.Lock().Unlock()
 
-	qfs.forgetChain_(c, inodeNum)
+	inode := qfs.inodeNoInstantiate(c, inodeNum)
+	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
+		inodeNum == quantumfs.InodeIdApi {
+
+		c.dlog("inode %d doesn't need to be forgotten", inodeNum)
+		// Nothing to do
+		return
+	}
+
+	qfs.uninstantiateChain_(c, inode)
 }
 
 // Don't use this method directly, use one of the semantically specific variants
@@ -853,22 +862,6 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		}
 		break
 	}
-}
-
-// Requires the treeLock be held for read as well as the instantiationLock
-// exclusively.
-func (qfs *QuantumFs) forgetChain_(c *ctx, inodeNum InodeId) {
-	defer c.FuncIn("Mux::forgetChain_", "inode %d", inodeNum).out()
-	inode := qfs.inodeNoInstantiate(c, inodeNum)
-	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
-		inodeNum == quantumfs.InodeIdApi {
-
-		c.dlog("inode %d doesn't need to be forgotten", inodeNum)
-		// Nothing to do
-		return
-	}
-
-	qfs.uninstantiateChain_(c, inode)
 }
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
