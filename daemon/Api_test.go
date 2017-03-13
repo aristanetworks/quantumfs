@@ -344,8 +344,6 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
-	test.t.Skipf("BUG190827")
-
 	srcWorkspace := test.newWorkspace()
 	dir1 := srcWorkspace + "/dir1"
 	dir2 := dir1 + "/dir2"
