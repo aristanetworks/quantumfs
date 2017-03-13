@@ -1,12 +1,12 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#include <string>
-#include <vector>
+#include "QFSClient/qfs_client_util.h"
 
 #include <gtest/gtest.h>
 
-#include "qfs_client_util.h"
+#include <string>
+#include <vector>
 
 namespace qfsclient {
 
@@ -84,4 +84,4 @@ TEST_F(QfsClientUtilTest, JoinTest) {
 	ASSERT_STREQ(expected.c_str(), actual.c_str());
 }
 
-} // namespace qfsclient
+}  // namespace qfsclient
