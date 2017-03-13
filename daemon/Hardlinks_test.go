@@ -223,9 +223,6 @@ func TestHardlinkForget(t *testing.T) {
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
-	// BUG 190827: Re-enable this test when that is fixed
-	t.Skip()
-
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
