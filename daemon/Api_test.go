@@ -247,13 +247,23 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 }
 
 func TestApiInsertOverExisting(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		dirtyDelay100Ms(test, config)
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
 		testApiInsertOverExisting(test, nil, nil)
 	})
 }
 
 func TestApiInsertOverExistingOpenInodes(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		dirtyDelay100Ms(test, config)
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
 		var dir2 *os.File
 		var file2 int
 
@@ -297,7 +307,12 @@ func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 }
 
 func TestApiInsertOverExistingForget(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		dirtyDelay100Ms(test, config)
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
 		messages := make([]TLA, 0, 10)
 
 		findInodes := func(workspace string) {
@@ -330,12 +345,6 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
 	test.t.Skipf("BUG190827")
-
-	config := test.defaultConfig()
-	config.CacheTimeSeconds = 0
-	config.CacheTimeNsecs = 100000
-	config.DirtyFlushDelay = 100 * time.Millisecond
-	test.startQuantumFs(config)
 
 	srcWorkspace := test.newWorkspace()
 	dir1 := srcWorkspace + "/dir1"
@@ -415,12 +424,7 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 }
 
 func TestWorkspaceDeletion(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		api := test.getApi()
 
 		ws1 := test.newWorkspace()

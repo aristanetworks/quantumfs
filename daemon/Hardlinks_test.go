@@ -11,7 +11,6 @@ import "io/ioutil"
 import "os"
 import "syscall"
 import "testing"
-import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -184,11 +183,7 @@ func TestHardlinkRelay(t *testing.T) {
 }
 
 func TestHardlinkForget(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.DirtyFlushDelay = 100 * time.Millisecond
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
