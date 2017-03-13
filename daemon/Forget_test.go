@@ -279,7 +279,7 @@ func TestForgetLookupRace(t *testing.T) {
 
 		test.syncAllWorkspaces()
 
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		_, err = os.Stat(testFile)
 		test.assertNoErr(err)
