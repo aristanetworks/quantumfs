@@ -151,7 +151,7 @@ func TestMultipleLookupCount(t *testing.T) {
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
 
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 
 		file2, err := os.Open(testFilename)
 		test.assert(err == nil, "Error opening file readonly")
@@ -159,7 +159,7 @@ func TestMultipleLookupCount(t *testing.T) {
 		file.Close()
 		file2.Close()
 		// Wait for the closes to bubble up to QuantumFS
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Forget Inodes
 		test.remountFilesystem()
