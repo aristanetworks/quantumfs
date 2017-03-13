@@ -1,17 +1,17 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#ifndef QFS_CLIENT_UTIL_H_
-#define QFS_CLIENT_UTIL_H_
+#ifndef QFSCLIENT_QFS_CLIENT_UTIL_H_
+#define QFSCLIENT_QFS_CLIENT_UTIL_H_
+
+#include <jansson.h>
 
 #include <string>
 #include <vector>
 
-#include <jansson.h>
-
-#include "qfs_client.h"
-#include "qfs_client_implementation.h"
-#include "qfs_client_data.h"
+#include "QFSClient/qfs_client.h"
+#include "QFSClient/qfs_client_implementation.h"
+#include "QFSClient/qfs_client_data.h"
 
 namespace qfsclient {
 namespace util {
@@ -52,10 +52,10 @@ std::string buildJsonErrorDetails(const std::string &error, const char *json);
 // replace all single quotes in the given string with double quotes. This is
 // to make string literals containing JSON more readable, since double quote
 // characters are very common in JSON but need to be escaped in string literals.
-void requote(std::string &s);
+void requote(std::string *s);
 
-} // namespace util
-} // namespace qfsclient
+}  // namespace util
+}  // namespace qfsclient
 
-#endif // QFS_CLIENT_UTIL_H_
+#endif  // QFSCLIENT_QFS_CLIENT_UTIL_H_
 
