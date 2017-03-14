@@ -167,7 +167,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	childInodes() []InodeId
+	directChildInodes() []InodeId
 }
 
 type InodeCommon struct {

@@ -217,10 +217,13 @@ func (cmap *ChildMap) inodeNum(name string) InodeId {
 	return quantumfs.InodeIdInvalid
 }
 
-func (cmap *ChildMap) inodes() []InodeId {
-	rtn := make([]InodeId, 0, len(cmap.children))
-	for _, v := range cmap.children {
-		rtn = append(rtn, v)
+func (cmap *ChildMap) directInodes() []InodeId {
+	rtn := make([]InodeId, 0, len(cmap.childrenRecords))
+	for id, record := range cmap.childrenRecords {
+		if _, isHardlink := record[0].(*Hardlink); isHardlink {
+			continue
+		}
+		rtn = append(rtn, id)
 	}
 
 	return rtn
