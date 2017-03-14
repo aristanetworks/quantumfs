@@ -287,6 +287,6 @@ func TestForgetLookupRace(t *testing.T) {
 		test.syncAllWorkspaces()
 
 		// This test will fail here with the error "Unknown inodeId %d" or
-		// "lookupCount less than zero"if the race happened.
+		// "lookupCount less than zero" if the race happened.
 	})
 }
