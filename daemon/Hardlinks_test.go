@@ -216,6 +216,49 @@ func TestHardlinkForget(t *testing.T) {
 	})
 }
 
+func TestHardlinkUninstantiateDirectory(t *testing.T) {
+	// If a hardlink is a child of many directories, it shouldn't prevent those
+	// directories from becoming uninstantiated simply because it itself is still
+	// instantiated. It is likely being held open by some other directory or
+	// handle.
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		dirName := workspace + "/dir"
+		err = os.Mkdir(dirName, 0777)
+		test.assertNoErr(err)
+
+		linkFile := dirName + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		// Read the hardlink to ensure it's instantiated
+		readData, err := ioutil.ReadFile(linkFile)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
+
+		dirInode := test.getInodeNum(dirName)
+		linkInode := test.getInodeNum(linkFile)
+		test.qfs.increaseLookupCount(linkInode)
+		test.remountFilesystem()
+
+		// Check that the parent uninstantiated, even if the Hardlink itself
+		// cannot be.
+		msg := fmt.Sprintf("hardlink parent inode %d to be uninstantiated",
+			dirInode)
+		test.waitFor(msg, func() bool {
+			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, dirInode)
+			return inode == nil
+		})
+	})
+}
+
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
