@@ -25,6 +25,10 @@ cppstyle:
 encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
 
+# TODO(krishna): clean it up
+qupload:
+	go build -gcflags '-e' github.com/aristanetworks/quantumfs/cmd/$@
+
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
