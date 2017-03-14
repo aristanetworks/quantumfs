@@ -207,7 +207,8 @@ func TestHardlinkForget(t *testing.T) {
 		test.remountFilesystem()
 
 		// Check that it's uninstantiated
-		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated", linkInode)
+		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated",
+			linkInode)
 		test.waitFor(msg, func() bool {
 			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
 			return inode == nil
