@@ -1,17 +1,17 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#ifndef QFS_CLIENT_DATA_H
-#define QFS_CLIENT_DATA_H
+#ifndef QFSCLIENT_QFS_CLIENT_DATA_H_
+#define QFSCLIENT_QFS_CLIENT_DATA_H_
 
 // These enums (CommandID and CommandError) are based on their master
 // definitions in quantumfs/cmds.go
 enum CommandID {
 	kCmdError = 0,
 	kCmdBranchRequest = 1,
-	kCmdGetAccessed = 2,	// not in aid/3015
-	kCmdClearAccessed = 3,	// not in aid/3015
-	kCmdSyncAll = 4,	// not in aid/3015
+	kCmdGetAccessed = 2,    // not in aid/3015
+	kCmdClearAccessed = 3,  // not in aid/3015
+	kCmdSyncAll = 4,        // not in aid/3015
 	kCmdInsertInode = 5,
 	kCmdDeleteWorkspace = 6,
 	kCmdSetBlock = 7,
@@ -71,5 +71,5 @@ static const char kBranchJSON[] = "{s:i,s:s,s:s}";
 static const char kSetBlockJSON[] = "{s:i,s:s,s:s}";
 static const char kGetBlockJSON[] = "{s:i,s:s}";
 
-#endif // QFS_CLIENT_DATA_H
+#endif  // QFSCLIENT_QFS_CLIENT_DATA_H_
 

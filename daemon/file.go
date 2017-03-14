@@ -77,6 +77,7 @@ type File struct {
 	accessor     blockAccessor
 	unlinkRecord DirectoryRecordIf
 	unlinkXAttr  map[string][]byte
+	unlinkLock   DeferableRwMutex
 }
 
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
@@ -95,7 +96,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("File::GetAttr").out()
 
-	record, err := fi.parent(c).getChildRecord(c, fi.InodeCommon.id)
+	record, err := fi.parentGetChildRecord(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
 		return fuse.EIO
@@ -115,10 +116,11 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 }
 
 func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
-	defer c.funcIn("File::openPermission").out()
+	defer c.FuncIn("File::openPermission", "%d", fi.inodeNum()).out()
 
-	record, error := fi.parent(c).getChildRecord(c, fi.id)
+	record, error := fi.parentGetChildRecord(c, fi.id)
 	if error != nil {
+		c.elog("%s", error.Error())
 		return false
 	}
 
@@ -240,7 +242,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parent(c).setChildAttr(c, fi.InodeCommon.id, nil, attr, out,
+	return fi.parentSetChildAttr(c, fi.InodeCommon.id, nil, attr, out,
 		updateMtime)
 }
 
@@ -297,7 +299,7 @@ func (fi *File) GetXAttrSize(c *ctx,
 
 	defer c.funcIn("File::GetXAttrSize").out()
 
-	return fi.parent(c).getChildXAttrSize(c, fi.inodeNum(), attr)
+	return fi.parentGetChildXAttrSize(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) GetXAttrData(c *ctx,
@@ -305,25 +307,25 @@ func (fi *File) GetXAttrData(c *ctx,
 
 	defer c.funcIn("File::GetXAttrData").out()
 
-	return fi.parent(c).getChildXAttrData(c, fi.inodeNum(), attr)
+	return fi.parentGetChildXAttrData(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
 	defer c.funcIn("File::ListXAttr").out()
 
-	return fi.parent(c).listChildXAttr(c, fi.inodeNum())
+	return fi.parentListChildXAttr(c, fi.inodeNum())
 }
 
 func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 	defer c.funcIn("File::SetXAttr").out()
 
-	return fi.parent(c).setChildXAttr(c, fi.inodeNum(), attr, data)
+	return fi.parentSetChildXAttr(c, fi.inodeNum(), attr, data)
 }
 
 func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	defer c.funcIn("File::RemoveXAttr").out()
 
-	return fi.parent(c).removeChildXAttr(c, fi.inodeNum(), attr)
+	return fi.parentRemoveChildXAttr(c, fi.inodeNum(), attr)
 }
 
 func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
@@ -339,9 +341,6 @@ func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) 
 // properties. Since the file cannot be accessed from the directory tree any longer
 // we do not need to upload it or any of its content. When being unlinked we'll
 // orphan the File by making it its own parent.
-//
-// Sometimes a File will access its own parent with or without its lock held. To
-// protect the internal DirectoryRecord we'll abuse the InodeCommon.parentLock.
 func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
@@ -354,8 +353,7 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 
 	c.dlog("File::setChildAttr Enter")
 	defer c.dlog("File::setChildAttr Exit")
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
 		panic("setChildAttr on self file before unlinking")
@@ -372,7 +370,7 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 	return fuse.OK
 }
 
-// Requires InodeCommon.parentLock
+// Requires unlinkLock
 func (fi *File) parseExtendedAttributes_(c *ctx) {
 	if fi.unlinkXAttr != nil {
 		return
@@ -411,8 +409,7 @@ func (fi *File) parseExtendedAttributes_(c *ctx) {
 func (fi *File) getExtendedAttribute(c *ctx, attr string) ([]byte, bool) {
 	defer c.FuncIn("File::getExtendedAttribute", "Attr: %s", attr).out()
 
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -468,8 +465,7 @@ func (fi *File) listChildXAttr(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -499,8 +495,7 @@ func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		return fuse.EIO
 	}
 
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -519,8 +514,7 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 		return fuse.EIO
 	}
 
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	fi.parseExtendedAttributes_(c)
 
@@ -545,8 +539,7 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, err
 
 	c.dlog("File::getChildRecord Enter")
 	defer c.dlog("File::getChildRecord Exit")
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
 		panic("getChildRecord on self file before unlinking")
@@ -558,8 +551,7 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, err
 func (fi *File) setChildRecord(c *ctx, record DirectoryRecordIf) {
 	defer c.funcIn("File::setChildRecord").out()
 
-	fi.parentLock.Lock()
-	defer fi.parentLock.Unlock()
+	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord != nil {
 		panic("setChildRecord on self file after unlinking")
@@ -620,7 +612,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		fi.parent(c).setChildAttr(c, fi.id, &neededType, &attr, nil, false)
+		fi.parentSetChildAttr(c, fi.id, &neededType, &attr, nil, false)
 	}
 	return nil
 }
@@ -731,6 +723,8 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return fuse.ReadResult(nil), fuse.EIO
 	}
 
+	c.vlog("Returning %d bytes", readCount)
+
 	return fuse.ReadResultData(buf[:readCount]), fuse.OK
 }
 
@@ -761,7 +755,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength())
-	fi.parent(c).setChildAttr(c, fi.id, nil, &attr, nil, true)
+	fi.parentSetChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
 
 	return writeCount, fuse.OK
@@ -772,13 +766,11 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 
 	defer fi.Lock().Unlock()
 
-	if fi.isOrphaned() {
-		c.vlog("Not flushing orphaned file")
-		return quantumfs.EmptyBlockKey
-	}
-
-	key := fi.accessor.sync(c)
-	fi.parent(c).syncChild(c, fi.inodeNum(), key)
+	key := quantumfs.EmptyBlockKey
+	fi.parentSyncChild(c, fi.inodeNum(), func() quantumfs.ObjectKey {
+		key = fi.accessor.sync(c)
+		return key
+	})
 	return key
 }
 
