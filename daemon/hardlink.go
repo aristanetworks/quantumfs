@@ -88,7 +88,13 @@ func (link *Hardlink) Type() quantumfs.ObjectType {
 }
 
 func (link *Hardlink) SetType(v quantumfs.ObjectType) {
-	panic("SetType called on hardlink")
+	if v == quantumfs.ObjectTypeHardlink {
+		panic("SetType called making hardlink")
+	}
+
+	link.set(func(dir *quantumfs.DirectoryRecord) {
+		dir.SetType(v)
+	})
 }
 
 func (link *Hardlink) Permissions() uint32 {

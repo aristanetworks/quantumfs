@@ -563,3 +563,43 @@ func TestHardlinkUninstantiated(t *testing.T) {
 			"data mismatch after Branch")
 	})
 }
+
+func (test *testHelper) LinkFileExp(path string, filename string) {
+	err := os.MkdirAll(path, 0777)
+	test.assertNoErr(err)
+
+	// Enough data to consume a multi block file
+	data := genData(quantumfs.MaxBlockSize + 1000)
+
+	err = printToFile(path + "/" + filename, string(data[:1000]))
+	test.assertNoErr(err)
+
+	// Make them a link
+	err = syscall.Link(path + "/" + filename, path + "/" + filename + "link")
+	test.assertNoErr(err)
+
+	// Cause the underlying file to expand and change its own type
+	err = printToFile(path + "/" + filename + "link", string(data[1000:]))
+	test.assertNoErr(err)
+
+	// Ensure that the file actually works
+	readData, err := ioutil.ReadFile(path + "/" + filename + "link")
+	test.assertNoErr(err)
+	test.assert(bytes.Equal(readData, data), "Link data wrong after expansion")
+}
+
+func TestHardlinkFileExpansionInWsr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		test.LinkFileExp(workspace, "fileA")
+	})
+}
+
+func TestHardlinkFileExpansionOutWsr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		test.LinkFileExp(workspace + "/dirB", "fileB")
+	})
+}
