@@ -15,8 +15,8 @@ DEPS      := $(SRCS:.cc=.d)
 TEST_SRCS := $(d)/qfs_client_test.cc $(d)/qfs_client_util_test.cc
 TEST_OBJS := $(TEST_SRCS:.cc=.o)
 
-CXX_FLAGS      := -xc++ -I$(d) -fPIC -g -Werror -std=c++11
-LD_FLAGS       := -shared -Wl,-rpath,$(d)
+CXX_FLAGS      := -xc++ -I. -fPIC -g -Werror -std=c++11
+LD_FLAGS       := -shared -Wl,-rpath,.
 TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
 
 all: $(TARGET) test

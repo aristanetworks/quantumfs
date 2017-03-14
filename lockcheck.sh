@@ -40,6 +40,7 @@ do
 				fi
 				if [[ ( "$LINE" =~ ".LockTree().Unlock()" ) || \
 					( "$LINE" =~ ".LockTreeWaitAtMost(" ) ||\
+					( "$LINE" =~ "LockTreeGet" ) ||\
 					( "$LINE" =~ "func" && "$LINE" =~ "_(" ) ]]
 					then
 					if [ "$LOCKLINE" -ne "-1" ]; then

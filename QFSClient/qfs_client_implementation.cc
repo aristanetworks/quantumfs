@@ -1,23 +1,23 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#include "qfs_client_implementation.h"
+#include "QFSClient/qfs_client_implementation.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <jansson.h>
+
 #include <algorithm>
 #include <ios>
 #include <vector>
 
-#include <jansson.h>
-
-#include "qfs_client.h"
-#include "qfs_client_data.h"
-#include "qfs_client_test.h"
-#include "qfs_client_util.h"
+#include "QFSClient/qfs_client.h"
+#include "QFSClient/qfs_client_data.h"
+#include "QFSClient/qfs_client_test.h"
+#include "QFSClient/qfs_client_util.h"
 
 namespace qfsclient {
 
@@ -56,11 +56,9 @@ json_t *ApiContext::GetResponseJsonObject() const {
 }
 
 ApiImpl::CommandBuffer::CommandBuffer() {
-
 }
 
 ApiImpl::CommandBuffer::~CommandBuffer() {
-
 }
 
 // Return a const pointer to the data in the buffer
@@ -112,7 +110,7 @@ Error GetApi(const char *path, Api **api) {
 
 void ReleaseApi(Api *api) {
 	if (api != NULL) {
-		delete (ApiImpl*)api;
+		delete reinterpret_cast<ApiImpl*>(api);
 	}
 }
 
@@ -220,7 +218,7 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 
 	byte data[4096];
 	while(!this->file.eof()) {
-		this->file.read((char *)data, sizeof(data));
+		this->file.read(reinterpret_cast<char *>(data), sizeof(data));
 
 		if (this->file.fail() && !(this->file.eof())) {
 			// any read failure *except* an EOF is a failure
@@ -304,7 +302,6 @@ Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_name) {
 	// three tokens if split by '/'
 	if (tokens.size() != 3) {
 		return util::getError(kWorkspaceNameInvalid, workspace_name);
-
 	}
 
 	return util::getError(kSuccess);
@@ -320,7 +317,6 @@ Error ApiImpl::CheckWorkspacePathValid(const char *workspace_path) {
 	// three or more tokens if split by '/'
 	if (tokens.size() < 3) {
 		return util::getError(kWorkspacePathInvalid, workspace_path);
-
 	}
 
 	return util::getError(kSuccess);
@@ -398,9 +394,9 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 Error ApiImpl::SendJson(ApiContext *context) {
 	json_t *request_json = context->GetRequestJsonObject();
 	// we pass these flags to json_dumps() because:
-	//	JSON_COMPACT: there's no good reason for verbose JSON
-	//	JSON_SORT_KEYS: so that the tests can get predictable JSON and will
-	//		be able to compare generated JSON reliably
+	//    JSON_COMPACT: there's no good reason for verbose JSON
+	//    JSON_SORT_KEYS: so that the tests can get predictable JSON and will
+	//                    be able to compare generated JSON reliably
 	char *request_json_str = json_dumps(request_json,
 					    JSON_COMPACT | JSON_SORT_KEYS);
 
@@ -432,8 +428,8 @@ Error ApiImpl::GetAccessed(const char *workspace_root) {
 	}
 
 	// create JSON in a CommandBuffer with:
-	//	CommandId = kGetAccessed and
-	//	WorkspaceRoot = workspace_root
+	//    CommandId = kGetAccessed and
+	//    WorkspaceRoot = workspace_root
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kGetAccessedJSON,
@@ -475,12 +471,12 @@ Error ApiImpl::InsertInode(const char *destination,
 	}
 
 	// create JSON with:
-	//	CommandId = kCmdInsertInode and
-	//	DstPath = destination
-	//	Key = key
-	//	Uid = uid
-	//	Gid = gid
-	//	Permissions = permissions
+	//    CommandId = kCmdInsertInode and
+	//    DstPath = destination
+	//    Key = key
+	//    Uid = uid
+	//    Gid = gid
+	//    Permissions = permissions
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kInsertInodeJSON,
@@ -517,9 +513,9 @@ Error ApiImpl::Branch(const char *source, const char *destination) {
 	}
 
 	// create JSON with:
-	//	CommandId = kCmdBranchRequest and
-	//	Src = source
-	//	Dst = destination
+	//    CommandId = kCmdBranchRequest and
+	//    Src = source
+	//    Dst = destination
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kBranchJSON,
@@ -550,9 +546,9 @@ Error ApiImpl::SetBlock(const std::vector<byte> &key,
 	util::base64_encode(data, &base64_data);
 
 	// create JSON with:
-	//	CommandId = kCmdSetBlock and
-	//	Key = key
-	//	Data = data
+	//    CommandId = kCmdSetBlock and
+	//    Key = key
+	//    Data = data
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kSetBlockJSON,
@@ -580,8 +576,8 @@ Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
 	util::base64_encode(key, &base64_key);
 
 	// create JSON with:
-	//	CommandId = kCmdGetBlock and
-	//	Key = key
+	//    CommandId = kCmdGetBlock and
+	//    Key = key
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kGetBlockJSON,
@@ -670,5 +666,5 @@ std::string ApiImpl::FormatAccessedList(
 	return result;
 }
 
-} // namespace qfsclient
+}  // namespace qfsclient
 

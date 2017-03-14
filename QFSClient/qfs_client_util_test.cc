@@ -1,12 +1,12 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#include <string>
-#include <vector>
+#include "QFSClient/qfs_client_util.h"
 
 #include <gtest/gtest.h>
 
-#include "qfs_client_util.h"
+#include <string>
+#include <vector>
 
 namespace qfsclient {
 
@@ -14,6 +14,8 @@ class QfsClientUtilTest : public testing::Test {
  protected:
 	static void SetUpTestCase();
 	static void TearDownTestCase();
+
+	void RandomiseBlock(byte *block, size_t size);
 };
 
 void QfsClientUtilTest::SetUpTestCase() {
@@ -113,17 +115,18 @@ TEST_F(QfsClientUtilTest, Base64DecodeTest) {
 	ASSERT_EQ(memcmp(data.data(), result.data(), data.size()), 0);
 }
 
-void RandomiseBlock(byte *block, size_t size) {
-	srand(time(NULL));
+void QfsClientUtilTest::RandomiseBlock(byte *block, size_t size) {
+	unsigned int seed = time(NULL);
+	srand(seed);
 	for (size_t i = 0; i < size; i++) {
-		block[i] = rand();
+		block[i] = rand_r(&seed);
 	}
 }
 
 // Test base64 encoding and decoding of a larger block of random data
 TEST_F(QfsClientUtilTest, Base64BigTest) {
 	byte block[1024];
-	RandomiseBlock(block, 1024);
+	QfsClientUtilTest::RandomiseBlock(block, 1024);
 
 	std::string b64;
 	std::vector<byte> data, result;
@@ -140,7 +143,7 @@ TEST_F(QfsClientUtilTest, Base64BigTest) {
 // Negative test for base64 encoding and decoding
 TEST_F(QfsClientUtilTest, Base64BigBadTest) {
 	byte block[1024];
-	RandomiseBlock(block, 1024);
+	QfsClientUtilTest::RandomiseBlock(block, 1024);
 
 	std::string b64;
 	std::vector<byte> data, result;
@@ -149,7 +152,7 @@ TEST_F(QfsClientUtilTest, Base64BigBadTest) {
 
 	util::base64_encode(data, &b64);
 
-	// change the base64 string (but keep it as a valid base64 string) before
+	// change the base64 string (but keep it a valid base64 string) before
 	// trying to decode it
 	b64[123] = (b64[123] == 'r' ? 'R' : 'r');
 
@@ -159,4 +162,4 @@ TEST_F(QfsClientUtilTest, Base64BigBadTest) {
 	ASSERT_NE(memcmp(data.data(), result.data(), data.size()), 0);
 }
 
-} // namespace qfsclient
+}  // namespace qfsclient
