@@ -243,19 +243,31 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		test.assertNoErr(err)
 		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
 
+		wsrInode := test.getInodeNum(workspace)
 		dirInode := test.getInodeNum(dirName)
 		linkInode := test.getInodeNum(linkFile)
 		test.qfs.increaseLookupCount(linkInode)
+
 		test.remountFilesystem()
 
-		// Check that the parent uninstantiated, even if the Hardlink itself
-		// cannot be.
+		// Check that the directory parent uninstantiated, even if the
+		// Hardlink itself cannot be.
 		msg := fmt.Sprintf("hardlink parent inode %d to be uninstantiated",
 			dirInode)
 		test.waitFor(msg, func() bool {
 			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, dirInode)
 			return inode == nil
 		})
+
+		// Even though the directory "parent" should have been
+		// uninstantiated, the WorkspaceRoot must not have been
+		// uninstantiated because the hardlink is uninstantiated.
+		msg = fmt.Sprintf("Not all children unloaded, %d in %d", linkInode,
+			wsrInode)
+		test.waitFor("WSR to be held by instantiated hardlink",
+			func() bool { return test.testLogContains(msg) })
+
+		test.qfs.shouldForget(linkInode, 1)
 	})
 }
 
