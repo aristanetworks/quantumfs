@@ -261,7 +261,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 
 		// Even though the directory "parent" should have been
 		// uninstantiated, the WorkspaceRoot must not have been
-		// uninstantiated because the hardlink is uninstantiated.
+		// uninstantiated because the hardlink is instantiated.
 		msg = fmt.Sprintf("Not all children unloaded, %d in %d", linkInode,
 			wsrInode)
 		test.waitFor("WSR to be held by instantiated hardlink",
