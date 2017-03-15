@@ -172,13 +172,8 @@ func (dir *Directory) delChild_(c *ctx,
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.deleteChild(c, name)
 	}()
-	if record == nil {
-		// This can happen if the child is already deleted or it's a hardlink
-		c.dlog("Child delete doesn't need reparent: %s", name)
-		return nil
-	}
 
-	dir.self.markAccessed(c, record.Filename(), false)
+	dir.self.markAccessed(c, name, false)
 
 	dir.updateSize_(c)
 
@@ -490,6 +485,8 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 }
 
 func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
+	defer c.FuncIn("Directory::checkHardlink", "child inode %d", childId).out()
+
 	child := c.qfs.inode(c, childId)
 	if child != nil {
 		child.parentCheckLinkReparent(c, dir)
@@ -782,10 +779,10 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	return fuse.EACCES
 }
 
-func (dir *Directory) childInodes() []InodeId {
+func (dir *Directory) directChildInodes() []InodeId {
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.inodes()
+	return dir.children.directInodes()
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
@@ -879,6 +876,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			}
 
 			if record.Size() != 0 {
+				c.vlog("directory has %d children", record.Size())
 				return fuse.Status(syscall.ENOTEMPTY)
 			}
 

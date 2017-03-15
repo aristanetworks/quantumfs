@@ -208,7 +208,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) childInodes() []InodeId {
+func (tsl *TypespaceList) directChildInodes() []InodeId {
 	defer tsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(tsl.typespacesById))
@@ -509,7 +509,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) childInodes() []InodeId {
+func (nsl *NamespaceList) directChildInodes() []InodeId {
 	defer nsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(nsl.namespacesById))
@@ -807,7 +807,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) childInodes() []InodeId {
+func (wsl *WorkspaceList) directChildInodes() []InodeId {
 	defer wsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(wsl.workspacesById))

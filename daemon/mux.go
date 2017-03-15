@@ -608,7 +608,7 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
 
 	for _, inodeNum := range uninstantiated {
 		qfs.parentOfUninstantiated[inodeNum] = parent
-		c.vlog("Adding uninstantiated %v (%d)", inodeNum,
+		c.vlog("Adding uninstantiated %d from %d (%d)", inodeNum, parent,
 			len(qfs.parentOfUninstantiated))
 	}
 }
@@ -790,7 +790,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
-			children := dir.childInodes()
+			children := dir.directChildInodes()
 
 			for _, i := range children {
 				// To be fully unloaded, the child must have lookup
