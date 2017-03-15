@@ -14,7 +14,7 @@ import "github.com/hanwen/go-fuse/fuse"
 
 func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecordIf) (Inode, []InodeId) {
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
@@ -52,7 +52,7 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := link.parentGetChildRecord(c, link.InodeCommon.id)
+	record, err := link.parentGetChildRecordCopy(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
 		return fuse.EIO
@@ -228,8 +228,8 @@ func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeI
 	return nil, nil
 }
 
-func (link *Symlink) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (link *Symlink) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecordIf, error) {
 
 	c.elog("Unsupported record fetch on Symlink")
 	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")

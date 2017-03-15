@@ -17,7 +17,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// this with the inode parentLock locked since Sync locks the parent as well.
 	srcInode.Sync_DOWN(c)
 
-	newRecord, err := func() (DirectoryRecordIf, fuse.Status) {
+	newRecord, err := func() (quantumfs.DirectoryRecordIf, fuse.Status) {
 		defer srcInode.getParentLock().Lock().Unlock()
 
 		// ensure we're not orphaned
@@ -118,7 +118,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	// because the function holds the exclusive tree lock, so it is the only
 	// thread accessing this Inode. Also, recursive lock requiring won't occur.
 	defer dir.RLock().RUnlock()
-	record, err := dir.getChildRecord(c, inodeNum)
+	record, err := dir.getChildRecordCopy(c, inodeNum)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
 		return nil, fuse.EIO
@@ -151,7 +151,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 
 // the toLink parentLock must be locked
 func (dir *Directory) makeHardlink_DOWN_(c *ctx,
-	toLink Inode) (copy DirectoryRecordIf, err fuse.Status) {
+	toLink Inode) (copy quantumfs.DirectoryRecordIf, err fuse.Status) {
 
 	defer c.funcIn("Directory::makeHardlink_DOWN").out()
 

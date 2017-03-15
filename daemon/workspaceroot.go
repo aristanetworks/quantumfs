@@ -182,7 +182,7 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 }
 
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
-	record DirectoryRecordIf) *Hardlink {
+	record quantumfs.DirectoryRecordIf) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).out()
 
@@ -268,7 +268,7 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
 func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
-	record DirectoryRecordIf) {
+	record quantumfs.DirectoryRecordIf) {
 
 	defer wsr.linkLock.RLock().RUnlock()
 
@@ -300,7 +300,7 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 }
 
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
-	linkId HardlinkId) (record DirectoryRecordIf, inodeId InodeId) {
+	linkId HardlinkId) (record quantumfs.DirectoryRecordIf, inodeId InodeId) {
 
 	defer c.FuncIn("WorkspaceRoot::removeHardlink", "link %d", linkId).out()
 
