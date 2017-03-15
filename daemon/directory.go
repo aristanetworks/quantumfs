@@ -147,7 +147,8 @@ func (dir *Directory) updateSize_(c *ctx) {
 }
 
 // Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, inode InodeId, child quantumfs.DirectoryRecordIf) {
+func (dir *Directory) addChild_(c *ctx, inode InodeId,
+	child quantumfs.DirectoryRecordIf) {
 
 	defer c.funcIn("Directory::addChild_").out()
 
@@ -159,7 +160,9 @@ func (dir *Directory) addChild_(c *ctx, inode InodeId, child quantumfs.Directory
 }
 
 // Needs inode lock and parentLock for write
-func (dir *Directory) delChild_(c *ctx, name string) (toOrphan quantumfs.DirectoryRecordIf) {
+func (dir *Directory) delChild_(c *ctx,
+	name string) (toOrphan quantumfs.DirectoryRecordIf) {
+
 	defer c.funcIn("Directory::delChild_").out()
 
 	c.dlog("Unlinking inode %s", name)
@@ -667,8 +670,8 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 // All modifications to the record must be done whilst holding the parentLock.
 // If a function only wants to read, then it may suffice to grab a "snapshot" of it.
-func (dir *Directory) getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecordIf,
-	error) {
+func (dir *Directory) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecordIf, error) {
 
 	defer c.funcIn("Directory::getChildRecord").out()
 
@@ -1103,8 +1106,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// we need to unlock the parent early
 			defer parent.lock.Unlock()
 
-			newEntry, oldInodeId, err := func() (quantumfs.DirectoryRecordIf,
-				InodeId, fuse.Status) {
+			newEntry, oldInodeId,
+				err := func() (quantumfs.DirectoryRecordIf, InodeId,
+				fuse.Status) {
 
 				defer dir.childRecordLock.Lock().Unlock()
 
@@ -1192,8 +1196,8 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 }
 
 // Needs to hold childRecordLock
-func (dir *Directory) insertEntry_(c *ctx, entry quantumfs.DirectoryRecordIf, inodeNum InodeId,
-	childInode Inode) {
+func (dir *Directory) insertEntry_(c *ctx, entry quantumfs.DirectoryRecordIf,
+	inodeNum InodeId, childInode Inode) {
 
 	dir.children.loadChild(c, entry, inodeNum)
 
