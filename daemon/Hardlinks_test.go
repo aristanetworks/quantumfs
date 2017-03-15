@@ -569,8 +569,8 @@ func (test *testHelper) LinkFileExp(path string, filename string) {
 	// Enough data to consume a multi block file
 	data := genData(quantumfs.MaxBlockSize + 1000)
 
-	filepath := path+"/"+filename
-	linkpath := path+"/"+filename+"link"
+	filepath := path + "/" + filename
+	linkpath := path + "/" + filename + "link"
 	err = printToFile(filepath, string(data[:1000]))
 	test.assertNoErr(err)
 
