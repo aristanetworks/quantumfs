@@ -569,19 +569,21 @@ func (test *testHelper) LinkFileExp(path string, filename string) {
 	// Enough data to consume a multi block file
 	data := genData(quantumfs.MaxBlockSize + 1000)
 
-	err = printToFile(path+"/"+filename, string(data[:1000]))
+	filepath := path+"/"+filename
+	linkpath := path+"/"+filename+"link"
+	err = printToFile(filepath, string(data[:1000]))
 	test.assertNoErr(err)
 
 	// Make them a link
-	err = syscall.Link(path+"/"+filename, path+"/"+filename+"link")
+	err = syscall.Link(filepath, linkpath)
 	test.assertNoErr(err)
 
 	// Cause the underlying file to expand and change its own type
-	err = printToFile(path+"/"+filename+"link", string(data[1000:]))
+	err = printToFile(linkpath, string(data[1000:]))
 	test.assertNoErr(err)
 
 	// Ensure that the file actually works
-	readData, err := ioutil.ReadFile(path + "/" + filename + "link")
+	readData, err := ioutil.ReadFile(linkpath)
 	test.assertNoErr(err)
 	test.assert(bytes.Equal(readData, data), "Link data wrong after expansion")
 }
