@@ -745,55 +745,7 @@ func TestMain(m *testing.M) {
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	if outputTimeGraph {
-		timeMutex.Lock()
-		histogram := make([][]string, 20)
-		maxValue := 0
-		msPerBucket := 100.0
-		for i := 0; i < len(timeBuckets); i++ {
-			bucketIdx := int(timeBuckets[i].duration.Seconds() *
-				(1000.0 / msPerBucket))
-			if bucketIdx >= len(histogram) {
-				bucketIdx = len(histogram) - 1
-			}
-			histogram[bucketIdx] = append(histogram[bucketIdx],
-				timeBuckets[i].testName)
-
-			if len(histogram[bucketIdx]) > maxValue {
-				maxValue = len(histogram[bucketIdx])
-			}
-		}
-		timeMutex.Unlock()
-
-		// Scale outputs to fit into 60 columns wide
-		scaler := 1.0
-		if maxValue > 60 {
-			scaler = 60.0 / float64(maxValue)
-		}
-
-		fmt.Println("Test times:")
-		for i := len(histogram) - 1; i >= 0; i-- {
-			fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
-
-			scaled := int(float64(len(histogram[i])) * scaler)
-			if scaled == 0 && len(histogram[i]) > 0 {
-				scaled = 1
-			}
-
-			for j := 0; j < scaled; j++ {
-				fmt.Printf("#")
-			}
-			if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
-				fmt.Printf("(")
-				for j := 0; j < len(histogram[i]); j++ {
-					if j != 0 {
-						fmt.Printf(", ")
-					}
-					fmt.Printf("%s", histogram[i][j])
-				}
-				fmt.Printf(")")
-			}
-			fmt.Println()
-		}
+		outputTimeHistogram()
 	}
 
 	os.RemoveAll(testRunDir)
@@ -885,6 +837,58 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 	buf []byte) (uint32, fuse.Status) {
 
 	panic("Intentional crash")
+}
+
+func outputTimeHistogram() {
+	timeMutex.Lock()
+	histogram := make([][]string, 20)
+	maxValue := 0
+	msPerBucket := 100.0
+	for i := 0; i < len(timeBuckets); i++ {
+		bucketIdx := int(timeBuckets[i].duration.Seconds() *
+			(1000.0 / msPerBucket))
+		if bucketIdx >= len(histogram) {
+			bucketIdx = len(histogram) - 1
+		}
+		histogram[bucketIdx] = append(histogram[bucketIdx],
+			timeBuckets[i].testName)
+
+		if len(histogram[bucketIdx]) > maxValue {
+			maxValue = len(histogram[bucketIdx])
+		}
+	}
+	timeMutex.Unlock()
+
+	// Scale outputs to fit into 60 columns wide
+	scaler := 1.0
+	if maxValue > 60 {
+		scaler = 60.0 / float64(maxValue)
+	}
+
+	fmt.Println("Test times:")
+	for i := len(histogram) - 1; i >= 0; i-- {
+		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
+
+		scaled := int(float64(len(histogram[i])) * scaler)
+		if scaled == 0 && len(histogram[i]) > 0 {
+			scaled = 1
+		}
+
+		for j := 0; j < scaled; j++ {
+			fmt.Printf("#")
+		}
+		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
+			fmt.Printf("(")
+			for j := 0; j < len(histogram[i]); j++ {
+				if j != 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("%s", histogram[i][j])
+			}
+			fmt.Printf(")")
+		}
+		fmt.Println()
+	}
 }
 
 // If a quantumfs test fails then it may leave the filesystem mount hanging around in
