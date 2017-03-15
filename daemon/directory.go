@@ -913,6 +913,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			}
 
 			if record.Size() != 0 {
+				c.vlog("directory has %d children", record.Size())
 				return fuse.Status(syscall.ENOTEMPTY)
 			}
 
