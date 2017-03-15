@@ -45,9 +45,10 @@ var errorMutex sync.Mutex
 var errorLogs []logscanError
 
 type timeData struct {
-	duration	time.Duration
-	testName	string
+	duration time.Duration
+	testName string
 }
+
 var timeMutex sync.Mutex
 var timeBuckets []timeData
 
@@ -157,9 +158,9 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 	afterTest := time.Now()
 	timeMutex.Lock()
 	timeBuckets = append(timeBuckets,
-		timeData {
-			duration:	afterTest.Sub(beforeTest),
-			testName:	testName,
+		timeData{
+			duration: afterTest.Sub(beforeTest),
+			testName: testName,
 		})
 	timeMutex.Unlock()
 
@@ -752,7 +753,7 @@ func TestMain(m *testing.M) {
 			bucketIdx := int(timeBuckets[i].duration.Seconds() *
 				(1000.0 / msPerBucket))
 			if bucketIdx >= len(histogram) {
-				bucketIdx = len(histogram)-1
+				bucketIdx = len(histogram) - 1
 			}
 			histogram[bucketIdx] = append(histogram[bucketIdx],
 				timeBuckets[i].testName)
@@ -770,10 +771,10 @@ func TestMain(m *testing.M) {
 		}
 
 		fmt.Println("Test times:")
-		for i := len(histogram)-1; i >= 0; i-- {
+		for i := len(histogram) - 1; i >= 0; i-- {
 			fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
 
-			scaled := int(float64(len(histogram[i]))*scaler)
+			scaled := int(float64(len(histogram[i])) * scaler)
 			if scaled == 0 && len(histogram[i]) > 0 {
 				scaled = 1
 			}
