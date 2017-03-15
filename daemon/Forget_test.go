@@ -9,15 +9,8 @@ import "bytes"
 import "io/ioutil"
 import "os"
 import "strconv"
-import "syscall"
 import "testing"
 import "time"
-
-func remountFilesystem(test *testHelper) {
-	test.log("Remounting filesystem")
-	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
-	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
-}
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -34,7 +27,7 @@ func TestForgetOnDirectory(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -65,7 +58,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		}
 
 		// Now force the kernel to drop all cached inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -128,7 +121,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -151,19 +144,14 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 }
 
 func TestMultipleLookupCount(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
 		file, err := os.Create(testFilename)
 		test.assert(err == nil, "Error creating file: %v", err)
 
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 
 		file2, err := os.Open(testFilename)
 		test.assert(err == nil, "Error opening file readonly")
@@ -171,10 +159,10 @@ func TestMultipleLookupCount(t *testing.T) {
 		file.Close()
 		file2.Close()
 		// Wait for the closes to bubble up to QuantumFS
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Forget Inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertTestLog([]TLA{
 			TLA{true, "Looked up 2 Times",
@@ -186,12 +174,7 @@ func TestMultipleLookupCount(t *testing.T) {
 }
 
 func TestLookupCountHardlinks(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 		linkFilename := workspace + "/link"
@@ -206,7 +189,7 @@ func TestLookupCountHardlinks(t *testing.T) {
 		test.assert(err == nil, "Error creating hardlink")
 
 		// Forget Inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 
 		test.assertLogContains("Looked up 2 Times",
 			"Failed to cause a second lookup")
@@ -281,5 +264,29 @@ func TestForgetMarking(t *testing.T) {
 		test.assert(parent == nil,
 			"Parent %d not forgotten when all children unloaded",
 			parentId)
+	})
+}
+
+func TestForgetLookupRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data[:1000]))
+		test.assertNoErr(err)
+
+		test.syncAllWorkspaces()
+
+		test.remountFilesystem()
+
+		_, err = os.Stat(testFile)
+		test.assertNoErr(err)
+
+		test.syncAllWorkspaces()
+
+		// This test will fail here with the error "Unknown inodeId %d" or
+		// "lookupCount less than zero" if the race happened.
 	})
 }
