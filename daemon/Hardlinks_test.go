@@ -207,7 +207,8 @@ func TestHardlinkForget(t *testing.T) {
 		test.remountFilesystem()
 
 		// Check that it's uninstantiated
-		msg := fmt.Sprintf("hardlink inode %d to be forgotten", linkInode)
+		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated",
+			linkInode)
 		test.waitFor(msg, func() bool {
 			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
 			return inode == nil
@@ -218,9 +219,6 @@ func TestHardlinkForget(t *testing.T) {
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
-	// BUG 190827: Re-enable this test when that is fixed
-	t.Skip()
-
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
