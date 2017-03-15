@@ -17,14 +17,20 @@ func init() {
 		smallFileIOHandler)
 }
 
-func smallFileWriter(file *os.File,
+func smallFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, *HardLinkInfo, error) {
+	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
+
+	file, oerr := os.Open(path)
+	if oerr != nil {
+		return nil, oerr
+	}
+	defer file.Close()
 
 	keys, _, err := writeFileBlocks(file, uint64(finfo.Size()), ds)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	stat := finfo.Sys().(*syscall.Stat_t)
@@ -34,5 +40,5 @@ func smallFileWriter(file *os.File,
 		quantumfs.ObjectGid(stat.Uid, stat.Uid),
 		objType, keys[0])
 
-	return dirRecord, nil, nil
+	return dirRecord, nil
 }

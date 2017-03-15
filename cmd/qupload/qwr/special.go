@@ -18,13 +18,14 @@ func init() {
 		splFileIOHandler)
 }
 
-func splFileWriter(file *os.File,
+func splFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, *HardLinkInfo, error) {
+	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
 
 	var hash [quantumfs.ObjectKeyLength - 1]byte
 
+	// don't open special files
 	stat := finfo.Sys().(*syscall.Stat_t)
 	binary.LittleEndian.PutUint32(hash[0:4], stat.Mode)
 	binary.LittleEndian.PutUint32(hash[4:8], uint32(stat.Rdev))
@@ -33,11 +34,11 @@ func splFileWriter(file *os.File,
 	// all the information is embedded into key
 	// there are no blobs to be written here
 
-	dirRecord := createNewDirRecord(file.Name(), stat.Mode,
+	dirRecord := createNewDirRecord(finfo.Name(), stat.Mode,
 		uint32(stat.Rdev), uint64(finfo.Size()),
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
 		quantumfs.ObjectTypeSpecial, key)
 
-	return dirRecord, nil, nil
+	return dirRecord, nil
 }

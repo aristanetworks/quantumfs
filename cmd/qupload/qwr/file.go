@@ -10,9 +10,9 @@ import "syscall"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
-type fileObjWriter func(*os.File, os.FileInfo,
+type fileObjWriter func(string, os.FileInfo,
 	quantumfs.ObjectType,
-	quantumfs.DataStore) (*quantumfs.DirectoryRecord, *HardLinkInfo, error)
+	quantumfs.DataStore) (*quantumfs.DirectoryRecord, error)
 
 type fileObjIOHandler struct {
 	writer fileObjWriter
@@ -27,11 +27,7 @@ func registerFileObjIOHandler(objType quantumfs.ObjectType,
 }
 
 func fileObjectType(finfo os.FileInfo) quantumfs.ObjectType {
-	stat := finfo.Sys().(*syscall.Stat_t)
-
 	switch {
-	case stat.Nlink > 1:
-		return quantumfs.ObjectTypeHardlink
 	case utils.BitFlagsSet(uint(finfo.Mode()), uint(os.ModeSymlink)):
 		return quantumfs.ObjectTypeSymlink
 	case utils.BitFlagsSet(uint(finfo.Mode()), uint(os.ModeNamedPipe)) ||
@@ -60,18 +56,19 @@ func writer(objType quantumfs.ObjectType) (fileObjWriter, error) {
 
 func WriteFile(ds quantumfs.DataStore,
 	finfo os.FileInfo,
-	path string) (*quantumfs.DirectoryRecord, *HardLinkInfo, error) {
+	path string) (*quantumfs.DirectoryRecord, error) {
 
-	// process hardlinks first
-	setHardLink := false
 	stat := finfo.Sys().(*syscall.Stat_t)
+
+	// process hardlink first
+	setHardLink := false
 	if finfo.Mode().IsRegular() && stat.Nlink > 1 {
-		dirRecord, exists := HardLinkExists(finfo)
+		dirRecord, exists := HardLink(finfo)
 		if exists {
 			// return a new thin record
 			// representing the path for existing
 			// hardlink
-			return dirRecord, nil, nil
+			return dirRecord, nil
 		}
 		// this path is a hardlink
 		// WriteFile should write the file and then
@@ -79,41 +76,46 @@ func WriteFile(ds quantumfs.DataStore,
 		setHardLink = true
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Open %s failed: %s\n",
-			path, err)
-	}
-	defer file.Close()
-
+	// detect object type specific writer
 	objType := fileObjectType(finfo)
 	wr, wrerr := writer(objType)
 	if wrerr != nil {
-		return nil, nil, err
+		return nil, wrerr
 	}
 
-	dirRecord, hlinkInfo, err := wr(file, finfo, objType, ds)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Writing %s failed: %s\n",
-			path, err)
+	// use writer to write file blocks and file type
+	// specific metadata
+	dirRecord, werr := wr(path, finfo, objType, ds)
+	if werr != nil {
+		return nil, fmt.Errorf("Writing %s failed: %s\n",
+			path, werr)
 	}
+
+	// TODO(krishna): create DirectoryRecords here
+	// DirectoryRecord is setup in object type specific
+	// writer to allow object type specific mods if needed
+	// So far no such scenario has been seen
 
 	// write xattrs if any
 	xattrsKey, xerr := WriteXAttrs(path, ds)
 	if xerr != nil {
-		return nil, nil, xerr
+		return nil, xerr
 	}
 	if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		dirRecord.SetExtendedAttributes(xattrsKey)
 	}
 
 	// initialize hardlink info from dirRecord
+	// must be last step as it needs a fully setup
+	// directory record
 	if setHardLink {
-		// new thin directory record is returned
-		dirRecord = SetHardLink(dirRecord)
+		// instead of typical directory record use
+		// a directory record which points to the
+		// hardlink info
+		dirRecord = SetHardLink(finfo, dirRecord)
 	}
 
-	return dirRecord, hlinkInfo, nil
+	return dirRecord, nil
 }
 
 // caller ensures that file has at least readLen bytes without EOF

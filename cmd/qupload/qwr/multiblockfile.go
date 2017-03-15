@@ -43,14 +43,20 @@ func mbFileBlocksWriter(file *os.File,
 }
 
 // writes multi-block files of type Medium and Large
-func mbFileWriter(file *os.File,
+func mbFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, *HardLinkInfo, error) {
+	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
 
-	mbfKey, err := mbFileBlocksWriter(file, uint64(finfo.Size()), ds)
-	if err != nil {
-		return nil, nil, err
+	file, oerr := os.Open(path)
+	if oerr != nil {
+		return nil, oerr
+	}
+	defer file.Close()
+
+	mbfKey, werr := mbFileBlocksWriter(file, uint64(finfo.Size()), ds)
+	if werr != nil {
+		return nil, werr
 	}
 
 	stat := finfo.Sys().(*syscall.Stat_t)
@@ -60,5 +66,5 @@ func mbFileWriter(file *os.File,
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
 		objType, mbfKey)
 
-	return dirRecord, nil, err
+	return dirRecord, nil
 }
