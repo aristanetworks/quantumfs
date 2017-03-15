@@ -21,9 +21,9 @@ type ChildMap struct {
 
 func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
 	return &ChildMap{
-		wsr:             wsr_,
-		dir:             owner,
-		children:        make(map[string]InodeId, numEntries),
+		wsr:      wsr_,
+		dir:      owner,
+		children: make(map[string]InodeId, numEntries),
 		childrenRecords: make(map[InodeId][]quantumfs.DirectoryRecordIf,
 			numEntries),
 	}
