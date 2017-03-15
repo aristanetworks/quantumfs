@@ -44,6 +44,14 @@ type logscanError struct {
 var errorMutex sync.Mutex
 var errorLogs []logscanError
 
+type timeData struct {
+	duration time.Duration
+	testName string
+}
+
+var timeMutex sync.Mutex
+var timeBuckets []timeData
+
 func noStdOut(format string, args ...interface{}) error {
 	// Do nothing
 	return nil
@@ -134,16 +142,27 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 	}
 
 	th.log("Finished test preamble, starting test proper")
+	beforeTest := time.Now()
 	go th.execute(test)
 
 	var testResult string
 
 	select {
-	case <-time.After(1000 * time.Millisecond):
+	case <-time.After(1500 * time.Millisecond):
 		testResult = "ERROR: TIMED OUT"
 
 	case testResult = <-th.testResult:
 	}
+
+	// Record how long the test took so we can make a histogram
+	afterTest := time.Now()
+	timeMutex.Lock()
+	timeBuckets = append(timeBuckets,
+		timeData{
+			duration: afterTest.Sub(beforeTest),
+			testName: testName,
+		})
+	timeMutex.Unlock()
 
 	if !th.shouldFail && testResult != "" {
 		th.log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
@@ -693,6 +712,7 @@ func TestMain(m *testing.M) {
 
 	// Setup an array for tests with errors to be logscanned later
 	errorLogs = make([]logscanError, 0)
+	timeBuckets = make([]timeData, 0)
 
 	result := m.Run()
 
@@ -720,8 +740,13 @@ func TestMain(m *testing.M) {
 	for summary := range fullLogs {
 		testSummary += summary
 	}
+	outputTimeGraph := strings.Contains(testSummary, "TIMED OUT")
 	errorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
+
+	if outputTimeGraph {
+		outputTimeHistogram()
+	}
 
 	os.RemoveAll(testRunDir)
 	os.Exit(result)
@@ -784,6 +809,14 @@ func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
 }
 
 func (th *testHelper) assertTestLog(logs []TLA) {
+	contains := th.messagesInTestLog(logs)
+
+	for i, tla := range logs {
+		th.assert(contains[i] == tla.mustContain, tla.failMsg)
+	}
+}
+
+func (th *testHelper) messagesInTestLog(logs []TLA) []bool {
 	logFile := th.tempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
@@ -799,9 +832,26 @@ func (th *testHelper) assertTestLog(logs []TLA) {
 		}
 	}
 
-	for idx, tla := range logs {
-		th.assert(containChecker[idx] == tla.mustContain, tla.failMsg)
+	return containChecker
+}
+
+func (th *testHelper) testLogContains(text string) bool {
+	return th.allTestLogsMatch([]TLA{TLA{true, text, ""}})
+}
+
+func (th *testHelper) testLogDoesNotContain(text string) bool {
+	return th.allTestLogsMatch([]TLA{TLA{false, text, ""}})
+}
+
+func (th *testHelper) allTestLogsMatch(logs []TLA) bool {
+	contains := th.messagesInTestLog(logs)
+
+	for i, tla := range logs {
+		if contains[i] != tla.mustContain {
+			return false
+		}
 	}
+	return true
 }
 
 type crashOnWrite struct {
@@ -812,6 +862,58 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 	buf []byte) (uint32, fuse.Status) {
 
 	panic("Intentional crash")
+}
+
+func outputTimeHistogram() {
+	timeMutex.Lock()
+	histogram := make([][]string, 20)
+	maxValue := 0
+	msPerBucket := 100.0
+	for i := 0; i < len(timeBuckets); i++ {
+		bucketIdx := int(timeBuckets[i].duration.Seconds() *
+			(1000.0 / msPerBucket))
+		if bucketIdx >= len(histogram) {
+			bucketIdx = len(histogram) - 1
+		}
+		histogram[bucketIdx] = append(histogram[bucketIdx],
+			timeBuckets[i].testName)
+
+		if len(histogram[bucketIdx]) > maxValue {
+			maxValue = len(histogram[bucketIdx])
+		}
+	}
+	timeMutex.Unlock()
+
+	// Scale outputs to fit into 60 columns wide
+	scaler := 1.0
+	if maxValue > 60 {
+		scaler = 60.0 / float64(maxValue)
+	}
+
+	fmt.Println("Test times:")
+	for i := len(histogram) - 1; i >= 0; i-- {
+		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
+
+		scaled := int(float64(len(histogram[i])) * scaler)
+		if scaled == 0 && len(histogram[i]) > 0 {
+			scaled = 1
+		}
+
+		for j := 0; j < scaled; j++ {
+			fmt.Printf("#")
+		}
+		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
+			fmt.Printf("(")
+			for j := 0; j < len(histogram[i]); j++ {
+				if j != 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("%s", histogram[i][j])
+			}
+			fmt.Printf(")")
+		}
+		fmt.Println()
+	}
 }
 
 // If a quantumfs test fails then it may leave the filesystem mount hanging around in

@@ -216,6 +216,61 @@ func TestHardlinkForget(t *testing.T) {
 	})
 }
 
+func TestHardlinkUninstantiateDirectory(t *testing.T) {
+	// If a hardlink is a child of many directories, it shouldn't prevent those
+	// directories from becoming uninstantiated simply because it itself is still
+	// instantiated. It is likely being held open by some other directory or
+	// handle.
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		data := genData(2000)
+
+		testFile := workspace + "/testFile"
+		err := printToFile(testFile, string(data))
+		test.assertNoErr(err)
+
+		dirName := workspace + "/dir"
+		err = os.Mkdir(dirName, 0777)
+		test.assertNoErr(err)
+
+		linkFile := dirName + "/testLink"
+		err = syscall.Link(testFile, linkFile)
+		test.assertNoErr(err)
+
+		// Read the hardlink to ensure it's instantiated
+		readData, err := ioutil.ReadFile(linkFile)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(data, readData), "hardlink data mismatch")
+
+		wsrInode := test.getInodeNum(workspace)
+		dirInode := test.getInodeNum(dirName)
+		linkInode := test.getInodeNum(linkFile)
+		test.qfs.increaseLookupCount(linkInode)
+
+		test.remountFilesystem()
+
+		// Check that the directory parent uninstantiated, even if the
+		// Hardlink itself cannot be.
+		msg := fmt.Sprintf("hardlink parent inode %d to be uninstantiated",
+			dirInode)
+		test.waitFor(msg, func() bool {
+			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, dirInode)
+			return inode == nil
+		})
+
+		// Even though the directory "parent" should have been
+		// uninstantiated, the WorkspaceRoot must not have been
+		// uninstantiated because the hardlink is instantiated.
+		msg = fmt.Sprintf("Not all children unloaded, %d in %d", linkInode,
+			wsrInode)
+		test.waitFor("WSR to be held by instantiated hardlink",
+			func() bool { return test.testLogContains(msg) })
+
+		test.qfs.shouldForget(linkInode, 1)
+	})
+}
+
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
@@ -569,19 +624,21 @@ func (test *testHelper) LinkFileExp(path string, filename string) {
 	// Enough data to consume a multi block file
 	data := genData(quantumfs.MaxBlockSize + 1000)
 
-	err = printToFile(path+"/"+filename, string(data[:1000]))
+	filepath := path + "/" + filename
+	linkpath := path + "/" + filename + "link"
+	err = printToFile(filepath, string(data[:1000]))
 	test.assertNoErr(err)
 
 	// Make them a link
-	err = syscall.Link(path+"/"+filename, path+"/"+filename+"link")
+	err = syscall.Link(filepath, linkpath)
 	test.assertNoErr(err)
 
 	// Cause the underlying file to expand and change its own type
-	err = printToFile(path+"/"+filename+"link", string(data[1000:]))
+	err = printToFile(linkpath, string(data[1000:]))
 	test.assertNoErr(err)
 
 	// Ensure that the file actually works
-	readData, err := ioutil.ReadFile(path + "/" + filename + "link")
+	readData, err := ioutil.ReadFile(linkpath)
 	test.assertNoErr(err)
 	test.assert(bytes.Equal(readData, data), "Link data wrong after expansion")
 }
@@ -627,5 +684,32 @@ func TestHardlinkRecordRace(t *testing.T) {
 			test.assertNoErr(errA)
 			test.assertNoErr(errB)
 		}
+	})
+}
+
+func TestHardlinkDeleteFromDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		dir1 := workspace + "/dir1/dir1.1"
+		err := os.MkdirAll(dir1, 0777)
+		test.assertNoErr(err)
+
+		dir2 := workspace + "/dir2"
+		err = os.MkdirAll(dir2, 0777)
+		test.assertNoErr(err)
+
+		filename := dir1 + "/fileA"
+		linkname := dir2 + "/link"
+		data := genData(2000)
+
+		err = printToFile(filename, string(data))
+		test.assertNoErr(err)
+
+		err = syscall.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		err = os.RemoveAll(dir1)
+		test.assertNoErr(err)
 	})
 }

@@ -219,8 +219,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 	[]InodeId) {
 
-	c.vlog("WorkspaceRoot::instantiateChild Enter %d", inodeNum)
-	defer c.vlog("WorkspaceRoot::instantiateChild Exit")
+	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeNum).out()
 
 	hardlinkRecord := func() *quantumfs.DirectoryRecord {
 		defer wsr.linkLock.RLock().RUnlock()
@@ -515,15 +514,10 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			}
 
 			entry.SetID(newKey)
-
-			defer wsr.Directory.childRecordLock.Lock().Unlock()
-			wsr.Directory.publish_(c)
 		}()
 	} else {
 		wsr.Directory.syncChild(c, inodeNum, newKey)
 	}
-
-	wsr.publish(c)
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -586,10 +580,10 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	return wsr.rootId
 }
 
-func (wsr *WorkspaceRoot) childInodes() []InodeId {
+func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	defer wsr.Lock().Unlock()
 
-	directChildren := wsr.Directory.childInodes()
+	directChildren := wsr.Directory.directChildInodes()
 
 	for inodeNum, _ := range wsr.inodeToLink {
 		directChildren = append(directChildren, inodeNum)
