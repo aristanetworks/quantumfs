@@ -646,8 +646,52 @@ const (
 	PermSUID       = 1 << iota
 )
 
+type DirectoryRecordIf interface {
+	Filename() string
+	SetFilename(v string)
+
+	ID() ObjectKey
+	SetID(v ObjectKey)
+
+	Type() ObjectType
+	SetType(v ObjectType)
+
+	Permissions() uint32
+	SetPermissions(v uint32)
+
+	Owner() UID
+	SetOwner(v UID)
+
+	Group() GID
+	SetGroup(v GID)
+
+	Size() uint64
+	SetSize(v uint64)
+
+	ExtendedAttributes() ObjectKey
+	SetExtendedAttributes(v ObjectKey)
+
+	ContentTime() Time
+	SetContentTime(v Time)
+
+	ModificationTime() Time
+	SetModificationTime(v Time)
+
+	Record() DirectoryRecord
+	Nlinks() uint32
+
+	EncodeExtendedKey() []byte
+
+	ShallowCopy() *DirectoryRecord
+	Clone() DirectoryRecordIf
+}
+
+
 func NewDirectoryRecord() *DirectoryRecord {
 	segment := capn.NewBuffer(nil)
+
+	// for more records, nlinksCache is 1. If we're a shallow copy of a hardlink,
+	// it must be a different value greater than 1
 	record := DirectoryRecord{
 		record: encoding.NewRootDirectoryRecord(segment),
 	}
@@ -656,7 +700,9 @@ func NewDirectoryRecord() *DirectoryRecord {
 }
 
 type DirectoryRecord struct {
-	record encoding.DirectoryRecord
+	record		encoding.DirectoryRecord
+	nlinksCache	uint32
+	useCache	bool
 }
 
 func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
@@ -670,8 +716,18 @@ func (record *DirectoryRecord) Record() DirectoryRecord {
 	return *record
 }
 
+func (record *DirectoryRecord) SetNlinks(links uint32) {
+	record.nlinksCache = links
+	record.useCache = true
+}
+
 func (record *DirectoryRecord) Nlinks() uint32 {
-	return 1
+	// Unless otherwise set, this is a normal record with one link
+	if !record.useCache {
+		return 1
+	}
+
+	return record.nlinksCache
 }
 
 func (record *DirectoryRecord) Filename() string {
@@ -756,6 +812,28 @@ func (record *DirectoryRecord) SetExtendedAttributes(key ObjectKey) {
 
 func (record *DirectoryRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
+}
+
+func (record *DirectoryRecord) ShallowCopy() *DirectoryRecord {
+	newEntry := NewDirectoryRecord()
+	newEntry.SetNlinks(record.Nlinks())
+	newEntry.SetFilename(record.Filename())
+	newEntry.SetID(record.ID())
+	newEntry.SetType(record.Type())
+	newEntry.SetPermissions(record.Permissions())
+	newEntry.SetOwner(record.Owner())
+	newEntry.SetGroup(record.Group())
+	newEntry.SetSize(record.Size())
+	newEntry.SetExtendedAttributes(record.ExtendedAttributes())
+	newEntry.SetContentTime(record.ContentTime())
+	newEntry.SetModificationTime(record.ModificationTime())
+
+	return newEntry
+}
+
+func (record *DirectoryRecord) Clone() DirectoryRecordIf {
+	// For DirectoryRecord, ShallowCopy is as good as a clone
+	return record.ShallowCopy()
 }
 
 func EncodeExtendedKey(key ObjectKey, type_ ObjectType,

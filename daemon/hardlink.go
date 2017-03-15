@@ -14,7 +14,7 @@ func (v HardlinkId) Primitive() interface{} {
 	return uint64(v)
 }
 
-// Should implement DirectoryRecordIf
+// Should implement quantumfs.DirectoryRecordIf
 type Hardlink struct {
 	name   string
 	linkId HardlinkId
@@ -192,4 +192,34 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
 		realRecord.Size())
+}
+
+func (link *Hardlink) ShallowCopy() *quantumfs.DirectoryRecord {
+	valid, realRecord := link.wsr.getHardlink(link.linkId)
+	if !valid {
+		// This class shouldn't even exist if the hardlink's invalid
+		panic(fmt.Sprintf("Unable to get record for existing link %d",
+			link.linkId))
+	}
+
+	newEntry := quantumfs.NewDirectoryRecord()
+
+	newEntry.SetID(realRecord.ID())
+	newEntry.SetType(realRecord.Type())
+	newEntry.SetSize(realRecord.Size())
+
+	newEntry.SetNlinks(link.Nlinks())
+	newEntry.SetFilename(link.Filename())
+	newEntry.SetPermissions(link.Permissions())
+	newEntry.SetOwner(link.Owner())
+	newEntry.SetGroup(link.Group())
+	newEntry.SetExtendedAttributes(link.ExtendedAttributes())
+	newEntry.SetContentTime(link.ContentTime())
+	newEntry.SetModificationTime(link.ModificationTime())
+
+	return newEntry
+}
+
+func (link *Hardlink) Clone() quantumfs.DirectoryRecordIf {
+	return newHardlink(link.name, link.linkId, link.wsr)
 }

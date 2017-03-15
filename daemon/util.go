@@ -74,7 +74,7 @@ func assert(condition bool, msg string) {
 }
 
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	entry DirectoryRecordIf, updateMtime bool) {
+	entry quantumfs.DirectoryRecordIf, updateMtime bool) {
 
 	// Update the type if needed
 	if newType != nil {
@@ -143,24 +143,6 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 		c.vlog("Updated ctime")
 		entry.SetContentTime(now)
 	}
-}
-
-func cloneDirectoryRecord(
-	orig DirectoryRecordIf) DirectoryRecordIf {
-
-	newEntry := quantumfs.NewDirectoryRecord()
-	newEntry.SetFilename(orig.Filename())
-	newEntry.SetID(orig.ID())
-	newEntry.SetType(orig.Type())
-	newEntry.SetPermissions(orig.Permissions())
-	newEntry.SetOwner(orig.Owner())
-	newEntry.SetGroup(orig.Group())
-	newEntry.SetSize(orig.Size())
-	newEntry.SetExtendedAttributes(orig.ExtendedAttributes())
-	newEntry.SetContentTime(orig.ContentTime())
-	newEntry.SetModificationTime(orig.ModificationTime())
-
-	return newEntry
 }
 
 type DeferableMutex struct {
