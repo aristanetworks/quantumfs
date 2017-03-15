@@ -809,6 +809,14 @@ func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
 }
 
 func (th *testHelper) assertTestLog(logs []TLA) {
+	contains := th.messagesInTestLog(logs)
+
+	for i, tla := range logs {
+		th.assert(contains[i] == tla.mustContain, tla.failMsg)
+	}
+}
+
+func (th *testHelper) messagesInTestLog(logs []TLA) []bool {
 	logFile := th.tempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
@@ -824,9 +832,26 @@ func (th *testHelper) assertTestLog(logs []TLA) {
 		}
 	}
 
-	for idx, tla := range logs {
-		th.assert(containChecker[idx] == tla.mustContain, tla.failMsg)
+	return containChecker
+}
+
+func (th *testHelper) testLogContains(text string) bool {
+	return th.allTestLogsMatch([]TLA{TLA{true, text, ""}})
+}
+
+func (th *testHelper) testLogDoesNotContain(text string) bool {
+	return th.allTestLogsMatch([]TLA{TLA{false, text, ""}})
+}
+
+func (th *testHelper) allTestLogsMatch(logs []TLA) bool {
+	contains := th.messagesInTestLog(logs)
+
+	for i, tla := range logs {
+		if contains[i] != tla.mustContain {
+			return false
+		}
 	}
+	return true
 }
 
 type crashOnWrite struct {
