@@ -521,7 +521,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 	defer c.FuncIn("Directory::checkHardlink", "child inode %d", childId).out()
 
-	child := c.qfs.inodeNoInstantiate(c, childId)
+	child := c.qfs.inode(c, childId)
 	if child != nil {
 		child.parentCheckLinkReparent(c, dir)
 	}
