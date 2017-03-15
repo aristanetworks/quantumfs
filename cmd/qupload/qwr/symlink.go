@@ -13,32 +13,32 @@ func init() {
 		writer: symlinkWriter,
 	}
 
-	registerFileObjIOHandler(quantumfs.ObjectTypeSpecial,
+	registerFileObjIOHandler(quantumfs.ObjectTypeSymlink,
 		symlinkIOHandler)
 }
 
-func symlinkWriter(file *os.File,
+func symlinkWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, *HardLinkInfo, error) {
+	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
 
-	pointedTo, err := os.Readlink(file.Name())
+	pointedTo, err := os.Readlink(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	key, bErr := writeBlob([]byte(pointedTo),
-		quantumfs.KeyTypeMetadata, ds)
+	data := []byte(pointedTo)
+	key, bErr := writeBlob(data, quantumfs.KeyTypeMetadata, ds)
 	if bErr != nil {
-		return nil, nil, bErr
+		return nil, bErr
 	}
 
 	stat := finfo.Sys().(*syscall.Stat_t)
-	dirRecord := createNewDirRecord(file.Name(), stat.Mode,
-		uint32(stat.Rdev), uint64(finfo.Size()),
+	dirRecord := createNewDirRecord(finfo.Name(), stat.Mode,
+		uint32(stat.Rdev), uint64(len(data)),
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
 		quantumfs.ObjectTypeSymlink, key)
 
-	return dirRecord, nil, nil
+	return dirRecord, nil
 }

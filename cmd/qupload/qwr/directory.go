@@ -50,6 +50,7 @@ func WriteDirectory(base string, name string,
 			0, 0, 0, 0,
 			quantumfs.ObjectTypeDirectoryEntry,
 			key)
+		// xattrs cannot be saved in workspace root dir
 	} else {
 		finfo, serr := os.Lstat(filepath.Join(base, name))
 		if serr != nil {
@@ -62,6 +63,15 @@ func WriteDirectory(base string, name string,
 			quantumfs.ObjectGid(stat.Gid, stat.Gid),
 			quantumfs.ObjectTypeDirectoryEntry,
 			key)
+
+		xattrsKey, xerr := WriteXAttrs(filepath.Join(base, name), ds)
+		if xerr != nil {
+			return nil, xerr
+		}
+		if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
+			dirRecord.SetExtendedAttributes(xattrsKey)
+		}
+
 	}
 
 	return dirRecord, nil

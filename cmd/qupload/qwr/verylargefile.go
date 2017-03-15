@@ -17,12 +17,18 @@ func init() {
 		vlFileIOHandler)
 }
 
-func vlFileWriter(file *os.File,
+func vlFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, *HardLinkInfo, error) {
+	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
 
 	var mbfKeys []quantumfs.ObjectKey
+
+	file, oerr := os.Open(path)
+	if oerr != nil {
+		return nil, oerr
+	}
+	defer file.Close()
 
 	parts := uint64(finfo.Size()) / quantumfs.MaxLargeFileSize()
 	if uint64(finfo.Size())%quantumfs.MaxLargeFileSize() > 0 {
@@ -40,7 +46,7 @@ func vlFileWriter(file *os.File,
 
 		mbfKey, err := mbFileBlocksWriter(file, readSize, ds)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		mbfKeys = append(mbfKeys, mbfKey)
 		remainingSize -= readSize
@@ -57,7 +63,7 @@ func vlFileWriter(file *os.File,
 	vlfKey, vlfErr := writeBlob(vlf.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if vlfErr != nil {
-		return nil, nil, vlfErr
+		return nil, vlfErr
 	}
 
 	stat := finfo.Sys().(*syscall.Stat_t)
@@ -67,5 +73,5 @@ func vlFileWriter(file *os.File,
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
 		quantumfs.ObjectTypeVeryLargeFile, vlfKey)
 
-	return dirRecord, nil, nil
+	return dirRecord, nil
 }
