@@ -608,7 +608,7 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
 
 	for _, inodeNum := range uninstantiated {
 		qfs.parentOfUninstantiated[inodeNum] = parent
-		c.vlog("Adding uninstantiated %v (%d)", inodeNum,
+		c.vlog("Adding uninstantiated %d from %d (%d)", inodeNum, parent,
 			len(qfs.parentOfUninstantiated))
 	}
 }
