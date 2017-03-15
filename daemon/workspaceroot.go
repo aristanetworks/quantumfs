@@ -514,15 +514,10 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			}
 
 			entry.SetID(newKey)
-
-			defer wsr.Directory.childRecordLock.Lock().Unlock()
-			wsr.Directory.publish_(c)
 		}()
 	} else {
 		wsr.Directory.syncChild(c, inodeNum, newKey)
 	}
-
-	wsr.publish(c)
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
