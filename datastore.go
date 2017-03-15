@@ -686,7 +686,6 @@ type DirectoryRecordIf interface {
 	Clone() DirectoryRecordIf
 }
 
-
 func NewDirectoryRecord() *DirectoryRecord {
 	segment := capn.NewBuffer(nil)
 
@@ -700,9 +699,9 @@ func NewDirectoryRecord() *DirectoryRecord {
 }
 
 type DirectoryRecord struct {
-	record		encoding.DirectoryRecord
-	nlinksCache	uint32
-	useCache	bool
+	record      encoding.DirectoryRecord
+	nlinksCache uint32
+	useCache    bool
 }
 
 func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
