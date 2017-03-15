@@ -814,10 +814,10 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	return fuse.EACCES
 }
 
-func (dir *Directory) childInodes() []InodeId {
+func (dir *Directory) directChildInodes() []InodeId {
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.inodes()
+	return dir.children.directInodes()
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
