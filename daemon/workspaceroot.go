@@ -219,8 +219,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 	[]InodeId) {
 
-	c.vlog("WorkspaceRoot::instantiateChild Enter %d", inodeNum)
-	defer c.vlog("WorkspaceRoot::instantiateChild Exit")
+	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeNum).out()
 
 	hardlinkRecord := func() *quantumfs.DirectoryRecord {
 		defer wsr.linkLock.RLock().RUnlock()
