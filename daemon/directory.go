@@ -206,13 +206,8 @@ func (dir *Directory) delChild_(c *ctx, name string) (toOrphan DirectoryRecordIf
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.deleteChild(c, name)
 	}()
-	if record == nil {
-		// This can happen if the child is already deleted or it's a hardlink
-		c.dlog("Child delete doesn't need reparent: %s", name)
-		return nil
-	}
 
-	dir.self.markAccessed(c, record.Filename(), false)
+	dir.self.markAccessed(c, name, false)
 
 	dir.updateSize_(c)
 
