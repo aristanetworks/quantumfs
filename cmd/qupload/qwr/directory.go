@@ -3,6 +3,8 @@
 
 package qwr
 
+import "os"
+import "path/filepath"
 import "syscall"
 import "time"
 
@@ -49,9 +51,17 @@ func WriteDirectory(base string, name string,
 			quantumfs.ObjectTypeDirectoryEntry,
 			key)
 	} else {
-		// TODO(krishna): fetch stat and xattr information
-		//  from baseDir+name path
-		dirRecord = nil
+		finfo, serr := os.Lstat(filepath.Join(base, name))
+		if serr != nil {
+			return nil, serr
+		}
+		stat := finfo.Sys().(*syscall.Stat_t)
+		dirRecord = createNewDirRecord(name, stat.Mode,
+			uint32(stat.Rdev), 0,
+			quantumfs.ObjectUid(stat.Uid, stat.Uid),
+			quantumfs.ObjectGid(stat.Gid, stat.Gid),
+			quantumfs.ObjectTypeDirectoryEntry,
+			key)
 	}
 
 	return dirRecord, nil
