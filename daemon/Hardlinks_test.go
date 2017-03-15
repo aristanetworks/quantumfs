@@ -616,3 +616,30 @@ func TestHardlinkUninstantiated(t *testing.T) {
 			"data mismatch after Branch")
 	})
 }
+
+func TestHardlinkDeleteFromDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		dir1 := workspace + "/dir1/dir1.1"
+		err := os.MkdirAll(dir1, 0777)
+		test.assertNoErr(err)
+
+		dir2 := workspace + "/dir2"
+		err = os.MkdirAll(dir2, 0777)
+		test.assertNoErr(err)
+
+		filename := dir1 + "/fileA"
+		linkname := dir2 + "/link"
+		data := genData(2000)
+
+		err = printToFile(filename, string(data))
+		test.assertNoErr(err)
+
+		err = syscall.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		err = os.RemoveAll(dir1)
+		test.assertNoErr(err)
+	})
+}
