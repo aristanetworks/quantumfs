@@ -527,8 +527,8 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func (fi *File) getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecordIf,
-	error) {
+func (fi *File) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecordIf, error) {
 
 	defer c.funcIn("File::getChildRecordCopy").out()
 

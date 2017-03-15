@@ -24,11 +24,14 @@ func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMa
 		wsr:             wsr_,
 		dir:             owner,
 		children:        make(map[string]InodeId, numEntries),
-		childrenRecords: make(map[InodeId][]quantumfs.DirectoryRecordIf, numEntries),
+		childrenRecords: make(map[InodeId][]quantumfs.DirectoryRecordIf,
+			numEntries),
 	}
 }
 
-func (cmap *ChildMap) setRecord(inodeId InodeId, record quantumfs.DirectoryRecordIf) {
+func (cmap *ChildMap) setRecord(inodeId InodeId,
+	record quantumfs.DirectoryRecordIf) {
+
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(inodeId, record.Filename())
 
@@ -41,7 +44,9 @@ func (cmap *ChildMap) setRecord(inodeId InodeId, record quantumfs.DirectoryRecor
 	cmap.childrenRecords[inodeId] = list
 }
 
-func (cmap *ChildMap) delRecord(inodeId InodeId, name string) quantumfs.DirectoryRecordIf {
+func (cmap *ChildMap) delRecord(inodeId InodeId,
+	name string) quantumfs.DirectoryRecordIf {
+
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
 		return nil
