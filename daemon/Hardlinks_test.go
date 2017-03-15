@@ -617,6 +617,48 @@ func TestHardlinkUninstantiated(t *testing.T) {
 	})
 }
 
+func (test *testHelper) LinkFileExp(path string, filename string) {
+	err := os.MkdirAll(path, 0777)
+	test.assertNoErr(err)
+
+	// Enough data to consume a multi block file
+	data := genData(quantumfs.MaxBlockSize + 1000)
+
+	filepath := path + "/" + filename
+	linkpath := path + "/" + filename + "link"
+	err = printToFile(filepath, string(data[:1000]))
+	test.assertNoErr(err)
+
+	// Make them a link
+	err = syscall.Link(filepath, linkpath)
+	test.assertNoErr(err)
+
+	// Cause the underlying file to expand and change its own type
+	err = printToFile(linkpath, string(data[1000:]))
+	test.assertNoErr(err)
+
+	// Ensure that the file actually works
+	readData, err := ioutil.ReadFile(linkpath)
+	test.assertNoErr(err)
+	test.assert(bytes.Equal(readData, data), "Link data wrong after expansion")
+}
+
+func TestHardlinkFileExpansionInWsr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		test.LinkFileExp(workspace, "fileA")
+	})
+}
+
+func TestHardlinkFileExpansionOutWsr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		test.LinkFileExp(workspace+"/dirB", "fileB")
+	})
+}
+
 func TestHardlinkDeleteFromDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
