@@ -82,6 +82,7 @@ func main() {
 	// TODO(krishna): support mix of files and dirs later
 	var dirs []string
 	for d := 0; d < flag.NArg(); d++ {
+		fmt.Println("Appending dir: ", flag.Arg(d))
 		dirs = append(dirs, flag.Arg(d))
 	}
 

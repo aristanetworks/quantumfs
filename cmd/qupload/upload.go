@@ -19,7 +19,7 @@ func handleDir(base string, dir string,
 
 	curDirPath := filepath.Join(base, dir)
 
-	dirEnts, err := ioutil.ReadDir(dir)
+	dirEnts, err := ioutil.ReadDir(curDirPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Reading %s failed %s\n",
 			curDirPath, err)
@@ -36,6 +36,7 @@ func handleDir(base string, dir string,
 		if derr != nil {
 			return nil, nil, derr
 		}
+		fmt.Printf("Base: %s Dir:%s Records: %v\n", curDirPath, dirEnt.Name(), childRecords)
 		curDirRecords = append(curDirRecords, childRecords...)
 		curHlinks = append(curHlinks, childHlinks...)
 	}
@@ -46,25 +47,27 @@ func handleDir(base string, dir string,
 			continue
 		}
 
-		record, hlink, ferr := qwr.WriteFile(ds,
+		record, hlink, ferr := qwr.WriteFile(ds, dirEnt,
 			filepath.Join(curDirPath, dirEnt.Name()))
 		if ferr != nil {
 			return nil, nil, ferr
 		}
 
+		fmt.Printf("File:%s Records: %v\n", dirEnt.Name(), record)
 		curDirRecords = append(curDirRecords, record)
-		curDirHlinks = append(curDirHlinks, hlink)
+		curHlinks = append(curHlinks, hlink)
 	}
 
 	// root dir is handled by WriteWorkspaceRoot
 	if dir != "/" {
-		subdirRecord, serr := WriteDirectory(base, dir, curDirRecords, ds)
+		subdirRecord, serr := qwr.WriteDirectory(base, dir, curDirRecords, ds)
 		if serr != nil {
 			return nil, nil, serr
 		}
 		curDirRecords = []*quantumfs.DirectoryRecord{subdirRecord}
 	}
 
+	fmt.Printf("return Base: %s Dir:%s Records: %v\n", base, dir, curDirRecords)
 	return curDirRecords, curHlinks, nil
 }
 
@@ -75,6 +78,7 @@ func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
 	var topHlinks []*qwr.HardLinkInfo
 
 	for _, dir := range dirs {
+		fmt.Printf("Handling %s\n", filepath.Join(base, dir))
 		dirRecords, hlinks, err := handleDir(base, dir, ds)
 		if err != nil {
 			return err
@@ -83,10 +87,10 @@ func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
 		topHlinks = append(topHlinks, hlinks...)
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(base, topDirRecords, hlinks, ds)
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(base, topDirRecords, topHlinks, ds)
 	if wsrErr != nil {
 		return wsrErr
 	}
 
-	return wsdb.CreateWorkspace(wsdb, ws, wsrKey)
+	return qwr.CreateWorkspace(wsdb, ws, wsrKey)
 }
