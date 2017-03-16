@@ -13,7 +13,10 @@ enum CommandID {
 	kCmdClearAccessed = 3,  // not in aid/3015
 	kCmdSyncAll = 4,        // not in aid/3015
 	kCmdInsertInode = 5,
-	// missing: Merge, Freeze, Checkout, WorkspaceDelete, GetBlock, SetBlock
+	kCmdDeleteWorkspace = 6,
+	kCmdSetBlock = 7,
+	kCmdGetBlock = 8,
+	// missing: Merge, Freeze, Checkout
 };
 
 enum CommandError {
@@ -34,6 +37,9 @@ enum CommandError {
 
 	// The extended key is not stored in the datastore
 	kCmdKeyNotFound = 5,
+
+	// SetBlock was passed a block that was too large
+	kErrorBlockTooLarge = 6,
 };
 
 // names of commonly-used JSON fields
@@ -44,6 +50,7 @@ static const char kMessage[] = "Message";
 static const char kAccessList[] = "AccessList";
 static const char kDstPath[] = "DstPath";
 static const char kKey[] = "Key";
+static const char kData[] = "Data";
 static const char kUid[] = "Uid";
 static const char kGid[] = "Gid";
 static const char kPermissions[] = "Permissions";
@@ -61,6 +68,8 @@ const int kExtendedKeyLength = 40;
 static const char kGetAccessedJSON[] = "{s:i,s:s}";
 static const char kInsertInodeJSON[] = "{s:i,s:s,s:s,s:i,s:i,s:i}";
 static const char kBranchJSON[] = "{s:i,s:s,s:s}";
+static const char kSetBlockJSON[] = "{s:i,s:s,s:s}";
+static const char kGetBlockJSON[] = "{s:i,s:s}";
 
 #endif  // QFSCLIENT_QFS_CLIENT_DATA_H_
 

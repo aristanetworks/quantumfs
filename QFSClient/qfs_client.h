@@ -5,8 +5,11 @@
 #define QFSCLIENT_QFS_CLIENT_H_
 
 #include <string>
+#include <vector>
 
 namespace qfsclient {
+
+typedef uint8_t byte;
 
 /// Potential error values that may be returned in an ErrorCode object
 /// by methods of the Api class
@@ -64,6 +67,9 @@ enum ErrorCode {
 
 	// The given workspace name was not valid
 	kWorkspaceNameInvalid = 15,
+
+	// a JSON object was found with the wrong type
+	kJsonObjectWrongType = 16,
 };
 
 /// An `Error` object is returned by many member functions of the Api class. The
@@ -116,6 +122,29 @@ class Api {
 	/// @return An `Error` object that indicates success or failure.
 	virtual Error Branch(const char *source,
 			     const char *destination) = 0;
+
+	/// Store a block of data persistently.
+	///
+	/// @param [in] `key` A base64 string (which could represent a binary key)
+	/// to be used to identify the data and which will be needed later to
+	/// retrieve the data.
+	/// @param [in] `data` A string that holds a base64 representation of the
+	/// block of data to store.
+	///
+	/// @return An `Error` object that indicates success or failure.
+	virtual Error SetBlock(const std::vector<byte> &key,
+			       const std::vector<byte> &data) = 0;
+
+	/// Retrieve a block of data from the persistent data store.
+	///
+	/// @param [in] `key` A base64 string (which could represent a binary key)
+	/// to be used to identify the data to be retrieved.
+	/// @param [out] `data` A `std::string` that will be modified to hold a
+	/// base64 representation of the data block.
+	///
+	/// @return An `Error` object that indicates success or failure.
+	virtual Error GetBlock(const std::vector<byte> &key,
+			       std::vector<byte> *data) = 0;
 };
 
 /// Get an instance of an `Api` object that can be used to call QuantumFS API
