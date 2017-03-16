@@ -49,7 +49,7 @@ func newHardlink(name string, linkId HardlinkId, wsr *WorkspaceRoot) *Hardlink {
 func (link *Hardlink) get() *quantumfs.DirectoryRecord {
 	valid, link_ := link.wsr.getHardlink(link.linkId)
 	if !valid {
-		// This class shouldn't even exist if the hardlink's invalid
+		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
 			link.linkId))
 	}
@@ -185,7 +185,7 @@ func (link *Hardlink) Nlinks() uint32 {
 func (link *Hardlink) EncodeExtendedKey() []byte {
 	valid, realRecord := link.wsr.getHardlink(link.linkId)
 	if !valid {
-		// This class shouldn't even exist if the hardlink's invalid
+		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
 			link.linkId))
 	}
@@ -197,7 +197,7 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 func (link *Hardlink) ShallowCopy() *quantumfs.DirectoryRecord {
 	valid, realRecord := link.wsr.getHardlink(link.linkId)
 	if !valid {
-		// This class shouldn't even exist if the hardlink's invalid
+		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
 			link.linkId))
 	}
