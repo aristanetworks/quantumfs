@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // The hashing framework
@@ -18,13 +18,14 @@ void cCityHashCrc256(const char *s, size_t len, uint64_t *result);
 import "C"
 import "unsafe"
 
-const hashSize = sha1.Size
+// 160 bit hash
+const hashSize = 20
 
 
 func Hash(input []byte) [hashSize]byte {
-	//return sha1.Sum(input)
-	// HACK to test
 	hash := CityHash256(input)
+
+	// Truncate down to the number of bytes we want to use
 	var rtn [hashSize]byte
 	copy(rtn[:], hash[:hashSize])
 	return rtn
