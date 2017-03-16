@@ -19,8 +19,6 @@
 
 namespace qfsclient {
 
-typedef uint8_t byte;
-
 const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
 
@@ -75,15 +73,21 @@ class ApiImpl: public Api {
 	void Close();
 
 	// implemented API functions
-	Error GetAccessed(const char *workspace_root);
+	virtual Error GetAccessed(const char *workspace_root);
 
-	Error InsertInode(const char *destination,
-			  const char *key,
-			  uint32_t permissions,
-			  uint32_t uid,
-			  uint32_t gid);
+	virtual Error InsertInode(const char *destination,
+				  const char *key,
+				  uint32_t permissions,
+				  uint32_t uid,
+				  uint32_t gid);
 
-	Error Branch(const char *source, const char *destination);
+	virtual Error Branch(const char *source, const char *destination);
+
+	virtual Error SetBlock(const std::vector<byte> &key,
+			       const std::vector<byte> &data);
+
+	virtual Error GetBlock(const std::vector<byte> &key,
+			       std::vector<byte> *data);
 
  private:
 	// CommandBuffer is used internally to store the raw content of a command to

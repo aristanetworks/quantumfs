@@ -18,6 +18,9 @@ README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 
 3) ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
 
+4) follow the instructions in QFSClient/README to install the prerequisites for
+building QFSClient.
+
 Instructions
 ------------
 
