@@ -4,8 +4,6 @@
 // The hashing framework
 package quantumfs
 
-import "crypto/sha1"
-
 /*
 #cgo LDFLAGS: /usr/local/lib/libcityhash.a
 
