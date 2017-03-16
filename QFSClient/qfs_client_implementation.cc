@@ -396,7 +396,7 @@ Error ApiImpl::SendJson(ApiContext *context) {
 	// we pass these flags to json_dumps() because:
 	//    JSON_COMPACT: there's no good reason for verbose JSON
 	//    JSON_SORT_KEYS: so that the tests can get predictable JSON and will
-	//                  be able to compare generated JSON reliably
+	//                    be able to compare generated JSON reliably
 	char *request_json_str = json_dumps(request_json,
 					    JSON_COMPACT | JSON_SORT_KEYS);
 
@@ -537,6 +537,83 @@ Error ApiImpl::Branch(const char *source, const char *destination) {
 	return util::getError(kSuccess);
 }
 
+Error ApiImpl::SetBlock(const std::vector<byte> &key,
+			const std::vector<byte> &data) {
+	// convert key and data to base64 before stuffing into JSON
+	std::string base64_key;
+	std::string base64_data;
+	util::base64_encode(key, &base64_key);
+	util::base64_encode(data, &base64_data);
+
+	// create JSON with:
+	//    CommandId = kCmdSetBlock and
+	//    Key = key
+	//    Data = data
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kSetBlockJSON,
+					    kCommandId, kCmdSetBlock,
+					    kKey, base64_key.c_str(),
+					    kData, base64_data.c_str());
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+
+	Error err = this->SendJson(&context);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	return util::getError(kSuccess);
+}
+
+Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
+	// convert key to base64 before stuffing into JSON
+	std::string base64_key;
+	util::base64_encode(key, &base64_key);
+
+	// create JSON with:
+	//    CommandId = kCmdGetBlock and
+	//    Key = key
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kGetBlockJSON,
+					    kCommandId, kCmdGetBlock,
+					    kKey, base64_key.c_str());
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+
+	Error err = this->SendJson(&context);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	json_t *response_json = context.GetResponseJsonObject();
+
+	json_t *data_json_obj = json_object_get(response_json, kData);
+	if (data_json_obj == NULL) {
+		return util::getError(kMissingJsonObject, kData);
+	}
+	if (!json_is_string(data_json_obj)) {
+		return util::getError(kJsonObjectWrongType,
+				      "expected string for " + std::string(kData));
+	}
+
+	const char *data_base64 = json_string_value(data_json_obj);
+
+	// convert data_base64 from base64 to binary before setting value in data
+	util::base64_decode(data_base64, data);
+
+	return util::getError(kSuccess);
+}
+
 Error ApiImpl::PrepareAccessedListResponse(
 	const ApiContext *context,
 	std::unordered_map<std::string, bool> *accessed_list) {
@@ -551,10 +628,9 @@ Error ApiImpl::PrepareAccessedListResponse(
 	// key is the name of a file that has been created, whereas a false
 	// value in the map means that the value's corresponding key is the name
 	// of a file that has been accessed.
-	json_t *accessed_list_json_obj = json_object_get(response_json,
-							 kAccessList);
+	json_t *accessed_list_json_obj = json_object_get(response_json, kAccessList);
 	if (accessed_list_json_obj == NULL) {
-		return util::getError(kMissingJsonObject, "AccessList");
+		return util::getError(kMissingJsonObject, kAccessList);
 	}
 
 	const char *k;
