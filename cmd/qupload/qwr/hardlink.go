@@ -42,6 +42,24 @@ func HardLink(finfo os.FileInfo) (*quantumfs.DirectoryRecord, bool) {
 	stat := finfo.Sys().(*syscall.Stat_t)
 	hlinfo, exists := hardLinkInfoMap[stat.Ino]
 	if !exists {
+
+		hardLinkInfoNextID++
+
+		// the FilInfo.Stat already indicates the
+		// final link count for path but we start with 1
+		// since its possible that a writer selects only
+		// directories for upload and so the link count
+		// should reflect the entries written to QFS
+		// datastore
+		hlinfo := &HardLinkInfo{
+			record: nil,
+			id:     HardLinkID(hardLinkInfoNextID),
+			nlinks: 1,
+		}
+		// actual record is stored in SetHardLink
+		// its ok until then since all other callers
+		// don't need that information
+		hardLinkInfoMap[stat.Ino] = hlinfo
 		return nil, false
 	}
 
@@ -59,25 +77,11 @@ func HardLink(finfo os.FileInfo) (*quantumfs.DirectoryRecord, bool) {
 func SetHardLink(finfo os.FileInfo,
 	record *quantumfs.DirectoryRecord) *quantumfs.DirectoryRecord {
 
-	hardLinkInfoMutex.Lock()
-	defer hardLinkInfoMutex.Unlock()
-
-	hardLinkInfoNextID++
-
-	// the FilInfo.Stat already indicates the
-	// final link count for path but we start with 1
-	// since its possible that a writer selects only
-	// directories for upload and so the link count
-	// should reflect the entries written to QFS
-	// datastore
-	hlinfo := &HardLinkInfo{
-		record: record,
-		id:     HardLinkID(hardLinkInfoNextID),
-		nlinks: 1,
-	}
-
+	// only one caller will do a SetHardLink
 	stat := finfo.Sys().(*syscall.Stat_t)
-	hardLinkInfoMap[stat.Ino] = hlinfo
+	hlinfo := hardLinkInfoMap[stat.Ino]
+
+	hlinfo.record = record
 
 	// construct a thin directory record to represent
 	// source of the hard link

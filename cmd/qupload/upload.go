@@ -4,6 +4,7 @@
 package main
 
 import "fmt"
+import "os"
 import "io/ioutil"
 import "path/filepath"
 
@@ -11,89 +12,113 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
+import "golang.org/x/net/context"
+import "golang.org/x/sync/errgroup"
+
 // by default exclusion list is not checked
 var enableExclChecks = false
 
-func handleDirContents(base string, relpath string,
-	ds quantumfs.DataStore) ([]*quantumfs.DirectoryRecord, error) {
-
-	var curDirRecords []*quantumfs.DirectoryRecord
-
-	curDirPath := filepath.Join(base, relpath)
-	dirEnts, err := ioutil.ReadDir(curDirPath)
-	if err != nil {
-		return nil, fmt.Errorf("Reading %s failed %s\n",
-			curDirPath, err)
-	}
+func handleDirContents(ctx context.Context,
+	childWg *errgroup.Group, childDirRecChan chan<- *quantumfs.DirectoryRecord,
+	base string, relpath string,
+	dirEnts []os.FileInfo,
+	ds quantumfs.DataStore) {
 
 	// recurse over dirs, ignore files
 	for _, dirEnt := range dirEnts {
 		if !dirEnt.IsDir() {
 			continue
 		}
-		if enableExclChecks && utils.IsPathExcluded(
-			filepath.Join(relpath, dirEnt.Name())) {
+		name := filepath.Join(relpath, dirEnt.Name())
+		if enableExclChecks && utils.IsPathExcluded(name) {
 			continue
 		}
-		childRecords, derr := handleDir(curDirPath, dirEnt.Name(),
-			ds)
-		if derr != nil {
-			return nil, derr
-		}
-		//fmt.Printf("Base: %s Dir:%s Records: %v\n", curDirPath, dirEnt.Name(), childRecords)
-		curDirRecords = append(curDirRecords, childRecords...)
+
+		childWg.Go(func() error {
+			return handleDir(ctx, childDirRecChan, base, name, ds)
+		})
 	}
 
 	// handle all files within cur dir
-	for _, dirEnt := range dirEnts {
-		if dirEnt.IsDir() {
-			continue
+	childWg.Go(func() error {
+		for _, dirEnt := range dirEnts {
+			if dirEnt.IsDir() {
+				continue
+			}
+
+			name := filepath.Join(relpath, dirEnt.Name())
+			if enableExclChecks && utils.IsPathExcluded(name) {
+				continue
+			}
+			record, ferr := qwr.WriteFile(ds, dirEnt, filepath.Join(base, name))
+			if ferr != nil {
+				return ferr
+			}
+
+			//fmt.Printf("File:%s Records: %v\n", dirEnt.Name(), record)
+			childDirRecChan <- record
 		}
 
-		if enableExclChecks && utils.IsPathExcluded(
-			filepath.Join(relpath, dirEnt.Name())) {
-			continue
-		}
-		record, ferr := qwr.WriteFile(ds, dirEnt,
-			filepath.Join(curDirPath, dirEnt.Name()))
-		if ferr != nil {
-			return nil, ferr
-		}
-
-		//fmt.Printf("File:%s Records: %v\n", dirEnt.Name(), record)
-		curDirRecords = append(curDirRecords, record)
-	}
-
-	return curDirRecords, nil
+		return nil
+	})
 }
 
-func handleDir(base string, relpath string,
-	ds quantumfs.DataStore) ([]*quantumfs.DirectoryRecord,
-	error) {
+func handleDir(ctx context.Context, dirRecordChan chan<- *quantumfs.DirectoryRecord,
+	base string, relpath string,
+	ds quantumfs.DataStore) error {
 
 	var curDirRecords []*quantumfs.DirectoryRecord
+
+	// create a child context
+	childWg, childCtx := errgroup.WithContext(ctx)
+	// a directory record channel for go-routines
+	// operating in the child context
+	childDirRecChan := make(chan *quantumfs.DirectoryRecord)
 
 	// this relpath is included, check if it's contents
 	// are excluded
 	if !enableExclChecks || !utils.IsPathExcluded(relpath+"/") {
-		records, err := handleDirContents(base, relpath, ds)
+		curDirPath := filepath.Join(base, relpath)
+		dirEnts, err := ioutil.ReadDir(curDirPath)
 		if err != nil {
-			return nil, err
+			close(childDirRecChan)
+			return fmt.Errorf("Reading %s failed %s\n", curDirPath, err)
 		}
-		curDirRecords = append(curDirRecords, records...)
+		handleDirContents(childCtx, childWg, childDirRecChan, base, relpath, dirEnts, ds)
+	}
+
+	// when all the workers in childWg have exited
+	// then close the childDirRecChan
+	go func() {
+		childWg.Wait()
+		close(childDirRecChan)
+	}()
+
+	// collect DirectoryRecords over the channel
+	for dirRecord := range childDirRecChan {
+		curDirRecords = append(curDirRecords, dirRecord)
+	}
+
+	// once childDirRecChan closes check if there
+	// was an error
+	if err := childWg.Wait(); err != nil {
+		return err
 	}
 
 	// root dir is handled by WriteWorkspaceRoot
 	if relpath != "" {
 		subdirRecord, serr := qwr.WriteDirectory(base, relpath, curDirRecords, ds)
 		if serr != nil {
-			return nil, serr
+			return serr
 		}
 		curDirRecords = []*quantumfs.DirectoryRecord{subdirRecord}
 	}
 
 	//fmt.Printf("return Base: %s RelPath:%s Records: %v\n", base, relpath, curDirRecords)
-	return curDirRecords, nil
+	for _, dR := range curDirRecords {
+		dirRecordChan <- dR
+	}
+	return nil
 }
 
 func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
@@ -105,11 +130,33 @@ func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
 		enableExclChecks = true
 	}
 	fmt.Printf("Handling %s\n", filepath.Join(base, relpath))
-	dirRecords, err := handleDir(base, relpath, ds)
-	if err != nil {
+
+	// setup the top level wait-group and channel to
+	// receive DirectoryRecord information
+	topWg, topCtx := errgroup.WithContext(context.Background())
+	topDirRecChan := make(chan *quantumfs.DirectoryRecord)
+
+	// start the top-level goroutine
+	topWg.Go(func() error {
+		return handleDir(topCtx, topDirRecChan, base, relpath, ds)
+	})
+
+	go func() {
+		topWg.Wait()
+		close(topDirRecChan)
+	}()
+
+	// collect DirectoryRecords over the channel
+	for dirRecord := range topDirRecChan {
+		topDirRecords = append(topDirRecords, dirRecord)
+	}
+
+	// dirRecord channel is now closed, check if the WaitGroup
+	// exited prematurely due to errors
+	if err := topWg.Wait(); err != nil {
 		return err
 	}
-	topDirRecords = append(topDirRecords, dirRecords...)
+
 	fmt.Println("Completed handling dirs")
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(base, topDirRecords, ds)
 	if wsrErr != nil {
