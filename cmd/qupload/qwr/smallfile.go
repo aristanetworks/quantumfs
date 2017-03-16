@@ -33,12 +33,18 @@ func smallFileWriter(path string,
 		return nil, err
 	}
 
+	fileKey := quantumfs.EmptyBlockKey
+	// zero length files are small files which don't
+	// have any blocks, hence no keys
+	if len(keys) > 0 {
+		fileKey = keys[0]
+	}
 	stat := finfo.Sys().(*syscall.Stat_t)
 	dirRecord := createNewDirRecord(finfo.Name(),
 		stat.Mode, uint32(stat.Rdev), uint64(stat.Size),
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Uid, stat.Uid),
-		objType, keys[0])
+		objType, fileKey)
 
 	return dirRecord, nil
 }

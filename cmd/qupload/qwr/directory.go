@@ -11,7 +11,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
-func WriteDirectory(base string, name string,
+func WriteDirectory(base string, relpath string,
 	childRecords []*quantumfs.DirectoryRecord,
 	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
 
@@ -41,9 +41,8 @@ func WriteDirectory(base string, name string,
 		return nil, err
 	}
 
-	//TODO(krishna): handle the xattrs setup on current directory
 	var dirRecord *quantumfs.DirectoryRecord
-	if name == "" {
+	if relpath == "" {
 		//root directory - mode 0755, size = 0 since dir size
 		// is approximated by QFS based on dir entries
 		dirRecord = createNewDirRecord("", 0755,
@@ -52,26 +51,25 @@ func WriteDirectory(base string, name string,
 			key)
 		// xattrs cannot be saved in workspace root dir
 	} else {
-		finfo, serr := os.Lstat(filepath.Join(base, name))
+		finfo, serr := os.Lstat(filepath.Join(base, relpath))
 		if serr != nil {
 			return nil, serr
 		}
 		stat := finfo.Sys().(*syscall.Stat_t)
-		dirRecord = createNewDirRecord(name, stat.Mode,
+		dirRecord = createNewDirRecord(finfo.Name(), stat.Mode,
 			uint32(stat.Rdev), 0,
 			quantumfs.ObjectUid(stat.Uid, stat.Uid),
 			quantumfs.ObjectGid(stat.Gid, stat.Gid),
 			quantumfs.ObjectTypeDirectoryEntry,
 			key)
 
-		xattrsKey, xerr := WriteXAttrs(filepath.Join(base, name), ds)
+		xattrsKey, xerr := WriteXAttrs(filepath.Join(base, relpath), ds)
 		if xerr != nil {
 			return nil, xerr
 		}
 		if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 			dirRecord.SetExtendedAttributes(xattrsKey)
 		}
-
 	}
 
 	return dirRecord, nil

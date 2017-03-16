@@ -14,20 +14,20 @@ import "strings"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
+import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
 // Various exit reasons returned to the shell as exit code
 const (
-	exitOk           = iota
-	exitBadArgs      = iota
-	exitDatastoreErr = iota
-	exitWsdbErr      = iota
-	exitUpErr        = iota
+	exitOk      = iota
+	exitBadArgs = iota
+	exitArgErr  = iota
+	exitUpErr   = iota
 )
 
 func showUsage() {
 	fmt.Println("usage: qupload -datastore <dsname> -datastoreconf <dsconf>" +
-		" -workspaceDB <wsname> -workspaceDBconf <wsconf>" +
-		" dir1[,dir2[,...]]")
+		" -workspaceDB <wsname> -workspaceDBconf <wsconf> " +
+		" -basedir <dirname> [ -exclude <file> | dir ]")
 	flag.PrintDefaults()
 }
 
@@ -45,22 +45,13 @@ func main() {
 		"Name of workspace which'll contain uploaded data")
 	baseDir := flag.String("basedir", "",
 		"All directory arguments are relative to this base directory")
+	excludeFile := flag.String("exclude", "",
+		"Exclude the files and directories specified in this file")
 
 	flag.Usage = showUsage
 	flag.Parse()
 
-	if flag.NArg() == 0 {
-		flag.Usage()
-		os.Exit(exitBadArgs)
-	}
-
-	if flag.NFlag() == 0 || flag.NArg() == 0 {
-		flag.Usage()
-		os.Exit(exitBadArgs)
-	}
-
 	// TODO(krishna): check flag values and arg values
-
 	if strings.Count(*ws, "/") != 2 {
 		fmt.Println("Workspace name must contain precisely two \"/\"")
 		os.Exit(exitBadArgs)
@@ -69,25 +60,30 @@ func main() {
 	ds, dsErr := qwr.ConnectDatastore(*dsName, *dsConf)
 	if dsErr != nil {
 		fmt.Println(dsErr)
-		os.Exit(exitDatastoreErr)
+		os.Exit(exitArgErr)
 	}
 
 	wsdb, wsdbErr := qwr.ConnectWorkspaceDB(*wsdbName, *wsdbConf)
 	if wsdbErr != nil {
 		fmt.Println(wsdbErr)
-		os.Exit(exitWsdbErr)
+		os.Exit(exitArgErr)
 	}
 
-	// TODO(krishna): ensure all args are dirs
-	// TODO(krishna): support mix of files and dirs later
-	var dirs []string
-	for d := 0; d < flag.NArg(); d++ {
-		fmt.Println("Appending dir: ", flag.Arg(d))
-		dirs = append(dirs, flag.Arg(d))
+	// TODO(krishna): exclude file and directory argument cannot be
+	//                specified together
+	relpath := ""
+	if flag.NArg() == 0 {
+		exErr := utils.LoadExcludeList(*excludeFile)
+		if exErr != nil {
+			fmt.Println(exErr)
+			os.Exit(exitArgErr)
+		}
+	} else {
+		relpath = flag.Arg(0)
 	}
 
 	start := time.Now()
-	upErr := upload(ds, wsdb, *baseDir, *ws, dirs)
+	upErr := upload(ds, wsdb, *ws, *baseDir, relpath)
 	if upErr != nil {
 		fmt.Println(upErr)
 		os.Exit(exitUpErr)
