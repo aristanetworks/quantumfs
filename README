@@ -11,14 +11,22 @@ Dev Environment Setup
 1) ensure your GOPATH environment variable is correctly pointed such that this
 README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 
-2) clone the dependent libraries:
+2) clone the dependent go libraries:
 
 	cd $GOPATH/src/github.com/aristanetworks
         make fetch
 
-3) ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
+3) Compile and install the Google CityHash library:
 
-4) follow the instructions in QFSClient/README to install the prerequisites for
+	go get github.com/google/cityhash
+	cd $GOPATH/src/github.com/google/cityhash
+	./configure --enable-sse4.2
+	make all check CXXFLAGS="-g -O3 -msse4.2"
+	sudo make install
+
+4) ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
+
+5) follow the instructions in QFSClient/README to install the prerequisites for
 building QFSClient.
 
 Instructions
