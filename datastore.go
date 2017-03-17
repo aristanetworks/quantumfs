@@ -4,7 +4,6 @@
 // The datastore interface
 package quantumfs
 
-import "crypto/sha1"
 import "encoding/base64"
 import "encoding/binary"
 import "fmt"
@@ -139,9 +138,9 @@ func (v KeyType) Primitive() interface{} {
 // the identification hashes used by all the backing stores (most notably the VCS
 // such as git or Mercurial) and additional space to be used for datastore routing.
 //
-// In this case we use a 20 byte hash sufficient to store sha1 values and one
+// In this case we use a 20 byte hash sufficient to store hash values and one
 // additional byte used for routing.
-const ObjectKeyLength = 1 + sha1.Size
+const ObjectKeyLength = 1 + hashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
@@ -435,7 +434,7 @@ func createEmptyDirectory() ObjectKey {
 
 	bytes := emptyDir.Bytes()
 
-	hash := sha1.Sum(bytes)
+	hash := Hash(bytes)
 	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyDirKey.String()] = bytes
 	return emptyDirKey
@@ -446,7 +445,7 @@ var EmptyBlockKey ObjectKey
 func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
-	hash := sha1.Sum(bytes)
+	hash := Hash(bytes)
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyBlockKey.String()] = bytes
 	return emptyBlockKey
@@ -624,7 +623,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 	bytes := emptyWorkspace.Bytes()
 
-	hash := sha1.Sum(bytes)
+	hash := Hash(bytes)
 	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyWorkspaceKey.String()] = bytes
 	return emptyWorkspaceKey
