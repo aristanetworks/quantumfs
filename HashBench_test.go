@@ -114,4 +114,3 @@ func BenchmarkMd5Long(test *testing.B) {
 		md5.Sum(data)
 	}
 }
-
