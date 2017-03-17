@@ -700,7 +700,6 @@ func NewDirectRecord() *DirectRecord {
 type DirectRecord struct {
 	record      encoding.DirectoryRecord
 	nlinksCache uint32
-	useCache    bool
 }
 
 func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectRecord {
@@ -716,12 +715,11 @@ func (record *DirectRecord) Record() DirectRecord {
 
 func (record *DirectRecord) SetNlinks(links uint32) {
 	record.nlinksCache = links
-	record.useCache = true
 }
 
 func (record *DirectRecord) Nlinks() uint32 {
 	// Unless otherwise set, this is a normal record with one link
-	if !record.useCache {
+	if record.nlinksCache == 0 {
 		return 1
 	}
 
