@@ -6,8 +6,6 @@ package quantumfs
 // This file contains a buffer for the testing purpose only. Some interface functions
 // are only briefly implemented with a dummy return value
 
-import "crypto/sha1"
-
 import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
 
@@ -45,7 +43,7 @@ func (buf *TestBuffer) Set(data []byte, keyType KeyType) {
 }
 
 func (buf *TestBuffer) ContentHash() [ObjectKeyLength - 1]byte {
-	return sha1.Sum(buf.data)
+	return Hash(buf.data)
 }
 
 func (buf *TestBuffer) Key(c *Ctx) (ObjectKey, error) {
