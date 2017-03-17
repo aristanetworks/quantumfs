@@ -269,11 +269,11 @@ func (dir *DirectoryEntry) SetNumEntries(n int) {
 	dir.dir.SetNumEntries(uint32(n))
 }
 
-func (dir *DirectoryEntry) Entry(i int) *DirectoryRecord {
+func (dir *DirectoryEntry) Entry(i int) *DirectRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
 }
 
-func (dir *DirectoryEntry) SetEntry(i int, record *DirectoryRecord) {
+func (dir *DirectoryEntry) SetEntry(i int, record *DirectRecord) {
 	dir.dir.Entries().Set(i, record.record)
 }
 
@@ -499,11 +499,11 @@ func (r *HardlinkRecord) SetHardlinkID(v uint64) {
 	r.record.SetHardlinkID(v)
 }
 
-func (r *HardlinkRecord) Record() *DirectoryRecord {
+func (r *HardlinkRecord) Record() *DirectRecord {
 	return overlayDirectoryRecord(r.record.Record())
 }
 
-func (r *HardlinkRecord) SetRecord(v *DirectoryRecord) {
+func (r *HardlinkRecord) SetRecord(v *DirectRecord) {
 	r.record.SetRecord(v.record)
 }
 
@@ -645,7 +645,7 @@ const (
 	PermSUID       = 1 << iota
 )
 
-type DirectoryRecordIf interface {
+type DirectoryRecord interface {
 	Filename() string
 	SetFilename(v string)
 
@@ -676,50 +676,50 @@ type DirectoryRecordIf interface {
 	ModificationTime() Time
 	SetModificationTime(v Time)
 
-	Record() DirectoryRecord
+	Record() DirectRecord
 	Nlinks() uint32
 
 	EncodeExtendedKey() []byte
 
-	ShallowCopy() *DirectoryRecord
-	Clone() DirectoryRecordIf
+	ShallowCopy() *DirectRecord
+	Clone() DirectoryRecord
 }
 
-func NewDirectoryRecord() *DirectoryRecord {
+func NewDirectRecord() *DirectRecord {
 	segment := capn.NewBuffer(nil)
 
 	// for more records, nlinksCache is 1. If we're a shallow copy of a hardlink,
 	// it must be a different value greater than 1
-	record := DirectoryRecord{
+	record := DirectRecord{
 		record: encoding.NewRootDirectoryRecord(segment),
 	}
 
 	return &record
 }
 
-type DirectoryRecord struct {
+type DirectRecord struct {
 	record      encoding.DirectoryRecord
 	nlinksCache uint32
 	useCache    bool
 }
 
-func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectoryRecord {
-	record := DirectoryRecord{
+func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectRecord {
+	record := DirectRecord{
 		record: r,
 	}
 	return &record
 }
 
-func (record *DirectoryRecord) Record() DirectoryRecord {
+func (record *DirectRecord) Record() DirectRecord {
 	return *record
 }
 
-func (record *DirectoryRecord) SetNlinks(links uint32) {
+func (record *DirectRecord) SetNlinks(links uint32) {
 	record.nlinksCache = links
 	record.useCache = true
 }
 
-func (record *DirectoryRecord) Nlinks() uint32 {
+func (record *DirectRecord) Nlinks() uint32 {
 	// Unless otherwise set, this is a normal record with one link
 	if !record.useCache {
 		return 1
@@ -728,92 +728,92 @@ func (record *DirectoryRecord) Nlinks() uint32 {
 	return record.nlinksCache
 }
 
-func (record *DirectoryRecord) Filename() string {
+func (record *DirectRecord) Filename() string {
 	return record.record.Filename()
 }
 
-func (record *DirectoryRecord) SetFilename(name string) {
+func (record *DirectRecord) SetFilename(name string) {
 	record.record.SetFilename(name)
 }
 
-func (record *DirectoryRecord) Type() ObjectType {
+func (record *DirectRecord) Type() ObjectType {
 	return ObjectType(record.record.Type())
 }
 
-func (record *DirectoryRecord) SetType(t ObjectType) {
+func (record *DirectRecord) SetType(t ObjectType) {
 	record.record.SetType(uint8(t))
 }
 
-func (record *DirectoryRecord) ID() ObjectKey {
+func (record *DirectRecord) ID() ObjectKey {
 	return overlayObjectKey(record.record.Id())
 }
 
-func (record *DirectoryRecord) SetID(key ObjectKey) {
+func (record *DirectRecord) SetID(key ObjectKey) {
 	record.record.SetId(key.key)
 }
 
-func (record *DirectoryRecord) Size() uint64 {
+func (record *DirectRecord) Size() uint64 {
 	return record.record.Size()
 }
 
-func (record *DirectoryRecord) SetSize(s uint64) {
+func (record *DirectRecord) SetSize(s uint64) {
 	record.record.SetSize(s)
 }
 
-func (record *DirectoryRecord) ModificationTime() Time {
+func (record *DirectRecord) ModificationTime() Time {
 	return Time(record.record.ModificationTime())
 }
 
-func (record *DirectoryRecord) SetModificationTime(t Time) {
+func (record *DirectRecord) SetModificationTime(t Time) {
 	record.record.SetModificationTime(uint64(t))
 }
 
-func (record *DirectoryRecord) ContentTime() Time {
+func (record *DirectRecord) ContentTime() Time {
 	return Time(record.record.ContentTime())
 }
 
-func (record *DirectoryRecord) SetContentTime(t Time) {
+func (record *DirectRecord) SetContentTime(t Time) {
 	record.record.SetContentTime(uint64(t))
 }
 
-func (record *DirectoryRecord) Permissions() uint32 {
+func (record *DirectRecord) Permissions() uint32 {
 	return record.record.Permissions()
 }
 
-func (record *DirectoryRecord) SetPermissions(p uint32) {
+func (record *DirectRecord) SetPermissions(p uint32) {
 	record.record.SetPermissions(p)
 }
 
-func (record *DirectoryRecord) Owner() UID {
+func (record *DirectRecord) Owner() UID {
 	return UID(record.record.Owner())
 }
 
-func (record *DirectoryRecord) SetOwner(u UID) {
+func (record *DirectRecord) SetOwner(u UID) {
 	record.record.SetOwner(uint16(u))
 }
 
-func (record *DirectoryRecord) Group() GID {
+func (record *DirectRecord) Group() GID {
 	return GID(record.record.Group())
 }
 
-func (record *DirectoryRecord) SetGroup(g GID) {
+func (record *DirectRecord) SetGroup(g GID) {
 	record.record.SetGroup(uint16(g))
 }
 
-func (record *DirectoryRecord) ExtendedAttributes() ObjectKey {
+func (record *DirectRecord) ExtendedAttributes() ObjectKey {
 	return overlayObjectKey(record.record.ExtendedAttributes())
 }
 
-func (record *DirectoryRecord) SetExtendedAttributes(key ObjectKey) {
+func (record *DirectRecord) SetExtendedAttributes(key ObjectKey) {
 	record.record.SetExtendedAttributes(key.key)
 }
 
-func (record *DirectoryRecord) EncodeExtendedKey() []byte {
+func (record *DirectRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
 }
 
-func (record *DirectoryRecord) ShallowCopy() *DirectoryRecord {
-	newEntry := NewDirectoryRecord()
+func (record *DirectRecord) ShallowCopy() *DirectRecord {
+	newEntry := NewDirectRecord()
 	newEntry.SetNlinks(record.Nlinks())
 	newEntry.SetFilename(record.Filename())
 	newEntry.SetID(record.ID())
@@ -829,8 +829,8 @@ func (record *DirectoryRecord) ShallowCopy() *DirectoryRecord {
 	return newEntry
 }
 
-func (record *DirectoryRecord) Clone() DirectoryRecordIf {
-	// For DirectoryRecord, ShallowCopy is as good as a clone
+func (record *DirectRecord) Clone() DirectoryRecord {
+	// For DirectRecord, ShallowCopy is as good as a clone
 	return record.ShallowCopy()
 }
 
@@ -1085,8 +1085,8 @@ func calcMaxDirectoryRecords(maxSize int) int {
 	dir0 := newDirectoryEntryRecords(0)
 	size0recs := len(dir0.Bytes())
 
-	// setup the pointers in DirectoryRecord to practical max values
-	record := NewDirectoryRecord()
+	// setup the pointers in DirectRecord to practical max values
+	record := NewDirectRecord()
 	record.SetFilename(string(make([]byte, MaxFilenameLength)))
 	record.SetExtendedAttributes(createEmptyBlock())
 

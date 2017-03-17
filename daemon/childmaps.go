@@ -16,7 +16,7 @@ type ChildMap struct {
 	// can be many to one
 	children map[string]InodeId
 
-	childrenRecords map[InodeId][]quantumfs.DirectoryRecordIf
+	childrenRecords map[InodeId][]quantumfs.DirectoryRecord
 }
 
 func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
@@ -24,20 +24,20 @@ func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMa
 		wsr:      wsr_,
 		dir:      owner,
 		children: make(map[string]InodeId, numEntries),
-		childrenRecords: make(map[InodeId][]quantumfs.DirectoryRecordIf,
+		childrenRecords: make(map[InodeId][]quantumfs.DirectoryRecord,
 			numEntries),
 	}
 }
 
 func (cmap *ChildMap) setRecord(inodeId InodeId,
-	record quantumfs.DirectoryRecordIf) {
+	record quantumfs.DirectoryRecord) {
 
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(inodeId, record.Filename())
 
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
-		list = make([]quantumfs.DirectoryRecordIf, 0)
+		list = make([]quantumfs.DirectoryRecord, 0)
 	}
 
 	list = append(list, record)
@@ -45,7 +45,7 @@ func (cmap *ChildMap) setRecord(inodeId InodeId,
 }
 
 func (cmap *ChildMap) delRecord(inodeId InodeId,
-	name string) quantumfs.DirectoryRecordIf {
+	name string) quantumfs.DirectoryRecord {
 
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
@@ -67,7 +67,7 @@ func (cmap *ChildMap) delRecord(inodeId InodeId,
 	return nil
 }
 
-func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecordIf {
+func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecord {
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
 		return nil
@@ -81,7 +81,7 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecordIf {
 }
 
 func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
-	name string) quantumfs.DirectoryRecordIf {
+	name string) quantumfs.DirectoryRecord {
 
 	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).out()
 
@@ -100,7 +100,7 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 }
 
 // Returns the inodeId used for the child
-func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecordIf,
+func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
@@ -139,7 +139,7 @@ func (cmap *ChildMap) count() uint64 {
 }
 
 func (cmap *ChildMap) deleteChild(c *ctx,
-	name string) (needsReparent quantumfs.DirectoryRecordIf) {
+	name string) (needsReparent quantumfs.DirectoryRecord) {
 
 	inodeId, exists := cmap.children[name]
 	if !exists {
@@ -234,8 +234,8 @@ func (cmap *ChildMap) directInodes() []InodeId {
 	return rtn
 }
 
-func (cmap *ChildMap) records() []quantumfs.DirectoryRecordIf {
-	rtn := make([]quantumfs.DirectoryRecordIf, 0, len(cmap.childrenRecords))
+func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
+	rtn := make([]quantumfs.DirectoryRecord, 0, len(cmap.childrenRecords))
 	for _, i := range cmap.childrenRecords {
 		rtn = append(rtn, i...)
 	}
@@ -243,11 +243,11 @@ func (cmap *ChildMap) records() []quantumfs.DirectoryRecordIf {
 	return rtn
 }
 
-func (cmap *ChildMap) record(inodeNum InodeId) quantumfs.DirectoryRecordIf {
+func (cmap *ChildMap) record(inodeNum InodeId) quantumfs.DirectoryRecord {
 	return cmap.firstRecord(inodeNum)
 }
 
-func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecordIf {
+func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecord {
 	defer c.funcIn("ChildMap::recordByName").out()
 
 	inodeNum, exists := cmap.children[name]
@@ -265,7 +265,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx,
-	childId InodeId) (copy quantumfs.DirectoryRecordIf, err fuse.Status) {
+	childId InodeId) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
 	child := cmap.firstRecord(childId)
 	if child == nil {

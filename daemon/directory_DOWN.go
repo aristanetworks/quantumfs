@@ -17,7 +17,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// this with the inode parentLock locked since Sync locks the parent as well.
 	srcInode.Sync_DOWN(c)
 
-	newRecord, err := func() (quantumfs.DirectoryRecordIf, fuse.Status) {
+	newRecord, err := func() (quantumfs.DirectoryRecord, fuse.Status) {
 		defer srcInode.getParentLock().Lock().Unlock()
 
 		// ensure we're not orphaned
@@ -151,7 +151,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 
 // the toLink parentLock must be locked
 func (dir *Directory) makeHardlink_DOWN_(c *ctx,
-	toLink Inode) (copy quantumfs.DirectoryRecordIf, err fuse.Status) {
+	toLink Inode) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
 	defer c.funcIn("Directory::makeHardlink_DOWN").out()
 

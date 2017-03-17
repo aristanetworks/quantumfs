@@ -94,10 +94,10 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (wsr *ApiInode) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecordIf, error) {
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Api doesn't support record fetch")
-	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {

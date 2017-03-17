@@ -74,7 +74,7 @@ func assert(condition bool, msg string) {
 }
 
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	entry quantumfs.DirectoryRecordIf, updateMtime bool) {
+	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
 	// Update the type if needed
 	if newType != nil {

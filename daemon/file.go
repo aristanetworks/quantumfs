@@ -18,7 +18,7 @@ const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newSmallAccessor(c, size, key)
 
@@ -27,7 +27,7 @@ func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newMediumAccessor(c, key)
 
@@ -36,7 +36,7 @@ func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newLargeAccessor(c, key)
 
@@ -45,7 +45,7 @@ func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newVeryLargeAccessor(c, key)
 
@@ -75,7 +75,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 type File struct {
 	InodeCommon
 	accessor     blockAccessor
-	unlinkRecord quantumfs.DirectoryRecordIf
+	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
 	unlinkLock   DeferableRwMutex
 }
@@ -528,13 +528,13 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (fi *File) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecordIf, error) {
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	defer c.funcIn("File::getChildRecordCopy").out()
 
 	if !fi.isOrphaned() {
 		c.elog("Unsupported record fetch on file")
-		return &quantumfs.DirectoryRecord{},
+		return &quantumfs.DirectRecord{},
 			errors.New("Unsupported record fetch")
 	}
 
@@ -549,7 +549,7 @@ func (fi *File) getChildRecordCopy(c *ctx,
 	return fi.unlinkRecord.ShallowCopy(), nil
 }
 
-func (fi *File) setChildRecord(c *ctx, record quantumfs.DirectoryRecordIf) {
+func (fi *File) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.funcIn("File::setChildRecord").out()
 
 	defer fi.unlinkLock.Lock().Unlock()

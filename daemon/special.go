@@ -26,7 +26,7 @@ func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
 
 func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	var filetype uint32
 	var device uint32
@@ -254,10 +254,10 @@ func (special *Special) instantiateChild(c *ctx,
 }
 
 func (special *Special) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecordIf, error) {
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on Special")
-	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
@@ -281,7 +281,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func specialOverrideAttr(entry quantumfs.DirectoryRecordIf, attr *fuse.Attr) uint32 {
+func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
 	attr.Size = 0
 	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = 1
