@@ -126,3 +126,22 @@ func TestSymlinkSize(t *testing.T) {
 			stat_t.Size, len(orig))
 	})
 }
+
+func TestSymlinkHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		err := os.MkdirAll(workspace + "/dir", 0777)
+		test.assertNoErr(err)
+
+		file := workspace + "/dir/file"
+		softlink := workspace + "/dir/symlink"
+		hardlink := workspace + "/dir/hardlink"
+
+		err = syscall.Symlink(file, softlink)
+		test.assertNoErr(err)
+
+		err = syscall.Link(softlink, hardlink)
+		test.assertNoErr(err)
+	})
+}
