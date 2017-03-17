@@ -3,6 +3,10 @@
 
 #include "QFSClient/qfs_client_util.h"
 
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
+#include <openssl/evp.h>
+
 #include <algorithm>
 
 namespace qfsclient {
@@ -90,6 +94,8 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 		return "the API returned an error: " + details;
 	case kBufferTooBig:
 		return "an internal buffer is getting too big";
+	case kJsonObjectWrongType:
+		return "a JSON object had the wrong type: " + details;
 	}
 
 	std::string result("unknown error (");
@@ -117,6 +123,9 @@ std::string getApiError(CommandError code, std::string message) {
 		return "command failed (" + message + ")";
 	case kCmdKeyNotFound:
 		return "extended key not found in datastore (" + message + ")";
+	case kErrorBlockTooLarge:
+		return "SetBlock was passed a block that was too large: (" +
+			message + ")";
 	}
 
 	std::string result("unrecognised error code (");
@@ -147,6 +156,54 @@ void requote(std::string *s) {
 	std::replace(s->begin(), s->end(), '\'', '"');
 }
 
+void base64_encode(const std::vector<byte> &data, std::string *b64) {
+	b64->clear();
+
+	BIO *bio = BIO_new(BIO_f_base64());
+	BIO *bio_mem = BIO_new(BIO_s_mem());
+
+	if(!bio || !bio_mem) {
+		return;
+	}
+
+	// we have no need for linebreaks in the generated base64 text
+	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+
+	bio = BIO_push(bio, bio_mem);
+
+	if (BIO_write(bio, data.data(), data.size()) == data.size()) {
+		BIO_flush(bio);
+		BUF_MEM *result;
+		BIO_get_mem_ptr(bio, &result);
+		b64->assign((const char *)result->data, (size_t)result->length);
+	}
+
+	BIO_free_all(bio);
+}
+
+void base64_decode(const std::string &b64, std::vector<byte> *data) {
+	data->clear();
+
+	int max_result_size = ((b64.length() * 6) + 7) / 8;
+	data->resize(max_result_size);
+
+	BIO *bio = BIO_new(BIO_f_base64());
+	BIO *bio_mem = BIO_new_mem_buf(b64.c_str(), b64.length() + 1);
+	if(!bio || !bio_mem) {
+		return;
+	}
+
+	// if we don't set this flag, the decoder will expect at least a
+	// terminating linebreak in the input string
+	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+
+	bio = BIO_push(bio, bio_mem);
+
+	int actual_result_size = BIO_read(bio, data->data(), max_result_size);
+	data->resize(actual_result_size);
+
+	BIO_free_all(bio);
+}
+
 }  // namespace util
 }  // namespace qfsclient
-
