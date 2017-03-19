@@ -5,53 +5,42 @@ package qwr
 
 import "fmt"
 import "os"
+import "sync/atomic"
 import "syscall"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
-type fileObjWriter func(string, os.FileInfo,
+var DataBytesWritten uint64
+var MetadataBytesWritten uint64
+
+type fileObjectWriter func(string, os.FileInfo,
 	quantumfs.ObjectType,
-	quantumfs.DataStore) (*quantumfs.DirectoryRecord, error)
+	quantumfs.DataStore) (quantumfs.ObjectKey, error)
 
-type fileObjIOHandler struct {
-	writer fileObjWriter
-}
+func fileObjectInfo(path string, finfo os.FileInfo) (quantumfs.ObjectType, fileObjectWriter, error) {
+	mode := uint(finfo.Mode())
+	size := uint64(finfo.Size())
 
-var fileObjIOHandlers = make(map[quantumfs.ObjectType]*fileObjIOHandler)
-
-func registerFileObjIOHandler(objType quantumfs.ObjectType,
-	handler *fileObjIOHandler) {
-
-	fileObjIOHandlers[objType] = handler
-}
-
-func fileObjectType(finfo os.FileInfo) quantumfs.ObjectType {
 	switch {
-	case utils.BitFlagsSet(uint(finfo.Mode()), uint(os.ModeSymlink)):
-		return quantumfs.ObjectTypeSymlink
-	case utils.BitFlagsSet(uint(finfo.Mode()), uint(os.ModeNamedPipe)) ||
-		utils.BitFlagsSet(uint(finfo.Mode()), uint(os.ModeDevice)) ||
-		utils.BitFlagsSet(uint(finfo.Mode()), uint(os.ModeSocket)):
-		return quantumfs.ObjectTypeSpecial
-	case uint64(finfo.Size()) <= quantumfs.MaxSmallFileSize():
-		return quantumfs.ObjectTypeSmallFile
-	case uint64(finfo.Size()) <= quantumfs.MaxMediumFileSize():
-		return quantumfs.ObjectTypeMediumFile
-	case uint64(finfo.Size()) <= quantumfs.MaxLargeFileSize():
-		return quantumfs.ObjectTypeLargeFile
+	case utils.BitFlagsSet(mode, uint(os.ModeSymlink)):
+		return quantumfs.ObjectTypeSymlink, symlinkFileWriter, nil
+	case utils.BitFlagsSet(mode, uint(os.ModeNamedPipe)) ||
+		utils.BitFlagsSet(mode, uint(os.ModeDevice)) ||
+		utils.BitFlagsSet(mode, uint(os.ModeSocket)):
+		return quantumfs.ObjectTypeSpecial, specialFileWriter, nil
+	case size <= quantumfs.MaxSmallFileSize():
+		return quantumfs.ObjectTypeSmallFile, smallFileWriter, nil
+	case size <= quantumfs.MaxMediumFileSize():
+		return quantumfs.ObjectTypeMediumFile, mbFileWriter, nil
+	case size <= quantumfs.MaxLargeFileSize():
+		return quantumfs.ObjectTypeLargeFile, mbFileWriter, nil
+	case size <= quantumfs.MaxVeryLargeFileSize():
+		return quantumfs.ObjectTypeVeryLargeFile, vlFileWriter, nil
 	}
-	return quantumfs.ObjectTypeVeryLargeFile
-}
-
-func writer(objType quantumfs.ObjectType) (fileObjWriter, error) {
-	handler, ok := fileObjIOHandlers[objType]
-	if !ok {
-		return nil, fmt.Errorf("Writer not found for file object type: %d\n",
-			objType)
-	}
-
-	return handler.writer, nil
+	return quantumfs.ObjectTypeInvalid, nil,
+		fmt.Errorf("Unsupported file object type for %q", path)
 }
 
 func WriteFile(ds quantumfs.DataStore,
@@ -77,29 +66,36 @@ func WriteFile(ds quantumfs.DataStore,
 	}
 
 	// detect object type specific writer
-	objType := fileObjectType(finfo)
-	wr, wrerr := writer(objType)
-	if wrerr != nil {
-		return nil, wrerr
+	objType, objWriter, err := fileObjectInfo(path, finfo)
+	if err != nil {
+		return nil, err
 	}
 
 	// use writer to write file blocks and file type
 	// specific metadata
-	dirRecord, werr := wr(path, finfo, objType, ds)
+	fileKey, werr := objWriter(path, finfo, objType, ds)
 	if werr != nil {
-		return nil, fmt.Errorf("Writing %s failed: %s\n",
+		return nil, fmt.Errorf("Writer on %s failed: %s\n",
 			path, werr)
 	}
 
-	// TODO(krishna): create DirectoryRecords here
-	// DirectoryRecord is setup in object type specific
-	// writer to allow object type specific mods if needed
-	// So far no such scenario has been seen
+	dirRecord := createNewDirRecord(finfo.Name(), stat.Mode,
+		uint32(stat.Rdev), uint64(finfo.Size()),
+		quantumfs.ObjectUid(stat.Uid, stat.Uid),
+		quantumfs.ObjectGid(stat.Gid, stat.Gid),
+		objType,
+		// retain times from input files to maintain same blob
+		// content for repeated writes
+		// NOTE(krishna): should we instead use time.Now()
+		quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
+		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
+		fileKey)
 
 	// write xattrs if any
 	xattrsKey, xerr := WriteXAttrs(path, ds)
 	if xerr != nil {
-		return nil, xerr
+		return nil, fmt.Errorf("WriteXAttr failed on %s error:%s\n",
+			path, xerr)
 	}
 	if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		dirRecord.SetExtendedAttributes(xattrsKey)
@@ -159,6 +155,7 @@ func writeFileBlocks(file *os.File, readLen uint64,
 		if bErr != nil {
 			return nil, 0, bErr
 		}
+		atomic.AddUint64(&DataBytesWritten, uint64(len(chunk)))
 		keys = append(keys, key)
 		readLen -= uint64(len(chunk))
 	}

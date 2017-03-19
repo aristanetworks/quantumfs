@@ -6,6 +6,7 @@ package qwr
 import "encoding/binary"
 import "os"
 import "sync"
+import "sync/atomic"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
@@ -44,7 +45,6 @@ func HardLink(finfo os.FileInfo) (*quantumfs.DirectoryRecord, bool) {
 	if !exists {
 
 		hardLinkInfoNextID++
-
 		// the FilInfo.Stat already indicates the
 		// final link count for path but we start with 1
 		// since its possible that a writer selects only
@@ -76,6 +76,10 @@ func HardLink(finfo os.FileInfo) (*quantumfs.DirectoryRecord, bool) {
 
 func SetHardLink(finfo os.FileInfo,
 	record *quantumfs.DirectoryRecord) *quantumfs.DirectoryRecord {
+
+	// need locks to protect the map
+	hardLinkInfoMutex.Lock()
+	defer hardLinkInfoMutex.Unlock()
 
 	// only one caller will do a SetHardLink
 	stat := finfo.Sys().(*syscall.Stat_t)
@@ -111,6 +115,7 @@ func writeHardLinkInfo(ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error)
 			if err != nil {
 				return nil, err
 			}
+			atomic.AddUint64(&MetadataBytesWritten, uint64(len(hle.Bytes())))
 
 			hle = quantumfs.NewHardlinkEntry()
 			entryIdx = 0

@@ -305,6 +305,7 @@ const (
 	ObjectTypeLargeFile         = iota
 	ObjectTypeVeryLargeFile     = iota
 	ObjectTypeSpecial           = iota
+	ObjectTypeInvalid           = iota
 )
 
 // One of the ObjectType* values

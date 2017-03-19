@@ -4,29 +4,20 @@
 package qwr
 
 import "os"
-import "syscall"
+import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
-
-func init() {
-	vlFileIOHandler := &fileObjIOHandler{
-		writer: vlFileWriter,
-	}
-
-	registerFileObjIOHandler(quantumfs.ObjectTypeVeryLargeFile,
-		vlFileIOHandler)
-}
 
 func vlFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	var mbfKeys []quantumfs.ObjectKey
 
 	file, oerr := os.Open(path)
 	if oerr != nil {
-		return nil, oerr
+		return quantumfs.ZeroKey, oerr
 	}
 	defer file.Close()
 
@@ -46,7 +37,7 @@ func vlFileWriter(path string,
 
 		mbfKey, err := mbFileBlocksWriter(file, readSize, ds)
 		if err != nil {
-			return nil, err
+			return quantumfs.ZeroKey, err
 		}
 		mbfKeys = append(mbfKeys, mbfKey)
 		remainingSize -= readSize
@@ -63,15 +54,8 @@ func vlFileWriter(path string,
 	vlfKey, vlfErr := writeBlob(vlf.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if vlfErr != nil {
-		return nil, vlfErr
+		return quantumfs.ZeroKey, vlfErr
 	}
-
-	stat := finfo.Sys().(*syscall.Stat_t)
-	dirRecord := createNewDirRecord(file.Name(), stat.Mode,
-		uint32(stat.Rdev), uint64(finfo.Size()),
-		quantumfs.ObjectUid(stat.Uid, stat.Uid),
-		quantumfs.ObjectGid(stat.Gid, stat.Gid),
-		quantumfs.ObjectTypeVeryLargeFile, vlfKey)
-
-	return dirRecord, nil
+	atomic.AddUint64(&MetadataBytesWritten, uint64(len(vlf.Bytes())))
+	return vlfKey, vlfErr
 }

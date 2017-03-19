@@ -4,20 +4,9 @@
 package qwr
 
 import "os"
-import "syscall"
+import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
-
-func init() {
-	mbFileIOHandler := &fileObjIOHandler{
-		writer: mbFileWriter,
-	}
-
-	registerFileObjIOHandler(quantumfs.ObjectTypeMediumFile,
-		mbFileIOHandler)
-	registerFileObjIOHandler(quantumfs.ObjectTypeLargeFile,
-		mbFileIOHandler)
-}
 
 func mbFileBlocksWriter(file *os.File,
 	readSize uint64,
@@ -25,7 +14,7 @@ func mbFileBlocksWriter(file *os.File,
 
 	keys, lastBlockSize, err := writeFileBlocks(file, readSize, ds)
 	if err != nil {
-		return quantumfs.ObjectKey{}, err
+		return quantumfs.ZeroKey, err
 	}
 
 	mbf := quantumfs.NewMultiBlockFile(len(keys))
@@ -36,8 +25,9 @@ func mbFileBlocksWriter(file *os.File,
 
 	mbfKey, mbfErr := writeBlob(mbf.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if mbfErr != nil {
-		return quantumfs.ObjectKey{}, err
+		return quantumfs.ZeroKey, err
 	}
+	atomic.AddUint64(&MetadataBytesWritten, uint64(len(mbf.Bytes())))
 
 	return mbfKey, nil
 }
@@ -46,25 +36,13 @@ func mbFileBlocksWriter(file *os.File,
 func mbFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	file, oerr := os.Open(path)
 	if oerr != nil {
-		return nil, oerr
+		return quantumfs.ZeroKey, oerr
 	}
 	defer file.Close()
 
-	mbfKey, werr := mbFileBlocksWriter(file, uint64(finfo.Size()), ds)
-	if werr != nil {
-		return nil, werr
-	}
-
-	stat := finfo.Sys().(*syscall.Stat_t)
-	dirRecord := createNewDirRecord(file.Name(), stat.Mode,
-		uint32(stat.Rdev), uint64(finfo.Size()),
-		quantumfs.ObjectUid(stat.Uid, stat.Uid),
-		quantumfs.ObjectGid(stat.Gid, stat.Gid),
-		objType, mbfKey)
-
-	return dirRecord, nil
+	return mbFileBlocksWriter(file, uint64(finfo.Size()), ds)
 }

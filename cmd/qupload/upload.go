@@ -55,7 +55,7 @@ func handleDirContents(ctx context.Context,
 				return ferr
 			}
 
-			//fmt.Printf("File:%s Records: %v\n", dirEnt.Name(), record)
+			//fmt.Printf("Record: %s\n", record.Filename())
 			childDirRecChan <- record
 		}
 
@@ -96,6 +96,7 @@ func handleDir(ctx context.Context, dirRecordChan chan<- *quantumfs.DirectoryRec
 
 	// collect DirectoryRecords over the channel
 	for dirRecord := range childDirRecChan {
+		//fmt.Printf("Recvd %s\n", dirRecord.Filename())
 		curDirRecords = append(curDirRecords, dirRecord)
 	}
 
@@ -105,26 +106,19 @@ func handleDir(ctx context.Context, dirRecordChan chan<- *quantumfs.DirectoryRec
 		return err
 	}
 
-	// root dir is handled by WriteWorkspaceRoot
-	if relpath != "" {
-		subdirRecord, serr := qwr.WriteDirectory(base, relpath, curDirRecords, ds)
-		if serr != nil {
-			return serr
-		}
-		curDirRecords = []*quantumfs.DirectoryRecord{subdirRecord}
+	subdirRecord, serr := qwr.WriteDirectory(base, relpath, curDirRecords, ds)
+	if serr != nil {
+		fmt.Printf("Writing dir:%s failed: %s\n",
+			filepath.Join(base, relpath), serr)
+		return serr
 	}
 
-	//fmt.Printf("return Base: %s RelPath:%s Records: %v\n", base, relpath, curDirRecords)
-	for _, dR := range curDirRecords {
-		dirRecordChan <- dR
-	}
+	dirRecordChan <- subdirRecord
 	return nil
 }
 
 func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
-	ws string, base string, relpath string) error {
-
-	var topDirRecords []*quantumfs.DirectoryRecord
+	ws string, advance string, base string, relpath string) error {
 
 	if relpath == "" {
 		enableExclChecks = true
@@ -146,10 +140,8 @@ func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
 		close(topDirRecChan)
 	}()
 
-	// collect DirectoryRecords over the channel
-	for dirRecord := range topDirRecChan {
-		topDirRecords = append(topDirRecords, dirRecord)
-	}
+	// handleDir always publishes only 1 dirRecord
+	topDir := <-topDirRecChan
 
 	// dirRecord channel is now closed, check if the WaitGroup
 	// exited prematurely due to errors
@@ -158,10 +150,10 @@ func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
 	}
 
 	fmt.Println("Completed handling dirs")
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(base, topDirRecords, ds)
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(base, topDir.ID(), ds)
 	if wsrErr != nil {
 		return wsrErr
 	}
 
-	return qwr.CreateWorkspace(wsdb, ws, wsrKey)
+	return qwr.CreateWorkspace(wsdb, ws, advance, wsrKey)
 }
