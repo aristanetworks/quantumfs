@@ -49,7 +49,7 @@ func ConnectWorkspaceDB(name string,
 }
 
 func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
-	newWsrKey quantumfs.ObjectKey) error {
+	advance string, newWsrKey quantumfs.ObjectKey) error {
 
 	wsParts := strings.Split(ws, "/")
 	err := wsdb.BranchWorkspace(nil, "_null", "_null", "null",
@@ -65,6 +65,22 @@ func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 		return err
 	}
 
+	if advance != "" {
+		wsParts = strings.Split(advance, "/")
+
+		curKey, err := wsdb.Workspace(nil,
+			wsParts[0], wsParts[1], wsParts[2])
+		if err != nil {
+			return err
+		}
+		_, err = wsdb.AdvanceWorkspace(nil,
+			wsParts[0], wsParts[1], wsParts[2],
+			curKey, newWsrKey)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -75,7 +91,3 @@ func writeBlob(data []byte, keyType quantumfs.KeyType,
 	buf := quantumfs.NewTestBuffer(data, key)
 	return key, ds.Set(nil, key, buf)
 }
-
-// TODO(krishna): pseudo data-store layered on top QFS datastores
-//    to implement some rules common to all datastores to which
-//    files or directories can be uploaded

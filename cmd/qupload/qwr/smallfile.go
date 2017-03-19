@@ -4,33 +4,23 @@
 package qwr
 
 import "os"
-import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
-
-func init() {
-	smallFileIOHandler := &fileObjIOHandler{
-		writer: smallFileWriter,
-	}
-
-	registerFileObjIOHandler(quantumfs.ObjectTypeSmallFile,
-		smallFileIOHandler)
-}
 
 func smallFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	file, oerr := os.Open(path)
 	if oerr != nil {
-		return nil, oerr
+		return quantumfs.ZeroKey, oerr
 	}
 	defer file.Close()
 
 	keys, _, err := writeFileBlocks(file, uint64(finfo.Size()), ds)
 	if err != nil {
-		return nil, err
+		return quantumfs.ZeroKey, err
 	}
 
 	fileKey := quantumfs.EmptyBlockKey
@@ -39,12 +29,6 @@ func smallFileWriter(path string,
 	if len(keys) > 0 {
 		fileKey = keys[0]
 	}
-	stat := finfo.Sys().(*syscall.Stat_t)
-	dirRecord := createNewDirRecord(finfo.Name(),
-		stat.Mode, uint32(stat.Rdev), uint64(stat.Size),
-		quantumfs.ObjectUid(stat.Uid, stat.Uid),
-		quantumfs.ObjectGid(stat.Uid, stat.Uid),
-		objType, fileKey)
 
-	return dirRecord, nil
+	return fileKey, err
 }

@@ -6,6 +6,7 @@ package qwr
 import "os"
 import "path/filepath"
 import "syscall"
+import "sync/atomic"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -26,6 +27,7 @@ func WriteDirectory(base string, relpath string,
 			if err != nil {
 				return nil, err
 			}
+			atomic.AddUint64(&MetadataBytesWritten, uint64(len(rootDirEntry.Bytes())))
 			rootDirEntry = quantumfs.NewDirectoryEntry()
 			rootDirEntry.SetNext(key)
 			entryIdx = 0
@@ -40,6 +42,7 @@ func WriteDirectory(base string, relpath string,
 	if err != nil {
 		return nil, err
 	}
+	atomic.AddUint64(&MetadataBytesWritten, uint64(len(rootDirEntry.Bytes())))
 
 	var dirRecord *quantumfs.DirectoryRecord
 	if relpath == "" {
@@ -48,6 +51,8 @@ func WriteDirectory(base string, relpath string,
 		dirRecord = createNewDirRecord("", 0755,
 			0, 0, 0, 0,
 			quantumfs.ObjectTypeDirectoryEntry,
+			quantumfs.NewTime(time.Now()),
+			quantumfs.NewTime(time.Now()),
 			key)
 		// xattrs cannot be saved in workspace root dir
 	} else {
@@ -61,6 +66,9 @@ func WriteDirectory(base string, relpath string,
 			quantumfs.ObjectUid(stat.Uid, stat.Uid),
 			quantumfs.ObjectGid(stat.Gid, stat.Gid),
 			quantumfs.ObjectTypeDirectoryEntry,
+			// retain time of the input directory
+			quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
+			quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
 			key)
 
 		xattrsKey, xerr := WriteXAttrs(filepath.Join(base, relpath), ds)
@@ -78,9 +86,9 @@ func WriteDirectory(base string, relpath string,
 func createNewDirRecord(name string, mode uint32,
 	rdev uint32, size uint64, uid quantumfs.UID,
 	gid quantumfs.GID, objType quantumfs.ObjectType,
+	mtime quantumfs.Time, ctime quantumfs.Time,
 	key quantumfs.ObjectKey) *quantumfs.DirectoryRecord {
 
-	now := time.Now()
 	entry := quantumfs.NewDirectoryRecord()
 	entry.SetFilename(name)
 	entry.SetID(key)
@@ -93,8 +101,8 @@ func createNewDirRecord(name string, mode uint32,
 	entry.SetSize(size)
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 	// QFS doesn't store Atime currently
-	entry.SetContentTime(quantumfs.NewTime(now))
-	entry.SetModificationTime(quantumfs.NewTime(now))
+	entry.SetContentTime(ctime)
+	entry.SetModificationTime(mtime)
 
 	return entry
 }

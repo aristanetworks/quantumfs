@@ -9,19 +9,10 @@ import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
-func init() {
-	splFileIOHandler := &fileObjIOHandler{
-		writer: splFileWriter,
-	}
-
-	registerFileObjIOHandler(quantumfs.ObjectTypeSpecial,
-		splFileIOHandler)
-}
-
-func splFileWriter(path string,
+func specialFileWriter(path string,
 	finfo os.FileInfo,
 	objType quantumfs.ObjectType,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	var hash [quantumfs.ObjectKeyLength - 1]byte
 
@@ -30,15 +21,8 @@ func splFileWriter(path string,
 	binary.LittleEndian.PutUint32(hash[0:4], stat.Mode)
 	binary.LittleEndian.PutUint32(hash[4:8], uint32(stat.Rdev))
 
-	key := quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 	// all the information is embedded into key
 	// there are no blobs to be written here
-
-	dirRecord := createNewDirRecord(finfo.Name(), stat.Mode,
-		uint32(stat.Rdev), uint64(finfo.Size()),
-		quantumfs.ObjectUid(stat.Uid, stat.Uid),
-		quantumfs.ObjectGid(stat.Gid, stat.Gid),
-		quantumfs.ObjectTypeSpecial, key)
-
-	return dirRecord, nil
+	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash),
+		nil
 }

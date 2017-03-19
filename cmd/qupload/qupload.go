@@ -7,88 +7,211 @@
 // uploaded by this tool can be accessed using QFS.
 package main
 
+import "errors"
 import "flag"
 import "fmt"
 import "os"
 import "strings"
+import "syscall"
 import "time"
 
+import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
 // Various exit reasons returned to the shell as exit code
 const (
-	exitOk      = iota
-	exitBadArgs = iota
-	exitArgErr  = iota
-	exitUpErr   = iota
+	exitOk        = iota
+	exitErrArgs   = iota
+	exitErrUpload = iota
 )
 
+type params struct {
+	progress    bool
+	dsName      string
+	dsConf      string
+	wsdbName    string
+	wsdbConf    string
+	ws          string
+	advance     string
+	openFiles   uint64
+	baseDir     string
+	excludeFile string
+}
+
 func showUsage() {
-	fmt.Println("usage: qupload -datastore <dsname> -datastoreconf <dsconf>" +
-		" -workspaceDB <wsname> -workspaceDBconf <wsconf> " +
-		" -basedir <dirname> [ -exclude <file> | dir ]")
+	fmt.Printf(`
+qupload - tool to upload a directory hierarchy to a QFS supported datastore
+version: %s
+usage: qupload [-progress] -datastore <dsname> -datastoreconf <dsconf>
+               -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf> 
+			   -workspace <wsname> [-advance <wsname>]
+               -basedir <path> [ -exclude <file> | <relpath> ]
+
+Exmaples:
+1) qupload -datastore ether.cql -dataconf etherconfig
+           -workspaceDB ether.cql -workspaceDBconf etherconfig
+		   -workspace build/eos-trunk/11223344 -advance build/eos-trunk/latestPass
+		   -basedir /var/Abuild/66778899 -exclude excludeFile
+Above command will upload the contents of /var/Abuild/66778899 directory
+to the QFS workspace build/eos-trunk/11223344 and then advance build/eos-trunk/latestPass
+workspace to refer to it. The files and directories specified by excludeFile are
+excluded from upload.
+
+2) qupload -datastore ether.cql -dataconf etherconfig
+           -workspaceDB ether.cql -workspaceDBconf etherconfig
+		   -workspace build/eos-trunk/11223344 -openfiles 7000
+		   -basedir /var/Abuild/66778899 bin
+Above command will upload the contents of /var/Abuild/66778899/bin to the
+QFS workspace build/eos-trunk/11223344. During upload, a maximum of 7000
+files are opened at any time.
+`, quantumfs.Version)
 	flag.PrintDefaults()
+}
+
+func setOpenFilesLimit(files uint64) error {
+	rlimit := &syscall.Rlimit{
+		Cur: files,
+		Max: files,
+	}
+
+	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, rlimit)
+}
+
+func validateParams(p *params) (quantumfs.DataStore, quantumfs.WorkspaceDB, error) {
+
+	// check mandatory args
+	if p.dsName == "" || p.dsConf == "" || p.wsdbName == "" ||
+		p.wsdbConf == "" || p.ws == "" || p.baseDir == "" {
+		return nil, nil, errors.New("One or more mandatory flags are missing")
+	}
+
+	if strings.Count(p.ws, "/") != 2 {
+		return nil, nil, errors.New("Workspace name must contain precisely two \"/\"")
+	}
+
+	if p.advance != "" && strings.Count(p.advance, "/") != 2 {
+		return nil, nil, errors.New("Workspace to be advanced must contain precisely two \"/\"")
+	}
+
+	if p.excludeFile == "" && flag.Arg(0) == "" {
+		return nil, nil, errors.New("One of -excludeFile or directory argument must be specified")
+	}
+
+	ds, dsErr := qwr.ConnectDatastore(p.dsName, p.dsConf)
+	if dsErr != nil {
+		return nil, nil, dsErr
+	}
+	wsdb, wsdbErr := qwr.ConnectWorkspaceDB(p.wsdbName, p.wsdbConf)
+	if wsdbErr != nil {
+		return nil, nil, wsdbErr
+	}
+	ws1Parts := strings.Split(p.ws, "/")
+	advParts := strings.Split(p.advance, "/")
+	_, err := wsdb.Workspace(nil,
+		ws1Parts[0], ws1Parts[1], ws1Parts[2])
+	werr, _ := err.(*quantumfs.WorkspaceDbErr)
+	if err == nil {
+		return nil, nil, fmt.Errorf("Workspace %s must not exist\n", p.ws)
+	}
+	if err != nil && werr.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+		return nil, nil, fmt.Errorf("Error in workspace %s\n", err)
+	}
+	_, aerr := wsdb.Workspace(nil,
+		advParts[0], advParts[1], advParts[2])
+	if aerr != nil {
+		return nil, nil, fmt.Errorf("Error in advance workspace %s\n", aerr)
+	}
+
+	return ds, wsdb, nil
 }
 
 func main() {
 
-	dsName := flag.String("datastore", "",
+	var cliParams params
+
+	flag.BoolVar(&cliParams.progress, "progress", false,
+		"Show the data and metadata sizes uploaded")
+	flag.StringVar(&cliParams.dsName, "datastore", "",
 		"Name of the datastore to use")
-	dsConf := flag.String("datastoreconf", "",
+	flag.StringVar(&cliParams.dsConf, "datastoreconf", "",
 		"Options to pass to datastore")
-	wsdbName := flag.String("workspaceDB", "",
+	flag.StringVar(&cliParams.wsdbName, "workspaceDB", "",
 		"Name of the workspace DB to use")
-	wsdbConf := flag.String("workspaceDBconf", "",
+	flag.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "",
 		"Options to pass to workspace DB")
-	ws := flag.String("workspace", "",
+	flag.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
-	baseDir := flag.String("basedir", "",
+	flag.StringVar(&cliParams.advance, "advance", "",
+		"Name of workspace which'll be advanced to point to uploaded workspace")
+	flag.Uint64Var(&cliParams.openFiles, "openfiles", 60000,
+		"Limit number of open files")
+	flag.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
-	excludeFile := flag.String("exclude", "",
+	flag.StringVar(&cliParams.excludeFile, "exclude", "",
 		"Exclude the files and directories specified in this file")
 
 	flag.Usage = showUsage
 	flag.Parse()
 
-	// TODO(krishna): check flag values and arg values
-	if strings.Count(*ws, "/") != 2 {
-		fmt.Println("Workspace name must contain precisely two \"/\"")
-		os.Exit(exitBadArgs)
+	if flag.NFlag() == 0 {
+		flag.Usage()
+		os.Exit(0)
 	}
 
-	ds, dsErr := qwr.ConnectDatastore(*dsName, *dsConf)
-	if dsErr != nil {
-		fmt.Println(dsErr)
-		os.Exit(exitArgErr)
+	ds, wsdb, perr := validateParams(&cliParams)
+	if perr != nil {
+		fmt.Println(perr)
+		os.Exit(exitErrArgs)
 	}
 
-	wsdb, wsdbErr := qwr.ConnectWorkspaceDB(*wsdbName, *wsdbConf)
-	if wsdbErr != nil {
-		fmt.Println(wsdbErr)
-		os.Exit(exitArgErr)
+	// upload uses go-routines = O(dirs)
+	// and hence needs a large number of
+	// open files.
+	err := setOpenFilesLimit(cliParams.openFiles)
+	if err != nil {
+		fmt.Println("Failed to change open file limit. Use \"sudo\"")
+		os.Exit(exitErrArgs)
 	}
 
-	// TODO(krishna): exclude file and directory argument cannot be
-	//                specified together
 	relpath := ""
-	if flag.NArg() == 0 {
-		exErr := utils.LoadExcludeList(*excludeFile)
+	if cliParams.excludeFile != "" {
+		exErr := utils.LoadExcludeList(cliParams.excludeFile)
 		if exErr != nil {
 			fmt.Println(exErr)
-			os.Exit(exitArgErr)
+			os.Exit(exitErrArgs)
 		}
 	} else {
 		relpath = flag.Arg(0)
 	}
 
-	start := time.Now()
-	upErr := upload(ds, wsdb, *ws, *baseDir, relpath)
-	if upErr != nil {
-		fmt.Println(upErr)
-		os.Exit(exitUpErr)
+	if cliParams.progress == true {
+		go func() {
+			var d1, m1, d2, m2, speed uint64
+			for {
+				start := time.Now()
+				d1 = qwr.DataBytesWritten
+				m1 = qwr.MetadataBytesWritten
+				fmt.Printf("\rData: %12d Metadata: %12d Speed: %4d MB/s",
+					d1, m1, speed)
+				time.Sleep(1 * time.Second)
+				d2 = qwr.DataBytesWritten
+				m2 = qwr.MetadataBytesWritten
+				speed = (((d2 + m2) - (d1 + m1)) / uint64(1000000)) / uint64(time.Since(start).Seconds())
+			}
+		}()
 	}
 
-	fmt.Printf("Uploaded in %.0f secs to %s\n",
-		time.Since(start).Seconds(), *ws)
+	start := time.Now()
+	upErr := upload(ds, wsdb, cliParams.ws, cliParams.advance, cliParams.baseDir, relpath)
+	if upErr != nil {
+		fmt.Println(upErr)
+		os.Exit(exitErrUpload)
+	}
+
+	fmt.Printf("Uploaded Total: %d bytes (Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
+		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
+		qwr.DataBytesWritten, (qwr.DataBytesWritten*100)/(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		qwr.MetadataBytesWritten, (qwr.MetadataBytesWritten*100)/(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		time.Since(start).Seconds(), cliParams.ws)
 }
