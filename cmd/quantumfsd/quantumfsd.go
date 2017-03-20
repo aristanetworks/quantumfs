@@ -38,10 +38,10 @@ func init() {
 	const (
 		defaultCachePath        = "/var/run/quantumfs"
 		defaultCacheSize        = "8G"
-		defaultMountPath        = "/mnt/quantumfs"
+		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
-		defaultMemLogMegabytes  = 100
+		defaultmemlogmegabytes  = 1000
 	)
 
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
