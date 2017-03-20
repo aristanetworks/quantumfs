@@ -7,13 +7,15 @@ package walker
 
 import "flag"
 import "fmt"
-import "io/ioutil"
+
+//import "io/ioutil"
 import "os"
 import "runtime"
 import "runtime/debug"
 import "strings"
 import "sync"
-import "syscall"
+
+//import "syscall"
 import "testing"
 import "time"
 
@@ -61,8 +63,8 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 	testName = testName[lastSlash+1:]
 	cachePath := daemon.TestRunDir + "/" + testName
 	th := &daemon.TestHelper{}
-	th.Init(t, testName, cachePath, qlog.NewQlogExt(cachePath+"/ramfs",
-		60*10000*24, noStdOut))
+	th.Init(t, testName, make(chan string), time.Now(), cachePath,
+		qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24, noStdOut))
 	/*
 		th := &daemon.TestHelper{
 			t:          t,
@@ -92,7 +94,7 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 	var testResult string
 
 	select {
-	case <-time.After(1000 * time.Millisecond):
+	case <-time.After(10000 * time.Millisecond):
 		testResult = "ERROR: TIMED OUT"
 
 	case testResult = <-th.TestResult:
@@ -110,6 +112,7 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 var requestId = uint64(1000000000)
 
 // Temporary directory for this test run
+/*
 func init() {
 	syscall.Umask(0)
 
@@ -126,7 +129,7 @@ func init() {
 	}
 	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
 }
-
+*/
 // Seperate for each package
 func TestMain(m *testing.M) {
 	flag.Parse()

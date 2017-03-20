@@ -99,11 +99,13 @@ func runExpensiveTest(t *testing.T, test QuantumFsTest) {
 	runTestCommon(t, test, true, nil)
 }
 
-func (th *TestHelper) Init(t *testing.T, testName string,
-	cachePath string, logger *qlog.Qlog) {
+func (th *TestHelper) Init(t *testing.T, testName string, testResult chan string,
+	startTime time.Time, cachePath string, logger *qlog.Qlog) {
 
 	th.t = t
 	th.testName = testName
+	th.TestResult = testResult
+	th.startTime = startTime
 	th.cachePath = cachePath
 	th.logger = logger
 }
