@@ -1500,7 +1500,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		}
 	} else {
 		// We are deleting the only extended attribute. Change the
-		// DirectRecord key only
+		// DirectoryRecord key only
 		key = quantumfs.EmptyBlockKey
 	}
 
