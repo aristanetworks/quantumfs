@@ -38,8 +38,14 @@ rpm: $(COMMANDS)
 		--vendor='Arista Networks' \
 		--url http://gut/repos/quantumfs \
 		--description='A distributed filesystem optimized for large scale software development' \
+		--depends libstdc++ \
+		--depends fuse \
+		--after-install systemd_reload \
+		--after-remove systemd_reload \
+		--after-upgrade systemd_reload \
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
-		./qparse=/usr/sbin/qparse
+		./qparse=/usr/sbin/qparse \
+		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
 include QFSClient/Makefile
