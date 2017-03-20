@@ -122,4 +122,5 @@ func init() {
 		return
 	}
 	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
+	fmt.Println("calling init in testutils")
 }
