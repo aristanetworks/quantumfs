@@ -5,13 +5,8 @@ package walker
 
 // Test library for walker
 
-import "flag"
-import "fmt"
-
 //import "io/ioutil"
-import "os"
 import "runtime"
-import "runtime/debug"
 import "strings"
 import "sync"
 
@@ -33,11 +28,6 @@ type logscanError struct {
 
 var errorMutex sync.Mutex
 var errorLogs []logscanError
-
-func noStdOut(format string, args ...interface{}) error {
-	// Do nothing
-	return nil
-}
 
 // This is the normal way to run tests in the most time efficient manner
 // Keep in local package
@@ -64,7 +54,7 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 	cachePath := daemon.TestRunDir + "/" + testName
 	th := &daemon.TestHelper{}
 	th.Init(t, testName, make(chan string), time.Now(), cachePath,
-		qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24, noStdOut))
+		qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24, daemon.NoStdOut))
 	/*
 		th := &daemon.TestHelper{
 			t:          t,
@@ -130,66 +120,3 @@ func init() {
 	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
 }
 */
-// Seperate for each package
-func TestMain(m *testing.M) {
-	flag.Parse()
-
-	if os.Getuid() != 0 {
-		panic("quantumfs.daemon tests must be run as root")
-	}
-
-	// Disable Garbage Collection. Because the tests provide both the filesystem
-	// and the code accessing that filesystem the program is reentrant in ways
-	// opaque to the golang scheduler. Thus we can end up in a deadlock situation
-	// between two threads:
-	//
-	// ThreadFS is the filesystem, ThreadT is the test
-	//
-	//   ThreadFS                    ThreadT
-	//                               Start filesystem syscall
-	//   Start executing response
-	//   <GC Wait>                   <Queue GC wait after syscal return>
-	//                        DEADLOCK
-	//
-	// Because the filesystem request is blocked waiting on GC and the syscall
-	// will never return to allow GC to progress, the test program is deadlocked.
-	origGC := debug.SetGCPercent(-1)
-
-	// Precompute a bunch of our genData to save time during tests
-	//genData(40 * 1024 * 1024)
-
-	// Setup an array for tests with errors to be logscanned later
-	errorLogs = make([]logscanError, 0)
-
-	result := m.Run()
-
-	// We've finished running the tests and are about to do the full logscan.
-	// This create a tremendous amount of garbage, so we must enable garbage
-	// collection.
-	runtime.GC()
-	debug.SetGCPercent(origGC)
-
-	errorMutex.Lock()
-	fullLogs := make(chan string, len(errorLogs))
-	var logProcessing sync.WaitGroup
-	for i := 0; i < len(errorLogs); i++ {
-		logProcessing.Add(1)
-		go func(i int) {
-			defer logProcessing.Done()
-			//testSummary := outputLogError(errorLogs[i])
-			//fullLogs <- testSummary
-		}(i)
-	}
-
-	logProcessing.Wait()
-	close(fullLogs)
-	testSummary := ""
-	for summary := range fullLogs {
-		testSummary += summary
-	}
-	errorMutex.Unlock()
-	fmt.Println("------ Test Summary:\n" + testSummary)
-
-	os.RemoveAll(daemon.TestRunDir)
-	os.Exit(result)
-}
