@@ -36,7 +36,7 @@ func (store *setCountingDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey
 }
 
 func TestSyncFileOverwrite(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	runTestNoQfsExpensiveTest(t, func(test *TestHelper) {
 		config := test.defaultConfig()
 
 		// Make an instance of QuantumFs and put things there
@@ -82,7 +82,7 @@ func TestSyncFileOverwrite(t *testing.T) {
 }
 
 func TestSyncToDatastore(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	runTestNoQfsExpensiveTest(t, func(test *TestHelper) {
 		config := test.defaultConfig()
 
 		// Make an instance of QuantumFs and put things there
@@ -160,7 +160,7 @@ func TestSyncToDatastore(t *testing.T) {
 // expect any writes to be made into the datastore. Finally sync all the workspaces
 // and confirm some writes happened.
 func TestNoImplicitSync(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		dataStore := setCountingDataStore{
 			DataStore: test.qfs.c.dataStore.durableStore,
 		}

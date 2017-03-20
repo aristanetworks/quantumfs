@@ -12,7 +12,7 @@ import "testing"
 import "github.com/aristanetworks/quantumfs"
 
 func TestTypespaceListing(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		var stat syscall.Stat_t
 		err := syscall.Stat(test.absPath(quantumfs.ApiPath), &stat)
 		test.assert(err == nil, "Error getting api stat data: %v", err)
@@ -28,7 +28,7 @@ func TestTypespaceListing(t *testing.T) {
 }
 
 func TestNamespaceListing(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		entries, err :=
 			ioutil.ReadDir(test.absPath(quantumfs.NullTypespaceName))
 		test.assert(err == nil, "Couldn't read typespace listing")
@@ -39,7 +39,7 @@ func TestNamespaceListing(t *testing.T) {
 }
 
 func TestWorkspaceListing(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		entries, err :=
 			ioutil.ReadDir(test.absPath(quantumfs.NullNamespaceName))
 		test.assert(err == nil, "Couldn't read namespace listing")
@@ -50,7 +50,7 @@ func TestWorkspaceListing(t *testing.T) {
 }
 
 func TestNullWorkspaceListing(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		path := test.newWorkspace()
 
 		entries, err := ioutil.ReadDir(path)

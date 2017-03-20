@@ -16,7 +16,7 @@ import "unsafe"
 import "github.com/aristanetworks/quantumfs"
 
 func TestExtendedAttrReadWrite(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -65,7 +65,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 }
 
 func TestExtendedAttrList(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -115,7 +115,7 @@ func TestExtendedAttrList(t *testing.T) {
 }
 
 func TestExtendedAttrReadNonExist(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -135,7 +135,7 @@ func TestExtendedAttrReadNonExist(t *testing.T) {
 }
 
 func TestExtendedAttrRemove(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -207,7 +207,7 @@ func TestExtendedAttrRemove(t *testing.T) {
 }
 
 func matchXAttrExtendedKey(path string, extendedKey []byte,
-	test *testHelper, Type quantumfs.ObjectType) {
+	test *TestHelper, Type quantumfs.ObjectType) {
 
 	key, type_, size, err := quantumfs.DecodeExtendedKey(string(extendedKey))
 	test.assert(err == nil, "Error decompressing the packet")
@@ -230,7 +230,7 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 
 // Verify the get XAttr function for the self-defined extended key
 func TestXAttrExtendedKeyGet(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
@@ -321,7 +321,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 
 // Verify the set/remove XAttr function for extended key is illegal
 func TestXAttrTypeKeySetRemove(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
@@ -345,7 +345,7 @@ func TestXAttrTypeKeySetRemove(t *testing.T) {
 // Verify list XAttr function will attach extended key behind the real extended
 // attributes
 func TestXAttrTypeKeyList(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
@@ -374,7 +374,7 @@ func TestXAttrTypeKeyList(t *testing.T) {
 }
 
 func TestExtendedKeyDirtyChild(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/dir"
 		fileName := dirName + "/file"
@@ -508,7 +508,7 @@ func init() {
 	}
 }
 
-func initOrphanedFileExtendedAttributes(test *testHelper) (fd int) {
+func initOrphanedFileExtendedAttributes(test *TestHelper) (fd int) {
 	// Create the file
 	workspace := test.newWorkspace()
 	filename := workspace + "/file"
@@ -530,7 +530,7 @@ func initOrphanedFileExtendedAttributes(test *testHelper) (fd int) {
 }
 
 func TestOrphanedFileXAttrList(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
 		_, err, list := fListXattr(fd, 1024)
@@ -545,7 +545,7 @@ func TestOrphanedFileXAttrList(t *testing.T) {
 }
 
 func TestOrphanedFileXAttrGet(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
 
@@ -567,7 +567,7 @@ func TestOrphanedFileXAttrGet(t *testing.T) {
 }
 
 func TestOrphanFileXAttrSet(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
 
@@ -606,7 +606,7 @@ func TestOrphanFileXAttrSet(t *testing.T) {
 }
 
 func TestOrphanFileXAttrRemove(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
 
@@ -643,7 +643,7 @@ func TestOrphanFileXAttrRemove(t *testing.T) {
 }
 
 func TestHardlinkXAttr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		attrNoData := "user.nodata"

@@ -13,9 +13,10 @@ import "os"
 import "syscall"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestFileCreation(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "test"
@@ -42,7 +43,7 @@ func TestFileCreation(t *testing.T) {
 }
 
 func TestFileWriteBlockSize(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "testwsize"
@@ -61,7 +62,7 @@ func TestFileWriteBlockSize(t *testing.T) {
 }
 
 func TestFileReadWrite(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		//length of test Text should be 37, and not a multiple of readBuf len
 		testText := []byte("This is test data 1234567890 !@#^&*()")
 		//write the test data in two goes
@@ -166,7 +167,7 @@ func TestFileReadWrite(t *testing.T) {
 }
 
 func TestFileDescriptorPermissions(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testDir := workspace + "/testDir"
@@ -237,7 +238,7 @@ func TestFileDescriptorPermissions(t *testing.T) {
 }
 
 func TestRootFileDescriptorPermissions(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -296,7 +297,7 @@ func TestRootFileDescriptorPermissions(t *testing.T) {
 }
 
 func TestFileSizeChanges(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "test"
@@ -361,7 +362,7 @@ func TestFileSizeChanges(t *testing.T) {
 }
 
 func TestFileDescriptorDirtying(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
@@ -408,7 +409,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 
 // Test file metadata updates
 func TestFileAttrUpdate(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		api := test.getApi()
 
 		src := test.newWorkspace()
@@ -446,7 +447,7 @@ func TestFileAttrUpdate(t *testing.T) {
 }
 
 func TestFileAttrWriteUpdate(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		api := test.getApi()
 
 		src := test.newWorkspace()
@@ -488,7 +489,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 }
 
 func TestSmallFileZero(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -498,7 +499,7 @@ func TestSmallFileZero(t *testing.T) {
 		test.assert(err == nil, "Error writing tiny data to new fd")
 
 		os.Truncate(testFilename, 0)
-		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+		test.assert(utils.FileSize(testFilename) == 0, "Unable to zero file")
 
 		output, err := ioutil.ReadFile(testFilename)
 		test.assert(len(output) == 0, "Empty file not really empty")
@@ -507,7 +508,7 @@ func TestSmallFileZero(t *testing.T) {
 }
 
 func TestFileAccessAfterUnlink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -556,7 +557,7 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 }
 
 func TestSmallFileReadPastEnd(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -579,7 +580,7 @@ func TestSmallFileReadPastEnd(t *testing.T) {
 }
 
 func TestFileStatBlockCount(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -604,7 +605,7 @@ func TestFileStatBlockCount(t *testing.T) {
 }
 
 func TestFileReparentRace(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		var stat syscall.Stat_t

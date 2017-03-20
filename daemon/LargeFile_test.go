@@ -12,9 +12,10 @@ import "testing"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestLargeFileRead(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -50,7 +51,7 @@ func TestLargeFileRead(t *testing.T) {
 }
 
 func TestLargeFileExpansion(t *testing.T) {
-	runExpensiveTest(t, func(test *testHelper) {
+	runExpensiveTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -118,7 +119,7 @@ func TestLargeFileExpansion(t *testing.T) {
 }
 
 func TestLargeFileAttr(t *testing.T) {
-	runExpensiveTest(t, func(test *testHelper) {
+	runExpensiveTest(t, func(test *TestHelper) {
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -178,7 +179,7 @@ func TestLargeFileAttr(t *testing.T) {
 }
 
 func TestLargeFileZero(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -191,7 +192,7 @@ func TestLargeFileZero(t *testing.T) {
 			int64(quantumfs.MaxBlockSize))
 
 		os.Truncate(testFilename, 0)
-		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+		test.assert(utils.FileSize(testFilename) == 0, "Unable to zero file")
 
 		output, err := ioutil.ReadFile(testFilename)
 		test.assert(len(output) == 0, "Empty file not really empty")

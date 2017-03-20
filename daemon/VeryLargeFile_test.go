@@ -13,8 +13,9 @@ import "strconv"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
-func runConvertFrom(test *testHelper, fromFileSize uint64) {
+func runConvertFrom(test *TestHelper, fromFileSize uint64) {
 	workspace := test.newWorkspace()
 
 	testFilename := workspace + "/test"
@@ -38,7 +39,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 		newLen = maxLen
 	}
 	os.Truncate(testFilename, int64(newLen))
-	test.assert(test.fileSize(testFilename) == int64(newLen),
+	test.assert(utils.FileSize(testFilename) == int64(newLen),
 		"Truncation expansion failed")
 
 	// Then append data *again* to the end of it
@@ -46,9 +47,9 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	test.assert(err == nil,
 		"Error writing data (%d bytes) to existing fd: %v",
 		testDataSize, err)
-	test.assert(test.fileSize(testFilename) == int64(newLen+testDataSize),
+	test.assert(utils.FileSize(testFilename) == int64(newLen+testDataSize),
 		"Post truncation expansion write failed, %d",
-		test.fileSize(testFilename))
+		utils.FileSize(testFilename))
 
 	// Read our data back
 	fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
@@ -84,33 +85,33 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 }
 
 func TestSmallConvert(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		runConvertFrom(test, quantumfs.MaxSmallFileSize())
 	})
 }
 
 func TestMaxSmallConvert(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		runConvertFrom(test, uint64(quantumfs.MaxBlockSize))
 	})
 }
 
 func TestMedConvert(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		runConvertFrom(test, quantumfs.MaxSmallFileSize()+
 			uint64(quantumfs.MaxBlockSize))
 	})
 }
 
 func TestLargeConvert(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		runConvertFrom(test, quantumfs.MaxMediumFileSize()+
 			uint64(quantumfs.MaxBlockSize))
 	})
 }
 
 func TestVeryLargeFileZero(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -125,7 +126,7 @@ func TestVeryLargeFileZero(t *testing.T) {
 			int64(quantumfs.MaxBlockSize))
 
 		os.Truncate(testFilename, 0)
-		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+		test.assert(utils.FileSize(testFilename) == 0, "Unable to zero file")
 
 		output, err := ioutil.ReadFile(testFilename)
 		test.assert(len(output) == 0, "Empty file not really empty")
@@ -134,7 +135,7 @@ func TestVeryLargeFileZero(t *testing.T) {
 }
 
 func TestVeryLargeFileReadPastEnd(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
