@@ -1,6 +1,8 @@
 COMMANDS=quantumfsd qfs qparse
 PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal
 
+version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
+
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
 all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
@@ -24,7 +26,7 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
 
 $(COMMANDS): encoding/metadata.capnp.go
-	go build -gcflags '-e' github.com/aristanetworks/quantumfs/cmd/$@
+	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo go test github.com/aristanetworks/quantumfs/cmd/$@
@@ -43,6 +45,7 @@ rpm: $(COMMANDS)
 		--after-install systemd_reload \
 		--after-remove systemd_reload \
 		--after-upgrade systemd_reload \
+		--version $(version) \
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse \
