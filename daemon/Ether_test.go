@@ -13,7 +13,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
-func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
+func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
 	mountPath := th.tempDir + "/mnt"
 
 	datastorePath := th.tempDir + "/ether"
@@ -34,7 +34,7 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 
 func TestSmokeTestEtherFilesystem(t *testing.T) {
 	t.Skip("ether.filesystem often take more than 200ms to write a block")
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
+	runTestNoQfsExpensiveTest(t, func(test *TestHelper) {
 		test.startQuantumFs(test.etherFilesystemConfig())
 		interDirectoryRename(test)
 	})

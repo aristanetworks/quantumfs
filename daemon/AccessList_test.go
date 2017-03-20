@@ -11,7 +11,7 @@ import "reflect"
 import "testing"
 
 func TestAccessListFileCreate(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 		filename := "/test"
@@ -27,7 +27,7 @@ func TestAccessListFileCreate(t *testing.T) {
 }
 
 func TestAccessListFileOpen(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -60,7 +60,7 @@ func TestAccessListFileOpen(t *testing.T) {
 }
 
 func TestAccessListFileDelete(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -92,7 +92,7 @@ func TestAccessListFileDelete(t *testing.T) {
 }
 
 func TestAccessListDirectoryCreate(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 		dirname := "/test"
@@ -107,7 +107,7 @@ func TestAccessListDirectoryCreate(t *testing.T) {
 }
 
 func TestAccessListDirectoryDelete(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirname := "/test"
 		path := workspace + dirname
@@ -137,7 +137,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 }
 
 func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 		dir1 := "/dir1"
@@ -154,7 +154,7 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 }
 
 func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dir1 := "/dir1"
 		dir2 := "/dir2"
@@ -187,7 +187,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 }
 
 func TestAccessListMvChild(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirname1 := "/test1"
 		dirname2 := "/test2"
@@ -242,7 +242,7 @@ func TestAccessListMvChild(t *testing.T) {
 }
 
 func TestAccessListRename(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
@@ -285,7 +285,7 @@ func TestAccessListRename(t *testing.T) {
 }
 
 func TestAccessListHardLink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
@@ -328,7 +328,7 @@ func TestAccessListHardLink(t *testing.T) {
 }
 
 func TestAccessListSymlink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
@@ -369,7 +369,7 @@ func TestAccessListSymlink(t *testing.T) {
 }
 
 func TestAccessSpecialFiles(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 
@@ -411,7 +411,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 }
 
 func TestAccessListReadSymlink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
@@ -454,7 +454,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 }
 
 func TestAccessListOverwriteRemoval(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -489,7 +489,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 }
 
 func TestAccessListClear(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 		filename := "/test"

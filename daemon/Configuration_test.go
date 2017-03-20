@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs"
 // Confirm the bid configuration knobs have been set correctly.
 func TestBdiKnobs(t *testing.T) {
 	mbs := fmt.Sprintf("%d\n", quantumfs.MaxBlockSize/1024)
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		read_ahead_kb := fmt.Sprintf("/sys/class/bdi/0:%d/read_ahead_kb",
 			test.fuseConnection)
 		max_ratio := fmt.Sprintf("/sys/class/bdi/0:%d/max_ratio",

@@ -14,7 +14,7 @@ import "testing"
 import "github.com/aristanetworks/quantumfs"
 
 func TestHardlink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		testData := []byte("arstarst")
 
 		workspace := test.newWorkspace()
@@ -68,7 +68,7 @@ func TestHardlink(t *testing.T) {
 }
 
 func TestSymlinkCreate(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		link := workspace + "/symlink"
 		err := syscall.Symlink("/usr/bin/arch", link)
@@ -77,7 +77,7 @@ func TestSymlinkCreate(t *testing.T) {
 }
 
 func TestReadlink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
@@ -92,7 +92,7 @@ func TestReadlink(t *testing.T) {
 }
 
 func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
@@ -110,7 +110,7 @@ func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 }
 
 func TestSymlinkSize(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"

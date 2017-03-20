@@ -18,7 +18,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-func trimToStr(test *testHelper, logs []string, boundary string) []string {
+func trimToStr(test *TestHelper, logs []string, boundary string) []string {
 	boundaryCount := 0
 	var boundaryStart, boundaryEnd int
 	for i := 0; i < len(logs); i++ {
@@ -37,7 +37,7 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 }
 
 func TestMaxStringFail_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		longStr := string(genData(math.MaxUint16))
 
 		test.qfs.c.wlog("%s %d", longStr, 255)
@@ -50,7 +50,7 @@ func TestMaxStringFail_test(t *testing.T) {
 }
 
 func TestMaxStringLast_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		longStr := string(genData(math.MaxUint16))
 
 		test.qfs.c.wlog("%s", longStr)
@@ -63,7 +63,7 @@ func TestMaxStringLast_test(t *testing.T) {
 }
 
 func TestQParse(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		var logOut bytes.Buffer
 		var testMutex sync.Mutex
 		test.qfs.c.Qlog.Write = func(format string,
@@ -158,7 +158,7 @@ func TestQParse(t *testing.T) {
 }
 
 func TestQParsePartials_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		// Before we enable logs, let's cause all File logs to be
 		// partially written
 		test.qfs.c.Qlog.EnterTestMode("---In File::")
@@ -213,7 +213,7 @@ func TestQParsePartials_test(t *testing.T) {
 }
 
 func TestBooleanLogType(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 
 		test.qfs.c.wlog("booleans %t %t", true, false)
 

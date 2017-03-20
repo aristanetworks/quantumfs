@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
 
 func TestHardlinkReload(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
 		test.assertNoErr(err)
@@ -125,7 +125,7 @@ func TestHardlinkReload(t *testing.T) {
 }
 
 func TestHardlinkRelay(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testData := genData(2000)
@@ -183,7 +183,7 @@ func TestHardlinkRelay(t *testing.T) {
 }
 
 func TestHardlinkForget(t *testing.T) {
-	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
@@ -221,7 +221,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 	// directories from becoming uninstantiated simply because it itself is still
 	// instantiated. It is likely being held open by some other directory or
 	// handle.
-	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
@@ -274,7 +274,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
@@ -323,7 +323,7 @@ func TestHardlinkConversion(t *testing.T) {
 }
 
 func TestHardlinkSubdirChain(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
@@ -355,7 +355,7 @@ func TestHardlinkSubdirChain(t *testing.T) {
 }
 
 func TestHardlinkWsrChain(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)
@@ -384,7 +384,7 @@ func TestHardlinkWsrChain(t *testing.T) {
 }
 
 func TestHardlinkInterWorkspace(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspaceA := test.newWorkspace()
 		workspaceB := test.newWorkspace()
 
@@ -419,7 +419,7 @@ func TestHardlinkInterWorkspace(t *testing.T) {
 }
 
 func TestHardlinkOpenUnlink(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		filename := workspace + "/file"
@@ -443,7 +443,7 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 }
 
 func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
-	test *testHelper, Type quantumfs.ObjectType, wsr *WorkspaceRoot) {
+	test *TestHelper, Type quantumfs.ObjectType, wsr *WorkspaceRoot) {
 
 	key, type_, size, err := quantumfs.DecodeExtendedKey(string(extendedKey))
 	test.assert(err == nil, "Error decompressing the packet")
@@ -465,7 +465,7 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 }
 
 func TestHardlinkExtraction(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		filename := workspace + "/file"
@@ -501,7 +501,7 @@ func TestHardlinkExtraction(t *testing.T) {
 }
 
 func TestHardlinkRename(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		filename := workspace + "/file"
@@ -556,7 +556,7 @@ func ManualLookup(c *ctx, parent Inode, childName string) {
 }
 
 func TestHardlinkReparentRace(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		var stat syscall.Stat_t
@@ -585,7 +585,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 }
 
 func TestHardlinkUninstantiated(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
@@ -617,7 +617,7 @@ func TestHardlinkUninstantiated(t *testing.T) {
 	})
 }
 
-func (test *testHelper) LinkFileExp(path string, filename string) {
+func (test *TestHelper) LinkFileExp(path string, filename string) {
 	err := os.MkdirAll(path, 0777)
 	test.assertNoErr(err)
 
@@ -644,7 +644,7 @@ func (test *testHelper) LinkFileExp(path string, filename string) {
 }
 
 func TestHardlinkFileExpansionInWsr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		test.LinkFileExp(workspace, "fileA")
@@ -652,7 +652,7 @@ func TestHardlinkFileExpansionInWsr(t *testing.T) {
 }
 
 func TestHardlinkFileExpansionOutWsr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		test.LinkFileExp(workspace+"/dirB", "fileB")
@@ -660,7 +660,7 @@ func TestHardlinkFileExpansionOutWsr(t *testing.T) {
 }
 
 func TestHardlinkDeleteFromDirectory(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		dir1 := workspace + "/dir1/dir1.1"

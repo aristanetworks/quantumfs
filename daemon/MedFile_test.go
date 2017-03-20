@@ -13,9 +13,10 @@ import "testing"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestMedBranch(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -44,7 +45,7 @@ func TestFileExpansion(t *testing.T) {
 	// generate more data than small file size
 	data := genData(int(quantumfs.MaxSmallFileSize()) +
 		quantumfs.MaxBlockSize)
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -98,7 +99,7 @@ func TestFileExpansion(t *testing.T) {
 }
 
 func TestMedFileAttr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -158,7 +159,7 @@ func TestMedFileAttr(t *testing.T) {
 }
 
 func TestMedFileZero(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -171,7 +172,7 @@ func TestMedFileZero(t *testing.T) {
 			int64(quantumfs.MaxBlockSize))
 
 		os.Truncate(testFilename, 0)
-		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+		test.assert(utils.FileSize(testFilename) == 0, "Unable to zero file")
 
 		output, err := ioutil.ReadFile(testFilename)
 		test.assert(len(output) == 0, "Empty file not really empty")
@@ -180,7 +181,7 @@ func TestMedFileZero(t *testing.T) {
 }
 
 func TestMultiBlockFileReadPastEnd(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 

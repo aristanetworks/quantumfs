@@ -14,7 +14,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 
 func TestWorkspaceBranching(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		api := test.getApi()
 
 		// First branch the null workspace
@@ -45,7 +45,7 @@ func TestWorkspaceBranching(t *testing.T) {
 }
 
 func TestApiClearAccessList(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		accessList := make(map[string]bool)
 		workspace := test.newWorkspace()
 		filename := "/test"
@@ -71,7 +71,7 @@ func TestApiClearAccessList(t *testing.T) {
 	})
 }
 
-func getExtendedKeyHelper(test *testHelper, dst string, type_ string) string {
+func getExtendedKeyHelper(test *TestHelper, dst string, type_ string) string {
 	key := make([]byte, quantumfs.ExtendedKeyLength)
 	sz, err := syscall.Getxattr(dst, quantumfs.XAttrTypeKey, key)
 	test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
@@ -79,7 +79,7 @@ func getExtendedKeyHelper(test *testHelper, dst string, type_ string) string {
 	return string(key)
 }
 
-func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
+func ApiInsertInodeTest(test *TestHelper, uid uint32, gid uint32) {
 	api := test.getApi()
 
 	// Create the source and the target workspace
@@ -235,35 +235,35 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 }
 
 func TestApiInsertInode(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		ApiInsertInodeTest(test, 0, 0)
 	})
 }
 
 func TestApiInsertInodeAsUser(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		ApiInsertInodeTest(test, 10100, 10999)
 	})
 }
 
 func TestApiInsertOverExisting(t *testing.T) {
-	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+	configModifier := func(test *TestHelper, config *QuantumFsConfig) {
 		cacheTimeout100Ms(test, config)
 		dirtyDelay100Ms(test, config)
 	}
 
-	runTestCustomConfig(t, configModifier, func(test *testHelper) {
+	runTestCustomConfig(t, configModifier, func(test *TestHelper) {
 		testApiInsertOverExisting(test, nil, nil)
 	})
 }
 
 func TestApiInsertOverExistingOpenInodes(t *testing.T) {
-	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+	configModifier := func(test *TestHelper, config *QuantumFsConfig) {
 		cacheTimeout100Ms(test, config)
 		dirtyDelay100Ms(test, config)
 	}
 
-	runTestCustomConfig(t, configModifier, func(test *testHelper) {
+	runTestCustomConfig(t, configModifier, func(test *TestHelper) {
 		var dir2 *os.File
 		var file2 int
 
@@ -307,12 +307,12 @@ func TestApiInsertOverExistingOpenInodes(t *testing.T) {
 }
 
 func TestApiInsertOverExistingForget(t *testing.T) {
-	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+	configModifier := func(test *TestHelper, config *QuantumFsConfig) {
 		cacheTimeout100Ms(test, config)
 		dirtyDelay100Ms(test, config)
 	}
 
-	runTestCustomConfig(t, configModifier, func(test *testHelper) {
+	runTestCustomConfig(t, configModifier, func(test *TestHelper) {
 		messages := make([]TLA, 0, 10)
 
 		findInodes := func(workspace string) {
@@ -341,7 +341,7 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 	})
 }
 
-func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
+func testApiInsertOverExisting(test *TestHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
 	srcWorkspace := test.newWorkspace()
@@ -395,7 +395,7 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 }
 
 func TestApiNoRequestBlockingRead(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		api, err := os.Open(test.absPath(quantumfs.ApiPath))
 		test.assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
@@ -407,7 +407,7 @@ func TestApiNoRequestBlockingRead(t *testing.T) {
 }
 
 func TestApiNoRequestNonBlockingRead(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTest(t, func(test *TestHelper) {
 		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
 			syscall.O_NONBLOCK, 0)
 		test.assert(err == nil, "Error opening api file: %v", err)
@@ -422,7 +422,7 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 }
 
 func TestWorkspaceDeletion(t *testing.T) {
-	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *TestHelper) {
 		api := test.getApi()
 
 		ws1 := test.newWorkspace()
