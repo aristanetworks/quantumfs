@@ -32,8 +32,12 @@ $(COMMANDS): encoding/metadata.capnp.go
 $(PKGS_TO_TEST): encoding/metadata.capnp.go
 	sudo go test -gcflags '-e' github.com/aristanetworks/quantumfs/$@
 
-rpm: all
-	fpm -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
+rpm: $(COMMANDS)
+	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
+		--license='Arista Proprietary' \
+		--vendor='Arista Networks' \
+		--url http://gut/repos/quantumfs \
+		--description='A distributed filesystem optimized for large scale software development' \
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse
