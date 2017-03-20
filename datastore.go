@@ -691,7 +691,7 @@ type DirectoryRecord interface {
 	Clone() DirectoryRecord
 }
 
-func NewDirectRecord() *DirectRecord {
+func NewDirectoryRecord() *DirectRecord {
 	segment := capn.NewBuffer(nil)
 
 	// for more records, nlinksCache is 1. If we're a shallow copy of a hardlink,
@@ -817,7 +817,7 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 }
 
 func (record *DirectRecord) ShallowCopy() DirectoryRecord {
-	newEntry := NewDirectRecord()
+	newEntry := NewDirectoryRecord()
 	newEntry.SetNlinks(record.Nlinks())
 	newEntry.SetFilename(record.Filename())
 	newEntry.SetID(record.ID())
@@ -1090,7 +1090,7 @@ func calcMaxDirectoryRecords(maxSize int) int {
 	size0recs := len(dir0.Bytes())
 
 	// setup the pointers in DirectRecord to practical max values
-	record := NewDirectRecord()
+	record := NewDirectoryRecord()
 	record.SetFilename(string(make([]byte, MaxFilenameLength)))
 	record.SetExtendedAttributes(createEmptyBlock())
 

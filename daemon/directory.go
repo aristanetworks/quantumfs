@@ -1620,7 +1620,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 
 	// set up the Inode record
 	now := time.Now()
-	entry := quantumfs.NewDirectRecord()
+	entry := quantumfs.NewDirectoryRecord()
 	entry.SetFilename(name)
 	entry.SetID(key)
 	entry.SetType(type_)
