@@ -41,7 +41,7 @@ func init() {
 		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
-		defaultmemlogmegabytes  = 1000
+		defaultMemLogMegabytes  = 1000
 	)
 
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
