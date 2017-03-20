@@ -191,6 +191,9 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry quantumfs.DirectoryRecord) {
 
+	// Ensure we're working with a shallow copy for objectTypeToFileType
+	entry = entry.ShallowCopy()
+
 	attr.Ino = uint64(inodeNum)
 
 	fileType := objectTypeToFileType(c, entry.Type())
@@ -803,8 +806,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var recordType quantumfs.ObjectType
-		var owner quantumfs.UID
+		var recordCopy quantumfs.DirectoryRecord
 		err := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 
@@ -813,16 +815,16 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordType = record.Type()
-			owner = record.Owner()
+			recordCopy = record.ShallowCopy()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
 			return nil, err
 		}
 
-		type_ := objectTypeToFileType(c, recordType)
-		fileOwner := quantumfs.SystemUid(owner, c.fuseCtx.Owner.Uid)
+		type_ := objectTypeToFileType(c, recordCopy.Type())
+		fileOwner := quantumfs.SystemUid(recordCopy.Owner(),
+			c.fuseCtx.Owner.Uid)
 
 		if type_ == fuse.S_IFDIR {
 			c.vlog("Directory::Unlink directory")
@@ -869,6 +871,10 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			if record == nil {
 				return fuse.ENOENT
 			}
+
+			// Use a shallow copy of record to ensure the right type for
+			// objectTypeToFileType
+			record = record.ShallowCopy()
 
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {
