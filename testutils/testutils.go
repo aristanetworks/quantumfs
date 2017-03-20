@@ -10,7 +10,6 @@ import "strings"
 import "sync"
 import "testing"
 import "time"
-import "syscall"
 import "io/ioutil"
 import "os"
 
@@ -110,7 +109,6 @@ func (th *TestHelper) EndTest() {
 var TestRunDir string
 
 func init() {
-	syscall.Umask(0)
 
 	var err error
 	for i := 0; i < 10; i++ {
