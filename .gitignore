@@ -2,5 +2,6 @@
 /qfs
 /qparse
 /contentcheck
+/QuantumFS*.rpm
 .*.swp
 .swp
