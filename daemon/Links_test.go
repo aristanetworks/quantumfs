@@ -131,7 +131,7 @@ func TestSymlinkHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		err := os.MkdirAll(workspace + "/dir", 0777)
+		err := os.MkdirAll(workspace+"/dir", 0777)
 		test.assertNoErr(err)
 
 		file := workspace + "/dir/file"
