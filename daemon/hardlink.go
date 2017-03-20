@@ -168,10 +168,12 @@ func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
 }
 
 func (link *Hardlink) Record() quantumfs.DirectRecord {
-	rtn := quantumfs.NewDirectRecord()
+	// Note: this is a DirectRecord shallow copy type
+	rtn := quantumfs.NewDirectoryRecord()
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
 	rtn.SetID(encodeHardlinkId(link.linkId))
 	rtn.SetFilename(link.name)
+
 	// we only need to return a thin record - just enough information to
 	// create the hardlink. The rest is stored in workspaceroot.
 
@@ -202,7 +204,8 @@ func (link *Hardlink) ShallowCopy() quantumfs.DirectoryRecord {
 			link.linkId))
 	}
 
-	newEntry := quantumfs.NewDirectRecord()
+	// Note that this is a DirectRecord shallow copy type
+	newEntry := quantumfs.NewDirectoryRecord()
 
 	newEntry.SetID(realRecord.ID())
 	newEntry.SetType(realRecord.Type())
