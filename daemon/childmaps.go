@@ -290,7 +290,8 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 		child.Type() != quantumfs.ObjectTypeMediumFile &&
 		child.Type() != quantumfs.ObjectTypeLargeFile &&
 		child.Type() != quantumfs.ObjectTypeVeryLargeFile &&
-		child.Type() != quantumfs.ObjectTypeSymlink {
+		child.Type() != quantumfs.ObjectTypeSymlink &&
+		child.Type() != quantumfs.ObjectTypeSpecial {
 
 		c.dlog("Cannot hardlink %s - not a file", child.Filename())
 		return nil, fuse.EINVAL
