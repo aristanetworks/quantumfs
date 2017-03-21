@@ -38,7 +38,7 @@ func init() {
 	const (
 		defaultCachePath        = "/var/run/quantumfs"
 		defaultCacheSize        = "8G"
-		defaultMountPath        = "/mnt/quantumfs"
+		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
 		defaultMemLogMegabytes  = 100
