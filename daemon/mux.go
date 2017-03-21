@@ -1330,7 +1330,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
 	if fileHandle == nil {
-		c.elog("Read failed", fileHandle)
+		c.elog("Read failed %d", fileHandle)
 		return nil, fuse.ENOENT
 	}
 
