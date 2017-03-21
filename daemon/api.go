@@ -93,11 +93,11 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
-func (wsr *ApiInode) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (wsr *ApiInode) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Api doesn't support record fetch")
-	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
@@ -556,8 +556,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	defer parent.Lock().Unlock()
 	if record := parent.children.recordByName(c, target); record != nil {
-		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"Inode %s should not exist", target)
+		c.vlog("Removing target in preparation for replacement")
+		parent.delChild_(c, target)
 	}
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
@@ -566,6 +566,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	parent.duplicateInode_(c, target, permissions, 0, 0, size,
 		quantumfs.UID(uid), quantumfs.GID(gid),
 		type_, key)
+	parent.self.dirty(c)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }

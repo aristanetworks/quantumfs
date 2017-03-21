@@ -1,17 +1,17 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#ifndef QFS_CLIENT_UTIL_H_
-#define QFS_CLIENT_UTIL_H_
+#ifndef QFSCLIENT_QFS_CLIENT_UTIL_H_
+#define QFSCLIENT_QFS_CLIENT_UTIL_H_
+
+#include <jansson.h>
 
 #include <string>
 #include <vector>
 
-#include <jansson.h>
-
-#include "qfs_client.h"
-#include "qfs_client_implementation.h"
-#include "qfs_client_data.h"
+#include "QFSClient/qfs_client.h"
+#include "QFSClient/qfs_client_implementation.h"
+#include "QFSClient/qfs_client_data.h"
 
 namespace qfsclient {
 namespace util {
@@ -52,10 +52,18 @@ std::string buildJsonErrorDetails(const std::string &error, const char *json);
 // replace all single quotes in the given string with double quotes. This is
 // to make string literals containing JSON more readable, since double quote
 // characters are very common in JSON but need to be escaped in string literals.
-void requote(std::string &s);
+void requote(std::string *s);
 
-} // namespace util
-} // namespace qfsclient
+// Encode a block of data (stored in a std::vector<byte> as a base64 string,
+// storing the result in the std::string pointed to by the b64 parameter.
+void base64_encode(const std::vector<byte> &data, std::string *b64);
 
-#endif // QFS_CLIENT_UTIL_H_
+// Decode a base64 string into a block of data that will be stored in the
+// std::vector<byte> pointed to by the data parameter.
+void base64_decode(const std::string &b64, std::vector<byte> *data);
+
+}  // namespace util
+}  // namespace qfsclient
+
+#endif  // QFSCLIENT_QFS_CLIENT_UTIL_H_
 

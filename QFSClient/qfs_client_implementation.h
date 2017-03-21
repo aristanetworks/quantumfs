@@ -1,25 +1,23 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-#ifndef QFS_CLIENT_IMPLEMENTATION_H_
-#define QFS_CLIENT_IMPLEMENTATION_H_
+#ifndef QFSCLIENT_QFS_CLIENT_IMPLEMENTATION_H_
+#define QFSCLIENT_QFS_CLIENT_IMPLEMENTATION_H_
+
+#include "QFSClient/qfs_client.h"
 
 #include <stdint.h>
 #include <sys/types.h>
+
+#include <gtest/gtest_prod.h>
+#include <jansson.h>
 
 #include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include <gtest/gtest_prod.h>
-#include <jansson.h>
-
-#include "qfs_client.h"
-
 namespace qfsclient {
-
-typedef uint8_t byte;
 
 const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
@@ -28,7 +26,7 @@ const int kInodeIdApi = 2;
 // passed between functions used to handle an API call and should should be created
 // on the stack so that useful cleanup happens automatically.
 class ApiContext {
-public:
+ public:
 	ApiContext();
 	~ApiContext();
 
@@ -38,7 +36,7 @@ public:
 	void SetResponseJsonObject(json_t *response_json_object);
 	json_t *GetResponseJsonObject() const;
 
-private:
+ private:
 	json_t *request_json_object;
 	json_t *response_json_object;
 };
@@ -75,15 +73,21 @@ class ApiImpl: public Api {
 	void Close();
 
 	// implemented API functions
-	Error GetAccessed(const char *workspace_root);
+	virtual Error GetAccessed(const char *workspace_root);
 
-	Error InsertInode(const char *destination,
-			  const char *key,
-			  uint32_t permissions,
-			  uint32_t uid,
-			  uint32_t gid);
+	virtual Error InsertInode(const char *destination,
+				  const char *key,
+				  uint32_t permissions,
+				  uint32_t uid,
+				  uint32_t gid);
 
-	Error Branch(const char *source, const char *destination);
+	virtual Error Branch(const char *source, const char *destination);
+
+	virtual Error SetBlock(const std::vector<byte> &key,
+			       const std::vector<byte> &data);
+
+	virtual Error GetBlock(const std::vector<byte> &key,
+			       std::vector<byte> *data);
 
  private:
 	// CommandBuffer is used internally to store the raw content of a command to
@@ -224,7 +228,7 @@ class ApiImpl: public Api {
 	FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
 };
 
-} // namespace qfsclient
+}  // namespace qfsclient
 
-#endif // QFS_CLIENT_IMPLEMENTATION_H_
+#endif  // QFSCLIENT_QFS_CLIENT_IMPLEMENTATION_H_
 
