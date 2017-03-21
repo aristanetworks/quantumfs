@@ -15,19 +15,14 @@ func specialCreate(test *testHelper, filetype uint32) {
 		0x12345678)
 	test.assert(err == nil, "Error creating node: %v", err)
 
-	confirm := func(workspace string) {
+	confirm := func(filepath string, expectedNlink uint64) {
 		var stat syscall.Stat_t
-		err = syscall.Stat(testFilename, &stat)
+		err = syscall.Stat(filepath, &stat)
 		test.assert(err == nil, "Error stat'ing test file: %v", err)
 		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
 
-		if filetype == syscall.S_IFREG {
-			test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
-				stat.Nlink)
-		} else {
-			test.assert(stat.Nlink == 1, "Incorrect Nlink: %d",
-				stat.Nlink)
-		}
+		test.assert(stat.Nlink == expectedNlink, "Incorrect Nlink: %d",
+			stat.Nlink)
 
 		if filetype == syscall.S_IFBLK || filetype == syscall.S_IFCHR {
 			test.assert(stat.Rdev == 0x12345678,
@@ -45,11 +40,18 @@ func specialCreate(test *testHelper, filetype uint32) {
 			expectedPermissions, stat.Mode)
 	}
 
-	confirm(workspace)
+	confirm(testFilename, 1)
+
+	// Ensure hardlinks work too
+	testLinkname := testFilename + "_link"
+	err = syscall.Link(testFilename, testLinkname)
+	test.assertNoErr(err)
+	confirm(testLinkname, 2)
 
 	// Branch and confirm everything is still correct
 	workspace = test.absPath(test.branchWorkspace(workspace))
-	confirm(workspace)
+	confirm(workspace+"/test", 2)
+	confirm(workspace+"/test_link", 2)
 }
 
 func TestBlockDevCreation(t *testing.T) {
