@@ -9,6 +9,7 @@ import "bytes"
 import "io/ioutil"
 import "os"
 import "strconv"
+import "syscall"
 import "testing"
 import "time"
 
@@ -89,7 +90,7 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		fileId := test.getInodeNum(fileName)
 
 		// Now force the kernel to drop all cached inodes
-		remountFilesystem(test)
+		test.remountFilesystem()
 		test.assertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 		test.syncAllWorkspaces()

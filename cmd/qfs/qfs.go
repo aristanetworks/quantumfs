@@ -43,6 +43,9 @@ func main() {
 			" in octal format")
 		fmt.Println("  deleteWorkspace <workspace>")
 		fmt.Println("         - delete <workspace> from the WorkspaceDB")
+		fmt.Println("  enableRootWrite <workspace>")
+		fmt.Println("         - enable <workspace> the write permission")
+
 		os.Exit(exitBadCmd)
 	}
 
@@ -66,6 +69,8 @@ func main() {
 		sync()
 	case "deleteWorkspace":
 		deleteWorkspace()
+	case "enableRootWrite":
+		enableRootWrite()
 	}
 }
 
@@ -186,6 +191,24 @@ func deleteWorkspace() {
 
 	if err := api.DeleteWorkspace(workspace); err != nil {
 		fmt.Println("Delete failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func enableRootWrite() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for enable workspace" +
+			" write permission")
+		os.Exit(exitBadArgs)
+	}
+
+	workspace := flag.Arg(1)
+
+	fmt.Printf("Enabling workspace \"%s\" the write permission\n", workspace)
+	api := quantumfs.NewApi()
+
+	if err := api.EnableRootWrite(workspace); err != nil {
+		fmt.Println("EnableRootWrite failed:", err)
 		os.Exit(exitBadArgs)
 	}
 }
