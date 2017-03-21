@@ -44,6 +44,14 @@ type logscanError struct {
 var errorMutex sync.Mutex
 var errorLogs []logscanError
 
+type timeData struct {
+	duration time.Duration
+	testName string
+}
+
+var timeMutex sync.Mutex
+var timeBuckets []timeData
+
 func noStdOut(format string, args ...interface{}) error {
 	// Do nothing
 	return nil
@@ -52,20 +60,34 @@ func noStdOut(format string, args ...interface{}) error {
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test, true)
+	runTestCommon(t, test, true, nil)
 }
 
 // If you need to initialize the QuantumFS instance in some special way, then use
 // this variant.
 func runTestNoQfs(t *testing.T, test quantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test, false)
+	runTestCommon(t, test, false, nil)
+}
+
+type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
+
+// If you need to initialize QuantumFS with a special configuration, but not poke
+// into its internals before the test proper begins, use this.
+//
+// configModifier is a function which is given the default configuration and should
+// make whichever modifications the test requires in place.
+func runTestCustomConfig(t *testing.T, configModifier configModifierFunc,
+	test quantumFsTest) {
+
+	t.Parallel()
+	runTestCommon(t, test, true, configModifier)
 }
 
 // If you need to initialize the QuantumFS instance in some special way and the test
 // is relatively expensive, then use this variant.
 func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, false)
+	runTestCommon(t, test, false, nil)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -73,10 +95,12 @@ func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
 func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, true)
+	runTestCommon(t, test, true, nil)
 }
 
-func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
+func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
+	configModifier configModifierFunc) {
+
 	// Since we grab the test name from the backtrace, it must always be an
 	// identical number of frames back to the name of the test. Otherwise
 	// multiple tests will end up using the same temporary directory and nothing
@@ -109,20 +133,36 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
 	// failures due to timeouts caused by system slowness as we try to mount
 	// dozens of FUSE filesystems at once.
 	if startDefaultQfs {
-		th.startDefaultQuantumFs()
+		config := th.defaultConfig()
+		if configModifier != nil {
+			configModifier(th, &config)
+		}
+
+		th.startQuantumFs(config)
 	}
 
 	th.log("Finished test preamble, starting test proper")
+	beforeTest := time.Now()
 	go th.execute(test)
 
 	var testResult string
 
 	select {
-	case <-time.After(1000 * time.Millisecond):
+	case <-time.After(1500 * time.Millisecond):
 		testResult = "ERROR: TIMED OUT"
 
 	case testResult = <-th.testResult:
 	}
+
+	// Record how long the test took so we can make a histogram
+	afterTest := time.Now()
+	timeMutex.Lock()
+	timeBuckets = append(timeBuckets,
+		timeData{
+			duration: afterTest.Sub(beforeTest),
+			testName: testName,
+		})
+	timeMutex.Unlock()
 
 	if !th.shouldFail && testResult != "" {
 		th.log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
@@ -619,7 +659,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 func (th *testHelper) getInodeNum(path string) InodeId {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
-	th.assert(err == nil, "Error grabbing file inode: %v", err)
+	th.assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
 
 	return InodeId(stat.Ino)
 }
@@ -693,6 +733,7 @@ func TestMain(m *testing.M) {
 
 	// Setup an array for tests with errors to be logscanned later
 	errorLogs = make([]logscanError, 0)
+	timeBuckets = make([]timeData, 0)
 
 	result := m.Run()
 
@@ -720,8 +761,13 @@ func TestMain(m *testing.M) {
 	for summary := range fullLogs {
 		testSummary += summary
 	}
+	outputTimeGraph := strings.Contains(testSummary, "TIMED OUT")
 	errorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
+
+	if outputTimeGraph {
+		outputTimeHistogram()
+	}
 
 	os.RemoveAll(testRunDir)
 	os.Exit(result)
@@ -784,6 +830,14 @@ func (th *testHelper) assertLogDoesNotContain(text string, failMsg string) {
 }
 
 func (th *testHelper) assertTestLog(logs []TLA) {
+	contains := th.messagesInTestLog(logs)
+
+	for i, tla := range logs {
+		th.assert(contains[i] == tla.mustContain, tla.failMsg)
+	}
+}
+
+func (th *testHelper) messagesInTestLog(logs []TLA) []bool {
 	logFile := th.tempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
@@ -799,9 +853,26 @@ func (th *testHelper) assertTestLog(logs []TLA) {
 		}
 	}
 
-	for idx, tla := range logs {
-		th.assert(containChecker[idx] == tla.mustContain, tla.failMsg)
+	return containChecker
+}
+
+func (th *testHelper) testLogContains(text string) bool {
+	return th.allTestLogsMatch([]TLA{TLA{true, text, ""}})
+}
+
+func (th *testHelper) testLogDoesNotContain(text string) bool {
+	return th.allTestLogsMatch([]TLA{TLA{false, text, ""}})
+}
+
+func (th *testHelper) allTestLogsMatch(logs []TLA) bool {
+	contains := th.messagesInTestLog(logs)
+
+	for i, tla := range logs {
+		if contains[i] != tla.mustContain {
+			return false
+		}
 	}
+	return true
 }
 
 type crashOnWrite struct {
@@ -812,6 +883,58 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 	buf []byte) (uint32, fuse.Status) {
 
 	panic("Intentional crash")
+}
+
+func outputTimeHistogram() {
+	timeMutex.Lock()
+	histogram := make([][]string, 20)
+	maxValue := 0
+	msPerBucket := 100.0
+	for i := 0; i < len(timeBuckets); i++ {
+		bucketIdx := int(timeBuckets[i].duration.Seconds() *
+			(1000.0 / msPerBucket))
+		if bucketIdx >= len(histogram) {
+			bucketIdx = len(histogram) - 1
+		}
+		histogram[bucketIdx] = append(histogram[bucketIdx],
+			timeBuckets[i].testName)
+
+		if len(histogram[bucketIdx]) > maxValue {
+			maxValue = len(histogram[bucketIdx])
+		}
+	}
+	timeMutex.Unlock()
+
+	// Scale outputs to fit into 60 columns wide
+	scaler := 1.0
+	if maxValue > 60 {
+		scaler = 60.0 / float64(maxValue)
+	}
+
+	fmt.Println("Test times:")
+	for i := len(histogram) - 1; i >= 0; i-- {
+		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
+
+		scaled := int(float64(len(histogram[i])) * scaler)
+		if scaled == 0 && len(histogram[i]) > 0 {
+			scaled = 1
+		}
+
+		for j := 0; j < scaled; j++ {
+			fmt.Printf("#")
+		}
+		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
+			fmt.Printf("(")
+			for j := 0; j < len(histogram[i]); j++ {
+				if j != 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("%s", histogram[i][j])
+			}
+			fmt.Printf(")")
+		}
+		fmt.Println()
+	}
 }
 
 // If a quantumfs test fails then it may leave the filesystem mount hanging around in
@@ -1075,4 +1198,21 @@ func (test *testHelper) assertNoErr(err error) {
 	if err != nil {
 		test.assert(false, err.Error())
 	}
+}
+
+func (test *testHelper) remountFilesystem() {
+	test.log("Remounting filesystem")
+	err := syscall.Mount("", test.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
+	test.assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
+}
+
+// Modify the QuantumFS cache time to 100 milliseconds
+func cacheTimeout100Ms(test *testHelper, config *QuantumFsConfig) {
+	config.CacheTimeSeconds = 0
+	config.CacheTimeNsecs = 100000
+}
+
+// Modify the QuantumFS flush delay to 100 milliseconds
+func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
+	config.DirtyFlushDelay = 100 * time.Millisecond
 }

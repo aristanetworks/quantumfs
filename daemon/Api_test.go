@@ -5,6 +5,7 @@ package daemon
 
 // Test the various Api calls
 
+import "fmt"
 import "os"
 import "syscall"
 import "testing"
@@ -75,12 +76,12 @@ func TestApiClearAccessList(t *testing.T) {
 	})
 }
 
-func getExtendedKeyHelper(test *testHelper, dst string, type_ string) []byte {
+func getExtendedKeyHelper(test *testHelper, dst string, type_ string) string {
 	key := make([]byte, quantumfs.ExtendedKeyLength)
 	sz, err := syscall.Getxattr(dst, quantumfs.XAttrTypeKey, key)
 	test.assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 		"Error getting the key of %s: %v with a size of %d", type_, err, sz)
-	return key
+	return string(key)
 }
 
 func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
@@ -138,26 +139,18 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	test.assert(err == nil, "Error creating target directories: %v", err)
 
 	// Ensure the workspace root cannot be duplicated
-	err = api.InsertInode(dst, string(keyF), PermissionA, uid, gid)
+	err = api.InsertInode(dst, keyF, PermissionA, uid, gid)
 	test.assert(err != nil,
 		"Unexpected success duplicating workspace root")
 
 	// Ensure the non-existing intermediate Inode not be created
-	err = api.InsertInode(dst+"/nonExist/b", string(keyF),
-		PermissionA, uid, gid)
+	err = api.InsertInode(dst+"/nonExist/b", keyF, PermissionA, uid, gid)
 	test.assert(err != nil,
 		"Unexpected success creating non-existing intermediate"+
 			" Inode")
 
-	// Ensure the target node does not exist
-	err = api.InsertInode(dst+"/test/a", string(keyF),
-		PermissionA, uid, gid)
-	test.assert(err != nil,
-		"Error having the target node already")
-
 	// Duplicate the file in the given path
-	err = api.InsertInode(dst+"/test/a/file", string(keyF),
-		PermissionA, uid, gid)
+	err = api.InsertInode(dst+"/test/a/file", keyF, PermissionA, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a file to target workspace: %v", err)
 
@@ -191,8 +184,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		stat.Gid, expectedGid)
 
 	// Duplicate the directory in the given path
-	err = api.InsertInode(dst+"/test/a/dirtest", string(keyD),
-		PermissionA, uid, gid)
+	err = api.InsertInode(dst+"/test/a/dirtest", keyD, PermissionA, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a directory to target workspace: %v",
 		err)
@@ -212,12 +204,6 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	test.assert(err == nil, "Error getting status of child file: %v",
 		err)
 
-	// Ensure the no intermediate inode is a file
-	err = api.InsertInode(dst+"/test/a/dirtest/test", string(keyF),
-		PermissionA, uid, gid)
-	test.assert(err != nil,
-		"Unexpected success creating a file inside of a file")
-
 	// check the child is a file
 	expectedMode = syscall.S_IFREG | PermissionB
 	test.assert(stat.Mode == expectedMode,
@@ -225,8 +211,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		expectedMode, stat.Mode)
 
 	// Ensure the symlink in the given path
-	err = api.InsertInode(dst+"/symlink", string(keyS),
-		PermissionB, uid, gid)
+	err = api.InsertInode(dst+"/symlink", string(keyS), PermissionB, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a symlink to workspace: %v", err)
 
@@ -240,8 +225,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		expectedMode, stat.Mode, stat.Size)
 
 	// Ensure the pipe file in the given path
-	err = api.InsertInode(dst+"/Pipe", string(keyP),
-		PermissionB, uid, gid)
+	err = api.InsertInode(dst+"/Pipe", keyP, PermissionB, uid, gid)
 	test.assert(err == nil,
 		"Error duplicating a pipe file to workspace: %v", err)
 
@@ -265,6 +249,154 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ApiInsertInodeTest(test, 10100, 10999)
 	})
+}
+
+func TestApiInsertOverExisting(t *testing.T) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		dirtyDelay100Ms(test, config)
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
+		testApiInsertOverExisting(test, nil, nil)
+	})
+}
+
+func TestApiInsertOverExistingOpenInodes(t *testing.T) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		dirtyDelay100Ms(test, config)
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
+		var dir2 *os.File
+		var file2 int
+
+		defer func() {
+			syscall.Close(file2)
+			dir2.Close()
+		}()
+
+		openInodes := func(workspace string) {
+			var err error
+			dir2, err = os.Open(workspace + "/dir1/dir2")
+			test.assertNoErr(err)
+			_, err = dir2.Readdirnames(2)
+			test.assertNoErr(err)
+
+			file2, err = syscall.Open(workspace+"/dir1/dir2/file2",
+				os.O_RDWR, 0)
+			test.assertNoErr(err)
+		}
+
+		checkInodes := func(workspace string) {
+			_, err := dir2.Seek(0, os.SEEK_SET)
+			test.assertNoErr(err)
+			_, err = dir2.Readdirnames(-1)
+			test.assertNoErr(err)
+
+			test.log("Reading from file")
+			buf := make([]byte, 100, 100)
+			n, err := syscall.Read(file2, buf)
+			test.assertNoErr(err)
+			test.assert(n > 0, "Read no bytes from deleted file: %d", n)
+
+			test.log("Writing to file")
+			n, err = syscall.Write(file2, []byte("arstarstarst"))
+			test.assertNoErr(err)
+			test.assert(n > 0, "Wrote no bytes to deleted file: %d", n)
+		}
+
+		testApiInsertOverExisting(test, openInodes, checkInodes)
+	})
+}
+
+func TestApiInsertOverExistingForget(t *testing.T) {
+	configModifier := func(test *testHelper, config *QuantumFsConfig) {
+		cacheTimeout100Ms(test, config)
+		dirtyDelay100Ms(test, config)
+	}
+
+	runTestCustomConfig(t, configModifier, func(test *testHelper) {
+		messages := make([]TLA, 0, 10)
+
+		findInodes := func(workspace string) {
+			for _, file := range []string{"/dir1/file1",
+				"/dir1/dir2/file2", "/dir1/dir2/dir3/file3"} {
+
+				inodeNum := test.getInodeNum(workspace + file)
+				msg := fmt.Sprintf("Forget called on inode %d",
+					inodeNum)
+				tla := TLA{
+					mustContain: true,
+					text:        msg,
+					failMsg:     "Subtree inode not forgotten",
+				}
+				messages = append(messages, tla)
+			}
+		}
+
+		triggerForget := func(workspace string) {
+			test.remountFilesystem()
+		}
+
+		testApiInsertOverExisting(test, findInodes, triggerForget)
+
+		test.assertTestLog(messages)
+	})
+}
+
+func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
+	tamper2 func(workspace string)) {
+
+	srcWorkspace := test.newWorkspace()
+	dir1 := srcWorkspace + "/dir1"
+	dir2 := dir1 + "/dir2"
+	dir3 := dir2 + "/dir3"
+
+	err := os.MkdirAll(srcWorkspace+"/dir1/dir2/dir3", 0777)
+	test.assertNoErr(err)
+
+	err = printToFile(dir1+"/file1", "")
+	test.assertNoErr(err)
+	err = printToFile(dir2+"/file2", "oienoenoienoin")
+	test.assertNoErr(err)
+	err = printToFile(dir3+"/file3", "")
+	test.assertNoErr(err)
+
+	dstWorkspace := test.absPath(test.branchWorkspace(srcWorkspace))
+
+	// Create one marker file in srcWorkspace and dstWorkspace
+	err = printToFile(dir1+"/srcMarker", "")
+	test.assertNoErr(err)
+	err = printToFile(dstWorkspace+"/dir1/dstMarker", "")
+	test.assertNoErr(err)
+
+	if tamper1 != nil {
+		tamper1(dstWorkspace)
+	}
+
+	dir1Key := getExtendedKeyHelper(test, dir1, "dir1 key")
+
+	api := test.getApi()
+
+	err = api.InsertInode(test.relPath(dstWorkspace)+"/dir1", dir1Key,
+		0777, 0, 0)
+	test.assertNoErr(err)
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Now dir1/dstMarker should not exist and dir1/srcMarker should
+	file, err := os.Open(dstWorkspace + "/dir1/dstMarker")
+	test.assert(err != nil, "dstMarker still exists!")
+
+	file, err = os.Open(srcWorkspace + "/dir1/srcMarker")
+	test.assertNoErr(err)
+	defer file.Close()
+
+	if tamper2 != nil {
+		tamper2(dstWorkspace)
+	}
 }
 
 func TestApiNoRequestBlockingRead(t *testing.T) {
@@ -295,12 +427,7 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 }
 
 func TestWorkspaceDeletion(t *testing.T) {
-	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		config := test.defaultConfig()
-		config.CacheTimeSeconds = 0
-		config.CacheTimeNsecs = 100000
-		test.startQuantumFs(config)
-
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		api := test.getApi()
 
 		ws1 := test.newWorkspace()
