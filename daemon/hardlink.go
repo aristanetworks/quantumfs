@@ -14,7 +14,7 @@ func (v HardlinkId) Primitive() interface{} {
 	return uint64(v)
 }
 
-// Should implement DirectoryRecordIf
+// Should implement quantumfs.DirectoryRecord
 type Hardlink struct {
 	name   string
 	linkId HardlinkId
@@ -46,10 +46,10 @@ func newHardlink(name string, linkId HardlinkId, wsr *WorkspaceRoot) *Hardlink {
 	return &newLink
 }
 
-func (link *Hardlink) get() *quantumfs.DirectoryRecord {
+func (link *Hardlink) get() *quantumfs.DirectRecord {
 	valid, link_ := link.wsr.getHardlink(link.linkId)
 	if !valid {
-		// This class shouldn't even exist if the hardlink's invalid
+		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
 			link.linkId))
 	}
@@ -57,7 +57,7 @@ func (link *Hardlink) get() *quantumfs.DirectoryRecord {
 	return &link_
 }
 
-func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectoryRecord)) {
+func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectRecord)) {
 	link.wsr.setHardlink(link.linkId, fnSetter)
 }
 
@@ -88,7 +88,13 @@ func (link *Hardlink) Type() quantumfs.ObjectType {
 }
 
 func (link *Hardlink) SetType(v quantumfs.ObjectType) {
-	panic("SetType called on hardlink")
+	if v == quantumfs.ObjectTypeHardlink {
+		panic("SetType called making hardlink")
+	}
+
+	link.set(func(dir *quantumfs.DirectRecord) {
+		dir.SetType(v)
+	})
 }
 
 func (link *Hardlink) Permissions() uint32 {
@@ -96,7 +102,7 @@ func (link *Hardlink) Permissions() uint32 {
 }
 
 func (link *Hardlink) SetPermissions(v uint32) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetPermissions(v)
 	})
 }
@@ -106,7 +112,7 @@ func (link *Hardlink) Owner() quantumfs.UID {
 }
 
 func (link *Hardlink) SetOwner(v quantumfs.UID) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetOwner(v)
 	})
 }
@@ -116,7 +122,7 @@ func (link *Hardlink) Group() quantumfs.GID {
 }
 
 func (link *Hardlink) SetGroup(v quantumfs.GID) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetGroup(v)
 	})
 }
@@ -126,7 +132,7 @@ func (link *Hardlink) Size() uint64 {
 }
 
 func (link *Hardlink) SetSize(v uint64) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetSize(v)
 	})
 }
@@ -136,7 +142,7 @@ func (link *Hardlink) ExtendedAttributes() quantumfs.ObjectKey {
 }
 
 func (link *Hardlink) SetExtendedAttributes(v quantumfs.ObjectKey) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetExtendedAttributes(v)
 	})
 }
@@ -146,7 +152,7 @@ func (link *Hardlink) ContentTime() quantumfs.Time {
 }
 
 func (link *Hardlink) SetContentTime(v quantumfs.Time) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetContentTime(v)
 	})
 }
@@ -156,16 +162,18 @@ func (link *Hardlink) ModificationTime() quantumfs.Time {
 }
 
 func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
-	link.set(func(dir *quantumfs.DirectoryRecord) {
+	link.set(func(dir *quantumfs.DirectRecord) {
 		dir.SetModificationTime(v)
 	})
 }
 
-func (link *Hardlink) Record() quantumfs.DirectoryRecord {
+func (link *Hardlink) Record() quantumfs.DirectRecord {
+	// Note: this is a DirectRecord shallow copy type
 	rtn := quantumfs.NewDirectoryRecord()
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
 	rtn.SetID(encodeHardlinkId(link.linkId))
 	rtn.SetFilename(link.name)
+
 	// we only need to return a thin record - just enough information to
 	// create the hardlink. The rest is stored in workspaceroot.
 
@@ -179,11 +187,42 @@ func (link *Hardlink) Nlinks() uint32 {
 func (link *Hardlink) EncodeExtendedKey() []byte {
 	valid, realRecord := link.wsr.getHardlink(link.linkId)
 	if !valid {
-		// This class shouldn't even exist if the hardlink's invalid
+		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
 			link.linkId))
 	}
 
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
 		realRecord.Size())
+}
+
+func (link *Hardlink) ShallowCopy() quantumfs.DirectoryRecord {
+	valid, realRecord := link.wsr.getHardlink(link.linkId)
+	if !valid {
+		// This object shouldn't even exist if the hardlink's invalid
+		panic(fmt.Sprintf("Unable to get record for existing link %d",
+			link.linkId))
+	}
+
+	// Note that this is a DirectRecord shallow copy type
+	newEntry := quantumfs.NewDirectoryRecord()
+
+	newEntry.SetID(realRecord.ID())
+	newEntry.SetType(realRecord.Type())
+	newEntry.SetSize(realRecord.Size())
+
+	newEntry.SetNlinks(link.Nlinks())
+	newEntry.SetFilename(link.Filename())
+	newEntry.SetPermissions(link.Permissions())
+	newEntry.SetOwner(link.Owner())
+	newEntry.SetGroup(link.Group())
+	newEntry.SetExtendedAttributes(link.ExtendedAttributes())
+	newEntry.SetContentTime(link.ContentTime())
+	newEntry.SetModificationTime(link.ModificationTime())
+
+	return newEntry
+}
+
+func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
+	return newHardlink(link.name, link.linkId, link.wsr)
 }

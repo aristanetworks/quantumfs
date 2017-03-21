@@ -35,12 +35,12 @@ type WorkspaceRoot struct {
 }
 
 type linkEntry struct {
-	record  *quantumfs.DirectoryRecord
+	record  *quantumfs.DirectRecord
 	nlink   uint32
 	inodeId InodeId
 }
 
-func newLinkEntry(record_ *quantumfs.DirectoryRecord) linkEntry {
+func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
 	return linkEntry{
 		record:  record_,
 		nlink:   2,
@@ -182,7 +182,7 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 }
 
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
-	record DirectoryRecordIf) *Hardlink {
+	record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).out()
 
@@ -190,9 +190,9 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 		panic("newHardlink called on existing hardlink")
 	}
 
-	dirRecord, isRecord := record.(*quantumfs.DirectoryRecord)
+	dirRecord, isRecord := record.(*quantumfs.DirectRecord)
 	if !isRecord {
-		panic("newHardlink called on non-DirectoryRecord")
+		panic("newHardlink called on non-DirectRecord")
 	}
 
 	defer wsr.linkLock.Lock().Unlock()
@@ -219,10 +219,9 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 	[]InodeId) {
 
-	c.vlog("WorkspaceRoot::instantiateChild Enter %d", inodeNum)
-	defer c.vlog("WorkspaceRoot::instantiateChild Exit")
+	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeNum).out()
 
-	hardlinkRecord := func() *quantumfs.DirectoryRecord {
+	hardlinkRecord := func() *quantumfs.DirectRecord {
 		defer wsr.linkLock.RLock().RUnlock()
 
 		id, exists := wsr.inodeToLink[inodeNum]
@@ -268,7 +267,7 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
 func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
-	record DirectoryRecordIf) {
+	record quantumfs.DirectoryRecord) {
 
 	defer wsr.linkLock.RLock().RUnlock()
 
@@ -287,7 +286,7 @@ func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 
 // Return a snapshot / instance so that it's concurrency safe
 func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
-	record quantumfs.DirectoryRecord) {
+	record quantumfs.DirectRecord) {
 
 	defer wsr.linkLock.RLock().RUnlock()
 
@@ -296,11 +295,11 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 		return true, *(link.record)
 	}
 
-	return false, quantumfs.DirectoryRecord{}
+	return false, quantumfs.DirectRecord{}
 }
 
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
-	linkId HardlinkId) (record DirectoryRecordIf, inodeId InodeId) {
+	linkId HardlinkId) (record quantumfs.DirectoryRecord, inodeId InodeId) {
 
 	defer c.FuncIn("WorkspaceRoot::removeHardlink", "link %d", linkId).out()
 
@@ -343,7 +342,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 
 // We need the wsr lock to cover setting safely
 func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
-	fnSetter func(dir *quantumfs.DirectoryRecord)) {
+	fnSetter func(dir *quantumfs.DirectRecord)) {
 
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -515,15 +514,10 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			}
 
 			entry.SetID(newKey)
-
-			defer wsr.Directory.childRecordLock.Lock().Unlock()
-			wsr.Directory.publish_(c)
 		}()
 	} else {
 		wsr.Directory.syncChild(c, inodeNum, newKey)
 	}
-
-	wsr.publish(c)
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -586,10 +580,10 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	return wsr.rootId
 }
 
-func (wsr *WorkspaceRoot) childInodes() []InodeId {
+func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	defer wsr.Lock().Unlock()
 
-	directChildren := wsr.Directory.childInodes()
+	directChildren := wsr.Directory.directChildInodes()
 
 	for inodeNum, _ := range wsr.inodeToLink {
 		directChildren = append(directChildren, inodeNum)
