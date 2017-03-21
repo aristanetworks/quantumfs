@@ -22,6 +22,18 @@ func assert(condition bool, format string, args ...interface{}) {
 	}
 }
 
+func newCtx() *quantumfs.Ctx {
+	// Create  Ctx with random RequestId
+	Qlog := qlog.NewQlogTiny()
+	requestId := qlog.TestReqId
+	ctx := &quantumfs.Ctx{
+		Qlog:      Qlog,
+		RequestId: requestId,
+	}
+
+	return ctx
+}
+
 // Verify the Set() in processlocal/datastore. With an identical key, the datastore
 // should only update map once
 func TestIdenticalContentSync(t *testing.T) {
@@ -32,13 +44,7 @@ func TestIdenticalContentSync(t *testing.T) {
 	data := []byte("This is a source file")
 	data2 := []byte("This is a comparison file")
 
-	// Create  Ctx with random RequestId
-	Qlog := qlog.NewQlogTiny()
-	requestId := qlog.TestReqId
-	ctx := &quantumfs.Ctx{
-		Qlog:      Qlog,
-		RequestId: requestId,
-	}
+	ctx := newCtx()
 
 	// Generate an unique key for Set()
 	key_byte := []byte("40123456789abcdefghijklmnopq")

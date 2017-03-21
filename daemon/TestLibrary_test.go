@@ -93,7 +93,7 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool) {
 	th := &testHelper{
 		t:          t,
 		testName:   testName,
-		testResult: make(chan string),
+		testResult: make(chan string, 2), /* must be buffered */
 		startTime:  time.Now(),
 		cachePath:  cachePath,
 		logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
@@ -160,6 +160,8 @@ func (th *testHelper) execute(test quantumFsTest) {
 			result += "\nStack Trace:\n" + trace
 		}
 
+		// This can hang if the channel isn't buffered because in some rare
+		// situations the other side isn't there to read from the channel
 		th.testResult <- result
 	}(th)
 
