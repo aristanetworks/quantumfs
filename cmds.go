@@ -88,12 +88,15 @@ type CommandCommon struct {
 
 // The various command ID constants
 const (
-	CmdError         = iota
-	CmdBranchRequest = iota
-	CmdGetAccessed   = iota
-	CmdClearAccessed = iota
-	CmdSyncAll       = iota
-	CmdInsertInode   = iota
+	CmdError           = iota
+	CmdBranchRequest   = iota
+	CmdGetAccessed     = iota
+	CmdClearAccessed   = iota
+	CmdSyncAll         = iota
+	CmdInsertInode     = iota
+	CmdDeleteWorkspace = iota
+	CmdSetBlock        = iota
+	CmdGetBlock        = iota
 )
 
 // The various error codes
@@ -104,7 +107,10 @@ const (
 	ErrorBadCommandId  = iota // Unknown command ID
 	ErrorCommandFailed = iota // The Command failed, see the error for more info
 	ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
+	ErrorBlockTooLarge = iota // SetBlock was passed a block that was too large
 )
+
+const BufferSize = 4096
 
 type ErrorResponse struct {
 	CommandCommon
@@ -141,7 +147,26 @@ type InsertInodeRequest struct {
 	Permissions uint32
 }
 
-const BufferSize = 4096
+type DeleteWorkspaceRequest struct {
+	CommandCommon
+	WorkspacePath string
+}
+
+type SetBlockRequest struct {
+	CommandCommon
+	Key  []byte
+	Data []byte
+}
+
+type GetBlockRequest struct {
+	CommandCommon
+	Key []byte
+}
+
+type GetBlockResponse struct {
+	ErrorResponse
+	Data []byte
+}
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
@@ -299,7 +324,7 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	uid uint32, gid uint32) error {
 
 	if !isWorkspacePathValid(dst) {
-		return fmt.Errorf("\"%s\" must contain at least one \"/\"\n", dst)
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n", dst)
 	}
 
 	if !isKeyValid(key) {
@@ -333,6 +358,41 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Delete the given workspace.
+//
+// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
+func (api *Api) DeleteWorkspace(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := DeleteWorkspaceRequest{
+		CommandCommon: CommandCommon{CommandId: CmdDeleteWorkspace},
+		WorkspacePath: workspacepath,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
 	}
 	return nil
 }

@@ -87,42 +87,11 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 
 	for _, v := range list {
 		if v.Filename() == name {
-			return cmap.checkForReplace(c, v)
+			return v
 		}
 	}
 
 	return nil
-}
-
-// We need to check a record when we're returning it so that if a hardlink has nlink
-// of 1, that we turn it back into a normal file again
-func (cmap *ChildMap) checkForReplace(c *ctx,
-	record DirectoryRecordIf) DirectoryRecordIf {
-
-	if record.Type() != quantumfs.ObjectTypeHardlink {
-		return record
-	}
-
-	link := record.(*Hardlink)
-
-	// This needs to be turned back into a normal file
-	newRecord, inodeId := cmap.wsr.removeHardlink(c, link.linkId,
-		cmap.dir.inodeNum())
-
-	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
-		// wsr says hardlink isn't ready for removal yet
-		return record
-	}
-
-	// Ensure that we update this version of the record with this instance
-	// of the hardlink's information
-	newRecord.SetFilename(link.Filename())
-
-	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	cmap.setRecord(inodeId, newRecord)
-	cmap.dir.dirty(c)
-
-	return newRecord
 }
 
 // Returns the inodeId used for the child
@@ -168,14 +137,28 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	name string) (needsReparent DirectoryRecordIf) {
 
 	inodeId, exists := cmap.children[name]
-	if exists {
-		delete(cmap.children, name)
+	if !exists {
+		return nil
 	}
 
 	record := cmap.getRecord(c, inodeId, name)
 	if record == nil {
 		return nil
 	}
+
+	// This may be a hardlink that is due to be converted.
+	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
+		newRecord, inodeId := cmap.wsr.removeHardlink(c,
+			hardlink.linkId)
+
+		// Wsr says we're about to orphan the last hardlink copy
+		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
+			newRecord.SetFilename(hardlink.Filename())
+			record = newRecord
+			cmap.loadChild(c, newRecord, inodeId)
+		}
+	}
+	delete(cmap.children, name)
 
 	result := cmap.delRecord(inodeId, name)
 

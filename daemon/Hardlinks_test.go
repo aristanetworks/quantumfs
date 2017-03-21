@@ -13,30 +13,50 @@ import "syscall"
 import "testing"
 import "time"
 import "github.com/aristanetworks/quantumfs"
+import "github.com/hanwen/go-fuse/fuse"
 
 func TestHardlinkReload(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
+		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		test.assertNoErr(err)
 
 		// Create a couple files so we can copy its directory record
 		data := genData(2000)
-		testFileA := workspace + "/testFile"
-		err := printToFile(testFileA, string(data[:1000]))
+		testFileA := workspace + "/subdir/testFile"
+		err = printToFile(testFileA, string(data[:1000]))
 		test.assertNoErr(err)
 
-		testFileB := workspace + "/testFileB"
+		testFileB := workspace + "/subdir/testFileB"
 		err = printToFile(testFileB, string(data))
 		test.assertNoErr(err)
 
 		// artificially insert some hardlinks into the map
 		wsr := test.getWorkspaceRoot(workspace)
 
-		err = syscall.Link(testFileA, workspace+"/linkFileA")
+		err = syscall.Link(testFileA, workspace+"/subdir/linkFileA")
 		test.assertNoErr(err)
-		err = syscall.Link(testFileA, workspace+"/linkFileA2")
+		err = syscall.Link(testFileA,
+			workspace+"/subdir/grandchild/linkFileA2")
 		test.assertNoErr(err)
 		err = syscall.Link(testFileB, workspace+"/linkFileB")
 		test.assertNoErr(err)
+
+		// Write data to the hardlink to ensure it's syncChild function works
+		err = printToFile(workspace+"/subdir/grandchild/linkFileA2",
+			string(data[1000:]))
+		test.assertNoErr(err)
+
+		var nstat syscall.Stat_t
+		err = syscall.Stat(testFileA, &nstat)
+		test.assertNoErr(err)
+		test.assert(nstat.Nlink == 3,
+			"Nlink incorrect: %d", nstat.Nlink)
+
+		err = syscall.Stat(testFileB, &nstat)
+		test.assertNoErr(err)
+		test.assert(nstat.Nlink == 2,
+			"Nlink incorrect: %d", nstat.Nlink)
 
 		// Write another file to ensure the wsr is dirty
 		testFileC := workspace + "/testFileC"
@@ -52,6 +72,18 @@ func TestHardlinkReload(t *testing.T) {
 		test.assert(err == nil, "Unable to branch")
 
 		wsrB := test.getWorkspaceRoot(workspaceB)
+
+		// ensure that the hardlink was able to sync
+		wsrBFileA := test.absPath(workspaceB +
+			"/subdir/grandchild/linkFileA2")
+		readData, err := ioutil.ReadFile(wsrBFileA)
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(readData, data),
+			"Data not synced via hardlink")
+
+		stat, err := os.Stat(wsrBFileA)
+		test.assertNoErr(err)
+		test.assert(stat.Size() == int64(len(data)), "file length mismatch")
 
 		test.assert(len(wsr.hardlinks) == len(wsrB.hardlinks),
 			"Hardlink map length not preserved: %v %v", wsr.hardlinks,
@@ -191,6 +223,9 @@ func TestHardlinkForget(t *testing.T) {
 // When all hardlinks, but one, are deleted then we need to convert a hardlink back
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
+	// BUG 190827: Re-enable this test when that is fixed
+	t.Skip()
+
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
@@ -216,12 +251,12 @@ func TestHardlinkConversion(t *testing.T) {
 		test.assertNoErr(err)
 
 		// Ensure it's converted by performing an operation on linkFile
-		// that would trigger recordByName
-		err = os.Rename(linkFile, linkFile+"_newname")
+		// that would trigger checking if the hardlink needs conversion
+		remountFilesystem(test)
+
+		_, err = os.Stat(linkFile)
 		test.assertNoErr(err)
-		test.assertLogContains("ChildMap::recordByName",
-			"recordByName not triggered by Rename")
-		linkFile += "_newname"
+		test.syncAllWorkspaces()
 
 		// ensure we can still use the file as normal
 		err = printToFile(linkFile, string(data[1000:]))
@@ -360,16 +395,14 @@ func TestHardlinkOpenUnlink(t *testing.T) {
 }
 
 func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
-	test *testHelper, Type quantumfs.ObjectType) {
+	test *testHelper, Type quantumfs.ObjectType, wsr *WorkspaceRoot) {
 
 	key, type_, size, err := quantumfs.DecodeExtendedKey(string(extendedKey))
 	test.assert(err == nil, "Error decompressing the packet")
 
 	// Extract the internal ObjectKey from QuantumFS
 	inode := test.getInode(path)
-	parent := inode.parent(&test.qfs.c)
-	// parent should be the workspace root
-	wsr := parent.(*WorkspaceRoot)
+	// parent should be the workspace root.
 	isHardlink, linkId := wsr.checkHardlink(inode.inodeNum())
 	test.assert(isHardlink, "Expected hardlink isn't one.")
 
@@ -404,8 +437,9 @@ func TestHardlinkExtraction(t *testing.T) {
 			"Error getting the file key: %v with a size of %d",
 			err, sz)
 
+		wsr := test.getWorkspaceRoot(workspace)
 		matchXAttrHardlinkExtendedKey(filename, dst, test,
-			quantumfs.ObjectTypeSmallFile)
+			quantumfs.ObjectTypeSmallFile, wsr)
 
 		dst = make([]byte, quantumfs.ExtendedKeyLength)
 		sz, err = syscall.Getxattr(filename, quantumfs.XAttrTypeKey, dst)
@@ -414,7 +448,7 @@ func TestHardlinkExtraction(t *testing.T) {
 			err, sz)
 
 		matchXAttrHardlinkExtendedKey(linkname, dst, test,
-			quantumfs.ObjectTypeSmallFile)
+			quantumfs.ObjectTypeSmallFile, wsr)
 	})
 }
 
@@ -464,5 +498,73 @@ func TestHardlinkRename(t *testing.T) {
 			test.assert(bytes.Equal(readback, data),
 				"file %s data not preserved", v)
 		}
+	})
+}
+
+func ManualLookup(c *ctx, parent Inode, childName string) {
+	var dummy fuse.EntryOut
+	defer parent.RLockTree().RUnlock()
+	parent.Lookup(c, childName, &dummy)
+}
+
+func TestHardlinkReparentRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		var stat syscall.Stat_t
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			filename := fmt.Sprintf(workspace+"/file%d", i)
+			linkname := fmt.Sprintf(workspace+"/link%d", i)
+			file, err := os.Create(filename)
+			test.assertNoErr(err)
+
+			err = syscall.Link(filename, linkname)
+			test.assertNoErr(err)
+
+			file.WriteString("this is file data")
+			file.Close()
+
+			parent := test.getInode(workspace)
+
+			// We want to race the parent change with getting the parent
+			go os.Remove(filename)
+			go ManualLookup(&test.qfs.c, parent, filename)
+			go syscall.Stat(filename, &stat)
+			go os.Remove(linkname)
+		}
+	})
+}
+
+func TestHardlinkUninstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		test.assertNoErr(err)
+
+		filename := workspace + "/subdir/fileA"
+		linkname := workspace + "/subdir/grandchild/fileB"
+		data := genData(2000)
+
+		err = printToFile(filename, string(data))
+		test.assertNoErr(err)
+
+		err = syscall.Link(filename, linkname)
+		test.assertNoErr(err)
+
+		// trigger a sync so the workspace is published
+		test.syncAllWorkspaces()
+
+		workspaceB := "branch/copyWorkspace/test"
+		api := test.getApi()
+		err = api.Branch(test.relPath(workspace), workspaceB)
+		test.assertNoErr(err)
+
+		readData, err := ioutil.ReadFile(test.absPath(workspaceB +
+			"/subdir/grandchild/fileB"))
+		test.assertNoErr(err)
+		test.assert(bytes.Equal(readData, data),
+			"data mismatch after Branch")
 	})
 }

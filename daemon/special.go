@@ -75,7 +75,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	record, err := special.parent(c).getChildRecord(c, special.InodeCommon.id)
+	record, err := special.parentGetChildRecord(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
 		return fuse.EIO
@@ -115,7 +115,7 @@ func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	return special.parent(c).setChildAttr(c, special.InodeCommon.id,
+	return special.parentSetChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
 
@@ -274,7 +274,9 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := special.embedDataIntoKey_(c)
 
-	special.parent(c).syncChild(c, special.inodeNum(), key)
+	special.parentSyncChild(c, special.inodeNum(), func() quantumfs.ObjectKey {
+		return key
+	})
 
 	return key
 }
