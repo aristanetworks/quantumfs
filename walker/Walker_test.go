@@ -1,11 +1,7 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Test walker library by uploading files to QFS and then walking them using
-// the walker.
 package walker
-
-//import "strconv"
 
 import "flag"
 import "fmt"
@@ -16,6 +12,7 @@ import "sync"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs/daemon"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 // TODO(sid)
 // Test Walk of Dir
@@ -72,7 +69,7 @@ func TestMain(m *testing.M) {
 	origGC := debug.SetGCPercent(-1)
 
 	// Setup an array for tests with errors to be logscanned later
-	daemon.ErrorLogs = make([]daemon.LogscanError, 0)
+	testutils.ErrorLogs = make([]testutils.LogscanError, 0)
 
 	result := m.Run()
 
@@ -82,14 +79,14 @@ func TestMain(m *testing.M) {
 	runtime.GC()
 	debug.SetGCPercent(origGC)
 
-	daemon.ErrorMutex.Lock()
-	fullLogs := make(chan string, len(daemon.ErrorLogs))
+	testutils.ErrorMutex.Lock()
+	fullLogs := make(chan string, len(testutils.ErrorLogs))
 	var logProcessing sync.WaitGroup
-	for i := 0; i < len(daemon.ErrorLogs); i++ {
+	for i := 0; i < len(testutils.ErrorLogs); i++ {
 		logProcessing.Add(1)
 		go func(i int) {
 			defer logProcessing.Done()
-			testSummary := daemon.OutputLogError(daemon.ErrorLogs[i])
+			testSummary := testutils.OutputLogError(testutils.ErrorLogs[i])
 			fullLogs <- testSummary
 		}(i)
 	}
@@ -100,7 +97,7 @@ func TestMain(m *testing.M) {
 	for summary := range fullLogs {
 		testSummary += summary
 	}
-	daemon.ErrorMutex.Unlock()
+	testutils.ErrorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	os.RemoveAll(daemon.TestRunDir)

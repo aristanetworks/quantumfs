@@ -11,6 +11,7 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test daemon.QuantumFsTest) {
@@ -33,10 +34,18 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
 	cachePath := daemon.TestRunDir + "/" + testName
-	th := &daemon.TestHelper{}
-	th.Init(t, testName, make(chan string), time.Now(), cachePath,
-		qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24, daemon.NoStdOut))
 
+	th := &daemon.TestHelper{
+		TestHelper: testutils.TestHelper{
+			T:          t,
+			TestName:   testName,
+			TestResult: make(chan string, 2), /* must be buffered */
+			StartTime:  time.Now(),
+			CachePath:  cachePath,
+			Logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
+				daemon.NoStdOut),
+		},
+	}
 	th.CreateTestDirs()
 
 	defer th.EndTest()

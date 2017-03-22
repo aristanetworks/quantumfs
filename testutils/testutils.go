@@ -12,20 +12,25 @@ import "io"
 import "io/ioutil"
 import "os"
 import "runtime/debug"
+import "sort"
 import "strings"
 import "sync"
 import "syscall"
 import "testing"
 import "time"
 
-//import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 
 type QuantumFsTest func(test *TestHelper)
 
+type LogscanError struct {
+	LogFile           string
+	ShouldFailLogscan bool
+	TestName          string
+}
+
 type TestHelper struct {
-	mutex             sync.Mutex // Protects a mishmash of the members
 	T                 *testing.T
 	TestName          string
 	CachePath         string
@@ -45,19 +50,6 @@ func (th *TestHelper) Assert(condition bool, format string, args ...interface{})
 		panic(msg)
 	}
 }
-
-/*
-func (th *TestHelper) Init(t *testing.T, testName string, testResult chan string,
-	startTime time.Time, cachePath string, logger *qlog.Qlog) {
-
-	th.t = t
-	th.testName = testName
-	th.testResult = testResult
-	th.startTime = startTime
-	th.cachePath = cachePath
-	th.logger = logger
-}
-*/
 
 func (th *TestHelper) Execute(test QuantumFsTest) {
 	// Catch any panics and covert them into test failures
@@ -98,6 +90,24 @@ func (th *TestHelper) Execute(test QuantumFsTest) {
 
 func (th *TestHelper) EndTest() {
 
+	exception := recover()
+
+	if th.TempDir != "" {
+		time.Sleep(1 * time.Second)
+
+		//	if testFailed := th.logscan(); !testFailed {
+		if err := os.RemoveAll(th.TempDir); err != nil {
+			th.T.Fatalf("Failed to cleanup temporary mount "+
+				"point: %v", err)
+		}
+		//	}
+	} else {
+		th.T.Fatalf("No temporary directory available for logs")
+	}
+
+	if exception != nil {
+		th.T.Fatalf("Test failed with exception: %v", exception)
+	}
 }
 
 var TestRunDir string
@@ -130,17 +140,6 @@ func (th *TestHelper) CreateTestDirs() {
 	th.Log("Using mountpath %s", mountPath)
 
 	os.MkdirAll(th.TempDir+"/ether", 0777)
-}
-
-func (th *TestHelper) BaseInit(t *testing.T, testName string, testResult chan string,
-	startTime time.Time, cachePath string, logger *qlog.Qlog) {
-
-	th.T = t
-	th.TestName = testName
-	th.TestResult = testResult
-	th.StartTime = startTime
-	th.CachePath = cachePath
-	th.Logger = logger
 }
 
 type TLA struct {
@@ -215,61 +214,6 @@ func (th *TestHelper) FileSize(filename string) int64 {
 type TimeData struct {
 	Duration time.Duration
 	TestName string
-}
-
-var TimeMutex sync.Mutex
-var TimeBuckets []TimeData
-
-func OutputTimeHistogram() {
-	TimeMutex.Lock()
-	histogram := make([][]string, 20)
-	maxValue := 0
-	msPerBucket := 100.0
-	for i := 0; i < len(TimeBuckets); i++ {
-		bucketIdx := int(TimeBuckets[i].Duration.Seconds() *
-			(1000.0 / msPerBucket))
-		if bucketIdx >= len(histogram) {
-			bucketIdx = len(histogram) - 1
-		}
-		histogram[bucketIdx] = append(histogram[bucketIdx],
-			TimeBuckets[i].TestName)
-
-		if len(histogram[bucketIdx]) > maxValue {
-			maxValue = len(histogram[bucketIdx])
-		}
-	}
-	TimeMutex.Unlock()
-
-	// Scale outputs to fit into 60 columns wide
-	scaler := 1.0
-	if maxValue > 60 {
-		scaler = 60.0 / float64(maxValue)
-	}
-
-	fmt.Println("Test times:")
-	for i := len(histogram) - 1; i >= 0; i-- {
-		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
-
-		scaled := int(float64(len(histogram[i])) * scaler)
-		if scaled == 0 && len(histogram[i]) > 0 {
-			scaled = 1
-		}
-
-		for j := 0; j < scaled; j++ {
-			fmt.Printf("#")
-		}
-		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
-			fmt.Printf("(")
-			for j := 0; j < len(histogram[i]); j++ {
-				if j != 0 {
-					fmt.Printf(", ")
-				}
-				fmt.Printf("%s", histogram[i][j])
-			}
-			fmt.Printf(")")
-		}
-		fmt.Println()
-	}
 }
 
 func PrintToFile(filename string, data string) error {
@@ -407,4 +351,83 @@ func (th *TestHelper) Log(format string, args ...interface{}) error {
 			args...)...)
 
 	return nil
+}
+
+var ErrorMutex sync.Mutex
+var ErrorLogs []LogscanError
+
+// Check the test output for errors
+func (th *TestHelper) Logscan() (foundErrors bool) {
+	// Check the format string map for the log first to speed this up
+	logFile := th.TempDir + "/ramfs/qlog"
+	errorsPresent := qlog.LogscanSkim(logFile)
+
+	// Nothing went wrong if either we should fail and there were errors,
+	// or we shouldn't fail and there weren't errors
+	if th.ShouldFailLogscan == errorsPresent {
+		return false
+	}
+
+	// There was a problem
+	ErrorMutex.Lock()
+	ErrorLogs = append(ErrorLogs, LogscanError{
+		LogFile:           logFile,
+		ShouldFailLogscan: th.ShouldFailLogscan,
+		TestName:          th.TestName,
+	})
+	ErrorMutex.Unlock()
+
+	if !th.ShouldFailLogscan {
+		th.T.Fatalf("Test FAILED due to FATAL messages\n")
+	} else {
+		th.T.Fatalf("Test FAILED due to missing FATAL messages\n")
+	}
+
+	return true
+}
+
+func OutputLogError(errInfo LogscanError) (summary string) {
+
+	errors := make([]string, 0, 10)
+	testOutputRaw := qlog.ParseLogsRaw(errInfo.LogFile)
+	sort.Sort(qlog.SortByTimePtr(testOutputRaw))
+
+	var buffer bytes.Buffer
+
+	extraLines := 0
+	for _, rawLine := range testOutputRaw {
+		line := rawLine.ToString()
+		buffer.WriteString(line)
+
+		if strings.Contains(line, "PANIC") ||
+			strings.Contains(line, "WARN") ||
+			strings.Contains(line, "ERROR") {
+			extraLines = 2
+		}
+
+		// Output a couple extra lines after an ERROR
+		if extraLines > 0 {
+			// ensure a single line isn't ridiculously long
+			if len(line) > 255 {
+				line = line[:255] + "...TRUNCATED"
+			}
+
+			errors = append(errors, line)
+			extraLines--
+		}
+	}
+
+	if !errInfo.ShouldFailLogscan {
+		fmt.Printf("Test %s FAILED due to ERROR. Dumping Logs:\n%s\n"+
+			"--- Test %s FAILED\n\n\n", errInfo.TestName,
+			buffer.String(), errInfo.TestName)
+		return fmt.Sprintf("--- Test %s FAILED due to errors:\n%s\n",
+			errInfo.TestName, strings.Join(errors, "\n"))
+	} else {
+		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
+			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
+			errInfo.TestName, buffer.String(), errInfo.TestName)
+		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
+			" none.\n", errInfo.TestName)
+	}
 }
