@@ -2,7 +2,7 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // The hashing framework
-package quantumfs
+package hash
 
 /*
 #cgo LDFLAGS: /usr/local/lib/libcityhash.a
@@ -16,8 +16,7 @@ void cCityHashCrc256(const char *s, size_t len, uint64_t *result);
 import "C"
 import "unsafe"
 
-// 160 bit hash
-const hashSize = 20
+const hashSize = 20 // Must match in datastore.go
 
 func Hash(input []byte) [hashSize]byte {
 	hash := CityHash256(input)
