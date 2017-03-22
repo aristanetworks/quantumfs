@@ -13,7 +13,7 @@ import "strconv"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 func runConvertFrom(test *TestHelper, fromFileSize uint64) {
 	workspace := test.newWorkspace()
@@ -23,13 +23,13 @@ func runConvertFrom(test *TestHelper, fromFileSize uint64) {
 	// fromFileSize must be > testDataSize
 	testDataSize := 4096
 	data := genData(testDataSize)
-	err := printToFile(testFilename, string(data))
-	test.assert(err == nil,
+	err := testutils.PrintToFile(testFilename, string(data))
+	test.Assert(err == nil,
 		"Error writing data (%d bytes) to new fd: %v",
 		testDataSize, err)
 	// Make this the file size desired (and hence type)
 	err = os.Truncate(testFilename, int64(fromFileSize))
-	test.assert(err == nil, "Unable to truncate expand file to %d", fromFileSize)
+	test.Assert(err == nil, "Unable to truncate expand file to %d", fromFileSize)
 
 	// a sparse VeryLargeFile
 	newLen := int(quantumfs.MaxLargeFileSize()) + quantumfs.MaxBlockSize
@@ -39,49 +39,49 @@ func runConvertFrom(test *TestHelper, fromFileSize uint64) {
 		newLen = maxLen
 	}
 	os.Truncate(testFilename, int64(newLen))
-	test.assert(utils.FileSize(testFilename) == int64(newLen),
+	test.Assert(test.FileSize(testFilename) == int64(newLen),
 		"Truncation expansion failed")
 
 	// Then append data *again* to the end of it
-	err = printToFile(testFilename, string(data))
-	test.assert(err == nil,
+	err = testutils.PrintToFile(testFilename, string(data))
+	test.Assert(err == nil,
 		"Error writing data (%d bytes) to existing fd: %v",
 		testDataSize, err)
-	test.assert(utils.FileSize(testFilename) == int64(newLen+testDataSize),
+	test.Assert(test.FileSize(testFilename) == int64(newLen+testDataSize),
 		"Post truncation expansion write failed, %d",
-		utils.FileSize(testFilename))
+		test.FileSize(testFilename))
 
 	// Read our data back
 	fd, fdErr := os.OpenFile(testFilename, os.O_RDONLY, 0777)
-	test.assert(fdErr == nil, "Unable to open file for RDONLY")
+	test.Assert(fdErr == nil, "Unable to open file for RDONLY")
 	// Try to read more than should exist
-	startData := test.readTo(fd, 0, testDataSize+1000)
+	startData := test.ReadTo(fd, 0, testDataSize+1000)
 	err = fd.Close()
-	test.assert(err == nil, "Unable to close file")
-	test.assert(bytes.Equal(data, startData[:testDataSize]),
+	test.Assert(err == nil, "Unable to close file")
+	test.Assert(bytes.Equal(data, startData[:testDataSize]),
 		"Data not preserved in small to very large expansion")
-	test.assert(bytes.Equal(startData[testDataSize:], make([]byte, 1000)),
+	test.Assert(bytes.Equal(startData[testDataSize:], make([]byte, 1000)),
 		"Data hole not created in small to very large file expand")
 
 	// Now check the data at the end of the file
 	fd, fdErr = os.OpenFile(testFilename, os.O_RDONLY, 0777)
-	test.assert(fdErr == nil, "Unable to open file for RDONLY")
+	test.Assert(fdErr == nil, "Unable to open file for RDONLY")
 	// Try to read more than should exist
-	endData := test.readTo(fd, newLen-1000, testDataSize+2000)
+	endData := test.ReadTo(fd, newLen-1000, testDataSize+2000)
 	err = fd.Close()
-	test.assert(err == nil, "Unable to close file")
-	test.assert(bytes.Equal(endData[:1000], make([]byte, 1000)),
+	test.Assert(err == nil, "Unable to close file")
+	test.Assert(bytes.Equal(endData[:1000], make([]byte, 1000)),
 		"Data hole not in small to very large file expansion")
-	test.assert(bytes.Equal(data, endData[1000:]),
+	test.Assert(bytes.Equal(data, endData[1000:]),
 		"Data entry error after small to very large expansion")
 
 	// Branch the workspace
 	api := test.getApi()
 	dst := strconv.FormatUint(fromFileSize, 10) + "dst/verylargeattrsparse/test"
 	err = api.Branch(test.relPath(workspace), dst)
-	test.assert(err == nil, "Unable to branch")
+	test.Assert(err == nil, "Unable to branch")
 
-	test.checkSparse(test.absPath(dst+"/test"), testFilename, newLen/100, 10)
+	test.CheckSparse(test.absPath(dst+"/test"), testFilename, newLen/100, 10)
 }
 
 func TestSmallConvert(t *testing.T) {
@@ -118,19 +118,19 @@ func TestVeryLargeFileZero(t *testing.T) {
 
 		tinyDataSize := 10 * 1024
 		data := genData(tinyDataSize)
-		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing tiny (%d) data to new fd",
+		err := testutils.PrintToFile(testFilename, string(data))
+		test.Assert(err == nil, "Error writing tiny (%d) data to new fd",
 			tinyDataSize)
 		// expand this to be the desired file type (VeryLargeFile)
 		os.Truncate(testFilename, int64(quantumfs.MaxLargeFileSize())+
 			int64(quantumfs.MaxBlockSize))
 
 		os.Truncate(testFilename, 0)
-		test.assert(utils.FileSize(testFilename) == 0, "Unable to zero file")
+		test.Assert(test.FileSize(testFilename) == 0, "Unable to zero file")
 
 		output, err := ioutil.ReadFile(testFilename)
-		test.assert(len(output) == 0, "Empty file not really empty")
-		test.assert(err == nil, "Unable to read from empty file")
+		test.Assert(len(output) == 0, "Empty file not really empty")
+		test.Assert(err == nil, "Unable to read from empty file")
 	})
 }
 
@@ -141,12 +141,12 @@ func TestVeryLargeFileReadPastEnd(t *testing.T) {
 
 		// First create a file with some data
 		file, err := os.Create(testFilename)
-		test.assert(err == nil, "Error creating test file: %v", err)
+		test.Assert(err == nil, "Error creating test file: %v", err)
 
 		testDataSize := 100 * 1024
 		data := genData(testDataSize)
 		_, err = file.Write(data)
-		test.assert(err == nil, "Error writing data to file: %v", err)
+		test.Assert(err == nil, "Error writing data to file: %v", err)
 
 		// expand to VeryLargeFile type
 		os.Truncate(testFilename, int64(quantumfs.MaxLargeFileSize())+
@@ -157,7 +157,7 @@ func TestVeryLargeFileReadPastEnd(t *testing.T) {
 		input := make([]byte, testDataSize)
 		_, err = file.ReadAt(input, int64(quantumfs.MaxLargeFileSize())+
 			int64(2*quantumfs.MaxBlockSize))
-		test.assert(err == io.EOF, "Expected EOF got: %v", err)
+		test.Assert(err == io.EOF, "Expected EOF got: %v", err)
 
 		file.Close()
 	})

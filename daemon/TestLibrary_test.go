@@ -14,6 +14,8 @@ import "sync"
 import "os"
 import "time"
 
+import "github.com/aristanetworks/quantumfs/testutils"
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 
@@ -42,8 +44,7 @@ func TestMain(m *testing.M) {
 	genData(40 * 1024 * 1024)
 
 	// Setup an array for tests with errors to be logscanned later
-	errorLogs = make([]logscanError, 0)
-	timeBuckets = make([]timeData, 0)
+	ErrorLogs = make([]LogscanError, 0)
 
 	result := m.Run()
 
@@ -53,14 +54,14 @@ func TestMain(m *testing.M) {
 	runtime.GC()
 	debug.SetGCPercent(origGC)
 
-	errorMutex.Lock()
-	fullLogs := make(chan string, len(errorLogs))
+	ErrorMutex.Lock()
+	fullLogs := make(chan string, len(ErrorLogs))
 	var logProcessing sync.WaitGroup
-	for i := 0; i < len(errorLogs); i++ {
+	for i := 0; i < len(ErrorLogs); i++ {
 		logProcessing.Add(1)
 		go func(i int) {
 			defer logProcessing.Done()
-			testSummary := outputLogError(errorLogs[i])
+			testSummary := OutputLogError(ErrorLogs[i])
 			fullLogs <- testSummary
 		}(i)
 	}
@@ -72,11 +73,11 @@ func TestMain(m *testing.M) {
 		testSummary += summary
 	}
 	outputTimeGraph := strings.Contains(testSummary, "TIMED OUT")
-	errorMutex.Unlock()
+	ErrorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	if outputTimeGraph {
-		outputTimeHistogram()
+		testutils.OutputTimeHistogram()
 	}
 
 	os.RemoveAll(TestRunDir)
@@ -89,9 +90,9 @@ func TestRandomNamespaceName(t *testing.T) {
 		name2 := randomNamespaceName(8)
 		name3 := randomNamespaceName(10)
 
-		test.assert(len(name1) == 8, "name1 wrong length: %d", len(name1))
-		test.assert(name1 != name2, "name1 == name2: '%s'", name1)
-		test.assert(len(name3) == 10, "name3 wrong length: %d", len(name1))
+		test.Assert(len(name1) == 8, "name1 wrong length: %d", len(name1))
+		test.Assert(name1 != name2, "name1 == name2: '%s'", name1)
+		test.Assert(len(name3) == 10, "name3 wrong length: %d", len(name1))
 	})
 }
 
@@ -126,7 +127,7 @@ func TestTimeout(t *testing.T) {
 		// If we get here then the test library didn't time us out and we
 		// sould fail this test.
 		test.ShouldFail = false
-		test.assert(false, "Test didn't fail due to timeout")
+		test.Assert(false, "Test didn't fail due to timeout")
 	})
 }
 
@@ -135,7 +136,7 @@ func TestGenData(t *testing.T) {
 		hardcoded := "012345678910111213141516171819202122232425262"
 		data := genData(len(hardcoded))
 
-		test.assert(bytes.Equal([]byte(hardcoded), data),
+		test.Assert(bytes.Equal([]byte(hardcoded), data),
 			"Data gen function off: %s vs %s", hardcoded, data)
 	})
 }

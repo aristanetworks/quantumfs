@@ -18,18 +18,18 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 		apiPath := workspace + "/" + quantumfs.ApiPath
 
 		stat, err := os.Lstat(apiPath)
-		test.assert(err == nil,
+		test.Assert(err == nil,
 			"List api file error%v,%v", err, stat)
 		stat_t := stat.Sys().(*syscall.Stat_t)
-		test.assert(stat_t.Ino == quantumfs.InodeIdApi,
+		test.Assert(stat_t.Ino == quantumfs.InodeIdApi,
 			"Wrong Inode number for api file")
 
 		src := "_null/_null/null"
 		dst := "wsrtest/wsrtest/wsrtest"
 		api := quantumfs.NewApiWithPath(apiPath)
-		assert(api != nil, "Api nil")
+		test.Assert(api != nil, "Api nil")
 		err = api.Branch(src, dst)
-		test.assert(err == nil,
+		test.Assert(err == nil,
 			"Error branching with api in nullworkspace:%v", err)
 		api.Close()
 	})

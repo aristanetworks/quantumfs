@@ -17,12 +17,13 @@ func IoPipe(output *string) func(format string, args ...interface{}) error {
 }
 
 // FileSize returns the size of a file
-func FileSize(filename string) int64 {
+func FileSize(filename string) (int64, error) {
 	var stat syscall.Stat_t
-	//err := syscall.Stat(filename, &stat)
-	_ = syscall.Stat(filename, &stat)
-	// TODO check error
-	return stat.Size
+	err := syscall.Stat(filename, &stat)
+	if err != nil {
+		return -1, fmt.Errorf("error in stating file %s:%s", filename, err)
+	}
+	return stat.Size, nil
 }
 
 // A number of utility functions. It'd be nice to create packages for these
@@ -76,4 +77,13 @@ func BlocksRoundUp(len uint64, blockSize uint64) uint64 {
 	}
 
 	return blocks
+}
+
+// Assert the condition is true. If it is not true then fail the test with the given
+// message.
+func Assert(condition bool, format string, args ...interface{}) {
+	if !condition {
+		msg := fmt.Sprintf(format, args...)
+		panic(msg)
+	}
 }

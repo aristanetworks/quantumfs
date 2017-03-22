@@ -5,27 +5,27 @@
 // the walker.
 package walker
 
-import "os"
-
 //import "strconv"
 
 import "flag"
+import "fmt"
+import "os"
 import "runtime/debug"
 import "runtime"
-import "fmt"
 import "sync"
-
 import "testing"
+
 import "github.com/aristanetworks/quantumfs/daemon"
 
-//import "github.com/aristanetworks/quantumfs"
-
+// TODO(sid)
 // Test Walk of Dir
 // Test Walk of File
 // Test Walk of MedFile
 // Test Walk of VeryLargeFile
 // Test Walk of HardLink
+// Test walk of small random dir structure
 
+// Just a dummy Test. Replace with real walker related test.
 func TestFileWriteBlockSize(t *testing.T) {
 	runTest(t, func(test *daemon.TestHelper) {
 		workspace := test.NewWorkspace()
@@ -35,9 +35,6 @@ func TestFileWriteBlockSize(t *testing.T) {
 		test.Assert(file != nil && err == nil,
 			"Error creating file: %v", err)
 		defer file.Close()
-
-		//var data []byte
-		//data = strconv.AppendInt(data, 21, 10)
 
 		data := []byte("HowdY")
 
@@ -50,12 +47,11 @@ func TestFileWriteBlockSize(t *testing.T) {
 	})
 }
 
-// Seperate for each package
 func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if os.Getuid() != 0 {
-		panic("quantumfs.daemon tests must be run as root")
+		panic("quantumfs.walker tests must be run as root")
 	}
 
 	// Disable Garbage Collection. Because the tests provide both the filesystem
@@ -75,11 +71,8 @@ func TestMain(m *testing.M) {
 	// will never return to allow GC to progress, the test program is deadlocked.
 	origGC := debug.SetGCPercent(-1)
 
-	// Precompute a bunch of our genData to save time during tests
-	//genData(40 * 1024 * 1024)
-
 	// Setup an array for tests with errors to be logscanned later
-	errorLogs = make([]logscanError, 0)
+	daemon.ErrorLogs = make([]daemon.LogscanError, 0)
 
 	result := m.Run()
 
@@ -89,15 +82,15 @@ func TestMain(m *testing.M) {
 	runtime.GC()
 	debug.SetGCPercent(origGC)
 
-	errorMutex.Lock()
-	fullLogs := make(chan string, len(errorLogs))
+	daemon.ErrorMutex.Lock()
+	fullLogs := make(chan string, len(daemon.ErrorLogs))
 	var logProcessing sync.WaitGroup
-	for i := 0; i < len(errorLogs); i++ {
+	for i := 0; i < len(daemon.ErrorLogs); i++ {
 		logProcessing.Add(1)
 		go func(i int) {
 			defer logProcessing.Done()
-			//testSummary := outputLogError(errorLogs[i])
-			//fullLogs <- testSummary
+			testSummary := daemon.OutputLogError(daemon.ErrorLogs[i])
+			fullLogs <- testSummary
 		}(i)
 	}
 
@@ -107,21 +100,9 @@ func TestMain(m *testing.M) {
 	for summary := range fullLogs {
 		testSummary += summary
 	}
-	errorMutex.Unlock()
+	daemon.ErrorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	os.RemoveAll(daemon.TestRunDir)
 	os.Exit(result)
 }
-
-//runTestCommand
-//TestHelper
-//	createTestDirs
-//	endTest
-//	startDefaultQuantumFs
-//  startQuantumFS
-//
-// 	execute
-// 	shouldFail
-//	log
-//

@@ -21,7 +21,7 @@ func TestBdiKnobs(t *testing.T) {
 		max_ratio := fmt.Sprintf("/sys/class/bdi/0:%d/max_ratio",
 			test.fuseConnection)
 
-		test.waitFor("sysfs files to be written", func() bool {
+		test.WaitFor("sysfs files to be written", func() bool {
 			readAhead, err := ioutil.ReadFile(read_ahead_kb)
 			if err != nil {
 				return false
