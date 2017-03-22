@@ -49,7 +49,8 @@ func TestEmptyDB(t *testing.T) {
 		utils.Assert(num == 1, "Too many typespaces")
 
 		exists, err = db.TypespaceExists(nil, "_null")
-		utils.Assert(err == nil, "Error checking existence of typespace: %v", err)
+		utils.Assert(err == nil, "Error checking existence of typespace: %v",
+			err)
 		utils.Assert(exists, "Expected typespace not there")
 
 		exists, err = db.TypespaceExists(nil, "test")
@@ -141,10 +142,12 @@ func TestNamespaceList(t *testing.T) {
 		utils.Assert(err == nil, "Failed branching workspace: %v", err)
 
 		exists, err := db.WorkspaceExists(nil, "branch", "test", "a")
-		utils.Assert(err == nil, "Error checking if workspace exists: %v", err)
+		utils.Assert(err == nil, "Error checking if workspace exists: %v",
+			err)
 		utils.Assert(exists, "Workspace not really created")
 		exists, err = db.WorkspaceExists(nil, "branch", "test", "b")
-		utils.Assert(err == nil, "Error checking if workspace exists: %v", err)
+		utils.Assert(err == nil, "Error checking if workspace exists: %v",
+			err)
 		utils.Assert(exists, "Workspace not really created")
 
 		namespaces, err := db.NamespaceList(nil, "branch")
@@ -269,7 +272,8 @@ func TestAdvanceNotExist(t *testing.T) {
 
 		_, err = db.AdvanceWorkspace(nil, "branch", "test", "a", oldRootId,
 			quantumfs.EmptyDirKey)
-		utils.Assert(err != nil, "Succeeded advancing non-existant workspace")
+		utils.Assert(err != nil,
+			"Succeeded advancing non-existant workspace")
 	})
 }
 
@@ -314,7 +318,8 @@ func TestDbRestart(t *testing.T) {
 		db = NewWorkspaceDB(path + "/db")
 
 		exists, err := db.WorkspaceExists(nil, "branch", "test", "a")
-		utils.Assert(err == nil, "Error checking if workspace exists: %v", err)
+		utils.Assert(err == nil, "Error checking if workspace exists: %v",
+			err)
 		utils.Assert(exists, "Workspace didn't persist across restart")
 	})
 }

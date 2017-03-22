@@ -778,7 +778,8 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	// Verify the permission of the directory in order to delete a child
 	// If the sticky bit of the directory is set, the action can only be
 	// performed by file's owner, directory's owner, or root user
-	if checkStickyBit && utils.BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
+	if checkStickyBit &&
+		utils.BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
 		owner.Uid != fileOwner && owner.Uid != dirOwner {
 
 		c.vlog("Sticky owners don't match: FAIL")

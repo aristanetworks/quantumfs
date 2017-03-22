@@ -336,10 +336,9 @@ func (th *TestHelper) WaitFor(description string, condition func() bool) {
 		if condition() {
 			th.Log("Finished waiting for %s", description)
 			return
-		} else {
-			th.Log("Condition not satisfied")
-			time.Sleep(20 * time.Millisecond)
 		}
+		th.Log("Condition not satisfied")
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
@@ -423,11 +422,10 @@ func OutputLogError(errInfo LogscanError) (summary string) {
 			buffer.String(), errInfo.TestName)
 		return fmt.Sprintf("--- Test %s FAILED due to errors:\n%s\n",
 			errInfo.TestName, strings.Join(errors, "\n"))
-	} else {
-		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
-			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
-			errInfo.TestName, buffer.String(), errInfo.TestName)
-		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
-			" none.\n", errInfo.TestName)
 	}
+	fmt.Printf("Test %s FAILED due to missing FATAL messages."+
+		" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
+		errInfo.TestName, buffer.String(), errInfo.TestName)
+	return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
+		" none.\n", errInfo.TestName)
 }

@@ -23,8 +23,8 @@ func TestForgetOnDirectory(t *testing.T) {
 		data := genData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
-			err := testutils.PrintToFile(workspace+"/dir/file"+strconv.Itoa(i),
-				string(data))
+			err := testutils.PrintToFile(
+				workspace+"/dir/file"+strconv.Itoa(i), string(data))
 			test.Assert(err == nil, "Error creating small file")
 		}
 
@@ -54,8 +54,8 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		data := genData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
-			err := testutils.PrintToFile(workspace+"/file"+strconv.Itoa(i),
-				string(data))
+			err := testutils.PrintToFile(
+				workspace+"/file"+strconv.Itoa(i), string(data))
 			test.Assert(err == nil, "Error creating small file")
 		}
 
@@ -92,8 +92,8 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		numFiles := 10
 		data := genData(255)
 		for i := 0; i < numFiles; i++ {
-			err := testutils.PrintToFile(workspace+"/dir/file"+strconv.Itoa(i),
-				string(data))
+			err := testutils.PrintToFile(
+				workspace+"/dir/file"+strconv.Itoa(i), string(data))
 			test.Assert(err == nil, "Error creating small file")
 		}
 

@@ -12,7 +12,8 @@ func Walk(ds quantumfs.DataStore, db quantumfs.WorkspaceDB,
 	rootID quantumfs.ObjectKey,
 	f func(string, quantumfs.ObjectKey, uint64) error) error {
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
-		return fmt.Errorf("Type of rootID %s is %s instead of KeyTypeMetadata",
+		return fmt.Errorf(
+			"Type of rootID %s is %s instead of KeyTypeMetadata",
 			rootID.String(), key2String(rootID))
 	}
 
@@ -179,16 +180,19 @@ func handleDirectoryEntry(path string,
 		case quantumfs.ObjectTypeMediumFile:
 			fallthrough
 		case quantumfs.ObjectTypeLargeFile:
-			if err = handleMultiBlockFile(fpath, ds, dr.ID(), f); err != nil {
+			if err = handleMultiBlockFile(fpath,
+				ds, dr.ID(), f); err != nil {
 				return err
 			}
 		case quantumfs.ObjectTypeVeryLargeFile:
-			if err = handleVeryLargeFile(fpath, ds, dr.ID(), f); err != nil {
+			if err = handleVeryLargeFile(fpath,
+				ds, dr.ID(), f); err != nil {
 				return err
 			}
 		case quantumfs.ObjectTypeDirectoryEntry:
 			if !dr.ID().IsEqualTo(quantumfs.EmptyDirKey) {
-				if err = handleDirectoryEntry(fpath, ds, dr.ID(), f); err != nil {
+				if err = handleDirectoryEntry(fpath,
+					ds, dr.ID(), f); err != nil {
 					return err
 				}
 			}
