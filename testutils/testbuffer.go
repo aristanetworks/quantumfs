@@ -1,22 +1,23 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package quantumfs
+package testutils
 
 // This file contains a buffer for the testing purpose only. Some interface functions
 // are only briefly implemented with a dummy return value
 
+import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
 
 // Testing buffer only contains data and key to meet the requirements of Set() and
 // Get() in datastore
 type TestBuffer struct {
-	key  ObjectKey
+	key  quantumfs.ObjectKey
 	data []byte
 }
 
-func NewTestBuffer(in []byte, q_key ObjectKey) Buffer {
+func NewTestBuffer(in []byte, q_key quantumfs.ObjectKey) quantumfs.Buffer {
 	return &TestBuffer{
 		key:  q_key,
 		data: in,
