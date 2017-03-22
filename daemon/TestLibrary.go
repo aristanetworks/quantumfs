@@ -106,19 +106,14 @@ func runTestCommon(t *testing.T, test QuantumFsTest, startDefaultQfs bool,
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
+	testResultChan := make(chan string, 2)
+	startTime := time.Now()
 	cachePath := TestRunDir + "/" + testName
-	th := &TestHelper{
-		t:          t,
-		testName:   testName,
-		TestResult: make(chan string, 2), /* must be buffered */
-		startTime:  time.Now(),
-		cachePath:  cachePath,
-		logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
-			NoStdOut),
-	}
+	logger := qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24, NoStdOut)
 
-	th.BaseInit(th.t, th.testName, th.TestResult, th.startTime, th.cachePath, th.logger)
-	th.tempDir = TestRunDir + "/" + th.testName
+	th := &TestHelper{}
+	th.BaseInit(t, testName, testResultChan, startTime, cachePath, logger)
+	th.TempDir = TestRunDir + "/" + th.TestName
 	th.CreateTestDirs()
 
 	defer th.EndTest()
@@ -212,7 +207,7 @@ func abortFuse(th *TestHelper) {
 	}
 
 	// Forcefully abort the filesystem so it can be unmounted
-	th.t.Logf("Aborting FUSE connection %d", th.fuseConnection)
+	th.T.Logf("Aborting FUSE connection %d", th.fuseConnection)
 	path := fmt.Sprintf("%s/connections/%d/abort", fusectlPath,
 		th.fuseConnection)
 	abort, err := os.OpenFile(path, os.O_WRONLY, 0)
@@ -239,7 +234,7 @@ func (th *TestHelper) EndTest() {
 
 	if th.qfs != nil && th.qfs.server != nil {
 		if exception != nil {
-			th.t.Logf("Failed with exception, forcefully unmounting: %v",
+			th.T.Logf("Failed with exception, forcefully unmounting: %v",
 				exception)
 			th.Log("Failed with exception, forcefully unmounting: %v",
 				exception)
@@ -261,23 +256,23 @@ func (th *TestHelper) EndTest() {
 		}
 	}
 
-	if th.tempDir != "" {
+	if th.TempDir != "" {
 		th.waitToBeUnmounted()
 		th.waitForQuantumFsToFinish()
 		time.Sleep(1 * time.Second)
 
 		if testFailed := th.logscan(); !testFailed {
-			if err := os.RemoveAll(th.tempDir); err != nil {
-				th.t.Fatalf("Failed to cleanup temporary mount "+
+			if err := os.RemoveAll(th.TempDir); err != nil {
+				th.T.Fatalf("Failed to cleanup temporary mount "+
 					"point: %v", err)
 			}
 		}
 	} else {
-		th.t.Fatalf("No temporary directory available for logs")
+		th.T.Fatalf("No temporary directory available for logs")
 	}
 
 	if exception != nil {
-		th.t.Fatalf("Test failed with exception: %v", exception)
+		th.T.Fatalf("Test failed with exception: %v", exception)
 	}
 }
 
@@ -286,7 +281,7 @@ func (th *TestHelper) waitToBeUnmounted() {
 		mounts, err := ioutil.ReadFile("/proc/self/mountinfo")
 		if err == nil {
 			mounts := utils.BytesToString(mounts)
-			if !strings.Contains(mounts, th.tempDir) {
+			if !strings.Contains(mounts, th.TempDir) {
 				th.Log("Waited %d times to unmount", i)
 				return
 			}
@@ -301,7 +296,7 @@ func (th *TestHelper) waitToBeUnmounted() {
 // Check the test output for errors
 func (th *TestHelper) logscan() (foundErrors bool) {
 	// Check the format string map for the log first to speed this up
-	logFile := th.tempDir + "/ramfs/qlog"
+	logFile := th.TempDir + "/ramfs/qlog"
 	errorsPresent := qlog.LogscanSkim(logFile)
 
 	// Nothing went wrong if either we should fail and there were errors,
@@ -315,14 +310,14 @@ func (th *TestHelper) logscan() (foundErrors bool) {
 	ErrorLogs = append(ErrorLogs, LogscanError{
 		logFile:           logFile,
 		shouldFailLogscan: th.shouldFailLogscan,
-		testName:          th.testName,
+		testName:          th.TestName,
 	})
 	ErrorMutex.Unlock()
 
 	if !th.shouldFailLogscan {
-		th.t.Fatalf("Test FAILED due to FATAL messages\n")
+		th.T.Fatalf("Test FAILED due to FATAL messages\n")
 	} else {
-		th.t.Fatalf("Test FAILED due to missing FATAL messages\n")
+		th.T.Fatalf("Test FAILED due to missing FATAL messages\n")
 	}
 
 	return true
@@ -378,27 +373,19 @@ func OutputLogError(errInfo LogscanError) (summary string) {
 // package. This helper is more of a namespacing mechanism than a coherent object.
 type TestHelper struct {
 	mutex             sync.Mutex // Protects a mishmash of the members
-	t                 *testing.T
-	testName          string
 	qfs               *QuantumFs
 	qfsWait           sync.WaitGroup
-	cachePath         string
-	logger            *qlog.Qlog
-	tempDir           string
 	fuseConnection    int
 	api               *quantumfs.Api
-	TestResult        chan string
-	startTime         time.Time
-	ShouldFail        bool
 	shouldFailLogscan bool
 	testutils.TestHelper
 }
 
 func (th *TestHelper) defaultConfig() QuantumFsConfig {
-	mountPath := th.tempDir + "/mnt"
+	mountPath := th.TempDir + "/mnt"
 
 	config := QuantumFsConfig{
-		CachePath:        th.tempDir + "/ramfs",
+		CachePath:        th.TempDir + "/ramfs",
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
@@ -426,7 +413,7 @@ func serveSafely(th *TestHelper) {
 			if th.fuseConnection != 0 {
 				abortFuse(th)
 			}
-			th.t.Fatalf("FUSE panic'd: %v", exception)
+			th.T.Fatalf("FUSE panic'd: %v", exception)
 		}
 	}(th)
 
@@ -435,7 +422,7 @@ func serveSafely(th *TestHelper) {
 		MaxBackground: 1024,
 		MaxWrite:      quantumfs.MaxBlockSize,
 		FsName:        "QuantumFS",
-		Name:          th.testName,
+		Name:          th.TestName,
 		Options:       make([]string, 0),
 	}
 	mountOptions.Options = append(mountOptions.Options, "suid")
@@ -448,11 +435,11 @@ func serveSafely(th *TestHelper) {
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
-		th.t.Fatalf("Unable to setup test ramfs path")
+		th.T.Fatalf("Unable to setup test ramfs path")
 	}
 
 	th.Log("Instantiating quantumfs instance...")
-	quantumfs := NewQuantumFsLogs(config, th.logger)
+	quantumfs := NewQuantumFsLogs(config, th.Logger)
 	th.qfs = quantumfs
 
 	th.Log("Waiting for QuantumFs instance to start...")
@@ -479,12 +466,12 @@ func (th *TestHelper) getApi() *quantumfs.Api {
 
 // Make the given path absolute to the mount root
 func (th *TestHelper) absPath(path string) string {
-	return th.tempDir + "/mnt/" + path
+	return th.TempDir + "/mnt/" + path
 }
 
 // Make the given path relative to the mount root
 func (th *TestHelper) relPath(path string) string {
-	return strings.TrimPrefix(path, th.tempDir+"/mnt/")
+	return strings.TrimPrefix(path, th.TempDir+"/mnt/")
 }
 
 // Extract namespace and workspace path from the absolute path of
@@ -637,7 +624,7 @@ func (th *TestHelper) newCtx() *ctx {
 	reqId := atomic.AddUint64(&requestId, 1)
 	c := th.qfs.c.dummyReq(reqId)
 	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
-		th.testName)
+		th.TestName)
 	return c
 }
 
@@ -667,14 +654,14 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 func (th *TestHelper) Init(t *testing.T, testName string, testResult chan string,
 	startTime time.Time, cachePath string, logger *qlog.Qlog) {
 
-	th.t = t
-	th.testName = testName
-	th.TestResult = testResult
-	th.startTime = startTime
-	th.cachePath = cachePath
-	th.tempDir = cachePath
-	th.logger = logger
-	th.BaseInit(th.t, th.testName, th.TestResult, th.startTime, th.cachePath, th.logger)
+	//th.t = t
+	//th.TestName = testName
+	//th.TestResult = testResult
+	//th.startTime = startTime
+	//th.cachePath = cachePath
+	//th.tempDir = cachePath
+	//th.logger = logger
+	th.BaseInit(t, testName, testResult, startTime, cachePath, logger)
 }
 
 type crashOnWrite struct {
@@ -790,7 +777,7 @@ func (th *TestHelper) AssertNoErr(err error) {
 
 func (th *TestHelper) remountFilesystem() {
 	th.Log("Remounting filesystem")
-	err := syscall.Mount("", th.tempDir+"/mnt", "", syscall.MS_REMOUNT, "")
+	err := syscall.Mount("", th.TempDir+"/mnt", "", syscall.MS_REMOUNT, "")
 	th.Assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
 }
 
