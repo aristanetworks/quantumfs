@@ -447,7 +447,7 @@ func (api *Api) GetBlock(key []byte) ([]byte, error) {
 	if errorResponse.ErrorCode != ErrorOK {
 		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
-	
+
 	return getBlockResponse.Data, nil
 }
 
