@@ -16,14 +16,14 @@ void cCityHashCrc256(const char *s, size_t len, uint64_t *result);
 import "C"
 import "unsafe"
 
-const hashSize = 20 // Must match in datastore.go
+const HashSize = 20 // Must match in datastore.go
 
-func Hash(input []byte) [hashSize]byte {
+func Hash(input []byte) [HashSize]byte {
 	hash := CityHash256(input)
 
 	// Truncate down to the number of bytes we want to use
-	var rtn [hashSize]byte
-	copy(rtn[:], hash[:hashSize])
+	var rtn [HashSize]byte
+	copy(rtn[:], hash[:HashSize])
 	return rtn
 }
 
