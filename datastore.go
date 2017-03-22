@@ -1118,12 +1118,6 @@ func calcMaxBlocksLargeFile(maxSize int) int {
 }
 
 func init() {
-	emptyDirKey := createEmptyDirectory()
-	emptyBlockKey := createEmptyBlock()
-	emptyWorkspaceKey := createEmptyWorkspace(emptyDirKey)
-	EmptyDirKey = emptyDirKey
-	EmptyBlockKey = emptyBlockKey
-	EmptyWorkspaceKey = emptyWorkspaceKey
 	ZeroKey = NewObjectKey(KeyTypeEmbedded, [ObjectKeyLength - 1]byte{})
 
 	if MaxBlockSize > 1024*1024*1024 || MaxBlockSize < 32*1024 {
@@ -1159,4 +1153,11 @@ func init() {
 		panic(fmt.Sprintf("MaxBlockSize %d is small for ExtendedAttributes",
 			MaxBlockSize))
 	}
+
+	emptyDirKey := createEmptyDirectory()
+	emptyBlockKey := createEmptyBlock()
+	emptyWorkspaceKey := createEmptyWorkspace(emptyDirKey)
+	EmptyDirKey = emptyDirKey
+	EmptyBlockKey = emptyBlockKey
+	EmptyWorkspaceKey = emptyWorkspaceKey
 }
