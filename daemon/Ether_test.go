@@ -14,13 +14,13 @@ import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
-	mountPath := th.tempDir + "/mnt"
+	mountPath := th.TempDir + "/mnt"
 
-	datastorePath := th.tempDir + "/ether"
+	datastorePath := th.TempDir + "/ether"
 	datastore := thirdparty_backends.NewEtherFilesystemStore(datastorePath)
 
 	config := QuantumFsConfig{
-		CachePath:        th.tempDir + "/ramfs",
+		CachePath:        th.TempDir + "/ramfs",
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,

@@ -18,7 +18,7 @@ import "syscall"
 import "testing"
 import "time"
 
-import "github.com/aristanetworks/quantumfs"
+//import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 
@@ -26,17 +26,15 @@ type QuantumFsTest func(test *TestHelper)
 
 type TestHelper struct {
 	mutex             sync.Mutex // Protects a mishmash of the members
-	t                 *testing.T
-	testName          string
-	cachePath         string
-	logger            *qlog.Qlog
-	tempDir           string
-	fuseConnection    int
-	api               *quantumfs.Api
-	testResult        chan string
-	startTime         time.Time
-	shouldFail        bool
-	shouldFailLogscan bool
+	T                 *testing.T
+	TestName          string
+	CachePath         string
+	Logger            *qlog.Qlog
+	TempDir           string
+	TestResult        chan string
+	StartTime         time.Time
+	ShouldFail        bool
+	ShouldFailLogscan bool
 }
 
 // Assert the condition is true. If it is not true then fail the test with the given
@@ -92,7 +90,7 @@ func (th *TestHelper) Execute(test QuantumFsTest) {
 
 		// This can hang if the channel isn't buffered because in some rare
 		// situations the other side isn't there to read from the channel
-		th.testResult <- result
+		th.TestResult <- result
 	}(th)
 
 	test(th)
@@ -125,24 +123,24 @@ func init() {
 // CreateTestDirs makes the required directories for the test.
 // This directories are inside TestRunDir
 func (th *TestHelper) CreateTestDirs() {
-	th.tempDir = TestRunDir + "/" + th.testName
+	th.TempDir = TestRunDir + "/" + th.TestName
 
-	mountPath := th.tempDir + "/mnt"
+	mountPath := th.TempDir + "/mnt"
 	os.MkdirAll(mountPath, 0777)
 	th.Log("Using mountpath %s", mountPath)
 
-	os.MkdirAll(th.tempDir+"/ether", 0777)
+	os.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 func (th *TestHelper) BaseInit(t *testing.T, testName string, testResult chan string,
 	startTime time.Time, cachePath string, logger *qlog.Qlog) {
 
-	th.t = t
-	th.testName = testName
-	th.testResult = testResult
-	th.startTime = startTime
-	th.cachePath = cachePath
-	th.logger = logger
+	th.T = t
+	th.TestName = testName
+	th.TestResult = testResult
+	th.StartTime = startTime
+	th.CachePath = cachePath
+	th.Logger = logger
 }
 
 type TLA struct {
@@ -170,7 +168,7 @@ func (th *TestHelper) AssertTestLog(logs []TLA) {
 }
 
 func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
-	logFile := th.tempDir + "/ramfs/qlog"
+	logFile := th.TempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
 	containChecker := make([]bool, len(logs))
@@ -403,9 +401,9 @@ func (th *TestHelper) WaitFor(description string, condition func() bool) {
 
 // Log using the logger in TestHelper
 func (th *TestHelper) Log(format string, args ...interface{}) error {
-	th.t.Logf(th.testName+": "+format, args...)
-	th.logger.Log(qlog.LogTest, qlog.TestReqId, 1,
-		"[%s] "+format, append([]interface{}{th.testName},
+	th.T.Logf(th.TestName+": "+format, args...)
+	th.Logger.Log(qlog.LogTest, qlog.TestReqId, 1,
+		"[%s] "+format, append([]interface{}{th.TestName},
 			args...)...)
 
 	return nil

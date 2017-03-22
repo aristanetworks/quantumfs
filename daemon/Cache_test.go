@@ -72,7 +72,7 @@ func createDatastore(test *TestHelper, cacheSize int) (c *quantumfs.Ctx,
 
 	ctx := ctx{
 		Ctx: quantumfs.Ctx{
-			Qlog:      test.logger,
+			Qlog:      test.Logger,
 			RequestId: qlog.TestReqId,
 		},
 	}
