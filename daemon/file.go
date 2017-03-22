@@ -11,6 +11,7 @@ import "sync"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -67,7 +68,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 	file.self = &file
 	file.setParent(parent.inodeNum())
 
-	assert(file.treeLock() != nil, "File treeLock nil at init")
+	utils.Assert(file.treeLock() != nil, "File treeLock nil at init")
 
 	return &file
 }
@@ -137,23 +138,23 @@ func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 	var userAccess bool
 	switch flags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		userAccess = BitAnyFlagSet(uint(record.Permissions()),
+		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
 			quantumfs.PermReadOther|quantumfs.PermReadGroup|
 				quantumfs.PermReadOwner)
 	case syscall.O_WRONLY:
-		userAccess = BitAnyFlagSet(uint(record.Permissions()),
+		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
 			quantumfs.PermWriteOwner|quantumfs.PermWriteGroup|
 				quantumfs.PermWriteOwner)
 	case syscall.O_RDWR:
-		userAccess = BitAnyFlagSet(uint(record.Permissions()),
+		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
 			quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
 				quantumfs.PermWriteOwner|quantumfs.PermReadOther|
 				quantumfs.PermReadGroup|quantumfs.PermReadOwner)
 	}
 
 	var execAccess bool
-	if BitFlagsSet(flags, FMODE_EXEC) {
-		execAccess = BitAnyFlagSet(uint(record.Permissions()),
+	if utils.BitFlagsSet(flags, FMODE_EXEC) {
+		execAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
 			quantumfs.PermExecOther|quantumfs.PermExecGroup|
 				quantumfs.PermExecOwner|quantumfs.PermSUID|
 				quantumfs.PermSGID)
@@ -209,7 +210,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 		c.vlog("Got file lock")
 
-		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			if attr.Size != fi.accessor.fileLength() {
 				updateMtime = true
 			}
@@ -786,7 +787,7 @@ func newFileDescriptor(file *File, inodeNum InodeId,
 		file: file,
 	}
 
-	assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	utils.Assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
 	return fd
 }
 

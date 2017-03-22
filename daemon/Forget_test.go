@@ -12,6 +12,8 @@ import "strconv"
 import "testing"
 import "time"
 
+import "github.com/aristanetworks/quantumfs/testutils"
+
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *TestHelper) {
 		workspace := test.newWorkspace()
@@ -21,15 +23,15 @@ func TestForgetOnDirectory(t *testing.T) {
 		data := genData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
-			err := printToFile(workspace+"/dir/file"+strconv.Itoa(i),
+			err := testutils.PrintToFile(workspace+"/dir/file"+strconv.Itoa(i),
 				string(data))
-			test.assert(err == nil, "Error creating small file")
+			test.Assert(err == nil, "Error creating small file")
 		}
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
 
-		test.assertLogContains("Forget called",
+		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -37,9 +39,9 @@ func TestForgetOnDirectory(t *testing.T) {
 			var readBack []byte
 			readBack, err := ioutil.ReadFile(workspace + "/dir/file" +
 				strconv.Itoa(i))
-			test.assert(bytes.Equal(readBack, data),
+			test.Assert(bytes.Equal(readBack, data),
 				"File contents not preserved after Forget")
-			test.assert(err == nil, "Unable to read file after Forget")
+			test.Assert(err == nil, "Unable to read file after Forget")
 		}
 	})
 }
@@ -52,15 +54,15 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		data := genData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
-			err := printToFile(workspace+"/file"+strconv.Itoa(i),
+			err := testutils.PrintToFile(workspace+"/file"+strconv.Itoa(i),
 				string(data))
-			test.assert(err == nil, "Error creating small file")
+			test.Assert(err == nil, "Error creating small file")
 		}
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
 
-		test.assertLogContains("Forget called",
+		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -68,9 +70,9 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 			var readBack []byte
 			readBack, err := ioutil.ReadFile(workspace + "/file" +
 				strconv.Itoa(i))
-			test.assert(bytes.Equal(readBack, data),
+			test.Assert(bytes.Equal(readBack, data),
 				"File contents not preserved after Forget")
-			test.assert(err == nil, "Unable to read file after Forget")
+			test.Assert(err == nil, "Unable to read file after Forget")
 		}
 	})
 }
@@ -84,15 +86,15 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		dirName := workspace + "/dir"
 
 		err := os.Mkdir(dirName, 0777)
-		test.assert(err == nil, "Failed creating directory: %v", err)
+		test.Assert(err == nil, "Failed creating directory: %v", err)
 
 		// Generate a bunch of files
 		numFiles := 10
 		data := genData(255)
 		for i := 0; i < numFiles; i++ {
-			err := printToFile(workspace+"/dir/file"+strconv.Itoa(i),
+			err := testutils.PrintToFile(workspace+"/dir/file"+strconv.Itoa(i),
 				string(data))
-			test.assert(err == nil, "Error creating small file")
+			test.Assert(err == nil, "Error creating small file")
 		}
 
 		// Now branch this workspace so we have a workspace full of
@@ -104,10 +106,10 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// and add its children to the uninstantiated inode list.
 		dirInodeNum := test.getInodeNum(dirName)
 		dir, err := os.Open(dirName)
-		test.assert(err == nil, "Error opening directory: %v", err)
+		test.Assert(err == nil, "Error opening directory: %v", err)
 		children, err := dir.Readdirnames(-1)
-		test.assert(err == nil, "Error reading directory children: %v", err)
-		test.assert(len(children) == numFiles,
+		test.Assert(err == nil, "Error reading directory children: %v", err)
+		test.Assert(len(children) == numFiles,
 			"Wrong number of children: %d != %d", len(children),
 			numFiles)
 		dir.Close()
@@ -123,7 +125,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// uninstantiated children from the parentOfUninstantiated list.
 		test.remountFilesystem()
 
-		test.assertLogContains("Forget called",
+		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		test.qfs.mapMutex.Lock()
@@ -132,12 +134,12 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		numUninstantiatedNew := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock()
 
-		test.assert(numUninstantiatedOld > numUninstantiatedNew,
+		test.Assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed %d <= %d",
 			numUninstantiatedOld, numUninstantiatedNew)
 
 		for _, parent := range test.qfs.parentOfUninstantiated {
-			test.assert(parent != dirInodeNum, "Uninstantiated inodes "+
+			test.Assert(parent != dirInodeNum, "Uninstantiated inodes "+
 				"use forgotten directory as parent")
 		}
 	})
@@ -149,12 +151,12 @@ func TestMultipleLookupCount(t *testing.T) {
 		testFilename := workspace + "/test"
 
 		file, err := os.Create(testFilename)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.Assert(err == nil, "Error creating file: %v", err)
 
 		time.Sleep(200 * time.Millisecond)
 
 		file2, err := os.Open(testFilename)
-		test.assert(err == nil, "Error opening file readonly")
+		test.Assert(err == nil, "Error opening file readonly")
 
 		file.Close()
 		file2.Close()
@@ -164,12 +166,11 @@ func TestMultipleLookupCount(t *testing.T) {
 		// Forget Inodes
 		test.remountFilesystem()
 
-		test.assertTestLog([]TLA{
-			TLA{true, "Looked up 2 Times",
-				"Failed to cause a second lookup"},
-			TLA{true, "Forgetting inode with lookupCount of 2",
-				"Inode with second lookup not forgotten"},
-		})
+		test.AssertLogContains("Looked up 2 Times",
+			"Forgetting inode with lookupCount of 2")
+
+		test.AssertLogContains("Forgetting inode with lookupCount of 2",
+			"Inode with second lookup not forgotten")
 	})
 }
 
@@ -181,17 +182,17 @@ func TestLookupCountHardlinks(t *testing.T) {
 
 		// First lookup
 		file, err := os.Create(testFilename)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.Assert(err == nil, "Error creating file: %v", err)
 		file.Close()
 
 		// Second lookup
 		err = os.Link(testFilename, linkFilename)
-		test.assert(err == nil, "Error creating hardlink")
+		test.Assert(err == nil, "Error creating hardlink")
 
 		// Forget Inodes
 		test.remountFilesystem()
 
-		test.assertLogContains("Looked up 2 Times",
+		test.AssertLogContains("Looked up 2 Times",
 			"Failed to cause a second lookup")
 	})
 }
@@ -201,12 +202,12 @@ func TestForgetMarking(t *testing.T) {
 		workspace := test.newWorkspace()
 
 		// Make a simple one directory two children structure
-		test.assertNoErr(os.MkdirAll(workspace+"/testdir", 0777))
+		test.AssertNoErr(os.MkdirAll(workspace+"/testdir", 0777))
 
 		data := genData(1000)
-		test.assertNoErr(ioutil.WriteFile(workspace+"/testdir/a", data,
+		test.AssertNoErr(ioutil.WriteFile(workspace+"/testdir/a", data,
 			0777))
-		test.assertNoErr(ioutil.WriteFile(workspace+"/testdir/b", data,
+		test.AssertNoErr(ioutil.WriteFile(workspace+"/testdir/b", data,
 			0777))
 
 		// get the inode numbers
@@ -219,15 +220,15 @@ func TestForgetMarking(t *testing.T) {
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
 		parent := test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent != nil,
+		test.Assert(parent != nil,
 			"Parent not loaded when expected")
 
 		childA := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.assert(childA != nil,
+		test.Assert(childA != nil,
 			"ChildA not loaded when expected")
 
 		childB := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
-		test.assert(childB != nil,
+		test.Assert(childB != nil,
 			"ChildB not loaded when expected")
 
 		// Now start Forgetting
@@ -236,7 +237,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// Parent should still be loaded
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent != nil,
+		test.Assert(parent != nil,
 			"Parent forgotten while children are loaded")
 
 		// Forget one child, not enough to forget the parent
@@ -244,24 +245,24 @@ func TestForgetMarking(t *testing.T) {
 		test.syncAllWorkspaces()
 
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent != nil,
+		test.Assert(parent != nil,
 			"Parent forgotten when only 1/2 children unloaded")
 
 		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.assert(childA == nil, "ChildA not forgotten when requested")
+		test.Assert(childA == nil, "ChildA not forgotten when requested")
 
 		// Now forget the last child, which should unload the parent also
 		test.qfs.Forget(uint64(childIdB), 1)
 		test.syncAllWorkspaces()
 
 		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.assert(childA == nil, "ChildA not forgotten when requested")
+		test.Assert(childA == nil, "ChildA not forgotten when requested")
 
 		childB = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
-		test.assert(childB == nil, "ChildB not forgotten when requested")
+		test.Assert(childB == nil, "ChildB not forgotten when requested")
 
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.assert(parent == nil,
+		test.Assert(parent == nil,
 			"Parent %d not forgotten when all children unloaded",
 			parentId)
 	})
@@ -274,15 +275,15 @@ func TestForgetLookupRace(t *testing.T) {
 		data := genData(2000)
 
 		testFile := workspace + "/testFile"
-		err := printToFile(testFile, string(data[:1000]))
-		test.assertNoErr(err)
+		err := testutils.PrintToFile(testFile, string(data[:1000]))
+		test.AssertNoErr(err)
 
 		test.syncAllWorkspaces()
 
 		test.remountFilesystem()
 
 		_, err = os.Stat(testFile)
-		test.assertNoErr(err)
+		test.AssertNoErr(err)
 
 		test.syncAllWorkspaces()
 

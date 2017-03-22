@@ -30,6 +30,6 @@ $(COMMANDS): encoding/metadata.capnp.go
 	sudo go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go
-	sudo go test -p 1 -v -gcflags '-e' github.com/aristanetworks/quantumfs/$@
+	sudo go test -v  -gcflags '-e' github.com/aristanetworks/quantumfs/$@
 
 include QFSClient/Makefile

@@ -51,31 +51,31 @@ func TestSyncFileOverwrite(t *testing.T) {
 		for i := 0; i < len(data)/dataWidth; i++ {
 			fd, err := os.OpenFile(workspace+"/testFile",
 				os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-			test.assert(err == nil, "Unable to open testFile %s", err)
+			test.Assert(err == nil, "Unable to open testFile %s", err)
 
 			toWrite := data[i*dataWidth : (i+1)*dataWidth]
 			bufferedWriter := bufio.NewWriter(fd)
 			wrote, err := bufferedWriter.Write(toWrite)
 			totalWritten += wrote
-			test.assert(err == nil, "Unable to write to testFile")
+			test.Assert(err == nil, "Unable to write to testFile")
 
 			bufferedWriter.Flush()
 			fd.Close()
 
 			test.syncAllWorkspaces()
 		}
-		test.assert(totalWritten == len(data), "Written mismatch")
+		test.Assert(totalWritten == len(data), "Written mismatch")
 
 		test.api.Close()
 		err := test.qfs.server.Unmount()
-		test.assert(err == nil, "Failed to unmount during test")
+		test.Assert(err == nil, "Failed to unmount during test")
 
 		test.startQuantumFs(config)
 
 		fileRestored, err := ioutil.ReadFile(workspace + "/testFile")
-		test.assert(err == nil, "Unable to read file after qfs reload: %s",
+		test.Assert(err == nil, "Unable to read file after qfs reload: %s",
 			err)
-		test.assert(bytes.Equal(data, fileRestored),
+		test.Assert(bytes.Equal(data, fileRestored),
 			"File contents not completely synced / restored %d %d",
 			len(data), len(fileRestored))
 	})
@@ -121,7 +121,7 @@ func TestSyncToDatastore(t *testing.T) {
 		// can verify that the data was preserved via the datastore
 		test.api.Close()
 		err := test.qfs.server.Unmount()
-		test.assert(err == nil, "Failed to unmount during test")
+		test.Assert(err == nil, "Failed to unmount during test")
 		test.waitForQuantumFsToFinish()
 
 		test.startQuantumFs(config)
@@ -135,7 +135,7 @@ func TestSyncToDatastore(t *testing.T) {
 				folderStr := strings.Join(folderStack, "")
 
 				_, err := os.Stat(workspace + folderStr)
-				test.assert(err == nil, "Folder lost (%s): %v",
+				test.Assert(err == nil, "Folder lost (%s): %v",
 					workspace+folderStr, err)
 			} else if data[i] < '5' && len(folderStack) > 0 {
 				folderStack = folderStack[:len(folderStack)-1]
@@ -146,9 +146,9 @@ func TestSyncToDatastore(t *testing.T) {
 
 				fileData, err := ioutil.ReadFile(fileName)
 
-				test.assert(err == nil, "File lost (%s): %s",
+				test.Assert(err == nil, "File lost (%s): %s",
 					fileName, err)
-				test.assert(bytes.Equal(fileData, data),
+				test.Assert(bytes.Equal(fileData, data),
 					"File data doesn't match in %s", fileName)
 			}
 		}
@@ -173,40 +173,40 @@ func TestNoImplicitSync(t *testing.T) {
 
 		// Create a directory
 		err := os.MkdirAll(dirName, 0124)
-		test.assert(err == nil, "Error creating directories: %v", err)
+		test.Assert(err == nil, "Error creating directories: %v", err)
 
 		file, err := os.Create(testFilename)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.Assert(err == nil, "Error creating file: %v", err)
 		defer file.Close()
 
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
-		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
-		test.assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
+		test.Assert(err == nil, "Error stat'ing test file: %v", err)
+		test.Assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
+		test.Assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
 
 		var expectedPermissions uint32
 		expectedPermissions |= syscall.S_IFREG
 		expectedPermissions |= syscall.S_IRUSR | syscall.S_IWUSR
 		expectedPermissions |= syscall.S_IRGRP | syscall.S_IWGRP
 		expectedPermissions |= syscall.S_IROTH | syscall.S_IWOTH
-		test.assert(stat.Mode == expectedPermissions,
+		test.Assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
 
 		// Write a small file
 		origData := []byte("test text")
 		_, err = file.Write(origData)
-		test.assert(err == nil, "Error writing to file %v", err)
+		test.Assert(err == nil, "Error writing to file %v", err)
 
 		// Confirm nothing to this point has synced anything
 		setCount := atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount == 0, "Datastore sets occurred! %d", setCount)
+		test.Assert(setCount == 0, "Datastore sets occurred! %d", setCount)
 
 		// Confirm the data is correct
 		data, err := ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading from file %v", err)
-		test.assert(bytes.Equal(data, origData), "Data does not match %v",
+		test.Assert(err == nil, "Error reading from file %v", err)
+		test.Assert(bytes.Equal(data, origData), "Data does not match %v",
 			data)
 		// ioutil.ReadFile() opens and closes the file. This causes a
 		// Flush() which will sync the file. Record the number of datastore
@@ -215,39 +215,39 @@ func TestNoImplicitSync(t *testing.T) {
 
 		// Write a medium file
 		err = file.Truncate(20 * 1024 * 1024)
-		test.assert(err == nil, "Error extending small file %v", err)
+		test.Assert(err == nil, "Error extending small file %v", err)
 
 		// Confirm the only sync at this point was the move from small file
 		// to medium file.
 		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount == expectedCount, "Unexpected store writes %d",
+		test.Assert(setCount == expectedCount, "Unexpected store writes %d",
 			setCount)
 
 		data, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading from file %v", err)
-		test.assert(bytes.Equal(data[:len(origData)], origData),
+		test.Assert(err == nil, "Error reading from file %v", err)
+		test.Assert(bytes.Equal(data[:len(origData)], origData),
 			"Data does not match %v", data)
 		expectedCount = atomic.LoadUint64(&dataStore.setCount)
 
 		// Extend the file even further
 		origData = []byte("more text")
 		_, err = file.WriteAt(origData, 21*1024*1024)
-		test.assert(err == nil, "Error writing deep into medium file %v",
+		test.Assert(err == nil, "Error writing deep into medium file %v",
 			err)
 		buf := make([]byte, 100)
 		read, err := file.ReadAt(buf, 21*1024*1024)
-		test.assert(read == len(origData),
+		test.Assert(read == len(origData),
 			"Read unexpected number of bytes %d != %d", read,
 			len(origData))
-		test.assert(err == io.EOF, "Expected end of file! %v", err)
-		test.assert(bytes.Equal(buf[:read], origData),
+		test.Assert(err == io.EOF, "Expected end of file! %v", err)
+		test.Assert(bytes.Equal(buf[:read], origData),
 			"Incorrect data read back %v", buf)
 
 		// Now we sync everything and confirm that writes to the datastore
 		// happen
 		test.syncAllWorkspaces()
 		setCount = atomic.LoadUint64(&dataStore.setCount)
-		test.assert(setCount > expectedCount,
+		test.Assert(setCount > expectedCount,
 			"Datastore sets didn't happen! %d", setCount)
 	})
 }

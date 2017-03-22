@@ -28,7 +28,7 @@ func newTestDataStore(test *TestHelper) *testDataStore {
 func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	store.test.assert(store.shouldRead, "Received unexpected Get for %s",
+	store.test.Assert(store.shouldRead, "Received unexpected Get for %s",
 		key.String())
 	return store.datastore.Get(c, key, buf)
 }
@@ -57,7 +57,7 @@ func fillDatastore(c *quantumfs.Ctx, test *TestHelper, backingStore *testDataSto
 			dataStore: datastore,
 		}
 		err := backingStore.Set(c, key, buf)
-		test.assert(err == nil, "Error priming datastore: %v", err)
+		test.Assert(err == nil, "Error priming datastore: %v", err)
 	}
 }
 
@@ -89,45 +89,45 @@ func TestCacheLru(t *testing.T) {
 
 		// Prime the LRU by reading every entry in reverse order. At the end
 		// we should have the first cacheSize elements in the cache.
-		test.log("Priming LRU")
+		test.Log("Priming LRU")
 		for i := 2*cacheSize - 1; i > 0; i-- {
 			buf := datastore.Get(c, keys[i])
-			test.assert(buf != nil, "Failed retrieving block %d", i)
+			test.Assert(buf != nil, "Failed retrieving block %d", i)
 		}
-		test.log("Verifying cache")
-		test.assert(len(datastore.cache) == cacheSize,
+		test.Log("Verifying cache")
+		test.Assert(len(datastore.cache) == cacheSize,
 			"Cache size incorrect %d != %d", len(datastore.cache),
 			cacheSize)
 		for _, v := range datastore.cache {
 			i := int(v.data[1]) + int(v.data[2])*256
-			test.assert(i <= cacheSize+1,
+			test.Assert(i <= cacheSize+1,
 				"Unexpected block in cache %d", i)
 		}
-		test.log("Verifying LRU")
-		test.assert(datastore.lru.Len() == cacheSize,
+		test.Log("Verifying LRU")
+		test.Assert(datastore.lru.Len() == cacheSize,
 			"Lru size incorrect %d != %d", datastore.lru.Len(),
 			cacheSize)
 		num := 1
 		for e := datastore.lru.Back(); e != nil; e = e.Prev() {
 			buf := e.Value.(buffer)
 			i := int(buf.data[1]) + int(buf.data[2])*256
-			test.assert(i <= cacheSize+1,
+			test.Assert(i <= cacheSize+1,
 				"Unexpected block in lru %d", i)
-			test.assert(i == num, "Out of order block %d not %d", i, num)
+			test.Assert(i == num, "Out of order block %d not %d", i, num)
 			num++
 		}
 
 		// Cause a block to be refreshed to the beginning
 		buf := datastore.Get(c, keys[256])
-		test.assert(buf != nil, "Block not found")
+		test.Assert(buf != nil, "Block not found")
 
 		data := datastore.lru.Back().Value.(buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
-		test.assert(i == 256, "Incorrect most recent block %d != 256", i)
+		test.Assert(i == 256, "Incorrect most recent block %d != 256", i)
 
 		data = datastore.lru.Front().Value.(buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
-		test.assert(i == 255, "Incorrect least recent block %d != 255", i)
+		test.Assert(i == 255, "Incorrect least recent block %d != 255", i)
 	})
 }
 
@@ -140,7 +140,7 @@ func TestCacheCaching(t *testing.T) {
 		// Prime the cache
 		for i := 1; i < 100; i++ {
 			buf := datastore.Get(c, keys[i])
-			test.assert(buf != nil, "Failed to get block %d", i)
+			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
 
 		backingStore.shouldRead = false
@@ -149,7 +149,7 @@ func TestCacheCaching(t *testing.T) {
 		// testDataStore will assert.
 		for i := 1; i < 100; i++ {
 			buf := datastore.Get(c, keys[i])
-			test.assert(buf != nil, "Failed to get block %d", i)
+			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
 	})
 }
