@@ -17,14 +17,14 @@ import "C"
 import "unsafe"
 
 // 160 bit hash
-const hashSize = 20
+const HashSize = 20
 
-func Hash(input []byte) [hashSize]byte {
+func Hash(input []byte) [HashSize]byte {
 	hash := CityHash256(input)
 
 	// Truncate down to the number of bytes we want to use
-	var rtn [hashSize]byte
-	copy(rtn[:], hash[:hashSize])
+	var rtn [HashSize]byte
+	copy(rtn[:], hash[:HashSize])
 	return rtn
 }
 
