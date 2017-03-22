@@ -15,6 +15,8 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
+var version string
+
 type intSlice []uint64
 
 func (i *intSlice) String() string {
@@ -201,6 +203,8 @@ func main() {
 	bucketWidthNs = 1000000 * int64(bucketWidthMs)
 
 	if len(os.Args) == 1 {
+		fmt.Println("qparse version", version)
+
 		flag.Usage()
 		return
 	}
