@@ -86,7 +86,8 @@ func TestMain(m *testing.M) {
 		logProcessing.Add(1)
 		go func(i int) {
 			defer logProcessing.Done()
-			testSummary := testutils.OutputLogError(testutils.ErrorLogs[i])
+			testSummary :=
+				testutils.OutputLogError(testutils.ErrorLogs[i])
 			fullLogs <- testSummary
 		}(i)
 	}
