@@ -144,7 +144,7 @@ func (v KeyType) Primitive() interface{} {
 //
 // In this case we use a 20 byte hash sufficient to store hash values and one
 // additional byte used for routing.
-const ObjectKeyLength = 1 + HashSize
+const ObjectKeyLength = 1 + hashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
