@@ -43,9 +43,6 @@ func TestMain(m *testing.M) {
 	// Precompute a bunch of our genData to save time during tests
 	genData(40 * 1024 * 1024)
 
-	// Setup an array for tests with errors to be logscanned later
-	ErrorLogs = make([]LogscanError, 0)
-
 	result := m.Run()
 
 	// We've finished running the tests and are about to do the full logscan.
@@ -54,14 +51,14 @@ func TestMain(m *testing.M) {
 	runtime.GC()
 	debug.SetGCPercent(origGC)
 
-	ErrorMutex.Lock()
-	fullLogs := make(chan string, len(ErrorLogs))
+	testutils.ErrorMutex.Lock()
+	fullLogs := make(chan string, len(testutils.ErrorLogs))
 	var logProcessing sync.WaitGroup
-	for i := 0; i < len(ErrorLogs); i++ {
+	for i := 0; i < len(testutils.ErrorLogs); i++ {
 		logProcessing.Add(1)
 		go func(i int) {
 			defer logProcessing.Done()
-			testSummary := OutputLogError(ErrorLogs[i])
+			testSummary := testutils.OutputLogError(testutils.ErrorLogs[i])
 			fullLogs <- testSummary
 		}(i)
 	}
@@ -73,11 +70,11 @@ func TestMain(m *testing.M) {
 		testSummary += summary
 	}
 	outputTimeGraph := strings.Contains(testSummary, "TIMED OUT")
-	ErrorMutex.Unlock()
+	testutils.ErrorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	if outputTimeGraph {
-		testutils.OutputTimeHistogram()
+		outputTimeHistogram()
 	}
 
 	os.RemoveAll(TestRunDir)
@@ -101,7 +98,7 @@ func TestRandomNamespaceName(t *testing.T) {
 // system functional. Test this forceful unmounting here.
 func TestPanicFilesystemAbort(t *testing.T) {
 	runTest(t, func(test *TestHelper) {
-		test.shouldFailLogscan = true
+		test.ShouldFailLogscan = true
 
 		api := test.getApi()
 

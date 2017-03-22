@@ -3,9 +3,8 @@
 
 package daemon
 
-// Test library
+// Test library for daemon package
 
-import "bytes"
 import "fmt"
 import "io/ioutil"
 import "math/rand"
@@ -13,7 +12,6 @@ import "os"
 import "reflect"
 import "runtime"
 import "runtime/debug"
-import "sort"
 import "strings"
 import "strconv"
 import "sync"
@@ -33,18 +31,6 @@ import "github.com/hanwen/go-fuse/fuse"
 const fusectlPath = "/sys/fs/fuse/"
 
 type QuantumFsTest func(test *TestHelper)
-
-type LogscanError struct {
-	logFile           string
-	shouldFailLogscan bool
-	testName          string
-}
-
-var ErrorMutex sync.Mutex
-var ErrorLogs []LogscanError
-
-var timeMutex sync.Mutex
-var timeBuckets []testutils.TimeData
 
 //NoStdOut prints nothing to stdout
 func NoStdOut(format string, args ...interface{}) error {
@@ -106,14 +92,19 @@ func runTestCommon(t *testing.T, test QuantumFsTest, startDefaultQfs bool,
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
-	testResultChan := make(chan string, 2)
-	startTime := time.Now()
 	cachePath := TestRunDir + "/" + testName
-	logger := qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24, NoStdOut)
 
-	th := &TestHelper{}
-	th.BaseInit(t, testName, testResultChan, startTime, cachePath, logger)
-	th.TempDir = TestRunDir + "/" + th.TestName
+	th := &TestHelper{
+		TestHelper: testutils.TestHelper{
+			T:          t,
+			TestName:   testName,
+			TestResult: make(chan string, 2), /* must be buffered */
+			StartTime:  time.Now(),
+			CachePath:  cachePath,
+			Logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
+				NoStdOut),
+		},
+	}
 	th.CreateTestDirs()
 
 	defer th.EndTest()
@@ -261,7 +252,7 @@ func (th *TestHelper) EndTest() {
 		th.waitForQuantumFsToFinish()
 		time.Sleep(1 * time.Second)
 
-		if testFailed := th.logscan(); !testFailed {
+		if testFailed := th.Logscan(); !testFailed {
 			if err := os.RemoveAll(th.TempDir); err != nil {
 				th.T.Fatalf("Failed to cleanup temporary mount "+
 					"point: %v", err)
@@ -293,91 +284,13 @@ func (th *TestHelper) waitToBeUnmounted() {
 	th.Log("ERROR: Filesystem didn't unmount in time")
 }
 
-// Check the test output for errors
-func (th *TestHelper) logscan() (foundErrors bool) {
-	// Check the format string map for the log first to speed this up
-	logFile := th.TempDir + "/ramfs/qlog"
-	errorsPresent := qlog.LogscanSkim(logFile)
-
-	// Nothing went wrong if either we should fail and there were errors,
-	// or we shouldn't fail and there weren't errors
-	if th.shouldFailLogscan == errorsPresent {
-		return false
-	}
-
-	// There was a problem
-	ErrorMutex.Lock()
-	ErrorLogs = append(ErrorLogs, LogscanError{
-		logFile:           logFile,
-		shouldFailLogscan: th.shouldFailLogscan,
-		testName:          th.TestName,
-	})
-	ErrorMutex.Unlock()
-
-	if !th.shouldFailLogscan {
-		th.T.Fatalf("Test FAILED due to FATAL messages\n")
-	} else {
-		th.T.Fatalf("Test FAILED due to missing FATAL messages\n")
-	}
-
-	return true
-}
-
-func OutputLogError(errInfo LogscanError) (summary string) {
-
-	errors := make([]string, 0, 10)
-	testOutputRaw := qlog.ParseLogsRaw(errInfo.logFile)
-	sort.Sort(qlog.SortByTimePtr(testOutputRaw))
-
-	var buffer bytes.Buffer
-
-	extraLines := 0
-	for _, rawLine := range testOutputRaw {
-		line := rawLine.ToString()
-		buffer.WriteString(line)
-
-		if strings.Contains(line, "PANIC") ||
-			strings.Contains(line, "WARN") ||
-			strings.Contains(line, "ERROR") {
-			extraLines = 2
-		}
-
-		// Output a couple extra lines after an ERROR
-		if extraLines > 0 {
-			// ensure a single line isn't ridiculously long
-			if len(line) > 255 {
-				line = line[:255] + "...TRUNCATED"
-			}
-
-			errors = append(errors, line)
-			extraLines--
-		}
-	}
-
-	if !errInfo.shouldFailLogscan {
-		fmt.Printf("Test %s FAILED due to ERROR. Dumping Logs:\n%s\n"+
-			"--- Test %s FAILED\n\n\n", errInfo.testName,
-			buffer.String(), errInfo.testName)
-		return fmt.Sprintf("--- Test %s FAILED due to errors:\n%s\n",
-			errInfo.testName, strings.Join(errors, "\n"))
-	} else {
-		fmt.Printf("Test %s FAILED due to missing FATAL messages."+
-			" Dumping Logs:\n%s\n--- Test %s FAILED\n\n\n",
-			errInfo.testName, buffer.String(), errInfo.testName)
-		return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
-			" none.\n", errInfo.testName)
-	}
-}
-
 // TestHelper holds the variables important to maintain the state of testing in a
 // package. This helper is more of a namespacing mechanism than a coherent object.
 type TestHelper struct {
-	mutex             sync.Mutex // Protects a mishmash of the members
-	qfs               *QuantumFs
-	qfsWait           sync.WaitGroup
-	fuseConnection    int
-	api               *quantumfs.Api
-	shouldFailLogscan bool
+	qfs            *QuantumFs
+	qfsWait        sync.WaitGroup
+	fuseConnection int
+	api            *quantumfs.Api
 	testutils.TestHelper
 }
 
@@ -612,8 +525,6 @@ func init() {
 	fmt.Printf("1. daemon testutils.TestRunDir %s\n", TestRunDir)
 	fmt.Printf("1. daemon testutils.TestRunDir %s\n", testutils.TestRunDir)
 
-	timeMutex = testutils.TimeMutex
-	timeBuckets = testutils.TimeBuckets
 	TestRunDir = testutils.TestRunDir
 
 	fmt.Printf("2. daemon testutils.TestRunDir %s\n", testutils.TestRunDir)
@@ -648,20 +559,6 @@ func (c *ctx) dummyReq(request uint64) *ctx {
 		fuseCtx:     nil,
 	}
 	return requestCtx
-}
-
-// Init initializes the private memnbers of TestHelper
-func (th *TestHelper) Init(t *testing.T, testName string, testResult chan string,
-	startTime time.Time, cachePath string, logger *qlog.Qlog) {
-
-	//th.t = t
-	//th.TestName = testName
-	//th.TestResult = testResult
-	//th.startTime = startTime
-	//th.cachePath = cachePath
-	//th.tempDir = cachePath
-	//th.logger = logger
-	th.BaseInit(t, testName, testResult, startTime, cachePath, logger)
 }
 
 type crashOnWrite struct {
@@ -790,4 +687,59 @@ func cacheTimeout100Ms(test *TestHelper, config *QuantumFsConfig) {
 // Modify the QuantumFS flush delay to 100 milliseconds
 func dirtyDelay100Ms(test *TestHelper, config *QuantumFsConfig) {
 	config.DirtyFlushDelay = 100 * time.Millisecond
+}
+
+var timeMutex sync.Mutex
+var timeBuckets []testutils.TimeData
+
+func outputTimeHistogram() {
+	timeMutex.Lock()
+	histogram := make([][]string, 20)
+	maxValue := 0
+	msPerBucket := 100.0
+	for i := 0; i < len(timeBuckets); i++ {
+		bucketIdx := int(timeBuckets[i].Duration.Seconds() *
+			(1000.0 / msPerBucket))
+		if bucketIdx >= len(histogram) {
+			bucketIdx = len(histogram) - 1
+		}
+		histogram[bucketIdx] = append(histogram[bucketIdx],
+			timeBuckets[i].TestName)
+
+		if len(histogram[bucketIdx]) > maxValue {
+			maxValue = len(histogram[bucketIdx])
+		}
+	}
+	timeMutex.Unlock()
+
+	// Scale outputs to fit into 60 columns wide
+	scaler := 1.0
+	if maxValue > 60 {
+		scaler = 60.0 / float64(maxValue)
+	}
+
+	fmt.Println("Test times:")
+	for i := len(histogram) - 1; i >= 0; i-- {
+		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
+
+		scaled := int(float64(len(histogram[i])) * scaler)
+		if scaled == 0 && len(histogram[i]) > 0 {
+			scaled = 1
+		}
+
+		for j := 0; j < scaled; j++ {
+			fmt.Printf("#")
+		}
+		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
+			fmt.Printf("(")
+			for j := 0; j < len(histogram[i]); j++ {
+				if j != 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("%s", histogram[i][j])
+			}
+			fmt.Printf(")")
+		}
+		fmt.Println()
+	}
 }
