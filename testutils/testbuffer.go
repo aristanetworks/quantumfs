@@ -62,22 +62,26 @@ func (buf *TestBuffer) Size() int {
 
 func (buf *TestBuffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
 	segment := capn.NewBuffer(buf.data)
-	return quantumfs.OverlayDirectoryEntry(encoding.ReadRootDirectoryEntry(segment))
+	return quantumfs.OverlayDirectoryEntry(
+		encoding.ReadRootDirectoryEntry(segment))
 }
 
 func (buf *TestBuffer) AsWorkspaceRoot() quantumfs.WorkspaceRoot {
 	segment := capn.NewBuffer(buf.data)
-	return quantumfs.OverlayWorkspaceRoot(encoding.ReadRootWorkspaceRoot(segment))
+	return quantumfs.OverlayWorkspaceRoot(
+		encoding.ReadRootWorkspaceRoot(segment))
 }
 
 func (buf *TestBuffer) AsMultiBlockFile() quantumfs.MultiBlockFile {
 	segment := capn.NewBuffer(buf.data)
-	return quantumfs.OverlayMultiBlockFile(encoding.ReadRootMultiBlockFile(segment))
+	return quantumfs.OverlayMultiBlockFile(
+		encoding.ReadRootMultiBlockFile(segment))
 }
 
 func (buf *TestBuffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
 	segment := capn.NewBuffer(buf.data)
-	return quantumfs.OverlayVeryLargeFile(encoding.ReadRootVeryLargeFile(segment))
+	return quantumfs.OverlayVeryLargeFile(
+		encoding.ReadRootVeryLargeFile(segment))
 }
 
 func (buf *TestBuffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
