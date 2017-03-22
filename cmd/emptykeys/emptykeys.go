@@ -4,7 +4,7 @@
 // A utility which computes the constant keys for the various empty block types
 package main
 
-//import "encoding/hex"
+import "encoding/hex"
 import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
@@ -17,8 +17,7 @@ func main() {
 }
 
 func printHash(hash [hash.HashSize]byte, name string) {
-	key := quantumfs.NewObjectKey(quantumfs.KeyTypeConstant, hash)
-	fmt.Printf("Empty %s key: %v\n", name, key)
+	fmt.Printf("Empty %s hash: %s\n", name, hex.EncodeToString(hash[:]))
 }
 
 func computeEmptyBlock() {
