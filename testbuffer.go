@@ -43,7 +43,7 @@ func (buf *TestBuffer) Set(data []byte, keyType KeyType) {
 }
 
 func (buf *TestBuffer) ContentHash() [ObjectKeyLength - 1]byte {
-	return Hash(buf.data)
+	return hash.Hash(buf.data)
 }
 
 func (buf *TestBuffer) Key(c *Ctx) (ObjectKey, error) {

@@ -10,7 +10,11 @@ import "fmt"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
+import "github.com/aristanetworks/quantumfs/hash"
 import capn "github.com/glycerine/go-capnproto"
+
+// 160 bit hash
+const hashSize = 20 // must match in hash/hash.go
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
@@ -140,7 +144,7 @@ func (v KeyType) Primitive() interface{} {
 //
 // In this case we use a 20 byte hash sufficient to store hash values and one
 // additional byte used for routing.
-const ObjectKeyLength = 1 + hashSize
+const ObjectKeyLength = 1 + HashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
@@ -434,7 +438,7 @@ func createEmptyDirectory() ObjectKey {
 
 	bytes := emptyDir.Bytes()
 
-	hash := Hash(bytes)
+	hash := hash.Hash(bytes)
 	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyDirKey.String()] = bytes
 	return emptyDirKey
@@ -445,7 +449,7 @@ var EmptyBlockKey ObjectKey
 func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
-	hash := Hash(bytes)
+	hash := hash.Hash(bytes)
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyBlockKey.String()] = bytes
 	return emptyBlockKey
@@ -623,7 +627,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 	bytes := emptyWorkspace.Bytes()
 
-	hash := Hash(bytes)
+	hash := hash.Hash(bytes)
 	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyWorkspaceKey.String()] = bytes
 	return emptyWorkspaceKey
