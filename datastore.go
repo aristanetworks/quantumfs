@@ -140,7 +140,7 @@ func (v KeyType) Primitive() interface{} {
 //
 // In this case we use a 20 byte hash sufficient to store hash values and one
 // additional byte used for routing.
-const ObjectKeyLength = 1 + hashSize
+const ObjectKeyLength = 1 + HashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
@@ -150,7 +150,7 @@ type ObjectKey struct {
 	key encoding.ObjectKey
 }
 
-func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
+func NewObjectKey(type_ KeyType, hash [HashSize]byte) ObjectKey {
 	segment := capn.NewBuffer(nil)
 	key := ObjectKey{
 		key: encoding.NewRootObjectKey(segment),
