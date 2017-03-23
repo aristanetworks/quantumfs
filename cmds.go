@@ -90,16 +90,17 @@ type CommandCommon struct {
 // IMPORTANT: please do not change the order/values of the above constants, QFSClient
 // depends on the fact that the values should not change !!!!!
 const (
-	CmdError           = iota
-	CmdBranchRequest   = iota
-	CmdGetAccessed     = iota
-	CmdClearAccessed   = iota
-	CmdSyncAll         = iota
-	CmdInsertInode     = iota
-	CmdDeleteWorkspace = iota
-	CmdSetBlock        = iota
-	CmdGetBlock        = iota
-	CmdEnableRootWrite = iota
+	CmdError                 = iota
+	CmdBranchRequest         = iota
+	CmdGetAccessed           = iota
+	CmdClearAccessed         = iota
+	CmdSyncAll               = iota
+	CmdInsertInode           = iota
+	CmdDeleteWorkspace       = iota
+	CmdSetBlock              = iota
+	CmdGetBlock              = iota
+	CmdEnableRootWrite       = iota
+	CmdSetWorkspaceImmutable = iota
 )
 
 // The various error codes
@@ -175,6 +176,11 @@ type GetBlockRequest struct {
 type GetBlockResponse struct {
 	ErrorResponse
 	Data []byte
+}
+
+type SetWorkspaceImmutableRequest struct {
+	CommandCommon
+	WorkspacePath string
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -365,6 +371,9 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	return nil
 }
 
+// Enable the chosen workspace mutable
+//
+// dst is the path relative to the filesystem root, ie. user/joe/myws
 func (api *Api) EnableRootWrite(dst string) error {
 	if !isWorkspaceNameValid(dst) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
@@ -373,6 +382,41 @@ func (api *Api) EnableRootWrite(dst string) error {
 	cmd := EnableRootWriteRequest{
 		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
 		Workspace:     dst,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Make the chosen workspace irreversibly immutable
+//
+// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
+func (api *Api) SetWorkspaceImmutable(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := SetWorkspaceImmutableRequest{
+		CommandCommon: CommandCommon{CommandId: CmdSetWorkspaceImmutable},
+		WorkspacePath: workspacepath,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)
