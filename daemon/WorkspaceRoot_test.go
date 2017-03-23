@@ -237,3 +237,26 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 			"Error creating a small file: %v", err)
 	})
 }
+
+func TestSetWorkspaceImmutable(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		api := test.getApi()
+		err := api.SetWorkspaceImmutable(workspaceName)
+		test.assert(err == nil, "Failed setting the workspace %s immutable",
+			workspaceName)
+
+		err = api.EnableRootWrite(workspaceName)
+		test.assert(err == nil, "Failed enabling workspace %s write"+
+			" permission", workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
+
+	})
+}

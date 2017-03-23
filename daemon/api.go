@@ -398,7 +398,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdEnableRootWrite:
 		c.vlog("Received EnableRootWrite request")
 		api.enableRootWrite(c, buf)
-
+	case quantumfs.CmdSetWorkspaceImmutable:
+		c.vlog("Received EnableRootWrite request")
+		api.setWorkspaceImmutable(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -474,8 +476,7 @@ func (api *ApiHandle) syncAll(c *ctx) {
 }
 
 func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
-	c.vlog("Api::insertInode Enter")
-	defer c.vlog("Api::insertInode Exit")
+	defer c.funcIn("Api::insertInode Enter").out()
 
 	var cmd quantumfs.InsertInodeRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -567,10 +568,12 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	}
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
-	c.qfs.workspaceMutability[workspacePath] = true
+	if _, exists := c.qfs.workspaceMutability[workspacePath]; !exists {
+		c.qfs.workspaceMutability[workspacePath] = true
+	}
 
 	api.queueErrorResponse(quantumfs.ErrorOK,
-		"Enable Workspace Write Permission Succeeded")
+		"Enable workspace write permission succeeded")
 }
 
 func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
@@ -594,4 +597,29 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 	delete(c.qfs.workspaceMutability, workspacePath)
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
+}
+
+func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) {
+	defer c.funcIn("Api::setWorkspaceImmutable Enter").out()
+
+	var cmd quantumfs.SetWorkspaceImmutableRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	workspacePath := cmd.WorkspacePath
+	dst := strings.Split(workspacePath, "/")
+	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
+	if !exists {
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist", workspacePath)
+		return
+	}
+
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	c.qfs.workspaceMutability[workspacePath] = false
+
+	api.queueErrorResponse(quantumfs.ErrorOK,
+		"Making workspace immutable succeeded")
 }
