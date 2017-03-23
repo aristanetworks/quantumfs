@@ -7,6 +7,7 @@ package daemon
 
 import "fmt"
 import "os"
+import "runtime"
 import "syscall"
 import "testing"
 import "time"
@@ -344,8 +345,6 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
-	test.t.Skipf("BUG190827")
-
 	srcWorkspace := test.newWorkspace()
 	dir1 := srcWorkspace + "/dir1"
 	dir2 := dir1 + "/dir2"
@@ -418,8 +417,12 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		buf := make([]byte, 0, 256)
 		n, err := api.Read(buf)
 		test.assert(n == 0, "Wrong number of bytes read: %d", n)
-		test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
-			"Non-blocking read api without requests error:%v", err)
+
+		if runtime.Version() != "go1.7.3" {
+			test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
+				"Non-blocking read api without requests error:%v",
+				err)
+		}
 	})
 }
 

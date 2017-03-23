@@ -208,7 +208,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) childInodes() []InodeId {
+func (tsl *TypespaceList) directChildInodes() []InodeId {
 	defer tsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(tsl.typespacesById))
@@ -291,11 +291,11 @@ func (tsl *TypespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (tsl *TypespaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on TypespaceList")
-	return &quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectRecord{},
 		errors.New("Unsupported record fetch on TypespaceList")
 }
 
@@ -509,7 +509,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) childInodes() []InodeId {
+func (nsl *NamespaceList) directChildInodes() []InodeId {
 	defer nsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(nsl.namespacesById))
@@ -579,11 +579,11 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (nsl *NamespaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on NamespaceList")
-	return &quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectRecord{},
 		errors.New("Unsupported record fetch on NamespaceList")
 }
 
@@ -807,7 +807,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) childInodes() []InodeId {
+func (wsl *WorkspaceList) directChildInodes() []InodeId {
 	defer wsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(wsl.workspacesById))
@@ -880,11 +880,11 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (wsl *WorkspaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on WorkspaceList")
-	return &quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectRecord{},
 		errors.New("Unsupported record fetch on WorkspaceList")
 }
 

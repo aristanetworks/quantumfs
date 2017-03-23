@@ -73,7 +73,8 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error)
+	getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
+		error)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
@@ -115,7 +116,7 @@ type Inode interface {
 	isOrphaned() bool
 	isOrphaned_() bool
 	deleteSelf(c *ctx, toDelete Inode,
-		deleteFromParent func() (toOrphan DirectoryRecordIf,
+		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
 
 	parentMarkAccessed(c *ctx, path string, created bool)
@@ -133,7 +134,8 @@ type Inode interface {
 	parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
-	parentGetChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error)
+	parentGetChildRecordCopy(c *ctx,
+		inodeNum InodeId) (quantumfs.DirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
@@ -167,7 +169,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	childInodes() []InodeId
+	directChildInodes() []InodeId
 }
 
 type InodeCommon struct {
@@ -287,11 +289,11 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
 }
 
-func (inode *InodeCommon) parentGetChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).getChildRecord(c, inodeNum)
+	return inode.parent_(c).getChildRecordCopy(c, inodeNum)
 }
 
 // When iterating up the directory tree, we need to lock parents as we go,
@@ -518,7 +520,7 @@ func (inode *InodeCommon) isWorkspaceRoot() bool {
 // a child up to its parent outside of a DOWN function, deletion in the parent
 // must be done after the child's lock has been acquired.
 func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
-	deleteFromParent func() (toOrphan DirectoryRecordIf,
+	deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 		err fuse.Status)) fuse.Status {
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).out()

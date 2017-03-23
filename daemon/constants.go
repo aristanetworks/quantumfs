@@ -15,7 +15,6 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 		quantumfs.ObjectTypeMediumFile,
 		quantumfs.ObjectTypeLargeFile,
 		quantumfs.ObjectTypeVeryLargeFile,
-		quantumfs.ObjectTypeHardlink,
 		quantumfs.ObjectTypeVCSFile,
 		quantumfs.ObjectTypeBuildProduct: // Do we need recursive evaluation?
 		return fuse.S_IFREG
@@ -25,6 +24,10 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 
 	case quantumfs.ObjectTypeSymlink:
 		return fuse.S_IFLNK
+
+	case quantumfs.ObjectTypeHardlink:
+		c.elog("Hardlink must be translated into the underlying type")
+		return 0
 
 	case quantumfs.ObjectTypeSpecial:
 		// Note, Special isn't really a FIFO, but it's used as a signal to
