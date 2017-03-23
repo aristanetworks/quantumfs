@@ -38,7 +38,7 @@ var showMaxSizes bool
 
 func init() {
 	const (
-		defaultCachePath        = "/var/run/quantumfs"
+		defaultCachePath        = "/dev/shm/quantumfs"
 		defaultCacheSize        = "8G"
 		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 1
@@ -50,7 +50,7 @@ func init() {
 
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
 		"Default location of the internal cache. Should be on a ramfs or "+
-			"tmpfs filsystem")
+			"tmpfs filesystem to avoid random 1 second lag spikes")
 
 	flag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
 		"Size of the local cache, e.g. 8G or 512M")

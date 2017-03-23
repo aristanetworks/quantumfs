@@ -671,7 +671,8 @@ func init() {
 
 	var err error
 	for i := 0; i < 10; i++ {
-		testRunDir, err = ioutil.TempDir("", "quantumfsTest")
+		// We must use a ramfs or else we get IO lag spikes of > 1 second
+		testRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
 		if err != nil {
 			continue
 		}
