@@ -87,6 +87,8 @@ type CommandCommon struct {
 }
 
 // The various command ID constants
+// IMPORTANT: please do not change the order/values of the above constants, QFSClient
+// depends on the fact that the values should not change !!!!!
 const (
 	CmdError           = iota
 	CmdBranchRequest   = iota
@@ -97,17 +99,21 @@ const (
 	CmdDeleteWorkspace = iota
 	CmdSetBlock        = iota
 	CmdGetBlock        = iota
+	CmdEnableRootWrite = iota
 )
 
 // The various error codes
+// IMPORTANT: please do not change the order/values of the above constants, QFSClient
+// depends on the fact that the values should not change !!!!!
 const (
-	ErrorOK            = iota // Command Successful
-	ErrorBadArgs       = iota // The argument is wrong
-	ErrorBadJson       = iota // Failed to parse command
-	ErrorBadCommandId  = iota // Unknown command ID
-	ErrorCommandFailed = iota // The Command failed, see the error for more info
-	ErrorKeyNotFound   = iota // The extended key is not stored in the datastore
-	ErrorBlockTooLarge = iota // SetBlock was passed a block that was too large
+	ErrorOK                = iota // Command Successful
+	ErrorBadArgs           = iota // The argument is wrong
+	ErrorBadJson           = iota // Failed to parse command
+	ErrorBadCommandId      = iota // Unknown command ID
+	ErrorCommandFailed     = iota // The Command failed, see the error for info
+	ErrorKeyNotFound       = iota // The extended key isn't stored in datastore
+	ErrorBlockTooLarge     = iota // SetBlock was passed a block that's too large
+	ErrorWorkspaceNotFound = iota // The workspace cannot be found in QuantumFS
 )
 
 type ErrorResponse struct {
@@ -143,6 +149,11 @@ type InsertInodeRequest struct {
 	Uid         uint32
 	Gid         uint32
 	Permissions uint32
+}
+
+type EnableRootWriteRequest struct {
+	CommandCommon
+	Workspace string
 }
 
 type DeleteWorkspaceRequest struct {
@@ -350,6 +361,37 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
+func (api *Api) EnableRootWrite(dst string) error {
+	if !isWorkspaceNameValid(dst) {
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
+	}
+
+	cmd := EnableRootWriteRequest{
+		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
+		Workspace:     dst,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
 	}
 	return nil
 }
