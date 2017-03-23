@@ -284,7 +284,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 func specialOverrideAttr(entry DirectoryRecordIf, attr *fuse.Attr) uint32 {
 	attr.Size = 0
-	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = 1
 
 	filetype, dev := decodeSpecialKey(entry.ID())

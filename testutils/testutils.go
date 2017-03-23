@@ -1,8 +1,8 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// testutils package provides helper functions for tools which do not need
-// to have a running quantumfs instance.
+// testutils package supplies a general purpose test framework and
+// useful helpers.
 package testutils
 
 import "bytes"
@@ -11,6 +11,7 @@ import "fmt"
 import "io"
 import "io/ioutil"
 import "os"
+import "runtime"
 import "runtime/debug"
 import "sort"
 import "strings"
@@ -45,9 +46,14 @@ type TestHelper struct {
 // Assert the condition is true. If it is not true then fail the test with the given
 // message
 func (th *TestHelper) Assert(condition bool, format string, args ...interface{}) {
-	if !condition {
-		msg := fmt.Sprintf(format, args...)
-		panic(msg)
+	utils.Assert(condition, format, args...)
+}
+
+// A lot of times you're trying to do a test and you get error codes. The errors
+// often describe the problem better than any th.Assert message, so use them
+func (th *TestHelper) AssertNoErr(err error) {
+	if err != nil {
+		th.Assert(false, err.Error())
 	}
 }
 
@@ -95,12 +101,12 @@ func (th *TestHelper) EndTest() {
 	if th.TempDir != "" {
 		time.Sleep(1 * time.Second)
 
-		//	if testFailed := th.logscan(); !testFailed {
-		if err := os.RemoveAll(th.TempDir); err != nil {
-			th.T.Fatalf("Failed to cleanup temporary mount "+
-				"point: %v", err)
+		if testFailed := th.Logscan(); !testFailed {
+			if err := os.RemoveAll(th.TempDir); err != nil {
+				th.T.Fatalf("Failed to cleanup temporary mount "+
+					"point: %v", err)
+			}
 		}
-		//	}
 	} else {
 		th.T.Fatalf("No temporary directory available for logs")
 	}
@@ -124,22 +130,9 @@ func init() {
 		if err := os.Chmod(TestRunDir, 0777); err != nil {
 			continue
 		}
-		fmt.Printf("testutils testutils.TestRunDir %s\n", TestRunDir)
 		return
 	}
 	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
-}
-
-// CreateTestDirs makes the required directories for the test.
-// This directories are inside TestRunDir
-func (th *TestHelper) CreateTestDirs() {
-	th.TempDir = TestRunDir + "/" + th.TestName
-
-	mountPath := th.TempDir + "/mnt"
-	os.MkdirAll(mountPath, 0777)
-	th.Log("Using mountpath %s", mountPath)
-
-	os.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 type TLA struct {
@@ -428,4 +421,105 @@ func OutputLogError(errInfo LogscanError) (summary string) {
 		errInfo.TestName, buffer.String(), errInfo.TestName)
 	return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
 		" none.\n", errInfo.TestName)
+}
+
+// Change the UID/GID the test thread to the given values. Use -1 not to change
+// either the UID or GID.
+func (th *TestHelper) SetUidGid(uid int, gid int) {
+	// The quantumfs tests are run as root because some tests require
+	// root privileges. However, root can read or write any file
+	// irrespective of the file permissions. Obviously if we want to
+	// test permissions then we cannot run as root.
+	//
+	// To accomplish this we lock this goroutine to a particular OS
+	// thread, then we change the EUID of that thread to something which
+	// isn't root. Finally at the end we need to restore the EUID of the
+	// thread before unlocking ourselves from that thread. If we do not
+	// follow this precise cleanup order other tests or goroutines may
+	// run using the other UID incorrectly.
+	runtime.LockOSThread()
+	if gid != -1 {
+		err := syscall.Setregid(-1, gid)
+		if err != nil {
+			runtime.UnlockOSThread()
+		}
+		th.Assert(err == nil, "Faild to change test EGID: %v", err)
+	}
+
+	if uid != -1 {
+		err := syscall.Setreuid(-1, uid)
+		if err != nil {
+			syscall.Setregid(-1, 0)
+			runtime.UnlockOSThread()
+		}
+		th.Assert(err == nil, "Failed to change test EUID: %v", err)
+	}
+
+}
+
+// Set the UID and GID back to the defaults
+func (th *TestHelper) SetUidGidToDefault() {
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+
+	th.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
+	th.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+}
+
+var TimeMutex sync.Mutex
+var TimeBuckets []TimeData
+
+func OutputTimeHistogram() {
+	TimeMutex.Lock()
+	histogram := make([][]string, 20)
+	maxValue := 0
+	msPerBucket := 100.0
+	for i := 0; i < len(TimeBuckets); i++ {
+		bucketIdx := int(TimeBuckets[i].Duration.Seconds() *
+			(1000.0 / msPerBucket))
+		if bucketIdx >= len(histogram) {
+			bucketIdx = len(histogram) - 1
+		}
+		histogram[bucketIdx] = append(histogram[bucketIdx],
+			TimeBuckets[i].TestName)
+
+		if len(histogram[bucketIdx]) > maxValue {
+			maxValue = len(histogram[bucketIdx])
+		}
+	}
+	TimeMutex.Unlock()
+
+	// Scale outputs to fit into 60 columns wide
+	scaler := 1.0
+	if maxValue > 60 {
+		scaler = 60.0 / float64(maxValue)
+	}
+
+	fmt.Println("Test times:")
+	for i := len(histogram) - 1; i >= 0; i-- {
+		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
+
+		scaled := int(float64(len(histogram[i])) * scaler)
+		if scaled == 0 && len(histogram[i]) > 0 {
+			scaled = 1
+		}
+
+		for j := 0; j < scaled; j++ {
+			fmt.Printf("#")
+		}
+		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
+			fmt.Printf("(")
+			for j := 0; j < len(histogram[i]); j++ {
+				if j != 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("%s", histogram[i][j])
+			}
+			fmt.Printf(")")
+		}
+		fmt.Println()
+	}
 }

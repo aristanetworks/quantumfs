@@ -75,7 +75,7 @@ func TestMain(m *testing.M) {
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
 	if outputTimeGraph {
-		outputTimeHistogram()
+		testutils.OutputTimeHistogram()
 	}
 
 	os.RemoveAll(TestRunDir)

@@ -14,17 +14,6 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
-// Given an integer, return the number of blocks of the given size necessary to
-// contain it.
-func BlocksRoundUp(len uint64, blockSize uint64) uint64 {
-	blocks := len / blockSize
-	if len%blockSize != 0 {
-		blocks++
-	}
-
-	return blocks
-}
-
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry DirectoryRecordIf, updateMtime bool) {
 

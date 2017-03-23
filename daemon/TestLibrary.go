@@ -138,19 +138,31 @@ func runTestCommon(t *testing.T, test QuantumFsTest, startDefaultQfs bool,
 
 	// Record how long the test took so we can make a histogram
 	afterTest := time.Now()
-	timeMutex.Lock()
-	timeBuckets = append(timeBuckets,
+	testutils.TimeMutex.Lock()
+	testutils.TimeBuckets = append(testutils.TimeBuckets,
 		testutils.TimeData{
 			Duration: afterTest.Sub(beforeTest),
 			TestName: testName,
 		})
-	timeMutex.Unlock()
+	testutils.TimeMutex.Unlock()
 
 	if !th.ShouldFail && testResult != "" {
 		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
 	} else if th.ShouldFail && testResult == "" {
 		th.Log("ERROR: Test is expected to fail, but didn't")
 	}
+}
+
+// CreateTestDirs makes the required directories for the test.
+// These directories are inside TestRunDir
+func (th *TestHelper) CreateTestDirs() {
+	th.TempDir = TestRunDir + "/" + th.TestName
+
+	mountPath := th.TempDir + "/mnt"
+	os.MkdirAll(mountPath, 0777)
+	th.Log("Using mountpath %s", mountPath)
+
+	os.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 // Execute the quantumfs test.
@@ -287,11 +299,11 @@ func (th *TestHelper) waitToBeUnmounted() {
 // TestHelper holds the variables important to maintain the state of testing in a
 // package. This helper is more of a namespacing mechanism than a coherent object.
 type TestHelper struct {
+	testutils.TestHelper
 	qfs            *QuantumFs
 	qfsWait        sync.WaitGroup
 	fuseConnection int
 	api            *quantumfs.Api
-	testutils.TestHelper
 }
 
 func (th *TestHelper) defaultConfig() QuantumFsConfig {
@@ -522,12 +534,7 @@ var requestId = uint64(1000000000)
 var TestRunDir string
 
 func init() {
-	fmt.Printf("1. daemon testutils.TestRunDir %s\n", TestRunDir)
-	fmt.Printf("1. daemon testutils.TestRunDir %s\n", testutils.TestRunDir)
-
 	TestRunDir = testutils.TestRunDir
-
-	fmt.Printf("2. daemon testutils.TestRunDir %s\n", testutils.TestRunDir)
 }
 
 // Produce a request specific ctx variable to use for quantumfs internal calls
@@ -618,60 +625,6 @@ func genData(maxLen int) []byte {
 	return precompGenData[:maxLen]
 }
 
-// Change the UID/GID the test thread to the given values. Use -1 not to change
-// either the UID or GID.
-func (th *TestHelper) setUidGid(uid int, gid int) {
-	// The quantumfs tests are run as root because some tests require
-	// root privileges. However, root can read or write any file
-	// irrespective of the file permissions. Obviously if we want to
-	// test permissions then we cannot run as root.
-	//
-	// To accomplish this we lock this goroutine to a particular OS
-	// thread, then we change the EUID of that thread to something which
-	// isn't root. Finally at the end we need to restore the EUID of the
-	// thread before unlocking ourselves from that thread. If we do not
-	// follow this precise cleanup order other tests or goroutines may
-	// run using the other UID incorrectly.
-	runtime.LockOSThread()
-	if gid != -1 {
-		err := syscall.Setregid(-1, gid)
-		if err != nil {
-			runtime.UnlockOSThread()
-		}
-		th.Assert(err == nil, "Faild to change test EGID: %v", err)
-	}
-
-	if uid != -1 {
-		err := syscall.Setreuid(-1, uid)
-		if err != nil {
-			syscall.Setregid(-1, 0)
-			runtime.UnlockOSThread()
-		}
-		th.Assert(err == nil, "Failed to change test EUID: %v", err)
-	}
-
-}
-
-// Set the UID and GID back to the defaults
-func (th *TestHelper) setUidGidToDefault() {
-	defer runtime.UnlockOSThread()
-
-	// Test always runs as root, so its euid and egid is 0
-	err1 := syscall.Setreuid(-1, 0)
-	err2 := syscall.Setregid(-1, 0)
-
-	th.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
-	th.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
-}
-
-// A lot of times you're trying to do a test and you get error codes. The errors
-// often describe the problem better than any th.Assert message, so use them
-func (th *TestHelper) AssertNoErr(err error) {
-	if err != nil {
-		th.Assert(false, err.Error())
-	}
-}
-
 func (th *TestHelper) remountFilesystem() {
 	th.Log("Remounting filesystem")
 	err := syscall.Mount("", th.TempDir+"/mnt", "", syscall.MS_REMOUNT, "")
@@ -687,59 +640,4 @@ func cacheTimeout100Ms(test *TestHelper, config *QuantumFsConfig) {
 // Modify the QuantumFS flush delay to 100 milliseconds
 func dirtyDelay100Ms(test *TestHelper, config *QuantumFsConfig) {
 	config.DirtyFlushDelay = 100 * time.Millisecond
-}
-
-var timeMutex sync.Mutex
-var timeBuckets []testutils.TimeData
-
-func outputTimeHistogram() {
-	timeMutex.Lock()
-	histogram := make([][]string, 20)
-	maxValue := 0
-	msPerBucket := 100.0
-	for i := 0; i < len(timeBuckets); i++ {
-		bucketIdx := int(timeBuckets[i].Duration.Seconds() *
-			(1000.0 / msPerBucket))
-		if bucketIdx >= len(histogram) {
-			bucketIdx = len(histogram) - 1
-		}
-		histogram[bucketIdx] = append(histogram[bucketIdx],
-			timeBuckets[i].TestName)
-
-		if len(histogram[bucketIdx]) > maxValue {
-			maxValue = len(histogram[bucketIdx])
-		}
-	}
-	timeMutex.Unlock()
-
-	// Scale outputs to fit into 60 columns wide
-	scaler := 1.0
-	if maxValue > 60 {
-		scaler = 60.0 / float64(maxValue)
-	}
-
-	fmt.Println("Test times:")
-	for i := len(histogram) - 1; i >= 0; i-- {
-		fmt.Printf("|%4dms|", (1+i)*int(msPerBucket))
-
-		scaled := int(float64(len(histogram[i])) * scaler)
-		if scaled == 0 && len(histogram[i]) > 0 {
-			scaled = 1
-		}
-
-		for j := 0; j < scaled; j++ {
-			fmt.Printf("#")
-		}
-		if len(histogram[i]) > 0 && len(histogram[i]) <= 4 {
-			fmt.Printf("(")
-			for j := 0; j < len(histogram[i]); j++ {
-				if j != 0 {
-					fmt.Printf(", ")
-				}
-				fmt.Printf("%s", histogram[i][j])
-			}
-			fmt.Printf(")")
-		}
-		fmt.Println()
-	}
 }

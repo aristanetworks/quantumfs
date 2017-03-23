@@ -237,7 +237,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		// linear approximately based upon the design document fixed field
 		// sizes, even though the real encoding is variable length.
 		attr.Size = 25 + 331*entry.Size()
-		attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+		attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 		attr.Nlink = uint32(entry.Size()) + 2
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
@@ -251,7 +251,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		// This ignore the datablocks containing the file metadata, which is
 		// relevant for medium, large and very large files.
 		attr.Size = entry.Size()
-		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
+		attr.Blocks = utils.BlocksRoundUp(entry.Size(), statBlockSize)
 		attr.Nlink = entry.Nlinks()
 	}
 
