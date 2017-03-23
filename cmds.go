@@ -461,7 +461,8 @@ func (api *Api) SetBlock(key []byte, data []byte) error {
 }
 
 // Note that, because we report the size of Api as 1024, we can't read more than
-// 1024 bytes of data... so blocks that you try to Get have a low size limit
+// 1024 bytes of data... so blocks that you try to Get have a low size limit.
+// See BUG185832
 func (api *Api) GetBlock(key []byte) ([]byte, error) {
 
 	cmd := GetBlockRequest{
