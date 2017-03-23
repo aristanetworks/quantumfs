@@ -14,7 +14,7 @@ import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
 
 // 160 bit hash
-const hashSize = 20 // must match in hash/hash.go
+const HashSize = 20 // must match in hash/hash.go
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
