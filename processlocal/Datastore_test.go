@@ -11,6 +11,7 @@ import "fmt"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 // Assert the condition is true. If it is not true then fail the test with the given
@@ -51,7 +52,7 @@ func TestIdenticalContentSync(t *testing.T) {
 	key := quantumfs.NewObjectKeyFromBytes(key_byte)
 
 	// Put the source content into the buffer
-	buffer := quantumfs.NewSimpleBuffer(data, key)
+	buffer := testutils.NewSimpleBuffer(data, key)
 
 	// Set the content with the pre-defined unique key
 	store.Set(ctx, key, buffer)
@@ -60,7 +61,7 @@ func TestIdenticalContentSync(t *testing.T) {
 
 	// Get the content from the datastore
 	empty := make([]byte, 32, 32)
-	output := quantumfs.NewSimpleBuffer(empty, key)
+	output := testutils.NewSimpleBuffer(empty, key)
 	store.Get(ctx, key, output)
 
 	assert(bytes.Equal(output.Get(), data),
