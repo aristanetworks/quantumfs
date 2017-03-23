@@ -150,13 +150,15 @@ TEST_F(QfsClientTest, SendLargeCommandTest) {
 	ASSERT_FALSE(this->api == NULL);
 
 	const size_t size = 129 * 1024;
-	byte datum = 0x00;
+	byte datum = 0x41;
 	ApiImpl::CommandBuffer send;
 
 	for(int i = 0; i < size; i++) {
 		send.Append(&datum, 1);
-		datum++;
 	}
+	datum = 0x00;
+	send.Append(&datum, 1);
+
 
 	ApiImpl::CommandBuffer result;
 
@@ -699,7 +701,7 @@ TEST_F(QfsClientCommandBufferTest, AppendAndCopyLotsTest) {
 		buffer.Append(data, 1);
 	}
 
-	ASSERT_EQ(buffer.Size(), size);
+	 ASSERT_EQ(buffer.Size(), size);
 
 	const std::vector<byte> &data = buffer.data;
 	ApiImpl::CommandBuffer other_buffer;

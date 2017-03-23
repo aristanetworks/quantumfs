@@ -70,6 +70,10 @@ enum ErrorCode {
 
 	// a JSON object was found with the wrong type
 	kJsonObjectWrongType = 16,
+
+	// The file should be open with O_DIRECT, but the O_DIRECT is missing in
+	// the actual mode
+	kMissDirectMode = 16,
 };
 
 /// An `Error` object is returned by many member functions of the Api class. The

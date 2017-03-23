@@ -3,6 +3,7 @@
 
 #include "QFSClient/qfs_client_implementation.h"
 
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -139,22 +140,30 @@ Error ApiImpl::Open() {
 		}
 	}
 
-	if (!this->file.is_open()) {
-		this->file.open(this->path.c_str(),
-				std::ios::in | std::ios::out | std::ios::binary);
-
-		if (this->file.fail()) {
+	this->mtx.lock();
+	if (this->fd < 0) {
+		this->fd = open(this->path.c_str(), O_RDWR|O_DIRECT);
+		if (this->fd < 0)
 			return util::getError(kCantOpenApiFile, this->path);
-		}
+
+		this->mtx.unlock();
+
+		int flags = fcntl(fd, F_GETFL, 0);
+		if(flags&O_DIRECT  == 0)
+			return util::getError(kMissDirectMode, this->path);
 	}
+	this->mtx.unlock();
 
 	return util::getError(kSuccess);
 }
 
 void ApiImpl::Close() {
-	if (this->file.is_open()) {
-		this->file.close();
+	this->mtx.lock();
+	if(this->fd >= 0) {
+		close(this->fd);
+		this->fd = -1;
 	}
+	this->mtx.unlock();
 }
 
 Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
@@ -179,23 +188,32 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 }
 
 Error ApiImpl::WriteCommand(const CommandBuffer &command) {
-	if (!this->file.is_open()) {
+	this->mtx.lock();
+	if (this->fd < 0) {
+		this->mtx.unlock();
 		return util::getError(kApiFileNotOpen);
 	}
 
-	this->file.seekp(0);
-	if (this->file.fail()) {
+	int rtn = lseek(this->fd, 0, SEEK_SET);
+	this->mtx.unlock();
+	if (rtn == -1) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
-	this->file.write((const char *)command.Data(), command.Size());
-	if (this->file.fail()) {
-		return util::getError(kApiFileWriteFail, this->path);
-	}
+	// make the input data aligned
+	char *subblk = reinterpret_cast<char*>(
+			aligned_alloc(blkSize, command.Size()));
+	memcpy(subblk, command.Data(), command.Size());
+	int tmpSize = (command.Size()/blkSize)*blkSize;
+	if(command.Size()%blkSize > 0)
+		tmpSize += blkSize;
 
-	this->file.flush();
-	if (this->file.fail()) {
-		return util::getError(kApiFileFlushFail, this->path);
+	this->mtx.lock();
+	rtn = write(this->fd, (const char *)subblk, tmpSize);
+	this->mtx.unlock();
+	free(subblk);
+	if (rtn != tmpSize) {
+		return util::getError(kApiFileWriteFail, this->path);
 	}
 
 	return util::getError(kSuccess);
@@ -204,38 +222,59 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	ErrorCode err = kSuccess;
 
-	if (!this->file.is_open()) {
+	this->mtx.lock();
+	if (this->fd < 0) {
+		this->mtx.unlock();
 		return util::getError(kApiFileNotOpen);
 	}
 
-	this->file.seekg(0);
-	if (this->file.fail()) {
+	int rtn = lseek(this->fd, 0, SEEK_SET);
+	this->mtx.unlock();
+	if (rtn == -1) {
 		return util::getError(kApiFileSeekFail);
 	}
 
 	// read up to 4k at a time, stopping on EOF
 	command->Reset();
 
-	byte data[4096];
-	while(!this->file.eof()) {
-		this->file.read(reinterpret_cast<char *>(data), sizeof(data));
+	// make the buffer align to page block for O_DIRECT
+	int tmpSize = 4096;
+	byte* data = reinterpret_cast<byte*>(aligned_alloc(blkSize, tmpSize));
+	char tmp[4096];
 
-		if (this->file.fail() && !(this->file.eof())) {
+	rtn = tmpSize;
+	while(rtn == tmpSize) {
+		this->mtx.lock();
+		rtn = read(this->fd, data, tmpSize);
+		this->mtx.unlock();
+
+		if (rtn == 0) {  // finish the loop when EOF
+			break;
+		} else if (rtn < 0) {
 			// any read failure *except* an EOF is a failure
+			free(data);
 			return util::getError(kApiFileReadFail, this->path);
 		}
 
-		size_t size = this->file.gcount();
-		err = command->Append(data, size);
+		// copy the content from the aligned buffer to a normal buffer and
+		// get the accurate length of the return response
+		memset(tmp, 0, tmpSize);
+		memcpy(tmp, data, rtn);
+		rtn = static_cast<int>(strlen(tmp));
+		if (rtn < tmpSize)  // take the end of '\0' into account
+			rtn += 1;
+		else
+			rtn = tmpSize;
+
+		size_t size = (size_t)rtn;
+		err = command->Append(reinterpret_cast<byte*>(tmp), size);
 
 		if (err != kSuccess) {
+			free(data);
 			return util::getError(err);
 		}
 	}
-
-	// clear the file stream's state, because it will remain in an error state
-	// after hitting an EOF
-	this->file.clear();
+	free(data);
 
 	return util::getError(err);
 }
