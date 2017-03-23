@@ -158,7 +158,7 @@ class ApiImpl: public Api {
 	// Initialize the file descriptor as -1 which mean it hasn't been opened yet
 	int fd = -1;
 	// The mutex protecting multiple accesses to file descriptor
-	pthread_mutex_t mtx;
+	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	// We use the presence of a value in this member variable to indicate that
 	// the API file's location is known (either because it was passed to the

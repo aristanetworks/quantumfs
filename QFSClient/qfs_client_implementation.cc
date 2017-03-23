@@ -140,30 +140,30 @@ Error ApiImpl::Open() {
 		}
 	}
 
-	this->mtx.lock();
+	pthread_mutex_lock(&this->mutex);
 	if (this->fd < 0) {
 		this->fd = open(this->path.c_str(), O_RDWR|O_DIRECT);
 		if (this->fd < 0)
 			return util::getError(kCantOpenApiFile, this->path);
 
-		this->mtx.unlock();
+		pthread_mutex_unlock(&this->mutex);
 
 		int flags = fcntl(fd, F_GETFL, 0);
 		if(flags&O_DIRECT  == 0)
 			return util::getError(kMissDirectMode, this->path);
 	}
-	this->mtx.unlock();
+	pthread_mutex_unlock(&this->mutex);
 
 	return util::getError(kSuccess);
 }
 
 void ApiImpl::Close() {
-	this->mtx.lock();
+	pthread_mutex_lock(&this->mutex);
 	if(this->fd >= 0) {
 		close(this->fd);
 		this->fd = -1;
 	}
-	this->mtx.unlock();
+	pthread_mutex_unlock(&this->mutex);
 }
 
 Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
@@ -188,14 +188,14 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 }
 
 Error ApiImpl::WriteCommand(const CommandBuffer &command) {
-	this->mtx.lock();
+	pthread_mutex_lock(&this->mutex);
 	if (this->fd < 0) {
-		this->mtx.unlock();
+		pthread_mutex_unlock(&this->mutex);
 		return util::getError(kApiFileNotOpen);
 	}
 
 	int rtn = lseek(this->fd, 0, SEEK_SET);
-	this->mtx.unlock();
+	pthread_mutex_unlock(&this->mutex);
 	if (rtn == -1) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
@@ -208,9 +208,9 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 	if(command.Size()%blkSize > 0)
 		tmpSize += blkSize;
 
-	this->mtx.lock();
+	pthread_mutex_lock(&this->mutex);
 	rtn = write(this->fd, (const char *)subblk, tmpSize);
-	this->mtx.unlock();
+	pthread_mutex_unlock(&this->mutex);
 	free(subblk);
 	if (rtn != tmpSize) {
 		return util::getError(kApiFileWriteFail, this->path);
@@ -222,14 +222,14 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	ErrorCode err = kSuccess;
 
-	this->mtx.lock();
+	pthread_mutex_lock(&this->mutex);
 	if (this->fd < 0) {
-		this->mtx.unlock();
+		pthread_mutex_unlock(&this->mutex);
 		return util::getError(kApiFileNotOpen);
 	}
 
 	int rtn = lseek(this->fd, 0, SEEK_SET);
-	this->mtx.unlock();
+	pthread_mutex_unlock(&this->mutex);
 	if (rtn == -1) {
 		return util::getError(kApiFileSeekFail);
 	}
@@ -244,10 +244,9 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 
 	rtn = tmpSize;
 	while(rtn == tmpSize) {
-		this->mtx.lock();
+		pthread_mutex_lock(&this->mutex);
 		rtn = read(this->fd, data, tmpSize);
-		this->mtx.unlock();
-
+		pthread_mutex_lock(&this->mutex);
 		if (rtn == 0) {  // finish the loop when EOF
 			break;
 		} else if (rtn < 0) {
