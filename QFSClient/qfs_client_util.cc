@@ -188,7 +188,8 @@ void base64_decode(const std::string &b64, std::vector<byte> *data) {
 	data->resize(max_result_size);
 
 	BIO *bio = BIO_new(BIO_f_base64());
-	BIO *bio_mem = BIO_new_mem_buf(b64.c_str(), b64.length() + 1);
+	BIO *bio_mem = BIO_new_mem_buf(const_cast<char*>(b64.c_str()),
+	                               b64.length() + 1);
 	if(!bio || !bio_mem) {
 		return;
 	}
