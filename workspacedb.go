@@ -66,14 +66,14 @@ type WorkspaceDB interface {
 
 type WsdbErrCode int
 type WorkspaceDbErr struct {
-	code WsdbErrCode
-	msg  string
+	Code WsdbErrCode
+	Msg  string
 }
 
 func NewWorkspaceDbErr(code WsdbErrCode, format string,
 	args ...interface{}) error {
 
-	return &WorkspaceDbErr{code: code, msg: fmt.Sprintf(format, args)}
+	return &WorkspaceDbErr{Code: code, Msg: fmt.Sprintf(format, args)}
 }
 
 const (
@@ -87,11 +87,11 @@ const (
 )
 
 func (err *WorkspaceDbErr) Error() string {
-	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.msg)
+	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.Msg)
 }
 
 func (err *WorkspaceDbErr) ErrorCode() string {
-	switch err.code {
+	switch err.Code {
 	default:
 		return "Unknown wsdb error"
 	case WSDB_WORKSPACE_EXISTS:
