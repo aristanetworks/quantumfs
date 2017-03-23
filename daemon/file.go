@@ -476,9 +476,7 @@ func (fi *File) listChildXAttr(c *ctx,
 		nameBuffer.WriteByte(0)
 	}
 
-	c.vlog("Appending %s", quantumfs.XAttrTypeKey)
-	nameBuffer.WriteString(quantumfs.XAttrTypeKey)
-	nameBuffer.WriteByte(0)
+	// don't append our self-defined extended attribute XAttrTypeKey to hide it
 
 	c.vlog("Returning %d bytes", nameBuffer.Len())
 

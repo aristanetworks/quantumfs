@@ -76,9 +76,6 @@ func TestExtendedAttrList(t *testing.T) {
 		data := make([]byte, 64000)
 		size, err := syscall.Listxattr(testFilename, data)
 		test.assert(err == nil, "Error listing XAttr: %v", err)
-		// by default NULL-terminated XAttrTypeKey is present
-		test.assert(size-1 == len([]byte(quantumfs.XAttrTypeKey)),
-			"Unexpected XAttr, size %d", size)
 
 		// Add a bunch of attributes
 		const N = 100
@@ -100,14 +97,11 @@ func TestExtendedAttrList(t *testing.T) {
 		data = data[:size]
 		names := bytes.Split(data, []byte("\x00"))
 		names = names[:len(names)-1] // Remove empty last element
-		test.assert(len(names) == N+1, "Fewer XAttr than expected: %d != %d",
-			len(names), N+1)
+		test.assert(len(names) == N, "Fewer XAttr than expected: %d != %d",
+			len(names), N)
 
 		for _, nameBytes := range names {
 			name := string(nameBytes)
-			if name == quantumfs.XAttrTypeKey {
-				continue
-			}
 			test.assert(strings.HasPrefix(name, "user.attr"),
 				"Incorrect XAttr name %s", name)
 		}
@@ -156,16 +150,13 @@ func TestExtendedAttrRemove(t *testing.T) {
 			data = data[:size]
 			names := bytes.Split(data, []byte("\x00"))
 			names = names[:len(names)-1] // Remove empty last element
-			test.assert(len(names) == N+1,
+			test.assert(len(names) == N,
 				"Fewer XAttr than expected: %d != %d",
-				len(names), N+1)
+				len(names), N)
 
 			nameSet := make(map[string]bool)
 			for _, nameBytes := range names {
 				name := string(nameBytes)
-				if name == quantumfs.XAttrTypeKey {
-					continue
-				}
 				test.assert(strings.HasPrefix(name, "user.attr"),
 					"Incorrect XAttr name %s", name)
 				nameSet[name] = true
@@ -366,8 +357,7 @@ func TestXAttrTypeKeyList(t *testing.T) {
 		_, err = syscall.Listxattr(testFilename, dst)
 		test.assert(err == nil &&
 			bytes.Contains(dst, []byte("security.one")) &&
-			bytes.Contains(dst, []byte("security.two")) &&
-			bytes.Contains(dst, []byte(quantumfs.XAttrTypeKey)),
+			bytes.Contains(dst, []byte("security.two")),
 			"Error listing XAttr: %v with content of %s",
 			err, dst)
 	})
@@ -695,8 +685,6 @@ func TestHardlinkXAttr(t *testing.T) {
 			"Previous xattr missing")
 		test.assert(bytes.Contains(data, []byte(attrData)),
 			"Xattr missing")
-		test.assert(bytes.Contains(data, []byte("quantumfs.key")),
-			"Quantumfs key missing")
 
 		// Linked
 		dataFile := make([]byte, 100)

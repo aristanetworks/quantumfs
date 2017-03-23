@@ -52,7 +52,7 @@ func TestIdenticalContentSync(t *testing.T) {
 	key := quantumfs.NewObjectKeyFromBytes(key_byte)
 
 	// Put the source content into the buffer
-	buffer := testutils.NewTestBuffer(data, key)
+	buffer := testutils.NewSimpleBuffer(data, key)
 
 	// Set the content with the pre-defined unique key
 	store.Set(ctx, key, buffer)
@@ -61,7 +61,7 @@ func TestIdenticalContentSync(t *testing.T) {
 
 	// Get the content from the datastore
 	empty := make([]byte, 32, 32)
-	output := testutils.NewTestBuffer(empty, key)
+	output := testutils.NewSimpleBuffer(empty, key)
 	store.Get(ctx, key, output)
 
 	assert(bytes.Equal(output.Get(), data),
