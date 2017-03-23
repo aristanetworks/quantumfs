@@ -618,7 +618,7 @@ func (api *ApiHandle) setBlock(c *ctx, buf []byte) {
 
 	var hash [quantumfs.HashSize]byte
 	copy(hash[:len(hash)], cmd.Key)
-	key := quantumfs.NewObjectKey(quantumfs.KeyTypeOther, hash)
+	key := quantumfs.NewObjectKey(quantumfs.KeyTypeApi, hash)
 
 	buffer := newBuffer(c, cmd.Data, key.Type())
 
@@ -646,7 +646,7 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) {
 
 	var hash [quantumfs.HashSize]byte
 	copy(hash[:len(hash)], cmd.Key)
-	key := quantumfs.NewObjectKey(quantumfs.KeyTypeOther, hash)
+	key := quantumfs.NewObjectKey(quantumfs.KeyTypeApi, hash)
 
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {

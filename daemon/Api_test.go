@@ -466,5 +466,12 @@ func TestApiGetAndSetBlock(t *testing.T) {
 		test.assertNoErr(err)
 
 		test.assert(bytes.Equal(data, readData), "Data mismatch")
+
+		// Ensure that we are checking the key length correctly
+		err = api.SetBlock(key[:1], data)
+		test.assert(err != nil, "Invalid key length allowed in SetBlock")
+
+		_, err = api.GetBlock(key[:1])
+		test.assert(err != nil, "Invalid key length allowed in GetBlock")
 	})
 }
