@@ -486,8 +486,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	dst := strings.Split(cmd.DstPath, "/")
 	key, type_, size, err := quantumfs.DecodeExtendedKey(cmd.Key)
 	permissions := cmd.Permissions
-	uid := quantumfs.ObjectUid(c.Ctx, uint32(cmd.Uid), uint32(cmd.Uid))
-	gid := quantumfs.ObjectGid(c.Ctx, uint32(cmd.Gid), uint32(cmd.Gid))
+	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
+	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
