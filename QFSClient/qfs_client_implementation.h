@@ -6,6 +6,7 @@
 
 #include "QFSClient/qfs_client.h"
 
+#include <pthread.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -21,6 +22,7 @@ namespace qfsclient {
 
 const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
+const int blkSize = 512;
 
 // Class used for holding internal context about an in-flight API call. It may be
 // passed between functions used to handle an API call and should should be created
@@ -153,7 +155,10 @@ class ApiImpl: public Api {
 	// indicate the path's validity.
 	Error CheckWorkspacePathValid(const char *workspace_path);
 
-	std::fstream file;
+	// Initialize the file descriptor as -1 which mean it hasn't been opened yet
+	int fd = -1;
+	// The mutex protecting multiple accesses to file descriptor
+	pthread_mutex_t mtx;
 
 	// We use the presence of a value in this member variable to indicate that
 	// the API file's location is known (either because it was passed to the
