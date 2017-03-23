@@ -16,6 +16,7 @@ void cCityHashCrc256(const char *s, size_t len, uint64_t *result);
 import "C"
 import "unsafe"
 
+// 160 bit hash
 const HashSize = 20 // Must match in datastore.go
 
 func Hash(input []byte) [HashSize]byte {

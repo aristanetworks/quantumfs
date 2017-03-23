@@ -5,6 +5,7 @@ package daemon
 
 // Test the various Api calls
 
+import "bytes"
 import "fmt"
 import "os"
 import "runtime"
@@ -449,5 +450,28 @@ func TestWorkspaceDeletion(t *testing.T) {
 
 		err = syscall.Stat(ws2, &stat)
 		test.assert(err == nil, "Workspace2 deleted: %v", err)
+	})
+}
+
+func TestApiGetAndSetBlock(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		key := []byte("11112222333344445555")
+		data := genData(300)
+		err := api.SetBlock(key, data)
+		test.assertNoErr(err)
+
+		readData, err := api.GetBlock(key)
+		test.assertNoErr(err)
+
+		test.assert(bytes.Equal(data, readData), "Data mismatch")
+
+		// Ensure that we are checking the key length correctly
+		err = api.SetBlock(key[:1], data)
+		test.assert(err != nil, "Invalid key length allowed in SetBlock")
+
+		_, err = api.GetBlock(key[:1])
+		test.assert(err != nil, "Invalid key length allowed in GetBlock")
 	})
 }

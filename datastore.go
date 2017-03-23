@@ -14,7 +14,7 @@ import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
 
 // 160 bit hash
-const hashSize = 20 // must match in hash/hash.go
+const HashSize = 20 // must match in hash/hash.go
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
@@ -107,6 +107,8 @@ const (
 	// this value indicates that the rest of the key is embedded data which is
 	// interpretted directly.
 	KeyTypeEmbedded = iota
+
+	KeyTypeApi = iota // A key-value pair provided entirely by the api
 )
 
 // String names for KeyTypes
@@ -144,7 +146,7 @@ func (v KeyType) Primitive() interface{} {
 //
 // In this case we use a 20 byte hash sufficient to store hash values and one
 // additional byte used for routing.
-const ObjectKeyLength = 1 + hashSize
+const ObjectKeyLength = 1 + HashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
@@ -154,7 +156,7 @@ type ObjectKey struct {
 	key encoding.ObjectKey
 }
 
-func NewObjectKey(type_ KeyType, hash [ObjectKeyLength - 1]byte) ObjectKey {
+func NewObjectKey(type_ KeyType, hash [HashSize]byte) ObjectKey {
 	segment := capn.NewBuffer(nil)
 	key := ObjectKey{
 		key: encoding.NewRootObjectKey(segment),

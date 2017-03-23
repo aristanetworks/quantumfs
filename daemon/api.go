@@ -36,7 +36,9 @@ type ApiInode struct {
 
 func fillApiAttr(attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
-	attr.Size = 1024
+	// You can never read more than a file's size, so this must be larger than
+	// any possible api response message length
+	attr.Size = uint64(1024)
 	attr.Blocks = 1
 
 	now := time.Now()
@@ -395,10 +397,15 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdDeleteWorkspace:
 		c.vlog("Received DeleteWorkspace request")
 		api.deleteWorkspace(c, buf)
+	case quantumfs.CmdSetBlock:
+		c.vlog("Received SetBlock request")
+		api.setBlock(c, buf)
+	case quantumfs.CmdGetBlock:
+		c.vlog("Received GetBlock request")
+		api.getBlock(c, buf)
 	case quantumfs.CmdEnableRootWrite:
 		c.vlog("Received EnableRootWrite request")
 		api.enableRootWrite(c, buf)
-
 	}
 
 	c.vlog("done writing to file")
@@ -594,4 +601,76 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 	delete(c.qfs.workspaceMutability, workspacePath)
 
 	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
+}
+
+func (api *ApiHandle) setBlock(c *ctx, buf []byte) {
+	var cmd quantumfs.SetBlockRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	if len(cmd.Key) != quantumfs.HashSize {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			fmt.Sprintf("Key must be %d bytes", quantumfs.HashSize))
+		return
+	}
+
+	var hash [quantumfs.HashSize]byte
+	copy(hash[:len(hash)], cmd.Key)
+	key := quantumfs.NewObjectKey(quantumfs.KeyTypeApi, hash)
+
+	buffer := newBuffer(c, cmd.Data, key.Type())
+
+	err := c.dataStore.durableStore.Set(&c.Ctx, key, buffer)
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return
+	}
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Block set succeeded")
+}
+
+func (api *ApiHandle) getBlock(c *ctx, buf []byte) {
+	var cmd quantumfs.GetBlockRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	if len(cmd.Key) != quantumfs.HashSize {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			fmt.Sprintf("Key must be %d bytes", quantumfs.HashSize))
+		return
+	}
+
+	var hash [quantumfs.HashSize]byte
+	copy(hash[:len(hash)], cmd.Key)
+	key := quantumfs.NewObjectKey(quantumfs.KeyTypeApi, hash)
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Nil buffer returned from datastore")
+		return
+	}
+
+	response := quantumfs.GetBlockResponse{
+		ErrorResponse: quantumfs.ErrorResponse{
+			CommandCommon: quantumfs.CommandCommon{
+				CommandId: quantumfs.CmdError,
+			},
+			ErrorCode: quantumfs.ErrorOK,
+			Message:   "",
+		},
+		Data: buffer.Get(),
+	}
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		panic("Failed to marshall API GetBlockResponse")
+	}
+
+	c.vlog("Data length %d, response length %d", buffer.Size(), len(bytes))
+	api.responses <- fuse.ReadResultData(bytes)
 }
