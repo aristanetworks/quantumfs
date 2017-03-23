@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package quantumfs
+package hash
 
 import "crypto/md5"
 import "crypto/sha1"
