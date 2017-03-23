@@ -6,11 +6,15 @@ package quantumfs
 
 import "encoding/base64"
 import "encoding/binary"
+import "encoding/hex"
 import "fmt"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
+
+// 160 bit hash
+const hashSize = 20 // must match in hash/hash.go
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
@@ -427,6 +431,24 @@ func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
 	return Time(t)
 }
 
+// Take constant hashes produced by the emptykeys tool and convert them into a byte
+// string as if we have computed the hash ourselves. This is necessary to allow
+// clients to import the quantumfs package without requiring that CityHash is built
+// and available.
+func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
+	var out [ObjectKeyLength - 1]byte
+
+	bytes, err := hex.DecodeString(hash)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for i := range bytes {
+		out[i] = bytes[1]
+	}
+	return out
+}
+
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
@@ -434,7 +456,7 @@ func createEmptyDirectory() ObjectKey {
 
 	bytes := emptyDir.Bytes()
 
-	hash := Hash(bytes)
+	hash := decodeHashConstant("2ee5784d3bdfcd8617885fdac9aee5f7c890fce8")
 	emptyDirKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyDirKey.String()] = bytes
 	return emptyDirKey
@@ -445,7 +467,7 @@ var EmptyBlockKey ObjectKey
 func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
-	hash := Hash(bytes)
+	hash := decodeHashConstant("30f9a5e6242f1695e006ebf1f4bd0868824d627b")
 	emptyBlockKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyBlockKey.String()] = bytes
 	return emptyBlockKey
@@ -623,7 +645,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 	bytes := emptyWorkspace.Bytes()
 
-	hash := Hash(bytes)
+	hash := decodeHashConstant("fd14336f054b393fdd4e298859565c91337e5791")
 	emptyWorkspaceKey := NewObjectKey(KeyTypeConstant, hash)
 	constStore.store[emptyWorkspaceKey.String()] = bytes
 	return emptyWorkspaceKey
@@ -1114,12 +1136,6 @@ func calcMaxBlocksLargeFile(maxSize int) int {
 }
 
 func init() {
-	emptyDirKey := createEmptyDirectory()
-	emptyBlockKey := createEmptyBlock()
-	emptyWorkspaceKey := createEmptyWorkspace(emptyDirKey)
-	EmptyDirKey = emptyDirKey
-	EmptyBlockKey = emptyBlockKey
-	EmptyWorkspaceKey = emptyWorkspaceKey
 	ZeroKey = NewObjectKey(KeyTypeEmbedded, [ObjectKeyLength - 1]byte{})
 
 	if MaxBlockSize > 1024*1024*1024 || MaxBlockSize < 32*1024 {
@@ -1155,4 +1171,11 @@ func init() {
 		panic(fmt.Sprintf("MaxBlockSize %d is small for ExtendedAttributes",
 			MaxBlockSize))
 	}
+
+	emptyDirKey := createEmptyDirectory()
+	emptyBlockKey := createEmptyBlock()
+	emptyWorkspaceKey := createEmptyWorkspace(emptyDirKey)
+	EmptyDirKey = emptyDirKey
+	EmptyBlockKey = emptyBlockKey
+	EmptyWorkspaceKey = emptyWorkspaceKey
 }
