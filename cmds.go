@@ -431,6 +431,69 @@ func (api *Api) DeleteWorkspace(workspacepath string) error {
 	return nil
 }
 
+func (api *Api) SetBlock(key []byte, data []byte) error {
+
+	cmd := SetBlockRequest{
+		CommandCommon: CommandCommon{CommandId: CmdSetBlock},
+		Key:           key,
+		Data:          data,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Note that, because we report the size of Api as 1024, we can't read more than
+// 1024 bytes of data... so blocks that you try to Get have a low size limit.
+// See BUG185832
+func (api *Api) GetBlock(key []byte) ([]byte, error) {
+
+	cmd := GetBlockRequest{
+		CommandCommon: CommandCommon{CommandId: CmdGetBlock},
+		Key:           key,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	var getBlockResponse GetBlockResponse
+	err = json.Unmarshal(buf, &getBlockResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	errorResponse := getBlockResponse.ErrorResponse
+	if errorResponse.ErrorCode != ErrorOK {
+		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+
+	return getBlockResponse.Data, nil
+}
+
 func isWorkspaceNameValid(wsr string) bool {
 	if slashes := strings.Count(wsr, "/"); slashes != 2 {
 		return false
