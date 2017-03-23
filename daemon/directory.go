@@ -1780,6 +1780,7 @@ func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
+	assert(true, "Illegal call on Directory::Write()")
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
