@@ -7,6 +7,7 @@ import "container/list"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
+import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/qlog"
 import capn "github.com/glycerine/go-capnproto"
 
@@ -243,7 +244,7 @@ func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
 }
 
 func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
-	return quantumfs.Hash(buf.data)
+	return hash.Hash(buf.data)
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {

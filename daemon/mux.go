@@ -5,6 +5,7 @@
 // requests and forwards them to the correct Inode.
 package daemon
 
+import "reflect"
 import "container/list"
 import "fmt"
 import "io/ioutil"
@@ -42,6 +43,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		flushComplete:          make(chan struct{}),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
+		workspaceMutability:    make(map[string]bool),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -131,6 +133,13 @@ type QuantumFs struct {
 	// with positive values are still referenced by the kernel.
 	lookupCountLock DeferableMutex
 	lookupCounts    map[InodeId]uint64
+
+	// The workspaceMutability defines whether all inodes in each of the local
+	// workspace is mutable(write-permitted). Once if a workspace is set to be
+	// mutable, should it be put into the map, and all others are default to
+	// false
+	mutabilityLock      DeferableRwMutex
+	workspaceMutability map[string]bool
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -864,6 +873,107 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
+	workspace string) (*WorkspaceRoot, bool) {
+
+	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Enter Workspace %s/%s/%s",
+		typespace, namespace, workspace).out()
+
+	// Get the WorkspaceList Inode number
+	var typespaceAttr fuse.EntryOut
+	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
+		&typespaceAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
+
+	var namespaceAttr fuse.EntryOut
+	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
+		&namespaceAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
+
+	// Get the WorkspaceRoot Inode number
+	var workspaceRootAttr fuse.EntryOut
+	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
+		&workspaceRootAttr)
+	if result != fuse.OK {
+		return nil, false
+	}
+
+	// Fetch the WorkspaceRoot object itelf
+	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
+
+	return wsr.(*WorkspaceRoot), wsr != nil
+}
+
+func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
+	c.vlog("QuantumFs::workspaceIsMutable %d", inode.inodeNum())
+
+	var wsr *WorkspaceRoot
+	switch inode.(type) {
+	// The default cases will be inode such as file, symlink, hardlink etc, they
+	// get workspaceroots from their parents.
+	default:
+		// if inode is already forgotten, the workspace doesn't process it.
+		if inode.isOrphaned() {
+			return true
+		}
+		// Otherwise, go up to its parent which must be a directory/workspace
+		defer inode.getParentLock().RLock().RUnlock()
+		parent := inode.parent_(c)
+		switch parent.(type) {
+		default:
+			panic(fmt.Sprintf("The inode type is unexpected: %v",
+				reflect.TypeOf(parent)))
+		case *WorkspaceList:
+			return true
+		case *WorkspaceRoot:
+			wsr = parent.(*WorkspaceRoot)
+		case *Directory:
+			wsr = parent.(*Directory).wsr
+		}
+	case *WorkspaceRoot:
+		wsr = inode.(*WorkspaceRoot)
+	case *Directory:
+		wsr = inode.(*Directory).wsr
+	case *TypespaceList:
+		// If the inode is typespace/namespace/workspace/api, return true
+		// immediately since workspaceroot shouldn't have authority over them
+		return true
+	case *NamespaceList:
+		return true
+	case *WorkspaceList:
+		return true
+	case *ApiInode:
+		return true
+	}
+
+	defer qfs.mutabilityLock.RLock().RUnlock()
+
+	key := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
+	rootMutability, exists := qfs.workspaceMutability[key]
+	if !exists {
+		return false
+	}
+
+	return rootMutability
+
+}
+
+func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
+	flags uint32) bool {
+
+	// Only if the Open() requires write permission, is it blocked by the
+	// read-only workspace
+	if flags&syscall.O_ACCMODE == syscall.O_RDONLY {
+		return true
+	}
+
+	return qfs.workspaceIsMutable(c, inode)
+}
+
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer qfs.c.funcIn("Mux::Forget").out()
 	defer logRequestPanic(&qfs.c)
@@ -918,6 +1028,10 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 		return fuse.ENOENT
 	}
 
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
+	}
+
 	return inode.SetAttr(c, input, out)
 }
 
@@ -935,6 +1049,10 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	defer unlock.RUnlock()
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
 	}
 
 	return inode.Mknod(c, name, input, out)
@@ -956,6 +1074,10 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 		return fuse.ENOENT
 	}
 
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
+	}
+
 	return inode.Mkdir(c, name, input, out)
 }
 
@@ -973,6 +1095,10 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 	defer unlock.RUnlock()
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
 	}
 
 	return inode.Unlink(c, name)
@@ -994,6 +1120,10 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
+	}
+
 	return inode.Rmdir(c, name)
 }
 
@@ -1007,25 +1137,28 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	defer c.FuncIn("Mux::Rename", "Enter Inode %d newdir %d %s -> %s",
 		input.NodeId, input.Newdir, oldName, newName).out()
 
+	srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
+	defer unlock.RUnlock()
+	if srcInode == nil {
+		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutable(c, srcInode) {
+		return fuse.EPERM
+	}
+
 	if input.NodeId == input.Newdir {
-		inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
-		defer unlock.RUnlock()
-		if inode == nil {
-			return fuse.ENOENT
-		}
-
-		return inode.RenameChild(c, oldName, newName)
+		return srcInode.RenameChild(c, oldName, newName)
 	} else {
-		srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
-		defer unlock.RUnlock()
-		if srcInode == nil {
-			return fuse.ENOENT
-		}
-
 		dstInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.Newdir))
 		defer unlock.RUnlock()
+
 		if dstInode == nil {
 			return fuse.ENOENT
+		}
+
+		if !qfs.workspaceIsMutable(c, dstInode) {
+			return fuse.EPERM
 		}
 
 		return srcInode.MvChild(c, dstInode, oldName, newName)
@@ -1050,6 +1183,10 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	dstInode := qfs.inode(c, InodeId(input.NodeId))
 	if dstInode == nil {
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutable(c, dstInode) {
+		return fuse.EPERM
 	}
 
 	// Via races, srcInode and dstInode can be forgotten here
@@ -1093,6 +1230,10 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	defer unlock.RUnlock()
 	if inode == nil {
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
 	}
 
 	return inode.Symlink(c, pointedTo, linkName, out)
@@ -1252,6 +1393,10 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 		return fuse.ENOENT
 	}
 
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
+	}
+
 	return inode.SetXAttr(c, attr, data)
 }
 
@@ -1275,6 +1420,10 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 		return fuse.ENOENT
 	}
 
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
+	}
+
 	return inode.RemoveXAttr(c, attr)
 }
 
@@ -1295,6 +1444,10 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 		return fuse.EACCES // TODO Confirm this is correct
 	}
 
+	if !qfs.workspaceIsMutable(c, inode) {
+		return fuse.EPERM
+	}
+
 	return inode.Create(c, input, name, out)
 }
 
@@ -1312,6 +1465,10 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 	if inode == nil {
 		c.elog("Open failed Inode %d", input.NodeId)
 		return fuse.ENOENT
+	}
+
+	if !qfs.workspaceIsMutableAtOpen(c, inode, input.Flags) {
+		return fuse.EPERM
 	}
 
 	return inode.Open(c, input.Flags, input.Mode, out)
@@ -1506,40 +1663,4 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
-}
-
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
-
-	workspace string) (*WorkspaceRoot, bool) {
-
-	c.vlog("QuantumFs::getWorkspaceRoot %s/%s/%s",
-		typespace, namespace, workspace)
-
-	// Get the WorkspaceList Inode number
-	var typespaceAttr fuse.EntryOut
-	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
-		&typespaceAttr)
-	if result != fuse.OK {
-		return nil, false
-	}
-
-	var namespaceAttr fuse.EntryOut
-	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
-		&namespaceAttr)
-	if result != fuse.OK {
-		return nil, false
-	}
-
-	// Get the WorkspaceRoot Inode number
-	var workspaceRootAttr fuse.EntryOut
-	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
-		&workspaceRootAttr)
-	if result != fuse.OK {
-		return nil, false
-	}
-
-	// Fetch the WorkspaceRoot object itelf
-	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
-
-	return wsr.(*WorkspaceRoot), wsr != nil
 }
