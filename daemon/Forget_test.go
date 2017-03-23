@@ -9,6 +9,7 @@ import "bytes"
 import "io/ioutil"
 import "os"
 import "strconv"
+import "syscall"
 import "testing"
 import "time"
 
@@ -72,6 +73,41 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 				"File contents not preserved after Forget")
 			test.assert(err == nil, "Unable to read file after Forget")
 		}
+	})
+}
+
+func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		fileName := workspace + "/file"
+		file, err := os.Create(fileName)
+		test.assert(err == nil, "Error creating a small file: %v", err)
+		file.Close()
+
+		// Get inodeId of workspace and namespace
+		wsrId := test.getInodeNum(workspace)
+		fileId := test.getInodeNum(fileName)
+
+		// Now force the kernel to drop all cached inodes
+		test.remountFilesystem()
+		test.assertLogContains("Forget called",
+			"No inode forget triggered during dentry drop.")
+		test.syncAllWorkspaces()
+
+		// Make sure that the workspace has already been uninstantiated
+		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
+		test.assert(fileInode == nil,
+			"Failed to forgot file inode")
+
+		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
+		test.assert(wsrInode == nil,
+			"Failed to forgot workspace inode")
+
+		// Verify the mutability is preserved
+		fd, err := syscall.Creat(workspace+"/file1", 0124)
+		defer syscall.Close(fd)
+		test.assert(err == nil, "Error opening the file: %v", err)
 	})
 }
 
