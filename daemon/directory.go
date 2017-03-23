@@ -547,8 +547,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	uid := c.fuseCtx.Owner.Uid
 	gid := c.fuseCtx.Owner.Gid
-	UID := quantumfs.ObjectUid(c.Ctx, uid, uid)
-	GID := quantumfs.ObjectGid(c.Ctx, gid, gid)
+	UID := quantumfs.ObjectUid(uid, uid)
+	GID := quantumfs.ObjectGid(gid, gid)
 	entry := dir.createNewEntry(c, name, mode, umask, rdev,
 		0, UID, GID, type_, key)
 	inodeNum := c.qfs.newInodeId()
