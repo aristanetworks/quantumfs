@@ -7,6 +7,7 @@ package daemon
 
 import "fmt"
 import "os"
+import "runtime"
 import "syscall"
 import "sync"
 import "sync/atomic"
@@ -611,6 +612,12 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		test.assert(n == 0, "Wrong number of bytes read: %d", n)
 		test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
 			"Non-blocking read api without requests error:%v", err)
+
+		if runtime.Version() != "go1.7.3" {
+			test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
+				"Non-blocking read api without requests error:%v",
+				err)
+		}
 	})
 }
 
