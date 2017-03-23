@@ -75,7 +75,6 @@ func BlocksRoundUp(len uint64, blockSize uint64) uint64 {
 	if len%blockSize != 0 {
 		blocks++
 	}
-
 	return blocks
 }
 

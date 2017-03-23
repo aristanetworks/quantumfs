@@ -15,6 +15,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestFileCreation(t *testing.T) {
 	runTest(t, func(test *TestHelper) {
@@ -177,8 +178,8 @@ func TestFileDescriptorPermissions(t *testing.T) {
 		err := syscall.Mkdir(testDir, 0777)
 		test.Assert(err == nil, "Error creating directories: %v", err)
 
-		test.setUidGid(99, -1)
-		defer test.setUidGidToDefault()
+		test.SetUidGid(99, -1)
+		defer test.SetUidGidToDefault()
 
 		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)
@@ -598,7 +599,7 @@ func TestFileStatBlockCount(t *testing.T) {
 		err = syscall.Stat(testFilename, &stat)
 		test.Assert(err == nil, "Error stat'ing test file: %v", err)
 		// stat.Blocks must always be in terms of 512B blocks
-		test.Assert(uint64(stat.Blocks) == BlocksRoundUp(uint64(stat.Size),
+		test.Assert(uint64(stat.Blocks) == utils.BlocksRoundUp(uint64(stat.Size),
 			uint64(512)),
 			"Blocks is not in terms of 512B blocks. Blocks %v Size %v",
 			stat.Blocks, stat.Size)
