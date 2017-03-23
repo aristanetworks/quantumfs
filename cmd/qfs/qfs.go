@@ -12,6 +12,8 @@ import "strconv"
 
 import "github.com/aristanetworks/quantumfs"
 
+var version string
+
 // Various exit reasons, will be returned to the shell as an exit code
 const (
 	exitOk      = iota
@@ -23,6 +25,7 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() == 0 {
+		fmt.Println("qfs version", version)
 		fmt.Println("usage: qfs [options] <command> [ARG1[,ARG2[,...]]]")
 		flag.PrintDefaults()
 		fmt.Println("Available commands:")
