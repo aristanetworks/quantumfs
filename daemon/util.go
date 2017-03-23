@@ -99,14 +99,14 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.SetOwner(quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
+		entry.SetOwner(quantumfs.ObjectUid(attr.Owner.Uid,
 			c.fuseCtx.Owner.Uid))
 		c.vlog("Owner now %d UID %d context %d", entry.Owner(),
 			attr.Owner.Uid, c.fuseCtx.Owner.Uid)
 	}
 
 	if BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.SetGroup(quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
+		entry.SetGroup(quantumfs.ObjectGid(attr.Owner.Gid,
 			c.fuseCtx.Owner.Gid))
 		c.vlog("Group now %d GID %d context %d", entry.Group(),
 			attr.Owner.Gid, c.fuseCtx.Owner.Gid)

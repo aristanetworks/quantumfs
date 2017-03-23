@@ -111,9 +111,9 @@ const (
 	ErrorBadArgs           = iota // The argument is wrong
 	ErrorBadJson           = iota // Failed to parse command
 	ErrorBadCommandId      = iota // Unknown command ID
-	ErrorCommandFailed     = iota // The Command failed, see the error for more info
-	ErrorKeyNotFound       = iota // The extended key is not stored in the datastore
-	ErrorBlockTooLarge     = iota // SetBlock was passed a block that was too large
+	ErrorCommandFailed     = iota // The Command failed, see the error for info
+	ErrorKeyNotFound       = iota // The extended key isn't stored in datastore
+	ErrorBlockTooLarge     = iota // SetBlock was passed a block that's too large
 	ErrorWorkspaceNotFound = iota // The workspace cannot be found in QuantumFS
 )
 
