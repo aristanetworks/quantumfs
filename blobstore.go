@@ -46,8 +46,8 @@ func NewError(code BSErrorCode, msg string, a ...interface{}) error {
 // BlobStore interface
 type BlobStore interface {
 
-	// Get returns both the value and metadata for the given key along
-	// with an error value that indicates whether the key was found.
+	// Get returns both the value and metadata for the given key or
+	// an error
 	Get(key string) ([]byte, map[string]string, error)
 
 	// Insert stores the given value and metadata for the key
@@ -64,8 +64,7 @@ type BlobStore interface {
 	// blobstore.
 	Delete(key string) error
 
-	// Metadata returns the metadata for the given key along with a boolean
-	// value that indicates whether the key was found.
+	// Metadata returns the metadata for the given key or an error
 	Metadata(key string) (map[string]string, error)
 
 	// Update updates the metadata for a given key irrespective of its prior
