@@ -23,7 +23,11 @@ import "time"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 
-type QuantumFsTest func(test *TestHelper)
+type TestArg interface {
+	Execute(test QuantumFsTest)
+}
+
+type QuantumFsTest func(test TestArg)
 
 type LogscanError struct {
 	LogFile           string

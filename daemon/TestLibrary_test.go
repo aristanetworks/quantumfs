@@ -5,7 +5,6 @@ package daemon
 
 import "bytes"
 import "flag"
-import "runtime/debug"
 import "runtime"
 import "testing"
 import "fmt"
@@ -23,7 +22,6 @@ import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
-import "github.com/aristanetworks/quantumfs/utils"
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -94,8 +92,6 @@ func TestGenData(t *testing.T) {
 			"Data gen function off: %s vs %s", hardcoded, data)
 	})
 }
-
-type quantumFsTest func(test *testHelper)
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
@@ -187,7 +183,8 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 
 	th.Log("Finished test preamble, starting test proper")
 	beforeTest := time.Now()
-	go th.execute(test)
+
+	go th.Execute(th.testHelperUpcast(test))
 
 	testResult := th.WaitForResult()
 
@@ -208,42 +205,14 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 	}
 }
 
-// execute the quantumfs test.
-func (th *testHelper) execute(test quantumFsTest) {
-	// Catch any panics and covert them into test failures
-	defer func(th *testHelper) {
-		err := recover()
-		trace := ""
+type quantumFsTest func(test *testHelper)
 
-		// If the test passed pass that fact back to runTest()
-		if err == nil {
-			err = ""
-		} else {
-			// Capture the stack trace of the failure
-			trace = utils.BytesToString(debug.Stack())
-			trace = strings.SplitN(trace, "\n", 8)[7]
-		}
+func (th *testHelper) testHelperUpcast(
+	testFn func(test *testHelper)) testutils.QuantumFsTest {
 
-		var result string
-		switch err.(type) {
-		default:
-			result = fmt.Sprintf("Unknown panic type: %v", err)
-		case string:
-			result = err.(string)
-		case error:
-			result = err.(error).Error()
-		}
-
-		if trace != "" {
-			result += "\nStack Trace:\n" + trace
-		}
-
-		// This can hang if the channel isn't buffered because in some rare
-		// situations the other side isn't there to read from the channel
-		th.TestResult <- result
-	}(th)
-
-	test(th)
+	return func(test testutils.TestArg) {
+		testFn(th)
+	}
 }
 
 var genDataMutex sync.RWMutex
