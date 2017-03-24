@@ -3,7 +3,7 @@
 
 package daemon
 
-// Test the various operations on type NullWorkspaceRoot, whose only instance is
+// Test the various operations on type NullSpaceNameRoot, whose only instance is
 // _null/null, creating any type of file or directory under this path is enforced
 // to be prohibited.
 
@@ -11,7 +11,7 @@ import "os"
 import "syscall"
 import "testing"
 
-func TestNullWorkspaceDirectoryCreation(t *testing.T) {
+func TestNullSpaceNameDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
@@ -22,7 +22,7 @@ func TestNullWorkspaceDirectoryCreation(t *testing.T) {
 	})
 }
 
-func TestNullWorkspaceFileCreation(t *testing.T) {
+func TestNullSpaceNameFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
@@ -37,7 +37,7 @@ func TestNullWorkspaceFileCreation(t *testing.T) {
 
 // This function is implemented to facilitate the creation of different types of
 // special files
-func NullWorkspaceSpecialFile(test *testHelper, filetype uint32) {
+func NullSpaceNameSpecialFile(test *testHelper, filetype uint32) {
 	workspace := test.nullWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
@@ -46,31 +46,31 @@ func NullWorkspaceSpecialFile(test *testHelper, filetype uint32) {
 		"Unexpected success creating special file in null")
 }
 
-func TestNullWorkspaceBlockDevCreation(t *testing.T) {
+func TestNullSpaceNameBlockDevCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		NullWorkspaceSpecialFile(test, syscall.S_IFBLK)
+		NullSpaceNameSpecialFile(test, syscall.S_IFBLK)
 	})
 }
 
-func TestNullWorkspaceCharDevCreation(t *testing.T) {
+func TestNullSpaceNameCharDevCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		NullWorkspaceSpecialFile(test, syscall.S_IFCHR)
+		NullSpaceNameSpecialFile(test, syscall.S_IFCHR)
 	})
 }
 
-func TestNullWorkspaceSocketCreation(t *testing.T) {
+func TestNullSpaceNameSocketCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		NullWorkspaceSpecialFile(test, syscall.S_IFSOCK)
+		NullSpaceNameSpecialFile(test, syscall.S_IFSOCK)
 	})
 }
 
-func TestNullWorkspaceFileMknodCreation(t *testing.T) {
+func TestNullSpaceNameFileMknodCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		NullWorkspaceSpecialFile(test, syscall.S_IFREG)
+		NullSpaceNameSpecialFile(test, syscall.S_IFREG)
 	})
 }
 
-func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
+func TestNullSpaceNameFileSymlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.nullWorkspace()
 		link := workspace + "/symlink"
@@ -80,7 +80,7 @@ func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
 	})
 }
 
-func TestNullWorkspaceHardlinkCreation(t *testing.T) {
+func TestNullSpaceNameHardlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFileName := workspace + "/testfile"
@@ -96,7 +96,7 @@ func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 	})
 }
 
-func TestNullWorkspaceRename(t *testing.T) {
+func TestNullSpaceNameRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFileName := workspace + "/testfile"
