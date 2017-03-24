@@ -63,13 +63,13 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 			panic("Unable to create Typespaces bucket")
 		}
 
-		_null_, err := typespaces.CreateBucketIfNotExists([]byte(""+
+		_null_, err := typespaces.CreateBucketIfNotExists([]byte("" +
 			quantumfs.NullSpaceName))
 		if err != nil {
 			panic("Unable to create _null typespace")
 		}
 
-		_null, err := _null_.CreateBucketIfNotExists([]byte(""+
+		_null, err := _null_.CreateBucketIfNotExists([]byte("" +
 			quantumfs.NullSpaceName))
 		if err != nil {
 			panic("Unable to create _null namespace")
