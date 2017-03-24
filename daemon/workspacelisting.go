@@ -151,6 +151,10 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 		touched[name] = true
 	}
 
+	// We must lock the instantiation lock to ensure no races between when we
+	// check inodeNoInstantiate and when we call setInode/removeUninstantiated
+	defer c.qfs.instantiationLock.Lock().Unlock()
+
 	// Then delete entries which no longer exist
 	for name, id := range *inodeMap {
 		if _, exists := touched[name]; !exists {
