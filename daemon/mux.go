@@ -954,11 +954,13 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 
 	key := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
 	rootMutability, exists := qfs.workspaceMutability[key]
-	if !exists {
+	if !exists || !rootMutability {
 		return false
 	}
 
-	return rootMutability
+	immutable, _ := c.workspaceDB.ImmutableWorkspaceExists(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+	return rootMutability && !immutable
 
 }
 

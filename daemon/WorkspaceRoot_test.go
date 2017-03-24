@@ -260,3 +260,36 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 
 	})
 }
+
+func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		api := test.getApi()
+		err := api.SetWorkspaceImmutable(workspaceName)
+		test.assert(err == nil, "Failed setting the workspace %s immutable",
+			workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
+
+		err = api.DeleteWorkspace(workspaceName)
+		test.assert(err == nil, "Failed deleting the workspace %s",
+			workspaceName)
+
+		err = api.Branch(test.nullWorkspaceRel(), workspaceName)
+		test.assert(err == nil, "Failed branching workspace: %v", err)
+
+		err = api.EnableRootWrite(workspaceName)
+		test.assert(err == nil,
+			"Failed to enable write permission in workspace: %v", err)
+
+		fd1, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd1)
+		test.assert(err == nil, "Error creating a small file: %v", err)
+	})
+}

@@ -617,6 +617,13 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) {
 		return
 	}
 
+	err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx, dst[0], dst[1], dst[2])
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Workspace %s can't be set immutable", workspacePath)
+		return
+	}
+
 	defer c.qfs.mutabilityLock.Lock().Unlock()
 	c.qfs.workspaceMutability[workspacePath] = false
 
