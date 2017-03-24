@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestLargeFileRead(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -51,7 +51,7 @@ func TestLargeFileRead(t *testing.T) {
 }
 
 func TestLargeFileExpansion(t *testing.T) {
-	runExpensiveTest(t, func(test *TestHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -119,7 +119,7 @@ func TestLargeFileExpansion(t *testing.T) {
 }
 
 func TestLargeFileAttr(t *testing.T) {
-	runExpensiveTest(t, func(test *TestHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -179,7 +179,7 @@ func TestLargeFileAttr(t *testing.T) {
 }
 
 func TestLargeFileZero(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"

@@ -13,13 +13,15 @@ import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
 
+type quantumFsTest func(test *testHelper)
+
 // This is the normal way to run tests in the most time efficient manner
-func runTest(t *testing.T, test daemon.QuantumFsTest) {
+func runTest(t *testing.T, test quantumFsTest) {
 	t.Parallel()
 	runTestCommon(t, test, true)
 }
 
-func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
+func runTestCommon(t *testing.T, test quantumFsTest,
 	startDefaultQfs bool) {
 	// Since we grab the test name from the backtrace, it must always be an
 	// identical number of frames back to the name of the test. Otherwise
@@ -35,17 +37,20 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 	testName = testName[lastSlash+1:]
 	cachePath := daemon.TestRunDir + "/" + testName
 
-	th := &daemon.TestHelper{
-		TestHelper: testutils.TestHelper{
-			T:          t,
-			TestName:   testName,
-			TestResult: make(chan string, 2), /* must be buffered */
-			StartTime:  time.Now(),
-			CachePath:  cachePath,
-			Logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
-				daemon.NoStdOut),
+	th := &testHelper{
+		TestHelper: daemon.TestHelper{
+			TestHelper: testutils.TestHelper{
+				T:          t,
+				TestName:   testName,
+				TestResult: make(chan string, 2), // must be buffered
+				StartTime:  time.Now(),
+				CachePath:  cachePath,
+				Logger: qlog.NewQlogExt(cachePath+"/ramfs",
+					60*10000*24, daemon.NoStdOut),
+			},
 		},
 	}
+
 	th.CreateTestDirs()
 
 	defer th.EndTest()
@@ -57,19 +62,15 @@ func runTestCommon(t *testing.T, test daemon.QuantumFsTest,
 	th.Log("Finished test preamble, starting test proper")
 	go th.Execute(test)
 
-	var testResult string
-
-	// Allow tests to run for up to 1 seconds before considering them timed out.
-	select {
-	case <-time.After(1000 * time.Millisecond):
-		testResult = "ERROR: TIMED OUT"
-
-	case testResult = <-th.TestResult:
-	}
+	testResult := th.ShowSummary()
 
 	if !th.ShouldFail && testResult != "" {
 		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
 	} else if th.ShouldFail && testResult == "" {
 		th.Log("ERROR: Test is expected to fail, but didn't")
 	}
+}
+
+type testHelper struct {
+	daemon.TestHelper
 }

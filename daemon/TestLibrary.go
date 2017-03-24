@@ -9,15 +9,10 @@ import "fmt"
 import "io/ioutil"
 import "math/rand"
 import "os"
-import "reflect"
 import "runtime"
 import "runtime/debug"
 import "strings"
-import "strconv"
 import "sync"
-import "sync/atomic"
-import "syscall"
-import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -37,120 +32,15 @@ func NoStdOut(format string, args ...interface{}) error {
 	return nil
 }
 
-// This is the normal way to run tests in the most time efficient manner
-func runTest(t *testing.T, test QuantumFsTest) {
-	t.Parallel()
-	runTestCommon(t, test, true, nil)
-}
-
-// If you need to initialize the QuantumFS instance in some special way,
-// then use this variant.
-func runTestNoQfs(t *testing.T, test QuantumFsTest) {
-	t.Parallel()
-	runTestCommon(t, test, false, nil)
-}
-
-// configModifier is a function which is given the default configuration and should
-// make whichever modifications the test requires in place.
-type configModifierFunc func(test *TestHelper, config *QuantumFsConfig)
-
-// If you need to initialize QuantumFS with a special configuration, but not poke
-// into its internals before the test proper begins, use this.
-func runTestCustomConfig(t *testing.T, configModifier configModifierFunc,
-	test QuantumFsTest) {
-
-	t.Parallel()
-	runTestCommon(t, test, true, configModifier)
-}
-
-// If you need to initialize the QuantumFS instance in some special way and the test
-// is relatively expensive, then use this variant.
-func runTestNoQfsExpensiveTest(t *testing.T, test QuantumFsTest) {
-	runTestCommon(t, test, false, nil)
-}
-
-// If you have a test which is expensive in terms of CPU time, then use
-// runExpensiveTest() which will not run it at the same time as other tests. This is
-// to prevent multiple expensive tests from running concurrently and causing each
-// other to time out due to CPU starvation.
-func runExpensiveTest(t *testing.T, test QuantumFsTest) {
-	runTestCommon(t, test, true, nil)
-}
-
-func runTestCommon(t *testing.T, test QuantumFsTest, startDefaultQfs bool,
-	configModifier configModifierFunc) {
-
-	// Since we grab the test name from the backtrace, it must always be an
-	// identical number of frames back to the name of the test. Otherwise
-	// multiple tests will end up using the same temporary directory and nothing
-	// will work.
-	//
-	// 2 <testname>
-	// 1 runTest/runExpensiveTest
-	// 0 runTestCommon
-	testPc, _, _, _ := runtime.Caller(2)
-	testName := runtime.FuncForPC(testPc).Name()
-	lastSlash := strings.LastIndex(testName, "/")
-	testName = testName[lastSlash+1:]
-	cachePath := TestRunDir + "/" + testName
-
-	th := &TestHelper{
-		TestHelper: testutils.TestHelper{
-			T:          t,
-			TestName:   testName,
-			TestResult: make(chan string, 2), /* must be buffered */
-			StartTime:  time.Now(),
-			CachePath:  cachePath,
-			Logger: qlog.NewQlogExt(cachePath+"/ramfs", 60*10000*24,
-				NoStdOut),
-		},
-	}
-	th.CreateTestDirs()
-
-	defer th.EndTest()
-
-	// Allow tests to run for up to 1 seconds before considering them timed out.
-	// If we are going to start a standard QuantumFS instance we can start the
-	// timer before the test proper and therefore avoid false positive test
-	// failures due to timeouts caused by system slowness as we try to mount
-	// dozens of FUSE filesystems at once.
-	if startDefaultQfs {
-		config := th.defaultConfig()
-		if configModifier != nil {
-			configModifier(th, &config)
-		}
-
-		th.startQuantumFs(config)
-	}
-
-	th.Log("Finished test preamble, starting test proper")
-	beforeTest := time.Now()
-	go th.Execute(test)
-
-	var testResult string
-
-	select {
-	case <-time.After(1500 * time.Millisecond):
-		testResult = "ERROR: TIMED OUT"
-
-	case testResult = <-th.TestResult:
-	}
-
-	// Record how long the test took so we can make a histogram
-	afterTest := time.Now()
-	testutils.TimeMutex.Lock()
-	testutils.TimeBuckets = append(testutils.TimeBuckets,
-		testutils.TimeData{
-			Duration: afterTest.Sub(beforeTest),
-			TestName: testName,
-		})
-	testutils.TimeMutex.Unlock()
-
-	if !th.ShouldFail && testResult != "" {
-		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
-	} else if th.ShouldFail && testResult == "" {
-		th.Log("ERROR: Test is expected to fail, but didn't")
-	}
+// TestHelper holds the variables important to maintain the state of testing
+// in a package which intends to use a QFS instance. daemon.TestHelper will
+// need to be embedded in that package's testHelper.
+type TestHelper struct {
+	testutils.TestHelper
+	qfs            *QuantumFs
+	qfsWait        sync.WaitGroup
+	fuseConnection int
+	api            *quantumfs.Api
 }
 
 // CreateTestDirs makes the required directories for the test.
@@ -163,44 +53,6 @@ func (th *TestHelper) CreateTestDirs() {
 	th.Log("Using mountpath %s", mountPath)
 
 	os.MkdirAll(th.TempDir+"/ether", 0777)
-}
-
-// Execute the quantumfs test.
-func (th *TestHelper) Execute(test QuantumFsTest) {
-	// Catch any panics and covert them into test failures
-	defer func(th *TestHelper) {
-		err := recover()
-		trace := ""
-
-		// If the test passed pass that fact back to runTest()
-		if err == nil {
-			err = ""
-		} else {
-			// Capture the stack trace of the failure
-			trace = utils.BytesToString(debug.Stack())
-			trace = strings.SplitN(trace, "\n", 8)[7]
-		}
-
-		var result string
-		switch err.(type) {
-		default:
-			result = fmt.Sprintf("Unknown panic type: %v", err)
-		case string:
-			result = err.(string)
-		case error:
-			result = err.(error).Error()
-		}
-
-		if trace != "" {
-			result += "\nStack Trace:\n" + trace
-		}
-
-		// This can hang if the channel isn't buffered because in some rare
-		// situations the other side isn't there to read from the channel
-		th.TestResult <- result
-	}(th)
-
-	test(th)
 }
 
 func abortFuse(th *TestHelper) {
@@ -296,16 +148,6 @@ func (th *TestHelper) waitToBeUnmounted() {
 	th.Log("ERROR: Filesystem didn't unmount in time")
 }
 
-// TestHelper holds the variables important to maintain the state of testing in a
-// package. This helper is more of a namespacing mechanism than a coherent object.
-type TestHelper struct {
-	testutils.TestHelper
-	qfs            *QuantumFs
-	qfsWait        sync.WaitGroup
-	fuseConnection int
-	api            *quantumfs.Api
-}
-
 func (th *TestHelper) defaultConfig() QuantumFsConfig {
 	mountPath := th.TempDir + "/mnt"
 
@@ -399,17 +241,6 @@ func (th *TestHelper) relPath(path string) string {
 	return strings.TrimPrefix(path, th.TempDir+"/mnt/")
 }
 
-// Extract namespace and workspace path from the absolute path of
-// a workspaceroot
-func (th *TestHelper) getWorkspaceComponents(abspath string) (string,
-	string, string) {
-
-	relpath := th.relPath(abspath)
-	components := strings.Split(relpath, "/")
-
-	return components[0], components[1], components[2]
-}
-
 // Return a random namespace/workspace name of given length
 func randomNamespaceName(size int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz" + "0123456789-." +
@@ -481,52 +312,6 @@ func (th *TestHelper) syncAllWorkspaces() {
 	th.Assert(err == nil, "Error when syncing all workspaces: %v", err)
 }
 
-// Retrieve a list of FileDescriptor from an Inode
-func (th *TestHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
-	handles := make([]*FileDescriptor, 0)
-
-	defer th.qfs.mapMutex.Lock().Unlock()
-
-	for _, file := range th.qfs.fileHandles {
-		fh, ok := file.(*FileDescriptor)
-		if !ok {
-			continue
-		}
-
-		if fh.inodeNum == InodeId(inodeNum) {
-			handles = append(handles, fh)
-		}
-	}
-
-	return handles
-}
-
-// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
-func (th *TestHelper) getInodeNum(path string) InodeId {
-	var stat syscall.Stat_t
-	err := syscall.Stat(path, &stat)
-	th.Assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
-
-	return InodeId(stat.Ino)
-}
-
-// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
-func (th *TestHelper) getInode(path string) Inode {
-	inodeNum := th.getInodeNum(path)
-	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-}
-
-// Retrieve the rootId of the given workspace
-func (th *TestHelper) workspaceRootId(typespace string, namespace string,
-	workspace string) quantumfs.ObjectKey {
-
-	key, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
-		typespace, namespace, workspace)
-	th.Assert(err == nil, "Error fetching key")
-
-	return key
-}
-
 // Global test request ID incremented for all the running tests
 var requestId = uint64(1000000000)
 
@@ -535,15 +320,6 @@ var TestRunDir string
 
 func init() {
 	TestRunDir = testutils.TestRunDir
-}
-
-// Produce a request specific ctx variable to use for quantumfs internal calls
-func (th *TestHelper) newCtx() *ctx {
-	reqId := atomic.AddUint64(&requestId, 1)
-	c := th.qfs.c.dummyReq(reqId)
-	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
-		th.TestName)
-	return c
 }
 
 // Produce a test infrastructure ctx variable for use with QuantumFS utility
@@ -578,66 +354,41 @@ func (crash *crashOnWrite) Write(c *ctx, offset uint64, size uint32, flags uint3
 	panic("Intentional crash")
 }
 
-// Convert an absolute workspace path to the matching WorkspaceRoot object
-func (th *TestHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
-	parts := strings.Split(th.relPath(workspace), "/")
-	wsr, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
-		parts[0], parts[1], parts[2])
+var origGC int
 
-	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
+func PreTestRuns() {
 
-	return wsr
-}
+	testutils.PreTestRuns()
 
-func (th *TestHelper) getAccessList(workspace string) map[string]bool {
-	return th.getWorkspaceRoot(workspace).getList()
-}
-
-func (th *TestHelper) AssertAccessList(testlist map[string]bool,
-	wsrlist map[string]bool, message string) {
-
-	eq := reflect.DeepEqual(testlist, wsrlist)
-	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
-	message = message + msg
-	th.Assert(eq, message)
-}
-
-var genDataMutex sync.RWMutex
-var precompGenData []byte
-var genDataLast int
-
-func genData(maxLen int) []byte {
-	if maxLen > len(precompGenData) {
-		// we need to expand the array
-		genDataMutex.Lock()
-
-		for len(precompGenData) <= maxLen {
-			precompGenData = append(precompGenData,
-				strconv.Itoa(genDataLast)...)
-			genDataLast++
-		}
-
-		genDataMutex.Unlock()
+	if os.Getuid() != 0 {
+		panic("quantumfs.daemon tests must be run as root")
 	}
-	genDataMutex.RLock()
-	defer genDataMutex.RUnlock()
 
-	return precompGenData[:maxLen]
+	// Disable Garbage Collection. Because the tests provide both the filesystem
+	// and the code accessing that filesystem the program is reentrant in ways
+	// opaque to the golang scheduler. Thus we can end up in a deadlock situation
+	// between two threads:
+	//
+	// ThreadFS is the filesystem, ThreadT is the test
+	//
+	//   ThreadFS                    ThreadT
+	//                               Start filesystem syscall
+	//   Start executing response
+	//   <GC Wait>                   <Queue GC wait after syscal return>
+	//                        DEADLOCK
+	//
+	// Because the filesystem request is blocked waiting on GC and the syscall
+	// will never return to allow GC to progress, the test program is deadlocked.
+	origGC = debug.SetGCPercent(-1)
 }
 
-func (th *TestHelper) remountFilesystem() {
-	th.Log("Remounting filesystem")
-	err := syscall.Mount("", th.TempDir+"/mnt", "", syscall.MS_REMOUNT, "")
-	th.Assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
-}
+func PostTestRuns() {
 
-// Modify the QuantumFS cache time to 100 milliseconds
-func cacheTimeout100Ms(test *TestHelper, config *QuantumFsConfig) {
-	config.CacheTimeSeconds = 0
-	config.CacheTimeNsecs = 100000
-}
+	// We've finished running the tests and are about to do the full logscan.
+	// This create a tremendous amount of garbage, so we must enable garbage
+	// collection.
+	runtime.GC()
+	debug.SetGCPercent(origGC)
 
-// Modify the QuantumFS flush delay to 100 milliseconds
-func dirtyDelay100Ms(test *TestHelper, config *QuantumFsConfig) {
-	config.DirtyFlushDelay = 100 * time.Millisecond
+	testutils.PostTestRuns()
 }

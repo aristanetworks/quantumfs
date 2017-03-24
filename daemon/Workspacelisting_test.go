@@ -9,7 +9,7 @@ import "syscall"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
 
-func verifyWorkspacelistingInodeStatus(c *ctx, test *TestHelper,
+func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 	name string, space string, mustBeInstantiated bool,
 	inodeMap *map[string]InodeId) InodeId {
 
@@ -29,7 +29,7 @@ func verifyWorkspacelistingInodeStatus(c *ctx, test *TestHelper,
 }
 
 func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 
 		c := test.newCtx()
 		tslInode := test.qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)

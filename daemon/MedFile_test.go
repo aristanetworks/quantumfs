@@ -16,7 +16,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestMedBranch(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -45,7 +45,7 @@ func TestFileExpansion(t *testing.T) {
 	// generate more data than small file size
 	data := genData(int(quantumfs.MaxSmallFileSize()) +
 		quantumfs.MaxBlockSize)
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -99,7 +99,7 @@ func TestFileExpansion(t *testing.T) {
 }
 
 func TestMedFileAttr(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
 		workspace := test.newWorkspace()
@@ -159,7 +159,7 @@ func TestMedFileAttr(t *testing.T) {
 }
 
 func TestMedFileZero(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -181,7 +181,7 @@ func TestMedFileZero(t *testing.T) {
 }
 
 func TestMultiBlockFileReadPastEnd(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
