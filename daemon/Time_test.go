@@ -39,7 +39,7 @@ func getTimeFromFile(file *os.File) (mtime int64, ctime int64) {
 
 func TestTimeChmod(t *testing.T) {
 	// Change metadata and confirm mtime isn't changed
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		dirName := workspace + "/dir"
@@ -78,7 +78,7 @@ func TestTimeChmod(t *testing.T) {
 
 // Change contents and confirm both ctime and mtime are changed
 func TestTimeModification(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		dirName := workspace + "/dir"
@@ -110,7 +110,7 @@ func TestTimeModification(t *testing.T) {
 // Confirm that if a file inside a directory has it's times change, the directory
 // doesn't have it's time change
 func TestTimeRecursiveCtime(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		dirName := workspace + "/dir"
@@ -135,7 +135,7 @@ func TestTimeRecursiveCtime(t *testing.T) {
 }
 
 func TestTimeIntraDirectoryRename(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/dir"
 		testFilename1 := dirName + "/test"
@@ -160,7 +160,7 @@ func TestTimeIntraDirectoryRename(t *testing.T) {
 }
 
 func TestTimeInterDirectoryRename(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		interDirectoryRename(test)
 		workspace := test.newWorkspace()
 		testDir1 := workspace + "/dir1"
@@ -193,7 +193,7 @@ func TestTimeInterDirectoryRename(t *testing.T) {
 }
 
 func TestTimeOrphanedFile(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -236,7 +236,7 @@ func TestTimeOrphanedFile(t *testing.T) {
 }
 
 func TestTimeHardlinkFile(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		filename := workspace + "/test"
 

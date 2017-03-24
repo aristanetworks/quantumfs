@@ -8,7 +8,7 @@ package daemon
 import "syscall"
 import "testing"
 
-func specialCreate(test *TestHelper, filetype uint32) {
+func specialCreate(test *testHelper, filetype uint32) {
 	workspace := test.newWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
@@ -53,30 +53,30 @@ func specialCreate(test *TestHelper, filetype uint32) {
 }
 
 func TestBlockDevCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFBLK)
 	})
 }
 
 func TestCharDevCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFCHR)
 	})
 }
 
 func TestSocketCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFSOCK)
 	})
 }
 
 func TestFileMknodCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		specialCreate(test, syscall.S_IFREG)
 	})
 }
 
-func specialCreateFail(test *TestHelper, filetype uint32) {
+func specialCreateFail(test *testHelper, filetype uint32) {
 	workspace := test.newWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
@@ -85,13 +85,13 @@ func specialCreateFail(test *TestHelper, filetype uint32) {
 }
 
 func TestDirectoryMknodCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		specialCreateFail(test, syscall.S_IFDIR)
 	})
 }
 
 func TestSymlinkMknodCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		specialCreateFail(test, syscall.S_IFLNK)
 	})
 }

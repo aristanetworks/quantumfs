@@ -116,6 +116,17 @@ func (th *TestHelper) EndTest() {
 	}
 }
 
+func (th *TestHelper) WaitForResult() string {
+	var testResult string
+	select {
+	case <-time.After(1500 * time.Millisecond):
+		testResult = "ERROR: TIMED OUT"
+
+	case testResult = <-th.TestResult:
+	}
+	return testResult
+}
+
 var TestRunDir string
 
 func init() {
@@ -378,6 +389,80 @@ func (th *TestHelper) Logscan() (foundErrors bool) {
 	return true
 }
 
+// Change the UID/GID the test thread to the given values. Use -1 not to change
+// either the UID or GID.
+func (th *TestHelper) SetUidGid(uid int, gid int) {
+	// The quantumfs tests are run as root because some tests require
+	// root privileges. However, root can read or write any file
+	// irrespective of the file permissions. Obviously if we want to
+	// test permissions then we cannot run as root.
+	//
+	// To accomplish this we lock this goroutine to a particular OS
+	// thread, then we change the EUID of that thread to something which
+	// isn't root. Finally at the end we need to restore the EUID of the
+	// thread before unlocking ourselves from that thread. If we do not
+	// follow this precise cleanup order other tests or goroutines may
+	// run using the other UID incorrectly.
+	runtime.LockOSThread()
+	if gid != -1 {
+		err := syscall.Setregid(-1, gid)
+		if err != nil {
+			runtime.UnlockOSThread()
+		}
+		th.Assert(err == nil, "Faild to change test EGID: %v", err)
+	}
+
+	if uid != -1 {
+		err := syscall.Setreuid(-1, uid)
+		if err != nil {
+			syscall.Setregid(-1, 0)
+			runtime.UnlockOSThread()
+		}
+		th.Assert(err == nil, "Failed to change test EUID: %v", err)
+	}
+}
+
+// Set the UID and GID back to the defaults
+func (th *TestHelper) SetUidGidToDefault() {
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+
+	th.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
+	th.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+}
+
+func ShowSummary() {
+	ErrorMutex.Lock()
+	fullLogs := make(chan string, len(ErrorLogs))
+	var logProcessing sync.WaitGroup
+	for i := 0; i < len(ErrorLogs); i++ {
+		logProcessing.Add(1)
+		go func(i int) {
+			defer logProcessing.Done()
+			testSummary :=
+				OutputLogError(ErrorLogs[i])
+			fullLogs <- testSummary
+		}(i)
+	}
+
+	logProcessing.Wait()
+	close(fullLogs)
+	testSummary := ""
+	for summary := range fullLogs {
+		testSummary += summary
+	}
+	outputTimeGraph := strings.Contains(testSummary, "TIMED OUT")
+	ErrorMutex.Unlock()
+	fmt.Println("------ Test Summary:\n" + testSummary)
+
+	if outputTimeGraph {
+		OutputTimeHistogram()
+	}
+}
+
 func OutputLogError(errInfo LogscanError) (summary string) {
 
 	errors := make([]string, 0, 10)
@@ -421,52 +506,6 @@ func OutputLogError(errInfo LogscanError) (summary string) {
 		errInfo.TestName, buffer.String(), errInfo.TestName)
 	return fmt.Sprintf("--- Test %s FAILED\nExpected errors, but found"+
 		" none.\n", errInfo.TestName)
-}
-
-// Change the UID/GID the test thread to the given values. Use -1 not to change
-// either the UID or GID.
-func (th *TestHelper) SetUidGid(uid int, gid int) {
-	// The quantumfs tests are run as root because some tests require
-	// root privileges. However, root can read or write any file
-	// irrespective of the file permissions. Obviously if we want to
-	// test permissions then we cannot run as root.
-	//
-	// To accomplish this we lock this goroutine to a particular OS
-	// thread, then we change the EUID of that thread to something which
-	// isn't root. Finally at the end we need to restore the EUID of the
-	// thread before unlocking ourselves from that thread. If we do not
-	// follow this precise cleanup order other tests or goroutines may
-	// run using the other UID incorrectly.
-	runtime.LockOSThread()
-	if gid != -1 {
-		err := syscall.Setregid(-1, gid)
-		if err != nil {
-			runtime.UnlockOSThread()
-		}
-		th.Assert(err == nil, "Faild to change test EGID: %v", err)
-	}
-
-	if uid != -1 {
-		err := syscall.Setreuid(-1, uid)
-		if err != nil {
-			syscall.Setregid(-1, 0)
-			runtime.UnlockOSThread()
-		}
-		th.Assert(err == nil, "Failed to change test EUID: %v", err)
-	}
-
-}
-
-// Set the UID and GID back to the defaults
-func (th *TestHelper) SetUidGidToDefault() {
-	defer runtime.UnlockOSThread()
-
-	// Test always runs as root, so its euid and egid is 0
-	err1 := syscall.Setreuid(-1, 0)
-	err2 := syscall.Setregid(-1, 0)
-
-	th.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
-	th.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
 }
 
 var TimeMutex sync.Mutex
@@ -522,4 +561,13 @@ func OutputTimeHistogram() {
 		}
 		fmt.Println()
 	}
+}
+
+func PreTestRuns() {
+	ErrorLogs = make([]LogscanError, 0)
+}
+
+func PostTestRuns() {
+	ShowSummary()
+	os.RemoveAll(TestRunDir)
 }

@@ -17,7 +17,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestDirectoryCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/" + "test"
@@ -43,7 +43,7 @@ func TestDirectoryCreation(t *testing.T) {
 }
 
 func TestRecursiveDirectoryCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/test/a/b"
 		err := os.MkdirAll(dirName, 0124)
@@ -68,7 +68,7 @@ func TestRecursiveDirectoryCreation(t *testing.T) {
 }
 
 func TestRecursiveDirectoryFileCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
@@ -99,7 +99,7 @@ func TestRecursiveDirectoryFileCreation(t *testing.T) {
 }
 
 func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		// Create a file and determine its inode numbers
 		workspace := test.newWorkspace()
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
@@ -154,7 +154,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 // workspace after modifying the directory and confirm the newly loaded directory
 // contains the changes in the update.
 func TestDirectoryUpdate(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
 		src := test.newWorkspace()
@@ -181,7 +181,7 @@ func TestDirectoryUpdate(t *testing.T) {
 }
 
 func TestDirectoryFileDeletion(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
@@ -204,7 +204,7 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	})
 }
 
-func testUnlinkPermissions(test *TestHelper, onDirectory bool, asRoot bool,
+func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	directoryUserMatches bool, directoryGroupMatches bool, directorySticky bool,
 	permissions uint32, mustSucceed bool) {
 
@@ -269,168 +269,168 @@ func testUnlinkPermissions(test *TestHelper, onDirectory bool, asRoot bool,
 }
 
 func TestUnlinkPermissionsAsRootNoPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, true, false, false, false, 0000,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsRootNoPermsSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, true, false, false, true, 0000,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsRootNoPermsOwner(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, true, true, true, false, 0000,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsRootNoPermsOwnerSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, true, true, true, true, 0000,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWrite(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, false, 0555,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWriteSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, true, 0555,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWriteOwner(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, false, 0555,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserNoWriteOwnerSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, true, 0555,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWrite(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, false, 0755,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, true, 0755,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWriteOwner(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, false, 0755,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserUserWriteOwnerSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, true, 0755,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWrite(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, false, 0575,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, true, 0575,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteOwner(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, false, 0575,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, true, 0575,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, true, false, 0575,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, true, true, 0575,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, false, 0557,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, true, 0557,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteOwner(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, false, 0557,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, true, 0557,
 			false)
 	})
 }
 
 func TestUnlinkPermissionsAsUserInWorkspaceRoot(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, false, false, false, false, false, 0000,
 			true)
 	})
 }
 
 func TestUnlinkPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		test.SetUidGid(99, -1)
@@ -443,7 +443,7 @@ func TestUnlinkPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 }
 
 func TestDirectoryUnlinkDirectory(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/" + "test"
 		err := os.Mkdir(testDir, 0124)
@@ -460,7 +460,7 @@ func TestDirectoryUnlinkDirectory(t *testing.T) {
 }
 
 func TestDirectoryRmdirEmpty(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0124)
@@ -472,7 +472,7 @@ func TestDirectoryRmdirEmpty(t *testing.T) {
 }
 
 func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0324)
@@ -492,7 +492,7 @@ func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 }
 
 func TestDirectoryRmdirNotEmpty(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0124)
@@ -510,7 +510,7 @@ func TestDirectoryRmdirNotEmpty(t *testing.T) {
 }
 
 func TestDirectoryRmdirFile(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFile := workspace + "/test"
 		fd, err := os.Create(testFile)
@@ -527,7 +527,7 @@ func TestDirectoryRmdirFile(t *testing.T) {
 // Confirm that when we reload a directory from the datastore that the classes it
 // instantiates matches the type of the entry in the directory.
 func TestDirectoryChildTypes(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testDir := workspace + "/testdir"
@@ -558,7 +558,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 }
 
 func TestLargeDirectory(t *testing.T) {
-	runExpensiveTest(t, func(test *TestHelper) {
+	runExpensiveTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
@@ -616,7 +616,7 @@ func TestLargeDirectory(t *testing.T) {
 }
 
 func TestDirectoryChmod(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/testdir"
 
@@ -639,7 +639,7 @@ func TestDirectoryChmod(t *testing.T) {
 }
 
 func TestIntraDirectoryRename(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename1 := workspace + "/test"
 		testFilename2 := workspace + "/test2"
@@ -664,12 +664,12 @@ func TestIntraDirectoryRename(t *testing.T) {
 }
 
 func TestInterDirectoryRename(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		interDirectoryRename(test)
 	})
 }
 
-func interDirectoryRename(test *TestHelper) {
+func interDirectoryRename(test *testHelper) {
 	workspace := test.newWorkspace()
 	testDir1 := workspace + "/dir1"
 	testDir2 := workspace + "/dir2"
@@ -700,7 +700,7 @@ func interDirectoryRename(test *TestHelper) {
 }
 
 func TestRenameIntoParent(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/child"
@@ -732,7 +732,7 @@ func TestRenameIntoParent(t *testing.T) {
 }
 
 func TestRenameIntoChild(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/child"
@@ -764,7 +764,7 @@ func TestRenameIntoChild(t *testing.T) {
 }
 
 func TestRenameIntoIndirectParent(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/indirect/child"
@@ -796,7 +796,7 @@ func TestRenameIntoIndirectParent(t *testing.T) {
 }
 
 func TestRenameIntoIndirectChild(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/indirect/child"
@@ -828,7 +828,7 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 }
 
 func TestSUIDPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -856,7 +856,7 @@ func TestSUIDPerms(t *testing.T) {
 }
 
 func TestLoadOnDemand(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/layerA/layerB/layerC"
 		fileA := "/layerA/fileA"
@@ -922,7 +922,7 @@ func TestLoadOnDemand(t *testing.T) {
 // Change the ownership of a file to be owned by the user and then confirm that the
 // dummy user is used when viewing the permissions as root.
 func TestChownUserAsRoot(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -944,7 +944,7 @@ func TestChownUserAsRoot(t *testing.T) {
 // Ensure that when we rewind the directory entry we get new files added after the
 // directory was opened.
 func TestDirectorySnapshotRefresh(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		parent := test.newWorkspace()
 
 		for i := 0; i < 2; i++ {
@@ -995,7 +995,7 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 
 // Trigger GetAttr on a directory in order to confirm that it works correctly
 func TestDirectoryGetAttr(t *testing.T) {
-	runTestCustomConfig(t, cacheTimeout100Ms, func(test *TestHelper) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/dir"
 
@@ -1024,7 +1024,7 @@ func TestDirectoryGetAttr(t *testing.T) {
 	})
 }
 
-func testInodeCreatePermissions(test *TestHelper, testDir string, mustSucceed bool,
+func testInodeCreatePermissions(test *testHelper, testDir string, mustSucceed bool,
 	failMsg string) {
 
 	check := func(err error) {
@@ -1055,7 +1055,7 @@ func testInodeCreatePermissions(test *TestHelper, testDir string, mustSucceed bo
 }
 
 func TestInodeCreatePermissionsAsRootNoPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0000)
@@ -1067,7 +1067,7 @@ func TestInodeCreatePermissionsAsRootNoPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsRootUserPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0700)
@@ -1079,7 +1079,7 @@ func TestInodeCreatePermissionsAsRootUserPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsRootGroupPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0070)
@@ -1091,7 +1091,7 @@ func TestInodeCreatePermissionsAsRootGroupPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsRootOtherPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0007)
@@ -1103,7 +1103,7 @@ func TestInodeCreatePermissionsAsRootOtherPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0000)
@@ -1117,7 +1117,7 @@ func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0700)
@@ -1131,7 +1131,7 @@ func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0070)
@@ -1145,7 +1145,7 @@ func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0007)
@@ -1159,7 +1159,7 @@ func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0000)
@@ -1173,7 +1173,7 @@ func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0700)
@@ -1187,7 +1187,7 @@ func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0070)
@@ -1201,7 +1201,7 @@ func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 		err := os.Mkdir(testDir, 0007)
@@ -1215,7 +1215,7 @@ func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 
@@ -1231,7 +1231,7 @@ func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 
@@ -1247,7 +1247,7 @@ func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 
@@ -1263,7 +1263,7 @@ func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
 }
 
 func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"
 

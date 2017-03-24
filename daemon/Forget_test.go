@@ -15,7 +15,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestForgetOnDirectory(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		os.MkdirAll(workspace+"/dir", 0777)
 
@@ -47,7 +47,7 @@ func TestForgetOnDirectory(t *testing.T) {
 }
 
 func TestForgetOnWorkspaceRoot(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		numFiles := 10
@@ -81,7 +81,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 	// This test is disabled until we can think of a good way to fix it. Also,
 	// its not 100% necessary.
 	t.Skip()
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		dirName := workspace + "/dir"
 
@@ -146,7 +146,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 }
 
 func TestMultipleLookupCount(t *testing.T) {
-	runTestCustomConfig(t, cacheTimeout100Ms, func(test *TestHelper) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 
@@ -175,7 +175,7 @@ func TestMultipleLookupCount(t *testing.T) {
 }
 
 func TestLookupCountHardlinks(t *testing.T) {
-	runTestCustomConfig(t, cacheTimeout100Ms, func(test *TestHelper) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 		linkFilename := workspace + "/link"
@@ -198,7 +198,7 @@ func TestLookupCountHardlinks(t *testing.T) {
 }
 
 func TestForgetMarking(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		// Make a simple one directory two children structure
@@ -269,7 +269,7 @@ func TestForgetMarking(t *testing.T) {
 }
 
 func TestForgetLookupRace(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		data := genData(2000)

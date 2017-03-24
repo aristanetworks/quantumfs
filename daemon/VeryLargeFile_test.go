@@ -15,7 +15,7 @@ import "testing"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-func runConvertFrom(test *TestHelper, fromFileSize uint64) {
+func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	workspace := test.newWorkspace()
 
 	testFilename := workspace + "/test"
@@ -85,33 +85,33 @@ func runConvertFrom(test *TestHelper, fromFileSize uint64) {
 }
 
 func TestSmallConvert(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, quantumfs.MaxSmallFileSize())
 	})
 }
 
 func TestMaxSmallConvert(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, uint64(quantumfs.MaxBlockSize))
 	})
 }
 
 func TestMedConvert(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, quantumfs.MaxSmallFileSize()+
 			uint64(quantumfs.MaxBlockSize))
 	})
 }
 
 func TestLargeConvert(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		runConvertFrom(test, quantumfs.MaxMediumFileSize()+
 			uint64(quantumfs.MaxBlockSize))
 	})
 }
 
 func TestVeryLargeFileZero(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
 		testFilename := workspace + "/test"
@@ -135,7 +135,7 @@ func TestVeryLargeFileZero(t *testing.T) {
 }
 
 func TestVeryLargeFileReadPastEnd(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
 

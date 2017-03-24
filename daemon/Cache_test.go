@@ -14,10 +14,10 @@ import "github.com/aristanetworks/quantumfs/qlog"
 type testDataStore struct {
 	datastore  quantumfs.DataStore
 	shouldRead bool
-	test       *TestHelper
+	test       *testHelper
 }
 
-func newTestDataStore(test *TestHelper) *testDataStore {
+func newTestDataStore(test *testHelper) *testDataStore {
 	return &testDataStore{
 		datastore:  processlocal.NewDataStore(""),
 		shouldRead: true,
@@ -39,7 +39,7 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
-func fillDatastore(c *quantumfs.Ctx, test *TestHelper, backingStore *testDataStore,
+func fillDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataStore,
 	datastore *dataStore, cacheSize int,
 	keys map[int]quantumfs.ObjectKey) {
 
@@ -61,7 +61,7 @@ func fillDatastore(c *quantumfs.Ctx, test *TestHelper, backingStore *testDataSto
 	}
 }
 
-func createDatastore(test *TestHelper, cacheSize int) (c *quantumfs.Ctx,
+func createDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
 	backingStore *testDataStore, datastore *dataStore,
 	keys map[int]quantumfs.ObjectKey) {
 
@@ -82,7 +82,7 @@ func createDatastore(test *TestHelper, cacheSize int) (c *quantumfs.Ctx,
 }
 
 func TestCacheLru(t *testing.T) {
-	runTestNoQfs(t, func(test *TestHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
 		c, backingStore, datastore, keys := createDatastore(test, cacheSize)
 		fillDatastore(c, test, backingStore, datastore, cacheSize, keys)
@@ -132,7 +132,7 @@ func TestCacheLru(t *testing.T) {
 }
 
 func TestCacheCaching(t *testing.T) {
-	runTestNoQfs(t, func(test *TestHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
 		c, backingStore, datastore, keys := createDatastore(test, cacheSize)
 		fillDatastore(c, test, backingStore, datastore, cacheSize, keys)

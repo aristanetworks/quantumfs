@@ -12,7 +12,7 @@ import "syscall"
 import "testing"
 
 func TestNullWorkspaceDirectoryCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
 
@@ -23,7 +23,7 @@ func TestNullWorkspaceDirectoryCreation(t *testing.T) {
 }
 
 func TestNullWorkspaceFileCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.nullWorkspace()
 		testFilename := workspace + "/" + "test"
 
@@ -37,7 +37,7 @@ func TestNullWorkspaceFileCreation(t *testing.T) {
 
 // This function is implemented to facilitate the creation of different types of
 // special files
-func NullWorkspaceSpecialFile(test *TestHelper, filetype uint32) {
+func NullWorkspaceSpecialFile(test *testHelper, filetype uint32) {
 	workspace := test.nullWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
@@ -47,31 +47,31 @@ func NullWorkspaceSpecialFile(test *TestHelper, filetype uint32) {
 }
 
 func TestNullWorkspaceBlockDevCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		NullWorkspaceSpecialFile(test, syscall.S_IFBLK)
 	})
 }
 
 func TestNullWorkspaceCharDevCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		NullWorkspaceSpecialFile(test, syscall.S_IFCHR)
 	})
 }
 
 func TestNullWorkspaceSocketCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		NullWorkspaceSpecialFile(test, syscall.S_IFSOCK)
 	})
 }
 
 func TestNullWorkspaceFileMknodCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		NullWorkspaceSpecialFile(test, syscall.S_IFREG)
 	})
 }
 
 func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.nullWorkspace()
 		link := workspace + "/symlink"
 		err := syscall.Symlink("/usr/bin/arch", link)
@@ -81,7 +81,7 @@ func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
 }
 
 func TestNullWorkspaceHardlinkCreation(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFileName := workspace + "/testfile"
 		fd, err := os.Create(testFileName)
@@ -97,7 +97,7 @@ func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 }
 
 func TestNullWorkspaceRename(t *testing.T) {
-	runTest(t, func(test *TestHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFileName := workspace + "/testfile"
 		fd, err := os.Create(testFileName)
