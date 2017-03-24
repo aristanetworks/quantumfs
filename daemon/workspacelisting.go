@@ -1025,7 +1025,7 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		wsl.namespaceName == quantumfs.NullSpaceName &&
 		wsl.workspacesById[inodeNum] == quantumfs.NullSpaceName {
 
-		return newNullSpaceNameRoot(c, wsl.typespaceName, wsl.namespaceName,
+		return newNullWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
 			wsl.workspacesById[inodeNum], wsl, inodeNum)
 	} else {
 		return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,

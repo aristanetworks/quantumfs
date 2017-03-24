@@ -49,7 +49,7 @@ func TestWorkspaceListing(t *testing.T) {
 	})
 }
 
-func TestNullSpaceNameListing(t *testing.T) {
+func TestWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		path := test.newWorkspace()
 
