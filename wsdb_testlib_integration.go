@@ -27,32 +27,32 @@ func (s *wsdbCommonIntegTest) TestIntegEmptyDB() {
 
 	tsList, err2 := s.db.TypespaceList()
 	s.req.NoError(err2, "TypespaceList failed %s", err2)
-	s.req.Equal([]string{"_null"}, tsList,
+	s.req.Equal([]string{wsdb.NullSpaceName}, tsList,
 		"Empty DB has incorrect list of typespaces")
 
-	nsCount, err2 := s.db.NumNamespaces("_null")
+	nsCount, err2 := s.db.NumNamespaces(wsdb.NullSpaceName)
 	s.req.NoError(err2, "NumNamespaces failed %s", err2)
 	s.req.Equal(1, nsCount, "Empty DB has incorrect count of namespaces")
 
-	nsList, err4 := s.db.NamespaceList("_null")
+	nsList, err4 := s.db.NamespaceList(wsdb.NullSpaceName)
 	s.req.NoError(err4, "NamespaceList failed %s", err4)
-	s.req.Equal([]string{"_null"}, nsList,
+	s.req.Equal([]string{wsdb.NullSpaceName}, nsList,
 		"Empty DB has incorrect list of namespaces")
 
-	wsCount, err5 := s.db.NumWorkspaces("_null", "_null")
+	wsCount, err5 := s.db.NumWorkspaces(wsdb.NullSpaceName, wsdb.NullSpaceName)
 	s.req.NoError(err5, "NumWorkspaces failed %s", err5)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
 
-	wsList, err6 := s.db.WorkspaceList("_null", "_null")
+	wsList, err6 := s.db.WorkspaceList(wsdb.NullSpaceName, wsdb.NullSpaceName)
 	s.req.NoError(err6, "WorkspaceList failed %s", err6)
-	s.req.Equal([]string{"null"}, wsList,
+	s.req.Equal([]string{wsdb.NullSpaceName}, wsList,
 		"Empty DB has incorrect list of workspaces")
 }
 
 func (s *wsdbCommonIntegTest) TestIntegBranching() {
 
-	err := s.db.BranchWorkspace("_null", "_null", "null",
-		"ts1", "ns1", "ws1")
+	err := s.db.BranchWorkspace(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	tsCount, err1 := s.db.NumTypespaces()
@@ -62,8 +62,8 @@ func (s *wsdbCommonIntegTest) TestIntegBranching() {
 
 	tsList, err2 := s.db.TypespaceList()
 	s.req.NoError(err2, "TypespaceList failed %s", err2)
-	s.req.Contains(tsList, "_null",
-		"Expected typespace _null not found")
+	s.req.Contains(tsList, wsdb.NullSpaceName,
+		"Expected null typespace not found")
 	s.req.Contains(tsList, "ts1",
 		"Expected typespace ts1 not found")
 
@@ -85,7 +85,7 @@ func (s *wsdbCommonIntegTest) TestIntegBranching() {
 	wsList, err6 := s.db.WorkspaceList("ts1", "ns1")
 	s.req.NoError(err6, "WorkspaceList failed %s", err6)
 	s.req.Contains(wsList, "ws1",
-		"Expected workspace null not found")
+		"Expected workspace ws1 not found")
 }
 
 func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
@@ -93,20 +93,22 @@ func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
 	emptyKey := []byte(nil)
 	newKey := []byte{1, 2, 3}
 
-	e := s.db.BranchWorkspace("_null", "_null", "null",
-		"ts1", "ns1", "ws1")
+	e := s.db.BranchWorkspace(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(e, "Error branching null workspace: %v", e)
 
 	key, err1 := s.db.Workspace("ts1", "ns1", "ws1")
 	s.req.NoError(err1, "Workspace failed %s", err1)
 	s.req.True(bytes.Equal(key, emptyKey), "Current RootID isn't empty")
 
-	newRootID, err := s.db.AdvanceWorkspace("ts1", "ns1", "ws1", emptyKey, newKey)
+	newRootID, err := s.db.AdvanceWorkspace("ts1", "ns1", "ws1", emptyKey,
+		newKey)
 	s.req.NoError(err, "Error in advancing workspace EmptyDirKey: %v", err)
 	s.req.True(bytes.Equal(newRootID, newKey), "New RootID isn't EmptyDirKey")
 
 	newRootID, err = s.db.AdvanceWorkspace("ts1", "ns1", "ws1", newKey, emptyKey)
-	s.req.NoError(err, "Error in advancing workspace to EmptyWorkspaceKey: %v", err)
+	s.req.NoError(err, "Error in advancing workspace to EmptyWorkspaceKey: %v",
+		err)
 	s.req.True(bytes.Equal(newRootID, emptyKey),
 		"New RootID isn't EmptyWorkspaceKey")
 }

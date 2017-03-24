@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/suite"
 )
@@ -29,8 +30,8 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockWsdbKeyPut(mockSession, "_null", "_null", "null",
-		[]byte(nil), nil)
+	mockWsdbKeyPut(mockSession, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte(nil), nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
@@ -85,31 +86,34 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 
 	// disable fetches from DB so that cache state is unchanged
 	suite.cache.disableCqlRefresh(1 * time.Hour)
-	suite.cache.disableCqlRefresh(1*time.Hour, "_null")
-	suite.cache.disableCqlRefresh(1*time.Hour, "_null", "_null")
+	suite.cache.disableCqlRefresh(1*time.Hour, wsdb.NullSpaceName)
+	suite.cache.disableCqlRefresh(1*time.Hour, wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
 
-	nsCount, err1 := suite.common.wsdb.NumNamespaces("_null")
+	nsCount, err1 := suite.common.wsdb.NumNamespaces(wsdb.NullSpaceName)
 	suite.Require().NoError(err1,
 		"NumNamespaces failed: %s", err1)
 	suite.Require().Equal(1, nsCount,
 		"Incorrect number of namespaces in cache: %d", nsCount)
 
-	nsList, err2 := suite.common.wsdb.NamespaceList("_null")
+	nsList, err2 := suite.common.wsdb.NamespaceList(wsdb.NullSpaceName)
 	suite.Require().NoError(err2,
 		"NamespaceList failed: %s", err2)
-	suite.Require().Contains(nsList, "_null",
+	suite.Require().Contains(nsList, wsdb.NullSpaceName,
 		"Incorrect namespaces in cache")
 
-	wsCount, err3 := suite.common.wsdb.NumWorkspaces("_null", "_null")
+	wsCount, err3 := suite.common.wsdb.NumWorkspaces(wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
 	suite.Require().NoError(err3,
 		"NumWorkspaces failed: %s", err3)
 	suite.Require().Equal(1, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
 
-	wsList, err4 := suite.common.wsdb.WorkspaceList("_null", "_null")
+	wsList, err4 := suite.common.wsdb.WorkspaceList(wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
 	suite.Require().NoError(err4,
 		"WorkspaceList failed: %s", err4)
-	suite.Require().Equal([]string{"null"}, wsList,
+	suite.Require().Equal([]string{wsdb.NullSpaceName}, wsList,
 		"Incorrect workspaces in cache")
 
 }
@@ -122,7 +126,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 	tsIter := new(MockIter)
 	tsVals := []interface{}(nil)
 
-	nsRows := mockDbRows{[]interface{}{"_null"}, []interface{}{"remoteNS"}}
+	nsRows := mockDbRows{[]interface{}{wsdb.NullSpaceName},
+		[]interface{}{"remoteNS"}}
 	nsIter := new(MockIter)
 	nsVals := []interface{}{"remoteTS"}
 
@@ -155,7 +160,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 
 	nsList, err2 := suite.common.wsdb.NamespaceList("remoteTS")
 	suite.Require().NoError(err2, "NamespaceList failed: %s", err2)
-	suite.Require().Contains(nsList, "_null",
+	suite.Require().Contains(nsList, wsdb.NullSpaceName,
 		"Incorrect namespaces in cache")
 	suite.Require().Contains(nsList, "remoteNS",
 		"Incorrect namespaces in cache")
@@ -188,7 +193,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 	tsVals := []interface{}(nil)
 
 	// first ensure that remote entries are injected into cache
-	nsRows := mockDbRows{[]interface{}{"_null"}, []interface{}{"remoteNS"}}
+	nsRows := mockDbRows{[]interface{}{wsdb.NullSpaceName},
+		[]interface{}{"remoteNS"}}
 	nsIter := new(MockIter)
 	nsVals := []interface{}{"remoteTS"}
 
@@ -231,7 +237,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 
 	// cache must now contain
 	// typespaces: remoteTS
-	// namespaces: _null, remoteNS
+	// namespaces: null, remoteNS
 	// workspaces for remoteNS: remoteWS
 
 	// mock workspace DB fetch returning no workspaces for "remoteNS" namespace
@@ -252,16 +258,18 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 
 	// newly branched workspace must be in cache
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts1", "ns1", "ws1", []byte(nil), gocql.ErrNotFound)
-	err := suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts1", "ns1", "ws1")
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1",
+		[]byte(nil), gocql.ErrNotFound)
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts1", "ns1", "ws2", []byte(nil), gocql.ErrNotFound)
-	err = suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts1", "ns1", "ws2")
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws2",
+		[]byte(nil), gocql.ErrNotFound)
+	err = suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws2")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	// disable fetches from DB so that cache state is unchanged
@@ -326,14 +334,15 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	// wait for fetch to stall
 	<-wsFetchPause
 
-	// fetched data contains null and specialWS workspaces for _null
+	// fetched data contains null and specialWS workspaces for the null
 	// namespace
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts1", "ns1", "ws1", []byte(nil), gocql.ErrNotFound)
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1",
+		[]byte(nil), gocql.ErrNotFound)
 
-	// causes a local insert of ws1 workspace for _null namespace
-	err := suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts1", "ns1", "ws1")
+	// causes a local insert of ws1 workspace for the null namespace
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	// unpause the DB fetch
@@ -356,11 +365,12 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	// check that cache has remote as well as new local insert
 	// even though fetched data didn't include the local insert
 
-	suite.cache.InsertEntities("_null", "_null", "specialWS")
+	suite.cache.InsertEntities(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		"specialWS")
 
-	wsRows := mockDbRows{{"null"}, {"specialWS"}}
+	wsRows := mockDbRows{{wsdb.NullSpaceName}, {"specialWS"}}
 	wsIter := new(MockIter)
-	wsVals := []interface{}{"_null", "_null"}
+	wsVals := []interface{}{wsdb.NullSpaceName, wsdb.NullSpaceName}
 
 	var wsList []string
 	var wsWg sync.WaitGroup
@@ -370,24 +380,26 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 		wsIter, wsFetchPause)
 
 	suite.cache.disableCqlRefresh(1 * time.Hour)
-	suite.cache.disableCqlRefresh(1*time.Hour, "_null")
-	suite.cache.enableCqlRefresh("_null", "_null")
+	suite.cache.disableCqlRefresh(1*time.Hour, wsdb.NullSpaceName)
+	suite.cache.enableCqlRefresh(wsdb.NullSpaceName, wsdb.NullSpaceName)
 
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList, _ = suite.common.wsdb.WorkspaceList("_null", "_null")
+		wsList, _ = suite.common.wsdb.WorkspaceList(wsdb.NullSpaceName,
+			wsdb.NullSpaceName)
 	}()
 
 	// wait for fetch to stall
 	<-wsFetchPause
 
-	// fetched data contains null and specialWS workspaces for _null
+	// fetched data contains null and specialWS workspaces for the null
 	// namespace
 
 	// TODO: currently workspaceDB API doesn't contain deletes
 	//       so do a cache delete here
-	suite.cache.DeleteEntities("_null", "_null", "specialWS")
+	suite.cache.DeleteEntities(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		"specialWS")
 
 	// unpause the DB fetch
 	wsFetchPause <- true
@@ -395,18 +407,19 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	// wait for NamespaceList API to complete
 	wsWg.Wait()
 
-	suite.Require().Contains(wsList, "null",
-		"Expected workspace null not in cache")
+	suite.Require().Contains(wsList, wsdb.NullSpaceName,
+		"Expected null workspace not in cache")
 	suite.Require().NotContains(wsList, "specialWS",
 		"Unexpected workspace specialWS in cache")
 }
 
 func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
-	suite.cache.InsertEntities("_null", "_null", "specialWS")
+	suite.cache.InsertEntities(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		"specialWS")
 
-	wsRows := mockDbRows{{"null"}, {"specialWS"}}
+	wsRows := mockDbRows{{wsdb.NullSpaceName}, {"specialWS"}}
 	wsIter := new(MockIter)
-	wsVals := []interface{}{"_null", "_null"}
+	wsVals := []interface{}{wsdb.NullSpaceName, wsdb.NullSpaceName}
 	var wsList []string
 	var wsWg sync.WaitGroup
 	wsFetchPause := make(chan bool)
@@ -415,25 +428,28 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 		wsIter, wsFetchPause)
 
 	suite.cache.disableCqlRefresh(1 * time.Hour)
-	suite.cache.disableCqlRefresh(1*time.Hour, "_null")
-	suite.cache.enableCqlRefresh("_null", "_null")
+	suite.cache.disableCqlRefresh(1*time.Hour, wsdb.NullSpaceName)
+	suite.cache.enableCqlRefresh(wsdb.NullSpaceName, wsdb.NullSpaceName)
 
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsList, _ = suite.common.wsdb.WorkspaceList("_null", "_null")
+		wsList, _ = suite.common.wsdb.WorkspaceList(wsdb.NullSpaceName,
+			wsdb.NullSpaceName)
 	}()
 
 	// wait for fetch to stall
 	<-wsFetchPause
 
-	// fetched data contains null and specialWS workspaces for _null
+	// fetched data contains null and specialWS workspaces for null
 	// namespace
-	suite.cache.InsertEntities("_null", "_null", "newWS")
-	suite.cache.DeleteEntities("_null", "_null", "newWS")
+	suite.cache.InsertEntities(wsdb.NullSpaceName, wsdb.NullSpaceName, "newWS")
+	suite.cache.DeleteEntities(wsdb.NullSpaceName, wsdb.NullSpaceName, "newWS")
 
-	suite.cache.DeleteEntities("_null", "_null", "specialWS")
-	suite.cache.InsertEntities("_null", "_null", "specialWS")
+	suite.cache.DeleteEntities(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		"specialWS")
+	suite.cache.InsertEntities(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		"specialWS")
 
 	// unpause the DB fetch
 	wsFetchPause <- true
@@ -441,8 +457,8 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 	// wait for NamespaceList API to complete
 	wsWg.Wait()
 
-	suite.Require().Contains(wsList, "null",
-		"Expected workspace null not in cache")
+	suite.Require().Contains(wsList, wsdb.NullSpaceName,
+		"Expected null workspace not in cache")
 	suite.Require().Contains(wsList, "specialWS",
 		"Unexpected workspace specialWS in cache")
 	suite.Require().NotContains(wsList, "newWS",
@@ -451,18 +467,20 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 
 func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts2", "ns2", "a", []byte(nil), gocql.ErrNotFound)
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "a",
+		[]byte(nil), gocql.ErrNotFound)
 
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts2", "ns2", "b", []byte(nil), gocql.ErrNotFound)
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "b",
+		[]byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts2", "ns2", "a")
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "a")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
-	err = suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts2", "ns2", "b")
+	err = suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "b")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{{"a"}, {"b"}}
@@ -508,11 +526,13 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	// workspaces for "parentNS" namespace, delete "parentNS" namespace.
 	// The list of workspaces must be empty due to parent detachment
 	// detection
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts", "parentNS", "childWS", []byte(nil), gocql.ErrNotFound)
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
+		"childWS", []byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts", "parentNS", "childWS")
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
+		"childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{[]interface{}{"childWS"}}
@@ -538,7 +558,7 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	// wait for fetch to stall
 	<-wsFetchPause
 
-	// delete _null namespace
+	// delete null namespace
 	suite.cache.DeleteEntities("ts", "parentNS")
 
 	// unpause the DB fetch
@@ -553,14 +573,16 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 
 func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 	// while refresh is underway as part of getting list of
-	// workspaces for "parentNS" namespace, delete "_null" typespace.
+	// workspaces for "parentNS" namespace, delete "null" typespace.
 	// The list of workspaces must be empty due to ancestor detachment
 	// detection
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts", "parentNS", "childWS", []byte(nil), gocql.ErrNotFound)
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
+		"childWS", []byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts", "parentNS", "childWS")
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
+		"childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{[]interface{}{"childWS"}}
@@ -586,7 +608,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 	// wait for fetch to stall
 	<-wsFetchPause
 
-	// delete _null typespace (and all children)
+	// delete null typespace (and all children)
 	suite.cache.DeleteEntities("ts")
 
 	// unpause the DB fetch
@@ -603,11 +625,13 @@ func (suite *wsdbCacheTestSuite) TestCacheChildDeleteDuringRefresh() {
 	// while refresh is underway as part of getting list of
 	// namespaces for "ts" typespace, delete "childWS" workspace.
 	// The list of namspaces must be empty
-	mockBranchWorkspace(suite.common.mockSess, "_null", "_null", "null",
-		"ts", "parentNS", "childWS", []byte(nil), gocql.ErrNotFound)
+	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
+		"childWS", []byte(nil), gocql.ErrNotFound)
 
-	err := suite.common.wsdb.BranchWorkspace("_null", "_null", "null",
-		"ts", "parentNS", "childWS")
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
+		"childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	nsRows := mockDbRows{[]interface{}{"parentNS"}}

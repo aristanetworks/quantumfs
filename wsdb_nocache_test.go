@@ -6,6 +6,7 @@ package cql
 import (
 	"testing"
 
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,8 +26,8 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockWsdbKeyPut(mockSession, "_null",
-		"_null", "null", []byte(nil), nil)
+	mockWsdbKeyPut(mockSession, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte(nil), nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{

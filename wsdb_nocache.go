@@ -30,17 +30,18 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 		return nil, err
 	}
 
-	wsdb := &noCacheWsdb{
+	wsdbInst := &noCacheWsdb{
 		store:    &store,
 		keyspace: cfg.Cluster.KeySpace,
 	}
 
-	err = wsdb.wsdbKeyPut("_null", "_null", "null", []byte(nil))
+	err = wsdbInst.wsdbKeyPut(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte(nil))
 	if err != nil {
 		return nil, err
 	}
 
-	return wsdb, nil
+	return wsdbInst, nil
 }
 
 // --- workspace DB API implementation ---
@@ -145,7 +146,7 @@ func (nc *noCacheWsdb) WorkspaceExists(typespace string, namespace string,
 func isTypespaceReserved(typespace string) bool {
 	// verify that this is not an attempt to alter the
 	// seed/first workspaceDB entry setup by ether implementation of workspaceDB
-	return typespace == "_null"
+	return typespace == wsdb.NullSpaceName
 }
 
 func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
@@ -154,7 +155,7 @@ func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
 
 	if isTypespaceReserved(dstTypespace) {
 		return wsdb.NewError(wsdb.ErrLocked,
-			"Branch failed: _null typespace is locked")
+			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
 
 	key, present, err := nc.wsdbKeyGet(srcTypespace, srcNamespace,
@@ -222,7 +223,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(typespace string,
 
 	if isTypespaceReserved(typespace) && currentRootID != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrLocked,
-			"Branch failed: _null typespace is locked")
+			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
 
 	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
@@ -240,10 +241,13 @@ func (nc *noCacheWsdb) AdvanceWorkspace(typespace string,
 
 	if !bytes.Equal(currentRootID, key) {
 		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
-			"cannot advance workspace expected:%s found:%s", currentRootID, key)
+			"cannot advance workspace expected:%s found:%s",
+			currentRootID, key)
 	}
 
-	if err := nc.wsdbKeyPut(typespace, namespace, workspace, newRootID); err != nil {
+	if err := nc.wsdbKeyPut(typespace, namespace, workspace,
+		newRootID); err != nil {
+
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
 			"during Put in AdvanceWorkspace %s/%s/%s : %s",
 			typespace, namespace, workspace, err.Error())

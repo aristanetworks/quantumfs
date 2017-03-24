@@ -40,8 +40,9 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 	c := newEntityCache(3, 1*time.Second, cwsdb, wsdbFetcherImpl)
 
 	// QFS requires an empty workspaceDB to contain null namespace
-	// and _null workspace
-	c.InsertEntities("_null", "_null", "null")
+	// and null workspace
+	c.InsertEntities(wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
 
 	cwsdb.cache = c
 
