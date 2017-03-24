@@ -26,7 +26,8 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 		test.assert(stat_t.Ino == quantumfs.InodeIdApi,
 			"Wrong Inode number for api file")
 
-		src := "_null/_null/null"
+		src := quantumfs.NullSpaceName+"/"+quantumfs.NullSpaceName+"/"+
+			quantumfs.NullSpaceName
 		dst := "wsrtest/wsrtest/wsrtest"
 		api := quantumfs.NewApiWithPath(apiPath)
 		assert(api != nil, "Api nil")
