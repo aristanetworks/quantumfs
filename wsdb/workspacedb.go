@@ -13,6 +13,9 @@ type ObjectKey []byte
 // ErrCode is error code from workspace DB APIs
 type ErrCode int
 
+// NullSpaceName is the string token for each part of the null workspace path
+const NullSpaceName = "_"
+
 const (
 	// ErrReserved should not be used
 	ErrReserved ErrCode = iota
