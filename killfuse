@@ -1,0 +1,7 @@
+cd /sys/fs/fuse/connections/
+sleep 1
+for i in *; do
+	echo 1 > $i/abort
+done
+sleep 1
+mount|awk '/quantumfs/{print $3}'|xargs -n 1 fusermount -u
