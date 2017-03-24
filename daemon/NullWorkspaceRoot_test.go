@@ -3,7 +3,7 @@
 
 package daemon
 
-// Test the various operations on type NullSpaceNameRoot, whose only instance is
+// Test the various operations on type NullWorkspaceRoot, whose only instance is
 // _null/null, creating any type of file or directory under this path is enforced
 // to be prohibited.
 
