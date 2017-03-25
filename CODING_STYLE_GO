@@ -14,6 +14,53 @@ time. Here are examples of mutually acceptable formatting in some of these
 challenging cases. For the purposes of discussion all the examples below will assume
 a maximum line length of 60.
 
+Enums
+=====
+
+All enums in quantumfs package must use explicit numbers instead of iota directive.
+This simplifies spotting mismatches in exported constant values across API implementations
+in different programming languages.
+
+When using a set of constants to represent an enum type, make sure to have the first
+constant represent an invalid value. For example -
+
+const (
+	KeyTypeInvalid   = 0 // Invalid
+	KeyTypeConstant  = 1 // A statically known object, such as the empty block
+	KeyTypeOther     = 2 // A nonspecific type
+  ...
+)
+
+When error codes/enums are exchanged with clients in different programming
+language, use first enum with value 0 to represent success. For example -
+
+const (
+	ErrorOK                = 0 // Command Successful
+	ErrorBadArgs           = 1 // The argument is wrong
+  ...
+)
+
+In Go, success is represented using nil error. When the error codes/enums are used
+only in the Go code, then reserve the first enum with value 0. This ensures that
+constants representing error conditions can match to error codes in other programming
+languages where 0 is treated as success. For example -
+
+const (
+	WSDB_RESERVED            WsdbErrCode = 0
+	WSDB_WORKSPACE_NOT_FOUND             = 1 // The workspace didn't exist
+	WSDB_WORKSPACE_EXISTS                = 2 // The workspace already exists
+  ...
+)
+
+maps cleanly to following C++ enum
+
+enum WsdbErrorCode {
+	// Success
+	kSuccess = 0,
+	kWorkspaceNotFound = 1,
+  ...
+};
+
 Long Function Signature
 =======================
 
