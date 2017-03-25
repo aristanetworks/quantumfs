@@ -106,7 +106,8 @@ func NewEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	}
 
 	// since generic wsdb API sets up _null/null with nil key
-	key, err := eWsdb.wsdb.AdvanceWorkspace("_null", "_null", "null",
+	key, err := eWsdb.wsdb.AdvanceWorkspace(quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		[]byte(nil), quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
 		// an existing workspaceDB will have currentRootID as

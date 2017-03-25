@@ -73,10 +73,8 @@ func MaxVeryLargeFileSize() uint64 {
 
 // Special reserved typespace/namespace/workspace names
 const (
-	ApiPath           = "api" // File used for the qfs api
-	NullTypespaceName = "_null"
-	NullNamespaceName = "_null"
-	NullWorkspaceName = "null"
+	ApiPath       = "api" // File used for the qfs api
+	NullSpaceName = "_"
 )
 
 // Special reserved inode numbers

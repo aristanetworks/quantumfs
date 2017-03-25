@@ -560,9 +560,9 @@ func TestRandomNamespaceName(t *testing.T) {
 }
 
 func (th *testHelper) nullWorkspaceRel() string {
-	type_ := quantumfs.NullTypespaceName
-	name_ := quantumfs.NullNamespaceName
-	work_ := quantumfs.NullWorkspaceName
+	type_ := quantumfs.NullSpaceName
+	name_ := quantumfs.NullSpaceName
+	work_ := quantumfs.NullSpaceName
 	return type_ + "/" + name_ + "/" + work_
 }
 
@@ -934,7 +934,8 @@ func TestPanicFilesystemAbort(t *testing.T) {
 		test.qfs.mapMutex.Unlock()
 
 		// panic Quantumfs
-		api.Branch("_null/_null/null", "branch/test/crash")
+		api.Branch(quantumfs.NullSpaceName+"/"+quantumfs.NullSpaceName+"/"+
+			quantumfs.NullSpaceName, "branch/test/crash")
 	})
 }
 
