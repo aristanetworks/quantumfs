@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	entry DirectoryRecordIf, updateMtime bool) {
+	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
 	// Update the type if needed
 	if newType != nil {
@@ -40,14 +40,14 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 	}
 
 	if utils.BitFlagsSet(valid, fuse.FATTR_UID) {
-		entry.SetOwner(quantumfs.ObjectUid(c.Ctx, attr.Owner.Uid,
+		entry.SetOwner(quantumfs.ObjectUid(attr.Owner.Uid,
 			c.fuseCtx.Owner.Uid))
 		c.vlog("Owner now %d UID %d context %d", entry.Owner(),
 			attr.Owner.Uid, c.fuseCtx.Owner.Uid)
 	}
 
 	if utils.BitFlagsSet(valid, fuse.FATTR_GID) {
-		entry.SetGroup(quantumfs.ObjectGid(c.Ctx, attr.Owner.Gid,
+		entry.SetGroup(quantumfs.ObjectGid(attr.Owner.Gid,
 			c.fuseCtx.Owner.Gid))
 		c.vlog("Group now %d GID %d context %d", entry.Group(),
 			attr.Owner.Gid, c.fuseCtx.Owner.Gid)
@@ -84,24 +84,6 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 		c.vlog("Updated ctime")
 		entry.SetContentTime(now)
 	}
-}
-
-func cloneDirectoryRecord(
-	orig DirectoryRecordIf) DirectoryRecordIf {
-
-	newEntry := quantumfs.NewDirectoryRecord()
-	newEntry.SetFilename(orig.Filename())
-	newEntry.SetID(orig.ID())
-	newEntry.SetType(orig.Type())
-	newEntry.SetPermissions(orig.Permissions())
-	newEntry.SetOwner(orig.Owner())
-	newEntry.SetGroup(orig.Group())
-	newEntry.SetSize(orig.Size())
-	newEntry.SetExtendedAttributes(orig.ExtendedAttributes())
-	newEntry.SetContentTime(orig.ContentTime())
-	newEntry.SetModificationTime(orig.ModificationTime())
-
-	return newEntry
 }
 
 type DeferableMutex struct {

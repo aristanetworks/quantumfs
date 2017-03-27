@@ -19,7 +19,7 @@ const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newSmallAccessor(c, size, key)
 
@@ -28,7 +28,7 @@ func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newMediumAccessor(c, key)
 
@@ -37,7 +37,7 @@ func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newLargeAccessor(c, key)
 
@@ -46,7 +46,7 @@ func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord DirectoryRecordIf) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
 	accessor := newVeryLargeAccessor(c, key)
 
@@ -76,7 +76,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 type File struct {
 	InodeCommon
 	accessor     blockAccessor
-	unlinkRecord DirectoryRecordIf
+	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
 	unlinkLock   DeferableRwMutex
 }
@@ -97,7 +97,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("File::GetAttr").out()
 
-	record, err := fi.parentGetChildRecord(c, fi.InodeCommon.id)
+	record, err := fi.parentGetChildRecordCopy(c, fi.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", fi.id)
 		return fuse.EIO
@@ -119,7 +119,7 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
 	defer c.FuncIn("File::openPermission", "%d", fi.inodeNum()).out()
 
-	record, error := fi.parentGetChildRecord(c, fi.id)
+	record, error := fi.parentGetChildRecordCopy(c, fi.id)
 	if error != nil {
 		c.elog("%s", error.Error())
 		return false
@@ -477,9 +477,7 @@ func (fi *File) listChildXAttr(c *ctx,
 		nameBuffer.WriteByte(0)
 	}
 
-	c.vlog("Appending %s", quantumfs.XAttrTypeKey)
-	nameBuffer.WriteString(quantumfs.XAttrTypeKey)
-	nameBuffer.WriteByte(0)
+	// don't append our self-defined extended attribute XAttrTypeKey to hide it
 
 	c.vlog("Returning %d bytes", nameBuffer.Len())
 
@@ -528,13 +526,14 @@ func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, error) {
+func (fi *File) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	defer c.funcIn("File::getChildRecord").out()
+	defer c.funcIn("File::getChildRecordCopy").out()
 
 	if !fi.isOrphaned() {
 		c.elog("Unsupported record fetch on file")
-		return &quantumfs.DirectoryRecord{},
+		return &quantumfs.DirectRecord{},
 			errors.New("Unsupported record fetch")
 	}
 
@@ -546,10 +545,10 @@ func (fi *File) getChildRecord(c *ctx, inodeNum InodeId) (DirectoryRecordIf, err
 		panic("getChildRecord on self file before unlinking")
 	}
 
-	return fi.unlinkRecord, nil
+	return fi.unlinkRecord.ShallowCopy(), nil
 }
 
-func (fi *File) setChildRecord(c *ctx, record DirectoryRecordIf) {
+func (fi *File) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.funcIn("File::setChildRecord").out()
 
 	defer fi.unlinkLock.Lock().Unlock()
@@ -558,7 +557,7 @@ func (fi *File) setChildRecord(c *ctx, record DirectoryRecordIf) {
 		panic("setChildRecord on self file after unlinking")
 	}
 
-	fi.unlinkRecord = cloneDirectoryRecord(record)
+	fi.unlinkRecord = record
 }
 
 func resize(buffer []byte, size int) []byte {

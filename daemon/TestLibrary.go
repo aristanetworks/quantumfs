@@ -18,9 +18,9 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/qlog"
-
 import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/utils"
+
 import "github.com/hanwen/go-fuse/fuse"
 
 const fusectlPath = "/sys/fs/fuse/"
@@ -255,9 +255,9 @@ func randomNamespaceName(size int) string {
 }
 
 func (th *TestHelper) nullWorkspaceRel() string {
-	type_ := quantumfs.NullTypespaceName
-	name_ := quantumfs.NullNamespaceName
-	work_ := quantumfs.NullWorkspaceName
+	type_ := quantumfs.NullSpaceName
+	name_ := quantumfs.NullSpaceName
+	work_ := quantumfs.NullSpaceName
 	return type_ + "/" + name_ + "/" + work_
 }
 
@@ -265,13 +265,7 @@ func (th *TestHelper) nullWorkspace() string {
 	return th.absPath(th.nullWorkspaceRel())
 }
 
-// Create a new workspace to test within
-// Returns the absolute path of the workspace
-func (th *TestHelper) NewWorkspace() string {
-	return th.newWorkspace()
-}
-
-func (th *TestHelper) newWorkspace() string {
+func (th *TestHelper) newWorkspaceWithoutWritePerm() string {
 	api := th.getApi()
 
 	type_ := randomNamespaceName(8)
@@ -287,18 +281,42 @@ func (th *TestHelper) newWorkspace() string {
 	return th.absPath(dst)
 }
 
-// Branch existing workspace into new random name
+// Create a new workspace to test within
 //
-// Returns the relative path of the new workspace.
-func (th *TestHelper) branchWorkspace(original string) string {
+// Returns the absolute path of the workspace
+func (th *TestHelper) newWorkspace() string {
+	path := th.newWorkspaceWithoutWritePerm()
+
+	api := th.getApi()
+	err := api.EnableRootWrite(th.relPath(path))
+	th.Assert(err == nil, "Failed to enable write permission in workspace: %v",
+		err)
+
+	return path
+}
+
+func (th *TestHelper) branchWorkspaceWithoutWritePerm(original string) string {
 	src := th.relPath(original)
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10) +
 		"/" + randomNamespaceName(8)
 
 	api := th.getApi()
 	err := api.Branch(src, dst)
-
 	th.Assert(err == nil, "Failed to branch workspace: %s -> %s: %v", src, dst,
+		err)
+
+	return dst
+}
+
+// Branch existing workspace into new random name
+//
+// Returns the relative path of the new workspace.
+func (th *TestHelper) branchWorkspace(original string) string {
+	dst := th.branchWorkspaceWithoutWritePerm(original)
+
+	api := th.getApi()
+	err := api.EnableRootWrite(dst)
+	th.Assert(err == nil, "Failed to enable write permission in workspace: %v",
 		err)
 
 	return dst

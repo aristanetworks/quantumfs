@@ -37,7 +37,9 @@ type ApiInode struct {
 
 func fillApiAttr(attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
-	attr.Size = 1024
+	// You can never read more than a file's size, so this must be larger than
+	// any possible api response message length
+	attr.Size = uint64(1024)
 	attr.Blocks = 1
 
 	now := time.Now()
@@ -94,11 +96,11 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
-func (wsr *ApiInode) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (wsr *ApiInode) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Api doesn't support record fetch")
-	return &quantumfs.DirectoryRecord{}, errors.New("Unsupported record fetch")
+	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
@@ -396,6 +398,15 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdDeleteWorkspace:
 		c.vlog("Received DeleteWorkspace request")
 		api.deleteWorkspace(c, buf)
+	case quantumfs.CmdSetBlock:
+		c.vlog("Received SetBlock request")
+		api.setBlock(c, buf)
+	case quantumfs.CmdGetBlock:
+		c.vlog("Received GetBlock request")
+		api.getBlock(c, buf)
+	case quantumfs.CmdEnableRootWrite:
+		c.vlog("Received EnableRootWrite request")
+		api.enableRootWrite(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -436,7 +447,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 	parts := strings.Split(wsr, "/")
 	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
@@ -456,7 +467,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 	parts := strings.Split(wsr, "/")
 	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
@@ -483,13 +494,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	dst := strings.Split(cmd.DstPath, "/")
 	key, type_, size, err := quantumfs.DecodeExtendedKey(cmd.Key)
 	permissions := cmd.Permissions
-	uid := quantumfs.ObjectUid(c.Ctx, uint32(cmd.Uid), uint32(cmd.Uid))
-	gid := quantumfs.ObjectGid(c.Ctx, uint32(cmd.Gid), uint32(cmd.Gid))
+	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
+	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
-		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 		return
 	}
@@ -545,6 +556,31 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }
 
+func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
+	defer c.funcIn("Api::enableRootWrite Enter").out()
+
+	var cmd quantumfs.EnableRootWriteRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	workspacePath := cmd.Workspace
+	dst := strings.Split(workspacePath, "/")
+	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
+	if !exists {
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist", workspacePath)
+		return
+	}
+
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	c.qfs.workspaceMutability[workspacePath] = true
+
+	api.queueErrorResponse(quantumfs.ErrorOK,
+		"Enable Workspace Write Permission Succeeded")
+}
+
 func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 	var cmd quantumfs.DeleteWorkspaceRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -552,8 +588,8 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 		return
 	}
 
-	parts := strings.Split(cmd.WorkspacePath, "/")
-
+	workspacePath := cmd.WorkspacePath
+	parts := strings.Split(workspacePath, "/")
 	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
 		parts[2]); err != nil {
 
@@ -561,5 +597,81 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
 		return
 	}
 
+	// Remove the record of the removed workspace from workspaceMutability map
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	delete(c.qfs.workspaceMutability, workspacePath)
+
 	api.queueErrorResponse(quantumfs.ErrorOK, "Workspace deletion succeeded")
+}
+
+func (api *ApiHandle) setBlock(c *ctx, buf []byte) {
+	var cmd quantumfs.SetBlockRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	if len(cmd.Key) != quantumfs.HashSize {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			fmt.Sprintf("Key must be %d bytes", quantumfs.HashSize))
+		return
+	}
+
+	var hash [quantumfs.HashSize]byte
+	copy(hash[:len(hash)], cmd.Key)
+	key := quantumfs.NewObjectKey(quantumfs.KeyTypeApi, hash)
+
+	buffer := newBuffer(c, cmd.Data, key.Type())
+
+	err := c.dataStore.durableStore.Set(&c.Ctx, key, buffer)
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed, err.Error())
+		return
+	}
+
+	api.queueErrorResponse(quantumfs.ErrorOK, "Block set succeeded")
+}
+
+func (api *ApiHandle) getBlock(c *ctx, buf []byte) {
+	var cmd quantumfs.GetBlockRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	if len(cmd.Key) != quantumfs.HashSize {
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			fmt.Sprintf("Key must be %d bytes", quantumfs.HashSize))
+		return
+	}
+
+	var hash [quantumfs.HashSize]byte
+	copy(hash[:len(hash)], cmd.Key)
+	key := quantumfs.NewObjectKey(quantumfs.KeyTypeApi, hash)
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Nil buffer returned from datastore")
+		return
+	}
+
+	response := quantumfs.GetBlockResponse{
+		ErrorResponse: quantumfs.ErrorResponse{
+			CommandCommon: quantumfs.CommandCommon{
+				CommandId: quantumfs.CmdError,
+			},
+			ErrorCode: quantumfs.ErrorOK,
+			Message:   "",
+		},
+		Data: buffer.Get(),
+	}
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		panic("Failed to marshall API GetBlockResponse")
+	}
+
+	c.vlog("Data length %d, response length %d", buffer.Size(), len(bytes))
+	api.responses <- fuse.ReadResultData(bytes)
 }

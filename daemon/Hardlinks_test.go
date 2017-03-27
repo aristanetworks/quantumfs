@@ -662,6 +662,34 @@ func TestHardlinkFileExpansionOutWsr(t *testing.T) {
 	})
 }
 
+// Once a hardlink record is returned to a class for use, the hardlink may be
+// unlinked before the record is used. We need to accommodate that.
+func TestHardlinkRecordRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		data := genData(100)
+
+		// This is a race condition, so repeat to increase the likelihood
+		for i := 0; i < 100; i++ {
+			filename := fmt.Sprintf("%s/file%d", workspace, i)
+			err := testutils.PrintToFile(filename, string(data))
+			test.AssertNoErr(err)
+
+			err = syscall.Link(filename, filename+"link")
+			test.AssertNoErr(err)
+
+			for i := 0; i < 10; i++ {
+				go os.Stat(filename)
+			}
+			// quickly remove the link before all of the GetAttrs finish
+			errA := os.Remove(filename)
+			errB := os.Remove(filename + "link")
+			test.AssertNoErr(errA)
+			test.AssertNoErr(errB)
+		}
+	})
+}
+
 func TestHardlinkDeleteFromDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()

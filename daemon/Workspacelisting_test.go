@@ -42,8 +42,8 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 			"Error getting a non-existing inodeId of typespace")
 
 		// Creating a file in the new workspace can trigger updateChildren
-		// in workspacelisting. Map within will be updated, so inodes in
-		// the proceeding workspace will be valid right now.
+		// in workspacelisting. Map within will be updated, so inodes in the
+		// proceeding workspace will be valid right now.
 		workspace1 := test.newWorkspace()
 		testFilename := workspace1 + "/" + "test"
 		err := syscall.Mkdir(testFilename, 0124)
@@ -58,7 +58,7 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		// Instantiate the three inodes and verify the existence
 		testFilename = workspace + "/" + "test"
 		err = syscall.Mkdir(testFilename, 0124)
-		test.Assert(err == nil, "Error creating directories: %v", err)
+		test.Assert(err == nil, "Failed creating directories: %v", err)
 
 		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
 			"typespace", true, &tsl.typespacesByName)

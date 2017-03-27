@@ -30,7 +30,7 @@ func TestTypespaceListing(t *testing.T) {
 func TestNamespaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		entries, err :=
-			ioutil.ReadDir(test.absPath(quantumfs.NullTypespaceName))
+			ioutil.ReadDir(test.absPath(quantumfs.NullSpaceName))
 		test.Assert(err == nil, "Couldn't read typespace listing")
 		test.Assert(len(entries) == 1,
 			"Incorrect number of entries in null typespace: %d",
@@ -41,7 +41,7 @@ func TestNamespaceListing(t *testing.T) {
 func TestWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		entries, err :=
-			ioutil.ReadDir(test.absPath(quantumfs.NullNamespaceName))
+			ioutil.ReadDir(test.absPath(quantumfs.NullSpaceName))
 		test.Assert(err == nil, "Couldn't read namespace listing")
 		test.Assert(len(entries) == 1,
 			"Incorrect number of entries in null namespace: %d",

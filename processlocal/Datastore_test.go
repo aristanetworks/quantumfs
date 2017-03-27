@@ -10,6 +10,7 @@ import "bytes"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -42,7 +43,7 @@ func TestIdenticalContentSync(t *testing.T) {
 	key := quantumfs.NewObjectKeyFromBytes(key_byte)
 
 	// Put the source content into the buffer
-	buffer := quantumfs.NewTestBuffer(data, key)
+	buffer := testutils.NewSimpleBuffer(data, key)
 
 	// Set the content with the pre-defined unique key
 	store.Set(ctx, key, buffer)
@@ -51,7 +52,7 @@ func TestIdenticalContentSync(t *testing.T) {
 
 	// Get the content from the datastore
 	empty := make([]byte, 32, 32)
-	output := quantumfs.NewTestBuffer(empty, key)
+	output := testutils.NewSimpleBuffer(empty, key)
 	store.Get(ctx, key, output)
 
 	utils.Assert(bytes.Equal(output.Get(), data),

@@ -27,6 +27,8 @@ const (
 	exitWorkspaceDbInitFail = iota
 )
 
+var version string
+
 var cacheSizeString string
 var cacheTimeNsecs uint
 var memLogMegabytes uint
@@ -36,17 +38,19 @@ var showMaxSizes bool
 
 func init() {
 	const (
-		defaultCachePath        = "/var/run/quantumfs"
+		defaultCachePath        = "/dev/shm/quantumfs"
 		defaultCacheSize        = "8G"
-		defaultMountPath        = "/mnt/quantumfs"
+		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 1
 		defaultCacheTimeNsecs   = 0
 		defaultMemLogMegabytes  = 100
 	)
 
+	fmt.Printf("QuantumFS version %s\n", version)
+
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
 		"Default location of the internal cache. Should be on a ramfs or "+
-			"tmpfs filsystem")
+			"tmpfs filesystem to avoid random 1 second lag spikes")
 
 	flag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
 		"Size of the local cache, e.g. 8G or 512M")
