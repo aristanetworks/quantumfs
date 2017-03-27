@@ -1652,9 +1652,9 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 		dir.name_).out()
 
 	defer dir.Lock().Unlock()
-	defer dir.childRecordLock.Lock().Unlock()
 
 	dir.parentSyncChild(c, dir.inodeNum(), func() quantumfs.ObjectKey {
+		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
 		return dir.baseLayerId
 	})

@@ -1021,9 +1021,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	if wsl.typespaceName == quantumfs.NullTypespaceName &&
-		wsl.namespaceName == quantumfs.NullNamespaceName &&
-		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
+	if wsl.typespaceName == quantumfs.NullSpaceName &&
+		wsl.namespaceName == quantumfs.NullSpaceName &&
+		wsl.workspacesById[inodeNum] == quantumfs.NullSpaceName {
 
 		// The WorkspaceDB should have already mark null workspace as
 		// immutable, so create it as any other workspace, but it won't pass
