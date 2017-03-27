@@ -1,10 +1,10 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// qupload is a command line tool used to upload files or directories
+// qupload is a command line tool used to upload a file or directory hirarchy
 // into a datastore and workspace DB supported by QFS. This tool
 // does not require QFS instance to be available locally. The content
-// uploaded by this tool can be accessed using QFS.
+// uploaded by this tool can be accessed using any QFS instance.
 package main
 
 import "errors"
@@ -34,7 +34,6 @@ type params struct {
 	wsdbConf    string
 	ws          string
 	advance     string
-	openFiles   uint64
 	baseDir     string
 	excludeFile string
 }
@@ -45,7 +44,7 @@ func showUsage() {
 	fmt.Printf(`
 qupload - tool to upload a directory hierarchy to a QFS supported datastore
 version: %s
-usage: qupload [-progress] -datastore <dsname> -datastoreconf <dsconf>
+usage: qupload [-progress -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf> 
 			   -workspace <wsname> [-advance <wsname>]
                -basedir <path> [ -exclude <file> | <relpath> ]
