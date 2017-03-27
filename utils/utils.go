@@ -7,15 +7,6 @@ import "bytes"
 import "fmt"
 import "syscall"
 
-//IoPipe returns a function
-func IoPipe(output *string) func(format string, args ...interface{}) error {
-	return func(format string, args ...interface{}) error {
-		newline := fmt.Sprintf(format, args...)
-		*output += newline
-		return nil
-	}
-}
-
 // FileSize returns the size of a file
 func FileSize(filename string) (int64, error) {
 	var stat syscall.Stat_t
