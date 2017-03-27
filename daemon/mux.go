@@ -958,8 +958,9 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 		return false
 	}
 
-	immutable, _ := c.workspaceDB.ImmutableWorkspaceExists(&c.Ctx,
+	immutable, _ := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
+	c.vlog("QuantumFs::workspaceIsMutable %v", immutable)
 	return rootMutability && !immutable
 
 }

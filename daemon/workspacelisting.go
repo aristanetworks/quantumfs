@@ -1025,7 +1025,10 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		wsl.namespaceName == quantumfs.NullNamespaceName &&
 		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
 
-		return newNullWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
+		// The WorkspaceDB should have already mark null workspace as
+		// immutable, so create it as any other workspace, but it won't pass
+		// any of the write permission check
+		return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
 			wsl.workspacesById[inodeNum], wsl, inodeNum)
 	} else {
 		return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
