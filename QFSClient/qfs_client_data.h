@@ -17,7 +17,7 @@ enum CommandID {
 	kCmdDeleteWorkspace = 7,
 	kCmdSetBlock = 8,
 	kCmdGetBlock = 9,
-	// missing: Merge, Freeze, Checkout
+	kCmdEnableRootWrite = 10,
 };
 
 enum CommandError {
