@@ -4,8 +4,11 @@
 package utils
 
 import "bufio"
+import "bytes"
 import "fmt"
 import "os"
+import "path/filepath"
+import "regexp"
 import "strings"
 
 // Given a bitflag field and an integer of flags, return whether the flags are set or
@@ -17,36 +20,59 @@ func BitFlagsSet(field uint, flags uint) bool {
 	return false
 }
 
-var excludeLines []string
+type ExcludeInfo struct {
+	re                  *regexp.Regexp
+	dirRecordCounts     map[string]int
+	rootDirRecordCounts int
+}
 
-func parseExcludeLine(line string) bool {
-	line = strings.TrimSpace(line)
-	// ignore comments and empty lines
-	if len(line) == 0 || strings.HasPrefix(line, "#") {
-		return true
+func (e *ExcludeInfo) PathExcluded(path string) bool {
+	result := e.re.MatchString(path)
+	//fmt.Println("CHECKRE: ", path, result)
+	return result
+}
+
+func (e *ExcludeInfo) RecordsExcluded(path string, recs int) int {
+	if path == "/" {
+		return recs - e.rootDirRecordCounts
 	}
+	exrecs, exist := e.dirRecordCounts[path]
+	if !exist {
+		return recs
+	}
+	if exrecs == 0 {
+		return 0
+	}
+	return recs - exrecs
+}
 
-	// consider one word per line
+func parseExcludeLine(line string) (string, bool) {
 	parts := strings.Split(line, " ")
-	//fmt.Println("Excluding ", parts[0])
-	excludeLines = append(excludeLines, parts[0])
-	return true
-}
-
-func IsPathExcluded(path string) bool {
-	for _, exPath := range excludeLines {
-		//fmt.Println("Ex: ", exPath, "In: ", path)
-		if strings.HasPrefix(path, exPath) {
-			return true
-		}
+	// rules
+	switch {
+	// only 1 word per line
+	case len(parts) > 1:
+		return "", false
+	// word must not begin with /
+	case strings.HasPrefix(line, "/"):
+		return "", false
+	// word must not begin with .
+	case strings.HasPrefix(line, "."):
+		return "", false
 	}
-	return false
+	return parts[0], true
 }
 
-func LoadExcludeList(path string) error {
-	file, oerr := os.Open(path)
-	if oerr != nil {
-		return oerr
+func LoadExcludeInfo(path string) (*ExcludeInfo, error) {
+
+	var r bytes.Buffer
+	var exInfo ExcludeInfo
+
+	exInfo.dirRecordCounts = make(map[string]int)
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
 	defer file.Close()
 
@@ -54,15 +80,40 @@ func LoadExcludeList(path string) error {
 	lineno := 1
 	for s.Scan() {
 		line := s.Text()
-		if !parseExcludeLine(line) {
-			return fmt.Errorf("Bad exclude line: %s at: %d\n",
-				line, lineno)
+		line = strings.TrimSpace(line)
+		// ignore comments and empty lines
+		if len(line) == 0 || strings.HasPrefix(line, "#") {
+			continue
+		}
+		word, ok := parseExcludeLine(line)
+		if !ok {
+			return nil, fmt.Errorf("Bad exclude line: %s in: %s:%d\n",
+				line, path, lineno)
+		}
+		r.WriteString("^" + word + "|")
+		switch {
+		case strings.HasSuffix(word, "/"):
+			exInfo.dirRecordCounts[strings.TrimSuffix(word, "/")] = 0
+		case filepath.Dir(word) == ".":
+			exInfo.rootDirRecordCounts++
+		default:
+			exInfo.dirRecordCounts[filepath.Dir(word)]++
 		}
 		lineno++
 	}
 
-	if serr := s.Err(); serr != nil {
-		return serr
+	if err = s.Err(); err != nil {
+		return nil, err
 	}
-	return nil
+
+	reExp := strings.TrimSuffix(r.String(), "|")
+	//fmt.Println("Exclude expression = ", reExp)
+	exInfo.re, err = regexp.Compile(reExp)
+	if err != nil {
+		return nil, err
+	}
+
+	//fmt.Printf("%v\n", exInfo)
+	//os.Exit(0)
+	return &exInfo, nil
 }
