@@ -103,11 +103,19 @@ func findApiPathMount() string {
 		connectionId = connectionI
 	}
 
-	if connectionId != -1 {
-		return path
-	} else {
+	if connectionId == -1 {
+		// We didn't find a mount
 		return ""
 	}
+
+	// We've found precisely one mount, ensure the file is really the api file.
+	path = fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
+	stat, err := os.Lstat(path)
+	if err != nil || !fileIsApi(stat) {
+		return ""
+	}
+
+	return path
 }
 
 func findApiPathUpwards() (string, error) {
