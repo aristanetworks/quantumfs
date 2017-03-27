@@ -74,7 +74,7 @@ func findApiPathMount() string {
 	for {
 		bline, _, err := mountinfo.ReadLine()
 		if err != nil {
-			return ""
+			break
 		}
 
 		line := string(bline)
