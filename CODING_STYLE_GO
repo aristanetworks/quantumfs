@@ -17,7 +17,8 @@ a maximum line length of 60.
 Enums
 =====
 
-All enums in quantumfs package must use explicit numbers instead of iota directive.
+All enums in quantumfs package, but not necessarily the other packages such as
+quantumfs/daemon, must use explicit numbers instead of iota directive.
 This simplifies spotting mismatches in exported constant values across API implementations
 in different programming languages.
 

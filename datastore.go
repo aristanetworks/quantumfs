@@ -106,7 +106,7 @@ const (
 
 	// A key which isn't a key and should never be found in a datastore. Instead
 	// this value indicates that the rest of the key is embedded data which is
-	// interpretted directly.
+	// interpreted directly.
 	KeyTypeEmbedded = 7
 
 	KeyTypeApi = 8 // A key-value pair provided entirely by the api
@@ -657,7 +657,6 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 // Permission bit names
 const (
-	PermInvalid    = 0
 	PermExecOther  = 1 << 0
 	PermWriteOther = 1 << 1
 	PermReadOther  = 1 << 2
