@@ -12,7 +12,6 @@ import "flag"
 import "fmt"
 import "os"
 import "strings"
-import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -45,38 +44,24 @@ func showUsage() {
 qupload - tool to upload a directory hierarchy to a QFS supported datastore
 version: %s
 usage: qupload [-progress -datastore <dsname> -datastoreconf <dsconf>
-               -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf> 
-			   -workspace <wsname> [-advance <wsname>]
-               -basedir <path> [ -exclude <file> | <relpath> ]
-
+                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>]
+				-workspace <wsname> [-advance <wsname>]
+				-basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
-1) qupload -datastore ether.cql -dataconf etherconfig
-           -workspaceDB ether.cql -workspaceDBconf etherconfig
-		   -workspace build/eos-trunk/11223344 -advance build/eos-trunk/latestPass
+1) qupload -workspace build/eos-trunk/11223344
 		   -basedir /var/Abuild/66778899 -exclude excludeFile
 Above command will upload the contents of /var/Abuild/66778899 directory
-to the QFS workspace build/eos-trunk/11223344 and then advance build/eos-trunk/latestPass
-workspace to refer to it. The files and directories specified by excludeFile are
-excluded from upload.
+to the QFS workspace build/eos-trunk/11223344. The files and directories
+specified by excludeFile are excluded from upload.
 
-2) qupload -datastore ether.cql -dataconf etherconfig
-           -workspaceDB ether.cql -workspaceDBconf etherconfig
-		   -workspace build/eos-trunk/11223344 -openfiles 7000
-		   -basedir /var/Abuild/66778899 bin
-Above command will upload the contents of /var/Abuild/66778899/bin to the
-QFS workspace build/eos-trunk/11223344. During upload, a maximum of 7000
-files are opened at any time.
+2) qupload -workspace build/eos-trunk/11223344
+		   -basedir /var/Abuild/66778899 src
+Above command will upload the contents of /var/Abuild/66778899/src directory
+to the QFS workspace build/eos-trunk/11223344. The files and directories
+specified by excludeFile are excluded from upload. 
+
 `, version)
 	flag.PrintDefaults()
-}
-
-func setOpenFilesLimit(files uint64) error {
-	rlimit := &syscall.Rlimit{
-		Cur: files,
-		Max: files,
-	}
-
-	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, rlimit)
 }
 
 func validateParams(p *params) (quantumfs.DataStore, quantumfs.WorkspaceDB, error) {
@@ -145,8 +130,6 @@ func main() {
 		"Name of workspace which'll contain uploaded data")
 	flag.StringVar(&cliParams.advance, "advance", "",
 		"Name of workspace which'll be advanced to point to uploaded workspace")
-	flag.Uint64Var(&cliParams.openFiles, "openfiles", 60000,
-		"Limit number of open files")
 	flag.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
 	flag.StringVar(&cliParams.excludeFile, "exclude", "",
@@ -163,15 +146,6 @@ func main() {
 	ds, wsdb, perr := validateParams(&cliParams)
 	if perr != nil {
 		fmt.Println(perr)
-		os.Exit(exitErrArgs)
-	}
-
-	// upload uses go-routines = O(dirs)
-	// and hence needs a large number of
-	// open files.
-	err := setOpenFilesLimit(cliParams.openFiles)
-	if err != nil {
-		fmt.Println("Failed to change open file limit. Use \"sudo\"")
 		os.Exit(exitErrArgs)
 	}
 
