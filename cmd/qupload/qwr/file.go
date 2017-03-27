@@ -108,7 +108,8 @@ func WriteFile(ds quantumfs.DataStore,
 		// instead of typical directory record use
 		// a directory record which points to the
 		// hardlink info
-		dirRecord = SetHardLink(finfo, dirRecord)
+		dirRecord = SetHardLink(finfo,
+			dirRecord.(*quantumfs.DirectRecord))
 	}
 
 	return dirRecord, nil
