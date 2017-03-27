@@ -35,7 +35,6 @@ func mbFileBlocksWriter(file *os.File,
 // writes multi-block files of type Medium and Large
 func mbFileWriter(path string,
 	finfo os.FileInfo,
-	objType quantumfs.ObjectType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	file, oerr := os.Open(path)

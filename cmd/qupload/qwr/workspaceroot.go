@@ -3,6 +3,7 @@
 
 package qwr
 
+import "fmt"
 import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
@@ -10,12 +11,11 @@ import "github.com/aristanetworks/quantumfs"
 func WriteWorkspaceRoot(rootDirKey quantumfs.ObjectKey,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
-	// xattrs cannot be saved in workspace root directory
-
 	// publish all the hardlinks for this wsr
 	hardLinkEntry, herr := writeHardLinkInfo(ds)
 	if herr != nil {
-		return quantumfs.ZeroKey, herr
+		return quantumfs.ZeroKey,
+			fmt.Errorf("Write hard info inf failed: %v", herr)
 	}
 
 	// write WSR
@@ -26,7 +26,8 @@ func WriteWorkspaceRoot(rootDirKey quantumfs.ObjectKey,
 	wsr.SetHardlinkEntry(hardLinkEntry)
 	wKey, werr := writeBlob(wsr.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if werr != nil {
-		return quantumfs.ZeroKey, werr
+		return quantumfs.ZeroKey,
+			fmt.Errorf("Write workspace root failed: %v", werr)
 	}
 	atomic.AddUint64(&MetadataBytesWritten, uint64(len(wsr.Bytes())))
 	return wKey, nil

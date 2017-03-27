@@ -46,17 +46,15 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 	rootTracker = false
 }
 
+// mutex over directory state must be held
 func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
-	// assert that mutex is held
-	//fmt.Println("Handing dirRecord ", path)
 	tracker, ok := dirEntryTrackers[path]
 	if !ok {
-		panic(fmt.Sprintf("DirEntry must exist for %s", path))
+		panic(fmt.Sprintf("BUG: Directory state tracker must exist for %q", path))
 	}
-	// must always have a vacant index
+
 	tracker.records = append(tracker.records, record)
 	if len(tracker.records) == cap(tracker.records) {
-		//fmt.Println("Directory entry ", path, " is full")
 		record, err := qwr.WriteDirectory(path, tracker.info, tracker.records, dataStore)
 		if err != nil {
 			return err
@@ -66,7 +64,7 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 			topDirRecord = record
 			return nil
 		}
-
+		// this might be the last directory entry for parent
 		err = handleDirRecord(record, filepath.Dir(path))
 		if err != nil {
 			return err
@@ -75,7 +73,7 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 	return nil
 }
 
-func handlePathInfo(ctx context.Context, piChan <-chan *pathInfo) error {
+func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 	var record quantumfs.DirectoryRecord
 	var err error
 	var msg *pathInfo
@@ -96,7 +94,8 @@ func handlePathInfo(ctx context.Context, piChan <-chan *pathInfo) error {
 				return err
 			}
 		} else {
-			// empty directory
+			// walker walks non-empty directories to generate
+			// worker handles empty directory
 			stat := msg.info.Sys().(*syscall.Stat_t)
 			record = qwr.CreateNewDirRecord(msg.info.Name(), stat.Mode,
 				uint32(stat.Rdev), 0,
@@ -120,15 +119,13 @@ func handlePathInfo(ctx context.Context, piChan <-chan *pathInfo) error {
 	}
 }
 
-// base == "./somebase", path == "somebase"
-// base == "somebase" , path == "somebase"
-// base == "/somebase" , path == "/somebase"
-// filepath.Clean() change 1 to 2
+// if base == "a/b/c" and path "c/d" then
+// relativePath is "d"
 func relativePath(path string, base string) (string, error) {
 	checkPath, relErr := filepath.Rel(filepath.Clean(base), path)
-	//fmt.Println("RELPATH: ", filepath.Clean(base), path, checkPath)
 	if relErr != nil {
-		return "", relErr
+		return "", fmt.Errorf("relativePath: %q %q error: %v",
+			path, base, relErr)
 	}
 	if checkPath == "." {
 		checkPath = "/"
@@ -136,69 +133,84 @@ func relativePath(path string, base string) (string, error) {
 	return checkPath, nil
 }
 
-// when base is "./somebase" or "/somebase" or "somebase" then pathHandler is called with
-//  path as "somebase" then path as "somebase/somedir" and so on
-func pathHandler(ctx context.Context, piChan chan<- *pathInfo,
+func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error,
 	exInfo *utils.ExcludeInfo) error {
 
+	// when base is "./somebase" or "/somebase" or "somebase" then
+	// pathWalker is called with path as "somebase" then path as
+	// "somebase/somedir" and so on
 	if err != nil {
 		return err
 	}
 
+	// exclude files and directories per exclude
+	// file spec
 	checkPath, relErr := relativePath(path, root)
 	if relErr != nil {
 		return relErr
 	}
 	if exInfo != nil && exInfo.PathExcluded(checkPath) {
-		//fmt.Println("Skipping ", path)
 		if info.IsDir() {
 			return filepath.SkipDir
 		}
-
 		return nil
 	}
-	//fmt.Println("Walking ", path, " ", checkPath)
-	// a file's parent directory will always be seen before
-	// the
-	// check if path is a directory and its excluded
-	// check if path is a file and its excluded
 
-	// if path is a directory then find expected count of
-	// DirectoryRecords for this path
+	// For directories, establish proper state
+	// tracking while accounting for excluded files
+	// and subdirs in parent dir so that its state
+	// tracking is terminated appropriately.
 	if info.IsDir() {
 		dirEnts, dirErr := ioutil.ReadDir(path)
 		if dirErr != nil {
-			return dirErr
+			return fmt.Errorf("pathWalker ReadDir error: %v", dirErr)
 		}
 		expectedDirRecords := len(dirEnts)
 		if exInfo != nil {
 			expectedDirRecords = exInfo.RecordsExcluded(checkPath, expectedDirRecords)
 		}
+		// Empty directory is like a file with no content
+		// whose parent directory state tracking has already been
+		// setup. Hence empty directory is handled by worker to maintain
+		// separation of concerns between walker and worker
 		if expectedDirRecords > 0 {
 			setupDirEntryTracker(path, info, expectedDirRecords)
 			return nil
 		}
 	}
 
-	// uploading a single regular file
+	// handle scenario of qupload of single file
 	if checkPath == "/" && info.Mode().IsRegular() {
 		parent := filepath.Dir(path)
 		parentInfo, perr := os.Lstat(parent)
 		if perr != nil {
-			return perr
+			return fmt.Errorf("pathWalker parent %q error: %v",
+				parent, perr)
 		}
+		// parentInfo helps in setting up the directory entry
+		// under workspace root
 		setupDirEntryTracker(parent, parentInfo, 1)
 	}
 
+	// send pathInfo to workers
 	select {
 	case <-ctx.Done():
-		return errors.New("At least one worker has exited with error")
+		return errors.New("Exiting walker since qt least one worker " +
+			"has exited with error")
 	case piChan <- &pathInfo{path: path, info: info}:
 	}
 	return nil
 }
 
+// "concurrency" number of goroutines and a walker goroutine
+// are used in an errgroup for upload. The walker sends "pathInfo"
+// over the channel and workers act on it. For each directory, state
+// is tracked until all its children are uploaded. When all children of
+// a parent are uploaded, the parent is uploaded and its state is no
+// longer tracked. Upload finishes when the top directory is uploaded.
+// walker generates directory state trackers
+// worker writes blobs, generates directory records and updates the directory state
 func upload(ws string, advance string, root string, exInfo *utils.ExcludeInfo,
 	conc uint) error {
 
@@ -211,15 +223,14 @@ func upload(ws string, advance string, root string, exInfo *utils.ExcludeInfo,
 	// workers
 	for i := uint(0); i < conc; i++ {
 		group.Go(func() error {
-			return handlePathInfo(groupCtx, piChan)
+			return pathWorker(groupCtx, piChan)
 		})
 	}
 	// walker
 	group.Go(func() error {
-		//fmt.Println("=== Started handling dirs ===")
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
-				return pathHandler(groupCtx, piChan, path, root, info, err, exInfo)
+				return pathWalker(groupCtx, piChan, path, root, info, err, exInfo)
 			})
 		close(piChan)
 		return err
@@ -230,12 +241,9 @@ func upload(ws string, advance string, root string, exInfo *utils.ExcludeInfo,
 		return err
 	}
 
-	//fmt.Println("=== Completed handling dirs ===")
-	// assert topDirRecord != nil
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(topDirRecord.ID(), dataStore)
 	if wsrErr != nil {
 		return wsrErr
 	}
-
 	return qwr.CreateWorkspace(wsDB, ws, advance, wsrKey)
 }

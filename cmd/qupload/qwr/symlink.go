@@ -7,9 +7,7 @@ import "os"
 
 import "github.com/aristanetworks/quantumfs"
 
-func symlinkFileWriter(path string,
-	finfo os.FileInfo,
-	objType quantumfs.ObjectType,
+func symlinkFileWriter(path string, finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	pointedTo, err := os.Readlink(path)

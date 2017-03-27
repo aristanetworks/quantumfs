@@ -36,7 +36,6 @@ func encodeHardLinkID(id HardLinkID) quantumfs.ObjectKey {
 }
 
 func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
-
 	hardLinkInfoMutex.Lock()
 	defer hardLinkInfoMutex.Unlock()
 

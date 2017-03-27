@@ -28,7 +28,6 @@ type ExcludeInfo struct {
 
 func (e *ExcludeInfo) PathExcluded(path string) bool {
 	result := e.re.MatchString(path)
-	//fmt.Println("CHECKRE: ", path, result)
 	return result
 }
 
@@ -107,13 +106,9 @@ func LoadExcludeInfo(path string) (*ExcludeInfo, error) {
 	}
 
 	reExp := strings.TrimSuffix(r.String(), "|")
-	//fmt.Println("Exclude expression = ", reExp)
 	exInfo.re, err = regexp.Compile(reExp)
 	if err != nil {
 		return nil, err
 	}
-
-	//fmt.Printf("%v\n", exInfo)
-	//os.Exit(0)
 	return &exInfo, nil
 }
