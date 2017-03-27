@@ -72,15 +72,14 @@ func (err *Error) Error() string {
 	return fmt.Sprintf("Error: %s: %s", err.ErrorCode(), err.Msg)
 }
 
-// WorkspaceDB provides a cluster-wide and consistent mapping between names and
-// ObjectKeys. Workspace names have two components and are represented as strings with
-// the format "<namespace>/<workspace>". <namespace> would often be a username or
-// something like abuild. <workspace> will be somewhat arbitrary.
+// WorkspaceDB provides a cluster-wide and consistent mapping between names
+// and ObjectKeys. Workspace names have three components and are represented
+// as strings with the format "<typespace>/<namespace>/<workspace>".
 //
-// Most of the API is synchronous and consistent. The notable exceptions are the
-// calls to list the available namespaces and workspaces within a namespace. These
-// must respond without blocking from a local cache if possible, perfectly accurate
-// data is not required.
+// Most of the API is synchronous and consistent. The notable exceptions are
+// the calls to list and count of typespaces, namespaces and workspaces.
+// These must respond without blocking, from a local cache if possible,
+// perfectly accurate data is not required.
 //
 // Since workspaceDB is a cluster-wide datastore, apart from errors like
 // ErrWorkspaceNotFound, ErrWorkspaceExists, it is possible to get
@@ -112,20 +111,26 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	//  ErrWorkspaceNotFound
-	BranchWorkspace(srcTypespace string, srcNamespace string, srcWorkspace string,
-		dstTypespace string, dstNamespace string, dstWorkspace string) error
+	BranchWorkspace(srcTypespace string, srcNamespace string,
+		srcWorkspace string, dstTypespace string,
+		dstNamespace string, dstWorkspace string) error
 
-	// AdvanceWorkspace changes the workspace rootID. If the current rootID
-	// doesn't match what the client considers the current rootID then no changes
-	// are made and the current rootID is returned such that the client can merge
-	// the changes and retry.
+	// DeleteWorkspace deletes the workspace
+	DeleteWorkspace(typespace string, namespace string,
+		workspace string) error
+
+	// AdvanceWorkspace changes the workspace rootID. If the
+	// current rootID doesn't match what the client considers
+	// the current rootID then no changes are made and the
+	// current rootID is returned such that the client can
+	// merge the changes and retry.
 	//
 	// The return value is the new rootID.
 	//
 	// Possible errors are:
 	//  ErrWorkspaceNotFound
-	//  ErrWorkspaceOutOfDate: The workspace rootID was changed remotely so the local
-	//                         instance is out of date
+	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
+	//  	remotely so the local instance is out of date
 	AdvanceWorkspace(typespace string, namespace string, workspace string,
 		currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
 }
