@@ -45,7 +45,7 @@ func fileObjectInfo(path string, finfo os.FileInfo) (quantumfs.ObjectType, fileO
 
 func WriteFile(ds quantumfs.DataStore,
 	finfo os.FileInfo,
-	path string) (*quantumfs.DirectoryRecord, error) {
+	path string) (quantumfs.DirectoryRecord, error) {
 
 	stat := finfo.Sys().(*syscall.Stat_t)
 

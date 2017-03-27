@@ -88,6 +88,6 @@ func writeBlob(data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	key := quantumfs.NewObjectKey(keyType, sha1.Sum(data))
-	buf := quantumfs.NewTestBuffer(data, key)
+	buf := quantumfs.NewSimpleBuffer(data, key)
 	return key, ds.Set(nil, key, buf)
 }

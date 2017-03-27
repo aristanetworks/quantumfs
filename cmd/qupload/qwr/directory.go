@@ -13,38 +13,38 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
 func WriteDirectory(base string, relpath string,
-	childRecords []*quantumfs.DirectoryRecord,
-	ds quantumfs.DataStore) (*quantumfs.DirectoryRecord, error) {
+	childRecords []quantumfs.DirectoryRecord,
+	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
 
-	rootDirEntry := quantumfs.NewDirectoryEntry()
-	rootDirEntry.SetNext(quantumfs.EmptyDirKey)
+	dirEntry := quantumfs.NewDirectoryEntry()
+	dirEntry.SetNext(quantumfs.EmptyDirKey)
 	entryIdx := 0
 	for _, child := range childRecords {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
-			rootDirEntry.SetNumEntries(entryIdx)
-			key, err := writeBlob(rootDirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
+			dirEntry.SetNumEntries(entryIdx)
+			key, err := writeBlob(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
 				return nil, err
 			}
-			atomic.AddUint64(&MetadataBytesWritten, uint64(len(rootDirEntry.Bytes())))
-			rootDirEntry = quantumfs.NewDirectoryEntry()
-			rootDirEntry.SetNext(key)
+			atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
+			dirEntry = quantumfs.NewDirectoryEntry()
+			dirEntry.SetNext(key)
 			entryIdx = 0
 		}
 
-		rootDirEntry.SetEntry(entryIdx, child)
+		dirEntry.SetEntry(entryIdx, child.(*quantumfs.DirectRecord))
 		entryIdx++
 	}
 
-	rootDirEntry.SetNumEntries(entryIdx)
-	key, err := writeBlob(rootDirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	dirEntry.SetNumEntries(entryIdx)
+	key, err := writeBlob(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
 		return nil, err
 	}
-	atomic.AddUint64(&MetadataBytesWritten, uint64(len(rootDirEntry.Bytes())))
+	atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
 
-	var dirRecord *quantumfs.DirectoryRecord
+	var dirRecord quantumfs.DirectoryRecord
 	if relpath == "" {
 		//root directory - mode 0755, size = 0 since dir size
 		// is approximated by QFS based on dir entries
@@ -87,7 +87,7 @@ func createNewDirRecord(name string, mode uint32,
 	rdev uint32, size uint64, uid quantumfs.UID,
 	gid quantumfs.GID, objType quantumfs.ObjectType,
 	mtime quantumfs.Time, ctime quantumfs.Time,
-	key quantumfs.ObjectKey) *quantumfs.DirectoryRecord {
+	key quantumfs.ObjectKey) quantumfs.DirectoryRecord {
 
 	entry := quantumfs.NewDirectoryRecord()
 	entry.SetFilename(name)
