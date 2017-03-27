@@ -48,6 +48,8 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
 	link.self.markSelfAccessed(c, false)
+	c.elog("Access called on a symlink - should have been dereferenced.")
+
 	return fuse.OK
 }
 

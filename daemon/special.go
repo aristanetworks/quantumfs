@@ -70,8 +70,15 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	defer c.funcIn("Special::Access").out()
+
 	special.self.markSelfAccessed(c, false)
-	return fuse.OK
+	access := openPermission(c, special, mask)
+	if access {
+		return fuse.OK
+	}
+
+	return fuse.EPERM
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
