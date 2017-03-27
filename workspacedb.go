@@ -51,7 +51,7 @@ type WorkspaceDB interface {
 	SetWorkspaceImmutable(c *Ctx, typespace string, namespace string,
 		workspace string) error
 
-	ImmutableWorkspaceExists(c *Ctx, typespace string, namespace string,
+	WorkspaceIsImmutable(c *Ctx, typespace string, namespace string,
 		workspace string) (bool, error)
 
 	// AdvanceWorkspace changes the workspace rootID. If the current rootID

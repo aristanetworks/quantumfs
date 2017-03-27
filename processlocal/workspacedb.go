@@ -343,7 +343,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	return newRootId, nil
 }
 
-func (wsdb *WorkspaceDB) ImmutableWorkspaceExists(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
 	wsdb.stateMutex.RLock()

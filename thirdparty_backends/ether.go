@@ -260,9 +260,8 @@ func (w *EtherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
 		"Ether does not support setting workspaces immutable")
 }
 
-func (w *EtherWsdbTranslator) ImmutableWorkspaceExists(c *quantumfs.Ctx,
+func (w *EtherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (bool, error) {
 
-	return false, quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
-		"Ether does not support verifying immutable workspaces")
+	return false, nil
 }
