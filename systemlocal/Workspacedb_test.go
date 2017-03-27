@@ -54,7 +54,7 @@ func TestEmptyDB(t *testing.T) {
 		assert(err == nil, "Error in counting typespaces: %v", err)
 		assert(num == 1, "Too many typespaces")
 
-		exists, err = db.TypespaceExists(nil, "_null")
+		exists, err = db.TypespaceExists(nil, quantumfs.NullSpaceName)
 		assert(err == nil, "Error checking existence of typespace: %v", err)
 		assert(exists, "Expected typespace not there")
 
@@ -63,35 +63,41 @@ func TestEmptyDB(t *testing.T) {
 			err)
 		assert(!exists, "Unexpected namespace")
 
-		num, err = db.NumNamespaces(nil, "_null")
+		num, err = db.NumNamespaces(nil, quantumfs.NullSpaceName)
 		assert(err == nil, "Error in counting namespaces: %v", err)
 		assert(num == 1, "Too many namespaces")
 
-		exists, err = db.NamespaceExists(nil, "_null", "_null")
+		exists, err = db.NamespaceExists(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName)
 		assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		assert(exists, "Expected namespace not there")
 
-		exists, err = db.NamespaceExists(nil, "_null", "test")
+		exists, err = db.NamespaceExists(nil, quantumfs.NullSpaceName,
+			"test")
 		assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		assert(!exists, "Unexpected namespace")
 
-		num, err = db.NumWorkspaces(nil, "_null", "_null")
+		num, err = db.NumWorkspaces(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName)
 		assert(err == nil, "Error in counting workspaces: %v", err)
 		assert(num == 1, "Too many workspaces")
 
-		exists, err = db.WorkspaceExists(nil, "_null", "_null", "null")
+		exists, err = db.WorkspaceExists(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		assert(err == nil, "Error checking existence workspace: %v",
 			err)
 		assert(exists, "Expected workspace not there")
 
-		exists, err = db.WorkspaceExists(nil, "_null", "_null", "other")
+		exists, err = db.WorkspaceExists(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "other")
 		assert(err == nil, "Error checking existence of workspace: %v",
 			err)
 		assert(!exists, "Unexpected workspace")
 
-		key, err := db.Workspace(nil, "_null", "_null", "null")
+		key, err := db.Workspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		assert(err == nil, "Error fetching key: %v",
 			err)
 		assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
@@ -107,19 +113,22 @@ func TestBranching(t *testing.T) {
 			"somewhere", "else")
 		assert(err != nil, "Succeeded branching invalid typespace")
 
-		err = db.BranchWorkspace(nil, "_null", "notthere", "a", "branch",
-			"somewhere", "else")
+		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName, "notthere",
+			"a", "branch", "somewhere", "else")
 		assert(err != nil, "Succeeded branching invalid namespace")
 
-		err = db.BranchWorkspace(nil, "_null", "_null", "notthere",
-			"branch", "somewhere", "else")
+		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "notthere", "branch", "somewhere",
+			"else")
 		assert(err != nil, "Succeeded branching invalid workspace")
 
-		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err == nil, "Error branching null workspace: %v", err)
 
-		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err != nil, "Succeeded branching to existing workspace")
 
@@ -138,11 +147,13 @@ func TestNamespaceList(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err == nil, "Failed branching workspace: %v", err)
 
-		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "b")
 		assert(err == nil, "Failed branching workspace: %v", err)
 
@@ -182,7 +193,8 @@ func TestWorkspaceList(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err == nil, "Error branching  workspace: %v", err)
 
@@ -214,7 +226,7 @@ func TestWorkspaceList(t *testing.T) {
 		branch := false
 
 		for _, typespace := range typespaces {
-			if typespace == "_null" {
+			if typespace == quantumfs.NullSpaceName {
 				_null_ = true
 			}
 
@@ -251,11 +263,13 @@ func TestAdvanceOk(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err == nil, "Error branching workspace: %v", err)
 
-		oldRootId, err := db.Workspace(nil, "_null", "_null", "null")
+		oldRootId, err := db.Workspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		assert(err == nil, "Error getting key: %v", err)
 
 		newRootId, err := db.AdvanceWorkspace(nil, "branch", "test", "a",
@@ -270,7 +284,8 @@ func TestAdvanceNotExist(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		oldRootId, err := db.Workspace(nil, "_null", "_null", "null")
+		oldRootId, err := db.Workspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		assert(err == nil, "Error getting key: %v", err)
 
 		_, err = db.AdvanceWorkspace(nil, "branch", "test", "a", oldRootId,
@@ -283,11 +298,13 @@ func TestAdvanceOldRootId(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
 
-		err := db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err == nil, "Error branching workspace: %v", err)
 
-		oldRootId, err := db.Workspace(nil, "_null", "_null", "null")
+		oldRootId, err := db.Workspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		assert(err == nil, "Error getting key: %v", err)
 
 		newRootId, err := db.AdvanceWorkspace(nil, "branch", "test", "a",
@@ -309,7 +326,8 @@ func TestDbRestart(t *testing.T) {
 		assert(err == nil, "Error counting typespaces: %v", err)
 		assert(num == 1, "Too many typespaces")
 
-		err = db.BranchWorkspace(nil, "_null", "_null", "null", "branch",
+		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		assert(err == nil, "Error branching workspace: %v", err)
 
@@ -333,9 +351,9 @@ func createWorkspaces(wsdb quantumfs.WorkspaceDB) {
 		[3]string{"type2", "name3", "work4"},
 	}
 
-	nullType := quantumfs.NullTypespaceName
-	nullName := quantumfs.NullNamespaceName
-	nullWork := quantumfs.NullWorkspaceName
+	nullType := quantumfs.NullSpaceName
+	nullName := quantumfs.NullSpaceName
+	nullWork := quantumfs.NullSpaceName
 
 	for _, workspace := range workspaces {
 		err := wsdb.BranchWorkspace(nil, nullType, nullName, nullWork,
