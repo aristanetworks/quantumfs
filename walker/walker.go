@@ -5,6 +5,7 @@ package walker
 
 import "fmt"
 import "path/filepath"
+
 import "github.com/aristanetworks/quantumfs"
 
 // Walk the workspace hierarchy
@@ -54,37 +55,6 @@ func key2String(key quantumfs.ObjectKey) string {
 }
 
 // TODO: move this to quantumfs package
-func objectType2String(typ quantumfs.ObjectType) string {
-	switch typ {
-	case quantumfs.ObjectTypeBuildProduct:
-		return "ObjectTypeBuildProduct"
-	case quantumfs.ObjectTypeDirectoryEntry:
-		return "ObjectTypeDirectoryEntry"
-	case quantumfs.ObjectTypeExtendedAttribute:
-		return "ObjectTypeExtendedAttribute"
-	case quantumfs.ObjectTypeHardlink:
-		return "ObjectTypeHardlink"
-	case quantumfs.ObjectTypeSymlink:
-		return "ObjectTypeSymlink"
-	case quantumfs.ObjectTypeVCSFile:
-		return "ObjectTypeVCSFile"
-	case quantumfs.ObjectTypeWorkspaceRoot:
-		return "ObjectTypeWorkspaceRoot"
-	case quantumfs.ObjectTypeSmallFile:
-		return "ObjectTypeSmallFile"
-	case quantumfs.ObjectTypeMediumFile:
-		return "ObjectTypeMediumFile"
-	case quantumfs.ObjectTypeLargeFile:
-		return "ObjectTypeLargeFile"
-	case quantumfs.ObjectTypeVeryLargeFile:
-		return "ObjectTypeVeryLargeFile"
-	case quantumfs.ObjectTypeSpecial:
-		return "ObjectTypeSpecial"
-	default:
-		return fmt.Sprintf("Unknown ObjectType %d\n", typ)
-	}
-}
-
 func assertNonZeroBuf(buf quantumfs.Buffer,
 	format string, args ...string) {
 
@@ -206,7 +176,7 @@ func handleDirectoryEntry(path string,
 			}
 		default:
 			//fmt.Println(dr.Filename(), dr.Size(),
-			//	objectType2String(dr.Type()), key2String(dr.ID()))
+			//	quantumfs.ObjectType2String(dr.Type()), key2String(dr.ID()))
 		}
 	}
 
