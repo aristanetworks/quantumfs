@@ -36,7 +36,7 @@ func TestMedBranch(t *testing.T) {
 
 		// use a stride offset such that at least 20 checks
 		// are done
-		test.CheckSparse(test.absPath(dst+"/test"), testFilename,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename,
 			len(data)/20, 10)
 	})
 }
@@ -153,7 +153,7 @@ func TestMedFileAttr(t *testing.T) {
 		test.Assert(err == nil, "Unable to branch")
 
 		// stride offset chosen to allow 20 checks
-		test.CheckSparse(test.absPath(dst+"/test"), testFilename,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename,
 			int(newSize)/20, 10)
 	})
 }

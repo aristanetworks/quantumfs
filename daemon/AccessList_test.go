@@ -21,7 +21,7 @@ func TestAccessListFileCreate(t *testing.T) {
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -44,7 +44,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		accessList[filename] = false
 		file.Close()
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -54,7 +54,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		file.Close()
 		accessList[filename] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -76,7 +76,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		test.Assert(err == nil, "Remove file error:%v", err)
 		accessList[filename] = false
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -86,7 +86,7 @@ func TestAccessListFileDelete(t *testing.T) {
 			"Remove file error:%v", err)
 		accessList[filename] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -101,7 +101,7 @@ func TestAccessListDirectoryCreate(t *testing.T) {
 		test.Assert(err == nil, "Create directory error:%v", err)
 		accessList[dirname] = true
 		wsrlist := test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -122,7 +122,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		test.Assert(err == nil, "Delete directory error:%v", err)
 		accessList[dirname] = false
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -131,7 +131,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		test.Assert(err == nil, "Delete directory error:%v", err)
 		accessList[dirname] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -148,7 +148,7 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 		accessList[dir1] = true
 		accessList[dir1+dir2] = true
 		wsrlist := test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -171,7 +171,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		accessList[dir1] = false
 		accessList[dir1+dir2] = false
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -181,7 +181,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		accessList[dir1] = true
 		accessList[dir1+dir2] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -222,7 +222,7 @@ func TestAccessListMvChild(t *testing.T) {
 		accessList[dirname1+filename1] = false
 		accessList[dirname2+filename3] = true
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -236,7 +236,7 @@ func TestAccessListMvChild(t *testing.T) {
 		accessList[dirname2+filename2] = true
 		accessList[dirname2+filename3] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -266,7 +266,7 @@ func TestAccessListRename(t *testing.T) {
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -278,7 +278,7 @@ func TestAccessListRename(t *testing.T) {
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 	})
@@ -310,7 +310,7 @@ func TestAccessListHardLink(t *testing.T) {
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -322,7 +322,7 @@ func TestAccessListHardLink(t *testing.T) {
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -351,7 +351,7 @@ func TestAccessListSymlink(t *testing.T) {
 		accessList[dirname] = false
 		accessList[dirname+filename2] = true
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -363,7 +363,7 @@ func TestAccessListSymlink(t *testing.T) {
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -436,7 +436,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 		accessList[dirname] = false
 		accessList[dirname+filename2] = false
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -447,7 +447,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 	})
@@ -472,7 +472,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(absbworkspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		accessList = make(map[string]bool)
@@ -483,7 +483,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 	})
 }
@@ -499,14 +499,14 @@ func TestAccessListClear(t *testing.T) {
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		wsr := test.getWorkspaceRoot(workspace)
 		wsr.clearList()
 		accessList = make(map[string]bool)
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error maps not clear")
 	})
 }

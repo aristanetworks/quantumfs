@@ -99,7 +99,6 @@ func (th *TestHelper) Execute(test QuantumFsTest) {
 }
 
 func (th *TestHelper) EndTest() {
-
 	exception := recover()
 
 	if th.TempDir != "" {
@@ -261,79 +260,6 @@ func (th *TestHelper) ReadTo(file *os.File, offset int, num int) []byte {
 	return rtn
 }
 
-func (th *TestHelper) CheckSparse(fileA string, fileB string, offset int,
-	len int) {
-
-	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
-	th.Assert(err == nil, "Unable to open fileA for RDONLY")
-	defer fdA.Close()
-
-	fdB, err := os.OpenFile(fileB, os.O_RDONLY, 0777)
-	th.Assert(err == nil, "Unable to open fileB for RDONLY")
-	defer fdB.Close()
-
-	statA, err := fdA.Stat()
-	th.Assert(err == nil, "Unable to fetch fileA stats")
-	statB, err := fdB.Stat()
-	th.Assert(err == nil, "Unable to fetch fileB stats")
-	th.Assert(statB.Size() == statA.Size(), "file sizes don't match")
-
-	rtnA := make([]byte, len)
-	rtnB := make([]byte, len)
-
-	for idx := int64(0); idx+int64(len) < statA.Size(); idx += int64(offset) {
-		var readA int
-		for readA < len {
-			readIt, err := fdA.ReadAt(rtnA[readA:], idx+int64(readA))
-
-			if err == io.EOF {
-				return
-			}
-			th.Assert(err == nil,
-				"Error while reading from fileA at %d", idx)
-			readA += readIt
-		}
-
-		var readB int
-		for readB < len {
-			readIt, err := fdB.ReadAt(rtnB[readB:], idx+int64(readB))
-
-			if err == io.EOF {
-				return
-			}
-			th.Assert(err == nil,
-				"Error while reading from fileB at %d", idx)
-			readB += readIt
-		}
-		th.Assert(bytes.Equal(rtnA, rtnB), "data mismatch, %v vs %v",
-			rtnA, rtnB)
-	}
-}
-
-func (th *TestHelper) CheckZeroSparse(fileA string, offset int) {
-
-	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
-	th.Assert(err == nil, "Unable to open fileA for RDONLY")
-	defer fdA.Close()
-
-	statA, err := fdA.Stat()
-	th.Assert(err == nil, "Unable to fetch fileA stats")
-
-	rtnA := make([]byte, 1)
-	for idx := int64(0); idx < statA.Size(); idx += int64(offset) {
-		_, err := fdA.ReadAt(rtnA, idx)
-
-		if err == io.EOF {
-			return
-		}
-		th.Assert(err == nil,
-			"Error while reading from fileA at %d", idx)
-
-		th.Assert(bytes.Equal(rtnA, []byte{0}), "file %s not zeroed",
-			fileA)
-	}
-}
-
 // Repeatedly check the condition by calling the function until that function returns
 // true.
 //
@@ -468,7 +394,6 @@ func ShowSummary() {
 }
 
 func OutputLogError(errInfo LogscanError) (summary string) {
-
 	errors := make([]string, 0, 10)
 	testOutputRaw := qlog.ParseLogsRaw(errInfo.LogFile)
 	sort.Sort(qlog.SortByTimePtr(testOutputRaw))

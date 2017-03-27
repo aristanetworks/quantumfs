@@ -5,23 +5,22 @@ package daemon
 
 import "bytes"
 import "flag"
-import "runtime"
-import "testing"
 import "fmt"
+import "io"
+import "os"
 import "reflect"
+import "runtime"
 import "strconv"
 import "strings"
 import "sync"
 import "sync/atomic"
 import "syscall"
-import "os"
+import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/processlocal"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -343,7 +342,7 @@ func (th *testHelper) getAccessList(workspace string) map[string]bool {
 	return th.getWorkspaceRoot(workspace).getList()
 }
 
-func (th *testHelper) AssertAccessList(testlist map[string]bool,
+func (th *testHelper) assertAccessList(testlist map[string]bool,
 	wsrlist map[string]bool, message string) {
 
 	eq := reflect.DeepEqual(testlist, wsrlist)
@@ -352,21 +351,74 @@ func (th *testHelper) AssertAccessList(testlist map[string]bool,
 	th.Assert(eq, message)
 }
 
-func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
-	mountPath := th.TempDir + "/mnt"
+func (th *testHelper) checkSparse(fileA string, fileB string, offset int,
+	len int) {
 
-	datastorePath := th.TempDir + "/ether"
-	datastore := thirdparty_backends.NewEtherFilesystemStore(datastorePath)
+	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
+	th.Assert(err == nil, "Unable to open fileA for RDONLY")
+	defer fdA.Close()
 
-	config := QuantumFsConfig{
-		CachePath:        th.TempDir + "/ramfs",
-		CacheSize:        1 * 1024 * 1024,
-		CacheTimeSeconds: 1,
-		CacheTimeNsecs:   0,
-		DirtyFlushDelay:  30 * time.Second,
-		MountPath:        mountPath,
-		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
-		DurableStore:     datastore,
+	fdB, err := os.OpenFile(fileB, os.O_RDONLY, 0777)
+	th.Assert(err == nil, "Unable to open fileB for RDONLY")
+	defer fdB.Close()
+
+	statA, err := fdA.Stat()
+	th.Assert(err == nil, "Unable to fetch fileA stats")
+	statB, err := fdB.Stat()
+	th.Assert(err == nil, "Unable to fetch fileB stats")
+	th.Assert(statB.Size() == statA.Size(), "file sizes don't match")
+
+	rtnA := make([]byte, len)
+	rtnB := make([]byte, len)
+
+	for idx := int64(0); idx+int64(len) < statA.Size(); idx += int64(offset) {
+		var readA int
+		for readA < len {
+			readIt, err := fdA.ReadAt(rtnA[readA:], idx+int64(readA))
+
+			if err == io.EOF {
+				return
+			}
+			th.Assert(err == nil,
+				"Error while reading from fileA at %d", idx)
+			readA += readIt
+		}
+
+		var readB int
+		for readB < len {
+			readIt, err := fdB.ReadAt(rtnB[readB:], idx+int64(readB))
+
+			if err == io.EOF {
+				return
+			}
+			th.Assert(err == nil,
+				"Error while reading from fileB at %d", idx)
+			readB += readIt
+		}
+		th.Assert(bytes.Equal(rtnA, rtnB), "data mismatch, %v vs %v",
+			rtnA, rtnB)
 	}
-	return config
+}
+
+func (th *testHelper) checkZeroSparse(fileA string, offset int) {
+	fdA, err := os.OpenFile(fileA, os.O_RDONLY, 0777)
+	th.Assert(err == nil, "Unable to open fileA for RDONLY")
+	defer fdA.Close()
+
+	statA, err := fdA.Stat()
+	th.Assert(err == nil, "Unable to fetch fileA stats")
+
+	rtnA := make([]byte, 1)
+	for idx := int64(0); idx < statA.Size(); idx += int64(offset) {
+		_, err := fdA.ReadAt(rtnA, idx)
+
+		if err == io.EOF {
+			return
+		}
+		th.Assert(err == nil,
+			"Error while reading from fileA at %d", idx)
+
+		th.Assert(bytes.Equal(rtnA, []byte{0}), "file %s not zeroed",
+			fileA)
+	}
 }
