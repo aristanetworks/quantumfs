@@ -10,13 +10,12 @@ import "reflect"
 import "strconv"
 import "strings"
 import "testing"
-import "github.com/aristanetworks/quantumfs/utils"
 
 func TestLogSet(t *testing.T) {
 	qlog := NewQlogTiny()
 	// let's redirect the log writer in qfs
 	var logs string
-	qlog.SetWriter(utils.IoPipe(&logs))
+	qlog.SetWriter(ioPipe(&logs))
 
 	qlog.SetLogLevels("Daemon|2")
 	qlog.Log(LogDaemon, MuxReqId, 1, "TestToken1")

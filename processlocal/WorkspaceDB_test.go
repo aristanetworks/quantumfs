@@ -19,9 +19,9 @@ func createWorkspaces(ctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB) {
 		[3]string{"type2", "name3", "work4"},
 	}
 
-	nullType := quantumfs.NullTypespaceName
-	nullName := quantumfs.NullNamespaceName
-	nullWork := quantumfs.NullWorkspaceName
+	nullType := quantumfs.NullSpaceName
+	nullName := quantumfs.NullSpaceName
+	nullWork := quantumfs.NullSpaceName
 
 	for _, workspace := range workspaces {
 		err := wsdb.BranchWorkspace(ctx, nullType, nullName, nullWork,

@@ -292,11 +292,11 @@ func (tsl *TypespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (tsl *TypespaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on TypespaceList")
-	return &quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectRecord{},
 		errors.New("Unsupported record fetch on TypespaceList")
 }
 
@@ -580,11 +580,11 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (nsl *NamespaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on NamespaceList")
-	return &quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectRecord{},
 		errors.New("Unsupported record fetch on NamespaceList")
 }
 
@@ -881,11 +881,11 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (wsl *WorkspaceList) getChildRecord(c *ctx,
-	inodeNum InodeId) (DirectoryRecordIf, error) {
+func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
+	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on WorkspaceList")
-	return &quantumfs.DirectoryRecord{},
+	return &quantumfs.DirectRecord{},
 		errors.New("Unsupported record fetch on WorkspaceList")
 }
 
@@ -1022,9 +1022,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	if wsl.typespaceName == quantumfs.NullTypespaceName &&
-		wsl.namespaceName == quantumfs.NullNamespaceName &&
-		wsl.workspacesById[inodeNum] == quantumfs.NullWorkspaceName {
+	if wsl.typespaceName == quantumfs.NullSpaceName &&
+		wsl.namespaceName == quantumfs.NullSpaceName &&
+		wsl.workspacesById[inodeNum] == quantumfs.NullSpaceName {
 
 		return newNullWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
 			wsl.workspacesById[inodeNum], wsl, inodeNum)

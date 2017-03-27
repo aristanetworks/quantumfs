@@ -7,6 +7,7 @@ import "bytes"
 import "flag"
 import "fmt"
 import "io"
+import "io/ioutil"
 import "os"
 import "reflect"
 import "runtime"
@@ -47,27 +48,6 @@ func TestRandomNamespaceName(t *testing.T) {
 	})
 }
 
-// If a quantumfs test fails then it may leave the filesystem mount hanging around in
-// a blocked state. testHelper needs to forcefully abort and umount these to keep the
-// system functional. Test this forceful unmounting here.
-func TestPanicFilesystemAbort(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.ShouldFailLogscan = true
-
-		api := test.getApi()
-
-		// Introduce a panicing error into quantumfs
-		test.qfs.mapMutex.Lock()
-		for k, v := range test.qfs.fileHandles {
-			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
-		}
-		test.qfs.mapMutex.Unlock()
-
-		// panic Quantumfs
-		api.Branch("_null/_null/null", "branch/test/crash")
-	})
-}
-
 // If a test never returns from some event, such as an inifinite loop, the test
 // should timeout and cleanup after itself.
 func TestTimeout(t *testing.T) {
@@ -89,6 +69,28 @@ func TestGenData(t *testing.T) {
 
 		test.Assert(bytes.Equal([]byte(hardcoded), data),
 			"Data gen function off: %s vs %s", hardcoded, data)
+	})
+}
+
+// If a quantumfs test fails then it may leave the filesystem mount hanging around in
+// a blocked state. testHelper needs to forcefully abort and umount these to keep the
+// system functional. Test this forceful unmounting here.
+func TestPanicFilesystemAbort(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.ShouldFailLogscan = true
+
+		api := test.getApi()
+
+		// Introduce a panicing error into quantumfs
+		test.qfs.mapMutex.Lock()
+		for k, v := range test.qfs.fileHandles {
+			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
+		}
+		test.qfs.mapMutex.Unlock()
+
+		// panic Quantumfs
+		api.Branch(quantumfs.NullSpaceName+"/"+quantumfs.NullSpaceName+"/"+
+			quantumfs.NullSpaceName, "branch/test/crash")
 	})
 }
 
@@ -288,6 +290,27 @@ func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	th.Assert(err == nil, "Error fetching key")
 
 	return key
+}
+
+// Temporary directory for this test run
+var testRunDir string
+
+func init() {
+	syscall.Umask(0)
+
+	var err error
+	for i := 0; i < 10; i++ {
+		// We must use a ramfs or else we get IO lag spikes of > 1 second
+		testRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
+		if err != nil {
+			continue
+		}
+		if err := os.Chmod(testRunDir, 777); err != nil {
+			continue
+		}
+		return
+	}
+	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
 }
 
 // Produce a request specific ctx variable to use for quantumfs internal calls

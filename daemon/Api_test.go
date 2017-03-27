@@ -5,8 +5,10 @@ package daemon
 
 // Test the various Api calls
 
+import "bytes"
 import "fmt"
 import "os"
+import "runtime"
 import "syscall"
 import "testing"
 import "time"
@@ -29,6 +31,11 @@ func TestWorkspaceBranching(t *testing.T) {
 		dst = "work/apitest/b"
 		err = api.Branch(src, dst)
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
+
+		// Enable the write permission of this workspace
+		err = api.EnableRootWrite(dst)
+		test.Assert(err == nil, "Failed to enable write permission in "+
+			"workspace: %v", err)
 
 		// Then create a file
 		testFilename := test.absPath(dst + "/" + "test")
@@ -417,8 +424,12 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		buf := make([]byte, 0, 256)
 		n, err := api.Read(buf)
 		test.Assert(n == 0, "Wrong number of bytes read: %d", n)
-		test.Assert(err.(*os.PathError).Err == syscall.EAGAIN,
-			"Non-blocking read api without requests error:%v", err)
+
+		if runtime.Version() != "go1.7.3" {
+			test.Assert(err.(*os.PathError).Err == syscall.EAGAIN,
+				"Non-blocking read api without requests error:%v",
+				err)
+		}
 	})
 }
 
@@ -440,5 +451,28 @@ func TestWorkspaceDeletion(t *testing.T) {
 
 		err = syscall.Stat(ws2, &stat)
 		test.Assert(err == nil, "Workspace2 deleted: %v", err)
+	})
+}
+
+func TestApiGetAndSetBlock(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		key := []byte("11112222333344445555")
+		data := genData(300)
+		err := api.SetBlock(key, data)
+		test.AssertNoErr(err)
+
+		readData, err := api.GetBlock(key)
+		test.AssertNoErr(err)
+
+		test.Assert(bytes.Equal(data, readData), "Data mismatch")
+
+		// Ensure that we are checking the key length correctly
+		err = api.SetBlock(key[:1], data)
+		test.Assert(err != nil, "Invalid key length allowed in SetBlock")
+
+		_, err = api.GetBlock(key[:1])
+		test.Assert(err != nil, "Invalid key length allowed in GetBlock")
 	})
 }

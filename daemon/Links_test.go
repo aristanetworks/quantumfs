@@ -12,6 +12,7 @@ import "syscall"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -124,5 +125,43 @@ func TestSymlinkSize(t *testing.T) {
 		test.Assert(stat_t.Size == int64(len(orig)),
 			"Wrong size of symlink:%d, should be:%d",
 			stat_t.Size, len(orig))
+	})
+}
+
+func TestSymlinkHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		err := os.MkdirAll(workspace+"/dir", 0777)
+		test.AssertNoErr(err)
+
+		file := workspace + "/dir/file"
+		softlink := workspace + "/dir/symlink"
+		hardlink := workspace + "/dir/hardlink"
+
+		data := genData(2000)
+		err = testutils.PrintToFile(file, string(data))
+		test.AssertNoErr(err)
+
+		err = syscall.Symlink(file, softlink)
+		test.AssertNoErr(err)
+
+		err = syscall.Link(softlink, hardlink)
+		test.AssertNoErr(err)
+
+		err = testutils.PrintToFile(softlink, string(data))
+		test.AssertNoErr(err)
+		data = append(data, data...)
+
+		readData, err := ioutil.ReadFile(softlink)
+		test.AssertNoErr(err)
+		test.Assert(bytes.Equal(readData, data), "data mismatch")
+
+		readData, err = ioutil.ReadFile(hardlink)
+		test.AssertNoErr(err)
+		test.Assert(bytes.Equal(readData, data), "data mismatch")
+
+		err = testutils.PrintToFile(softlink, string(data))
+		test.AssertNoErr(err)
 	})
 }
