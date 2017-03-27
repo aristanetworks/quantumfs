@@ -16,9 +16,9 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	}
 
 	// Create the null workspace
-	type_ := quantumfs.NullTypespaceName
-	name_ := quantumfs.NullNamespaceName
-	work_ := quantumfs.NullWorkspaceName
+	type_ := quantumfs.NullSpaceName
+	name_ := quantumfs.NullSpaceName
+	work_ := quantumfs.NullSpaceName
 	wsdb.cache[type_] = make(map[string]map[string]quantumfs.ObjectKey)
 	wsdb.cache[type_][name_] = make(map[string]quantumfs.ObjectKey)
 	wsdb.cache[type_][name_][work_] = quantumfs.EmptyWorkspaceKey

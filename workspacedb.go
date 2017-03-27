@@ -72,32 +72,32 @@ type WorkspaceDB interface {
 
 type WsdbErrCode int
 type WorkspaceDbErr struct {
-	code WsdbErrCode
-	msg  string
+	Code WsdbErrCode
+	Msg  string
 }
 
 func NewWorkspaceDbErr(code WsdbErrCode, format string,
 	args ...interface{}) error {
 
-	return &WorkspaceDbErr{code: code, msg: fmt.Sprintf(format, args)}
+	return &WorkspaceDbErr{Code: code, Msg: fmt.Sprintf(format, args)}
 }
 
 const (
-	WSDB_RESERVED            WsdbErrCode = iota
-	WSDB_WORKSPACE_NOT_FOUND             = iota // The workspace didn't exist
-	WSDB_WORKSPACE_EXISTS                = iota // The workspace already exists
-	WSDB_FATAL_DB_ERROR                  = iota // Fatal error in workspace DB
-	WSDB_LOCKED                          = iota // workspace is locked
+	WSDB_RESERVED            WsdbErrCode = 0
+	WSDB_WORKSPACE_NOT_FOUND             = 1 // The workspace didn't exist
+	WSDB_WORKSPACE_EXISTS                = 2 // The workspace already exists
+	WSDB_FATAL_DB_ERROR                  = 3 // Fatal error in workspace DB
+	WSDB_LOCKED                          = 4 // workspace is locked
 	// The operation was based off out of date information
-	WSDB_OUT_OF_DATE = iota
+	WSDB_OUT_OF_DATE = 5
 )
 
 func (err *WorkspaceDbErr) Error() string {
-	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.msg)
+	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.Msg)
 }
 
 func (err *WorkspaceDbErr) ErrorCode() string {
-	switch err.code {
+	switch err.Code {
 	default:
 		return "Unknown wsdb error"
 	case WSDB_WORKSPACE_EXISTS:

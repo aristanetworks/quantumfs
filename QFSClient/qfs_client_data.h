@@ -7,16 +7,17 @@
 // These enums (CommandID and CommandError) are based on their master
 // definitions in quantumfs/cmds.go
 enum CommandID {
-	kCmdError = 0,
-	kCmdBranchRequest = 1,
-	kCmdGetAccessed = 2,    // not in aid/3015
-	kCmdClearAccessed = 3,  // not in aid/3015
-	kCmdSyncAll = 4,        // not in aid/3015
-	kCmdInsertInode = 5,
-	kCmdDeleteWorkspace = 6,
-	kCmdSetBlock = 7,
-	kCmdGetBlock = 8,
-	// missing: Merge, Freeze, Checkout
+	kCmdInvalid = 0,
+	kCmdError = 1,
+	kCmdBranchRequest = 2,
+	kCmdGetAccessed = 3,    // not in aid/3015
+	kCmdClearAccessed = 4,  // not in aid/3015
+	kCmdSyncAll = 5,        // not in aid/3015
+	kCmdInsertInode = 6,
+	kCmdDeleteWorkspace = 7,
+	kCmdSetBlock = 8,
+	kCmdGetBlock = 9,
+	kCmdEnableRootWrite = 10,
 };
 
 enum CommandError {
