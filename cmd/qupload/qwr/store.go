@@ -21,8 +21,8 @@ func ConnectDatastore(name string,
 
 		store := datastore.Constructor(config)
 		if store == nil {
-			return nil, fmt.Errorf("Datastore connection failed '%s:%s'\n",
-				name, config)
+			return nil, fmt.Errorf("Datastore connection "+
+				"failed '%s:%s'\n", name, config)
 		}
 		return store, nil
 	}
@@ -40,8 +40,8 @@ func ConnectWorkspaceDB(name string,
 
 		ws := db.Constructor(config)
 		if ws == nil {
-			return nil, fmt.Errorf("WorkspaceDB connection failed '%s:%s'\n",
-				name, config)
+			return nil, fmt.Errorf("WorkspaceDB connection "+
+				"failed '%s:%s'\n", name, config)
 		}
 		return ws, nil
 	}
@@ -53,8 +53,9 @@ func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 	advance string, newWsrKey quantumfs.ObjectKey) error {
 
 	wsParts := strings.Split(ws, "/")
-	err := wsdb.BranchWorkspace(nil, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, wsParts[0], wsParts[1], wsParts[2])
+	err := wsdb.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		wsParts[0], wsParts[1], wsParts[2])
 	if err != nil {
 		return err
 	}

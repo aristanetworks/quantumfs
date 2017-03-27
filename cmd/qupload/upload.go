@@ -50,12 +50,14 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 	tracker, ok := dirEntryTrackers[path]
 	if !ok {
-		panic(fmt.Sprintf("BUG: Directory state tracker must exist for %q", path))
+		panic(fmt.Sprintf("BUG: Directory state tracker must "+
+			"exist for %q", path))
 	}
 
 	tracker.records = append(tracker.records, record)
 	if len(tracker.records) == cap(tracker.records) {
-		record, err := qwr.WriteDirectory(path, tracker.info, tracker.records, dataStore)
+		record, err := qwr.WriteDirectory(path, tracker.info,
+			tracker.records, dataStore)
 		if err != nil {
 			return err
 		}
@@ -89,7 +91,8 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 		}
 
 		if !msg.info.IsDir() {
-			record, err = qwr.WriteFile(dataStore, msg.info, msg.path)
+			record, err = qwr.WriteFile(dataStore,
+				msg.info, msg.path)
 			if err != nil {
 				return err
 			}
@@ -97,14 +100,16 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 			// walker walks non-empty directories to generate
 			// worker handles empty directory
 			stat := msg.info.Sys().(*syscall.Stat_t)
-			record = qwr.CreateNewDirRecord(msg.info.Name(), stat.Mode,
-				uint32(stat.Rdev), 0,
+			record = qwr.CreateNewDirRecord(msg.info.Name(),
+				stat.Mode, uint32(stat.Rdev), 0,
 				quantumfs.ObjectUid(stat.Uid, stat.Uid),
 				quantumfs.ObjectGid(stat.Gid, stat.Gid),
 				quantumfs.ObjectTypeDirectoryEntry,
 				// retain time of the input directory
-				quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
-				quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
+				quantumfs.NewTime(time.Unix(stat.Mtim.Sec,
+					stat.Mtim.Nsec)),
+				quantumfs.NewTime(time.Unix(stat.Ctim.Sec,
+					stat.Ctim.Nsec)),
 				quantumfs.EmptyDirKey)
 		}
 
@@ -168,7 +173,8 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 		}
 		expectedDirRecords := len(dirEnts)
 		if exInfo != nil {
-			expectedDirRecords = exInfo.RecordsExcluded(checkPath, expectedDirRecords)
+			expectedDirRecords = exInfo.RecordsExcluded(checkPath,
+				expectedDirRecords)
 		}
 		// Empty directory is like a file with no content
 		// whose parent directory state tracking has already been
@@ -230,7 +236,8 @@ func upload(ws string, advance string, root string, exInfo *utils.ExcludeInfo,
 	group.Go(func() error {
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
-				return pathWalker(groupCtx, piChan, path, root, info, err, exInfo)
+				return pathWalker(groupCtx, piChan, path,
+					root, info, err, exInfo)
 			})
 		close(piChan)
 		return err

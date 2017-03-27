@@ -18,7 +18,9 @@ var MetadataBytesWritten uint64
 type fileObjectWriter func(string, os.FileInfo,
 	quantumfs.DataStore) (quantumfs.ObjectKey, error)
 
-func fileObjectInfo(path string, finfo os.FileInfo) (quantumfs.ObjectType, fileObjectWriter, error) {
+func fileObjectInfo(path string,
+	finfo os.FileInfo) (quantumfs.ObjectType, fileObjectWriter, error) {
+
 	mode := uint(finfo.Mode())
 	size := uint64(finfo.Size())
 
@@ -70,14 +72,16 @@ func WriteFile(ds quantumfs.DataStore,
 	// detect object type specific writer
 	objType, objWriter, err := fileObjectInfo(path, finfo)
 	if err != nil {
-		return nil, fmt.Errorf("WriteFile object type detect failed: %v", err)
+		return nil, fmt.Errorf("WriteFile object type detect "+
+			"failed: %v", err)
 	}
 
 	// use writer to write file blocks and file type
 	// specific metadata
 	fileKey, werr := objWriter(path, finfo, ds)
 	if werr != nil {
-		return nil, fmt.Errorf("WriteFile object writer %d for %q failed: %v\n",
+		return nil, fmt.Errorf("WriteFile object writer %d "+
+			"for %q failed: %v\n",
 			objType, path, werr)
 	}
 
@@ -147,7 +151,8 @@ func writeFileBlocks(file *os.File, readLen uint64,
 		}
 		if bytesRead != len(chunk) {
 			return nil, 0,
-				fmt.Errorf("writeFileBlocks: Read %s failed due to partial read. "+
+				fmt.Errorf("writeFileBlocks: Read %s failed "+
+					"due to partial read. "+
 					"Actual %d != Expected %d\n",
 					file.Name(), bytesRead, len(chunk))
 		}

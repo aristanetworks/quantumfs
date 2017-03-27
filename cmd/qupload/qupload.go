@@ -49,8 +49,8 @@ qupload - tool to upload a directory hierarchy to a QFS supported datastore
 version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
-			   -workspace <wsname> [-progress -advance <wsname>]
-			   -basedir <path> [ -exclude <file> | <reldirpath> ]
+	       -workspace <wsname> [-progress -advance <wsname>]
+	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
 1) qupload -workspace build/eos-trunk/11223344
 		   -basedir /var/Abuild/66778899 -exclude excludeFile
@@ -78,7 +78,8 @@ func validateParams(p *params) error {
 	}
 
 	if strings.Count(p.ws, "/") != 2 {
-		return errors.New("Workspace name must contain precisely two \"/\"")
+		return errors.New("Workspace name must contain " +
+			"precisely two \"/\"")
 	}
 
 	if p.advance != "" && strings.Count(p.advance, "/") != 2 {
@@ -101,9 +102,9 @@ func validateParams(p *params) error {
 	if flag.NArg() == 1 {
 		if strings.HasPrefix(flag.Arg(0), "/") {
 			return errors.New("Directory argument must be " +
-				"relative to the base directory. Do not use absolute path")
+				"relative to the base directory. Do not " +
+				"absolute path")
 		}
-
 		root = filepath.Join(p.baseDir, flag.Arg(0))
 	}
 
@@ -167,7 +168,8 @@ func main() {
 	flag.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
 	flag.StringVar(&cliParams.advance, "advance", "",
-		"Name of workspace which'll be advanced to point to uploaded workspace")
+		"Name of workspace which'll be advanced to point"+
+			"to uploaded workspace")
 	flag.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
 	flag.StringVar(&cliParams.excludeFile, "exclude", "",
@@ -203,35 +205,44 @@ func main() {
 
 	if cliParams.progress == true {
 		go func() {
-			fmt.Println("Data and Metadata is the size being read by qupload " +
-				"tool for uploading to QFS datastore. Since upload data " +
-				"is deduped, less data may be sent on wire")
+			fmt.Println("Data and Metadata is the size being " +
+				"read by qupload tool for uploading to QFS " +
+				"datastore. Since upload data is deduped, " +
+				"less data may be sent on wire")
 			var d1, m1, d2, m2, speed uint64
 			for {
 				start := time.Now()
 				d1 = qwr.DataBytesWritten
 				m1 = qwr.MetadataBytesWritten
-				fmt.Printf("\rData: %12d Metadata: %12d Speed: %4d MB/s",
-					d1, m1, speed)
+				fmt.Printf("\rData: %12d Metadata: %12d "+
+					"Speed: %4d MB/s", d1, m1, speed)
 				time.Sleep(1 * time.Second)
 				d2 = qwr.DataBytesWritten
 				m2 = qwr.MetadataBytesWritten
-				speed = (((d2 + m2) - (d1 + m1)) / uint64(1000000)) / uint64(time.Since(start).Seconds())
+				speed = (((d2 + m2) - (d1 + m1)) /
+					uint64(1000000)) /
+					uint64(time.Since(start).Seconds())
 			}
 		}()
 	}
 
 	start := time.Now()
-	upErr := upload(cliParams.ws, cliParams.advance, filepath.Join(cliParams.baseDir, relpath), exInfo,
+	upErr := upload(cliParams.ws, cliParams.advance,
+		filepath.Join(cliParams.baseDir, relpath), exInfo,
 		cliParams.conc)
 	if upErr != nil {
 		fmt.Println("Upload failed: ", upErr)
 		os.Exit(exitErrUpload)
 	}
 
-	fmt.Printf("Upload completed. Total: %d bytes (Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
+	fmt.Printf("Upload completed. Total: %d bytes "+
+		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
 		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
-		qwr.DataBytesWritten, (qwr.DataBytesWritten*100)/(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
-		qwr.MetadataBytesWritten, (qwr.MetadataBytesWritten*100)/(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		qwr.DataBytesWritten,
+		(qwr.DataBytesWritten*100)/
+			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		qwr.MetadataBytesWritten,
+		(qwr.MetadataBytesWritten*100)/
+			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
 		time.Since(start).Seconds(), cliParams.ws)
 }

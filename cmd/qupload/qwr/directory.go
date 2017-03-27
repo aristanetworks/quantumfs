@@ -23,12 +23,15 @@ func WriteDirectory(path string, info os.FileInfo,
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			dirEntry.SetNumEntries(entryIdx)
-			key, err := writeBlob(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
+			key, err := writeBlob(dirEntry.Bytes(),
+				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
-				return nil, fmt.Errorf("WriteDirectory %q failed: %v",
-					path, err)
+				return nil,
+					fmt.Errorf("WriteDirectory %q "+
+						"failed: %v", path, err)
 			}
-			atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
+			atomic.AddUint64(&MetadataBytesWritten,
+				uint64(len(dirEntry.Bytes())))
 			dirEntry = quantumfs.NewDirectoryEntry()
 			dirEntry.SetNext(key)
 			entryIdx = 0
