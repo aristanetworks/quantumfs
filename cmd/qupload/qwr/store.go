@@ -8,6 +8,7 @@ import "fmt"
 import "strings"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 func ConnectDatastore(name string,
@@ -88,6 +89,6 @@ func writeBlob(data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	key := quantumfs.NewObjectKey(keyType, sha1.Sum(data))
-	buf := quantumfs.NewSimpleBuffer(data, key)
+	buf := testutils.NewSimpleBuffer(data, key)
 	return key, ds.Set(nil, key, buf)
 }

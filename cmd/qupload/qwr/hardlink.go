@@ -14,7 +14,7 @@ import "github.com/aristanetworks/quantumfs"
 type HardLinkID uint64
 
 type HardLinkInfo struct {
-	record *quantumfs.DirectoryRecord
+	record *quantumfs.DirectRecord
 	id     HardLinkID
 	nlinks uint32
 }
@@ -35,7 +35,7 @@ func encodeHardLinkID(id HardLinkID) quantumfs.ObjectKey {
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
 }
 
-func HardLink(finfo os.FileInfo) (*quantumfs.DirectoryRecord, bool) {
+func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
 
 	hardLinkInfoMutex.Lock()
 	defer hardLinkInfoMutex.Unlock()
@@ -75,7 +75,7 @@ func HardLink(finfo os.FileInfo) (*quantumfs.DirectoryRecord, bool) {
 }
 
 func SetHardLink(finfo os.FileInfo,
-	record *quantumfs.DirectoryRecord) *quantumfs.DirectoryRecord {
+	record *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
 
 	// need locks to protect the map
 	hardLinkInfoMutex.Lock()

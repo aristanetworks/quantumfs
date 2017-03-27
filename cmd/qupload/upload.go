@@ -19,7 +19,7 @@ import "golang.org/x/sync/errgroup"
 var enableExclChecks = false
 
 func handleDirContents(ctx context.Context,
-	childWg *errgroup.Group, childDirRecChan chan<- *quantumfs.DirectoryRecord,
+	childWg *errgroup.Group, childDirRecChan chan<- quantumfs.DirectoryRecord,
 	base string, relpath string,
 	dirEnts []os.FileInfo,
 	ds quantumfs.DataStore) {
@@ -63,17 +63,17 @@ func handleDirContents(ctx context.Context,
 	})
 }
 
-func handleDir(ctx context.Context, dirRecordChan chan<- *quantumfs.DirectoryRecord,
+func handleDir(ctx context.Context, dirRecordChan chan<- quantumfs.DirectoryRecord,
 	base string, relpath string,
 	ds quantumfs.DataStore) error {
 
-	var curDirRecords []*quantumfs.DirectoryRecord
+	var curDirRecords []quantumfs.DirectoryRecord
 
 	// create a child context
 	childWg, childCtx := errgroup.WithContext(ctx)
 	// a directory record channel for go-routines
 	// operating in the child context
-	childDirRecChan := make(chan *quantumfs.DirectoryRecord)
+	childDirRecChan := make(chan quantumfs.DirectoryRecord)
 
 	// this relpath is included, check if it's contents
 	// are excluded
@@ -128,7 +128,7 @@ func upload(ds quantumfs.DataStore, wsdb quantumfs.WorkspaceDB,
 	// setup the top level wait-group and channel to
 	// receive DirectoryRecord information
 	topWg, topCtx := errgroup.WithContext(context.Background())
-	topDirRecChan := make(chan *quantumfs.DirectoryRecord)
+	topDirRecChan := make(chan quantumfs.DirectoryRecord)
 
 	// start the top-level goroutine
 	topWg.Go(func() error {

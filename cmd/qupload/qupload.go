@@ -39,6 +39,8 @@ type params struct {
 	excludeFile string
 }
 
+var version string
+
 func showUsage() {
 	fmt.Printf(`
 qupload - tool to upload a directory hierarchy to a QFS supported datastore
@@ -65,7 +67,7 @@ excluded from upload.
 Above command will upload the contents of /var/Abuild/66778899/bin to the
 QFS workspace build/eos-trunk/11223344. During upload, a maximum of 7000
 files are opened at any time.
-`, quantumfs.Version)
+`, version)
 	flag.PrintDefaults()
 }
 
