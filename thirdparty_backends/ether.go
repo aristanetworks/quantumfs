@@ -67,15 +67,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectK
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	_, err := ebt.blobstore.Metadata(key.String())
-	if err != nil {
-		bE, _ := err.(*blobstore.Error)
-		// TODO(krishna): check TTL too
-		if bE.Code == blobstore.ErrKeyNotFound {
-			return ebt.blobstore.Insert(key.String(), buf.Get(), nil)
-		}
-	}
-	return err
+	return ebt.blobstore.Insert(key.String(), buf.Get(), nil)
 }
 
 type EtherWsdbTranslator struct {
