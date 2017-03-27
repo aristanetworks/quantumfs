@@ -422,8 +422,15 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on Directory")
-	return fuse.ENOSYS
+	defer c.funcIn("Directory::Access").out()
+
+	dir.markSelfAccessed(c, false)
+	access := openPermission(c, dir, mask)
+	if access {
+		return fuse.OK
+	}
+
+	return fuse.EPERM
 }
 
 func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
