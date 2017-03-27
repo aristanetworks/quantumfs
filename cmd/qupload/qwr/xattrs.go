@@ -81,8 +81,8 @@ func WriteXAttrs(path string,
 	sizeofXAttrs, err, _ := lListXattr(path, 0)
 	if err != nil {
 		return quantumfs.EmptyBlockKey,
-			fmt.Errorf("Write xattrs (list size) for %q failed: %v",
-				path, err)
+			fmt.Errorf("Write xattrs (list size) for "+
+				"%q failed: %v", path, err)
 	}
 
 	if sizeofXAttrs == 0 {
@@ -93,19 +93,21 @@ func WriteXAttrs(path string,
 	_, err, xattrs = lListXattr(path, sizeofXAttrs)
 	if err != nil {
 		return quantumfs.EmptyBlockKey,
-			fmt.Errorf("Write xattrs (list read) for %q failed: %v",
-				path, err)
+			fmt.Errorf("Write xattrs (list read) for "+
+				"%q failed: %v", path, err)
 	}
 
 	// attribute names are separated by null byte
-	xattrNames := strings.Split(strings.Trim(string(xattrs), "\000"), "\000")
+	xattrNames := strings.Split(strings.Trim(string(xattrs),
+		"\000"), "\000")
 
 	if len(xattrNames) > quantumfs.MaxNumExtendedAttributes() {
 		return quantumfs.EmptyBlockKey,
 			fmt.Errorf("Write xattrs failed. "+
-				"Max number of xattrs supported is %d, found %d on "+
-				"path %s\n", quantumfs.MaxNumExtendedAttributes(), len(xattrNames),
-				path)
+				"Max number of xattrs supported is "+
+				"%d, found %d on path %s\n",
+				quantumfs.MaxNumExtendedAttributes(),
+				len(xattrNames), path)
 	}
 
 	xattrMetadata := quantumfs.NewExtendedAttributes()
@@ -113,22 +115,25 @@ func WriteXAttrs(path string,
 		xattrSz, err, _ := lGetXattr(path, xattrName, 0)
 		if err != nil {
 			return quantumfs.EmptyBlockKey,
-				fmt.Errorf("Write xattrs (attr size) %q for %q failed: %v",
-					xattrName, path, err)
+				fmt.Errorf("Write xattrs (attr size) %q "+
+					"for %q failed: %v", xattrName,
+					path, err)
 		}
 		var xattrData []byte
 		_, err, xattrData = lGetXattr(path, xattrName, xattrSz)
 		if err != nil {
 			return quantumfs.EmptyBlockKey,
-				fmt.Errorf("Write xattrs (attr read) %q for %q failed: %v",
-					xattrName, path, err)
+				fmt.Errorf("Write xattrs (attr read) %q "+
+					"for %q failed: %v", xattrName,
+					path, err)
 		}
 
 		dataKey, bErr := writeBlob(xattrData, quantumfs.KeyTypeData, ds)
 		if bErr != nil {
 			return quantumfs.EmptyBlockKey,
-				fmt.Errorf("Write xattrs (blob write) %q for %q failed: %v",
-					xattrName, path, err)
+				fmt.Errorf("Write xattrs (blob write) %q "+
+					"for %q failed: %v", xattrName,
+					path, err)
 		}
 		atomic.AddUint64(&MetadataBytesWritten, uint64(len(xattrData)))
 
@@ -140,9 +145,10 @@ func WriteXAttrs(path string,
 		quantumfs.KeyTypeMetadata, ds)
 	if xerr != nil {
 		return quantumfs.EmptyBlockKey,
-			fmt.Errorf("Write xattrs (metadata write) for %q failed: %v",
-				path, xerr)
+			fmt.Errorf("Write xattrs (metadata write) for "+
+				"%q failed: %v", path, xerr)
 	}
-	atomic.AddUint64(&MetadataBytesWritten, uint64(len(xattrMetadata.Bytes())))
+	atomic.AddUint64(&MetadataBytesWritten,
+		uint64(len(xattrMetadata.Bytes())))
 	return xKey, nil
 }

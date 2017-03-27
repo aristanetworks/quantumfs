@@ -114,7 +114,8 @@ func writeHardLinkInfo(ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error)
 			if err != nil {
 				return nil, err
 			}
-			atomic.AddUint64(&MetadataBytesWritten, uint64(len(hle.Bytes())))
+			atomic.AddUint64(&MetadataBytesWritten,
+				uint64(len(hle.Bytes())))
 
 			hle = quantumfs.NewHardlinkEntry()
 			entryIdx = 0
