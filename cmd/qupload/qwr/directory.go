@@ -4,15 +4,14 @@
 package qwr
 
 import "os"
-import "path/filepath"
-import "syscall"
 import "sync/atomic"
+import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
-func WriteDirectory(base string, relpath string,
+func WriteDirectory(path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,
 	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
 
@@ -44,46 +43,29 @@ func WriteDirectory(base string, relpath string,
 	}
 	atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
 
-	var dirRecord quantumfs.DirectoryRecord
-	if relpath == "" {
-		//root directory - mode 0755, size = 0 since dir size
-		// is approximated by QFS based on dir entries
-		dirRecord = createNewDirRecord("", 0755,
-			0, 0, 0, 0,
-			quantumfs.ObjectTypeDirectoryEntry,
-			quantumfs.NewTime(time.Now()),
-			quantumfs.NewTime(time.Now()),
-			key)
-		// xattrs cannot be saved in workspace root dir
-	} else {
-		finfo, serr := os.Lstat(filepath.Join(base, relpath))
-		if serr != nil {
-			return nil, serr
-		}
-		stat := finfo.Sys().(*syscall.Stat_t)
-		dirRecord = createNewDirRecord(finfo.Name(), stat.Mode,
-			uint32(stat.Rdev), 0,
-			quantumfs.ObjectUid(stat.Uid, stat.Uid),
-			quantumfs.ObjectGid(stat.Gid, stat.Gid),
-			quantumfs.ObjectTypeDirectoryEntry,
-			// retain time of the input directory
-			quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
-			quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
-			key)
+	stat := info.Sys().(*syscall.Stat_t)
+	dirRecord := CreateNewDirRecord(info.Name(), stat.Mode,
+		uint32(stat.Rdev), 0,
+		quantumfs.ObjectUid(stat.Uid, stat.Uid),
+		quantumfs.ObjectGid(stat.Gid, stat.Gid),
+		quantumfs.ObjectTypeDirectoryEntry,
+		// retain time of the input directory
+		quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
+		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
+		key)
 
-		xattrsKey, xerr := WriteXAttrs(filepath.Join(base, relpath), ds)
-		if xerr != nil {
-			return nil, xerr
-		}
-		if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
-			dirRecord.SetExtendedAttributes(xattrsKey)
-		}
+	xattrsKey, xerr := WriteXAttrs(path, ds)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
+		dirRecord.SetExtendedAttributes(xattrsKey)
 	}
 
 	return dirRecord, nil
 }
 
-func createNewDirRecord(name string, mode uint32,
+func CreateNewDirRecord(name string, mode uint32,
 	rdev uint32, size uint64, uid quantumfs.UID,
 	gid quantumfs.GID, objType quantumfs.ObjectType,
 	mtime quantumfs.Time, ctime quantumfs.Time,

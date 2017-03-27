@@ -11,6 +11,7 @@ import "errors"
 import "flag"
 import "fmt"
 import "os"
+import "path/filepath"
 import "strings"
 import "time"
 
@@ -35,8 +36,11 @@ type params struct {
 	advance     string
 	baseDir     string
 	excludeFile string
+	conc        uint
 }
 
+var dataStore quantumfs.DataStore
+var wsDB quantumfs.WorkspaceDB
 var version string
 
 func showUsage() {
@@ -64,67 +68,96 @@ specified by excludeFile are excluded from upload.
 	flag.PrintDefaults()
 }
 
-func validateParams(p *params) (quantumfs.DataStore, quantumfs.WorkspaceDB, error) {
+func validateParams(p *params) error {
+	var err error
 
 	// check mandatory args
-	if p.dsName == "" || p.dsConf == "" || p.wsdbName == "" ||
-		p.wsdbConf == "" || p.ws == "" || p.baseDir == "" {
-		return nil, nil, errors.New("One or more mandatory flags are missing")
+	if p.ws == "" || p.baseDir == "" {
+		return errors.New("One or more mandatory flags are missing")
 	}
 
 	if strings.Count(p.ws, "/") != 2 {
-		return nil, nil, errors.New("Workspace name must contain precisely two \"/\"")
+		return errors.New("Workspace name must contain precisely two \"/\"")
 	}
 
 	if p.advance != "" && strings.Count(p.advance, "/") != 2 {
-		return nil, nil, errors.New("Workspace to be advanced must contain precisely two \"/\"")
+		return errors.New("Workspace to be advanced must contain precisely two \"/\"")
 	}
 
-	if p.excludeFile == "" && flag.Arg(0) == "" {
-		return nil, nil, errors.New("One of -excludeFile or directory argument must be specified")
+	if (p.excludeFile == "" && flag.NArg() == 0) ||
+		(p.excludeFile != "" && flag.NArg() > 0) {
+		return errors.New("One of -excludeFile or directory argument must be specified")
 	}
 
-	ds, dsErr := qwr.ConnectDatastore(p.dsName, p.dsConf)
-	if dsErr != nil {
-		return nil, nil, dsErr
+	if flag.NArg() > 1 {
+		return errors.New("At most 1 directory or file must be specified")
 	}
-	wsdb, wsdbErr := qwr.ConnectWorkspaceDB(p.wsdbName, p.wsdbConf)
-	if wsdbErr != nil {
-		return nil, nil, wsdbErr
+
+	root := p.baseDir
+	if flag.NArg() == 1 {
+		if strings.HasPrefix(flag.Arg(0), "/") {
+			return errors.New("Directory argument is relative to the base directory. Do not use absolute path")
+		}
+
+		root = filepath.Join(p.baseDir, flag.Arg(0))
+	}
+
+	info, err := os.Lstat(root)
+	if err != nil {
+		return fmt.Errorf("%s : %s\n", root, err)
+	}
+	if !info.Mode().IsRegular() && !info.IsDir() {
+		return fmt.Errorf("%s must be regular file or directory", root)
+	}
+
+	if p.conc == 0 {
+		return errors.New("Concurrency must be > 0")
+	}
+
+	dataStore, err = qwr.ConnectDatastore(p.dsName, p.dsConf)
+	if err != nil {
+		return err
+	}
+	wsDB, err = qwr.ConnectWorkspaceDB(p.wsdbName, p.wsdbConf)
+	if err != nil {
+		return err
 	}
 	ws1Parts := strings.Split(p.ws, "/")
-	advParts := strings.Split(p.advance, "/")
-	_, err := wsdb.Workspace(nil,
+	_, err = wsDB.Workspace(nil,
 		ws1Parts[0], ws1Parts[1], ws1Parts[2])
 	werr, _ := err.(*quantumfs.WorkspaceDbErr)
 	if err == nil {
-		return nil, nil, fmt.Errorf("Workspace %s must not exist\n", p.ws)
+		return fmt.Errorf("Workspace %s must not exist\n", p.ws)
 	}
 	if err != nil && werr.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
-		return nil, nil, fmt.Errorf("Error in workspace %s\n", err)
+		return fmt.Errorf("Error in workspace %s\n", err)
 	}
-	_, aerr := wsdb.Workspace(nil,
-		advParts[0], advParts[1], advParts[2])
-	if aerr != nil {
-		return nil, nil, fmt.Errorf("Error in advance workspace %s\n", aerr)
+	if p.advance != "" {
+		advParts := strings.Split(p.advance, "/")
+		_, err = wsDB.Workspace(nil,
+			advParts[0], advParts[1], advParts[2])
+		if err != nil {
+			return fmt.Errorf("Error in advance workspace %s\n", err)
+		}
 	}
 
-	return ds, wsdb, nil
+	return nil
 }
 
 func main() {
 
 	var cliParams params
+	var err error
 
 	flag.BoolVar(&cliParams.progress, "progress", false,
 		"Show the data and metadata sizes uploaded")
-	flag.StringVar(&cliParams.dsName, "datastore", "",
+	flag.StringVar(&cliParams.dsName, "datastore", "ether.cql",
 		"Name of the datastore to use")
-	flag.StringVar(&cliParams.dsConf, "datastoreconf", "",
+	flag.StringVar(&cliParams.dsConf, "datastoreconf", "/etc/qupload/scylla-abuild",
 		"Options to pass to datastore")
-	flag.StringVar(&cliParams.wsdbName, "workspaceDB", "",
+	flag.StringVar(&cliParams.wsdbName, "workspaceDB", "ether.cql",
 		"Name of the workspace DB to use")
-	flag.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "",
+	flag.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "/etc/qupload/scylla-abuild",
 		"Options to pass to workspace DB")
 	flag.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
@@ -132,8 +165,10 @@ func main() {
 		"Name of workspace which'll be advanced to point to uploaded workspace")
 	flag.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
-	flag.StringVar(&cliParams.excludeFile, "exclude", "",
+	flag.StringVar(&cliParams.excludeFile, "exclude", "/etc/qupload/abuild-excludes",
 		"Exclude the files and directories specified in this file")
+	flag.UintVar(&cliParams.conc, "concurrency", 10,
+		"Number of worker threads")
 
 	flag.Usage = showUsage
 	flag.Parse()
@@ -143,17 +178,18 @@ func main() {
 		os.Exit(0)
 	}
 
-	ds, wsdb, perr := validateParams(&cliParams)
+	perr := validateParams(&cliParams)
 	if perr != nil {
 		fmt.Println(perr)
 		os.Exit(exitErrArgs)
 	}
 
 	relpath := ""
+	var exInfo *utils.ExcludeInfo
 	if cliParams.excludeFile != "" {
-		exErr := utils.LoadExcludeList(cliParams.excludeFile)
-		if exErr != nil {
-			fmt.Println(exErr)
+		exInfo, err = utils.LoadExcludeInfo(cliParams.excludeFile)
+		if err != nil {
+			fmt.Println(err)
 			os.Exit(exitErrArgs)
 		}
 	} else {
@@ -178,7 +214,8 @@ func main() {
 	}
 
 	start := time.Now()
-	upErr := upload(ds, wsdb, cliParams.ws, cliParams.advance, cliParams.baseDir, relpath)
+	upErr := upload(cliParams.ws, cliParams.advance, filepath.Join(cliParams.baseDir, relpath), exInfo,
+		cliParams.conc)
 	if upErr != nil {
 		fmt.Println(upErr)
 		os.Exit(exitErrUpload)

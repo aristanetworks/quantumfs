@@ -7,7 +7,7 @@ import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
 
-func WriteWorkspaceRoot(baseDir string, rootDirKey quantumfs.ObjectKey,
+func WriteWorkspaceRoot(rootDirKey quantumfs.ObjectKey,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	// xattrs cannot be saved in workspace root directory

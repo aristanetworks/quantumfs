@@ -79,7 +79,7 @@ func WriteFile(ds quantumfs.DataStore,
 			path, werr)
 	}
 
-	dirRecord := createNewDirRecord(finfo.Name(), stat.Mode,
+	dirRecord := CreateNewDirRecord(finfo.Name(), stat.Mode,
 		uint32(stat.Rdev), uint64(finfo.Size()),
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),

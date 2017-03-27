@@ -3,11 +3,11 @@
 
 package qwr
 
-import "crypto/sha1"
 import "fmt"
 import "strings"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
@@ -88,7 +88,7 @@ func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 func writeBlob(data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
-	key := quantumfs.NewObjectKey(keyType, sha1.Sum(data))
+	key := quantumfs.NewObjectKey(keyType, hash.Hash(data))
 	buf := testutils.NewSimpleBuffer(data, key)
 	return key, ds.Set(nil, key, buf)
 }
