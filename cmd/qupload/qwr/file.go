@@ -16,7 +16,6 @@ var DataBytesWritten uint64
 var MetadataBytesWritten uint64
 
 type fileObjectWriter func(string, os.FileInfo,
-	quantumfs.ObjectType,
 	quantumfs.DataStore) (quantumfs.ObjectKey, error)
 
 func fileObjectInfo(path string, finfo os.FileInfo) (quantumfs.ObjectType, fileObjectWriter, error) {
@@ -49,7 +48,9 @@ func WriteFile(ds quantumfs.DataStore,
 
 	stat := finfo.Sys().(*syscall.Stat_t)
 
-	// process hardlink first
+	// process hardlink first since we can
+	// skip the content write if the hardlink
+	// content already exists
 	setHardLink := false
 	if finfo.Mode().IsRegular() && stat.Nlink > 1 {
 		dirRecord, exists := HardLink(finfo)
@@ -62,21 +63,22 @@ func WriteFile(ds quantumfs.DataStore,
 		// this path is a hardlink
 		// WriteFile should write the file and then
 		// setup hardlink record
+		// only one thread will write the file
 		setHardLink = true
 	}
 
 	// detect object type specific writer
 	objType, objWriter, err := fileObjectInfo(path, finfo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("WriteFile object type detect failed: %v", err)
 	}
 
 	// use writer to write file blocks and file type
 	// specific metadata
-	fileKey, werr := objWriter(path, finfo, objType, ds)
+	fileKey, werr := objWriter(path, finfo, ds)
 	if werr != nil {
-		return nil, fmt.Errorf("Writer on %s failed: %s\n",
-			path, werr)
+		return nil, fmt.Errorf("WriteFile object writer %d for %q failed: %v\n",
+			objType, path, werr)
 	}
 
 	dirRecord := CreateNewDirRecord(finfo.Name(), stat.Mode,
@@ -86,7 +88,6 @@ func WriteFile(ds quantumfs.DataStore,
 		objType,
 		// retain times from input files to maintain same blob
 		// content for repeated writes
-		// NOTE(krishna): should we instead use time.Now()
 		quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
 		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
 		fileKey)
@@ -94,8 +95,7 @@ func WriteFile(ds quantumfs.DataStore,
 	// write xattrs if any
 	xattrsKey, xerr := WriteXAttrs(path, ds)
 	if xerr != nil {
-		return nil, fmt.Errorf("WriteXAttr failed on %s error:%s\n",
-			path, xerr)
+		return nil, xerr
 	}
 	if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		dirRecord.SetExtendedAttributes(xattrsKey)
@@ -103,11 +103,9 @@ func WriteFile(ds quantumfs.DataStore,
 
 	// initialize hardlink info from dirRecord
 	// must be last step as it needs a fully setup
-	// directory record
+	// directory record based on file content
 	if setHardLink {
-		// instead of typical directory record use
-		// a directory record which points to the
-		// hardlink info
+		// returned dir record
 		dirRecord = SetHardLink(finfo,
 			dirRecord.(*quantumfs.DirectRecord))
 	}
@@ -148,9 +146,10 @@ func writeFileBlocks(file *os.File, readLen uint64,
 			return nil, 0, err
 		}
 		if bytesRead != len(chunk) {
-			return nil, 0, fmt.Errorf("Read %s failed due to partial read."+
-				" ActualLen %d != ExpectedLen %d\n",
-				file.Name(), bytesRead, len(chunk))
+			return nil, 0,
+				fmt.Errorf("writeFileBlocks: Read %s failed due to partial read. "+
+					"Actual %d != Expected %d\n",
+					file.Name(), bytesRead, len(chunk))
 		}
 		key, bErr := writeBlob(chunk, quantumfs.KeyTypeData, ds)
 		if bErr != nil {

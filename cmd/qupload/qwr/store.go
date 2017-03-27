@@ -53,8 +53,8 @@ func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 	advance string, newWsrKey quantumfs.ObjectKey) error {
 
 	wsParts := strings.Split(ws, "/")
-	err := wsdb.BranchWorkspace(nil, "_null", "_null", "null",
-		wsParts[0], wsParts[1], wsParts[2])
+	err := wsdb.BranchWorkspace(nil, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, wsParts[0], wsParts[1], wsParts[2])
 	if err != nil {
 		return err
 	}

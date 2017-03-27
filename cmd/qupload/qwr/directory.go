@@ -3,6 +3,7 @@
 
 package qwr
 
+import "fmt"
 import "os"
 import "sync/atomic"
 import "syscall"
@@ -24,7 +25,8 @@ func WriteDirectory(path string, info os.FileInfo,
 			dirEntry.SetNumEntries(entryIdx)
 			key, err := writeBlob(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("WriteDirectory %q failed: %v",
+					path, err)
 			}
 			atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
 			dirEntry = quantumfs.NewDirectoryEntry()
@@ -39,7 +41,8 @@ func WriteDirectory(path string, info os.FileInfo,
 	dirEntry.SetNumEntries(entryIdx)
 	key, err := writeBlob(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("WriteDirectory %q failed: %v",
+			path, err)
 	}
 	atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
 
