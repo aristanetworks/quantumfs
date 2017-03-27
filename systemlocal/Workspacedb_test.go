@@ -49,7 +49,8 @@ func TestEmptyDB(t *testing.T) {
 		utils.Assert(num == 1, "Too many typespaces")
 
 		exists, err = db.TypespaceExists(nil, quantumfs.NullSpaceName)
-		utils.Assert(err == nil, "Error checking existence of typespace: %v", err)
+		utils.Assert(err == nil, "Error checking existence of typespace: %v",
+			err)
 		utils.Assert(exists, "Expected typespace not there")
 
 		exists, err = db.TypespaceExists(nil, "test")
