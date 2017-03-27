@@ -150,6 +150,17 @@ func (cw *cacheWsdb) BranchWorkspace(srcTypespace string, srcNamespace string,
 	return nil
 }
 
+func (cw *cacheWsdb) DeleteWorkspace(typespace string, namespace string,
+	workspace string) error {
+
+	if err := cw.base.DeleteWorkspace(typespace, namespace,
+		workspace); err != nil {
+		return err
+	}
+
+	cw.cache.DeleteEntities(typespace, namespace, workspace)
+	return nil
+}
 func (cw *cacheWsdb) Workspace(typespace string, namespace string,
 	workspace string) (wsdb.ObjectKey, error) {
 

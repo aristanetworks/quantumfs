@@ -112,3 +112,13 @@ func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
 	s.req.True(bytes.Equal(newRootID, emptyKey),
 		"New RootID isn't EmptyWorkspaceKey")
 }
+
+func (s *wsdbCommonIntegTest) TestIntegDeleteNullTypespace() {
+	err := s.db.DeleteWorkspace(wsdb.NullSpaceName, "ns1", "ws1")
+	s.req.Error(err, "Succeeded in deleting null workspace")
+}
+
+func (s *wsdbCommonIntegTest) TestIntegDeleteWorkspaceOK() {
+	err := s.db.DeleteWorkspace("ts1", "ns1", "ws1")
+	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
+}

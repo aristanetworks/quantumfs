@@ -49,6 +49,14 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegAdvanceOk() {
 	suite.common.TestIntegAdvanceOk()
 }
 
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteNullTypespace() {
+	suite.common.TestIntegDeleteNullTypespace()
+}
+
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteWorkspaceOK() {
+	suite.common.TestIntegDeleteWorkspaceOK()
+}
+
 func (suite *wsdbNoCacheIntegTestSuite) TearDownTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")

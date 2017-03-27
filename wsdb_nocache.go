@@ -143,9 +143,11 @@ func (nc *noCacheWsdb) WorkspaceExists(typespace string, namespace string,
 	return present, nil
 }
 
-func isTypespaceReserved(typespace string) bool {
-	// verify that this is not an attempt to alter the
-	// seed/first workspaceDB entry setup by ether implementation of workspaceDB
+// All workspaces under the wsdb.NullSpaceName
+// typespace are locked. They cannot be deleted,
+// cannot be advanced or cannot be destination
+// of branch operation
+func isTypespaceLocked(typespace string) bool {
 	return typespace == wsdb.NullSpaceName
 }
 
@@ -153,7 +155,7 @@ func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
 	srcNamespace string, srcWorkspace string,
 	dstTypespace string, dstNamespace string, dstWorkspace string) error {
 
-	if isTypespaceReserved(dstTypespace) {
+	if isTypespaceLocked(dstTypespace) {
 		return wsdb.NewError(wsdb.ErrLocked,
 			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
@@ -217,11 +219,29 @@ func (nc *noCacheWsdb) Workspace(typespace string, namespace string,
 	return key, nil
 }
 
+func (nc *noCacheWsdb) DeleteWorkspace(typespace string, namespace string,
+	workspace string) error {
+
+	if isTypespaceLocked(typespace) {
+		return wsdb.NewError(wsdb.ErrLocked,
+			"Delete failed: "+wsdb.NullSpaceName+" typespace is locked")
+	}
+
+	err := nc.wsdbKeyDel(typespace, namespace, workspace)
+	if err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Del in DeleteWorkspace %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
+	}
+
+	return nil
+}
+
 func (nc *noCacheWsdb) AdvanceWorkspace(typespace string,
 	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
-	if isTypespaceReserved(typespace) && currentRootID != nil {
+	if isTypespaceLocked(typespace) && currentRootID != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrLocked,
 			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
@@ -406,6 +426,19 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
 	}
 }
 
+func (nc *noCacheWsdb) wsdbKeyDel(typespace string,
+	namespace string, workspace string) error {
+
+	qryStr := fmt.Sprintf(`
+DELETE
+FROM %s.workspacedb
+WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace)
+
+	query := nc.store.session.Query(qryStr, typespace,
+		namespace, workspace)
+
+	return query.Exec()
+}
 func (nc *noCacheWsdb) wsdbKeyPut(typespace string,
 	namespace string, workspace string,
 	key []byte) error {

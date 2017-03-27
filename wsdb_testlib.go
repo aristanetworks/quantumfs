@@ -295,3 +295,14 @@ func (s *wsdbCommonUnitTest) TestInitialAdvanceWorkspace() {
 	s.req.Error(err,
 		"Succeeded in advancing null workspace after initial set")
 }
+
+func (s *wsdbCommonUnitTest) TestDeleteNullTypespace() {
+	err := s.wsdb.DeleteWorkspace(wsdb.NullSpaceName, "ns1", "ws1")
+	s.req.Error(err, "Succeeded in deleting null workspace")
+}
+
+func (s *wsdbCommonUnitTest) TestDeleteWorkspaceOK() {
+	mockWsdbKeyDel(s.mockSess, "ts1", "ns1", "ws1", nil)
+	err := s.wsdb.DeleteWorkspace("ts1", "ns1", "ws1")
+	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
+}

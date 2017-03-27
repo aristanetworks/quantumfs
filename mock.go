@@ -339,6 +339,23 @@ FROM ether.workspacedb
 WHERE typespace = ? AND namespace = ? LIMIT 1`, args).Return(query)
 }
 
+func mockWsdbKeyDel(sess *MockSession, typespace string,
+	namespace string, workspace string, err error) {
+
+	query := new(MockQuery)
+	stmt := `
+DELETE
+FROM ether.workspacedb
+WHERE typespace=? AND namespace=? AND workspace=?`
+	sess.On("Query", stmt,
+		[]interface{}{typespace, namespace, workspace}).Return(query)
+	if err == nil {
+		query.On("Exec").Return(nil)
+	} else {
+		query.On("Exec").Return(err)
+	}
+}
+
 func mockWsdbKeyGet(sess *MockSession, typespace string,
 	namespace string, workspace string, key []byte, err error) {
 

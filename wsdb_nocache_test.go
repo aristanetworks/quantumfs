@@ -85,6 +85,14 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheInitialAdvanceWorkspace() {
 	suite.common.TestInitialAdvanceWorkspace()
 }
 
+func (suite *wsdbNoCacheTestSuite) TestNoCacheDeleteNullTypespace() {
+	suite.common.TestDeleteNullTypespace()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheDeleteWorkspaceOK() {
+	suite.common.TestDeleteWorkspaceOK()
+}
+
 func (suite *wsdbNoCacheTestSuite) TearDownTest() {
 	resetCqlStore()
 }

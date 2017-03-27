@@ -521,11 +521,11 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 		"workspace list in cache is not empty")
 }
 
+// TestCacheParentDeleteDuringRefresh tests scenario of
+// delete "parentNS" namespace while DB refresh is underway
+// as part of getting list of workspaces for "parentNS" namespace
+// to ensure that list of workspaces is empty
 func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
-	// while refresh is underway as part of getting list of
-	// workspaces for "parentNS" namespace, delete "parentNS" namespace.
-	// The list of workspaces must be empty due to parent detachment
-	// detection
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
 		"childWS", []byte(nil), gocql.ErrNotFound)
@@ -571,11 +571,11 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 		"workspace list in cache is not empty")
 }
 
+// TestCacheAncestorDeleteDuringRefresh tests the scenario of
+// delete "null" typespace while DB refresh is underway as part of
+// getting list of workspaces for "parentNS" namespace to
+// ensure list of workspaces is empty
 func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
-	// while refresh is underway as part of getting list of
-	// workspaces for "parentNS" namespace, delete "null" typespace.
-	// The list of workspaces must be empty due to ancestor detachment
-	// detection
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
 		"childWS", []byte(nil), gocql.ErrNotFound)
@@ -621,10 +621,11 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 		"workspace list in cache is not empty")
 }
 
+// TestCacheChildDeleteDuringRefresh tests the scenario of
+// delete "childWS" workspace when DB refresh is
+// underway as part of getting list of namespaces for "ts" typespace
+// to ensure the list of namespaces is eempty
 func (suite *wsdbCacheTestSuite) TestCacheChildDeleteDuringRefresh() {
-	// while refresh is underway as part of getting list of
-	// namespaces for "ts" typespace, delete "childWS" workspace.
-	// The list of namspaces must be empty
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
 		"childWS", []byte(nil), gocql.ErrNotFound)
@@ -680,6 +681,51 @@ func (suite *wsdbCacheTestSuite) TestCacheLockedAdvance() {
 
 func (suite *wsdbCacheTestSuite) TestCacheInitialAdvanceWorkspace() {
 	suite.common.TestInitialAdvanceWorkspace()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheDeleteNullTypespace() {
+	suite.common.TestDeleteNullTypespace()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceOK() {
+	suite.common.TestDeleteWorkspaceOK()
+}
+
+// TestCacheDeleteWorkspaceNumOK tests if the cache is updated
+// properly when a workspace is deleted
+func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
+	mockBranchWorkspace(suite.common.mockSess,
+		wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1", []byte(nil),
+		gocql.ErrNotFound)
+	err := suite.common.wsdb.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
+	suite.Require().NoError(err,
+		"Error branching "+wsdb.NullSpaceName+" workspace: %v", err)
+
+	// disable fetches from DB so that cache state is unchanged
+	suite.cache.disableCqlRefresh(1 * time.Hour)
+	suite.cache.disableCqlRefresh(1*time.Hour, wsdb.NullSpaceName)
+	suite.cache.disableCqlRefresh(1*time.Hour, wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
+	suite.cache.disableCqlRefresh(1*time.Hour, "ts1")
+	suite.cache.disableCqlRefresh(1*time.Hour, "ts1", "ns1")
+
+	// cached APIs
+	tsCount, err1 := suite.common.wsdb.NumTypespaces()
+	suite.Require().NoError(err1, "NumTypespaces failed: %s", err1)
+	suite.Require().Equal(2, tsCount,
+		"Incorrect number of Typespaces. Exp: 2, Actual: %d", tsCount)
+
+	mockWsdbKeyDel(suite.common.mockSess, "ts1", "ns1", "ws1", nil)
+	err = suite.common.wsdb.DeleteWorkspace("ts1", "ns1", "ws1")
+	suite.Require().NoError(err, "Error in DeleteWorkspace: %v", err)
+
+	tsCount, err1 = suite.common.wsdb.NumTypespaces()
+	suite.Require().NoError(err1, "NumTypespaces failed: %s", err1)
+	// locally branched workspace should get deleted from cache
+	suite.Require().Equal(1, tsCount,
+		"Incorrect number of Typespaces. Exp: 1, Actual: %d", tsCount)
 }
 
 // TODO: once the APIs return errors, add appropriate test cases

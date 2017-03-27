@@ -8,6 +8,7 @@ package cql
 import (
 	"testing"
 
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -40,6 +41,40 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegBranching() {
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegAdvanceOk() {
 	suite.common.TestIntegAdvanceOk()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteNullTypespace() {
+	suite.common.TestIntegDeleteNullTypespace()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceOK() {
+	suite.common.TestIntegDeleteWorkspaceOK()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
+	err := suite.common.db.BranchWorkspace(wsdb.NullSpaceName,
+		wsdb.NullSpaceName, wsdb.NullSpaceName,
+		"ts1", "ns1", "ws1")
+	suite.Require().NoError(err,
+		"Error branching null workspace: %v", err)
+
+	count, err1 := suite.common.db.NumTypespaces()
+	suite.Require().NoError(err1,
+		"Error NumTypespaces: %v", err1)
+	suite.Require().Equal(2, count,
+		"Unexpected count of typespaces. Exp: 2 Actual: %d",
+		count)
+
+	delErr := suite.common.db.DeleteWorkspace("ts1", "ns1", "ws1")
+	suite.Require().NoError(delErr,
+		"Error DeleteWorkspace: %v", delErr)
+
+	count, err1 = suite.common.db.NumTypespaces()
+	suite.Require().NoError(err1,
+		"Error NumTypespaces: %v", err1)
+	suite.Require().Equal(1, count,
+		"Unexpected count of typespaces. Exp: 1 Actual: %d",
+		count)
 }
 
 func (suite *wsdbCacheIntegTestSuite) TearDownTest() {
