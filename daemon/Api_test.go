@@ -56,7 +56,7 @@ func TestApiClearAccessList(t *testing.T) {
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
 		api := test.getApi()
@@ -67,7 +67,7 @@ func TestApiClearAccessList(t *testing.T) {
 			"Error clearing accessList with api")
 		accessList = make(map[string]bool)
 		wsrlist = test.getAccessList(workspace)
-		test.AssertAccessList(accessList, wsrlist,
+		test.assertAccessList(accessList, wsrlist,
 			"Error maps not clear")
 	})
 }

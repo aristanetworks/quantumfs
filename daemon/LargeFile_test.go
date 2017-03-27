@@ -144,7 +144,7 @@ func TestLargeFileAttr(t *testing.T) {
 
 		// Read what should be all zeros
 		// stride offset to cause 1000 checks
-		test.CheckZeroSparse(testFilename, int(newSize)/1000)
+		test.checkZeroSparse(testFilename, int(newSize)/1000)
 
 		// Ensure that we can write data into the hole
 		testString := []byte("testData")
@@ -173,7 +173,7 @@ func TestLargeFileAttr(t *testing.T) {
 		err = api.Branch(test.relPath(workspace), dst)
 		test.Assert(err == nil, "Unable to branch")
 
-		test.CheckSparse(test.absPath(dst+"/test"), testFilename,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename,
 			int(newSize)/100, 10)
 	})
 }
