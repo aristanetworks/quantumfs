@@ -13,29 +13,29 @@ func specialCreate(test *testHelper, filetype uint32) {
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
 		0x12345678)
-	test.assert(err == nil, "Error creating node: %v", err)
+	test.Assert(err == nil, "Error creating node: %v", err)
 
 	confirm := func(filepath string, expectedNlink uint64) {
 		var stat syscall.Stat_t
 		err = syscall.Stat(filepath, &stat)
-		test.assert(err == nil, "Error stat'ing test file: %v", err)
-		test.assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
+		test.Assert(err == nil, "Error stat'ing test file: %v", err)
+		test.Assert(stat.Size == 0, "Incorrect Size: %d", stat.Size)
 
-		test.assert(stat.Nlink == expectedNlink, "Incorrect Nlink: %d",
+		test.Assert(stat.Nlink == expectedNlink, "Incorrect Nlink: %d",
 			stat.Nlink)
 
 		if filetype == syscall.S_IFBLK || filetype == syscall.S_IFCHR {
-			test.assert(stat.Rdev == 0x12345678,
+			test.Assert(stat.Rdev == 0x12345678,
 				"Node rdev incorrect %x", stat.Rdev)
 		} else {
-			test.assert(stat.Rdev == 0, "Node rdev incorrectly set %x",
+			test.Assert(stat.Rdev == 0, "Node rdev incorrectly set %x",
 				stat.Rdev)
 		}
 
 		var expectedPermissions uint32
 		expectedPermissions |= filetype
 		expectedPermissions |= syscall.S_IRWXU
-		test.assert(stat.Mode == expectedPermissions,
+		test.Assert(stat.Mode == expectedPermissions,
 			"File permissions incorrect. Expected %x got %x",
 			expectedPermissions, stat.Mode)
 	}
@@ -45,7 +45,7 @@ func specialCreate(test *testHelper, filetype uint32) {
 	// Ensure hardlinks work too
 	testLinkname := testFilename + "_link"
 	err = syscall.Link(testFilename, testLinkname)
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 	confirm(testLinkname, 2)
 
 	// Branch and confirm everything is still correct
@@ -83,7 +83,7 @@ func specialCreateFail(test *testHelper, filetype uint32) {
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
 		0x12345678)
-	test.assert(err != nil, "Unexpected success creating node")
+	test.Assert(err != nil, "Unexpected success creating node")
 }
 
 func TestDirectoryMknodCreation(t *testing.T) {

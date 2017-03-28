@@ -11,6 +11,7 @@ import "sync"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
@@ -38,7 +39,7 @@ type Directory struct {
 	// accessible in instantiateChild(), which may be called indirectly
 	// via qfs.inode() from a context where the Inode lock is already
 	// held.
-	childRecordLock DeferableMutex
+	childRecordLock utils.DeferableMutex
 	children        *ChildMap
 }
 
@@ -95,7 +96,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 		}
 	}
 
-	assert(dir.treeLock() != nil, "Directory treeLock nil at init")
+	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 
 	return uninstantiated
 }
@@ -205,7 +206,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		// linear approximately based upon the design document fixed field
 		// sizes, even though the real encoding is variable length.
 		attr.Size = 25 + 331*entry.Size()
-		attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+		attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 		attr.Nlink = uint32(entry.Size()) + 2
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
@@ -219,7 +220,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		// This ignore the datablocks containing the file metadata, which is
 		// relevant for medium, large and very large files.
 		attr.Size = entry.Size()
-		attr.Blocks = BlocksRoundUp(entry.Size(), statBlockSize)
+		attr.Blocks = utils.BlocksRoundUp(entry.Size(), statBlockSize)
 		attr.Nlink = entry.Nlinks()
 	}
 
@@ -242,40 +243,40 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 func permissionsToMode(permissions uint32) uint32 {
 	var mode uint32
 
-	if BitFlagsSet(uint(permissions), quantumfs.PermExecOther) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermExecOther) {
 		mode |= syscall.S_IXOTH
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermWriteOther) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermWriteOther) {
 		mode |= syscall.S_IWOTH
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermReadOther) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermReadOther) {
 		mode |= syscall.S_IROTH
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermExecGroup) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermExecGroup) {
 		mode |= syscall.S_IXGRP
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermWriteGroup) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermWriteGroup) {
 		mode |= syscall.S_IWGRP
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermReadGroup) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermReadGroup) {
 		mode |= syscall.S_IRGRP
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermExecOwner) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermExecOwner) {
 		mode |= syscall.S_IXUSR
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermWriteOwner) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermWriteOwner) {
 		mode |= syscall.S_IWUSR
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermReadOwner) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermReadOwner) {
 		mode |= syscall.S_IRUSR
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermSticky) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermSticky) {
 		mode |= syscall.S_ISVTX
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermSGID) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermSGID) {
 		mode |= syscall.S_ISGID
 	}
-	if BitFlagsSet(uint(permissions), quantumfs.PermSUID) {
+	if utils.BitFlagsSet(uint(permissions), quantumfs.PermSUID) {
 		mode |= syscall.S_ISUID
 	}
 
@@ -286,40 +287,40 @@ func modeToPermissions(mode uint32, umask uint32) uint32 {
 	var permissions uint32
 	mode = mode & ^umask
 
-	if BitFlagsSet(uint(mode), syscall.S_IXOTH) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IXOTH) {
 		permissions |= quantumfs.PermExecOther
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IWOTH) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IWOTH) {
 		permissions |= quantumfs.PermWriteOther
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IROTH) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IROTH) {
 		permissions |= quantumfs.PermReadOther
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IXGRP) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IXGRP) {
 		permissions |= quantumfs.PermExecGroup
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IWGRP) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IWGRP) {
 		permissions |= quantumfs.PermWriteGroup
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IRGRP) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IRGRP) {
 		permissions |= quantumfs.PermReadGroup
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IXUSR) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IXUSR) {
 		permissions |= quantumfs.PermExecOwner
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IWUSR) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IWUSR) {
 		permissions |= quantumfs.PermWriteOwner
 	}
-	if BitFlagsSet(uint(mode), syscall.S_IRUSR) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_IRUSR) {
 		permissions |= quantumfs.PermReadOwner
 	}
-	if BitFlagsSet(uint(mode), syscall.S_ISVTX) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_ISVTX) {
 		permissions |= quantumfs.PermSticky
 	}
-	if BitFlagsSet(uint(mode), syscall.S_ISGID) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_ISGID) {
 		permissions |= quantumfs.PermSGID
 	}
-	if BitFlagsSet(uint(mode), syscall.S_ISUID) {
+	if utils.BitFlagsSet(uint(mode), syscall.S_ISUID) {
 		permissions |= quantumfs.PermSUID
 	}
 
@@ -748,7 +749,8 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	// Verify the permission of the directory in order to delete a child
 	// If the sticky bit of the directory is set, the action can only be
 	// performed by file's owner, directory's owner, or root user
-	if checkStickyBit && BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
+	if checkStickyBit &&
+		utils.BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
 		owner.Uid != fileOwner && owner.Uid != dirOwner {
 
 		c.vlog("Sticky owners don't match: FAIL")
@@ -760,19 +762,19 @@ func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
 	if owner.Uid == dirOwner {
 		permWX = syscall.S_IWUSR | syscall.S_IXUSR
 		// Check the current directory having x and w permissions
-		if BitFlagsSet(uint(permission), uint(permWX)) {
+		if utils.BitFlagsSet(uint(permission), uint(permWX)) {
 			c.vlog("Has owner write: OK")
 			return fuse.OK
 		}
 	} else if owner.Gid == dirGroup {
 		permWX = syscall.S_IWGRP | syscall.S_IXGRP
-		if BitFlagsSet(uint(permission), uint(permWX)) {
+		if utils.BitFlagsSet(uint(permission), uint(permWX)) {
 			c.vlog("Has group write: OK")
 			return fuse.OK
 		}
 	} else { // all the other
 		permWX = syscall.S_IWOTH | syscall.S_IXOTH
-		if BitFlagsSet(uint(permission), uint(permWX)) {
+		if utils.BitFlagsSet(uint(permission), uint(permWX)) {
 			c.vlog("Has other write: OK")
 			return fuse.OK
 		}
@@ -966,15 +968,15 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 		}
 
 		c.dlog("Directory::Mknod Mode %x", input.Mode)
-		if BitFlagsSet(uint(input.Mode), syscall.S_IFIFO) ||
-			BitFlagsSet(uint(input.Mode), syscall.S_IFSOCK) ||
-			BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
-			BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
+		if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFIFO) ||
+			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFSOCK) ||
+			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
+			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
 
 			dir.create_(c, name, input.Mode, input.Umask, input.Rdev,
 				newSpecial, quantumfs.ObjectTypeSpecial,
 				quantumfs.ZeroKey, out)
-		} else if BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
+		} else if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
 			dir.create_(c, name, input.Mode, input.Umask, 0,
 				newSmallFile, quantumfs.ObjectTypeSmallFile,
 				quantumfs.EmptyBlockKey, out)
@@ -1691,7 +1693,7 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 		src: src,
 	}
 
-	assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
+	utils.Assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
 
 	return &ds
 }
@@ -1775,7 +1777,7 @@ func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	assert(true, "Illegal call on Directory::Write()")
+	utils.Assert(true, "Illegal call on Directory::Write()")
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
