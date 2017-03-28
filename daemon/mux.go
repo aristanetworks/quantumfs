@@ -297,15 +297,14 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	dirtyInode.inode.markClean()
 
 	if dirtyInode.shouldUninstantiate {
+		defer qfs.instantiationLock.Lock().Unlock()
 		qfs.uninstantiateInode_(c, inodeNum)
 	}
 }
 
-// Requires treeLock for read
+// Requires treeLock for read and the instantiationLock
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).out()
-
-	defer qfs.instantiationLock.Lock().Unlock()
 
 	inode := qfs.inodeNoInstantiate(c, inodeNum)
 	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
@@ -987,6 +986,8 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		qfs.c.dlog("inode %d lookup not zero yet", nodeID)
 		return
 	}
+
+	defer qfs.instantiationLock.Lock().Unlock()
 
 	if inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID)); inode != nil {
 		inode.queueToForget(&qfs.c)
