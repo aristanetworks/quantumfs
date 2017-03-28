@@ -1174,8 +1174,9 @@ func (test *testHelper) setUidGid(uid int, gid int) {
 	if uid != -1 {
 		err := syscall.Setreuid(-1, uid)
 		if err != nil {
-			syscall.Setregid(-1, 0)
+			err2 := syscall.Setregid(-1, 0)
 			runtime.UnlockOSThread()
+			test.assert(err2 == nil, "Failed to emergency set gid to 0")
 		}
 		test.assert(err == nil, "Failed to change test EUID: %v", err)
 	}

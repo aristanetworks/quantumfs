@@ -73,7 +73,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	defer c.funcIn("Special::Access").out()
 
 	special.self.markSelfAccessed(c, false)
-	access := openPermission(c, special, mask)
+	access := accessPermission(c, special, mask, uid)
 	if access {
 		return fuse.OK
 	}

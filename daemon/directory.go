@@ -425,7 +425,7 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 	defer c.funcIn("Directory::Access").out()
 
 	dir.markSelfAccessed(c, false)
-	access := openPermission(c, dir, mask)
+	access := accessPermission(c, dir, mask, uid)
 	if access {
 		return fuse.OK
 	}
