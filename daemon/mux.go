@@ -18,6 +18,7 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 const defaultCacheSize = 4096
@@ -732,7 +733,7 @@ func logRequestPanic(c *ctx) {
 	stackTrace := debug.Stack()
 
 	c.elog("ERROR: PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
-		fmt.Sprintf("%v", exception), BytesToString(stackTrace))
+		fmt.Sprintf("%v", exception), utils.BytesToString(stackTrace))
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
@@ -1492,7 +1493,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	}
 
 	return fileHandle.Read(c, input.Offset, input.Size,
-		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
+		buf, utils.BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
