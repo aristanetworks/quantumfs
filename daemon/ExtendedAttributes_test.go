@@ -278,7 +278,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 			quantumfs.ObjectTypeDirectoryEntry)
 
 		// check the symlink
-		sz, err, dst = utils.GetXattr(linkName, quantumfs.XAttrTypeKey,
+		sz, err, dst = utils.LGetXattr(linkName, quantumfs.XAttrTypeKey,
 			quantumfs.ExtendedKeyLength)
 		test.Assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the symlink key: %v with a size of %d",
