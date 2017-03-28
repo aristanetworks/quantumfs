@@ -104,10 +104,12 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 		const size = 64
 
 		// Add three XAttr to test the list function
-		err := utils.SetXattr(symlFilename, "security.one", []byte("TestOne"), 0)
+		err := utils.SetXattr(symlFilename, "security.one",
+			[]byte("TestOne"), 0)
 		test.Assert(err == nil,
 			"Error setting XAttr for list function: %v", err)
-		err = utils.SetXattr(symlFilename, "security.two", []byte("TestTwo"), 0)
+		err = utils.SetXattr(symlFilename, "security.two",
+			[]byte("TestTwo"), 0)
 		test.Assert(err == nil,
 			"Error setting XAttr for list function: %v", err)
 		err = utils.SetXattr(symlFilename,
