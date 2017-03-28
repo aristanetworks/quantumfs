@@ -10,7 +10,7 @@ import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func WriteDirectory(path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,

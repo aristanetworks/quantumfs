@@ -11,15 +11,6 @@ import "path/filepath"
 import "regexp"
 import "strings"
 
-// Given a bitflag field and an integer of flags, return whether the flags are set or
-// not as a boolean.
-func BitFlagsSet(field uint, flags uint) bool {
-	if field&flags == flags {
-		return true
-	}
-	return false
-}
-
 type ExcludeInfo struct {
 	re                  *regexp.Regexp
 	dirRecordCounts     map[string]int
