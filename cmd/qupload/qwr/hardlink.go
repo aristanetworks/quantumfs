@@ -44,7 +44,7 @@ func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
 	if !exists {
 
 		hardLinkInfoNextID++
-		// the FilInfo.Stat already indicates the
+		// the FileInfo.Stat already indicates the
 		// final link count for path but we start with 1
 		// since its possible that a writer selects only
 		// directories for upload and so the link count
@@ -109,7 +109,7 @@ func writeHardLinkInfo(ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error)
 			hle.SetNumEntries(entryIdx)
 			hle.SetNext(hleKey)
 
-			hleKey, err = writeBlob(hle.Bytes(),
+			hleKey, err = writeBlock(hle.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
 				return nil, err

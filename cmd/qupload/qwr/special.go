@@ -20,7 +20,7 @@ func specialFileWriter(path string, finfo os.FileInfo,
 	binary.LittleEndian.PutUint32(hash[4:8], uint32(stat.Rdev))
 
 	// all the information is embedded into key
-	// there are no blobs to be written here
+	// there are no blocks to be written here
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash),
 		nil
 }

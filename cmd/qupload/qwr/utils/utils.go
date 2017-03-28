@@ -62,7 +62,7 @@ func parseExcludeLine(line string) (string, bool) {
 	return parts[0], true
 }
 
-func LoadExcludeInfo(path string) (*ExcludeInfo, error) {
+func LoadExcludeInfo(base string, path string) (*ExcludeInfo, error) {
 
 	var r bytes.Buffer
 	var exInfo ExcludeInfo
@@ -86,9 +86,17 @@ func LoadExcludeInfo(path string) (*ExcludeInfo, error) {
 		}
 		word, ok := parseExcludeLine(line)
 		if !ok {
-			return nil, fmt.Errorf("Bad exclude line: %s in: %s:%d\n",
-				line, path, lineno)
+			return nil, fmt.Errorf("%s:%d Bad exclude line: %s",
+				path, lineno, line)
 		}
+
+		// check to ensure the path entry in exlcude file is valid
+		_, serr := os.Lstat(filepath.Join(base, word))
+		if serr != nil {
+			return nil, fmt.Errorf("%s:%d %v", path,
+				lineno, serr)
+		}
+
 		r.WriteString("^" + word + "|")
 		switch {
 		case strings.HasSuffix(word, "/"):

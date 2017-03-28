@@ -50,7 +50,7 @@ func vlFileWriter(path string,
 		vlf.SetLargeFileKey(i, mbfKeys[i])
 	}
 
-	vlfKey, vlfErr := writeBlob(vlf.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	vlfKey, vlfErr := writeBlock(vlf.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if vlfErr != nil {
 		return quantumfs.ZeroKey, vlfErr
 	}

@@ -86,7 +86,7 @@ func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 	return nil
 }
 
-func writeBlob(data []byte, keyType quantumfs.KeyType,
+func writeBlock(data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	key := quantumfs.NewObjectKey(keyType, hash.Hash(data))

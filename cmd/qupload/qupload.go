@@ -1,9 +1,9 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// qupload is a command line tool used to upload a file or directory heirarchy
+// qupload is a command line tool used to upload a file or directory hierarchy
 // into a datastore and workspace DB supported by QFS. This tool
-// does not require QFS instance to be available locally. The content
+// does not require an QFS instance to be available locally. The content
 // uploaded by this tool can be accessed using any QFS instance.
 package main
 
@@ -56,14 +56,24 @@ Exmaples:
 		   -basedir /var/Abuild/66778899 -exclude excludeFile
 Above command will upload the contents of /var/Abuild/66778899 directory
 to the QFS workspace build/eos-trunk/11223344. The files and directories
-specified by excludeFile are excluded from upload.
+specified by excludeFile are excluded from upload. See below for details about
+the exclude file format.
 
 2) qupload -workspace build/eos-trunk/11223344
 		   -basedir /var/Abuild/66778899 src
 Above command will upload the contents of /var/Abuild/66778899/src directory
-to the QFS workspace build/eos-trunk/11223344. The files and directories
-specified by excludeFile are excluded from upload. 
+to the QFS workspace build/eos-trunk/11223344. All files and sub-directories
+are included since an exclude file is not specified.
 
+The exclude file specifies paths that must be excluded from upload.
+The exclude file should be formatted based on following rules:
+
+One path per line
+Path must be relative to the base directory specified
+Absolute paths are not allowed
+To create a directory without its contents, specify / at the end of path
+To skip directory completely, specify directory name without trailing /
+Comments and empty lines are allowed
 `, version)
 	flag.PrintDefaults()
 }
@@ -175,7 +185,7 @@ func main() {
 	flag.StringVar(&cliParams.excludeFile, "exclude", "",
 		"Exclude the files and directories specified in this file")
 	flag.UintVar(&cliParams.conc, "concurrency", 10,
-		"Number of worker threads")
+		"Number of concurrent uploaders")
 
 	flag.Usage = showUsage
 	flag.Parse()
@@ -194,7 +204,8 @@ func main() {
 	relpath := ""
 	var exInfo *utils.ExcludeInfo
 	if cliParams.excludeFile != "" {
-		exInfo, err = utils.LoadExcludeInfo(cliParams.excludeFile)
+		exInfo, err = utils.LoadExcludeInfo(cliParams.baseDir,
+			cliParams.excludeFile)
 		if err != nil {
 			fmt.Println("Exclude file processing failed: ", err)
 			os.Exit(exitErrArgs)
@@ -215,7 +226,7 @@ func main() {
 				d1 = qwr.DataBytesWritten
 				m1 = qwr.MetadataBytesWritten
 				fmt.Printf("\rData: %12d Metadata: %12d "+
-					"Speed: %4d MB/s", d1, m1, speed)
+					"Speed: %5d MB/s", d1, m1, speed)
 				time.Sleep(1 * time.Second)
 				d2 = qwr.DataBytesWritten
 				m2 = qwr.MetadataBytesWritten

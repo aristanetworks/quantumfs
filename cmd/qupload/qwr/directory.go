@@ -23,7 +23,7 @@ func WriteDirectory(path string, info os.FileInfo,
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			dirEntry.SetNumEntries(entryIdx)
-			key, err := writeBlob(dirEntry.Bytes(),
+			key, err := writeBlock(dirEntry.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
 				return nil,
@@ -42,7 +42,7 @@ func WriteDirectory(path string, info os.FileInfo,
 	}
 
 	dirEntry.SetNumEntries(entryIdx)
-	key, err := writeBlob(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	key, err := writeBlock(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
 		return nil, fmt.Errorf("WriteDirectory %q failed: %v",
 			path, err)
@@ -88,7 +88,7 @@ func CreateNewDirRecord(name string, mode uint32,
 	entry.SetGroup(gid)
 	entry.SetSize(size)
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
-	// QFS doesn't store Atime currently
+	// QFS doesn't store Atime since its too expensive
 	entry.SetContentTime(ctime)
 	entry.SetModificationTime(mtime)
 

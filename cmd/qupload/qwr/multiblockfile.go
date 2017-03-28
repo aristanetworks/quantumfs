@@ -23,7 +23,7 @@ func mbFileBlocksWriter(file *os.File,
 	mbf.SetListOfBlocks(keys)
 	mbf.SetSizeOfLastBlock(lastBlockSize)
 
-	mbfKey, mbfErr := writeBlob(mbf.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	mbfKey, mbfErr := writeBlock(mbf.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if mbfErr != nil {
 		return quantumfs.ZeroKey, err
 	}

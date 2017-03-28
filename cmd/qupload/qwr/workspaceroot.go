@@ -24,7 +24,7 @@ func WriteWorkspaceRoot(rootDirKey quantumfs.ObjectKey,
 	// to access root's DirectoryEntry object is sufficient
 	wsr.SetBaseLayer(rootDirKey)
 	wsr.SetHardlinkEntry(hardLinkEntry)
-	wKey, werr := writeBlob(wsr.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	wKey, werr := writeBlock(wsr.Bytes(), quantumfs.KeyTypeMetadata, ds)
 	if werr != nil {
 		return quantumfs.ZeroKey,
 			fmt.Errorf("Write workspace root failed: %v", werr)

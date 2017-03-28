@@ -19,6 +19,17 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 
+// Overview about qupload tool's conncurrent nature:
+//
+// It uses "concurrency" number of goroutines and a walker goroutine
+// are in a errgroup. The walker sends "pathInfo"
+// over the channel and workers act on it. For each directory, state
+// is tracked until all its children are uploaded. When all children of
+// a parent are uploaded, the parent is uploaded and its state is no
+// longer tracked. Upload finishes when the top directory is uploaded.
+// walker generates directory state trackers worker writes blocks,
+// generates directory records and updates the directory state
+
 type pathInfo struct {
 	path string
 	info os.FileInfo
@@ -91,6 +102,9 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 		}
 
 		if !msg.info.IsDir() {
+			// WriteFile() will detect the file type based on
+			// stat information and setup appropriate data
+			// and metadata for the file in storage
 			record, err = qwr.WriteFile(dataStore,
 				msg.info, msg.path)
 			if err != nil {
@@ -142,7 +156,7 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error,
 	exInfo *utils.ExcludeInfo) error {
 
-	// when base is "./somebase" or "/somebase" or "somebase" then
+	// when basedir is "./somebase" or "/somebase" or "somebase" then
 	// pathWalker is called with path as "somebase" then path as
 	// "somebase/somedir" and so on
 	if err != nil {
@@ -186,7 +200,16 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 		}
 	}
 
-	// handle scenario of qupload of single file
+	// This section is an optimization for scenario where qupload
+	// is invoked to upload a single file. The optimization is that
+	// one doesn't need to specify an exclude file to exlude rest of the
+	// content in that directory. The qupload invocation would be
+	// qupload -basedir somedir .... filename
+	// in such case the pathWalker never gets a directory as input and
+	// so we need to special case it for setting up the directory
+	// state tracker
+	// This section isn't used when multiple files within the basedir
+	// are to be uploaded
 	if checkPath == "/" && info.Mode().IsRegular() {
 		parent := filepath.Dir(path)
 		parentInfo, perr := os.Lstat(parent)
@@ -209,14 +232,6 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	return nil
 }
 
-// "concurrency" number of goroutines and a walker goroutine
-// are used in an errgroup for upload. The walker sends "pathInfo"
-// over the channel and workers act on it. For each directory, state
-// is tracked until all its children are uploaded. When all children of
-// a parent are uploaded, the parent is uploaded and its state is no
-// longer tracked. Upload finishes when the top directory is uploaded.
-// walker generates directory state trackers
-// worker writes blobs, generates directory records and updates the directory state
 func upload(ws string, advance string, root string, exInfo *utils.ExcludeInfo,
 	conc uint) error {
 

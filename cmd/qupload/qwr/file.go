@@ -90,7 +90,7 @@ func WriteFile(ds quantumfs.DataStore,
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
 		objType,
-		// retain times from input files to maintain same blob
+		// retain times from input files to maintain same block
 		// content for repeated writes
 		quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
 		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
@@ -123,7 +123,7 @@ func writeFileBlocks(file *os.File, readLen uint64,
 
 	var keys []quantumfs.ObjectKey
 
-	// never attempt to read more than MaxBlobSize in each
+	// never attempt to read more than MaxBlockSize in each
 	// iteration below. The backing array doesn't ever need
 	// to increase beyond whats constructed here
 	var chunk []byte
@@ -156,7 +156,7 @@ func writeFileBlocks(file *os.File, readLen uint64,
 					"Actual %d != Expected %d\n",
 					file.Name(), bytesRead, len(chunk))
 		}
-		key, bErr := writeBlob(chunk, quantumfs.KeyTypeData, ds)
+		key, bErr := writeBlock(chunk, quantumfs.KeyTypeData, ds)
 		if bErr != nil {
 			return nil, 0, bErr
 		}
