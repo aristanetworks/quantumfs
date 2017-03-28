@@ -17,7 +17,7 @@ func TestAccessListFileCreate(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
@@ -32,7 +32,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		accessList := make(map[string]bool)
@@ -40,7 +40,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		absbworkspace := test.absPath(bworkspace)
 		path = absbworkspace + filename
 		file, err := os.Open(path)
-		test.assert(err == nil, "Open file error:%v", err)
+		test.Assert(err == nil, "Open file error:%v", err)
 		accessList[filename] = false
 		file.Close()
 		wsrlist := test.getAccessList(absbworkspace)
@@ -50,7 +50,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		accessList = make(map[string]bool)
 		path = workspace + filename
 		file, err = os.Open(path)
-		test.assert(err == nil, "Open file error%v", err)
+		test.Assert(err == nil, "Open file error%v", err)
 		file.Close()
 		accessList[filename] = true
 		wsrlist = test.getAccessList(workspace)
@@ -65,7 +65,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		accessList := make(map[string]bool)
@@ -73,7 +73,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		absbworkspace := test.absPath(bworkspace)
 		path = absbworkspace + filename
 		err = os.Remove(path)
-		test.assert(err == nil, "Remove file error:%v", err)
+		test.Assert(err == nil, "Remove file error:%v", err)
 		accessList[filename] = false
 		wsrlist := test.getAccessList(absbworkspace)
 		test.assertAccessList(accessList, wsrlist,
@@ -82,7 +82,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		accessList = make(map[string]bool)
 		path = workspace + filename
 		err = os.Remove(path)
-		test.assert(err == nil,
+		test.Assert(err == nil,
 			"Remove file error:%v", err)
 		accessList[filename] = true
 		wsrlist = test.getAccessList(workspace)
@@ -98,7 +98,7 @@ func TestAccessListDirectoryCreate(t *testing.T) {
 		dirname := "/test"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		accessList[dirname] = true
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
@@ -112,14 +112,14 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		dirname := "/test"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 
 		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.absPath(bworkspace)
 		path = absbworkspace + dirname
 		err = syscall.Rmdir(path)
-		test.assert(err == nil, "Delete directory error:%v", err)
+		test.Assert(err == nil, "Delete directory error:%v", err)
 		accessList[dirname] = false
 		wsrlist := test.getAccessList(absbworkspace)
 		test.assertAccessList(accessList, wsrlist,
@@ -128,7 +128,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		accessList = make(map[string]bool)
 		path = workspace + dirname
 		err = syscall.Rmdir(path)
-		test.assert(err == nil, "Delete directory error:%v", err)
+		test.Assert(err == nil, "Delete directory error:%v", err)
 		accessList[dirname] = true
 		wsrlist = test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
@@ -144,7 +144,7 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
 		err := os.MkdirAll(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		accessList[dir1] = true
 		accessList[dir1+dir2] = true
 		wsrlist := test.getAccessList(workspace)
@@ -160,14 +160,14 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
 		err := os.MkdirAll(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 
 		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.absPath(bworkspace)
 		path = absbworkspace + dir1
 		err = os.RemoveAll(path)
-		test.assert(err == nil, "Delete directory error:%v", err)
+		test.Assert(err == nil, "Delete directory error:%v", err)
 		accessList[dir1] = false
 		accessList[dir1+dir2] = false
 		wsrlist := test.getAccessList(absbworkspace)
@@ -177,7 +177,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		accessList = make(map[string]bool)
 		path = workspace + dir1
 		err = os.RemoveAll(path)
-		test.assert(err == nil, "Delete directory error:%v", err)
+		test.Assert(err == nil, "Delete directory error:%v", err)
 		accessList[dir1] = true
 		accessList[dir1+dir2] = true
 		wsrlist = test.getAccessList(workspace)
@@ -196,18 +196,18 @@ func TestAccessListMvChild(t *testing.T) {
 		filename3 := "/test3.c"
 		path := workspace + dirname1
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		path = workspace + dirname1 + filename1
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		path = workspace + dirname2
 		err = syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		path = workspace + dirname2 + filename2
 		fd, err = syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
@@ -216,7 +216,7 @@ func TestAccessListMvChild(t *testing.T) {
 		path1 := absbworkspace + dirname1 + filename1
 		path2 := absbworkspace + dirname2 + filename3
 		err = os.Rename(path1, path2)
-		test.assert(err == nil, "Move file error:%v", err)
+		test.Assert(err == nil, "Move file error:%v", err)
 		accessList[dirname1] = false
 		accessList[dirname2] = false
 		accessList[dirname1+filename1] = false
@@ -229,7 +229,7 @@ func TestAccessListMvChild(t *testing.T) {
 		path1 = workspace + dirname1 + filename1
 		path2 = workspace + dirname2 + filename3
 		err = os.Rename(path1, path2)
-		test.assert(err == nil, "Move file error:%v", err)
+		test.Assert(err == nil, "Move file error:%v", err)
 		accessList[dirname1] = true
 		accessList[dirname2] = true
 		accessList[dirname1+filename1] = true
@@ -249,10 +249,10 @@ func TestAccessListRename(t *testing.T) {
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		path = workspace + dirname + filename1
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
@@ -261,7 +261,7 @@ func TestAccessListRename(t *testing.T) {
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = os.Rename(path1, path2)
-		test.assert(err == nil, "Move file error:%v", err)
+		test.Assert(err == nil, "Move file error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename1] = false
 		accessList[dirname+filename2] = true
@@ -273,7 +273,7 @@ func TestAccessListRename(t *testing.T) {
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = os.Rename(path1, path2)
-		test.assert(err == nil, "Move file error:%v", err)
+		test.Assert(err == nil, "Move file error:%v", err)
 		accessList[dirname] = true
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
@@ -292,10 +292,10 @@ func TestAccessListHardLink(t *testing.T) {
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		path = workspace + dirname + filename1
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
@@ -304,7 +304,7 @@ func TestAccessListHardLink(t *testing.T) {
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = syscall.Link(path1, path2)
-		test.assert(err == nil, "Create hard link error:%v", err)
+		test.Assert(err == nil, "Create hard link error:%v", err)
 		accessList[dirname] = false
 		accessList[filename1] = false
 		accessList[dirname+filename1] = false
@@ -317,7 +317,7 @@ func TestAccessListHardLink(t *testing.T) {
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = syscall.Link(path1, path2)
-		test.assert(err == nil, "Create hard link error:%v", err)
+		test.Assert(err == nil, "Create hard link error:%v", err)
 		accessList[dirname] = true
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
@@ -335,10 +335,10 @@ func TestAccessListSymlink(t *testing.T) {
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		path = workspace + dirname + filename1
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
@@ -347,7 +347,7 @@ func TestAccessListSymlink(t *testing.T) {
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
-		test.assert(err == nil, "Create symlink error:%v", err)
+		test.Assert(err == nil, "Create symlink error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename2] = true
 		wsrlist := test.getAccessList(absbworkspace)
@@ -358,7 +358,7 @@ func TestAccessListSymlink(t *testing.T) {
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
-		test.assert(err == nil, "Create symlink error:%v", err)
+		test.Assert(err == nil, "Create symlink error:%v", err)
 		accessList[dirname] = true
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
@@ -376,27 +376,27 @@ func TestAccessSpecialFiles(t *testing.T) {
 		path := workspace + "/test1"
 		err := syscall.Mknod(path, syscall.S_IFBLK|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error:%v", err)
+		test.Assert(err == nil, "Make special file error:%v", err)
 		accessList["/test1"] = true
 
 		path = workspace + "/test2"
 		err = syscall.Mknod(path, syscall.S_IFCHR|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error:%v", err)
+		test.Assert(err == nil, "Make special file error:%v", err)
 
 		accessList["/test2"] = true
 
 		path = workspace + "/test3"
 		err = syscall.Mknod(path, syscall.S_IFSOCK|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error:%v", err)
+		test.Assert(err == nil, "Make special file error:%v", err)
 
 		accessList["/test3"] = true
 
 		path = workspace + "/test4"
 		err = syscall.Mknod(path, syscall.S_IFREG|syscall.S_IRWXU,
 			0x12345678)
-		test.assert(err == nil, "Make special file error:%v", err)
+		test.Assert(err == nil, "Make special file error:%v", err)
 
 		accessList["/test4"] = true
 
@@ -405,7 +405,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 		eq := reflect.DeepEqual(accessList, wsr.accessList)
 		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
 			accessList, wsr.accessList)
-		test.assert(eq,
+		test.Assert(eq,
 			"Error two maps not equal, map content:"+msg)
 	})
 }
@@ -418,21 +418,21 @@ func TestAccessListReadSymlink(t *testing.T) {
 		filename2 := "/test2.c"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
-		test.assert(err == nil, "Create directory error:%v", err)
+		test.Assert(err == nil, "Create directory error:%v", err)
 		path1 := workspace + dirname + filename1
 		fd, err := syscall.Creat(path1, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 		path2 := workspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
-		test.assert(err == nil, "Create symlink error:%v", err)
+		test.Assert(err == nil, "Create symlink error:%v", err)
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.absPath(bworkspace)
 		accessList := make(map[string]bool)
 		path2 = absbworkspace + dirname + filename2
 		path1, err = os.Readlink(path2)
-		test.assert(err == nil, "Read symlink error:%v", err)
+		test.Assert(err == nil, "Read symlink error:%v", err)
 		accessList[dirname] = false
 		accessList[dirname+filename2] = false
 		wsrlist := test.getAccessList(absbworkspace)
@@ -442,7 +442,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 		accessList = make(map[string]bool)
 		path2 = workspace + dirname + filename2
 		path1, err = os.Readlink(path2)
-		test.assert(err == nil, "Read symlink error:%v", err)
+		test.Assert(err == nil, "Read symlink error:%v", err)
 		accessList[dirname] = true
 		accessList[dirname+filename1] = true
 		accessList[dirname+filename2] = true
@@ -459,7 +459,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
@@ -467,7 +467,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		accessList := make(map[string]bool)
 		path = absbworkspace + filename
 		err = os.Remove(path)
-		test.assert(err == nil, "Remove file error:%v", err)
+		test.Assert(err == nil, "Remove file error:%v", err)
 		fd, err = syscall.Creat(path, 0666)
 		accessList[filename] = true
 		syscall.Close(fd)
@@ -478,7 +478,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		accessList = make(map[string]bool)
 		path = workspace + filename
 		err = os.Remove(path)
-		test.assert(err == nil, "Remove file error:%v", err)
+		test.Assert(err == nil, "Remove file error:%v", err)
 		fd, err = syscall.Creat(path, 0666)
 		accessList[filename] = true
 		syscall.Close(fd)
@@ -495,7 +495,7 @@ func TestAccessListClear(t *testing.T) {
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error:%v", err)
+		test.Assert(err == nil, "Create file error:%v", err)
 		accessList[filename] = true
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
