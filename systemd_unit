@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStartPre=/bin/mkdir -p /var/run/quantumfs /qfs
+ExecStartPre=/bin/mkdir -p /dev/shm/quantumfs /qfs
 ExecStart=/usr/sbin/quantumfsd \
 	  -datastore ether.cql -datastoreconf /etc/quantumfsd.conf \
 	  -workspaceDB ether.cql -workspaceDBconf /etc/quantumfsd.conf
