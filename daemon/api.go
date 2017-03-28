@@ -258,7 +258,7 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
-	defer c.funcIn("newApiHandle Enter").out()
+	defer c.funcIn("newApiHandle").out()
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
@@ -484,7 +484,7 @@ func (api *ApiHandle) syncAll(c *ctx) {
 }
 
 func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
-	defer c.funcIn("Api::insertInode Enter").out()
+	defer c.funcIn("Api::insertInode").out()
 
 	var cmd quantumfs.InsertInodeRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -558,7 +558,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 }
 
 func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
-	defer c.funcIn("Api::enableRootWrite Enter").out()
+	defer c.funcIn("Api::enableRootWrite").out()
 
 	var cmd quantumfs.EnableRootWriteRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -680,9 +680,14 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) {
 }
 
 func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) {
-	defer c.funcIn("Api::setWorkspaceImmutable Enter").out()
+	defer c.funcIn("Api::setWorkspaceImmutable").out()
 
 	var cmd quantumfs.SetWorkspaceImmutableRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
 	workspacePath := cmd.WorkspacePath
 	dst := strings.Split(workspacePath, "/")
 	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
