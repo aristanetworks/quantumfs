@@ -11,10 +11,12 @@ import "os"
 import "strings"
 import "syscall"
 import "testing"
-import "unsafe"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
+
+var _zero uintptr
 
 func TestExtendedAttrReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
