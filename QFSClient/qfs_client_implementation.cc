@@ -202,11 +202,11 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 
 	// make the input data aligned
 	char *subblk = reinterpret_cast<char*>(
-			aligned_alloc(blkSize, command.Size()));
+			aligned_alloc(kBlkSize, command.Size()));
 	memcpy(subblk, command.Data(), command.Size());
-	int tmpSize = (command.Size()/blkSize)*blkSize;
-	if(command.Size()%blkSize > 0)
-		tmpSize += blkSize;
+	int tmpSize = (command.Size()/kBlkSize)*kBlkSize;
+	if(command.Size()%kBlkSize > 0)
+		tmpSize += kBlkSize;
 
 	pthread_mutex_lock(&(this->mutex));
 	rtn = write(this->fd, (const char *)subblk, tmpSize);
@@ -239,7 +239,7 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 
 	// make the buffer align to page block for O_DIRECT
 	int tmpSize = 4096;
-	byte* data = reinterpret_cast<byte*>(aligned_alloc(blkSize, tmpSize));
+	byte* data = reinterpret_cast<byte*>(aligned_alloc(kBlkSize, tmpSize));
 	char tmp[4096];
 
 	rtn = tmpSize;
