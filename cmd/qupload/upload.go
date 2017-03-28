@@ -42,12 +42,12 @@ type dirEntryTracker struct {
 }
 
 var dirEntryTrackers = make(map[string]*dirEntryTracker)
-var mutex utils.DeferableMutex
+var dirStateMutex utils.DeferableMutex
 var topDirRecord quantumfs.DirectoryRecord
 var rootTracker = true
 
 func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
-	defer mutex.Lock().Unlock()
+	defer dirStateMutex.Lock().Unlock()
 	dirEntryTrackers[path] = &dirEntryTracker{
 		records: make([]quantumfs.DirectoryRecord, 0, recordCount),
 		info:    info,
@@ -56,17 +56,22 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 	rootTracker = false
 }
 
-// mutex over directory state must be held
 func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
-	tracker, ok := dirEntryTrackers[path]
-	if !ok {
-		panic(fmt.Sprintf("BUG: Directory state tracker must "+
-			"exist for %q", path))
-	}
+	var err error
+	defer dirStateMutex.Lock().Unlock()
 
-	tracker.records = append(tracker.records, record)
-	if len(tracker.records) == cap(tracker.records) {
-		record, err := qwr.WriteDirectory(path, tracker.info,
+	for {
+		tracker, ok := dirEntryTrackers[path]
+		if !ok {
+			panic(fmt.Sprintf("BUG: Directory state tracker must "+
+				"exist for %q", path))
+		}
+
+		tracker.records = append(tracker.records, record)
+		if len(tracker.records) != cap(tracker.records) {
+			return nil
+		}
+		record, err = qwr.WriteDirectory(path, tracker.info,
 			tracker.records, dataStore)
 		if err != nil {
 			return err
@@ -76,13 +81,10 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 			topDirRecord = record
 			return nil
 		}
-		// this might be the last directory entry for parent
-		err = handleDirRecord(record, filepath.Dir(path))
-		if err != nil {
-			return err
-		}
+		// we flushed current dir which could be the last
+		// subdir for parent
+		path = filepath.Dir(path)
 	}
-	return nil
 }
 
 func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
@@ -126,10 +128,7 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 				quantumfs.EmptyDirKey)
 		}
 
-		err = func() error {
-			defer mutex.Lock().Unlock()
-			return handleDirRecord(record, filepath.Dir(msg.path))
-		}()
+		err = handleDirRecord(record, filepath.Dir(msg.path))
 		if err != nil {
 			return err
 		}
