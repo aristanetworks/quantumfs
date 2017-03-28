@@ -15,7 +15,7 @@ import "unsafe"
 var _zero uintptr
 
 // a customized symlink XAttribute set command
-func SetXattr(path string, attr string, data []byte, flags int) (err error) {
+func LSetXattr(path string, attr string, data []byte, flags int) (err error) {
 	var path_str_ptr *byte
 	path_str_ptr, err = syscall.BytePtrFromString(path)
 	if err != nil {
@@ -45,7 +45,7 @@ func SetXattr(path string, attr string, data []byte, flags int) (err error) {
 }
 
 // a customized symlink XAttribute get command
-func GetXattr(path string, attr string,
+func LGetXattr(path string, attr string,
 	size int) (sz int, err error, output []byte) {
 	var path_str_ptr *byte
 	path_str_ptr, err = syscall.BytePtrFromString(path)
@@ -78,7 +78,7 @@ func GetXattr(path string, attr string,
 }
 
 // a customized symlink XAttribute list command
-func ListXattr(path string, size int) (sz int, err error, output []byte) {
+func LListXattr(path string, size int) (sz int, err error, output []byte) {
 	var path_str_ptr *byte
 	path_str_ptr, err = syscall.BytePtrFromString(path)
 	if err != nil {
@@ -103,7 +103,7 @@ func ListXattr(path string, size int) (sz int, err error, output []byte) {
 }
 
 // create a customized symlink XAttribute remove command
-func RemoveXattr(path string, attr string) (err error) {
+func LRemoveXattr(path string, attr string) (err error) {
 	var path_str_ptr *byte
 	path_str_ptr, err = syscall.BytePtrFromString(path)
 	if err != nil {
@@ -117,6 +117,97 @@ func RemoveXattr(path string, attr string) (err error) {
 	_, _, e1 := syscall.Syscall(syscall.SYS_LREMOVEXATTR,
 		uintptr(unsafe.Pointer(path_str_ptr)),
 		uintptr(unsafe.Pointer(attr_str_ptr)), 0)
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}
+
+// golang syscall library doesn't provide xattr syscalls which
+// accept fd, hence we use these custom functions
+
+func FSetXattr(fd int, attr string, data []byte, flags int) (err error) {
+	var attr_str_ptr *byte
+	attr_str_ptr, err = syscall.BytePtrFromString(attr)
+	if err != nil {
+		return
+	}
+	var data_buf_ptr unsafe.Pointer
+	if len(data) > 0 {
+		data_buf_ptr = unsafe.Pointer(&data[0])
+	} else {
+		data_buf_ptr = unsafe.Pointer(&_zero)
+	}
+	_, _, e1 := syscall.Syscall6(syscall.SYS_FSETXATTR,
+		uintptr(fd),
+		uintptr(unsafe.Pointer(attr_str_ptr)),
+		uintptr(data_buf_ptr), uintptr(len(data)), uintptr(flags), 0)
+
+	if e1 != 0 {
+		err = e1
+	}
+	return
+}
+
+func FGetXattr(fd int, attr string,
+	size int) (sz int, err error, output []byte) {
+
+	var attr_str_ptr *byte
+	attr_str_ptr, err = syscall.BytePtrFromString(attr)
+	if err != nil {
+		return
+	}
+	var dest_buf_ptr unsafe.Pointer
+	dest := make([]byte, size, size*2)
+	if size > 0 {
+		dest_buf_ptr = unsafe.Pointer(&dest[0])
+	} else {
+		dest_buf_ptr = unsafe.Pointer(&_zero)
+	}
+	r0, _, e1 := syscall.Syscall6(syscall.SYS_FGETXATTR,
+		uintptr(fd), uintptr(unsafe.Pointer(attr_str_ptr)),
+		uintptr(dest_buf_ptr), uintptr(len(dest)), 0, 0)
+
+	sz = int(r0)
+	if e1 != 0 {
+		err = e1
+	}
+	if sz > 0 {
+		dest = dest[:sz]
+	}
+	output = dest
+	return
+}
+
+func FListXattr(fd int, size int) (sz int, err error, output []byte) {
+	var dest_buf_ptr unsafe.Pointer
+	dest := make([]byte, size, size*2)
+	if size > 0 {
+		dest_buf_ptr = unsafe.Pointer(&dest[0])
+	} else {
+		dest_buf_ptr = unsafe.Pointer(&_zero)
+	}
+	r0, _, e1 := syscall.Syscall(syscall.SYS_FLISTXATTR,
+		uintptr(fd), uintptr(dest_buf_ptr), uintptr(len(dest)))
+	sz = int(r0)
+	if e1 != 0 {
+		err = e1
+	}
+	if sz > 0 {
+		dest = dest[:sz]
+	}
+	output = dest
+	return
+}
+
+func FRemoveXattr(fd int, attr string) (err error) {
+	var attr_str_ptr *byte
+	attr_str_ptr, err = syscall.BytePtrFromString(attr)
+	if err != nil {
+		return
+	}
+	_, _, e1 := syscall.Syscall(syscall.SYS_FREMOVEXATTR,
+		uintptr(fd), uintptr(unsafe.Pointer(attr_str_ptr)), 0)
 	if e1 != 0 {
 		err = e1
 	}

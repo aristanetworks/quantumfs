@@ -58,30 +58,30 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 		// Test the consistance b/t Unix and QuantumFS
 		// The reference about namespace can be found on
 		// http://man7.org/linux/man-pages/man7/xattr.7.html
-		err := utils.SetXattr(symlFilename, "user.one", data, 0)
+		err := utils.LSetXattr(symlFilename, "user.one", data, 0)
 		test.Assert(err != nil,
 			"Error setting XAttr not supposed to run")
 
 		// verify the normal namespace "security"
-		err = utils.SetXattr(symlFilename, "security.one", data, 0)
+		err = utils.LSetXattr(symlFilename, "security.one", data, 0)
 		test.Assert(err == nil, "Error setting XAttr: %v", err)
 
 		// verify the attribute is actually stored
-		_, err, output := utils.GetXattr(symlFilename, "security.one", size)
+		_, err, output := utils.LGetXattr(symlFilename, "security.one", size)
 		test.Assert(err == nil && bytes.Contains(output, data),
 			"Error getting the Xattribute for symlink: %v, %s",
 			err, output)
 
 		// Try to get non-existing attribute
-		_, err, output = utils.GetXattr(symlFilename, "security.two", size)
+		_, err, output = utils.LGetXattr(symlFilename, "security.two", size)
 		test.Assert(err != nil,
 			"Error getting non-existing Xattribute for symlink: %v, %s",
 			err, output)
 
 		// Switch Content of the assigned attribute
-		err = utils.SetXattr(symlFilename, "security.one", data2, 0)
+		err = utils.LSetXattr(symlFilename, "security.one", data2, 0)
 		test.Assert(err == nil, "Error reset XAttr: %v", err)
-		_, err, output = utils.GetXattr(symlFilename, "security.one", size)
+		_, err, output = utils.LGetXattr(symlFilename, "security.one", size)
 		test.Assert(err == nil && !bytes.Contains(output, data) &&
 			bytes.Contains(output, data2),
 			"Error get reset XAttr: %v, %s", err, output)
@@ -103,19 +103,19 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 		const size = 64
 
 		// Add three XAttr to test the list function
-		err := utils.SetXattr(symlFilename, "security.one",
+		err := utils.LSetXattr(symlFilename, "security.one",
 			[]byte("TestOne"), 0)
 		test.Assert(err == nil,
 			"Error setting XAttr for list function: %v", err)
-		err = utils.SetXattr(symlFilename, "security.two",
+		err = utils.LSetXattr(symlFilename, "security.two",
 			[]byte("TestTwo"), 0)
 		test.Assert(err == nil,
 			"Error setting XAttr for list function: %v", err)
-		err = utils.SetXattr(symlFilename,
+		err = utils.LSetXattr(symlFilename,
 			"security.three", []byte("TestThree"), 0)
 		test.Assert(err == nil,
 			"Error setting XAttr for list function: %v", err)
-		_, err, output := utils.ListXattr(symlFilename, size)
+		_, err, output := utils.LListXattr(symlFilename, size)
 		test.Assert(err == nil &&
 			bytes.Contains(output, []byte("security.one")) &&
 			bytes.Contains(output, []byte("security.two")) &&
@@ -123,10 +123,10 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 			"Error listing all of XAttr: %v, %s", err, output)
 
 		// verify the removing function
-		err = utils.RemoveXattr(symlFilename, "security.two")
+		err = utils.LRemoveXattr(symlFilename, "security.two")
 		test.Assert(err == nil, "Error removing XAttr: %v, %s", err, output)
 
-		_, err, output = utils.ListXattr(symlFilename, size)
+		_, err, output = utils.LListXattr(symlFilename, size)
 		test.Assert(err == nil &&
 			bytes.Contains(output, []byte("security.one")) &&
 			!bytes.Contains(output, []byte("security.two")) &&
@@ -134,10 +134,10 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 			"Error listing rest of XAttr: %v, %s", err, output)
 
 		// verify the attempt to remove non-existing attribute
-		err = utils.RemoveXattr(symlFilename, "security.two")
+		err = utils.LRemoveXattr(symlFilename, "security.two")
 		test.Assert(err != nil, "Error removing XAttr: %v", err)
 
-		_, err, output = utils.ListXattr(symlFilename, size)
+		_, err, output = utils.LListXattr(symlFilename, size)
 		test.Assert(err == nil &&
 			bytes.Contains(output, []byte("security.one")) &&
 			!bytes.Contains(output, []byte("security.two")) &&
