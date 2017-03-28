@@ -22,7 +22,6 @@ const R_OK = 4
 const W_OK = 2
 const X_OK = 1
 const F_OK = 0
-
 // Given a bitflag field and an integer of flags, return whether the flags are set or
 // not as a boolean.
 func BitFlagsSet(field uint, flags uint) bool {
@@ -237,7 +236,30 @@ func findFuseConnection(c *ctx, mountPath string) int {
 }
 
 func openPermission(c *ctx, inode Inode, flags_ uint32) bool {
-	defer c.FuncIn("File::openPermission", "%d", inode.inodeNum()).out()
+	return openPermissionUid(c, inode, flags_, c.fuseCtx.Owner.Uid)
+}
+
+func accessPermission(c *ctx, inode Inode, mode uint32, uid uint32) bool {
+	// translate access flags into open flags and return the result
+	flags := uint32(syscall.O_ACCMODE)
+	if mode & R_OK != 0 && mode & W_OK != 0 {
+		flags |= syscall.O_RDWR
+	} else if mode & R_OK != 0 {
+		flags |= syscall.O_RDONLY
+	} else if mode & W_OK != 0 {
+		flags |= syscall.O_WRONLY
+	}
+
+	if mode & X_OK != 0 {
+		flags |= FMODE_EXEC
+	}
+
+	return openPermissionUid(c, inode, flags, uid)
+}
+
+func openPermissionUid(c *ctx, inode Inode, flags_ uint32, uid uint32) bool {
+	defer c.FuncIn("File::openPermission", "inode %d, uid %d", inode.inodeNum(),
+		uid).out()
 
 	record, error := inode.parentGetChildRecordCopy(c, inode.inodeNum())
 	if error != nil {
@@ -245,7 +267,7 @@ func openPermission(c *ctx, inode Inode, flags_ uint32) bool {
 		return false
 	}
 
-	if c.fuseCtx.Owner.Uid == 0 {
+	if uid == 0 {
 		c.vlog("Root permission check, allowing")
 		return true
 	}
@@ -281,6 +303,6 @@ func openPermission(c *ctx, inode Inode, flags_ uint32) bool {
 	}
 
 	success := userAccess || execAccess
-	c.vlog("Permission check result %d", success)
+	c.vlog("Permission check result %v %v", userAccess, execAccess)
 	return success
 }

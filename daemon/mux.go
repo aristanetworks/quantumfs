@@ -1085,7 +1085,6 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 	name string) (result fuse.Status) {
 
 	result = fuse.EIO
-
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 	defer c.FuncIn("Mux::Unlink", "Enter Inode %d Name %s", header.NodeId,

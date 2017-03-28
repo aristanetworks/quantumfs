@@ -91,7 +91,7 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32,
 	defer c.funcIn("File::Access").out()
 
 	fi.markSelfAccessed(c, false)
-	access := openPermission(c, fi, mask)
+	access := accessPermission(c, fi, mask, uid)
 	if access {
 		return fuse.OK
 	}
