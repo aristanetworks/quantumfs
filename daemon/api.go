@@ -38,7 +38,7 @@ type ApiInode struct {
 func fillApiAttr(c *ctx, attr *fuse.Attr) {
 	attr.Ino = quantumfs.InodeIdApi
 	attr.Size = uint64(atomic.LoadInt64(&c.qfs.apiFileSize))
-	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 
 	now := time.Now()
 	attr.Atime = uint64(now.Unix())
@@ -115,7 +115,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	// Verify that O_DIRECT is actually set
-	if !BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
+	if !utils.BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
 		c.elog("FAIL setting O_DIRECT in File descriptor")
 		return fuse.EINVAL
 	}
@@ -434,7 +434,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		responseSize = api.deleteWorkspace(c, buf)
 	case quantumfs.CmdSetBlock:
 		c.vlog("Received SetBlock request")
-		aresponseSize = pi.setBlock(c, buf)
+		responseSize = api.setBlock(c, buf)
 	case quantumfs.CmdGetBlock:
 		c.vlog("Received GetBlock request")
 		responseSize = api.getBlock(c, buf)
@@ -623,7 +623,7 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 	defer c.qfs.mutabilityLock.Lock().Unlock()
 	c.qfs.workspaceMutability[workspacePath] = true
 
-	api.queueErrorResponse(quantumfs.ErrorOK,
+	return api.queueErrorResponse(quantumfs.ErrorOK,
 		"Enable Workspace Write Permission Succeeded")
 }
 

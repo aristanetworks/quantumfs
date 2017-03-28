@@ -64,13 +64,13 @@ func generateFiles(test *testHelper, size int, workspace,
 		expectedSize += len(filename)
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
-		test.assert(err == nil, "Create file error: %v at %s",
+		test.Assert(err == nil, "Create file error: %v at %s",
 			err, filename)
 		accessList[filename] = true
 		syscall.Close(fd)
 	}
 
-	test.assert(len(accessList) == size, "Fail creating correct "+
+	test.Assert(len(accessList) == size, "Fail creating correct "+
 		"accesslist with size of %d", len(accessList))
 
 	wsrlist := test.getAccessList(workspace)
@@ -96,10 +96,10 @@ func TestApiAccessListEmpty(t *testing.T) {
 		relpath := test.relPath(workspace)
 
 		responselist, err := api.GetAccessed(relpath)
-		test.assert(err == nil, "Error getting accessList with api")
+		test.Assert(err == nil, "Error getting accessList with api")
 
 		expectedSize := 0
-		test.assert(mapKeySizeSum(responselist) == expectedSize,
+		test.Assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
 
@@ -122,9 +122,9 @@ func TestApiAccessListLargeSize(t *testing.T) {
 		relpath := test.relPath(workspace)
 
 		responselist, err := api.GetAccessed(relpath)
-		test.assert(err == nil, "Error getting accessList with api")
+		test.Assert(err == nil, "Error getting accessList with api")
 
-		test.assert(mapKeySizeSum(responselist) == expectedSize,
+		test.Assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
 
@@ -147,7 +147,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 
 		responselist, _ := api.GetAccessed(relpath)
 		queueSize1 := atomic.LoadInt64(&test.qfs.apiFileSize)
-		test.assert(mapKeySizeSum(responselist) == expectedSize,
+		test.Assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
 
@@ -156,7 +156,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 
 		test.qfs.setFileHandle(&test.qfs.c, 7, nil)
 		queueSize2 := atomic.LoadInt64(&test.qfs.apiFileSize)
-		test.assert(queueSize1 >= int64(expectedSize) && queueSize2 == 0,
+		test.Assert(queueSize1 >= int64(expectedSize) && queueSize2 == 0,
 			"The apiFileSize: %d %d, the actual response size: %d)",
 			queueSize1, queueSize2, expectedSize)
 	})
@@ -190,7 +190,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		relpath2 := test.relPath(workspace2)
 		api2 := test.getUniqueApi(workspace2 + "/api")
 		defer api2.Close()
-		test.assert(api != api2, "Error getting the same file descriptor")
+		test.Assert(api != api2, "Error getting the same file descriptor")
 
 		go func() {
 			defer wg.Done()
@@ -199,7 +199,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 			initFileSize2 = int(
 				atomic.LoadInt64(&test.qfs.apiFileSize))
 			_, err := api2.GetAccessed(relpath2)
-			test.assert(err == nil, "Error getting accessList with api2")
+			test.Assert(err == nil, "Error getting accessList with api2")
 			endFileSize2 = int(
 				atomic.LoadInt64(&test.qfs.apiFileSize))
 		}()
@@ -212,9 +212,9 @@ func TestApiAccessListConcurrent(t *testing.T) {
 
 		wg.Wait()
 
-		test.assert(err == nil, "Error getting accessList with api")
+		test.Assert(err == nil, "Error getting accessList with api")
 
-		test.assert(mapKeySizeSum(responselist) == expectedSize,
+		test.Assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
 
@@ -226,7 +226,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		// starts at the same point, they will share the same prior
 		// apiFileSize. Only if their partial reads interleave, will the
 		// posterior apiFileSizes be the same
-		test.assert(initFileSize == initFileSize2 &&
+		test.Assert(initFileSize == initFileSize2 &&
 			endFileSize == endFileSize2 && endFileSize != 0,
 			"Error two api's aren't running in concurrent %d %d %d %d",
 			initFileSize, initFileSize2, endFileSize, endFileSize2)
@@ -587,7 +587,7 @@ func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
 			syscall.O_DIRECT, 0)
-		test.assert(err == nil, "Error opening api file: %v", err)
+		test.Assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
 
 		buf := make([]byte, 0, 256)
@@ -600,22 +600,22 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
 			syscall.O_DIRECT|syscall.O_NONBLOCK, 0)
-		test.assert(err == nil, "Error opening api file: %v", err)
+		test.Assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
 
 		// The file has set O_DIRECT flag, so the kernel won't trigger
 		// Read() if the client buffer is zero
 		buf := make([]byte, 0, 256)
 		n, err := api.Read(buf)
-		test.assert(n == 0, "Wrong number of bytes read: %d", n)
-		test.assert(err == nil,
+		test.Assert(n == 0, "Wrong number of bytes read: %d", n)
+		test.Assert(err == nil,
 			"Non-blocking read api without requests error:%v", err)
 
 		// Give the client buffer space to read from QuantumFs server
 		buf = make([]byte, 256)
 		api.Write(buf)
 		n, err = api.Read(buf)
-		test.assert(n == 0, "Wrong number of bytes read: %d", n)
+		test.Assert(n == 0, "Wrong number of bytes read: %d", n)
 		if runtime.Version() != "go1.7.3" {
 			test.Assert(err.(*os.PathError).Err == syscall.EAGAIN,
 				"Non-blocking read api without requests error:%v",
