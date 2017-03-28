@@ -128,10 +128,10 @@ func WriteXAttrs(path string,
 					path, err)
 		}
 
-		dataKey, bErr := writeBlob(xattrData, quantumfs.KeyTypeData, ds)
+		dataKey, bErr := writeBlock(xattrData, quantumfs.KeyTypeData, ds)
 		if bErr != nil {
 			return quantumfs.EmptyBlockKey,
-				fmt.Errorf("Write xattrs (blob write) %q "+
+				fmt.Errorf("Write xattrs (block write) %q "+
 					"for %q failed: %v", xattrName,
 					path, err)
 		}
@@ -141,7 +141,7 @@ func WriteXAttrs(path string,
 		xattrMetadata.SetNumAttributes(i + 1)
 	}
 
-	xKey, xerr := writeBlob(xattrMetadata.Bytes(),
+	xKey, xerr := writeBlock(xattrMetadata.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if xerr != nil {
 		return quantumfs.EmptyBlockKey,

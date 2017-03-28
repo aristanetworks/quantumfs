@@ -14,5 +14,5 @@ func symlinkFileWriter(path string, finfo os.FileInfo,
 	if err != nil {
 		return quantumfs.ZeroKey, err
 	}
-	return writeBlob([]byte(pointedTo), quantumfs.KeyTypeMetadata, ds)
+	return writeBlock([]byte(pointedTo), quantumfs.KeyTypeMetadata, ds)
 }
