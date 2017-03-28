@@ -8,7 +8,6 @@ import "fmt"
 import "os"
 import "io/ioutil"
 import "path/filepath"
-import "sync"
 import "syscall"
 import "time"
 
@@ -17,7 +16,8 @@ import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
+import qwrutils "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 // Overview about qupload tool's conncurrent nature:
 //
@@ -42,13 +42,12 @@ type dirEntryTracker struct {
 }
 
 var dirEntryTrackers = make(map[string]*dirEntryTracker)
-var mutex sync.Mutex
+var mutex utils.DeferableMutex
 var topDirRecord quantumfs.DirectoryRecord
 var rootTracker = true
 
 func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
-	mutex.Lock()
-	defer mutex.Unlock()
+	defer mutex.Lock().Unlock()
 	dirEntryTrackers[path] = &dirEntryTracker{
 		records: make([]quantumfs.DirectoryRecord, 0, recordCount),
 		info:    info,
@@ -128,8 +127,7 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 		}
 
 		err = func() error {
-			mutex.Lock()
-			defer mutex.Unlock()
+			defer mutex.Lock().Unlock()
 			return handleDirRecord(record, filepath.Dir(msg.path))
 		}()
 		if err != nil {
@@ -154,7 +152,7 @@ func relativePath(path string, base string) (string, error) {
 
 func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error,
-	exInfo *utils.ExcludeInfo) error {
+	exInfo *qwrutils.ExcludeInfo) error {
 
 	// when basedir is "./somebase" or "/somebase" or "somebase" then
 	// pathWalker is called with path as "somebase" then path as
@@ -232,7 +230,7 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(ws string, advance string, root string, exInfo *utils.ExcludeInfo,
+func upload(ws string, advance string, root string, exInfo *qwrutils.ExcludeInfo,
 	conc uint) error {
 
 	group, groupCtx := errgroup.WithContext(context.Background())

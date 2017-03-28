@@ -5,11 +5,11 @@ package qwr
 
 import "encoding/binary"
 import "os"
-import "sync"
 import "sync/atomic"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 type HardLinkID uint64
 
@@ -26,7 +26,7 @@ var hardLinkInfoMap = make(map[uint64]*HardLinkInfo)
 var hardLinkInfoNextID HardLinkID
 
 // needed for a concurrent client of qwr
-var hardLinkInfoMutex sync.Mutex
+var hardLinkInfoMutex utils.DeferableMutex
 
 func encodeHardLinkID(id HardLinkID) quantumfs.ObjectKey {
 	var hash [quantumfs.ObjectKeyLength - 1]byte
@@ -36,8 +36,7 @@ func encodeHardLinkID(id HardLinkID) quantumfs.ObjectKey {
 }
 
 func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
-	hardLinkInfoMutex.Lock()
-	defer hardLinkInfoMutex.Unlock()
+	defer hardLinkInfoMutex.Lock().Unlock()
 
 	stat := finfo.Sys().(*syscall.Stat_t)
 	hlinfo, exists := hardLinkInfoMap[stat.Ino]
@@ -77,8 +76,7 @@ func SetHardLink(finfo os.FileInfo,
 	record *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
 
 	// need locks to protect the map
-	hardLinkInfoMutex.Lock()
-	defer hardLinkInfoMutex.Unlock()
+	defer hardLinkInfoMutex.Lock().Unlock()
 
 	// only one caller will do a SetHardLink
 	stat := finfo.Sys().(*syscall.Stat_t)
