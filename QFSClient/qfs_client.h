@@ -73,7 +73,7 @@ enum ErrorCode {
 
 	// The file should be open with O_DIRECT, but the O_DIRECT is missing in
 	// the actual mode
-	kMissDirectMode = 16,
+	kMissDirectMode = 17,
 };
 
 /// An `Error` object is returned by many member functions of the Api class. The

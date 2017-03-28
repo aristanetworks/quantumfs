@@ -113,7 +113,7 @@ func (api *ApiInode) Rmdir(c *ctx, name string) fuse.Status {
 func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	// Verify that ODIRECT is actually set
+	// Verify that O_DIRECT is actually set
 	if !BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
 		c.elog("FAIL setting O_DIRECT in File descriptor")
 		return fuse.EINVAL
@@ -296,7 +296,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	c.vlog("Received read request on Api")
 	// Read() returns nil only if there is no response. There are two cases:
-	// 1. The offset is zero and channel api.responses is nil;
+	// 1. The offset is zero and channel api.responses is empty;
 	// 2. Buffer api.currentResponse finishes reading.
 	if (offset == 0 && len(api.responses) == 0) ||
 		(offset > 0 && offset >= uint64(len(api.currentResponse))) {

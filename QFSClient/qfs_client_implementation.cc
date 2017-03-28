@@ -140,30 +140,26 @@ Error ApiImpl::Open() {
 		}
 	}
 
-	pthread_mutex_lock(&(this->mutex));
+	pthread_mutex_lock(&this->fdMutex);
 	if (this->fd < 0) {
 		this->fd = open(this->path.c_str(), O_RDWR|O_DIRECT);
-		if (this->fd < 0)
+		if (this->fd < 0) {
+			pthread_mutex_unlock(&this->fdMutex);
 			return util::getError(kCantOpenApiFile, this->path);
-
-		pthread_mutex_unlock(&(this->mutex));
-
-		int flags = fcntl(fd, F_GETFL, 0);
-		if(flags&O_DIRECT  == 0)
-			return util::getError(kMissDirectMode, this->path);
+		}
 	}
-	pthread_mutex_unlock(&(this->mutex));
+	pthread_mutex_unlock(&this->fdMutex);
 
 	return util::getError(kSuccess);
 }
 
 void ApiImpl::Close() {
-	pthread_mutex_lock(&(this->mutex));
+	pthread_mutex_lock(&this->fdMutex);
 	if(this->fd >= 0) {
 		close(this->fd);
 		this->fd = -1;
 	}
-	pthread_mutex_unlock(&(this->mutex));
+	pthread_mutex_unlock(&this->fdMutex);
 }
 
 Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
@@ -188,18 +184,6 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 }
 
 Error ApiImpl::WriteCommand(const CommandBuffer &command) {
-	pthread_mutex_lock(&(this->mutex));
-	if (this->fd < 0) {
-		pthread_mutex_unlock(&(this->mutex));
-		return util::getError(kApiFileNotOpen);
-	}
-
-	int rtn = lseek(this->fd, 0, SEEK_SET);
-	pthread_mutex_unlock(&(this->mutex));
-	if (rtn == -1) {
-		return util::getError(kApiFileSeekFail, this->path);
-	}
-
 	// make the input data aligned
 	char *subblk = reinterpret_cast<char*>(
 			aligned_alloc(kBlkSize, command.Size()));
@@ -208,9 +192,19 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 	if(command.Size()%kBlkSize > 0)
 		tmpSize += kBlkSize;
 
-	pthread_mutex_lock(&(this->mutex));
+	pthread_mutex_lock(&this->fdMutex);
+	if (this->fd < 0) {
+		pthread_mutex_unlock(&this->fdMutex);
+		return util::getError(kApiFileNotOpen);
+	}
+
+	int rtn = lseek(this->fd, 0, SEEK_SET);
+	if (rtn == -1) {
+		return util::getError(kApiFileSeekFail, this->path);
+	}
+
 	rtn = write(this->fd, (const char *)subblk, tmpSize);
-	pthread_mutex_unlock(&(this->mutex));
+	pthread_mutex_unlock(&this->fdMutex);
 	free(subblk);
 	if (rtn != tmpSize) {
 		return util::getError(kApiFileWriteFail, this->path);
@@ -222,60 +216,55 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	ErrorCode err = kSuccess;
 
-	pthread_mutex_lock(&(this->mutex));
-	if (this->fd < 0) {
-		pthread_mutex_unlock(&(this->mutex));
-		return util::getError(kApiFileNotOpen);
-	}
-
-	int rtn = lseek(this->fd, 0, SEEK_SET);
-	pthread_mutex_unlock(&(this->mutex));
-	if (rtn == -1) {
-		return util::getError(kApiFileSeekFail);
-	}
-
 	// read up to 4k at a time, stopping on EOF
 	command->Reset();
 
 	// make the buffer align to page block for O_DIRECT
 	int tmpSize = 4096;
 	byte* data = reinterpret_cast<byte*>(aligned_alloc(kBlkSize, tmpSize));
-	char tmp[4096];
+
+	pthread_mutex_lock(&this->fdMutex);
+	if (this->fd < 0) {
+		pthread_mutex_unlock(&this->fdMutex);
+		return util::getError(kApiFileNotOpen);
+	}
+
+	int rtn = lseek(this->fd, 0, SEEK_SET);
+	if (rtn == -1)
+		return util::getError(kApiFileSeekFail);
 
 	rtn = tmpSize;
 	while(rtn == tmpSize) {
-		pthread_mutex_lock(&(this->mutex));
+		// clean the old memory record
+		memset(data, 0, tmpSize);
+
 		rtn = read(this->fd, data, tmpSize);
-		pthread_mutex_unlock(&(this->mutex));
 		if (rtn == 0) {  // finish the loop when EOF
-			break;
+			goto end;
 		} else if (rtn < 0) {
 			// any read failure *except* an EOF is a failure
-			free(data);
-			return util::getError(kApiFileReadFail, this->path);
+			err = kApiFileReadFail;
+			goto end;
 		}
 
-		// copy the content from the aligned buffer to a normal buffer and
 		// get the accurate length of the return response
-		memset(tmp, 0, tmpSize);
-		memcpy(tmp, data, rtn);
-		rtn = static_cast<int>(strlen(tmp));
+		rtn = static_cast<int>(strlen((const char*)data));
 		if (rtn < tmpSize)  // take the end of '\0' into account
 			rtn += 1;
 		else
 			rtn = tmpSize;
 
 		size_t size = (size_t)rtn;
-		err = command->Append(reinterpret_cast<byte*>(tmp), size);
+		err = command->Append(data, size);
 
-		if (err != kSuccess) {
-			free(data);
-			return util::getError(err);
-		}
+		if (err != kSuccess)
+			goto end;
 	}
-	free(data);
 
-	return util::getError(err);
+end:
+	pthread_mutex_unlock(&this->fdMutex);
+	free(data);
+	return util::getError(err, this->path);
 }
 
 Error ApiImpl::DeterminePath() {
