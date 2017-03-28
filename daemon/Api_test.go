@@ -17,7 +17,6 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
 
 func TestWorkspaceBranching(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -310,7 +309,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 
 	// get the key from a Symlink
 	keyS := make([]byte, quantumfs.ExtendedKeyLength)
-	sz, err, keyS := utils.LGetXattr(linkFilename, quantumfs.XAttrTypeKey,
+	sz, err, keyS := lGetXattr(linkFilename, quantumfs.XAttrTypeKey,
 		quantumfs.ExtendedKeyLength)
 	test.Assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 		"Error getting the Key of symlink: %v with a size of %d",
