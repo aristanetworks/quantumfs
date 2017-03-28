@@ -237,6 +237,11 @@ func (th *TestHelper) absPath(path string) string {
 }
 
 // Make the given path relative to the mount root
+func (th *TestHelper) RelPath(path string) string {
+	return th.relPath(path)
+}
+
+// Make the given path relative to the mount root
 func (th *TestHelper) relPath(path string) string {
 	return strings.TrimPrefix(path, th.TempDir+"/mnt/")
 }
@@ -281,6 +286,10 @@ func (th *TestHelper) newWorkspaceWithoutWritePerm() string {
 	return th.absPath(dst)
 }
 
+func (th *TestHelper) NewWorkspace() string {
+	return th.newWorkspace()
+}
+
 // Create a new workspace to test within
 //
 // Returns the absolute path of the workspace
@@ -322,12 +331,28 @@ func (th *TestHelper) branchWorkspace(original string) string {
 	return dst
 }
 
+func (th *TestHelper) SyncAllWorkspaces() {
+	th.syncAllWorkspaces()
+}
+
 // Sync all the active workspaces
 func (th *TestHelper) syncAllWorkspaces() {
 	api := th.getApi()
 	err := api.SyncAll()
 
 	th.Assert(err == nil, "Error when syncing all workspaces: %v", err)
+}
+
+func (th *TestHelper) GetWorkspaceDB() quantumfs.WorkspaceDB {
+	return th.qfs.config.WorkspaceDB
+}
+
+func (th *TestHelper) SetDataStore(ds quantumfs.DataStore) {
+	th.qfs.c.dataStore.durableStore = ds
+}
+
+func (th *TestHelper) GetDataStore() quantumfs.DataStore {
+	return th.qfs.c.dataStore.durableStore
 }
 
 // Global test request ID incremented for all the running tests

@@ -281,7 +281,6 @@ func (th *testHelper) getInode(path string) Inode {
 	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
-// Retrieve the rootId of the given workspace
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	workspace string) quantumfs.ObjectKey {
 

@@ -4,12 +4,15 @@
 package walker
 
 import "flag"
+import "fmt"
 import "os"
+import "reflect"
 import "runtime"
 import "strings"
 import "testing"
 import "time"
 
+import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
@@ -84,32 +87,112 @@ func (th *testHelper) testHelperUpcast(
 }
 
 // TODO(sid)
-// Test Walk of Dir
 // Test Walk of File
+// Test Walk of Dir
+// Test Walk of Dir with 2 files
 // Test Walk of MedFile
 // Test Walk of VeryLargeFile
 // Test Walk of HardLink
 // Test walk of small random dir structure
 
-// Just a dummy Test. Replace with real walker related test.
-func TestFileWriteBlockSize(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
+type testDataStore struct {
+	datastore quantumfs.DataStore
+	test      *testHelper
+	keys      map[quantumfs.ObjectKey]int
+}
 
+func newTestDataStore(test *testHelper, ds quantumfs.DataStore) *testDataStore {
+	return &testDataStore{
+		datastore: ds,
+		test:      test,
+		keys:      make(map[quantumfs.ObjectKey]int, 200),
+	}
+}
+
+func (store *testDataStore) flushKeys() {
+	store.keys = make(map[quantumfs.ObjectKey]int, 200)
+}
+
+func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buf quantumfs.Buffer) error {
+
+	return store.datastore.Get(c, key, buf)
+}
+
+func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buf quantumfs.Buffer) error {
+
+	store.keys[key] = 1
+	return store.datastore.Set(c, key, buf)
+}
+
+// Just a dummy Test. Replace with real walker related test.
+func TestFileWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		tds := newTestDataStore(test, ds)
+
+		test.SetDataStore(tds)
+
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "testwsize"
+		testFilename2 := workspace + "/" + "testwsize2"
 		file, err := os.Create(testFilename)
+		file2, err := os.Create(testFilename2)
+		tds.flushKeys()
+
 		test.Assert(file != nil && err == nil,
 			"Error creating file: %v", err)
 		defer file.Close()
-
 		data := []byte("HowdY")
-
+		data2 := []byte("idahsjdgsahjHowdY")
 		sz, err := file.Write(data)
+		_, _ = file2.Write(data2)
+
 		test.Assert(err == nil, "Error writing to new fd: %v", err)
 		test.Assert(sz == len(data), "Incorrect numbers of blocks written:",
 			" expected:%d   actual:%d,  %v", len(data), sz, err)
 		test.AssertLogContains("operateOnBlocks offset 0 size 5",
 			"Write block size not expected")
+
+		test.SyncAllWorkspaces()
+		finfo, err := os.Stat(testFilename)
+		fmt.Println("Size of the file is ", finfo.Size())
+		var walkMap = make(map[quantumfs.ObjectKey]int)
+		walkFunc := func(path string, key quantumfs.ObjectKey, size uint64) error {
+			walkMap[key] = 1
+			fmt.Println("Key while walking", path, " ", key)
+			return nil
+		}
+
+		workspace = test.RelPath(workspace)
+		fmt.Printf("%v\n", workspace)
+		fmt.Printf("%v\n", testFilename)
+		root := strings.Split(workspace, "/")
+		fmt.Printf("%v\n", db)
+		fmt.Printf("%v==%v==%v\n", root[0], root[1], root[2])
+		rootID, err := db.Workspace(nil, root[0], root[1], root[2])
+		//		rootID := th.workspaceRootId(root[0], root[1], root[2])
+		test.Assert(err == nil, "Error getting rootID for %v: %v",
+			root, err)
+
+		fmt.Println(rootID.String())
+
+		err = Walk(ds, db, rootID, walkFunc)
+		test.Assert(err == nil, "Error in walk: %v", err)
+
+		for k := range tds.keys {
+			fmt.Println("tds:", k)
+		}
+
+		for k := range walkMap {
+			fmt.Println("walk:", k)
+		}
+		eq := reflect.DeepEqual(tds.keys, walkMap)
+		test.Assert(eq == true, "2 maps are not equal")
+
+		fmt.Println(walkMap)
 	})
 }
 
