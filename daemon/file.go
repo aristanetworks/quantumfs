@@ -10,6 +10,7 @@ import "errors"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -66,7 +67,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 	file.self = &file
 	file.setParent(parent.inodeNum())
 
-	assert(file.treeLock() != nil, "File treeLock nil at init")
+	utils.Assert(file.treeLock() != nil, "File treeLock nil at init")
 
 	return &file
 }
@@ -166,7 +167,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 		c.vlog("Got file lock")
 
-		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			if attr.Size != fi.accessor.fileLength() {
 				updateMtime = true
 			}
@@ -742,7 +743,7 @@ func newFileDescriptor(file *File, inodeNum InodeId,
 		file: file,
 	}
 
-	assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	utils.Assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
 	return fd
 }
 
