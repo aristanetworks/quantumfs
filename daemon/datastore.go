@@ -6,10 +6,10 @@ package daemon
 import "container/list"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import capn "github.com/glycerine/go-capnproto"
 
 var zeros []byte
