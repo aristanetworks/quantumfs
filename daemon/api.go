@@ -14,6 +14,7 @@ import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewApiInode(treeLock *sync.RWMutex, parent InodeId) Inode {
@@ -26,7 +27,7 @@ func NewApiInode(treeLock *sync.RWMutex, parent InodeId) Inode {
 	}
 	api.self = &api
 	api.setParent(parent)
-	assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
+	utils.Assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
 
@@ -268,7 +269,7 @@ func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 		},
 		responses: make(chan fuse.ReadResult, 10),
 	}
-	assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
+	utils.Assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
 	return &api
 }
 

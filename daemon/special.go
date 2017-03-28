@@ -11,6 +11,7 @@ import "errors"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
@@ -53,7 +54,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	}
 	special.self = &special
 	special.setParent(parent.inodeNum())
-	assert(special.treeLock() != nil, "Special treeLock nil at init")
+	utils.Assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
 		dirRecord.SetID(special.embedDataIntoKey_(c))
@@ -290,7 +291,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
 	attr.Size = 0
-	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
 
 	filetype, dev := decodeSpecialKey(entry.ID())
