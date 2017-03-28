@@ -3,51 +3,11 @@
 
 package qwr
 
-import "fmt"
 import "strings"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
-
-func ConnectDatastore(name string,
-	config string) (quantumfs.DataStore, error) {
-
-	for _, datastore := range thirdparty_backends.Datastores {
-		if datastore.Name != name {
-			continue
-		}
-
-		store := datastore.Constructor(config)
-		if store == nil {
-			return nil, fmt.Errorf("Datastore connection "+
-				"failed '%s:%s'\n", name, config)
-		}
-		return store, nil
-	}
-
-	return nil, fmt.Errorf("Failed to find datastore '%s'\n", name)
-}
-
-func ConnectWorkspaceDB(name string,
-	config string) (quantumfs.WorkspaceDB, error) {
-
-	for _, db := range thirdparty_backends.WorkspaceDBs {
-		if db.Name != name {
-			continue
-		}
-
-		ws := db.Constructor(config)
-		if ws == nil {
-			return nil, fmt.Errorf("WorkspaceDB connection "+
-				"failed '%s:%s'\n", name, config)
-		}
-		return ws, nil
-	}
-
-	return nil, fmt.Errorf("Failed to find workspaceDB '%s'\n", name)
-}
 
 func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 	advance string, newWsrKey quantumfs.ObjectKey) error {
