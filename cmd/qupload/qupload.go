@@ -17,7 +17,6 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 // Various exit reasons returned to the shell as exit code
@@ -203,9 +202,9 @@ func main() {
 	}
 
 	relpath := ""
-	var exInfo *utils.ExcludeInfo
+	var exInfo *ExcludeInfo
 	if cliParams.excludeFile != "" {
-		exInfo, err = utils.LoadExcludeInfo(cliParams.baseDir,
+		exInfo, err = LoadExcludeInfo(cliParams.baseDir,
 			cliParams.excludeFile)
 		if err != nil {
 			fmt.Println("Exclude file processing failed: ", err)
