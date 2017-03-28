@@ -14,14 +14,14 @@ func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 	inodeMap *map[string]InodeId) InodeId {
 
 	id, exists := (*inodeMap)[name]
-	test.assert(exists, "Fail to get the inodeId of %s", space)
+	test.Assert(exists, "Fail to get the inodeId of %s", space)
 
 	inode := test.qfs.inodeNoInstantiate(c, id)
 	if mustBeInstantiated {
-		test.assert(inode != nil,
+		test.Assert(inode != nil,
 			"The %s should be instantiated", space)
 	} else {
-		test.assert(inode == nil,
+		test.Assert(inode == nil,
 			"The %s should be uninstantiated", space)
 	}
 
@@ -38,16 +38,16 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		workspace := test.newWorkspace()
 		type_, name_, work_ := test.getWorkspaceComponents(workspace)
 		_, exists := tsl.typespacesByName[type_]
-		test.assert(!exists,
+		test.Assert(!exists,
 			"Error getting a non-existing inodeId of typespace")
 
 		// Creating a file in the new workspace can trigger updateChildren
-		// in workspacelisting. Map within will be updated, so inodes in
-		// the proceeding workspace will be valid right now.
+		// in workspacelisting. Map within will be updated, so inodes in the
+		// proceeding workspace will be valid right now.
 		workspace1 := test.newWorkspace()
 		testFilename := workspace1 + "/" + "test"
 		err := syscall.Mkdir(testFilename, 0124)
-		test.assert(err == nil, "Error creating directories: %v", err)
+		test.Assert(err == nil, "Error creating directories: %v", err)
 
 		// Verify that the typespace has been assigned an ID to but not
 		// instantiated yet. If the inode is not created, there is no
@@ -58,7 +58,7 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		// Instantiate the three inodes and verify the existence
 		testFilename = workspace + "/" + "test"
 		err = syscall.Mkdir(testFilename, 0124)
-		test.assert(err == nil, "Error creating directories: %v", err)
+		test.Assert(err == nil, "Failed creating directories: %v", err)
 
 		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
 			"typespace", true, &tsl.typespacesByName)
