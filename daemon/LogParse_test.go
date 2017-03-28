@@ -17,6 +17,7 @@ import "syscall"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 func trimToStr(test *testHelper, logs []string, boundary string) []string {
 	boundaryCount := 0
@@ -31,7 +32,7 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 			boundaryCount++
 		}
 	}
-	test.assert(boundaryCount == 2, "Miscount of boundary markers %d",
+	test.Assert(boundaryCount == 2, "Miscount of boundary markers %d",
 		boundaryCount)
 	return logs[boundaryStart : boundaryEnd+1]
 }
@@ -43,7 +44,7 @@ func TestMaxStringFail_test(t *testing.T) {
 		test.qfs.c.wlog("%s %d", longStr, 255)
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
-		test.assert(strings.Contains(testLogs,
+		test.Assert(strings.Contains(testLogs,
 			"Packet has been clipped"),
 			"Over length string doesn't cause last parameter to drop")
 	})
@@ -56,7 +57,7 @@ func TestMaxStringLast_test(t *testing.T) {
 		test.qfs.c.wlog("%s", longStr)
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
-		test.assert(strings.Contains(testLogs,
+		test.Assert(strings.Contains(testLogs,
 			"Log data exceeds allowable length"),
 			"Over length string doesn't trigger warning")
 	})
@@ -85,20 +86,20 @@ func TestQParse(t *testing.T) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.Assert(err == nil, "Error creating file: %v", err)
 		syscall.Close(fd)
 
 		data := genData(1024)
-		err = printToFile(testFilename, string(data))
-		test.assert(err == nil, "Couldn't write 1KB data to file")
+		err = testutils.PrintToFile(testFilename, string(data))
+		test.Assert(err == nil, "Couldn't write 1KB data to file")
 
-		test.log("This is a test string, %d", 12345)
+		test.Log("This is a test string, %d", 12345)
 
 		err = os.Truncate(testFilename, 0)
-		test.assert(err == nil, "Couldn't truncate file to zero")
+		test.Assert(err == nil, "Couldn't truncate file to zero")
 
 		_, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Unable to read file contents")
+		test.Assert(err == nil, "Unable to read file contents")
 
 		test.qfs.c.wlog(testLogBoundary)
 
@@ -118,10 +119,10 @@ func TestQParse(t *testing.T) {
 		// Trim any lines outside of our "comparison boundaries"
 		testLogLines = trimToStr(test, testLogLines, testLogBoundary)
 		logOutLines = trimToStr(test, logOutLines, testLogBoundary)
-		test.assert(len(testLogLines) == len(logOutLines),
+		test.Assert(len(testLogLines) == len(logOutLines),
 			"log length mismatch %d %d", len(testLogLines),
 			len(logOutLines))
-		test.assert(len(testLogLines) > 2, "trimToStr not working")
+		test.Assert(len(testLogLines) > 2, "trimToStr not working")
 
 		debugStr := ""
 		for i := 0; i < len(logOutLines); i++ {
@@ -148,7 +149,7 @@ func TestQParse(t *testing.T) {
 					}
 				}
 
-				test.assert(false, "Qparse/stdout mismatch:\n%s\n"+
+				test.Assert(false, "Qparse/stdout mismatch:\n%s\n"+
 					" |%v| |%v|", debugStr,
 					[]byte(logOutLines[i]),
 					[]byte(testLogLines[i]))
@@ -171,20 +172,20 @@ func TestQParsePartials_test(t *testing.T) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
-		test.assert(err == nil, "Error creating file: %v", err)
+		test.Assert(err == nil, "Error creating file: %v", err)
 		syscall.Close(fd)
 
 		data := genData(1024)
-		err = printToFile(testFilename, string(data))
-		test.assert(err == nil, "Couldn't write 1KB data to file")
+		err = testutils.PrintToFile(testFilename, string(data))
+		test.Assert(err == nil, "Couldn't write 1KB data to file")
 
-		test.log("This is a test string, %d", 12345)
+		test.Log("This is a test string, %d", 12345)
 
 		err = os.Truncate(testFilename, 0)
-		test.assert(err == nil, "Couldn't truncate file to zero")
+		test.Assert(err == nil, "Couldn't truncate file to zero")
 
 		_, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Unable to read file contents")
+		test.Assert(err == nil, "Unable to read file contents")
 
 		// Now grab the log file
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
@@ -194,7 +195,7 @@ func TestQParsePartials_test(t *testing.T) {
 		count := 0
 		// Check to see if we see dropped packets interspersed with good ones
 		for i := 0; i < len(testLogLines); i++ {
-			test.assert(len(testLogLines[i]) < 6 ||
+			test.Assert(len(testLogLines[i]) < 6 ||
 				strings.Compare(testLogLines[i][:6], "File::") != 0,
 				"Not all File:: packets are broken")
 
@@ -207,7 +208,7 @@ func TestQParsePartials_test(t *testing.T) {
 			droppedEntry = isPartial
 		}
 
-		test.assert(count >= 5,
+		test.Assert(count >= 5,
 			"Unable to confidently prove partial packet reading")
 	})
 }
@@ -218,7 +219,7 @@ func TestBooleanLogType(t *testing.T) {
 		test.qfs.c.wlog("booleans %t %t", true, false)
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
-		test.assert(strings.Contains(testLogs, "booleans true false"),
+		test.Assert(strings.Contains(testLogs, "booleans true false"),
 			"boolean log types incorrectly output: %s", testLogs)
 	})
 }
