@@ -22,7 +22,7 @@ namespace qfsclient {
 
 const char kApiPath[] = "api";
 const int kInodeIdApi = 2;
-const int blkSize = 512;
+const int kBlkSize = 512;
 
 // Class used for holding internal context about an in-flight API call. It may be
 // passed between functions used to handle an API call and should should be created
