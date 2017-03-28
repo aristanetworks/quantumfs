@@ -18,6 +18,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
+import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 // Various exit reasons returned to the shell as exit code
 const (
@@ -130,11 +131,11 @@ func validateParams(p *params) error {
 		return errors.New("Concurrency must be > 0")
 	}
 
-	dataStore, err = qwr.ConnectDatastore(p.dsName, p.dsConf)
+	dataStore, err = thirdparty_backends.ConnectDatastore(p.dsName, p.dsConf)
 	if err != nil {
 		return err
 	}
-	wsDB, err = qwr.ConnectWorkspaceDB(p.wsdbName, p.wsdbConf)
+	wsDB, err = thirdparty_backends.ConnectWorkspaceDB(p.wsdbName, p.wsdbConf)
 	if err != nil {
 		return err
 	}
