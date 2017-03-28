@@ -3,6 +3,8 @@
 
 package utils
 
+import "sync"
+
 type DeferableMutex struct {
 	lock sync.Mutex
 }
