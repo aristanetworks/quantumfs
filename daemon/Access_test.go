@@ -10,6 +10,8 @@ import "sync"
 import "syscall"
 import "testing"
 
+import "github.com/aristanetworks/quantumfs/testutils"
+
 func permTest(test *testHelper, filename string, modeCheck uint32,
 	shouldPass bool) error {
 
@@ -56,34 +58,34 @@ func accessTest(test *testHelper, filename string, shouldPass bool, asRoot bool)
 	// This should always fail, unless you're root
 	go permTestSub(test, filename, 0000, asRoot, asRoot, &wg, &err)
 	wg.Wait()
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	wg.Add(1)
 	syscall.Chmod(filename, 0004)
 	go permTestSub(test, filename, 0004, shouldPass, asRoot, &wg, &err)
 	wg.Wait()
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	wg.Add(1)
 	syscall.Chmod(filename, 0002)
 	go permTestSub(test, filename, 0002, shouldPass, asRoot, &wg, &err)
 	wg.Wait()
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	wg.Add(1)
 	syscall.Chmod(filename, 0001)
 	go permTestSub(test, filename, 0001, shouldPass, asRoot, &wg, &err)
 	wg.Wait()
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 }
 
 func accessTestBothUsers(test *testHelper, filename string) {
 
 	err := os.Chown(filename, 100, 100)
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 
 	// first run the test as root
 	accessTest(test, filename, true, true)
@@ -93,7 +95,7 @@ func accessTestBothUsers(test *testHelper, filename string) {
 
 	// Now run it as the user who has access
 	err = os.Chown(filename, 0, 99)
-	test.assertNoErr(err)
+	test.AssertNoErr(err)
 	accessTest(test, filename, true, false)
 }
 
@@ -101,8 +103,8 @@ func TestAccessListFileInWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		filename := workspace +"/testFile"
-		err := printToFile(filename, string(genData(1000)))
-		test.assertNoErr(err)
+		err := testutils.PrintToFile(filename, string(genData(1000)))
+		test.AssertNoErr(err)
 
 		accessTestBothUsers(test, filename)
 	})
@@ -114,8 +116,8 @@ func TestAccessListFileSubdir(t *testing.T) {
 		os.MkdirAll(workspace+"/subdir", 0777)
 
 		filename := workspace +"/subdir/testFile"
-		err := printToFile(filename, string(genData(1000)))
-		test.assertNoErr(err)
+		err := testutils.PrintToFile(filename, string(genData(1000)))
+		test.AssertNoErr(err)
 
 		accessTestBothUsers(test, filename)
 	})
@@ -127,8 +129,8 @@ func TestAccessListHardlink(t *testing.T) {
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace +"/subdir/testFile"
-		err := printToFile(filename, string(genData(1000)))
-		test.assertNoErr(err)
+		err := testutils.PrintToFile(filename, string(genData(1000)))
+		test.AssertNoErr(err)
 
 		linkname := workspace +"/subdir/subsubdir/linkFile"
 		err = syscall.Link(filename, linkname)
@@ -144,8 +146,8 @@ func TestAccessSymlink(t *testing.T) {
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace +"/subdir/testFile"
-		err := printToFile(filename, string(genData(1000)))
-		test.assertNoErr(err)
+		err := testutils.PrintToFile(filename, string(genData(1000)))
+		test.AssertNoErr(err)
 
 		linkname := workspace +"/subdir/subsubdir/linkFile"
 		err = syscall.Symlink(filename, linkname)
