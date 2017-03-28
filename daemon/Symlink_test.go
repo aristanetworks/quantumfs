@@ -9,7 +9,6 @@ package daemon
 import "bytes"
 import "syscall"
 import "testing"
-import "unsafe"
 
 import "github.com/aristanetworks/quantumfs/utils"
 
