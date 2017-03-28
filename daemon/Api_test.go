@@ -17,6 +17,7 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestWorkspaceBranching(t *testing.T) {
 	runTest(t, func(test *testHelper) {
