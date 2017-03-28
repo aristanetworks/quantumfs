@@ -139,7 +139,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 		relpath := test.relPath(workspace)
 
 		responselist, _ := api.GetAccessed(relpath)
-		queueSize1 := test.qfs.apiFileSize
+		queueSize1 := atomic.LoadInt64(&test.qfs.apiFileSize)
 		test.assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
@@ -148,7 +148,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 			"Error two maps different")
 
 		test.qfs.setFileHandle(&test.qfs.c, 7, nil)
-		queueSize2 := test.qfs.apiFileSize
+		queueSize2 := atomic.LoadInt64(&test.qfs.apiFileSize)
 		test.assert(queueSize1 >= int64(expectedSize) && queueSize2 == 0,
 			"The apiFileSize: %d %d, the actual response size: %d)",
 			queueSize1, queueSize2, expectedSize)
@@ -183,8 +183,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		relpath2 := test.relPath(workspace2)
 		api2 := test.getUniqueApi(workspace2 + "/api")
 		defer api2.Close()
-		test.assert(api != api2,
-			"Error getting the same file descriptor")
+		test.assert(api != api2, "Error getting the same file descriptor")
 
 		go func() {
 			defer wg.Done()
@@ -192,7 +191,8 @@ func TestApiAccessListConcurrent(t *testing.T) {
 			<-startApi2
 			initFileSize2 = int(
 				atomic.LoadInt64(&test.qfs.apiFileSize))
-			api2.GetAccessed(relpath2)
+			_, err := api2.GetAccessed(relpath2)
+			test.assert(err == nil, "Error getting accessList with api2")
 			endFileSize2 = int(
 				atomic.LoadInt64(&test.qfs.apiFileSize))
 		}()
@@ -205,8 +205,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 
 		wg.Wait()
 
-		test.assert(err == nil,
-			"Error getting accessList with api")
+		test.assert(err == nil, "Error getting accessList with api")
 
 		test.assert(mapKeySizeSum(responselist) == expectedSize,
 			"Error getting unequal sizes %d != %d",
@@ -215,13 +214,13 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		test.assertAccessList(accessList, responselist,
 			"Error two maps different")
 
-		// In order to prove two api goroutines runs concurrently. Two
+		// In order to prove two api goroutines ran concurrently. Two
 		// conditions have to be satisfied. Only when two api goroutines
 		// starts at the same point, they will share the same prior
 		// apiFileSize. Only if their partial reads interleave, will the
 		// posterior apiFileSizes be the same
 		test.assert(initFileSize == initFileSize2 &&
-			endFileSize == endFileSize2,
+			endFileSize == endFileSize2 && endFileSize != 0,
 			"Error two api's aren't running in concurrent %d %d %d %d",
 			initFileSize, initFileSize2, endFileSize, endFileSize2)
 	})
@@ -610,9 +609,6 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		api.Write(buf)
 		n, err = api.Read(buf)
 		test.assert(n == 0, "Wrong number of bytes read: %d", n)
-		test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
-			"Non-blocking read api without requests error:%v", err)
-
 		if runtime.Version() != "go1.7.3" {
 			test.assert(err.(*os.PathError).Err == syscall.EAGAIN,
 				"Non-blocking read api without requests error:%v",

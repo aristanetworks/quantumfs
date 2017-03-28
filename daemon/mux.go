@@ -82,10 +82,10 @@ type QuantumFs struct {
 
 	// We present the sum of the size of all responses waiting on the api file as
 	// the size of that file because the kernel will clear any reads beyond what
-	// is believed the file length. Thus the file length needs to be at least as
-	// long as the largest response and using the sum of all response lengths is
-	// more efficient than computing the maximum response length over a large
-	// number of ApiHandles.
+	// is believed to be the file length. Thus the file length needs to be at
+	// least as long as the largest response and using the sum of all response
+	// lengths is more efficient than computing the maximum response length over
+	// a large number of ApiHandles.
 	apiFileSize int64
 
 	mapMutex    DeferableRwMutex
@@ -1559,7 +1559,6 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 }
 
 func (qfs *QuantumFs) increaseApiFileSize(c *ctx, offset int) {
-	// For every response, we append 4 more bytes to indicate its length
 	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset))
 	c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
 }
