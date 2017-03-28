@@ -5,7 +5,6 @@ package utils
 
 import "bytes"
 import "fmt"
-import "sync"
 import "syscall"
 
 // FileSize returns the size of a file
