@@ -7,6 +7,7 @@ import "fmt"
 import "path/filepath"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 // Walk the workspace hierarchy
 func Walk(ds quantumfs.DataStore, db quantumfs.WorkspaceDB,
@@ -18,7 +19,7 @@ func Walk(ds quantumfs.DataStore, db quantumfs.WorkspaceDB,
 			rootID.String(), key2String(rootID))
 	}
 
-	buf := quantumfs.NewTestBuffer(nil, rootID)
+	buf := testutils.NewSimpleBuffer(nil, rootID)
 	err := ds.Get(nil, rootID, buf)
 	if err != nil {
 		return err
@@ -68,7 +69,7 @@ func handleMultiBlockFile(path string,
 	key quantumfs.ObjectKey,
 	f func(string, quantumfs.ObjectKey, uint64) error) error {
 
-	buf := quantumfs.NewTestBuffer(nil, key)
+	buf := testutils.NewSimpleBuffer(nil, key)
 	if err := ds.Get(nil, key, buf); err != nil {
 		return err
 	}
@@ -100,7 +101,7 @@ func handleVeryLargeFile(path string,
 	key quantumfs.ObjectKey,
 	f func(string, quantumfs.ObjectKey, uint64) error) error {
 
-	buf := quantumfs.NewTestBuffer(nil, key)
+	buf := testutils.NewSimpleBuffer(nil, key)
 	err := ds.Get(nil, key, buf)
 	if err != nil {
 		return err
@@ -128,7 +129,7 @@ func handleDirectoryEntry(path string,
 	key quantumfs.ObjectKey,
 	f func(string, quantumfs.ObjectKey, uint64) error) error {
 
-	buf := quantumfs.NewTestBuffer(nil, key)
+	buf := testutils.NewSimpleBuffer(nil, key)
 	err := ds.Get(nil, key, buf)
 	if err != nil {
 		return err
