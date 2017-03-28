@@ -16,7 +16,6 @@ import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import qwrutils "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
 import "github.com/aristanetworks/quantumfs/utils"
 
 // Overview about qupload tool's conncurrent nature:
@@ -151,7 +150,7 @@ func relativePath(path string, base string) (string, error) {
 
 func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error,
-	exInfo *qwrutils.ExcludeInfo) error {
+	exInfo *ExcludeInfo) error {
 
 	// when basedir is "./somebase" or "/somebase" or "somebase" then
 	// pathWalker is called with path as "somebase" then path as
@@ -229,7 +228,7 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(ws string, advance string, root string, exInfo *qwrutils.ExcludeInfo,
+func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
 	conc uint) error {
 
 	group, groupCtx := errgroup.WithContext(context.Background())
