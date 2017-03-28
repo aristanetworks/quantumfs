@@ -10,7 +10,7 @@ import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr/utils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 var DataBytesWritten uint64
 var MetadataBytesWritten uint64
