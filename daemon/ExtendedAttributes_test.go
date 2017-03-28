@@ -11,6 +11,7 @@ import "os"
 import "strings"
 import "syscall"
 import "testing"
+import "unsafe"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
