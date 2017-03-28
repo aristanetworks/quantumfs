@@ -9,6 +9,7 @@ import "errors"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -27,7 +28,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	}
 	symlink.self = &symlink
 	symlink.setParent(parent.inodeNum())
-	assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
+	utils.Assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 
 	if dirRecord != nil {
 		buf := c.dataStore.Get(&(c.Ctx), key)
