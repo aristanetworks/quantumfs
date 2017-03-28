@@ -1,7 +1,7 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Utility functions to connect to registered datastore and workspaceD
+// Utility functions to connect to registered datastore and workspaceDB
 package thirdparty_backends
 
 import "fmt"
