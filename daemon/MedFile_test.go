@@ -13,6 +13,7 @@ import "testing"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestMedBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -25,13 +26,13 @@ func TestMedBranch(t *testing.T) {
 			quantumfs.MaxBlockSize)
 		// Write the data to the file continually past what
 		// a single block could hold.
-		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing data to new fd: %v",
+		err := testutils.PrintToFile(testFilename, string(data))
+		test.Assert(err == nil, "Error writing data to new fd: %v",
 			err)
 
 		// Branch the workspace
 		dst := test.branchWorkspace(workspace)
-		test.assert(err == nil, "Unable to branch")
+		test.Assert(err == nil, "Unable to branch")
 
 		// use a stride offset such that at least 20 checks
 		// are done
@@ -51,20 +52,20 @@ func TestFileExpansion(t *testing.T) {
 
 		// Write the data sequence to the file continually past what
 		// a single block could hold.
-		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing data to new fd: %v",
+		err := testutils.PrintToFile(testFilename, string(data))
+		test.Assert(err == nil, "Error writing data to new fd: %v",
 			err)
 
 		// Read it back
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading data back from file")
-		test.assert(len(data) == len(output),
+		test.Assert(err == nil, "Error reading data back from file")
+		test.Assert(len(data) == len(output),
 			"Data length mismatch, %d vs %d", len(data), len(output))
 
 		if !bytes.Equal(data, output) {
 			for i := 0; i < len(data); i++ {
-				test.assert(data[i] == output[i],
+				test.Assert(data[i] == output[i],
 					"Data readback mismatch at idx %d, %s vs %s",
 					i, data[i], output[i])
 			}
@@ -77,9 +78,9 @@ func TestFileExpansion(t *testing.T) {
 
 		// Ensure that the data remaining is what we expect
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading data from file")
-		test.assert(len(output) == newLen, "Truncated length incorrect")
-		test.assert(bytes.Equal(data[:newLen], output),
+		test.Assert(err == nil, "Error reading data from file")
+		test.Assert(len(output) == newLen, "Truncated length incorrect")
+		test.Assert(bytes.Equal(data[:newLen], output),
 			"Post-truncation mismatch")
 
 		// Let's re-expand it using SetAttr to any size
@@ -88,11 +89,11 @@ func TestFileExpansion(t *testing.T) {
 		os.Truncate(testFilename, int64(truncLen))
 
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading data+hole back from file")
-		test.assert(bytes.Equal(data[:newLen], output[:newLen]),
+		test.Assert(err == nil, "Error reading data+hole back from file")
+		test.Assert(bytes.Equal(data[:newLen], output[:newLen]),
 			"Data readback mismatch")
 		delta := truncLen - newLen
-		test.assert(bytes.Equal(make([]byte, delta), output[newLen:]),
+		test.Assert(bytes.Equal(make([]byte, delta), output[newLen:]),
 			"File hole not filled with zeros")
 	})
 }
@@ -117,17 +118,17 @@ func TestMedFileAttr(t *testing.T) {
 		// Check that the size increase worked
 		var stat syscall.Stat_t
 		err := syscall.Stat(testFilename, &stat)
-		test.assert(err == nil, "Unable to stat file: %v", err)
-		test.assert(stat.Size == int64(newSize), "File size incorrect, %d",
+		test.Assert(err == nil, "Unable to stat file: %v", err)
+		test.Assert(stat.Size == int64(newSize), "File size incorrect, %d",
 			stat.Size)
 
 		// Read what should be all zeros
 		var output []byte
 		output, err = ioutil.ReadFile(testFilename)
-		test.assert(err == nil, "Error reading hole from file")
+		test.Assert(err == nil, "Error reading hole from file")
 
 		for i := 0; i < len(output); i++ {
-			test.assert(output[i] == 0, "Data not zeroed in file, %s",
+			test.Assert(output[i] == 0, "Data not zeroed in file, %s",
 				output[i])
 		}
 
@@ -138,18 +139,18 @@ func TestMedFileAttr(t *testing.T) {
 		var count int
 		dataOffset := quantumfs.MaxBlockSize
 		file, err = os.OpenFile(testFilename, os.O_RDWR, 0777)
-		test.assert(err == nil, "Unable to open file for rdwr: %v", err)
+		test.Assert(err == nil, "Unable to open file for rdwr: %v", err)
 		count, err = file.WriteAt(testString, int64(dataOffset))
-		test.assert(err == nil, "Unable to write at offset: %v", err)
-		test.assert(count == len(testString),
+		test.Assert(err == nil, "Unable to write at offset: %v", err)
+		test.Assert(count == len(testString),
 			"Unable to write data all at once")
 		err = file.Close()
-		test.assert(err == nil, "Unable to close file handle")
+		test.Assert(err == nil, "Unable to close file handle")
 
 		// Branch the workspace
 		dst := "dst/medattrsparse/test"
 		err = api.Branch(test.relPath(workspace), dst)
-		test.assert(err == nil, "Unable to branch")
+		test.Assert(err == nil, "Unable to branch")
 
 		// stride offset chosen to allow 20 checks
 		test.checkSparse(test.absPath(dst+"/test"), testFilename,
@@ -164,18 +165,18 @@ func TestMedFileZero(t *testing.T) {
 		testFilename := workspace + "/test"
 
 		data := genData(10 * 1024)
-		err := printToFile(testFilename, string(data))
-		test.assert(err == nil, "Error writing tiny data to new fd")
+		err := testutils.PrintToFile(testFilename, string(data))
+		test.Assert(err == nil, "Error writing tiny data to new fd")
 		// expand this to be medium file type
 		os.Truncate(testFilename, int64(quantumfs.MaxSmallFileSize())+
 			int64(quantumfs.MaxBlockSize))
 
 		os.Truncate(testFilename, 0)
-		test.assert(test.fileSize(testFilename) == 0, "Unable to zero file")
+		test.Assert(test.FileSize(testFilename) == 0, "Unable to zero file")
 
 		output, err := ioutil.ReadFile(testFilename)
-		test.assert(len(output) == 0, "Empty file not really empty")
-		test.assert(err == nil, "Unable to read from empty file")
+		test.Assert(len(output) == 0, "Empty file not really empty")
+		test.Assert(err == nil, "Unable to read from empty file")
 	})
 }
 
@@ -186,7 +187,7 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 
 		// First create a file with some data
 		file, err := os.Create(testFilename)
-		test.assert(err == nil, "Error creating test file: %v", err)
+		test.Assert(err == nil, "Error creating test file: %v", err)
 
 		// generate small file (<= 1 block)
 		testDataSize := quantumfs.MaxBlockSize
@@ -196,7 +197,7 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 		}
 		data := genData(testDataSize)
 		_, err = file.Write(data)
-		test.assert(err == nil, "Error writing data to file: %v", err)
+		test.Assert(err == nil, "Error writing data to file: %v", err)
 
 		// expand the file to multi-block file
 		os.Truncate(testFilename, int64(2*quantumfs.MaxBlockSize))
@@ -205,7 +206,7 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 		// EOF return value.
 		input := make([]byte, 100*1024)
 		_, err = file.ReadAt(input, int64(3*quantumfs.MaxBlockSize))
-		test.assert(err == io.EOF, "Expected EOF got: %v", err)
+		test.Assert(err == io.EOF, "Expected EOF got: %v", err)
 
 		file.Close()
 	})

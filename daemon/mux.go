@@ -18,6 +18,7 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 const defaultCacheSize = 4096
@@ -296,15 +297,14 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	dirtyInode.inode.markClean()
 
 	if dirtyInode.shouldUninstantiate {
+		defer qfs.instantiationLock.Lock().Unlock()
 		qfs.uninstantiateInode_(c, inodeNum)
 	}
 }
 
-// Requires treeLock for read
+// Requires treeLock for read and the instantiationLock
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).out()
-
-	defer qfs.instantiationLock.Lock().Unlock()
 
 	inode := qfs.inodeNoInstantiate(c, inodeNum)
 	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
@@ -732,7 +732,7 @@ func logRequestPanic(c *ctx) {
 	stackTrace := debug.Stack()
 
 	c.elog("ERROR: PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
-		fmt.Sprintf("%v", exception), BytesToString(stackTrace))
+		fmt.Sprintf("%v", exception), utils.BytesToString(stackTrace))
 }
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
@@ -986,6 +986,8 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		qfs.c.dlog("inode %d lookup not zero yet", nodeID)
 		return
 	}
+
+	defer qfs.instantiationLock.Lock().Unlock()
 
 	if inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID)); inode != nil {
 		inode.queueToForget(&qfs.c)
@@ -1492,7 +1494,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	}
 
 	return fileHandle.Read(c, input.Offset, input.Size,
-		buf, BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
+		buf, utils.BitFlagsSet(uint(input.Flags), uint(syscall.O_NONBLOCK)))
 }
 
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
