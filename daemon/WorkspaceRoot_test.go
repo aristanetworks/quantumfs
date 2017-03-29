@@ -246,17 +246,17 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 
 		api := test.getApi()
 		err := api.SetWorkspaceImmutable(workspaceName)
-		test.assert(err == nil, "Failed setting the workspace %s immutable",
+		test.Assert(err == nil, "Failed setting the workspace %s immutable",
 			workspaceName)
 
 		err = api.EnableRootWrite(workspaceName)
-		test.assert(err == nil, "Failed enabling workspace %s write"+
+		test.Assert(err == nil, "Failed enabling workspace %s write"+
 			" permission", workspaceName)
 
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
-		test.assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EPERM,
 			"Error creating a small file: %v", err)
 
 	})
@@ -269,28 +269,28 @@ func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
 
 		api := test.getApi()
 		err := api.SetWorkspaceImmutable(workspaceName)
-		test.assert(err == nil, "Failed setting the workspace %s immutable",
+		test.Assert(err == nil, "Failed setting the workspace %s immutable",
 			workspaceName)
 
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
-		test.assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EPERM,
 			"Error creating a small file: %v", err)
 
 		err = api.DeleteWorkspace(workspaceName)
-		test.assert(err == nil, "Failed deleting the workspace %s",
+		test.Assert(err == nil, "Failed deleting the workspace %s",
 			workspaceName)
 
 		err = api.Branch(test.nullWorkspaceRel(), workspaceName)
-		test.assert(err == nil, "Failed branching workspace: %v", err)
+		test.Assert(err == nil, "Failed branching workspace: %v", err)
 
 		err = api.EnableRootWrite(workspaceName)
-		test.assert(err == nil,
+		test.Assert(err == nil,
 			"Failed to enable write permission in workspace: %v", err)
 
 		fd1, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd1)
-		test.assert(err == nil, "Error creating a small file: %v", err)
+		test.Assert(err == nil, "Error creating a small file: %v", err)
 	})
 }
