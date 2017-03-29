@@ -513,7 +513,8 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
 }
 
 func (inode *InodeCommon) isWorkspaceRoot() bool {
-	return false
+	_, isWsr := inode.self.(*WorkspaceRoot)
+	return isWsr
 }
 
 // Deleting a child may require that we orphan it, and because we *must* lock from

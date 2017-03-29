@@ -127,8 +127,9 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 
 	defer c.funcIn("File::Open").out()
 
-	if !openPermission(c, fi, flags) {
-		return fuse.EPERM
+	err := hasPermissionOpenFlags(c, fi, flags)
+	if err != fuse.OK {
+		return err
 	}
 	fi.self.markSelfAccessed(c, false)
 

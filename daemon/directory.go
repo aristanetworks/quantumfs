@@ -515,6 +515,12 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 
 	defer c.funcIn("Directory::OpenDir").out()
 
+	err := hasPermissionOpenFlags(c, dir, flags)
+	if err != fuse.OK {
+		return err
+	}
+	dir.self.markSelfAccessed(c, false)
+
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
@@ -601,7 +607,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 			return recordErr
 		}
 
-		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		err := hasDirectoryWritePerm(c, dir, false)
 		if err != fuse.OK {
 			return err
 		}
@@ -656,7 +662,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return recordErr
 		}
 
-		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		err := hasDirectoryWritePerm(c, dir, false)
 		if err != fuse.OK {
 			return err
 		}
@@ -717,80 +723,6 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) hasWritePermission(c *ctx, fileOwner uint32,
-	checkStickyBit bool) fuse.Status {
-
-	var arg string
-	if checkStickyBit {
-		arg = "checkStickyBit"
-	} else {
-		arg = "no checkStickyBit"
-	}
-	defer c.FuncIn("Directory::hasWritePermission", arg).out()
-
-	// If the directory is a workspace root, it is always permitted to modify the
-	// children inodes because its permission is 777 (Hardcoded in
-	// daemon/workspaceroot.go).
-	if dir.self.isWorkspaceRoot() {
-		c.vlog("Is WorkspaceRoot: OK")
-		return fuse.OK
-	}
-
-	owner := c.fuseCtx.Owner
-	dirRecord, err := dir.parentGetChildRecordCopy(c, dir.InodeCommon.id)
-	if err != nil {
-		c.wlog("Failed to find directory record in parent")
-		return fuse.ENOENT
-	}
-	dirOwner := quantumfs.SystemUid(dirRecord.Owner(), owner.Uid)
-	dirGroup := quantumfs.SystemGid(dirRecord.Group(), owner.Gid)
-	permission := dirRecord.Permissions()
-
-	// Root permission can bypass the permission, and the root is only verified
-	// by uid
-	if owner.Uid == 0 {
-		c.vlog("User is root: OK")
-		return fuse.OK
-	}
-
-	// Verify the permission of the directory in order to delete a child
-	// If the sticky bit of the directory is set, the action can only be
-	// performed by file's owner, directory's owner, or root user
-	if checkStickyBit &&
-		utils.BitFlagsSet(uint(permission), uint(syscall.S_ISVTX)) &&
-		owner.Uid != fileOwner && owner.Uid != dirOwner {
-
-		c.vlog("Sticky owners don't match: FAIL")
-		return fuse.EACCES
-	}
-
-	// Get whether current user is OWNER/GRP/OTHER
-	var permWX uint32
-	if owner.Uid == dirOwner {
-		permWX = syscall.S_IWUSR | syscall.S_IXUSR
-		// Check the current directory having x and w permissions
-		if utils.BitFlagsSet(uint(permission), uint(permWX)) {
-			c.vlog("Has owner write: OK")
-			return fuse.OK
-		}
-	} else if owner.Gid == dirGroup {
-		permWX = syscall.S_IWGRP | syscall.S_IXGRP
-		if utils.BitFlagsSet(uint(permission), uint(permWX)) {
-			c.vlog("Has group write: OK")
-			return fuse.OK
-		}
-	} else { // all the other
-		permWX = syscall.S_IWOTH | syscall.S_IXOTH
-		if utils.BitFlagsSet(uint(permission), uint(permWX)) {
-			c.vlog("Has other write: OK")
-			return fuse.OK
-		}
-	}
-
-	c.vlog("Directory::hasWritePermission %o vs %o", permWX, permission)
-	return fuse.EACCES
-}
-
 func (dir *Directory) directChildInodes() []InodeId {
 	defer dir.childRecordLock.Lock().Unlock()
 
@@ -832,15 +764,13 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		}
 
 		type_ := objectTypeToFileType(c, recordCopy.Type())
-		fileOwner := quantumfs.SystemUid(recordCopy.Owner(),
-			c.fuseCtx.Owner.Uid)
 
 		if type_ == fuse.S_IFDIR {
 			c.vlog("Directory::Unlink directory")
 			return nil, fuse.Status(syscall.EISDIR)
 		}
 
-		err = dir.hasWritePermission(c, fileOwner, true)
+		err = hasDirectoryWritePerm(c, dir, true)
 		if err != fuse.OK {
 			return nil, err
 		}
@@ -926,7 +856,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return recordErr
 		}
 
-		result := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		result := hasDirectoryWritePerm(c, dir, false)
 		if result != fuse.OK {
 			return result
 		}
@@ -969,7 +899,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			return recordErr
 		}
 
-		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		err := hasDirectoryWritePerm(c, dir, false)
 		if err != fuse.OK {
 			return err
 		}
