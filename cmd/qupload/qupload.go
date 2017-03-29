@@ -73,7 +73,7 @@ Path must be relative to the base directory specified
 Absolute paths are not allowed
 To create a directory without its contents, specify / at the end of path
 To skip directory completely, specify directory name without trailing /
-Comments and empty lines are allowed
+Comments and empty lines are allowed. A comment is any line that starts with #
 `, version)
 	flag.PrintDefaults()
 }

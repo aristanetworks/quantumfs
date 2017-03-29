@@ -18,16 +18,27 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/utils"
 
-// Overview about qupload tool's conncurrent nature:
+// Design notes about qupload parallelism:
 //
-// It uses "concurrency" number of goroutines and a walker goroutine
-// are in a errgroup. The walker sends "pathInfo"
-// over the channel and workers act on it. For each directory, state
-// is tracked until all its children are uploaded. When all children of
-// a parent are uploaded, the parent is uploaded and its state is no
-// longer tracked. Upload finishes when the top directory is uploaded.
-// walker generates directory state trackers worker writes blocks,
-// generates directory records and updates the directory state
+// A directory is uploaded after all its children have been uploaded. A state
+// is maintained for each directory which tracks how many of its children have
+// been uploaded so far. The state helps in deciding when to upload the
+// directory.
+//
+// Walker walks the input directory hierarchy and hands-off path information
+// to workers for the upload. Worker uploads the files or directories.
+// There is 1 walker and "concurrency" number of workers.
+
+// Walker sets up the per-directory state. The state is used by workers to
+// find out when a directory can be uploaded. When a worker finishes uploading
+// a file, it checks the file's parent directory's state to see if the
+// directory is ready to be uploaded. If not ready then the worker goes off to
+// upload another file. If the directory is ready to be uploaded then the
+// worker uploads it and checks the directory's parent for upload readiness.
+//
+// Since walker uses filepath.Walk, the files and subdirectories within
+// a directory are traversed in a lexical order. When a subdirectory is found,
+// its descended into and the walk continues.
 
 type pathInfo struct {
 	path string
@@ -231,11 +242,10 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
 	conc uint) error {
 
-	group, groupCtx := errgroup.WithContext(context.Background())
-	piChan := make(chan *pathInfo)
-
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
+	group, groupCtx := errgroup.WithContext(context.Background())
+	piChan := make(chan *pathInfo)
 
 	// workers
 	for i := uint(0); i < conc; i++ {

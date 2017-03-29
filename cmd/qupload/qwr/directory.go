@@ -88,7 +88,7 @@ func CreateNewDirRecord(name string, mode uint32,
 	entry.SetGroup(gid)
 	entry.SetSize(size)
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
-	// QFS doesn't store Atime since its too expensive
+	// QFS doesn't store Atime since it's too expensive
 	entry.SetContentTime(ctime)
 	entry.SetModificationTime(mtime)
 
