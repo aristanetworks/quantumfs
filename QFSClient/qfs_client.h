@@ -42,7 +42,7 @@ enum ErrorCode {
 	kApiFileWriteFail = 6,
 
 	// Writing a command to the API file failed
-	kApiFileFlushFail = 7,
+	kBufAlignmentFail = 7,
 
 	// Reading a command from the API file failed
 	kApiFileReadFail = 8,
@@ -70,10 +70,6 @@ enum ErrorCode {
 
 	// a JSON object was found with the wrong type
 	kJsonObjectWrongType = 16,
-
-	// The file should be open with O_DIRECT, but the O_DIRECT is missing in
-	// the actual mode
-	kMissDirectMode = 17,
 };
 
 /// An `Error` object is returned by many member functions of the Api class. The
