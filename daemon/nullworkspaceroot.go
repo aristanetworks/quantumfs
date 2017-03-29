@@ -63,8 +63,7 @@ func (nwsr *NullWorkspaceRoot) publish(c *ctx) {
 func (nwsr *NullWorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.vlog("NullWorkspaceRoot::syncChild Enter")
-	defer c.vlog("NullWorkspaceRoot::syncChild Exit")
+	defer c.funcIn("NullWorkspaceRoot::syncChild").out()
 	nwsr.Directory.syncChild(c, inodeNum, newKey)
 }
 

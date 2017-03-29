@@ -16,6 +16,8 @@ import "github.com/hanwen/go-fuse/fuse"
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
+	defer c.funcIn("modifyEntryWithAttr").out()
+
 	// Update the type if needed
 	if newType != nil {
 		entry.SetType(*newType)
@@ -87,6 +89,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func findFuseConnection(c *ctx, mountPath string) int {
+	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath)
 	c.dlog("Finding FUSE Connection ID...")
 	for i := 0; i < 100; i++ {
 		c.dlog("Waiting for mount try %d...", i)
