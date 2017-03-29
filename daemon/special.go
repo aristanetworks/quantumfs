@@ -18,6 +18,8 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newSpecial", "name %s", name).out()
+
 	var filetype uint32
 	var device uint32
 	var err error
@@ -65,11 +67,15 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	defer c.funcIn("Special::Access").out()
+
 	special.self.markSelfAccessed(c, false)
 	return fuse.OK
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("Special::GetAttr").out()
+
 	record, err := special.parentGetChildRecordCopy(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
@@ -98,18 +104,21 @@ func (special *Special) Open(c *ctx, flags uint32, mode uint32,
 func (special *Special) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("Special::OpenDir doing nothing")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("Special::Create doing nothing")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	defer c.funcIn("Special::SetAttr").out()
 	return special.parentSetChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
@@ -117,6 +126,7 @@ func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("Special::Mkdir doing nothing")
 	return fuse.ENOTDIR
 }
 

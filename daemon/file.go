@@ -21,6 +21,8 @@ func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newSmallFile", "name %s", name).out()
+
 	accessor := newSmallAccessor(c, size, key)
 
 	return newFile_(c, name, inodeNum, key, parent, accessor), nil
@@ -29,6 +31,8 @@ func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+
+	defer c.FuncIn("newMediumFile", "name %s", name).out()
 
 	accessor := newMediumAccessor(c, key)
 
@@ -39,6 +43,8 @@ func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newLargeFile", "name %s", name).out()
+
 	accessor := newLargeAccessor(c, key)
 
 	return newFile_(c, name, inodeNum, key, parent, accessor), nil
@@ -48,6 +54,8 @@ func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newVeryLargeFile", "name %s", name).out()
+
 	accessor := newVeryLargeAccessor(c, key)
 
 	return newFile_(c, name, inodeNum, key, parent, accessor), nil
@@ -55,6 +63,8 @@ func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newFile_(c *ctx, name string, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
+
+	defer c.funcIn("newFile_").out()
 
 	file := File{
 		InodeCommon: InodeCommon{
@@ -82,6 +92,7 @@ type File struct {
 }
 
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
+	c.FuncIn("FuncIn::dirtyChild", "inode %d", child).out()
 	if child != fi.inodeNum() {
 		panic("Unsupported dirtyChild() call on File")
 	}
@@ -113,6 +124,7 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("File::OpenDir doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -188,12 +200,14 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 }
 
 func (fi *File) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
+	c.vlog("File::Lookup doing nothing")
 	return fuse.ENOSYS
 }
 
 func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("File::Create doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -250,6 +264,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("File::Mkdir doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -352,8 +367,6 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 		return fuse.EIO
 	}
 
-	c.dlog("File::setChildAttr Enter")
-	defer c.dlog("File::setChildAttr Exit")
 	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
@@ -373,6 +386,8 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 
 // Requires unlinkLock
 func (fi *File) parseExtendedAttributes_(c *ctx) {
+	defer c.funcIn("File::parseExtendedAttributes_").out()
+
 	if fi.unlinkXAttr != nil {
 		return
 	}
@@ -537,8 +552,6 @@ func (fi *File) getChildRecordCopy(c *ctx,
 			errors.New("Unsupported record fetch")
 	}
 
-	c.dlog("File::getChildRecord Enter")
-	defer c.dlog("File::getChildRecord Exit")
 	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
@@ -574,6 +587,8 @@ func resize(buffer []byte, size int) []byte {
 }
 
 func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+	defer c.funcIn("pushData").out()
+
 	key, err := buffer.Key(&c.Ctx)
 	if err != nil {
 		c.elog("Unable to write data to the datastore")
@@ -796,6 +811,7 @@ type FileDescriptor struct {
 }
 
 func (fd *FileDescriptor) dirty(c *ctx) {
+	defer c.funcIn("FileDescriptor::dirty").out()
 	fd.file.self.dirty(c)
 }
 
@@ -809,11 +825,15 @@ func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (fd *FileDescriptor) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
+	defer c.funcIn("FileDescriptor::Read").out()
+
 	return fd.file.Read(c, offset, size, buf, nonblocking)
 }
 
 func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
+
+	defer c.funcIn("FileDescriptor::Write").out()
 
 	return fd.file.Write(c, offset, size, flags, buf)
 }

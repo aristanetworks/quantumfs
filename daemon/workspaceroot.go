@@ -55,6 +55,9 @@ func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
 func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	typespace string, namespace string) {
 
+	defer c.FuncIn("fillWorkspaceAttrFake", "inode %d typespace %s namespace %s",
+		inodeNum, typespace, namespace).out()
+
 	fillAttr(attr, inodeNum, 27)
 	attr.Mode = 0777 | fuse.S_IFDIR
 }
@@ -242,6 +245,8 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 }
 
 func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId {
+	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeIde", "linkId %d",
+		linkId).out()
 	defer wsr.linkLock.Lock().Unlock()
 
 	// Ensure the linkId is valid
@@ -355,6 +360,7 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 }
 
 func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
+	defer c.funcIn("WorkspaceRoot::initHardlinks").out()
 	defer wsr.linkLock.Lock().Unlock()
 
 	wsr.hardlinks = make(map[HardlinkId]linkEntry)
@@ -389,6 +395,8 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 
 func publishHardlinkMap(c *ctx,
 	records map[HardlinkId]linkEntry) *quantumfs.HardlinkEntry {
+
+	defer c.funcIn("publishHardlinkMap").out()
 
 	// entryIdx indexes into the metadata block
 	baseLayer := quantumfs.NewHardlinkEntry()
@@ -429,8 +437,7 @@ func publishHardlinkMap(c *ctx,
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) {
-	c.vlog("WorkspaceRoot::publish Enter")
-	defer c.vlog("WorkspaceRoot::publish Exit")
+	defer c.funcIn("WorkspaceRoot::publish").out()
 
 	wsr.lock.RLock()
 	defer wsr.lock.RUnlock()
@@ -472,6 +479,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 	children := wsr.Directory.getChildSnapshot(c)
 
+	defer c.funcIn("WorkspaceRoot::getChildSnapshot").out()
+
 	api := directoryContents{
 		filename: quantumfs.ApiPath,
 		fuseType: fuse.S_IFREG,
@@ -484,6 +493,8 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 
 func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
+
+	defer c.FuncIn("WorkspaceRoot::Lookup", "name %s", name).out()
 
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
@@ -498,8 +509,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	c.vlog("WorkspaceRoot::syncChild Enter")
-	defer c.vlog("WorkspaceRoot::syncChild Exit")
+	defer c.funcIn("WorkspaceRoot::syncChild").out()
 
 	isHardlink, linkId := wsr.checkHardlink(inodeNum)
 
@@ -522,8 +532,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 }
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	c.vlog("WorkspaceRoot::GetAttr Enter")
-	defer c.vlog("WorkspaceRoot::GetAttr Exit")
+	defer c.funcIn("WorkspaceRoot::GetAttr").out()
 	defer wsr.RLock().RUnlock()
 
 	var numChildDirectories uint32
@@ -541,6 +550,9 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
+	defer c.FuncIn("WorkspaceRoot::markAccessed", "path %s created %t", path,
+		created).out()
+
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	if wsr.accessList == nil {
@@ -554,7 +566,7 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
 }
 
 func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, created bool) {
-	return
+	c.vlog("WorkspaceRoot::markSelfAccessed doing nothing")
 }
 
 func (wsr *WorkspaceRoot) getList() map[string]bool {
