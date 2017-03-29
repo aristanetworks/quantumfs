@@ -214,7 +214,7 @@ func TestMultipleLookupCount(t *testing.T) {
 func TestLookupCountAfterCommand(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
-		filename := workspace + "/test"
+		fileName := workspace + "/test"
 		file, err := os.Create(fileName)
 		test.Assert(err == nil, "Error creating a small file: %v", err)
 		file.Close()
