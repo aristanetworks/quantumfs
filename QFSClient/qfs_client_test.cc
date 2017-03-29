@@ -284,7 +284,7 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 
 	// set up expected written JSON:
 	std::string expected_written_command_json =
-		"{'CommandId':2,'WorkspaceRoot':'test/workspace/root'}";
+		"{'CommandId':3,'WorkspaceRoot':'test/workspace/root'}";
 	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 	       expected_written_command_json.c_str());
@@ -313,7 +313,7 @@ TEST_F(QfsClientApiTest, InsertInodeTest) {
 
 	// set up expected written JSON:
 	std::string expected_written_command_json =
-		"{'CommandId':5,"
+		"{'CommandId':6,"
 		 "'DstPath':'/path/to/some/place/',"
 		 "'Gid':3001,"
 		 "'Key':'thisisadummyextendedkey01234567890123456',"
@@ -379,7 +379,7 @@ TEST_F(QfsClientApiTest, BranchTest) {
 
 	// set up expected written JSON:
 	std::string expected_written_command_json =
-	"{'CommandId':1,"
+	"{'CommandId':2,"
 	 "'Dst':'test/destination/workspace',"
 	 "'Src':'test/source/workspace'}";
 	util::requote(&expected_written_command_json);
@@ -406,7 +406,7 @@ TEST_F(QfsClientApiTest, SetBlockTest) {
 
 	// set up expected written JSON:
 	std::string expected_written_command_json =
-	"{'CommandId':7,"
+	"{'CommandId':8,"
 	 "'Data':'bG9va2JlaGluZHlvdQ==',"
 	 "'Key':'c29tZWFyYml0cmFyeWtleXZhbHVlMDM0MjMyNzg='}";
 	util::requote(&expected_written_command_json);
@@ -440,7 +440,7 @@ TEST_F(QfsClientApiTest, GetBlockTest) {
 
 	// set up expected written JSON:
 	std::string expected_written_command_json =
-	"{'CommandId':8,'Key':'c29tZWFyYml0cmFyeWtleXZhbHVlMDM0MjMyNzg='}";
+	"{'CommandId':9,'Key':'c29tZWFyYml0cmFyeWtleXZhbHVlMDM0MjMyNzg='}";
 	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 		expected_written_command_json.c_str());
@@ -483,7 +483,7 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 
 	// create expected JSON string to have been written
 	std::string expected_written_command_json =
-		"{'CommandId':2,'WorkspaceRoot':'one/two/three'}";
+		"{'CommandId':3,'WorkspaceRoot':'one/two/three'}";
 	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 	       expected_written_command_json.c_str());
