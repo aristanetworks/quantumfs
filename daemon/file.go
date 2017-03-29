@@ -8,7 +8,6 @@ package daemon
 import "bytes"
 import "errors"
 import "sync"
-import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
@@ -121,8 +120,9 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 
 	defer c.funcIn("File::Open").out()
 
-	if !fi.openPermission(c, flags) {
-		return fuse.EPERM
+	err := hasPermissionOpenFlags(c, fi, flags)
+	if err != fuse.OK {
+		return err
 	}
 	fi.self.markSelfAccessed(c, false)
 

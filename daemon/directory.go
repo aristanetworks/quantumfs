@@ -508,6 +508,12 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 
 	defer c.funcIn("Directory::OpenDir").out()
 
+	err := hasPermissionOpenFlags(c, dir, flags)
+	if err != fuse.OK {
+		return err
+	}
+	dir.self.markSelfAccessed(c, false)
+
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
@@ -594,7 +600,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 			return recordErr
 		}
 
-		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		err := hasDirectoryWritePerm(c, dir, false)
 		if err != fuse.OK {
 			return err
 		}
@@ -649,7 +655,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return recordErr
 		}
 
-		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		err := hasDirectoryWritePerm(c, dir, false)
 		if err != fuse.OK {
 			return err
 		}
@@ -751,15 +757,13 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		}
 
 		type_ := objectTypeToFileType(c, recordCopy.Type())
-		fileOwner := quantumfs.SystemUid(recordCopy.Owner(),
-			c.fuseCtx.Owner.Uid)
 
 		if type_ == fuse.S_IFDIR {
 			c.vlog("Directory::Unlink directory")
 			return nil, fuse.Status(syscall.EISDIR)
 		}
 
-		err = dir.hasWritePermission(c, fileOwner, true)
+		err = hasDirectoryWritePerm(c, dir, true)
 		if err != fuse.OK {
 			return nil, err
 		}
@@ -845,7 +849,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return recordErr
 		}
 
-		result := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		result := hasDirectoryWritePerm(c, dir, false)
 		if result != fuse.OK {
 			return result
 		}
@@ -888,7 +892,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			return recordErr
 		}
 
-		err := dir.hasWritePermission(c, c.fuseCtx.Owner.Uid, false)
+		err := hasDirectoryWritePerm(c, dir, false)
 		if err != fuse.OK {
 			return err
 		}
