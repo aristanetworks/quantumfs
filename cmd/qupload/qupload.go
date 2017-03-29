@@ -16,7 +16,7 @@ import "strings"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
+import "github.com/aristanetworks/quantumfs/qwr"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 
 // Various exit reasons returned to the shell as exit code
