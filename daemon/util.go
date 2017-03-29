@@ -219,6 +219,13 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	}
 	defer c.FuncIn("hasPermissionIds", arg, checkFlags).out()
 
+	// Root permission can bypass the permission, and the root is only verified
+	// by uid
+	if checkUid == 0 {
+		c.vlog("User is root: OK")
+		return fuse.OK
+	}
+
 	// If the inode is a workspace root, it is always permitted to modify the
 	// children inodes because its permission is 777 (Hardcoded in
 	// daemon/workspaceroot.go).
@@ -235,13 +242,6 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	inodeOwner := quantumfs.SystemUid(record.Owner(), checkUid)
 	inodeGroup := quantumfs.SystemGid(record.Group(), checkGid)
 	permission := record.Permissions()
-
-	// Root permission can bypass the permission, and the root is only verified
-	// by uid
-	if checkUid == 0 {
-		c.vlog("User is root: OK")
-		return fuse.OK
-	}
 
 	// Verify the permission of the inode in order to delete a child
 	// If the sticky bit of a directory is set, the action can only be
