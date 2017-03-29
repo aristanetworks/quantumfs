@@ -35,6 +35,9 @@ import "github.com/aristanetworks/quantumfs/utils"
 // directory is ready to be uploaded. If not ready then the worker goes off to
 // upload another file. If the directory is ready to be uploaded then the
 // worker uploads it and checks the directory's parent for upload readiness.
+// Workers are not specific to a directory. Since all workers listen on the
+// same channel, looking for path information, its possible that different
+// workers upload different files within the same directory.
 //
 // Since walker uses filepath.Walk, the files and subdirectories within
 // a directory are traversed in a lexical order. When a subdirectory is found,
