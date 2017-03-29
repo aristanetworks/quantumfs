@@ -191,22 +191,21 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	checkFlags := uint32(0)
 	switch openFlags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		checkFlags = quantumfs.PermReadOther|quantumfs.PermReadGroup|
-				quantumfs.PermReadOwner
+		checkFlags = quantumfs.PermReadOther | quantumfs.PermReadGroup |
+			quantumfs.PermReadOwner
 	case syscall.O_WRONLY:
-		checkFlags = quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner
+		checkFlags = quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
+			quantumfs.PermWriteOwner
 	case syscall.O_RDWR:
-		checkFlags = quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner|quantumfs.PermReadOther|
-				quantumfs.PermReadGroup|quantumfs.PermReadOwner
+		checkFlags = quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
+			quantumfs.PermWriteOwner | quantumfs.PermReadOther |
+			quantumfs.PermReadGroup | quantumfs.PermReadOwner
 	}
 
 	owner := c.fuseCtx.Owner
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid,
 		checkFlags, false)
 }
-	
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, checkFlags uint32, checkStickyBit bool) fuse.Status {
@@ -267,7 +266,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 			quantumfs.PermExecOther
 	}
 
-	if utils.BitFlagsSet(uint(permission), uint(checkFlags & permMask)) {
+	if utils.BitFlagsSet(uint(permission), uint(checkFlags&permMask)) {
 		c.vlog("Has permission: OK. %o %o %o", checkFlags, permMask,
 			permission)
 		return fuse.OK
@@ -276,4 +275,3 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	c.vlog("hasPermissionIds (%o & %o) vs %o", checkFlags, permMask, permission)
 	return fuse.EACCES
 }
-
