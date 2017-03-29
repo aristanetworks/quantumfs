@@ -32,21 +32,37 @@ class QfsClientTest : public testing::Test {
 	void CreateTestApiFile();
 };
 
-class QfsClientApiTest : public QfsClientTest, SendCommandHook {
+#ifdef REAL_QFS
+// tests to run on a real QuantumFS filesystem
+class QfsClientQFSTest : public testing::Test {
+ protected:
 	virtual void SetUp();
 	virtual void TearDown();
 
- public:
-	// SendTestHook, together with expected_written_command and read_command
+ protected:
+	ApiImpl *api;
+
+	// path to location in a QuantumFS filesystem
+	std::string location;
+};
+#endif  // REAL_QFS
+
+class QfsClientApiTest : public QfsClientTest, TestHook {
+	virtual void SetUp();
+	virtual void TearDown();
+
+ private:
+	// TestHook, together with expected_written_command and read_command
 	// is for the use of API tests - they can set the expected command that
 	// WriteCommand() is expected to write and provide a test response
-	// for ReadResponse() can return (via SendCommand) to the API function.
-	virtual Error SendTestHook();
+	// that ReadResponse() can return (via SendCommand) to the API function.
+	virtual Error PostWriteHook();
+	virtual Error PreReadHook(CommandBuffer *read_result);
 
  protected:
-	ApiImpl::CommandBuffer expected_written_command;
-	ApiImpl::CommandBuffer actual_written_command;
-	ApiImpl::CommandBuffer read_command;
+	CommandBuffer expected_written_command;
+	CommandBuffer actual_written_command;
+	CommandBuffer read_command;
 };
 
 class QfsClientDeterminePathTest : public QfsClientTest {
