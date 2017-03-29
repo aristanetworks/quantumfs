@@ -202,9 +202,14 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 			quantumfs.PermReadGroup | quantumfs.PermReadOwner
 	}
 
+	if utils.BitFlagsSet(uint(openFlags), FMODE_EXEC) {
+		checkFlags |= quantumfs.PermExecOther|quantumfs.PermExecGroup|
+			quantumfs.PermExecOwner|quantumfs.PermSUID|
+			quantumfs.PermSGID
+	}
+
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid,
-		checkFlags, false)
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, false)
 }
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
@@ -269,6 +274,15 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	if utils.BitFlagsSet(uint(permission), uint(checkFlags&permMask)) {
 		c.vlog("Has permission: OK. %o %o %o", checkFlags, permMask,
 			permission)
+		return fuse.OK
+	}
+
+	// If execute permissions are lacking, but the file has SUID/SGID, then we
+	// allow it. This may not be correct behavior, but it's what we've been doing
+	if utils.BitAnyFlagSet(uint(permission), uint(quantumfs.PermSUID|
+		quantumfs.PermSGID & checkFlags)) {
+
+		c.vlog("SUID/SGID set, Permission OK")
 		return fuse.OK
 	}
 
