@@ -628,3 +628,46 @@ func TestFileReparentRace(t *testing.T) {
 		}
 	})
 }
+
+func TestFileOwnership(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+
+		dirName := workspace + "/testdir"
+		err := os.MkdirAll(dirName, 0777)
+		test.AssertNoErr(err)
+
+		data := string(genData(2000))
+		testFileA := dirName + "/test"
+		err = testutils.PrintToFile(testFileA, data)
+		test.AssertNoErr(err)
+
+		testFileB := dirName + "/testB"
+		err = testutils.PrintToFile(testFileB, data)
+		test.AssertNoErr(err)
+
+		err = syscall.Chmod(testFileB, 0644)
+		test.AssertNoErr(err)
+		err = syscall.Chown(testFileB, 99, 99)
+		test.AssertNoErr(err)
+
+		// remove write permission on the parent directory
+		err = syscall.Chmod(dirName, 555)
+		test.AssertNoErr(err)
+
+		test.SetUidGid(99, -1)
+		defer test.SetUidGidToDefault()
+
+		// try to remove the file
+		err = os.Remove(testFileA)
+		test.Assert(err != nil, "Removable file without parent permissions")
+
+		// should still be able to write to the file we own
+		err = testutils.PrintToFile(testFileB, data)
+		test.AssertNoErr(err)
+
+		// but shouldn't be able to remove it
+		err = os.Remove(testFileB)
+		test.Assert(err != nil, "Removable file from dir without permission")
+	})
+}
