@@ -11,6 +11,7 @@ import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func NewTypespaceList() Inode {
@@ -21,7 +22,7 @@ func NewTypespaceList() Inode {
 	}
 	tsl.self = &tsl
 	tsl.InodeCommon.treeLock_ = &tsl.realTreeLock
-	assert(tsl.treeLock() != nil, "TypespaceList treeLock nil at init")
+	utils.Assert(tsl.treeLock() != nil, "TypespaceList treeLock nil at init")
 	return &tsl
 }
 
@@ -70,7 +71,7 @@ func (tsl *TypespaceList) markAccessed(c *ctx, path string, created bool) {
 
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	num, err := c.workspaceDB.NumTypespaces(&c.Ctx)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	fillAttr(attr, inodeNum, uint32(num))
 }
@@ -82,7 +83,7 @@ func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	typespace string, namespace string) {
 
 	num, err := c.workspaceDB.NumNamespaces(&c.Ctx, typespace)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	fillAttr(attr, inodeNum, uint32(num))
 }
@@ -91,7 +92,7 @@ func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	typespace string, namespace string) {
 
 	num, err := c.workspaceDB.NumWorkspaces(&c.Ctx, typespace, namespace)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	fillAttr(attr, inodeNum, uint32(num))
 }
@@ -150,6 +151,10 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 		}
 		touched[name] = true
 	}
+
+	// We must lock the instantiation lock to ensure no races between when we
+	// check inodeNoInstantiate and when we call setInode/removeUninstantiated
+	defer c.qfs.instantiationLock.Lock().Unlock()
 
 	// Then delete entries which no longer exist
 	for name, id := range *inodeMap {
@@ -221,7 +226,7 @@ func (tsl *TypespaceList) directChildInodes() []InodeId {
 
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	defer tsl.Lock().Unlock()
 
@@ -249,7 +254,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	}
 
 	exists, err := c.workspaceDB.TypespaceExists(&c.Ctx, name)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	if !exists {
 		return fuse.ENOENT
@@ -257,7 +262,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	var list []string
 	list, err = c.workspaceDB.TypespaceList(&c.Ctx)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	defer tsl.Lock().Unlock()
 
@@ -454,7 +459,7 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 	nsl.self = &nsl
 	nsl.setParent(parent.inodeNum())
 	nsl.InodeCommon.treeLock_ = &nsl.realTreeLock
-	assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
+	utils.Assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
 	return &nsl, nil
 }
 
@@ -522,7 +527,7 @@ func (nsl *NamespaceList) directChildInodes() []InodeId {
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	defer nsl.Lock().Unlock()
 
@@ -537,7 +542,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
 	exists, err := c.workspaceDB.NamespaceExists(&c.Ctx, nsl.typespaceName, name)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	if !exists {
 		return fuse.ENOENT
@@ -545,7 +550,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	var list []string
 	list, err = c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	defer nsl.Lock().Unlock()
 
@@ -751,7 +756,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string, workspace stri
 	wsl.self = &wsl
 	wsl.setParent(parent.inodeNum())
 	wsl.InodeCommon.treeLock_ = &wsl.realTreeLock
-	assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
+	utils.Assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
 	return &wsl, nil
 }
 
@@ -821,7 +826,7 @@ func (wsl *WorkspaceList) directChildInodes() []InodeId {
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	defer wsl.Lock().Unlock()
 
@@ -837,7 +842,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	exists, err := c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName, name)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	if !exists {
 		return fuse.ENOENT
@@ -846,7 +851,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	var list []string
 	list, err = c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
-	assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	defer wsl.Lock().Unlock()
 
