@@ -238,3 +238,19 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 			"Error creating a small file: %v", err)
 	})
 }
+
+// We need isWorkspaceRoot() to be more robust than it has been
+func TestWorkspaceRootChecker(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		wsr := test.getWorkspaceRoot(workspace)
+		var inode Inode
+		inode = wsr
+
+		test.Assert(inode.isWorkspaceRoot() == true,
+			"inode interface not routing")
+		test.Assert(wsr.isWorkspaceRoot() == true, "wsr not recognized")
+		test.Assert(wsr.Directory.isWorkspaceRoot() == true,
+			"wsr dir not routing")
+	})
+}

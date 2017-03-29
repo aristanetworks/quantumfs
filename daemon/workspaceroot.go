@@ -578,10 +578,6 @@ func (wsr *WorkspaceRoot) clearList() {
 	wsr.accessList = make(map[string]bool)
 }
 
-func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
-	return true
-}
-
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("WorkspaceRoot::flush").out()
 
