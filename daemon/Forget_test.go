@@ -211,6 +211,40 @@ func TestMultipleLookupCount(t *testing.T) {
 	})
 }
 
+func TestLookupCountAfterCommand(t *testing.T) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		filename := workspace + "/test"
+		file, err := os.Create(fileName)
+		test.Assert(err == nil, "Error creating a small file: %v", err)
+		file.Close()
+
+		relpath := test.relPath(workspace)
+
+		// Get inodeId of workspace and namespace
+		wsrId := test.getInodeNum(workspace)
+		fileId := test.getInodeNum(fileName)
+
+		api := test.getApi()
+		err = api.GetAccessed(relpath)
+
+		// Now force the kernel to drop all cached inodes
+		test.remountFilesystem()
+		test.AssertLogContains("Forget called",
+			"No inode forget triggered during dentry drop.")
+		test.syncAllWorkspaces()
+
+		// Make sure that the workspace has already been uninstantiated
+		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
+		test.Assert(fileInode == nil,
+			"Failed to forgot file inode")
+
+		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
+		test.Assert(wsrInode == nil,
+			"Failed to forgot workspace inode")
+	})
+}
+
 func TestLookupCountHardlinks(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
