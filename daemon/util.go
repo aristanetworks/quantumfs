@@ -172,55 +172,6 @@ func findFuseConnection(c *ctx, mountPath string) int {
 	return -1
 }
 
-func openPermission(c *ctx, inode Inode, flags_ uint32) bool {
-	defer c.FuncIn("openPermission", "%d", inode.inodeNum()).out()
-
-	record, error := inode.parentGetChildRecordCopy(c, inode.inodeNum())
-	if error != nil {
-		c.elog("%s", error.Error())
-		return false
-	}
-
-	if c.fuseCtx.Owner.Uid == 0 {
-		c.vlog("Root permission check, allowing")
-		return true
-	}
-
-	flags := uint(flags_)
-
-	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
-		flags)
-
-	var userAccess bool
-	switch flags & syscall.O_ACCMODE {
-	case syscall.O_RDONLY:
-		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermReadOther|quantumfs.PermReadGroup|
-				quantumfs.PermReadOwner)
-	case syscall.O_WRONLY:
-		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermWriteOwner|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner)
-	case syscall.O_RDWR:
-		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner|quantumfs.PermReadOther|
-				quantumfs.PermReadGroup|quantumfs.PermReadOwner)
-	}
-
-	var execAccess bool
-	if utils.BitFlagsSet(flags, FMODE_EXEC) {
-		execAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermExecOther|quantumfs.PermExecGroup|
-				quantumfs.PermExecOwner|quantumfs.PermSUID|
-				quantumfs.PermSGID)
-	}
-
-	success := userAccess || execAccess
-	c.vlog("Permission check result %d", success)
-	return success
-}
-
 func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status {
 
 	// Directories require execute permission in order to traverse them.
