@@ -15,7 +15,7 @@ import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
+import "github.com/aristanetworks/quantumfs/qwr"
 import "github.com/aristanetworks/quantumfs/utils"
 
 // Overview about qupload tool's conncurrent nature:
