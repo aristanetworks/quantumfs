@@ -11,9 +11,7 @@ import "io/ioutil"
 import "os"
 import "reflect"
 import "runtime"
-import "strconv"
 import "strings"
-import "sync"
 import "sync/atomic"
 import "syscall"
 import "testing"
@@ -214,29 +212,6 @@ func (th *testHelper) testHelperUpcast(
 	return func(test testutils.TestArg) {
 		testFn(th)
 	}
-}
-
-var genDataMutex sync.RWMutex
-var precompGenData []byte
-var genDataLast int
-
-func genData(maxLen int) []byte {
-	if maxLen > len(precompGenData) {
-		// we need to expand the array
-		genDataMutex.Lock()
-
-		for len(precompGenData) <= maxLen {
-			precompGenData = append(precompGenData,
-				strconv.Itoa(genDataLast)...)
-			genDataLast++
-		}
-
-		genDataMutex.Unlock()
-	}
-	genDataMutex.RLock()
-	defer genDataMutex.RUnlock()
-
-	return precompGenData[:maxLen]
 }
 
 // testHelper holds the variables important to maintain the state of testing
