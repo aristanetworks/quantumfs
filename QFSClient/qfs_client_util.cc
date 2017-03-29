@@ -74,8 +74,8 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 		return "couldn't seek within API file " + details;
 	case kApiFileWriteFail:
 		return "couldn't write to API file " + details;
-	case kApiFileFlushFail:
-		return "couldn't flush API file " + details;
+	case kBufAlignmentFail:
+		return "couldn't align the buffer ";
 	case kApiFileReadFail:
 		return "couldn't read from API file " + details;
 	case kWorkspacePathInvalid:

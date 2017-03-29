@@ -185,8 +185,12 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 
 Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 	// make the input data aligned
-	char *subblk = reinterpret_cast<char*>(
-			aligned_alloc(kBlkSize, command.Size()));
+	void *ptr = aligned_alloc(kBlkSize, command.Size());
+	if (ptr == NULL)
+		return util::getError(kBufAlignmentFail);
+
+	char *subblk = reinterpret_cast<char*>(ptr);
+
 	memcpy(subblk, command.Data(), command.Size());
 	int tmpSize = (command.Size()/kBlkSize)*kBlkSize;
 	if(command.Size()%kBlkSize > 0)
@@ -200,6 +204,7 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 
 	int rtn = lseek(this->fd, 0, SEEK_SET);
 	if (rtn == -1) {
+		pthread_mutex_unlock(&this->fdMutex);
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
@@ -221,7 +226,10 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 
 	// make the buffer align to page block for O_DIRECT
 	int tmpSize = 4096;
-	byte* data = reinterpret_cast<byte*>(aligned_alloc(kBlkSize, tmpSize));
+	void* ptr = aligned_alloc(kBlkSize, tmpSize);
+	if (ptr == NULL)
+		return util::getError(kBufAlignmentFail);
+	byte* data = reinterpret_cast<byte*>(ptr);
 
 	pthread_mutex_lock(&this->fdMutex);
 	if (this->fd < 0) {
@@ -230,8 +238,10 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	}
 
 	int rtn = lseek(this->fd, 0, SEEK_SET);
-	if (rtn == -1)
+	if (rtn == -1) {
+		pthread_mutex_unlock(&this->fdMutex);
 		return util::getError(kApiFileSeekFail);
+	}
 
 	rtn = tmpSize;
 	while(rtn == tmpSize) {
