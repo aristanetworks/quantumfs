@@ -12,6 +12,7 @@ import "os"
 import "runtime"
 import "runtime/debug"
 import "strings"
+import "strconv"
 import "sync"
 import "time"
 
@@ -222,6 +223,19 @@ func (th *TestHelper) waitForQuantumFsToFinish() {
 	th.qfsWait.Wait()
 }
 
+func (th *TestHelper) RestartQuantumFs() error {
+
+	config := th.qfs.config
+	th.api.Close()
+	err := th.qfs.server.Unmount()
+	if err != nil {
+		return err
+	}
+	th.waitForQuantumFsToFinish()
+	th.startQuantumFs(config)
+	return nil
+}
+
 func (th *TestHelper) getApi() *quantumfs.Api {
 	if th.api != nil {
 		return th.api
@@ -353,6 +367,33 @@ func (th *TestHelper) SetDataStore(ds quantumfs.DataStore) {
 
 func (th *TestHelper) GetDataStore() quantumfs.DataStore {
 	return th.qfs.c.dataStore.durableStore
+}
+
+var genDataMutex sync.RWMutex
+var precompGenData []byte
+var genDataLast int
+
+func GenData(maxLen int) []byte {
+	return genData(maxLen)
+}
+
+func genData(maxLen int) []byte {
+	if maxLen > len(precompGenData) {
+		// we need to expand the array
+		genDataMutex.Lock()
+
+		for len(precompGenData) <= maxLen {
+			precompGenData = append(precompGenData,
+				strconv.Itoa(genDataLast)...)
+			genDataLast++
+		}
+
+		genDataMutex.Unlock()
+	}
+	genDataMutex.RLock()
+	defer genDataMutex.RUnlock()
+
+	return precompGenData[:maxLen]
 }
 
 // Global test request ID incremented for all the running tests

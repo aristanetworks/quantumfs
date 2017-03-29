@@ -39,7 +39,7 @@ type Directory struct {
 	// accessible in instantiateChild(), which may be called indirectly
 	// via qfs.inode() from a context where the Inode lock is already
 	// held.
-	childRecordLock DeferableMutex
+	childRecordLock utils.DeferableMutex
 	children        *ChildMap
 }
 
