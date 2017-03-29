@@ -651,16 +651,23 @@ func TestFileOwnership(t *testing.T) {
 		err = syscall.Chown(testFileB, 99, 99)
 		test.AssertNoErr(err)
 
+		err = syscall.Chmod(testFileA, 660)
+		test.AssertNoErr(err)
+
 		// remove write permission on the parent directory
 		err = syscall.Chmod(dirName, 555)
 		test.AssertNoErr(err)
 
-		test.SetUidGid(99, -1)
+		test.SetUidGid(99, 99)
 		defer test.SetUidGidToDefault()
 
 		// try to remove the file
 		err = os.Remove(testFileA)
 		test.Assert(err != nil, "Removable file without parent permissions")
+
+		// should not be able to write to the file we don't own
+		err = testutils.PrintToFile(testFileA, data)
+		test.Assert(err != nil, "Able to write to file we don't own")
 
 		// should still be able to write to the file we own
 		err = testutils.PrintToFile(testFileB, data)

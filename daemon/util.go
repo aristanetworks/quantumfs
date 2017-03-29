@@ -262,9 +262,9 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 
 	var arg string
 	if checkStickyBit {
-		arg = "checkStickyBit, %x"
+		arg = "checkStickyBit, %o"
 	} else {
-		arg = "no checkStickyBit, %x"
+		arg = "no checkStickyBit, %o"
 	}
 	defer c.FuncIn("hasPermissionIds", arg, checkFlags).out()
 
