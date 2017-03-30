@@ -94,7 +94,7 @@ func accessTestBothUsers(test *testHelper, filename string) {
 	accessTest(test, filename, false, false)
 
 	// Now run it as the user who has access
-	err = os.Chown(filename, 0, 99)
+	err = os.Chown(filename, 99, 0)
 	test.AssertNoErr(err)
 	accessTest(test, filename, true, false)
 }
