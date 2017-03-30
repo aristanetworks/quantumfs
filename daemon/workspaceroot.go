@@ -29,7 +29,7 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	linkLock       DeferableRwMutex
+	linkLock       utils.DeferableRwMutex
 	hardlinks      map[HardlinkId]linkEntry
 	nextHardlinkId HardlinkId
 	inodeToLink    map[InodeId]HardlinkId

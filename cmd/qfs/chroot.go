@@ -417,6 +417,13 @@ func copyDirStayOnFs(src string, dst string) error {
 				return fmt.Errorf("Create directory %s error: %s",
 					nameDst, errMkdir.Error())
 			}
+			if name == "/dev/shm" {
+				// /dev/shm is generally a tmpfs filesystem full of
+				// things which make no sense to copy into the
+				// chroot. We want to create the directory, but not
+				// copy any of its contents.
+				return filepath.SkipDir
+			}
 		} else if finfo.Mode().IsRegular() {
 			// There should not be any ordinary files in /dev directory,
 			// though in rare cases like /dev/shm there may be. Warn, but
