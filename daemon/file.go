@@ -77,7 +77,7 @@ type File struct {
 	accessor     blockAccessor
 	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
-	unlinkLock   DeferableRwMutex
+	unlinkLock   utils.DeferableRwMutex
 }
 
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
