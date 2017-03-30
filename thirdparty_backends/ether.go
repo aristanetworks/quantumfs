@@ -39,8 +39,9 @@ func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 	return &translator
 }
 
-// we define a custom time so that Unmarshalling
-// can be setup
+// The JSON decoder, by default, doesn't unmarshal time.Duration from a
+// string. The custom struct allows to setup an unmarshaller which uses
+// time.ParseDuration
 type CqlTTLDuration struct {
 	Duration time.Duration
 }
@@ -64,9 +65,8 @@ func (d *CqlTTLDuration) UnmarshalJSON(data []byte) error {
 
 type CqlAdapterConfig struct {
 	// CqlTTLRefreshTime controls when a block's TTL is refreshed
-	// When a block's TTL is <= CqlTTLRefreshTime then its TTL
-	// is refreshed.
-	// Its a string in the format accepted by
+	// A block's TTL is refreshed when its TTL is <= CqlTTLRefreshTime
+	// ttlrefreshtime is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
 	TTLRefreshTime CqlTTLDuration `json:"ttlrefreshtime"`
 
@@ -74,14 +74,14 @@ type CqlAdapterConfig struct {
 	// be advanced during TTL refresh.
 	// When a block's TTL is refreshed, its new TTL is set as
 	// now + CqlTTLRefreshValue
-	// Its a string in the format accepted by
+	// ttlrefreshvalue is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
 	TTLRefreshValue CqlTTLDuration `json:"ttlrefreshvalue"`
 
 	// CqlTTLDefaultValue is the TTL value of a new block
 	// When a block is written its TTL is set to
 	// now + CqlTTLDefaultValue
-	// Its a string in the format accepted by
+	// ttldefaultvalue is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
 	TTLDefaultValue CqlTTLDuration `json:"ttldefaultvalue"`
 }
@@ -92,7 +92,7 @@ var defaultTTLValueSecs int64
 
 func loadCqlAdapterConfig(path string) error {
 	var c struct {
-		a CqlAdapterConfig `json:"qfs"`
+		a CqlAdapterConfig `json:"adapter"`
 	}
 
 	f, err := os.Open(path)
@@ -144,8 +144,7 @@ type EtherBlobStoreTranslator struct {
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
-// TODO(krishna) : refer to bugXXX which talks about cleaning up
-// blobstore API for proper metadata handling
+// TODO(krishna) : clean up blobstore API for proper metadata handling
 // once Metadata API is refactored, above assertion won't be necessary
 
 // TTL will be set using Insert under following scenarios:
@@ -158,11 +157,12 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 
 	if keyExist {
 		if metadata == nil {
-			panic("Store must return metadata")
+			return fmt.Errorf("Store must have metadata")
 		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
-			panic("Store must return metadata with TimeToLive")
+			return fmt.Errorf("Store must return metadata with " +
+				"TimeToLive")
 		}
 		ttlVal, err := strconv.ParseInt(ttl, 10, 64)
 		if err != nil {
