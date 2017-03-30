@@ -228,30 +228,31 @@ type CommandCommon struct {
 // IMPORTANT: please do not change the order/values of the above constants, QFSClient
 // depends on the fact that the values should not change !!!!!
 const (
-	CmdError           = iota
-	CmdBranchRequest   = iota
-	CmdGetAccessed     = iota
-	CmdClearAccessed   = iota
-	CmdSyncAll         = iota
-	CmdInsertInode     = iota
-	CmdDeleteWorkspace = iota
-	CmdSetBlock        = iota
-	CmdGetBlock        = iota
-	CmdEnableRootWrite = iota
+	CmdInvalid         = 0
+	CmdError           = 1
+	CmdBranchRequest   = 2
+	CmdGetAccessed     = 3
+	CmdClearAccessed   = 4
+	CmdSyncAll         = 5
+	CmdInsertInode     = 6
+	CmdDeleteWorkspace = 7
+	CmdSetBlock        = 8
+	CmdGetBlock        = 9
+	CmdEnableRootWrite = 10
 )
 
 // The various error codes
 // IMPORTANT: please do not change the order/values of the above constants, QFSClient
 // depends on the fact that the values should not change !!!!!
 const (
-	ErrorOK                = iota // Command Successful
-	ErrorBadArgs           = iota // The argument is wrong
-	ErrorBadJson           = iota // Failed to parse command
-	ErrorBadCommandId      = iota // Unknown command ID
-	ErrorCommandFailed     = iota // The Command failed, see the error for info
-	ErrorKeyNotFound       = iota // The extended key isn't stored in datastore
-	ErrorBlockTooLarge     = iota // SetBlock was passed a block that's too large
-	ErrorWorkspaceNotFound = iota // The workspace cannot be found in QuantumFS
+	ErrorOK                = 0 // Command Successful
+	ErrorBadArgs           = 1 // The argument is wrong
+	ErrorBadJson           = 2 // Failed to parse command
+	ErrorBadCommandId      = 3 // Unknown command ID
+	ErrorCommandFailed     = 4 // The Command failed, see the error for info
+	ErrorKeyNotFound       = 5 // The extended key isn't stored in datastore
+	ErrorBlockTooLarge     = 6 // SetBlock was passed a block that's too large
+	ErrorWorkspaceNotFound = 7 // The workspace cannot be found in QuantumFS
 )
 
 type ErrorResponse struct {

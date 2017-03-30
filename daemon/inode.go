@@ -10,6 +10,7 @@ import "sync"
 import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 type InodeId uint64
@@ -108,7 +109,7 @@ type Inode interface {
 	parent_(c *ctx) Inode
 	setParent(newParent InodeId)
 	setParent_(newParent InodeId)
-	getParentLock() *DeferableRwMutex
+	getParentLock() *utils.DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
 	// orphaned from the directory tree and cannot be accessed except directly by
@@ -183,10 +184,10 @@ type InodeCommon struct {
 	accessed_ uint32
 
 	// Note: parentId must not be accessed or changed without the parentLock
-	parentLock DeferableRwMutex
+	parentLock utils.DeferableRwMutex
 	parentId   InodeId
 
-	lock DeferableRwMutex
+	lock utils.DeferableRwMutex
 
 	// The treeLock is used to lock the entire workspace tree when certain
 	// tree-wide operations are being performed. Primarily this is done with all
@@ -196,7 +197,7 @@ type InodeCommon struct {
 
 	// This field is accessed using atomic instructions
 	dirty_           uint32 // 1 if this Inode or any children are dirty
-	dirtyElementLock DeferableMutex
+	dirtyElementLock utils.DeferableMutex
 	dirtyElement_    *list.Element
 }
 
@@ -377,7 +378,7 @@ func (inode *InodeCommon) setParent_(newParent InodeId) {
 	inode.parentId = newParent
 }
 
-func (inode *InodeCommon) getParentLock() *DeferableRwMutex {
+func (inode *InodeCommon) getParentLock() *utils.DeferableRwMutex {
 	return &inode.parentLock
 }
 
@@ -476,11 +477,11 @@ func (inode *InodeCommon) RLockTree() *sync.RWMutex {
 	return inode.treeLock_
 }
 
-func (inode *InodeCommon) Lock() NeedWriteUnlock {
+func (inode *InodeCommon) Lock() utils.NeedWriteUnlock {
 	return inode.lock.Lock()
 }
 
-func (inode *InodeCommon) RLock() NeedReadUnlock {
+func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 	return inode.lock.RLock()
 }
 
@@ -513,7 +514,8 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
 }
 
 func (inode *InodeCommon) isWorkspaceRoot() bool {
-	return false
+	_, isWsr := inode.self.(*WorkspaceRoot)
+	return isWsr
 }
 
 // Deleting a child may require that we orphan it, and because we *must* lock from
