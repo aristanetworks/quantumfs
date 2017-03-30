@@ -162,7 +162,7 @@ type EtherBlobStoreTranslator struct {
 
 // TTL will be set using Insert under following scenarios:
 //  a) key exists and current TTL < refreshTTLTimeSecs
-//  b) key doesn't exit
+//  b) key doesn't exist
 func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	metadata map[string]string, buf []byte) error {
 
