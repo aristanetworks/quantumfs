@@ -9,7 +9,11 @@
 package thirdparty_backends
 
 import "bytes"
+import "encoding/json"
 import "fmt"
+import "os"
+import "strconv"
+import "time"
 
 import "github.com/aristanetworks/ether/blobstore"
 import "github.com/aristanetworks/ether/cql"
@@ -35,7 +39,95 @@ func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 	return &translator
 }
 
+// we define a custom time so that Unmarshalling
+// can be setup
+type CqlTTLDuration struct {
+	Duration time.Duration
+}
+
+func (d *CqlTTLDuration) UnmarshalJSON(data []byte) error {
+	var str string
+	var dur time.Duration
+	var err error
+	if err = json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	dur, err = time.ParseDuration(str)
+	if err != nil {
+		return err
+	}
+
+	d.Duration = dur
+	return nil
+}
+
+type CqlAdapterConfig struct {
+	// CqlTTLRefreshTime controls when a block's TTL is refreshed
+	// When a block's TTL is <= CqlTTLRefreshTime then its TTL
+	// is refreshed.
+	// Its a string in the format accepted by
+	// https://golang.org/pkg/time/#ParseDuration
+	TTLRefreshTime CqlTTLDuration `json:"ttlrefreshtime"`
+
+	// CqlTTLRefreshValue is the time by which a block's TTL will
+	// be advanced during TTL refresh.
+	// When a block's TTL is refreshed, its new TTL is set as
+	// now + CqlTTLRefreshValue
+	// Its a string in the format accepted by
+	// https://golang.org/pkg/time/#ParseDuration
+	TTLRefreshValue CqlTTLDuration `json:"ttlrefreshvalue"`
+
+	// CqlTTLDefaultValue is the TTL value of a new block
+	// When a block is written its TTL is set to
+	// now + CqlTTLDefaultValue
+	// Its a string in the format accepted by
+	// https://golang.org/pkg/time/#ParseDuration
+	TTLDefaultValue CqlTTLDuration `json:"ttldefaultvalue"`
+}
+
+var refreshTTLTimeSecs int64
+var refreshTTLValueSecs int64
+var defaultTTLValueSecs int64
+
+func loadCqlAdapterConfig(path string) error {
+	var c struct {
+		a CqlAdapterConfig `json:"qfs"`
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	err = json.NewDecoder(f).Decode(&c)
+	if err != nil {
+		return err
+	}
+
+	refreshTTLTimeSecs = int64(c.a.TTLRefreshTime.Duration.Seconds())
+	refreshTTLValueSecs = int64(c.a.TTLRefreshValue.Duration.Seconds())
+	defaultTTLValueSecs = int64(c.a.TTLDefaultValue.Duration.Seconds())
+
+	if refreshTTLTimeSecs == 0 || refreshTTLValueSecs == 0 ||
+		defaultTTLValueSecs == 0 {
+		return fmt.Errorf("ttldefaultvalue, ttlrefreshvalue and " +
+			"ttlrefreshtime must be non-zero")
+	}
+
+	// we can add more checks here later on eg: min of 1 day etc
+
+	return nil
+}
+
 func NewEtherCqlStore(path string) quantumfs.DataStore {
+
+	cerr := loadCqlAdapterConfig(path)
+	if cerr != nil {
+		fmt.Printf("Error loading %q: %v\n", path, cerr)
+		return nil
+	}
 
 	blobstore, err := cql.NewCqlBlobStore(path)
 	if err != nil {
@@ -51,11 +143,61 @@ type EtherBlobStoreTranslator struct {
 	blobstore blobstore.BlobStore
 }
 
+// asserts that metadata is !nil and it contains cql.TimeToLive
+// TODO(krishna) : refer to bugXXX which talks about cleaning up
+// blobstore API for proper metadata handling
+// once Metadata API is refactored, above assertion won't be necessary
+
+// TTL will be set using Insert under following scenarios:
+//  a) key exists and current TTL < refreshTTLTimeSecs
+//  b) key doesn't exit
+func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
+	metadata map[string]string, buf []byte) error {
+
+	setTTL := time.Now().Unix() + defaultTTLValueSecs
+
+	if keyExist {
+		if metadata == nil {
+			panic("Store must return metadata")
+		}
+		ttl, ok := metadata[cql.TimeToLive]
+		if !ok {
+			panic("Store must return metadata with TimeToLive")
+		}
+		ttlVal, err := strconv.ParseInt(ttl, 10, 64)
+		if err != nil {
+			return fmt.Errorf("Invalid TTL value in metadata %s ",
+				ttl)
+		}
+
+		// if key exists and TTL doesn't need to be refreshed
+		// then return
+		if ttlVal > refreshTTLTimeSecs {
+			return nil
+		}
+		// if key exists but TTL needs to be refreshed then
+		// calculate new TTL. We don't need to re-fetch the
+		// data since data in buf has to be same, given the key
+		// exists
+		setTTL = time.Now().Unix() + refreshTTLValueSecs
+	}
+
+	// if key doesn't exist then use default TTL
+	newmetadata := make(map[string]string)
+	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", setTTL)
+	return b.Insert(key, buf, newmetadata)
+}
+
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	data, _, err := ebt.blobstore.Get(key.String())
+	ks := key.String()
+	data, metadata, err := ebt.blobstore.Get(ks)
+	if err != nil {
+		return err
+	}
 
+	err = refreshTTL(ebt.blobstore, true, ks, metadata, data)
 	if err != nil {
 		return err
 	}
@@ -67,7 +209,26 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectK
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	return ebt.blobstore.Insert(key.String(), buf.Get(), nil)
+	ks := key.String()
+	metadata, err := ebt.blobstore.Metadata(ks)
+
+	switch {
+	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
+		return refreshTTL(ebt.blobstore, false, ks, nil, buf.Get())
+
+	case err == nil:
+		return refreshTTL(ebt.blobstore, true, ks, metadata, buf.Get())
+
+	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
+		// if metadata error other than ErrKeyNotFound then fail the Set since
+		// we haven't been able to ascertain TTL state so we
+		// can't overwrite it
+		return err
+	}
+
+	panicMsg := fmt.Sprintf("EtherAdapter.Set code shouldn't reach here. "+
+		"Key %s error %v metadata %v\n", ks, err, metadata)
+	panic(panicMsg)
 }
 
 type EtherWsdbTranslator struct {
