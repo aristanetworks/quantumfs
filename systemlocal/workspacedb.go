@@ -328,13 +328,8 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 		}
 
 		// Create the destination typespace/namespace if necessary
-		namespaces, err := typespaces.CreateBucketIfNotExists(
-			[]byte(dstTypespace))
-		if err != nil {
-			return err
-		}
-		workspaces, err = namespaces.CreateBucketIfNotExists(
-			[]byte(dstNamespace))
+		workspaces, err := getWorkspaces(typespaces,
+			dstTypespace, dstNamespace)
 		if err != nil {
 			return err
 		}
@@ -496,7 +491,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 func (wsdb *WorkspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	exists := false
+	var exists bool
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		state := getWorkspaceContent_(tx, stateTypespacesBucket,
 			typespace, namespace, workspace)
@@ -509,28 +504,34 @@ func (wsdb *WorkspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 	return exists, err
 }
 
+func getWorkspaces(typespaces *bolt.Bucket, typespace string,
+	namespace string) (*bolt.Bucket, error) {
+
+	namespaces, err := typespaces.CreateBucketIfNotExists([]byte(typespace))
+	if err != nil {
+		return nil, err
+	}
+
+	workspaces, err := namespaces.CreateBucketIfNotExists([]byte(namespace))
+	if err != nil {
+		return nil, err
+	}
+	return workspaces, nil
+}
+
 func (wsdb *WorkspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
-		var err error
 
-		typespaces := tx.Bucket(typespacesBucket)
-		namespaces := typespaces.Bucket([]byte(typespace))
-		if namespaces == nil {
-			namespaces, err = typespaces.CreateBucket([]byte(typespace))
+		typespaces := tx.Bucket(stateTypespacesBucket)
+		workspaces, err := getWorkspaces(typespaces, typespace, namespace)
+		if err != nil {
 			return err
 		}
 
-		workspaces := namespaces.Bucket([]byte(namespace))
-		if workspaces == nil {
-			workspaces, err = namespaces.CreateBucket([]byte(namespace))
-			return err
-		}
-
-		state := workspaces.Bucket([]byte(workspace))
-		if state == nil {
-			state, err = workspaces.CreateBucket([]byte("T"))
+		err = workspaces.Put([]byte(workspace), []byte("T"))
+		if err != nil {
 			return err
 		}
 

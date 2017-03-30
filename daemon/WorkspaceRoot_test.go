@@ -294,3 +294,24 @@ func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
 		test.Assert(err == nil, "Error creating a small file: %v", err)
 	})
 }
+
+func TestSetRemoteWorkspaceImmutable(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		// Remotely set the workspace immutable
+		dst := strings.Split(workspaceName, "/")
+		c := test.testCtx()
+		err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx,
+			dst[0], dst[1], dst[2])
+		test.Assert(err == nil, "Workspace %s can't be set immutable",
+			workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.Assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
+	})
+}
