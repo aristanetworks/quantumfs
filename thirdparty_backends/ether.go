@@ -185,7 +185,7 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 
 		// if key exists and TTL doesn't need to be refreshed
 		// then return
-		if ttlVal > refreshTTLTimeSecs {
+		if ttlVal >= refreshTTLTimeSecs {
 			return nil
 		}
 		// if key exists but TTL needs to be refreshed then
