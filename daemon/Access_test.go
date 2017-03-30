@@ -25,9 +25,6 @@ func permTest(test *testHelper, filename string, modeCheck uint32,
 	}
 }
 
-// Access uses the real uid, so we can't use setregid the way we normally do.
-// Since we can't re-get sudo after changing the real uid, we have to run this check
-// in a go routine that we throw away.
 func permTestSub(test *testHelper, filename string, modeCheck uint32,
 	shouldPass bool, asRoot bool) {
 
