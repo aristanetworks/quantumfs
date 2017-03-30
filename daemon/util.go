@@ -199,9 +199,10 @@ func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status
 
 	// Directories require execute permission in order to traverse them.
 	// So, we must check both write and execute bits
-	checkFlags := uint32(quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
-		quantumfs.PermWriteOwner | quantumfs.PermExecOther |
-		quantumfs.PermExecGroup | quantumfs.PermExecOwner)
+	checkFlags := uint32(0 |
+		quantumfs.PermWriteOther | quantumfs.PermExecOther |
+		quantumfs.PermWriteOwner | quantumfs.PermExecOwner |
+		quantumfs.PermWriteGroup | quantumfs.PermExecGroup)
 
 	owner := c.fuseCtx.Owner
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags,
@@ -225,21 +226,20 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 			quantumfs.PermReadGroup | quantumfs.PermReadOwner
 	}
 
+	if utils.BitFlagsSet(uint(openFlags), FMODE_EXEC) {
+		checkFlags |= quantumfs.PermExecOther | quantumfs.PermExecGroup |
+			quantumfs.PermExecOwner | quantumfs.PermSUID |
+			quantumfs.PermSGID
+	}
+
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid,
-		checkFlags, false)
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, false)
 }
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, checkFlags uint32, checkStickyBit bool) fuse.Status {
 
-	var arg string
-	if checkStickyBit {
-		arg = "checkStickyBit, %o"
-	} else {
-		arg = "no checkStickyBit, %o"
-	}
-	defer c.FuncIn("hasPermissionIds", arg, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%t %o", checkStickyBit, checkFlags).out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
@@ -292,6 +292,15 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	if utils.BitFlagsSet(uint(permission), uint(checkFlags&permMask)) {
 		c.vlog("Has permission: OK. %o %o %o", checkFlags, permMask,
 			permission)
+		return fuse.OK
+	}
+
+	// If execute permissions are lacking, but the file has SUID/SGID, then we
+	// allow it. This may not be correct behavior, but it's what we've been doing
+	if utils.BitAnyFlagSet(uint(permission), uint(quantumfs.PermSUID|
+		quantumfs.PermSGID&checkFlags)) {
+
+		c.vlog("SUID/SGID set, Permission OK")
 		return fuse.OK
 	}
 
