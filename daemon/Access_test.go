@@ -4,82 +4,57 @@
 package daemon
 
 // Test that Access works in a variety of scenarios
-import "errors"
 import "os"
-import "sync"
 import "syscall"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func permTest(test *testHelper, filename string, modeCheck uint32,
-	shouldPass bool) error {
+	shouldPass bool) {
 
 	err := syscall.Access(filename+"garbage", F_OK)
-	if err == nil {
-		return errors.New("Access on invalid file passes")
-	}
+	test.Assert(err != nil, "Access on invalid file passes")
 
 	err = syscall.Access(filename, modeCheck)
-	if (err != nil) && shouldPass {
-		return errors.New("Access fails with permission")
-	} else if (err == nil) && !shouldPass {
-		return errors.New("Access doesn't fail when missing permission")
+	if shouldPass {
+		test.Assert(err == nil, "Access fails with permission")
+	} else {
+		test.Assert(err != nil,
+			"Access doesn't fail when missing permission")
 	}
-
-	return nil
 }
 
 // Access uses the real uid, so we can't use setregid the way we normally do.
 // Since we can't re-get sudo after changing the real uid, we have to run this check
 // in a go routine that we throw away.
 func permTestSub(test *testHelper, filename string, modeCheck uint32,
-	shouldPass bool, asRoot bool, wg *sync.WaitGroup, err *error) {
+	shouldPass bool, asRoot bool) {
 
 	defer syscall.Setreuid(0, -1)
-	defer wg.Done()
 
 	if !asRoot {
-		*err = syscall.Setreuid(99, -1)
-		if *err != nil {
-			return
-		}
+		err := syscall.Setreuid(99, -1)
+		test.AssertNoErr(err)
 	}
 
-	*err = permTest(test, filename, modeCheck, shouldPass)
+	permTest(test, filename, modeCheck, shouldPass)
 }
 
 func accessTest(test *testHelper, filename string, shouldPass bool, asRoot bool) {
-	var err error
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	syscall.Chmod(filename, 0000)
 	// just tests if file exists, so should always pass
-	go permTestSub(test, filename, F_OK, true, asRoot, &wg, &err)
-	wg.Wait()
-	test.AssertNoErr(err)
+	permTestSub(test, filename, F_OK, true, asRoot)
 
-	wg = sync.WaitGroup{}
-	wg.Add(1)
 	syscall.Chmod(filename, 0400)
-	go permTestSub(test, filename, R_OK, shouldPass, asRoot, &wg, &err)
-	wg.Wait()
-	test.AssertNoErr(err)
+	permTestSub(test, filename, R_OK, shouldPass, asRoot)
 
-	wg = sync.WaitGroup{}
-	wg.Add(1)
 	syscall.Chmod(filename, 0200)
-	go permTestSub(test, filename, W_OK, shouldPass, asRoot, &wg, &err)
-	wg.Wait()
-	test.AssertNoErr(err)
+	permTestSub(test, filename, W_OK, shouldPass, asRoot)
 
-	wg = sync.WaitGroup{}
-	wg.Add(1)
 	syscall.Chmod(filename, 0100)
-	go permTestSub(test, filename, X_OK, shouldPass, asRoot, &wg, &err)
-	wg.Wait()
-	test.AssertNoErr(err)
+	permTestSub(test, filename, X_OK, shouldPass, asRoot)
 }
 
 func accessTestBothUsers(test *testHelper, filename string) {
