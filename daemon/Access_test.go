@@ -1,10 +1,11 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package daemon
 
 // Test that Access works in a variety of scenarios
 import "os"
+import "runtime"
 import "syscall"
 import "testing"
 
@@ -28,11 +29,14 @@ func permTest(test *testHelper, filename string, modeCheck uint32,
 func permTestSub(test *testHelper, filename string, modeCheck uint32,
 	shouldPass bool, asRoot bool) {
 
-	defer syscall.Setreuid(0, -1)
-
 	if !asRoot {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
 		err := syscall.Setreuid(99, -1)
 		test.AssertNoErr(err)
+
+		defer syscall.Setreuid(0, -1)
 	}
 
 	permTest(test, filename, modeCheck, shouldPass)
@@ -91,6 +95,23 @@ func TestAccessListFileSubdir(t *testing.T) {
 		err := testutils.PrintToFile(filename, string(genData(1000)))
 		test.AssertNoErr(err)
 
+		accessTestBothUsers(test, filename)
+	})
+}
+
+func TestAccessListHardlinkInWsr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
+
+		filename := workspace + "/testFile"
+		err := testutils.PrintToFile(filename, string(genData(1000)))
+		test.AssertNoErr(err)
+
+		linkname := workspace + "/subdir/subsubdir/linkFile"
+		err = syscall.Link(filename, linkname)
+
+		accessTestBothUsers(test, linkname)
 		accessTestBothUsers(test, filename)
 	})
 }

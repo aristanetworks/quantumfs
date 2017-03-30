@@ -68,12 +68,7 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	defer c.funcIn("Special::Access").out()
 
 	special.self.markSelfAccessed(c, false)
-	access := hasAccessPermission(c, special, mask, uid, gid)
-	if access != fuse.OK {
-		return access
-	}
-
-	return fuse.OK
+	return hasAccessPermission(c, special, mask, uid, gid)
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
