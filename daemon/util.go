@@ -176,10 +176,6 @@ func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status
 
 	// Directories require execute permission in order to traverse them.
 	// So, we must check both write and execute bits
-	checkFlags := uint32(quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
-		quantumfs.PermWriteOwner | quantumfs.PermExecOther |
-		quantumfs.PermExecGroup | quantumfs.PermExecOwner)
-
 	checkFlags := uint32(0 |
 		quantumfs.PermWriteOther | quantumfs.PermExecOther |
 		quantumfs.PermWriteOwner | quantumfs.PermExecOwner |
