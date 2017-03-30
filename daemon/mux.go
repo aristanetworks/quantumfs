@@ -663,6 +663,7 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
+	qfs.c.dlog("inode has lookupCount of %d", lookupCount)
 	if !exists {
 		qfs.c.dlog("inode %d has not been instantiated", inodeId)
 		return true
@@ -883,6 +884,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	var typespaceAttr fuse.EntryOut
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
+	defer qfs.Forget(typespaceAttr.NodeId, 1)
 	if result != fuse.OK {
 		return nil, false
 	}
@@ -890,6 +892,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
+	defer qfs.Forget(namespaceAttr.NodeId, 1)
 	if result != fuse.OK {
 		return nil, false
 	}
@@ -898,6 +901,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	var workspaceRootAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
+	defer qfs.Forget(workspaceRootAttr.NodeId, 1)
 	if result != fuse.OK {
 		return nil, false
 	}
