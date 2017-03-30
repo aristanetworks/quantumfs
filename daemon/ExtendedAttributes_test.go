@@ -11,10 +11,10 @@ import "os"
 import "strings"
 import "syscall"
 import "testing"
-import "unsafe"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestExtendedAttrReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -278,7 +278,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 			quantumfs.ObjectTypeDirectoryEntry)
 
 		// check the symlink
-		sz, err, dst = lGetXattr(linkName, quantumfs.XAttrTypeKey,
+		sz, err, dst = utils.LGetXattr(linkName, quantumfs.XAttrTypeKey,
 			quantumfs.ExtendedKeyLength)
 		test.Assert(err == nil && sz == quantumfs.ExtendedKeyLength,
 			"Error getting the symlink key: %v with a size of %d",
@@ -398,94 +398,6 @@ func TestExtendedKeyDirtyChild(t *testing.T) {
 	})
 }
 
-func fSetXattr(fd int, attr string, data []byte, flags int) (err error) {
-	var attr_str_ptr *byte
-	attr_str_ptr, err = syscall.BytePtrFromString(attr)
-	if err != nil {
-		return
-	}
-	var data_buf_ptr unsafe.Pointer
-	if len(data) > 0 {
-		data_buf_ptr = unsafe.Pointer(&data[0])
-	} else {
-		data_buf_ptr = unsafe.Pointer(&_zero)
-	}
-	_, _, e1 := syscall.Syscall6(syscall.SYS_FSETXATTR,
-		uintptr(fd),
-		uintptr(unsafe.Pointer(attr_str_ptr)),
-		uintptr(data_buf_ptr), uintptr(len(data)), uintptr(flags), 0)
-
-	if e1 != 0 {
-		err = e1
-	}
-	return
-}
-
-func fGetXattr(fd int, attr string,
-	size int) (sz int, err error, output []byte) {
-
-	var attr_str_ptr *byte
-	attr_str_ptr, err = syscall.BytePtrFromString(attr)
-	if err != nil {
-		return
-	}
-	var dest_buf_ptr unsafe.Pointer
-	dest := make([]byte, size, size*2)
-	if size > 0 {
-		dest_buf_ptr = unsafe.Pointer(&dest[0])
-	} else {
-		dest_buf_ptr = unsafe.Pointer(&_zero)
-	}
-	r0, _, e1 := syscall.Syscall6(syscall.SYS_FGETXATTR,
-		uintptr(fd), uintptr(unsafe.Pointer(attr_str_ptr)),
-		uintptr(dest_buf_ptr), uintptr(len(dest)), 0, 0)
-
-	sz = int(r0)
-	if e1 != 0 {
-		err = e1
-	}
-	if sz > 0 {
-		dest = dest[:sz]
-	}
-	output = dest
-	return
-}
-
-func fListXattr(fd int, size int) (sz int, err error, output []byte) {
-	var dest_buf_ptr unsafe.Pointer
-	dest := make([]byte, size, size*2)
-	if size > 0 {
-		dest_buf_ptr = unsafe.Pointer(&dest[0])
-	} else {
-		dest_buf_ptr = unsafe.Pointer(&_zero)
-	}
-	r0, _, e1 := syscall.Syscall(syscall.SYS_FLISTXATTR,
-		uintptr(fd), uintptr(dest_buf_ptr), uintptr(len(dest)))
-	sz = int(r0)
-	if e1 != 0 {
-		err = e1
-	}
-	if sz > 0 {
-		dest = dest[:sz]
-	}
-	output = dest
-	return
-}
-
-func fRemoveXattr(fd int, attr string) (err error) {
-	var attr_str_ptr *byte
-	attr_str_ptr, err = syscall.BytePtrFromString(attr)
-	if err != nil {
-		return
-	}
-	_, _, e1 := syscall.Syscall(syscall.SYS_FREMOVEXATTR,
-		uintptr(fd), uintptr(unsafe.Pointer(attr_str_ptr)), 0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
-}
-
 var initialXAttrNames []string
 var initialXAttrValues []string
 
@@ -524,7 +436,7 @@ func TestOrphanedFileXAttrList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
-		_, err, list := fListXattr(fd, 1024)
+		_, err, list := utils.FListXattr(fd, 1024)
 
 		test.Assert(err == nil, "Error listing XAttrs: %v", err)
 
@@ -543,7 +455,7 @@ func TestOrphanedFileXAttrGet(t *testing.T) {
 		for i, name := range initialXAttrNames {
 			value := initialXAttrValues[i]
 
-			_, err, data := fGetXattr(fd, name, 1024)
+			_, err, data := utils.FGetXattr(fd, name, 1024)
 			test.Assert(err == nil, "Error retrieving attr: %v", err)
 
 			str := string(data)
@@ -551,7 +463,7 @@ func TestOrphanedFileXAttrGet(t *testing.T) {
 				str, value, name)
 		}
 
-		_, err, _ := fGetXattr(fd, "user.doesnotexist", 1024)
+		_, err, _ := utils.FGetXattr(fd, "user.doesnotexist", 1024)
 		test.Assert(err != nil && err == syscall.ENODATA,
 			"Succeeded retrieving non-existant XAttr")
 	})
@@ -562,13 +474,13 @@ func TestOrphanFileXAttrSet(t *testing.T) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
 
-		err := fSetXattr(fd, "user.new", []byte("new"), 0)
+		err := utils.FSetXattr(fd, "user.new", []byte("new"), 0)
 		test.Assert(err == nil, "Error creating XAttr: %v", err)
 
-		err = fSetXattr(fd, "user.a1", []byte("overwritten"), 0)
+		err = utils.FSetXattr(fd, "user.a1", []byte("overwritten"), 0)
 		test.Assert(err == nil, "Error overwriting XAttr: %v", err)
 
-		_, err, list := fListXattr(fd, 1024)
+		_, err, list := utils.FListXattr(fd, 1024)
 		test.Assert(err == nil, "Error listing XAttrs: %v", err)
 
 		for i, name := range initialXAttrNames {
@@ -581,7 +493,7 @@ func TestOrphanFileXAttrSet(t *testing.T) {
 			test.Assert(bytes.Contains(list, []byte(name)),
 				"XAttr list did not contain name %s", name)
 
-			_, err, data := fGetXattr(fd, name, 1024)
+			_, err, data := utils.FGetXattr(fd, name, 1024)
 			test.Assert(err == nil, "Error fetching XAttr: %v", err)
 			test.Assert(string(data) == value, "Value mismatch %s - %s",
 				string(data), value)
@@ -589,7 +501,7 @@ func TestOrphanFileXAttrSet(t *testing.T) {
 
 		test.Assert(bytes.Contains(list, []byte("user.new")),
 			"New XAttr not present")
-		_, err, data := fGetXattr(fd, "user.new", 1024)
+		_, err, data := utils.FGetXattr(fd, "user.new", 1024)
 		test.Assert(err == nil, "Error fetching new XAttr: %v", err)
 		test.Assert(string(data) == "new", "New attribute value wrong %s",
 			string(data))
@@ -601,16 +513,16 @@ func TestOrphanFileXAttrRemove(t *testing.T) {
 		fd := initOrphanedFileExtendedAttributes(test)
 		defer syscall.Close(fd)
 
-		err := fSetXattr(fd, "user.new", []byte("new"), 0)
+		err := utils.FSetXattr(fd, "user.new", []byte("new"), 0)
 		test.Assert(err == nil, "Error creating XAttr: %v", err)
 
-		err = fRemoveXattr(fd, "user.new")
+		err = utils.FRemoveXattr(fd, "user.new")
 		test.Assert(err == nil, "Error removing new XAttr: %v", err)
 
-		err = fRemoveXattr(fd, initialXAttrNames[0])
+		err = utils.FRemoveXattr(fd, initialXAttrNames[0])
 		test.Assert(err == nil, "Error removing existing XAttr: %v", err)
 
-		_, err, list := fListXattr(fd, 1024)
+		_, err, list := utils.FListXattr(fd, 1024)
 		test.Assert(err == nil, "Error listing XAttrs: %v", err)
 
 		for _, name := range initialXAttrNames {
@@ -627,7 +539,7 @@ func TestOrphanFileXAttrRemove(t *testing.T) {
 		test.Assert(!bytes.Contains(list, []byte("user.new")),
 			"XAttr list contains user.new")
 
-		err = fRemoveXattr(fd, "user.doesnotexist")
+		err = utils.FRemoveXattr(fd, "user.doesnotexist")
 		test.Assert(err != nil && err == syscall.ENODATA,
 			"Successed removing non-existant XAttr")
 	})
