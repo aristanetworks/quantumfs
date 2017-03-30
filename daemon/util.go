@@ -180,6 +180,11 @@ func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status
 		quantumfs.PermWriteOwner | quantumfs.PermExecOther |
 		quantumfs.PermExecGroup | quantumfs.PermExecOwner)
 
+	checkFlags := uint32(0 |
+		quantumfs.PermWriteOther | quantumfs.PermExecOther |
+		quantumfs.PermWriteOwner | quantumfs.PermExecOwner |
+		quantumfs.PermWriteGroup | quantumfs.PermExecGroup)
+
 	owner := c.fuseCtx.Owner
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags,
 		checkStickyBit)
@@ -215,13 +220,7 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, checkFlags uint32, checkStickyBit bool) fuse.Status {
 
-	var arg string
-	if checkStickyBit {
-		arg = "checkStickyBit, %o"
-	} else {
-		arg = "no checkStickyBit, %o"
-	}
-	defer c.FuncIn("hasPermissionIds", arg, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%t %o", checkStickyBit, checkFlags).out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
