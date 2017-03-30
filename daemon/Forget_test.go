@@ -14,6 +14,7 @@ import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/hanwen/go-fuse/fuse"
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -248,26 +249,34 @@ func TestLookupCountAfterCommand(t *testing.T) {
 	})
 }
 
+// This function is intended to test that hardlink dereferencing and lookup counting
+// works. So, to eliminate any kernel variation, we'll just call Mux::Lookup directly
 func TestLookupCountHardlinks(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testFilename := workspace + "/test"
-		linkFilename := workspace + "/link"
 
 		// First lookup
 		file, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating file: %v", err)
 		file.Close()
 
-		// Second lookup
-		err = os.Link(testFilename, linkFilename)
-		test.Assert(err == nil, "Error creating hardlink")
+		inodeNum := test.getInodeNum(testFilename)
+		wsrNum := test.getInodeNum(workspace)
+		var header fuse.InHeader
+		header.NodeId = uint64(wsrNum)
+		var out fuse.EntryOut
 
-		// Forget Inodes
-		test.remountFilesystem()
+		for i := 0; i < 100; i++ {
+			test.qfs.Lookup(&header, "test", &out)
+		}
 
-		test.AssertLogContains("Looked up 2 Times",
-			"Failed to cause a second lookup")
+		count, exists := test.qfs.lookupCount(inodeNum)
+		test.Assert(exists, "Lookup count missing for file")
+
+		// Since we can't guarantee the kernel hasn't looked it up extra by
+		// this point, and we don't want racy tests, only check we're greater
+		test.Assert(count > 100, "Lookup count missing lookups")
 	})
 }
 
