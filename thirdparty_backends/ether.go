@@ -233,9 +233,9 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 		return refreshTTL(ebt.blobstore, true, ks, metadata, buf.Get())
 
 	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
-		// if metadata error other than ErrKeyNotFound then fail the Set since
-		// we haven't been able to ascertain TTL state so we
-		// can't overwrite it
+		// if metadata error other than ErrKeyNotFound then fail
+		// the Set since we haven't been able to ascertain TTL state
+		// so we can't overwrite it
 		return err
 	}
 
