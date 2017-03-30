@@ -55,29 +55,29 @@ func accessTest(test *testHelper, filename string, shouldPass bool, asRoot bool)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	syscall.Chmod(filename, 0000)
-	// This should always fail, unless you're root
-	go permTestSub(test, filename, 0000, asRoot, asRoot, &wg, &err)
+	// just tests if file exists, so should always pass
+	go permTestSub(test, filename, F_OK, true, asRoot, &wg, &err)
 	wg.Wait()
 	test.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	wg.Add(1)
-	syscall.Chmod(filename, 0004)
-	go permTestSub(test, filename, 0004, shouldPass, asRoot, &wg, &err)
+	syscall.Chmod(filename, 0400)
+	go permTestSub(test, filename, R_OK, shouldPass, asRoot, &wg, &err)
 	wg.Wait()
 	test.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	wg.Add(1)
-	syscall.Chmod(filename, 0002)
-	go permTestSub(test, filename, 0002, shouldPass, asRoot, &wg, &err)
+	syscall.Chmod(filename, 0200)
+	go permTestSub(test, filename, W_OK, shouldPass, asRoot, &wg, &err)
 	wg.Wait()
 	test.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	wg.Add(1)
-	syscall.Chmod(filename, 0001)
-	go permTestSub(test, filename, 0001, shouldPass, asRoot, &wg, &err)
+	syscall.Chmod(filename, 0100)
+	go permTestSub(test, filename, X_OK, shouldPass, asRoot, &wg, &err)
 	wg.Wait()
 	test.AssertNoErr(err)
 }

@@ -86,18 +86,17 @@ func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	}
 }
 
-func (fi *File) Access(c *ctx, mask uint32, uid uint32,
-	gid uint32) fuse.Status {
+func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
 	defer c.funcIn("File::Access").out()
 
 	fi.markSelfAccessed(c, false)
-	access := accessPermission(c, fi, mask, uid)
-	if access {
-		return fuse.OK
+	access := hasAccessPermission(c, fi, mask, uid, gid)
+	if access != fuse.OK {
+		return access
 	}
 
-	return fuse.EPERM
+	return fuse.OK
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {

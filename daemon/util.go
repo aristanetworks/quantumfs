@@ -177,22 +177,27 @@ func findFuseConnection(c *ctx, mountPath string) int {
 	return -1
 }
 
-func accessPermission(c *ctx, inode Inode, mode uint32, uid uint32) bool {
-	// translate access flags into open flags and return the result
-	flags := uint32(syscall.O_ACCMODE)
-	if mode & R_OK != 0 && mode & W_OK != 0 {
-		flags |= syscall.O_RDWR
-	} else if mode & R_OK != 0 {
-		flags |= syscall.O_RDONLY
-	} else if mode & W_OK != 0 {
-		flags |= syscall.O_WRONLY
+func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	// translate access flags into permission flags and return the result
+	var checkFlags uint32
+	if mode & R_OK != 0 {
+		checkFlags |= quantumfs.PermReadOther | quantumfs.PermReadGroup |
+			quantumfs.PermReadOwner
+	}
+
+	if mode & W_OK != 0 {
+		checkFlags |= quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
+			quantumfs.PermWriteOwner
 	}
 
 	if mode & X_OK != 0 {
-		flags |= FMODE_EXEC
+		checkFlags |= quantumfs.PermExecOther | quantumfs.PermExecGroup |
+			quantumfs.PermExecOwner
 	}
 
-	return openPermissionUid(c, inode, flags, uid)
+	return hasPermissionIds(c, inode, uid, gid, checkFlags, false)
 }
 
 func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status {
@@ -239,7 +244,8 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, checkFlags uint32, checkStickyBit bool) fuse.Status {
 
-	defer c.FuncIn("hasPermissionIds", "%t %o", checkStickyBit, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%d %d %t %o", checkUid, checkGid,
+		checkStickyBit, checkFlags).out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
