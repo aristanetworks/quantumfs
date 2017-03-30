@@ -109,44 +109,25 @@ func maxSizes() {
 }
 
 func loadDatastore() {
-	for _, datastore := range thirdparty_backends.Datastores {
-		if datastore.Name != config.DataStoreName {
-			continue
-		}
-
-		config.DurableStore = datastore.Constructor(config.DataStoreConf)
-		if config.DurableStore == nil {
-			fmt.Printf("Datastore Constructor failed\n")
-			os.Exit(exitDataStoreInitFail)
-		} else {
-			break
-		}
-	}
-	if config.DurableStore == nil {
-		fmt.Printf("Failed to find datastore '%s'\n", config.DataStoreName)
+	ds, err := thirdparty_backends.ConnectDatastore(config.DataStoreName,
+		config.DataStoreConf)
+	if err != nil {
+		fmt.Printf("Datastore load failed\n")
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(exitDataStoreInitFail)
 	}
+	config.DurableStore = ds
 }
 
 func loadWorkspaceDB() {
-	for _, db := range thirdparty_backends.WorkspaceDBs {
-		if db.Name != config.WorkspaceDbName {
-			continue
-		}
-
-		config.WorkspaceDB = db.Constructor(config.WorkspaceDbConf)
-		if config.WorkspaceDB == nil {
-			fmt.Printf("WorkspaceDB Constructor failed\n")
-			os.Exit(exitWorkspaceDbInitFail)
-		} else {
-			break
-		}
-	}
-	if config.WorkspaceDB == nil {
-		fmt.Printf("Failed to find workspaceDB '%s'\n",
-			config.WorkspaceDbName)
+	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(
+		config.WorkspaceDbName, config.WorkspaceDbConf)
+	if err != nil {
+		fmt.Printf("WorkspaceDB load failed\n")
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(exitWorkspaceDbInitFail)
 	}
+	config.WorkspaceDB = wsdb
 }
 
 // Process the command arguments. Will show the command usage if no arguments are
