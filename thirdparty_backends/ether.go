@@ -27,6 +27,19 @@ func init() {
 	registerWorkspaceDB("ether.cql", NewEtherWorkspaceDB)
 }
 
+// TODO(krishna) TTL configuration is specific to CQL blobstore.
+// However due to current blobstore APIs managing store specific
+// metadata in common APIs, TTL metadata is being applied to all
+// blobstores managed by ether adapter.
+// APIs will be refactored to support store specific interfaces
+// for managing store specific metadata
+//
+// Currently, filesystem datastore doesn't accept a configuration file.
+// Hence refreshTTLTimeSecs = refreshTTLValueSecs =  defaultTTLValueSecs = 0
+// Hence the TTL metadata defaults to 0. In filesystem
+// datastore the TTL on the block doesn't count down and hence TTL is
+// actually never refreshed since TTL > refreshTTLTimeSecs (=0) always
+
 func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 
 	blobstore, err := filesystem.NewFilesystemStore(path)
@@ -42,11 +55,11 @@ func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 // The JSON decoder, by default, doesn't unmarshal time.Duration from a
 // string. The custom struct allows to setup an unmarshaller which uses
 // time.ParseDuration
-type CqlTTLDuration struct {
+type TTLDuration struct {
 	Duration time.Duration
 }
 
-func (d *CqlTTLDuration) UnmarshalJSON(data []byte) error {
+func (d *TTLDuration) UnmarshalJSON(data []byte) error {
 	var str string
 	var dur time.Duration
 	var err error
@@ -68,22 +81,22 @@ type CqlAdapterConfig struct {
 	// A block's TTL is refreshed when its TTL is <= CqlTTLRefreshTime
 	// ttlrefreshtime is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
-	TTLRefreshTime CqlTTLDuration `json:"ttlrefreshtime"`
+	TTLRefreshTime TTLDuration `json:"ttlrefreshtime"`
 
 	// CqlTTLRefreshValue is the time by which a block's TTL will
 	// be advanced during TTL refresh.
 	// When a block's TTL is refreshed, its new TTL is set as
-	// now + CqlTTLRefreshValue
+	// CqlTTLRefreshValue
 	// ttlrefreshvalue is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
-	TTLRefreshValue CqlTTLDuration `json:"ttlrefreshvalue"`
+	TTLRefreshValue TTLDuration `json:"ttlrefreshvalue"`
 
 	// CqlTTLDefaultValue is the TTL value of a new block
 	// When a block is written its TTL is set to
-	// now + CqlTTLDefaultValue
+	// CqlTTLDefaultValue
 	// ttldefaultvalue is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
-	TTLDefaultValue CqlTTLDuration `json:"ttldefaultvalue"`
+	TTLDefaultValue TTLDuration `json:"ttldefaultvalue"`
 }
 
 var refreshTTLTimeSecs int64
@@ -92,7 +105,7 @@ var defaultTTLValueSecs int64
 
 func loadCqlAdapterConfig(path string) error {
 	var c struct {
-		a CqlAdapterConfig `json:"adapter"`
+		A CqlAdapterConfig `json:"adapter"`
 	}
 
 	f, err := os.Open(path)
@@ -106,9 +119,9 @@ func loadCqlAdapterConfig(path string) error {
 		return err
 	}
 
-	refreshTTLTimeSecs = int64(c.a.TTLRefreshTime.Duration.Seconds())
-	refreshTTLValueSecs = int64(c.a.TTLRefreshValue.Duration.Seconds())
-	defaultTTLValueSecs = int64(c.a.TTLDefaultValue.Duration.Seconds())
+	refreshTTLTimeSecs = int64(c.A.TTLRefreshTime.Duration.Seconds())
+	refreshTTLValueSecs = int64(c.A.TTLRefreshValue.Duration.Seconds())
+	defaultTTLValueSecs = int64(c.A.TTLDefaultValue.Duration.Seconds())
 
 	if refreshTTLTimeSecs == 0 || refreshTTLValueSecs == 0 ||
 		defaultTTLValueSecs == 0 {
@@ -144,8 +157,8 @@ type EtherBlobStoreTranslator struct {
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
-// TODO(krishna) : clean up blobstore API for proper metadata handling
-// once Metadata API is refactored, above assertion won't be necessary
+// once Metadata API is refactored, above assertions will be
+// revisited
 
 // TTL will be set using Insert under following scenarios:
 //  a) key exists and current TTL < refreshTTLTimeSecs
@@ -153,7 +166,7 @@ type EtherBlobStoreTranslator struct {
 func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	metadata map[string]string, buf []byte) error {
 
-	setTTL := time.Now().Unix() + defaultTTLValueSecs
+	setTTL := defaultTTLValueSecs
 
 	if keyExist {
 		if metadata == nil {
@@ -179,7 +192,7 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 		// calculate new TTL. We don't need to re-fetch the
 		// data since data in buf has to be same, given the key
 		// exists
-		setTTL = time.Now().Unix() + refreshTTLValueSecs
+		setTTL = refreshTTLValueSecs
 	}
 
 	// if key doesn't exist then use default TTL
