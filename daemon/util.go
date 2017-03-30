@@ -137,17 +137,17 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 
 	// translate access flags into permission flags and return the result
 	var checkFlags uint32
-	if mode & R_OK != 0 {
+	if mode&R_OK != 0 {
 		checkFlags |= quantumfs.PermReadOther | quantumfs.PermReadGroup |
 			quantumfs.PermReadOwner
 	}
 
-	if mode & W_OK != 0 {
+	if mode&W_OK != 0 {
 		checkFlags |= quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
 			quantumfs.PermWriteOwner
 	}
 
-	if mode & X_OK != 0 {
+	if mode&X_OK != 0 {
 		checkFlags |= quantumfs.PermExecOther | quantumfs.PermExecGroup |
 			quantumfs.PermExecOwner
 	}

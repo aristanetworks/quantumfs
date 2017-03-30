@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs/testutils"
 func permTest(test *testHelper, filename string, modeCheck uint32,
 	shouldPass bool) error {
 
-	err := syscall.Access(filename + "garbage", F_OK)
+	err := syscall.Access(filename+"garbage", F_OK)
 	if err == nil {
 		return errors.New("Access on invalid file passes")
 	}
@@ -102,7 +102,7 @@ func accessTestBothUsers(test *testHelper, filename string) {
 func TestAccessListFileInWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
-		filename := workspace +"/testFile"
+		filename := workspace + "/testFile"
 		err := testutils.PrintToFile(filename, string(genData(1000)))
 		test.AssertNoErr(err)
 
@@ -115,7 +115,7 @@ func TestAccessListFileSubdir(t *testing.T) {
 		workspace := test.newWorkspace()
 		os.MkdirAll(workspace+"/subdir", 0777)
 
-		filename := workspace +"/subdir/testFile"
+		filename := workspace + "/subdir/testFile"
 		err := testutils.PrintToFile(filename, string(genData(1000)))
 		test.AssertNoErr(err)
 
@@ -128,11 +128,11 @@ func TestAccessListHardlink(t *testing.T) {
 		workspace := test.newWorkspace()
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
-		filename := workspace +"/subdir/testFile"
+		filename := workspace + "/subdir/testFile"
 		err := testutils.PrintToFile(filename, string(genData(1000)))
 		test.AssertNoErr(err)
 
-		linkname := workspace +"/subdir/subsubdir/linkFile"
+		linkname := workspace + "/subdir/subsubdir/linkFile"
 		err = syscall.Link(filename, linkname)
 
 		accessTestBothUsers(test, linkname)
@@ -145,11 +145,11 @@ func TestAccessSymlink(t *testing.T) {
 		workspace := test.newWorkspace()
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
-		filename := workspace +"/subdir/testFile"
+		filename := workspace + "/subdir/testFile"
 		err := testutils.PrintToFile(filename, string(genData(1000)))
 		test.AssertNoErr(err)
 
-		linkname := workspace +"/subdir/subsubdir/linkFile"
+		linkname := workspace + "/subdir/subsubdir/linkFile"
 		err = syscall.Symlink(filename, linkname)
 
 		accessTestBothUsers(test, linkname)
