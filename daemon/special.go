@@ -6,24 +6,13 @@ package daemon
 // This file holds the special type, which represents devices files, fifos and unix
 // domain sockets
 
-import "encoding/binary"
 import "errors"
+import "fmt"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
-
-func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
-	if key.Type() != quantumfs.KeyTypeEmbedded {
-		panic("Non-embedded key when initializing Special file")
-	}
-	hash := key.Hash()
-	filetype := binary.LittleEndian.Uint32(hash[0:4])
-	device := binary.LittleEndian.Uint32(hash[4:8])
-
-	return filetype, device
-}
 
 func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
@@ -31,9 +20,14 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	var filetype uint32
 	var device uint32
+	var err error
 	if dirRecord == nil {
 		// key is valid while mode and rdev are not
-		filetype, device = decodeSpecialKey(key)
+		filetype, device, err = quantumfs.DecodeSpecialKey(key)
+		if err != nil {
+			panic(fmt.Sprintf("Initializing special file failed: %v",
+				err))
+		}
 	} else {
 		// key is invalid, but mode and rdev contain the data we want and we
 		// must store it in directoryRecord
@@ -57,7 +51,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	utils.Assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
-		dirRecord.SetID(special.embedDataIntoKey_(c))
+		dirRecord.SetID(quantumfs.EncodeSpecialKey(filetype, device))
 	}
 	return &special, nil
 }
@@ -268,19 +262,10 @@ func (special *Special) getChildRecordCopy(c *ctx,
 	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
-func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
-	var hash [quantumfs.ObjectKeyLength - 1]byte
-
-	binary.LittleEndian.PutUint32(hash[0:4], special.filetype)
-	binary.LittleEndian.PutUint32(hash[4:8], special.device)
-
-	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
-}
-
 func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Special::flush").out()
 
-	key := special.embedDataIntoKey_(c)
+	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 
 	special.parentSyncChild(c, special.inodeNum(), func() quantumfs.ObjectKey {
 		return key
@@ -294,7 +279,11 @@ func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint3
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
 
-	filetype, dev := decodeSpecialKey(entry.ID())
+	filetype, dev, err := quantumfs.DecodeSpecialKey(entry.ID())
+	if err != nil {
+		panic(fmt.Sprintf("Decoding special file failed: %v",
+			err))
+	}
 	attr.Rdev = dev
 
 	return filetype

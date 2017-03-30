@@ -232,6 +232,25 @@ func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
 	return false
 }
 
+func DecodeSpecialKey(key ObjectKey) (fileType uint32, device uint32, err error) {
+	if key.Type() != KeyTypeEmbedded {
+		return 0, 0, fmt.Errorf("Non-embedded key when decoding " +
+			"special file")
+	}
+	hash := key.Hash()
+	fileType = binary.LittleEndian.Uint32(hash[0:4])
+	device = binary.LittleEndian.Uint32(hash[4:8])
+
+	return fileType, device, nil
+}
+
+func EncodeSpecialKey(fileType uint32, device uint32) ObjectKey {
+	var hash [ObjectKeyLength - 1]byte
+	binary.LittleEndian.PutUint32(hash[0:4], fileType)
+	binary.LittleEndian.PutUint32(hash[4:8], device)
+	return NewObjectKey(KeyTypeEmbedded, hash)
+}
+
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }

@@ -9,6 +9,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import capn "github.com/glycerine/go-capnproto"
 
 var zeros []byte
@@ -28,7 +29,7 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 type dataStore struct {
 	durableStore quantumfs.DataStore
 
-	cacheLock DeferableMutex
+	cacheLock utils.DeferableMutex
 	lru       list.List // Back is most recently used
 	cache     map[quantumfs.ObjectKey]*buffer
 	cacheSize int
