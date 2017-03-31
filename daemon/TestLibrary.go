@@ -241,7 +241,9 @@ func (th *TestHelper) getApi() *quantumfs.Api {
 		return th.api
 	}
 
-	th.api = quantumfs.NewApiWithPath(th.absPath(quantumfs.ApiPath))
+	api, err := quantumfs.NewApiWithPath(th.absPath(quantumfs.ApiPath))
+	th.Assert(err == nil, "Error getting api: %v", err)
+	th.api = api
 	return th.api
 }
 
