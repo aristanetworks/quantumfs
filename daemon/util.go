@@ -14,6 +14,11 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
+const R_OK = 4
+const W_OK = 2
+const X_OK = 1
+const F_OK = 0
+
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
@@ -127,6 +132,29 @@ func findFuseConnection(c *ctx, mountPath string) int {
 	return -1
 }
 
+func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	// translate access flags into permission flags and return the result
+	var checkFlags uint32
+	if mode&R_OK != 0 {
+		checkFlags |= quantumfs.PermReadOther | quantumfs.PermReadGroup |
+			quantumfs.PermReadOwner
+	}
+
+	if mode&W_OK != 0 {
+		checkFlags |= quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
+			quantumfs.PermWriteOwner
+	}
+
+	if mode&X_OK != 0 {
+		checkFlags |= quantumfs.PermExecOther | quantumfs.PermExecGroup |
+			quantumfs.PermExecOwner
+	}
+
+	return hasPermissionIds(c, inode, uid, gid, checkFlags, false)
+}
+
 func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status {
 
 	// Directories require execute permission in order to traverse them.
@@ -171,7 +199,8 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, checkFlags uint32, checkStickyBit bool) fuse.Status {
 
-	defer c.FuncIn("hasPermissionIds", "%t %o", checkStickyBit, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%d %d %t %o", checkUid, checkGid,
+		checkStickyBit, checkFlags).out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
