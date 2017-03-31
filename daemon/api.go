@@ -445,7 +445,8 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 
 	wsr := cmd.WorkspaceRoot
 	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, false,
+		parts[0], parts[1], parts[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -465,7 +466,8 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 
 	wsr := cmd.WorkspaceRoot
 	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, false,
+		parts[0], parts[1], parts[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -498,7 +500,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, true,
+		dst[0], dst[1], dst[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
@@ -544,10 +547,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 		c.vlog("Removing target in preparation for replacement")
 		parent.delChild_(c, target)
 	}
-
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
-
 	parent.duplicateInode_(c, target, permissions, 0, 0, size,
 		quantumfs.UID(uid), quantumfs.GID(gid),
 		type_, key)

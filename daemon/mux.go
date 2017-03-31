@@ -874,37 +874,46 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
-	workspace string) (*WorkspaceRoot, bool) {
+// In order to run getWorkspaceRoot, we must set a proper value for variable
+// instantiate. If the workspace doesn't have to instantiate children in future, it
+// doesn't need to instantiate itself either, so we can forget it by setting a false
+// instantiate. Otherwise, it should stay instantiated with a true value.
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, instantiate bool, typespace string,
+	namespace string, workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Enter Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
+
+	var nLookup uint64 = 1
+	if instantiate {
+		nLookup = 0
+	}
 
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
-	defer qfs.Forget(typespaceAttr.NodeId, 1)
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
 
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
-	defer qfs.Forget(namespaceAttr.NodeId, 1)
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
 
 	// Get the WorkspaceRoot Inode number
 	var workspaceRootAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
-	defer qfs.Forget(workspaceRootAttr.NodeId, 1)
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(workspaceRootAttr.NodeId, nLookup)
 
 	// Fetch the WorkspaceRoot object itelf
 	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
