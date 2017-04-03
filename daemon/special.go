@@ -6,33 +6,30 @@ package daemon
 // This file holds the special type, which represents devices files, fifos and unix
 // domain sockets
 
-import "encoding/binary"
 import "errors"
+import "fmt"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
-
-func decodeSpecialKey(key quantumfs.ObjectKey) (fileType uint32, rdev uint32) {
-	if key.Type() != quantumfs.KeyTypeEmbedded {
-		panic("Non-embedded key when initializing Special file")
-	}
-	hash := key.Hash()
-	filetype := binary.LittleEndian.Uint32(hash[0:4])
-	device := binary.LittleEndian.Uint32(hash[4:8])
-
-	return filetype, device
-}
 
 func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newSpecial", "name %s", name).out()
+
 	var filetype uint32
 	var device uint32
+	var err error
 	if dirRecord == nil {
 		// key is valid while mode and rdev are not
-		filetype, device = decodeSpecialKey(key)
+		filetype, device, err = quantumfs.DecodeSpecialKey(key)
+		if err != nil {
+			panic(fmt.Sprintf("Initializing special file failed: %v",
+				err))
+		}
 	} else {
 		// key is invalid, but mode and rdev contain the data we want and we
 		// must store it in directoryRecord
@@ -53,10 +50,10 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	}
 	special.self = &special
 	special.setParent(parent.inodeNum())
-	assert(special.treeLock() != nil, "Special treeLock nil at init")
+	utils.Assert(special.treeLock() != nil, "Special treeLock nil at init")
 
 	if dirRecord != nil {
-		dirRecord.SetID(special.embedDataIntoKey_(c))
+		dirRecord.SetID(quantumfs.EncodeSpecialKey(filetype, device))
 	}
 	return &special, nil
 }
@@ -70,11 +67,15 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	defer c.funcIn("Special::Access").out()
+
 	special.self.markSelfAccessed(c, false)
-	return fuse.OK
+	return hasAccessPermission(c, special, mask, uid, gid)
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("Special::GetAttr").out()
+
 	record, err := special.parentGetChildRecordCopy(c, special.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", special.id)
@@ -103,18 +104,21 @@ func (special *Special) Open(c *ctx, flags uint32, mode uint32,
 func (special *Special) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("Special::OpenDir doing nothing")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("Special::Create doing nothing")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
+	defer c.funcIn("Special::SetAttr").out()
 	return special.parentSetChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
@@ -122,6 +126,7 @@ func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("Special::Mkdir doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -260,19 +265,10 @@ func (special *Special) getChildRecordCopy(c *ctx,
 	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
-func (special *Special) embedDataIntoKey_(c *ctx) quantumfs.ObjectKey {
-	var hash [quantumfs.ObjectKeyLength - 1]byte
-
-	binary.LittleEndian.PutUint32(hash[0:4], special.filetype)
-	binary.LittleEndian.PutUint32(hash[4:8], special.device)
-
-	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
-}
-
 func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Special::flush").out()
 
-	key := special.embedDataIntoKey_(c)
+	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 
 	special.parentSyncChild(c, special.inodeNum(), func() quantumfs.ObjectKey {
 		return key
@@ -283,10 +279,14 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
 	attr.Size = 0
-	attr.Blocks = BlocksRoundUp(attr.Size, statBlockSize)
+	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
 
-	filetype, dev := decodeSpecialKey(entry.ID())
+	filetype, dev, err := quantumfs.DecodeSpecialKey(entry.ID())
+	if err != nil {
+		panic(fmt.Sprintf("Decoding special file failed: %v",
+			err))
+	}
 	attr.Rdev = dev
 
 	return filetype
