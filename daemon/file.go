@@ -8,9 +8,9 @@ package daemon
 import "bytes"
 import "errors"
 import "sync"
-import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 import "github.com/hanwen/go-fuse/fuse"
 
@@ -19,6 +19,8 @@ const FMODE_EXEC = 0x20 // From Linux
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+
+	defer c.FuncIn("newSmallFile", "name %s", name).out()
 
 	accessor := newSmallAccessor(c, size, key)
 
@@ -29,6 +31,8 @@ func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newMediumFile", "name %s", name).out()
+
 	accessor := newMediumAccessor(c, key)
 
 	return newFile_(c, name, inodeNum, key, parent, accessor), nil
@@ -37,6 +41,8 @@ func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+
+	defer c.FuncIn("newLargeFile", "name %s", name).out()
 
 	accessor := newLargeAccessor(c, key)
 
@@ -47,6 +53,8 @@ func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newVeryLargeFile", "name %s", name).out()
+
 	accessor := newVeryLargeAccessor(c, key)
 
 	return newFile_(c, name, inodeNum, key, parent, accessor), nil
@@ -54,6 +62,8 @@ func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 func newFile_(c *ctx, name string, inodeNum InodeId,
 	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
+
+	defer c.funcIn("newFile_").out()
 
 	file := File{
 		InodeCommon: InodeCommon{
@@ -67,7 +77,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 	file.self = &file
 	file.setParent(parent.inodeNum())
 
-	assert(file.treeLock() != nil, "File treeLock nil at init")
+	utils.Assert(file.treeLock() != nil, "File treeLock nil at init")
 
 	return &file
 }
@@ -77,20 +87,22 @@ type File struct {
 	accessor     blockAccessor
 	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
-	unlinkLock   DeferableRwMutex
+	unlinkLock   utils.DeferableRwMutex
 }
 
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
+	c.FuncIn("FuncIn::dirtyChild", "inode %d", child).out()
 	if child != fi.inodeNum() {
 		panic("Unsupported dirtyChild() call on File")
 	}
 }
 
-func (fi *File) Access(c *ctx, mask uint32, uid uint32,
-	gid uint32) fuse.Status {
+func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on File")
-	return fuse.ENOSYS
+	defer c.funcIn("File::Access").out()
+
+	fi.markSelfAccessed(c, false)
+	return hasAccessPermission(c, fi, mask, uid, gid)
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -112,56 +124,8 @@ func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("File::OpenDir doing nothing")
 	return fuse.ENOTDIR
-}
-
-func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
-	defer c.FuncIn("File::openPermission", "%d", fi.inodeNum()).out()
-
-	record, error := fi.parentGetChildRecordCopy(c, fi.id)
-	if error != nil {
-		c.elog("%s", error.Error())
-		return false
-	}
-
-	if c.fuseCtx.Owner.Uid == 0 {
-		c.vlog("Root permission check, allowing")
-		return true
-	}
-
-	flags := uint(flags_)
-
-	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
-		flags)
-
-	var userAccess bool
-	switch flags & syscall.O_ACCMODE {
-	case syscall.O_RDONLY:
-		userAccess = BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermReadOther|quantumfs.PermReadGroup|
-				quantumfs.PermReadOwner)
-	case syscall.O_WRONLY:
-		userAccess = BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermWriteOwner|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner)
-	case syscall.O_RDWR:
-		userAccess = BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner|quantumfs.PermReadOther|
-				quantumfs.PermReadGroup|quantumfs.PermReadOwner)
-	}
-
-	var execAccess bool
-	if BitFlagsSet(flags, FMODE_EXEC) {
-		execAccess = BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermExecOther|quantumfs.PermExecGroup|
-				quantumfs.PermExecOwner|quantumfs.PermSUID|
-				quantumfs.PermSGID)
-	}
-
-	success := userAccess || execAccess
-	c.vlog("Permission check result %d", success)
-	return success
 }
 
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
@@ -169,8 +133,9 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 
 	defer c.funcIn("File::Open").out()
 
-	if !fi.openPermission(c, flags) {
-		return fuse.EPERM
+	err := hasPermissionOpenFlags(c, fi, flags)
+	if err != fuse.OK {
+		return err
 	}
 	fi.self.markSelfAccessed(c, false)
 
@@ -187,12 +152,14 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 }
 
 func (fi *File) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
+	c.vlog("File::Lookup doing nothing")
 	return fuse.ENOSYS
 }
 
 func (fi *File) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("File::Create doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -209,7 +176,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 		c.vlog("Got file lock")
 
-		if BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			if attr.Size != fi.accessor.fileLength() {
 				updateMtime = true
 			}
@@ -249,6 +216,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("File::Mkdir doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -351,8 +319,6 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 		return fuse.EIO
 	}
 
-	c.dlog("File::setChildAttr Enter")
-	defer c.dlog("File::setChildAttr Exit")
 	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
@@ -372,6 +338,8 @@ func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.Object
 
 // Requires unlinkLock
 func (fi *File) parseExtendedAttributes_(c *ctx) {
+	defer c.funcIn("File::parseExtendedAttributes_").out()
+
 	if fi.unlinkXAttr != nil {
 		return
 	}
@@ -536,8 +504,6 @@ func (fi *File) getChildRecordCopy(c *ctx,
 			errors.New("Unsupported record fetch")
 	}
 
-	c.dlog("File::getChildRecord Enter")
-	defer c.dlog("File::getChildRecord Exit")
 	defer fi.unlinkLock.Lock().Unlock()
 
 	if fi.unlinkRecord == nil {
@@ -573,6 +539,8 @@ func resize(buffer []byte, size int) []byte {
 }
 
 func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+	defer c.funcIn("pushData").out()
+
 	key, err := buffer.Key(&c.Ctx)
 	if err != nil {
 		c.elog("Unable to write data to the datastore")
@@ -785,7 +753,7 @@ func newFileDescriptor(file *File, inodeNum InodeId,
 		file: file,
 	}
 
-	assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	utils.Assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
 	return fd
 }
 
@@ -795,6 +763,7 @@ type FileDescriptor struct {
 }
 
 func (fd *FileDescriptor) dirty(c *ctx) {
+	defer c.funcIn("FileDescriptor::dirty").out()
 	fd.file.self.dirty(c)
 }
 
@@ -808,11 +777,15 @@ func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (fd *FileDescriptor) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
+	defer c.funcIn("FileDescriptor::Read").out()
+
 	return fd.file.Read(c, offset, size, buf, nonblocking)
 }
 
 func (fd *FileDescriptor) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
+
+	defer c.funcIn("FileDescriptor::Write").out()
 
 	return fd.file.Write(c, offset, size, flags, buf)
 }

@@ -9,6 +9,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import capn "github.com/glycerine/go-capnproto"
 
 var zeros []byte
@@ -28,7 +29,7 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 type dataStore struct {
 	durableStore quantumfs.DataStore
 
-	cacheLock DeferableMutex
+	cacheLock utils.DeferableMutex
 	lru       list.List // Back is most recently used
 	cache     map[quantumfs.ObjectKey]*buffer
 	cacheSize int
@@ -36,6 +37,9 @@ type dataStore struct {
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
+
+	c.Vlog(qlog.LogDaemon, "---In dataStore::Get key %s", key.String())
+	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Get")
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
@@ -52,6 +56,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return nil
 	}()
 	if bufResult != nil {
+		c.Vlog(qlog.LogDaemon, "Found key in readcache")
 		return bufResult
 	}
 
@@ -60,6 +65,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err := quantumfs.ConstantStore.Get(c, key, &buf)
 	if err == nil {
+		c.Vlog(qlog.LogDaemon, "Found key in constant store")
 		return &buf
 	}
 
@@ -75,6 +81,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		store.cache[buf.key] = &buf
 		buf.lruElement = store.lru.PushBack(buf)
 
+		c.Vlog(qlog.LogDaemon, "Found key in durable store store")
 		return &buf
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
@@ -84,8 +91,12 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 }
 
 func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
+	c.Vlog(qlog.LogDaemon, "---In dataStore::Set")
+	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Set")
+
 	key, err := buffer.Key(c)
 	if err != nil {
+		c.Vlog(qlog.LogDaemon, "Error computing key %s", err.Error())
 		return err
 	}
 
@@ -104,6 +115,7 @@ func newEmptyBuffer() buffer {
 // Does not obey the initBlockSize capacity, so only for use with buffers that
 // are very unlikely to be written to
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
+	defer c.FuncIn("newBuffer", "keyType %d", keyType).out()
 
 	return &buffer{
 		data:      in,
@@ -116,6 +128,9 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 // Like newBuffer(), but 'in' is copied and ownership is not assumed
 func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	inSize := len(in)
+
+	defer c.FuncIn("newBufferCopy", "keyType %d inSize %d", keyType,
+		len(in)).out()
 
 	var newData []byte
 	// ensure our buffer meets min capacity
@@ -189,10 +204,15 @@ func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 }
 
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset_ uint32) uint32 {
+	c.Vlog(qlog.LogDaemon, "---In buffer::Write size %d offset %d", len(in),
+		offset_)
+	defer c.Vlog(qlog.LogDaemon, "Out-- buffer::Write")
+
 	offset := int(offset_)
 	// Sanity check offset and length
 	maxWriteLen := quantumfs.MaxBlockSize - offset
 	if maxWriteLen <= 0 {
+		c.Vlog(qlog.LogDaemon, "maxWriteLen <= 0")
 		return 0
 	}
 
@@ -248,6 +268,9 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
+	c.Vlog(qlog.LogDaemon, "---In buffer::Key")
+	defer c.Vlog(qlog.LogDaemon, "Out-- buffer::Key")
+
 	if !buf.dirty {
 		c.Vlog(qlog.LogDaemon, "Buffer not dirty")
 		return buf.key, nil

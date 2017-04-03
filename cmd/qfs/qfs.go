@@ -16,9 +16,10 @@ var version string
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (
-	exitOk      = iota
-	exitBadCmd  = iota
-	exitBadArgs = iota
+	exitOk          = iota
+	exitBadCmd      = iota
+	exitBadArgs     = iota
+	exitApiNotFound = iota
 )
 
 func main() {
@@ -90,7 +91,11 @@ func branch() {
 	dst := flag.Arg(2)
 
 	fmt.Printf("Branching workspace \"%s\" into \"%s\"\n", src, dst)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.Branch(src, dst); err != nil {
 		fmt.Println("Operations failed:", err)
@@ -108,7 +113,11 @@ func getAccessed() {
 	workspaceName := flag.Arg(1)
 
 	fmt.Printf("Getting the accessed list of Workspace:\"%s\"\n", workspaceName)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.GetAccessed(workspaceName); err != nil {
 		fmt.Println("Operations failed:", err)
@@ -126,7 +135,11 @@ func clearAccessed() {
 	wsr := flag.Arg(1)
 
 	fmt.Printf("Clearing the accessed list of WorkspaceRoot:\"%s\"\n", wsr)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.ClearAccessed(wsr); err != nil {
 		fmt.Println("Operations failed:", err)
@@ -166,7 +179,11 @@ func insertInode() {
 
 	fmt.Printf("Insert inode \"%v\" into \"%s\" with %d, %d and 0%o\n",
 		key, dst, uid, gid, permission)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.InsertInode(dst, key, permission, uid, gid); err != nil {
 		fmt.Println("Operations failed:", err)
@@ -175,7 +192,11 @@ func insertInode() {
 }
 
 func sync() {
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	api.SyncAll()
 	fmt.Println("Synced.")
@@ -190,7 +211,11 @@ func deleteWorkspace() {
 	workspace := flag.Arg(1)
 
 	fmt.Printf("Deleting workspace \"%s\"\n", workspace)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.DeleteWorkspace(workspace); err != nil {
 		fmt.Println("Delete failed:", err)
@@ -208,7 +233,11 @@ func enableRootWrite() {
 	workspace := flag.Arg(1)
 
 	fmt.Printf("Enabling workspace \"%s\" the write permission\n", workspace)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.EnableRootWrite(workspace); err != nil {
 		fmt.Println("EnableRootWrite failed:", err)
