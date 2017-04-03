@@ -86,11 +86,12 @@ func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	}
 }
 
-func (fi *File) Access(c *ctx, mask uint32, uid uint32,
-	gid uint32) fuse.Status {
+func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on File")
-	return fuse.ENOSYS
+	defer c.funcIn("File::Access").out()
+
+	fi.markSelfAccessed(c, false)
+	return hasAccessPermission(c, fi, mask, uid, gid)
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
