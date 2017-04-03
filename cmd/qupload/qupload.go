@@ -138,24 +138,6 @@ func validateParams(p *params) error {
 	if err != nil {
 		return err
 	}
-	ws1Parts := strings.Split(p.ws, "/")
-	_, err = wsDB.Workspace(nil,
-		ws1Parts[0], ws1Parts[1], ws1Parts[2])
-	werr, _ := err.(*quantumfs.WorkspaceDbErr)
-	if err == nil {
-		return fmt.Errorf("Workspace %s must not exist\n", p.ws)
-	}
-	if err != nil && werr.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
-		return fmt.Errorf("Error in workspace %s\n", err)
-	}
-	if p.advance != "" {
-		advParts := strings.Split(p.advance, "/")
-		_, err = wsDB.Workspace(nil,
-			advParts[0], advParts[1], advParts[2])
-		if err != nil {
-			return fmt.Errorf("Error in advance workspace %s\n", err)
-		}
-	}
 
 	return nil
 }
