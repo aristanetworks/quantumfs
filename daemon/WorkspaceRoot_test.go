@@ -29,8 +29,12 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 		src := quantumfs.NullSpaceName + "/" + quantumfs.NullSpaceName +
 			"/" + quantumfs.NullSpaceName
 		dst := "wsrtest/wsrtest/wsrtest"
-		api := quantumfs.NewApiWithPath(apiPath)
+
+		api, err := quantumfs.NewApiWithPath(apiPath)
+
+		test.Assert(err == nil, "Error retrieving Api: %v", err)
 		test.Assert(api != nil, "Api nil")
+
 		err = api.Branch(src, dst)
 		test.Assert(err == nil,
 			"Error branching with api in nullworkspace:%v", err)
