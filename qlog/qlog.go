@@ -93,8 +93,6 @@ func SpecialReq(reqId uint64) string {
 		return "[Qlog]"
 	case TestReqId:
 		return "[Test]"
-	case ToolReqId:
-		return "[Tool]"
 	}
 }
 
