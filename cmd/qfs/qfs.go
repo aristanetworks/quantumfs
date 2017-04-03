@@ -258,7 +258,11 @@ func setWorkspaceImmutable() {
 	workspace := flag.Arg(1)
 
 	fmt.Printf("Set workspace \"%s\" immutable\n", workspace)
-	api := quantumfs.NewApi()
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
 
 	if err := api.SetWorkspaceImmutable(workspace); err != nil {
 		fmt.Println("SetWorkspaceImmutable failed:", err)
