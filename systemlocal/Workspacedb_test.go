@@ -456,17 +456,18 @@ func TestDeleteTypespace(t *testing.T) {
 func TestSetWorkspaceImmutable(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		immutable, err := wsdb.WorkspaceIsImmutable(nil,
+		immutable, err := wsdb.WorkspaceIsImmutable(ctx,
 			"type1", "name1", "work1")
 		utils.Assert(err == nil && !immutable,
 			"Workspace is either immutable or with error: %v", err)
 
-		err = wsdb.SetWorkspaceImmutable(nil, "type1", "name1", "work1")
+		err = wsdb.SetWorkspaceImmutable(ctx, "type1", "name1", "work1")
 		utils.Assert(err == nil, "Failed setting workspace immutable")
 
-		immutable, err = wsdb.WorkspaceIsImmutable(nil,
+		immutable, err = wsdb.WorkspaceIsImmutable(ctx,
 			"type1", "name1", "work1")
 		utils.Assert(err == nil && immutable,
 			"Workspace is either mutable or with error: %v", err)
@@ -476,9 +477,10 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		immutable, err := wsdb.WorkspaceIsImmutable(nil,
+		immutable, err := wsdb.WorkspaceIsImmutable(ctx,
 			"type1", "name1", "work10")
 		utils.Assert(err == nil && !immutable,
 			"Workspace is either immutable or with error: %v", err)
@@ -488,20 +490,21 @@ func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
 func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		err := wsdb.SetWorkspaceImmutable(nil, "type1", "name1", "work1")
+		err := wsdb.SetWorkspaceImmutable(ctx, "type1", "name1", "work1")
 		utils.Assert(err == nil, "Failed setting workspace immutable")
 
-		immutable, err := wsdb.WorkspaceIsImmutable(nil,
+		immutable, err := wsdb.WorkspaceIsImmutable(ctx,
 			"type1", "name1", "work1")
 		utils.Assert(err == nil && immutable,
 			"Workspace is either mutable or with error: %v", err)
 
-		err = wsdb.DeleteWorkspace(nil, "type1", "name1", "work1")
+		err = wsdb.DeleteWorkspace(ctx, "type1", "name1", "work1")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		immutable, err = wsdb.WorkspaceIsImmutable(nil,
+		immutable, err = wsdb.WorkspaceIsImmutable(ctx,
 			"type1", "name1", "work1")
 		utils.Assert(err == nil && !immutable,
 			"Workspace is either immutable or with error: %v", err)
