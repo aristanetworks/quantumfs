@@ -29,8 +29,12 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 		src := quantumfs.NullSpaceName + "/" + quantumfs.NullSpaceName +
 			"/" + quantumfs.NullSpaceName
 		dst := "wsrtest/wsrtest/wsrtest"
-		api := quantumfs.NewApiWithPath(apiPath)
+
+		api, err := quantumfs.NewApiWithPath(apiPath)
+
+		test.Assert(err == nil, "Error retrieving Api: %v", err)
 		test.Assert(api != nil, "Api nil")
+
 		err = api.Branch(src, dst)
 		test.Assert(err == nil,
 			"Error branching with api in nullworkspace:%v", err)
@@ -236,5 +240,21 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 		defer syscall.Close(fd)
 		test.Assert(err == syscall.EPERM,
 			"Error creating a small file: %v", err)
+	})
+}
+
+// We need isWorkspaceRoot() to be more robust than it has been
+func TestWorkspaceRootChecker(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		wsr := test.getWorkspaceRoot(workspace)
+		var inode Inode
+		inode = wsr
+
+		test.Assert(inode.isWorkspaceRoot() == true,
+			"inode interface not routing")
+		test.Assert(wsr.isWorkspaceRoot() == true, "wsr not recognized")
+		test.Assert(wsr.Directory.isWorkspaceRoot() == true,
+			"wsr dir not routing")
 	})
 }

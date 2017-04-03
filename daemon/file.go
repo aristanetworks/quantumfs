@@ -8,7 +8,6 @@ package daemon
 import "bytes"
 import "errors"
 import "sync"
-import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
@@ -98,11 +97,12 @@ func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	}
 }
 
-func (fi *File) Access(c *ctx, mask uint32, uid uint32,
-	gid uint32) fuse.Status {
+func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on File")
-	return fuse.ENOSYS
+	defer c.funcIn("File::Access").out()
+
+	fi.markSelfAccessed(c, false)
+	return hasAccessPermission(c, fi, mask, uid, gid)
 }
 
 func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -128,62 +128,14 @@ func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	return fuse.ENOTDIR
 }
 
-func (fi *File) openPermission(c *ctx, flags_ uint32) bool {
-	defer c.FuncIn("File::openPermission", "%d", fi.inodeNum()).out()
-
-	record, error := fi.parentGetChildRecordCopy(c, fi.id)
-	if error != nil {
-		c.elog("%s", error.Error())
-		return false
-	}
-
-	if c.fuseCtx.Owner.Uid == 0 {
-		c.vlog("Root permission check, allowing")
-		return true
-	}
-
-	flags := uint(flags_)
-
-	c.vlog("Open permission check. Have %x, flags %x", record.Permissions(),
-		flags)
-
-	var userAccess bool
-	switch flags & syscall.O_ACCMODE {
-	case syscall.O_RDONLY:
-		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermReadOther|quantumfs.PermReadGroup|
-				quantumfs.PermReadOwner)
-	case syscall.O_WRONLY:
-		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermWriteOwner|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner)
-	case syscall.O_RDWR:
-		userAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermWriteOther|quantumfs.PermWriteGroup|
-				quantumfs.PermWriteOwner|quantumfs.PermReadOther|
-				quantumfs.PermReadGroup|quantumfs.PermReadOwner)
-	}
-
-	var execAccess bool
-	if utils.BitFlagsSet(flags, FMODE_EXEC) {
-		execAccess = utils.BitAnyFlagSet(uint(record.Permissions()),
-			quantumfs.PermExecOther|quantumfs.PermExecGroup|
-				quantumfs.PermExecOwner|quantumfs.PermSUID|
-				quantumfs.PermSGID)
-	}
-
-	success := userAccess || execAccess
-	c.vlog("Permission check result %d", success)
-	return success
-}
-
 func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
 	defer c.funcIn("File::Open").out()
 
-	if !fi.openPermission(c, flags) {
-		return fuse.EPERM
+	err := hasPermissionOpenFlags(c, fi, flags)
+	if err != fuse.OK {
+		return err
 	}
 	fi.self.markSelfAccessed(c, false)
 

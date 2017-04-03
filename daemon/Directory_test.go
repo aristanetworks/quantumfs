@@ -1035,8 +1035,17 @@ func testInodeCreatePermissions(test *testHelper, testDir string, mustSucceed bo
 		}
 	}
 
-	// Test Mkdir
-	err := os.Mkdir(testDir+"/testMkdir", 777)
+	// Test read permission
+	_, err := ioutil.ReadDir(testDir)
+	if mustSucceed {
+		test.Assert(err == nil, "%s: Open of parent failed, %v", failMsg,
+			err)
+	} else {
+		test.Assert(err != nil, "%s: Open of parent passed", failMsg)
+	}
+
+	// Test Mkdir (write permission)
+	err = os.Mkdir(testDir+"/testMkdir", 777)
 	check(err)
 
 	// Test Mknod
@@ -1184,6 +1193,7 @@ func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
 	})
+
 }
 
 func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
