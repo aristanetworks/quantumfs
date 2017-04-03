@@ -531,6 +531,15 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	}
 }
 
+func (wsr *WorkspaceRoot) Access(c *ctx, mask uint32, uid uint32,
+	gid uint32) fuse.Status {
+
+	defer c.funcIn("WorkspaceRoot::Access").out()
+
+	// WorkspaceRoot always allows access
+	return fuse.OK
+}
+
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("WorkspaceRoot::GetAttr").out()
 	defer wsr.RLock().RUnlock()
@@ -579,10 +588,6 @@ func (wsr *WorkspaceRoot) clearList() {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	wsr.accessList = make(map[string]bool)
-}
-
-func (wsr *WorkspaceRoot) isWorkspaceRoot() bool {
-	return true
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {

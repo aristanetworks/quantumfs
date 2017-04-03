@@ -53,6 +53,8 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	defer c.funcIn("Symlink::Access").out()
 
 	link.self.markSelfAccessed(c, false)
+	c.elog("Access called on a symlink - should have been dereferenced.")
+
 	return fuse.OK
 }
 
