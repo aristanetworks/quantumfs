@@ -137,7 +137,7 @@ func init() {
 	syscall.Umask(0)
 	var err error
 	for i := 0; i < 100; i++ {
-		TestRunDir, err = ioutil.TempDir("", "sidquantumfsTest")
+		TestRunDir, err = ioutil.TempDir("", "quantumfsTest")
 		if err != nil {
 			continue
 		}

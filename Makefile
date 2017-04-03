@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs qparse emptykeys qupload walk	
+COMMANDS=quantumfsd qfs qparse emptykeys qupload
 PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal walker
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
@@ -32,7 +32,7 @@ $(COMMANDS): encoding/metadata.capnp.go
 	sudo go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go
-	sudo go test -v -gcflags '-e' github.com/aristanetworks/quantumfs/$@
+	sudo go test -gcflags '-e' github.com/aristanetworks/quantumfs/$@
 
 rpm: $(COMMANDS)
 	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
