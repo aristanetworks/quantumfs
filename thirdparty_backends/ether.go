@@ -202,8 +202,8 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	return b.Insert(key, buf, newmetadata)
 }
 
-func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	buf quantumfs.Buffer) error {
+func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
 	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Get")
 	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
