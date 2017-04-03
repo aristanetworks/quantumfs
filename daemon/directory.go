@@ -546,15 +546,15 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	entryInfo := directoryContents{
 		filename: ".",
 	}
-	entry, err := dir.parentGetChildRecordCopy(c, dir.inodeNum())
-	if err != nil {
-		// Either something went wrong or we are a WorkspaceRoot and our
-		// parent doesn't know our attributes. In either case just fake it.
-		c.vlog("Directory maybe WSR")
-		fillWorkspaceAttrFake(c, &entryInfo.attr, dir.inodeNum(),
-			"", "")
-	} else {
-		c.vlog("Got record from parent")
+
+	// If we are a WorkspaceRoot then we need only add some entries,
+	// WorkspaceRoot.getChildSnapShot() will overwrite the first two entries with
+	// the correct data.
+	if !dir.self.isWorkspaceRoot() {
+		entry, err := dir.parentGetChildRecordCopy(c, dir.inodeNum())
+		utils.Assert(err == nil, "Failed to get record for inode %d %s",
+			dir.inodeNum(), err)
+
 		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
 			dir.inodeNum(), c.fuseCtx.Owner, entry)
 		entryInfo.fuseType = entryInfo.attr.Mode
@@ -563,31 +563,34 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	children = append(children, entryInfo)
 
 	c.vlog("Adding ..")
-	func() {
-		entryInfo := directoryContents{
-			filename: "..",
-		}
+	entryInfo = directoryContents{
+		filename: "..",
+	}
 
-		defer dir.parentLock.RLock().RUnlock()
-		parent := dir.parent_(c)
+	if !dir.self.isWorkspaceRoot() {
+		func() {
+			defer dir.parentLock.RLock().RUnlock()
+			parent := dir.parent_(c)
 
-		entry, err := parent.parentGetChildRecordCopy(c, parent.inodeNum())
-		if err != nil {
-			// Either something went wrong or our parent is a
-			// WorkspaceRoot and our grandparent doesn't know our
-			// parent's attributes. In either case just fake it.
-			c.vlog("parent maybe WSR")
-			fillWorkspaceAttrFake(c, &entryInfo.attr, parent.inodeNum(),
-				"", "")
-		} else {
-			c.vlog("Got record from grandparent")
-			fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-				parent.inodeNum(), c.fuseCtx.Owner, entry)
+			if parent.isWorkspaceRoot() {
+				wsr := parent.(*WorkspaceRoot)
+				wsr.fillWorkspaceAttrReal(c, &entryInfo.attr)
+			} else {
+				entry, err := parent.parentGetChildRecordCopy(c,
+					parent.inodeNum())
+				utils.Assert(err == nil,
+					"Failed to get record for inode %d %s",
+					parent.inodeNum(), err)
+
+				c.vlog("Got record from grandparent")
+				fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+					parent.inodeNum(), c.fuseCtx.Owner, entry)
+			}
 			entryInfo.fuseType = entryInfo.attr.Mode
-		}
+		}()
+	}
 
-		children = append(children, entryInfo)
-	}()
+	children = append(children, entryInfo)
 
 	c.vlog("Adding real children")
 	for _, entry := range records {
