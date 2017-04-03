@@ -477,9 +477,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
-	children := wsr.Directory.getChildSnapshot(c)
-
 	defer c.funcIn("WorkspaceRoot::getChildSnapshot").out()
+
+	children := wsr.Directory.getChildSnapshot(c)
 
 	api := directoryContents{
 		filename: quantumfs.ApiPath,

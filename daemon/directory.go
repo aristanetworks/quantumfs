@@ -540,7 +540,56 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.childRecordLock.Lock().Unlock()
 
 	records := dir.children.records()
-	children := make([]directoryContents, 0, len(records))
+	children := make([]directoryContents, 0, len(records)+2)
+
+	c.vlog("Adding .")
+	entryInfo := directoryContents{
+		filename: ".",
+	}
+	entry, err := dir.parentGetChildRecordCopy(c, dir.inodeNum())
+	if err != nil {
+		// Either something went wrong or we are a WorkspaceRoot and our
+		// parent doesn't know our attributes. In either case just fake it.
+		c.vlog("Directory maybe WSR")
+		fillWorkspaceAttrFake(c, &entryInfo.attr, dir.inodeNum(),
+			"", "")
+	} else {
+		c.vlog("Got record from parent")
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+			dir.inodeNum(), c.fuseCtx.Owner, entry)
+		entryInfo.fuseType = entryInfo.attr.Mode
+	}
+
+	children = append(children, entryInfo)
+
+	c.vlog("Adding ..")
+	func() {
+		entryInfo := directoryContents{
+			filename: "..",
+		}
+
+		defer dir.parentLock.RLock().RUnlock()
+		parent := dir.parent_(c)
+
+		entry, err := parent.parentGetChildRecordCopy(c, parent.inodeNum())
+		if err != nil {
+			// Either something went wrong or our parent is a
+			// WorkspaceRoot and our grandparent doesn't know our
+			// parent's attributes. In either case just fake it.
+			c.vlog("parent maybe WSR")
+			fillWorkspaceAttrFake(c, &entryInfo.attr, parent.inodeNum(),
+				"", "")
+		} else {
+			c.vlog("Got record from grandparent")
+			fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+				parent.inodeNum(), c.fuseCtx.Owner, entry)
+			entryInfo.fuseType = entryInfo.attr.Mode
+		}
+
+		children = append(children, entryInfo)
+	}()
+
+	c.vlog("Adding real children")
 	for _, entry := range records {
 		filename := entry.Filename()
 
@@ -1680,34 +1729,6 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		c.dlog("Refreshing child list")
 		ds.children = ds.src.getChildSnapshot(c)
 	}
-
-	// Add .
-	if offset == 0 {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: "."}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			return fuse.OK
-		}
-
-		details.NodeId = uint64(ds.FileHandleCommon.inodeNum)
-		fillEntryOutCacheData(c, details)
-		fillRootAttr(c, &details.Attr, ds.FileHandleCommon.inodeNum)
-	}
-	offset++
-
-	// Add ..
-	if offset == 1 {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: ".."}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			return fuse.OK
-		}
-
-		details.NodeId = uint64(ds.FileHandleCommon.inodeNum)
-		fillEntryOutCacheData(c, details)
-		fillRootAttr(c, &details.Attr, ds.FileHandleCommon.inodeNum)
-	}
-	offset++
 
 	processed := 0
 	for _, child := range ds.children {
