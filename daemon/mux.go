@@ -136,9 +136,10 @@ type QuantumFs struct {
 	lookupCounts    map[InodeId]uint64
 
 	// The workspaceMutability defines whether all inodes in each of the local
-	// workspace is mutable(write-permitted). Once if a workspace is set to be
-	// mutable, should it be put into the map, and all others are default to
-	// false
+	// workspace is mutable(write-permitted). When set the workspace immutable,
+	// FALSE should be put into map, and the workspace will stay immutable
+	// forever. Once if a workspace is not immutable, can it be set mutable, so
+	// TRUE should be put into the map. Empty entires are default as read-only.
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]bool
 }
@@ -954,13 +955,11 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 
 	key := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
 	rootMutability, exists := qfs.workspaceMutability[key]
-	if !exists || !rootMutability {
+	if !exists {
 		return false
 	}
 
-	immutable, _ := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
-		wsr.typespace, wsr.namespace, wsr.workspace)
-	return rootMutability && !immutable
+	return rootMutability
 
 }
 

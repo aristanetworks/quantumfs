@@ -312,6 +312,14 @@ func TestSetRemoteWorkspaceImmutable(t *testing.T) {
 		test.Assert(err == nil, "Workspace %s can't be set immutable",
 			workspaceName)
 
+		// The workspaceDB doesn't support frequent accesses, so immediate
+		// update from remote changes cannot be supported either. The
+		// immutability can only be update when EnableRootWrite() runs
+		api := test.getApi()
+		err = api.EnableRootWrite(workspaceName)
+		test.Assert(err != nil, "Unexpected success on enabling workspace"+
+			" %s write permission", workspaceName)
+
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
