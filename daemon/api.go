@@ -408,7 +408,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		c.vlog("Received EnableRootWrite request")
 		api.enableRootWrite(c, buf)
 	case quantumfs.CmdSetWorkspaceImmutable:
-		c.vlog("Received EnableRootWrite request")
+		c.vlog("Received SetWorkspaceImmutable request")
 		api.setWorkspaceImmutable(c, buf)
 	}
 

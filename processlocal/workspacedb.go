@@ -30,7 +30,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 
 // The function requires the mutex on the map except for the NewWorkspaceDB
 func insertMap_(cache workspaceMap, typespace string,
-	namespace string, workspace string, init interface{}) error {
+	namespace string, workspace string, val interface{}) error {
 
 	if _, exists := cache[typespace]; !exists {
 		cache[typespace] = make(map[string]map[string]interface{})
@@ -44,7 +44,7 @@ func insertMap_(cache workspaceMap, typespace string,
 		return fmt.Errorf("Destination Workspace already exists")
 	}
 
-	cache[typespace][namespace][workspace] = init
+	cache[typespace][namespace][workspace] = val
 	return nil
 
 }
@@ -166,11 +166,7 @@ func (wsdb *WorkspaceDB) workspace(c *quantumfs.Ctx, typespace string,
 		return rootId, exists
 	}
 
-	rootId, exists = rootVar.(quantumfs.ObjectKey)
-	if !exists {
-		panic("Failed to acquired the correct quantumFS key")
-	}
-
+	rootId, _ = rootVar.(quantumfs.ObjectKey)
 	return rootId, exists
 }
 
@@ -221,11 +217,8 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	return nil
 }
 
-func deleteWorkspaceRecord(c *quantumfs.Ctx, mutex sync.RWMutex, cache workspaceMap,
+func deleteWorkspaceRecord(c *quantumfs.Ctx, cache workspaceMap,
 	typespace string, namespace string, workspace string) error {
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	_, ok := cache[typespace]
 	if !ok {
@@ -265,14 +258,19 @@ func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 
 	// Through all these checks, if the workspace could not exist, we return
 	// success. The caller wanted that workspace to not exist and it doesn't.
-	err := deleteWorkspaceRecord(c, wsdb.cacheMutex, wsdb.cache,
-		typespace, namespace, workspace)
+	err := func() error {
+		wsdb.cacheMutex.Lock()
+		defer wsdb.cacheMutex.Unlock()
+		return deleteWorkspaceRecord(c, wsdb.cache, typespace,
+			namespace, workspace)
+	}()
 	if err != nil {
 		return err
 	}
 
-	return deleteWorkspaceRecord(c, wsdb.stateMutex, wsdb.state,
-		typespace, namespace, workspace)
+	wsdb.stateMutex.Lock()
+	defer wsdb.stateMutex.Unlock()
+	return deleteWorkspaceRecord(c, wsdb.state, typespace, namespace, workspace)
 }
 
 func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
