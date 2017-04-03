@@ -60,53 +60,37 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 
 	// Create the null workspace
 	db.Update(func(tx *bolt.Tx) error {
-		typespaces, err := tx.CreateBucketIfNotExists(typespacesBucket)
-		if err != nil {
-			panic("Unable to create Typespaces bucket")
-		}
+		insertMap(tx, typespacesBucket)
+		insertMap(tx, stateTypespacesBucket)
 
-		_null_, err := typespaces.CreateBucketIfNotExists([]byte("" +
-			quantumfs.NullSpaceName))
-		if err != nil {
-			panic("Unable to create _null typespace")
-		}
-
-		_null, err := _null_.CreateBucketIfNotExists([]byte("" +
-			quantumfs.NullSpaceName))
-		if err != nil {
-			panic("Unable to create _null namespace")
-		}
-
-		err = _null.Put([]byte(quantumfs.NullSpaceName),
-			quantumfs.EmptyWorkspaceKey.Value())
-		if err != nil {
-			panic("Unable to reset null workspace")
-		}
-
-		stateTypespaces, err := tx.CreateBucketIfNotExists(
-			stateTypespacesBucket)
-		if err != nil {
-			panic("Unable to create StateTypespaces bucket")
-		}
-
-		nullState, err := stateTypespaces.CreateBucketIfNotExists(
-			[]byte("_null"))
-		if err != nil {
-			panic("Unable to create _null typespace in state table")
-		}
-
-		_nullState, err := nullState.CreateBucketIfNotExists([]byte("_null"))
-		if err != nil {
-			panic("Unable to create _null namespace in state table")
-		}
-
-		err = _nullState.Put([]byte("null"), []byte("T"))
-		if err != nil {
-			panic("Unable to reset null workspace in state table")
-		}
 		return nil
 	})
 	return wsdb
+}
+
+func insertMap(tx *bolt.Tx, bucketKey []byte) {
+	typespaces, err := tx.CreateBucketIfNotExists(bucketKey)
+	if err != nil {
+		panic("Unable to create Typespaces bucket")
+	}
+
+	_null_, err := typespaces.CreateBucketIfNotExists([]byte("" +
+		quantumfs.NullSpaceName))
+	if err != nil {
+		panic("Unable to create null typespace")
+	}
+
+	_null, err := _null_.CreateBucketIfNotExists([]byte("" +
+		quantumfs.NullSpaceName))
+	if err != nil {
+		panic("Unable to create null namespace")
+	}
+
+	err = _null.Put([]byte(quantumfs.NullSpaceName),
+		quantumfs.EmptyWorkspaceKey.Value())
+	if err != nil {
+		panic("Unable to reset null workspace")
+	}
 }
 
 // WorkspaceDB is a persistent, system local quantumfs.WorkspaceDB. It only supports
