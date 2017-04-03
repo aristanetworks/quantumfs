@@ -15,12 +15,13 @@ func (fi *File) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
+	defer c.funcIn("File::Sync_DOWN").out()
 	fi.flush(c)
 	return fuse.OK
 }
 
 func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
-	defer c.funcIn("File::Sync_DOWN").out()
+	defer c.funcIn("FileDescriptor::Sync_DOWN").out()
 
 	fd.file.flush(c)
 

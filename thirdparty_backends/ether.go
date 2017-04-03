@@ -18,8 +18,9 @@ import "time"
 import "github.com/aristanetworks/ether/blobstore"
 import "github.com/aristanetworks/ether/cql"
 import "github.com/aristanetworks/ether/filesystem"
-import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/ether/qubit/wsdb"
+import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 func init() {
 	registerDatastore("ether.filesystem", NewEtherFilesystemStore)
@@ -204,6 +205,9 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
+	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Get")
+	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
+
 	ks := key.String()
 	data, metadata, err := ebt.blobstore.Get(ks)
 	if err != nil {
@@ -221,6 +225,9 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectK
 
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
+
+	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Set")
+	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Set")
 
 	ks := key.String()
 	metadata, err := ebt.blobstore.Metadata(ks)
@@ -297,6 +304,9 @@ func NewEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 }
 
 func (w *EtherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NumTypespaces")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NumTypespaces")
+
 	count, err := w.wsdb.NumTypespaces()
 	if err != nil {
 		return 0, convertWsdbError(err)
@@ -306,6 +316,9 @@ func (w *EtherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 
 func (w *EtherWsdbTranslator) TypespaceList(
 	c *quantumfs.Ctx) ([]string, error) {
+
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::TypespaceList")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::TypespaceList")
 
 	list, err := w.wsdb.TypespaceList()
 	if err != nil {
@@ -317,6 +330,9 @@ func (w *EtherWsdbTranslator) TypespaceList(
 func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 	typespace string) (int, error) {
 
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NumNamespaces")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NumNamespaces")
+
 	count, err := w.wsdb.NumNamespaces(typespace)
 	if err != nil {
 		return 0, convertWsdbError(err)
@@ -326,6 +342,9 @@ func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 
 func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 	typespace string) ([]string, error) {
+
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NamespaceList")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NamespaceList")
 
 	list, err := w.wsdb.NamespaceList(typespace)
 	if err != nil {
@@ -337,6 +356,9 @@ func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 func (w *EtherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 	typespace string, namespace string) (int, error) {
 
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NumWorkspaces")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NumWorkspaces")
+
 	count, err := w.wsdb.NumWorkspaces(typespace, namespace)
 	if err != nil {
 		return 0, convertWsdbError(err)
@@ -346,6 +368,9 @@ func (w *EtherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 
 func (w *EtherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	typespace string, namespace string) ([]string, error) {
+
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::WorkspaceList")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::WorkspaceList")
 
 	list, err := w.wsdb.WorkspaceList(typespace, namespace)
 	if err != nil {
@@ -357,16 +382,23 @@ func (w *EtherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 func (w *EtherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
 	typespace string) (bool, error) {
 
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::TypespaceExists")
+	defer c.Vlog(qlog.LogWorkspaceDb,
+		"Out-- EtherWsdbTranslator::TypespaceExists")
+
 	exists, err := w.wsdb.TypespaceExists(typespace)
 	if err != nil {
 		return exists, convertWsdbError(err)
 	}
 	return exists, nil
-
 }
 
 func (w *EtherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
 	typespace string, namespace string) (bool, error) {
+
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NamespaceExists")
+	defer c.Vlog(qlog.LogWorkspaceDb,
+		"Out-- EtherWsdbTranslator::NamespaceExists")
 
 	exists, err := w.wsdb.NamespaceExists(typespace, namespace)
 	if err != nil {
@@ -378,6 +410,10 @@ func (w *EtherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
 func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::WorkspaceExists")
+	defer c.Vlog(qlog.LogWorkspaceDb,
+		"Out-- EtherWsdbTranslator::WorkspaceExists")
+
 	exists, err := w.wsdb.WorkspaceExists(typespace, namespace, workspace)
 	if err != nil {
 		return exists, convertWsdbError(err)
@@ -387,6 +423,9 @@ func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 
 func (w *EtherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::Workspace")
+	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::Workspace")
 
 	key, err := w.wsdb.Workspace(typespace, namespace, workspace)
 	if err != nil {
@@ -400,6 +439,10 @@ func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::BranchWorkspace")
+	defer c.Vlog(qlog.LogWorkspaceDb,
+		"Out-- EtherWsdbTranslator::BranchWorkspace")
+
 	err := w.wsdb.BranchWorkspace(srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
@@ -411,6 +454,10 @@ func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 func (w *EtherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::DeleteWorkspace")
+	defer c.Vlog(qlog.LogWorkspaceDb,
+		"Out-- EtherWsdbTranslator::DeleteWorkspace")
+
 	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 		"Ether does not support deleting workspaces")
 }
@@ -418,6 +465,10 @@ func (w *EtherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+
+	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::AdvanceWorkspace")
+	defer c.Vlog(qlog.LogWorkspaceDb,
+		"Out-- EtherWsdbTranslator::AdvanceWorkspace")
 
 	key, err := w.wsdb.AdvanceWorkspace(typespace, namespace, workspace,
 		currentRootId.Value(), newRootId.Value())

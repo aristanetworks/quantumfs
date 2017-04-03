@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs qparse emptykeys
+COMMANDS=quantumfsd qfs qparse emptykeys qupload
 PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
