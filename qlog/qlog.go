@@ -67,7 +67,8 @@ const (
 	LogWorkspaceDb
 	LogTest
 	LogQlog
-	logSubsystemMax = LogQlog
+	LogTool
+	logSubsystemMax = LogTool
 )
 
 const (
@@ -92,6 +93,8 @@ func SpecialReq(reqId uint64) string {
 		return "[Qlog]"
 	case TestReqId:
 		return "[Test]"
+	case ToolReqId:
+		return "[Tool]"
 	}
 }
 
@@ -107,6 +110,8 @@ func (enum LogSubsystem) String() string {
 		return "Test"
 	case LogQlog:
 		return "Qlog"
+	case LogTool:
+		return "Tool"
 	}
 	return ""
 }
@@ -123,6 +128,8 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 		return LogTest, nil
 	case "qlog":
 		return LogQlog, nil
+	case "tool":
+		return LogTool, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
