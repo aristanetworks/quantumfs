@@ -25,6 +25,9 @@ type DataStore struct {
 func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
+	c.Vlog(qlog.LogDatastore, "---In processlocal::Get key %s", key.String())
+	defer c.Vlog(qlog.LogDatastore, "Out-- processlocal::Get")
+
 	var err error
 
 	store.mutex.RLock()
@@ -39,6 +42,9 @@ func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buffer quantumfs.Buffer) error {
+
+	c.Vlog(qlog.LogDatastore, "---In processlocal::Set key %s", key.String())
+	defer c.Vlog(qlog.LogDatastore, "Out-- processlocal::Set")
 
 	if buffer.Size() > int(quantumfs.MaxBlockSize) {
 		panic("Attempted to store overlarge block")
