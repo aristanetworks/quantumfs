@@ -17,6 +17,8 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
+	defer c.FuncIn("newSymlink", "name %s", name).out()
+
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
 			id:        inodeNum,
@@ -48,11 +50,16 @@ type Symlink struct {
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
+	defer c.funcIn("Symlink::Access").out()
+
 	link.self.markSelfAccessed(c, false)
+	c.elog("Access called on a symlink - should have been dereferenced.")
+
 	return fuse.OK
 }
 
 func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("Symlink::GetAttr").out()
 	record, err := link.parentGetChildRecordCopy(c, link.InodeCommon.id)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %d", link.id)
@@ -81,17 +88,21 @@ func (link *Symlink) Open(c *ctx, flags uint32, mode uint32,
 func (link *Symlink) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("Symlink::OpenDir doing nothing")
 	return fuse.ENOTDIR
 }
 
 func (link *Symlink) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("Symlink::Create doing nothing")
 	return fuse.ENOTDIR
 }
 
 func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
+
+	defer c.funcIn("Symlink::SetAttr").out()
 
 	return link.parentSetChildAttr(c, link.InodeCommon.id, nil, attr, out,
 		false)
@@ -100,6 +111,7 @@ func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (link *Symlink) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("Symlink::Mkdir doing nothing")
 	return fuse.ENOTDIR
 }
 
@@ -121,6 +133,8 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 }
 
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
+	defer c.funcIn("Symlink::Readlink").out()
+
 	link.self.markSelfAccessed(c, false)
 	data := c.dataStore.Get(&c.Ctx, link.key)
 	if data == nil {
@@ -154,24 +168,29 @@ func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
+	defer c.funcIn("Symlink::GetXAttrSize").out()
 	return link.parentGetChildXAttrSize(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
+	defer c.funcIn("Symlink::GetXAttrData").out()
 	return link.parentGetChildXAttrData(c, link.inodeNum(), attr)
 }
 
 func (link *Symlink) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	defer c.funcIn("Symlink::ListXAttr").out()
 	return link.parentListChildXAttr(c, link.inodeNum())
 }
 
 func (link *Symlink) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	defer c.funcIn("Symlink::SetXAttr").out()
 	return link.parentSetChildXAttr(c, link.inodeNum(), attr, data)
 }
 
 func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	defer c.funcIn("Symlink::RemoveXAttr").out()
 	return link.parentRemoveChildXAttr(c, link.inodeNum(), attr)
 }
 
