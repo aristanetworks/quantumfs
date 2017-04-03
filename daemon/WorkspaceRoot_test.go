@@ -254,7 +254,7 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 			workspaceName)
 
 		err = api.EnableRootWrite(workspaceName)
-		test.Assert(err == nil, "Failed enabling workspace %s write"+
+		test.Assert(err != nil, "Successfully enabling workspace %s write"+
 			" permission", workspaceName)
 
 		fileName := workspace + "/file"

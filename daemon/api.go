@@ -577,8 +577,12 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	}
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
-	if _, exists := c.qfs.workspaceMutability[workspacePath]; !exists {
+	if mutable, exists := c.qfs.workspaceMutability[workspacePath]; !exists {
 		c.qfs.workspaceMutability[workspacePath] = true
+	} else if mutable == false {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"WorkspaceRoot has already been set immutable")
+		return
 	}
 
 	api.queueErrorResponse(quantumfs.ErrorOK,
