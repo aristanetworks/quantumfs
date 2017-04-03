@@ -3,21 +3,25 @@
 
 package qwr
 
+import "fmt"
 import "strings"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-func createWsIfNotExist(wsdb quantumfs.WorkspaceDB,
-	wsname string) (quantumfs.ObjectKey, error) {
+func createAdvance(wsdb quantumfs.WorkspaceDB,
+	wsname string,
+	newKey quantumfs.ObjectKey) error {
 	wsParts := strings.Split(wsname, "/")
 
+	fmt.Println("Checking ", wsname)
 	curKey, err := wsdb.Workspace(nil,
 		wsParts[0], wsParts[1], wsParts[2])
 	if err != nil {
 		if wsdbErrCode, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 			if wsdbErrCode.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+				fmt.Println(wsname, " doesn't exist, so creating...")
 				err = wsdb.BranchWorkspace(nil,
 					quantumfs.NullSpaceName,
 					quantumfs.NullSpaceName,
@@ -27,42 +31,37 @@ func createWsIfNotExist(wsdb quantumfs.WorkspaceDB,
 		}
 
 		if err != nil {
-			return curKey, err
+			return err
 		}
 
+		fmt.Println("Checking ", wsname)
 		curKey, err = wsdb.Workspace(nil,
 			wsParts[0], wsParts[1], wsParts[2])
 	}
 
-	return curKey, err
+	fmt.Println("Advancing ", wsname, curKey, newKey)
+	_, err = wsdb.AdvanceWorkspace(nil,
+		wsParts[0], wsParts[1], wsParts[2],
+		curKey, newKey)
+	if err != nil {
+		return err
+	}
 
+	return nil
 }
 
 func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 	advance string, newWsrKey quantumfs.ObjectKey) error {
 
-	wsParts := strings.Split(ws, "/")
-	curKey, err := createWsIfNotExist(wsdb, ws)
-	if err != nil {
-		return err
-	}
-	_, err = wsdb.AdvanceWorkspace(nil,
-		wsParts[0], wsParts[1], wsParts[2],
-		quantumfs.EmptyWorkspaceKey, newWsrKey)
+	err := createAdvance(wsdb, ws, newWsrKey)
 	if err != nil {
 		return err
 	}
 
 	if advance != "" {
-		wsParts = strings.Split(advance, "/")
-		curKey, err = createWsIfNotExist(wsdb, advance)
+		err := createAdvance(wsdb, advance, newWsrKey)
 		if err != nil {
-			_, err = wsdb.AdvanceWorkspace(nil,
-				wsParts[0], wsParts[1], wsParts[2],
-				curKey, newWsrKey)
-			if err != nil {
-				return err
-			}
+			return err
 		}
 	}
 

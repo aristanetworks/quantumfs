@@ -228,7 +228,7 @@ func main() {
 		os.Exit(exitErrUpload)
 	}
 
-	fmt.Printf("Upload completed. Total: %d bytes "+
+	fmt.Printf("\nUpload completed. Total: %d bytes "+
 		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
 		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
 		qwr.DataBytesWritten,
