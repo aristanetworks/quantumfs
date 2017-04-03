@@ -39,9 +39,11 @@ type TypespaceList struct {
 func (tsl *TypespaceList) dirty(c *ctx) {
 	// Override InodeCommon.dirty() because namespaces don't get dirty in the
 	// traditional manner
+	c.vlog("TypespaceList::dirty doing nothing")
 }
 
 func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
+	c.vlog("TypespaceList::dirtyChild doing nothing")
 }
 
 func (tsl *TypespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -52,6 +54,7 @@ func (tsl *TypespaceList) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (tsl *TypespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("TypespaceList::GetAttr").out()
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
@@ -60,6 +63,8 @@ func (tsl *TypespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 }
 
 func (tsl *TypespaceList) markSelfAccessed(c *ctx, created bool) {
+	defer c.FuncIn("TypespaceList::markSelfAccessed", "created %t",
+		created).out()
 	tsl.markAccessed(c, "", created)
 	return
 }
@@ -70,6 +75,7 @@ func (tsl *TypespaceList) markAccessed(c *ctx, path string, created bool) {
 }
 
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
+	defer c.FuncIn("fillRootAttr", "inode %d", inodeNum).out()
 	num, err := c.workspaceDB.NumTypespaces(&c.Ctx)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
@@ -82,6 +88,8 @@ type listingAttrFill func(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	typespace string, namespace string) {
 
+	defer c.FuncIn("fillTypespaceAttr", "inode %d", inodeNum).out()
+
 	num, err := c.workspaceDB.NumNamespaces(&c.Ctx, typespace)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
@@ -90,6 +98,8 @@ func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	typespace string, namespace string) {
+
+	defer c.FuncIn("fillNamespaceAttr", "inode %d", inodeNum).out()
 
 	num, err := c.workspaceDB.NumWorkspaces(&c.Ctx, typespace, namespace)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
@@ -134,7 +144,7 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 	nameMap *map[InodeId]string, parent Inode) {
 
-	defer c.FuncIn("updateChildren", "Enter Parent Inode %d",
+	defer c.FuncIn("updateChildren", "Parent Inode %d",
 		parent.inodeNum()).out()
 
 	touched := make(map[string]bool)
@@ -177,6 +187,8 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 func snapshotChildren(c *ctx, children *map[string]InodeId, typespace string,
 	fillAttr listingAttrFill) []directoryContents {
 
+	defer c.FuncIn("snapshotChildren", "typespace %s", typespace).out()
+
 	out := make([]directoryContents, 0, len(*children))
 	for name, inode := range *children {
 		child := directoryContents{
@@ -199,11 +211,14 @@ func snapshotChildren(c *ctx, children *map[string]InodeId, typespace string,
 func (tsl *TypespaceList) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("TypespaceList::Open doing nothing")
 	return fuse.ENOSYS
 }
 
 func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
+
+	defer c.funcIn("TypespaceList::OpenDir").out()
 
 	ds := newDirectorySnapshot(c, tsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
@@ -225,6 +240,8 @@ func (tsl *TypespaceList) directChildInodes() []InodeId {
 }
 
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
+	defer c.funcIn("TypespaceList::getChildSnapshot").out()
+
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
@@ -246,6 +263,8 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
+	defer c.FuncIn("TypespaceList::Lookup", "name %s", name).out()
+
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
@@ -259,6 +278,8 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	if !exists {
 		return fuse.ENOENT
 	}
+
+	c.vlog("Typespace exists")
 
 	var list []string
 	list, err = c.workspaceDB.TypespaceList(&c.Ctx)
@@ -280,6 +301,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 func (tsl *TypespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("TypespaceList::Create doing nothing")
 	return fuse.EACCES
 }
 
@@ -293,6 +315,7 @@ func (tsl *TypespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (tsl *TypespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("TypespaceList::Mkdir doing nothing")
 	return fuse.EPERM
 }
 
@@ -378,6 +401,7 @@ func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 
 func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
+	c.vlog("TypespaceList::syncChild doing nothing")
 }
 
 func (tsl *TypespaceList) setChildAttr(c *ctx, inodeNum InodeId,
@@ -450,6 +474,9 @@ func (tsl *TypespaceList) flush(c *ctx) quantumfs.ObjectKey {
 func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
+	defer c.FuncIn("newNamespaceList", "typespace %s namespace %s workspace %s",
+		typespace, namespace, workspace).out()
+
 	nsl := NamespaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
 		typespaceName:    typespace,
@@ -477,9 +504,11 @@ type NamespaceList struct {
 func (nsl *NamespaceList) dirty(c *ctx) {
 	// Override InodeCommon.dirty() because namespaces don't get dirty in the
 	// traditional manner
+	c.vlog("NamespaceList::dirty doing nothing")
 }
 
 func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
+	c.vlog("NamespaceList::dirtyChild doing nothing")
 }
 
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -490,6 +519,7 @@ func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("NamespaceList::GetAttr").out()
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
@@ -500,11 +530,14 @@ func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (nsl *NamespaceList) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("NamespaceList::Open doing nothing")
 	return fuse.ENOSYS
 }
 
 func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
+
+	defer c.funcIn("NamespaceList::OpenDir").out()
 
 	ds := newDirectorySnapshot(c, nsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
@@ -526,6 +559,8 @@ func (nsl *NamespaceList) directChildInodes() []InodeId {
 }
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
+	defer c.funcIn("NamespaceList::getChildSnapshot").out()
+
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
@@ -541,12 +576,16 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
+	defer c.FuncIn("NamespaceList::Lookup", "name %s", name).out()
+
 	exists, err := c.workspaceDB.NamespaceExists(&c.Ctx, nsl.typespaceName, name)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 
 	if !exists {
 		return fuse.ENOENT
 	}
+
+	c.vlog("Namespace exists")
 
 	var list []string
 	list, err = c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
@@ -568,6 +607,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("NamespaceList::Create doing nothing")
 	return fuse.EACCES
 }
 
@@ -581,6 +621,7 @@ func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("NamespaceList::Mkdir doing nothing")
 	return fuse.EPERM
 }
 
@@ -666,6 +707,8 @@ func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
+
+	c.vlog("NamespaceList::syncChild doing nothing")
 }
 
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
@@ -729,6 +772,8 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 }
 
 func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
+	defer c.FuncIn("NamespaceList::markSelfAccessed", "created %t",
+		created).out()
 	nsl.markAccessed(c, "", created)
 	return
 }
@@ -745,6 +790,9 @@ func (nsl *NamespaceList) flush(c *ctx) quantumfs.ObjectKey {
 
 func newWorkspaceList(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+
+	defer c.FuncIn("newWorkspaceList", "typespace %s namespace %s workspace %s",
+		typespace, namespace, workspace).out()
 
 	wsl := WorkspaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
@@ -775,9 +823,11 @@ type WorkspaceList struct {
 func (wsl *WorkspaceList) dirty(c *ctx) {
 	// Override InodeCommon.dirty() because workspaces don't get dirty in the
 	// traditional manner.
+	c.vlog("WorkspaceList::dirty doing nothing")
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
+	c.vlog("WorkspaceList::dirtyChild doing nothing")
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -788,6 +838,7 @@ func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("WorkspaceList::GetAttr").out()
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 
@@ -798,11 +849,14 @@ func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (wsl *WorkspaceList) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
+	c.vlog("WorkspaceList::Open doing nothing")
 	return fuse.ENOSYS
 }
 
 func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	mode uint32, out *fuse.OpenOut) fuse.Status {
+
+	defer c.funcIn("WorkspaceList::OpenDir").out()
 
 	ds := newDirectorySnapshot(c, wsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
@@ -824,6 +878,8 @@ func (wsl *WorkspaceList) directChildInodes() []InodeId {
 }
 
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
+	defer c.funcIn("WorkspaceList::getChildSnapshot").out()
+
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
@@ -840,6 +896,8 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
+	defer c.FuncIn("WorkspaceList::Lookup", "name %s", name).out()
+
 	exists, err := c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName, name)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
@@ -847,6 +905,8 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	if !exists {
 		return fuse.ENOENT
 	}
+
+	c.vlog("Workspace exists")
 
 	var list []string
 	list, err = c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
@@ -869,6 +929,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
+	c.vlog("WorkspaceList::Create doing nothing")
 	return fuse.EACCES
 }
 
@@ -882,6 +943,7 @@ func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	out *fuse.EntryOut) fuse.Status {
 
+	c.vlog("WorkspaceList::Mkdir doing nothing")
 	return fuse.EPERM
 }
 
@@ -967,6 +1029,8 @@ func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
+
+	c.vlog("WorkspaceList::syncChild doing nothing")
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
@@ -1039,6 +1103,8 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 }
 
 func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
+	defer c.FuncIn("WorkspaceList::markSelfAccessed", "created %t",
+		created).out()
 	wsl.markAccessed(c, "", created)
 	return
 }
