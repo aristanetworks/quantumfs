@@ -61,3 +61,42 @@ func TestNullWorkspaceListing(t *testing.T) {
 			len(entries))
 	})
 }
+
+func checkNlink(test *testHelper, path string, expectedCount uint64) {
+
+	var stat syscall.Stat_t
+	err := syscall.Stat(test.absPath(path), &stat)
+	test.AssertNoErr(err)
+
+	test.Assert(stat.Nlink == expectedCount,
+		"%s has incorrect nlink %d != %d", path, stat.Nlink,
+		expectedCount)
+}
+
+func TestListingNlinkValues(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspaces := [...]string{
+			"a1/b1/c1",
+			"a1/b2/c1",
+			"a1/b2/c2",
+			"a2/b3/c1",
+		}
+
+		api := test.getApi()
+
+		for _, name := range workspaces {
+			err := api.Branch(test.nullWorkspaceRel(), name)
+			test.AssertNoErr(err)
+		}
+
+		checkNlink(test, "a1", 4)
+		checkNlink(test, "a1/.", 4)
+		checkNlink(test, "a1/b1/..", 4)
+		checkNlink(test, "a1/b1", 3)
+		checkNlink(test, "a1/b1/.", 3)
+		checkNlink(test, "a1/b2", 4)
+		checkNlink(test, "a1/b2/c1/..", 4)
+		checkNlink(test, "a1/b2/c1", 29)
+		checkNlink(test, "a1/b2/c1/.", 29)
+	})
+}
