@@ -20,8 +20,7 @@ import "github.com/aristanetworks/ether/cql"
 import "github.com/aristanetworks/ether/filesystem"
 import "github.com/aristanetworks/ether/qubit/wsdb"
 import "github.com/aristanetworks/quantumfs"
-
-//import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 func init() {
 	registerDatastore("ether.filesystem", NewEtherFilesystemStore)
