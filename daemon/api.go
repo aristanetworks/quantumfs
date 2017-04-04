@@ -581,8 +581,9 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 
 	defer parent.Lock().Unlock()
 	if record := parent.children.recordByName(c, target); record != nil {
-		c.vlog("Removing target in preparation for replacement")
-		parent.delChild_(c, target)
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Inode %s should not exist", target)
+		return
 	}
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
