@@ -77,9 +77,9 @@ func accessTestBothUsers(test *testHelper, filename string) {
 
 func TestAccessListFileInWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := workspace + "/testFile"
-		err := testutils.PrintToFile(filename, string(genData(1000)))
+		err := testutils.PrintToFile(filename, string(GenData(1000)))
 		test.AssertNoErr(err)
 
 		accessTestBothUsers(test, filename)
@@ -88,11 +88,11 @@ func TestAccessListFileInWsr(t *testing.T) {
 
 func TestAccessListFileSubdir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		os.MkdirAll(workspace+"/subdir", 0777)
 
 		filename := workspace + "/subdir/testFile"
-		err := testutils.PrintToFile(filename, string(genData(1000)))
+		err := testutils.PrintToFile(filename, string(GenData(1000)))
 		test.AssertNoErr(err)
 
 		accessTestBothUsers(test, filename)
@@ -101,11 +101,11 @@ func TestAccessListFileSubdir(t *testing.T) {
 
 func TestAccessListHardlinkInWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace + "/testFile"
-		err := testutils.PrintToFile(filename, string(genData(1000)))
+		err := testutils.PrintToFile(filename, string(GenData(1000)))
 		test.AssertNoErr(err)
 
 		linkname := workspace + "/subdir/subsubdir/linkFile"
@@ -118,11 +118,11 @@ func TestAccessListHardlinkInWsr(t *testing.T) {
 
 func TestAccessListHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace + "/subdir/testFile"
-		err := testutils.PrintToFile(filename, string(genData(1000)))
+		err := testutils.PrintToFile(filename, string(GenData(1000)))
 		test.AssertNoErr(err)
 
 		linkname := workspace + "/subdir/subsubdir/linkFile"
@@ -135,11 +135,11 @@ func TestAccessListHardlink(t *testing.T) {
 
 func TestAccessSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace + "/subdir/testFile"
-		err := testutils.PrintToFile(filename, string(genData(1000)))
+		err := testutils.PrintToFile(filename, string(GenData(1000)))
 		test.AssertNoErr(err)
 
 		linkname := workspace + "/subdir/subsubdir/linkFile"
@@ -152,7 +152,7 @@ func TestAccessSymlink(t *testing.T) {
 
 func TestAccessDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		os.MkdirAll(workspace+"/subdir", 0777)
 
 		accessTestBothUsers(test, workspace+"/subdir")

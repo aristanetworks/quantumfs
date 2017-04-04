@@ -254,11 +254,6 @@ func (th *TestHelper) absPath(path string) string {
 
 // Make the given path relative to the mount root
 func (th *TestHelper) RelPath(path string) string {
-	return th.relPath(path)
-}
-
-// Make the given path relative to the mount root
-func (th *TestHelper) relPath(path string) string {
 	return strings.TrimPrefix(path, th.TempDir+"/mnt/")
 }
 
@@ -313,7 +308,7 @@ func (th *TestHelper) newWorkspace() string {
 	path := th.newWorkspaceWithoutWritePerm()
 
 	api := th.getApi()
-	err := api.EnableRootWrite(th.relPath(path))
+	err := api.EnableRootWrite(th.RelPath(path))
 	th.Assert(err == nil, "Failed to enable write permission in workspace: %v",
 		err)
 
@@ -321,7 +316,7 @@ func (th *TestHelper) newWorkspace() string {
 }
 
 func (th *TestHelper) branchWorkspaceWithoutWritePerm(original string) string {
-	src := th.relPath(original)
+	src := th.RelPath(original)
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10) +
 		"/" + randomNamespaceName(8)
 
@@ -347,12 +342,8 @@ func (th *TestHelper) branchWorkspace(original string) string {
 	return dst
 }
 
-func (th *TestHelper) SyncAllWorkspaces() {
-	th.syncAllWorkspaces()
-}
-
 // Sync all the active workspaces
-func (th *TestHelper) syncAllWorkspaces() {
+func (th *TestHelper) SyncAllWorkspaces() {
 	api := th.getApi()
 	err := api.SyncAll()
 
@@ -376,10 +367,6 @@ var precompGenData []byte
 var genDataLast int
 
 func GenData(maxLen int) []byte {
-	return genData(maxLen)
-}
-
-func genData(maxLen int) []byte {
 	if maxLen > len(precompGenData) {
 		// we need to expand the array
 		genDataMutex.Lock()

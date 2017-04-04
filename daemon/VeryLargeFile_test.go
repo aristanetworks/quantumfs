@@ -16,13 +16,13 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func runConvertFrom(test *testHelper, fromFileSize uint64) {
-	workspace := test.newWorkspace()
+	workspace := test.NewWorkspace()
 
 	testFilename := workspace + "/test"
 
 	// fromFileSize must be > testDataSize
 	testDataSize := 4096
-	data := genData(testDataSize)
+	data := GenData(testDataSize)
 	err := testutils.PrintToFile(testFilename, string(data))
 	test.Assert(err == nil,
 		"Error writing data (%d bytes) to new fd: %v",
@@ -78,7 +78,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	// Branch the workspace
 	api := test.getApi()
 	dst := strconv.FormatUint(fromFileSize, 10) + "dst/verylargeattrsparse/test"
-	err = api.Branch(test.relPath(workspace), dst)
+	err = api.Branch(test.RelPath(workspace), dst)
 	test.Assert(err == nil, "Unable to branch")
 
 	test.checkSparse(test.absPath(dst+"/test"), testFilename, newLen/100, 10)
@@ -112,12 +112,12 @@ func TestLargeConvert(t *testing.T) {
 
 func TestVeryLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
 		tinyDataSize := 10 * 1024
-		data := genData(tinyDataSize)
+		data := GenData(tinyDataSize)
 		err := testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Error writing tiny (%d) data to new fd",
 			tinyDataSize)
@@ -136,7 +136,7 @@ func TestVeryLargeFileZero(t *testing.T) {
 
 func TestVeryLargeFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// First create a file with some data
@@ -144,7 +144,7 @@ func TestVeryLargeFileReadPastEnd(t *testing.T) {
 		test.Assert(err == nil, "Error creating test file: %v", err)
 
 		testDataSize := 100 * 1024
-		data := genData(testDataSize)
+		data := GenData(testDataSize)
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing data to file: %v", err)
 
