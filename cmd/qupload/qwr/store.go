@@ -10,19 +10,19 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-func createAdvance(wsdb quantumfs.WorkspaceDB,
+func createAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 	wsname string,
 	newKey quantumfs.ObjectKey) error {
 	wsParts := strings.Split(wsname, "/")
 
 	fmt.Println("Checking ", wsname)
-	curKey, err := wsdb.Workspace(nil,
+	curKey, err := wsdb.Workspace(qctx,
 		wsParts[0], wsParts[1], wsParts[2])
 	if err != nil {
 		if wsdbErrCode, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 			if wsdbErrCode.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
 				fmt.Println(wsname, " doesn't exist, so creating...")
-				err = wsdb.BranchWorkspace(nil,
+				err = wsdb.BranchWorkspace(qctx,
 					quantumfs.NullSpaceName,
 					quantumfs.NullSpaceName,
 					quantumfs.NullSpaceName,
@@ -35,12 +35,12 @@ func createAdvance(wsdb quantumfs.WorkspaceDB,
 		}
 
 		fmt.Println("Checking ", wsname)
-		curKey, err = wsdb.Workspace(nil,
+		curKey, err = wsdb.Workspace(qctx,
 			wsParts[0], wsParts[1], wsParts[2])
 	}
 
 	fmt.Println("Advancing ", wsname, curKey, newKey)
-	_, err = wsdb.AdvanceWorkspace(nil,
+	_, err = wsdb.AdvanceWorkspace(qctx,
 		wsParts[0], wsParts[1], wsParts[2],
 		curKey, newKey)
 	if err != nil {
@@ -50,16 +50,16 @@ func createAdvance(wsdb quantumfs.WorkspaceDB,
 	return nil
 }
 
-func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
+func CreateWorkspace(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
 	advance string, newWsrKey quantumfs.ObjectKey) error {
 
-	err := createAdvance(wsdb, ws, newWsrKey)
+	err := createAdvance(qctx, wsdb, ws, newWsrKey)
 	if err != nil {
 		return err
 	}
 
 	if advance != "" {
-		err := createAdvance(wsdb, advance, newWsrKey)
+		err := createAdvance(qctx, wsdb, advance, newWsrKey)
 		if err != nil {
 			return err
 		}
@@ -68,10 +68,10 @@ func CreateWorkspace(wsdb quantumfs.WorkspaceDB, ws string,
 	return nil
 }
 
-func writeBlock(data []byte, keyType quantumfs.KeyType,
+func writeBlock(qctx *quantumfs.Ctx, data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	key := quantumfs.NewObjectKey(keyType, hash.Hash(data))
 	buf := testutils.NewSimpleBuffer(data, key)
-	return key, ds.Set(nil, key, buf)
+	return key, ds.Set(qctx, key, buf)
 }

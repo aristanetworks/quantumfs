@@ -69,7 +69,9 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 	rootTracker = false
 }
 
-func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
+func handleDirRecord(qctx *quantumfs.Ctx,
+	record quantumfs.DirectoryRecord, path string) error {
+
 	var err error
 	defer dirStateMutex.Lock().Unlock()
 
@@ -84,7 +86,7 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 		if len(tracker.records) != cap(tracker.records) {
 			return nil
 		}
-		record, err = qwr.WriteDirectory(path, tracker.info,
+		record, err = qwr.WriteDirectory(qctx, path, tracker.info,
 			tracker.records, dataStore)
 		if err != nil {
 			return err
@@ -100,7 +102,9 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 	}
 }
 
-func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
+func pathWorker(ctx context.Context, qctx *quantumfs.Ctx,
+	piChan <-chan *pathInfo) error {
+
 	var record quantumfs.DirectoryRecord
 	var err error
 	var msg *pathInfo
@@ -119,7 +123,7 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 			// WriteFile() will detect the file type based on
 			// stat information and setup appropriate data
 			// and metadata for the file in storage
-			record, err = qwr.WriteFile(dataStore,
+			record, err = qwr.WriteFile(qctx, dataStore,
 				msg.info, msg.path)
 			if err != nil {
 				return err
@@ -141,7 +145,7 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 				quantumfs.EmptyDirKey)
 		}
 
-		err = handleDirRecord(record, filepath.Dir(msg.path))
+		err = handleDirRecord(qctx, record, filepath.Dir(msg.path))
 		if err != nil {
 			return err
 		}
@@ -242,8 +246,8 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
-	conc uint) error {
+func upload(qctx *quantumfs.Ctx, ws string, advance string, root string,
+	exInfo *ExcludeInfo, conc uint) error {
 
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
@@ -253,7 +257,7 @@ func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
 	// workers
 	for i := uint(0); i < conc; i++ {
 		group.Go(func() error {
-			return pathWorker(groupCtx, piChan)
+			return pathWorker(groupCtx, qctx, piChan)
 		})
 	}
 	// walker
@@ -272,9 +276,10 @@ func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
 		return err
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(topDirRecord.ID(), dataStore)
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(qctx, topDirRecord.ID(),
+		dataStore)
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return qwr.CreateWorkspace(wsDB, ws, advance, wsrKey)
+	return qwr.CreateWorkspace(qctx, wsDB, ws, advance, wsrKey)
 }

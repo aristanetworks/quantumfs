@@ -94,7 +94,8 @@ func SetHardLink(finfo os.FileInfo,
 	return newDirRecord
 }
 
-func writeHardLinkInfo(ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error) {
+func writeHardLinkInfo(qctx *quantumfs.Ctx,
+	ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error) {
 
 	// entryIdx indexes into the metadata block
 	hle := quantumfs.NewHardlinkEntry()
@@ -107,7 +108,7 @@ func writeHardLinkInfo(ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error)
 			hle.SetNumEntries(entryIdx)
 			hle.SetNext(hleKey)
 
-			hleKey, err = writeBlock(hle.Bytes(),
+			hleKey, err = writeBlock(qctx, hle.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
 				return nil, err
