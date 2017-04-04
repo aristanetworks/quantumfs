@@ -1306,14 +1306,14 @@ func TestDirectoryNlinkValues(t *testing.T) {
 
 		w := test.relPath(workspace)
 
-		checkNlink(test, w+"/a1", 4)
-		checkNlink(test, w+"/a1/.", 4)
-		checkNlink(test, w+"/a1/b1/..", 4)
-		checkNlink(test, w+"/a1/b1", 3)
-		checkNlink(test, w+"/a1/b1/.", 3)
-		checkNlink(test, w+"/a1/b2", 4)
-		checkNlink(test, w+"/a1/b2/c1/..", 4)
-		checkNlink(test, w+"/a1/b2/c1", 2)
-		checkNlink(test, w+"/a1/b2/c1/.", 2)
+		checkNlink(test, w+"/a1", 4, 4)
+		checkNlink(test, w+"/a1/.", 4, 4)
+		checkNlink(test, w+"/a1/b1/..", 4, 4)
+		checkNlink(test, w+"/a1/b1", 3, 3)
+		checkNlink(test, w+"/a1/b1/.", 3, 3)
+		checkNlink(test, w+"/a1/b2", 4, 4)
+		checkNlink(test, w+"/a1/b2/c1/..", 4, 4)
+		checkNlink(test, w+"/a1/b2/c1", 2, 2)
+		checkNlink(test, w+"/a1/b2/c1/.", 2, 2)
 	})
 }
