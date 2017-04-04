@@ -216,8 +216,15 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	testDir := workspace
 	if onDirectory {
 		testDir = workspace + "/testDir"
-		err := os.Mkdir(testDir, os.FileMode(permissions))
+		err := syscall.Mkdir(testDir, permissions)
 		test.Assert(err == nil, "Failed creating testDir: %v", err)
+
+		if directorySticky {
+			checkInfo, err := os.Stat(testDir)
+			test.AssertNoErr(err)
+			test.Assert(checkInfo.Mode() & os.ModeSticky != 0,
+				"Sticky bit missing: %o", checkInfo.Mode())
+		}
 	}
 	testFile := testDir + "/file"
 
@@ -351,8 +358,8 @@ func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
 
 func TestUnlinkPermissionsAsUserThinPermsWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0700,
-			true)
+		testUnlinkPermissions(test, true, false, false, false, true, 0777,
+			false)
 	})
 }
 
