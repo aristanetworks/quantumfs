@@ -82,7 +82,7 @@ func Assert(condition bool, format string, args ...interface{}) {
 // MkdirAll creates a directory named path, along with any necessary parents, and
 // returns nil, or else returns an error.
 // The permission bits perm are used for all directories that MkdirAll creates.
-// If path is already a directory, MkdirAll does nothing and returns nil. 
+// If path is already a directory, MkdirAll does nothing and returns nil.
 // Note: this is copied from golang source, and modified to use syscall.Mkdir because
 // there's a bug with os.Mkdir where sticky bits are lost
 func MkdirAll(path string, perm os.FileMode) error {

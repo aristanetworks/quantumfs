@@ -224,7 +224,7 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		if directorySticky {
 			checkInfo, err := os.Stat(testDir)
 			test.AssertNoErr(err)
-			test.Assert(checkInfo.Mode() & os.ModeSticky != 0,
+			test.Assert(checkInfo.Mode()&os.ModeSticky != 0,
 				"Sticky bit missing after mkdir")
 		}
 	}
@@ -397,7 +397,7 @@ func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
-t.Skip()
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, true, true, 0575,
 			true)
@@ -412,7 +412,7 @@ func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteSticky(t *testing.T) {
-t.Skip()
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, true, 0557,
 			true)
