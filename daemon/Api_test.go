@@ -56,7 +56,7 @@ func TestWorkspaceBranching(t *testing.T) {
 func TestApiClearAccessList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
@@ -69,7 +69,7 @@ func TestApiClearAccessList(t *testing.T) {
 
 		api := test.getApi()
 
-		relpath := test.relPath(workspace)
+		relpath := test.RelPath(workspace)
 		err = api.ClearAccessed(relpath)
 		test.Assert(err == nil,
 			"Error clearing accessList with api")
@@ -92,9 +92,9 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	api := test.getApi()
 
 	// Create the source and the target workspace
-	workspaceSrc := test.newWorkspace()
-	workspaceDst := test.newWorkspace()
-	dst := test.relPath(workspaceDst)
+	workspaceSrc := test.NewWorkspace()
+	workspaceDst := test.NewWorkspace()
+	dst := test.RelPath(workspaceDst)
 
 	dirName := workspaceSrc + "/test/a"
 	dirName1 := dirName + "/b"
@@ -353,7 +353,7 @@ func TestApiInsertOverExistingForget(t *testing.T) {
 func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	tamper2 func(workspace string)) {
 
-	srcWorkspace := test.newWorkspace()
+	srcWorkspace := test.NewWorkspace()
 	dir1 := srcWorkspace + "/dir1"
 	dir2 := dir1 + "/dir2"
 	dir3 := dir2 + "/dir3"
@@ -384,7 +384,7 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 
 	api := test.getApi()
 
-	err = api.InsertInode(test.relPath(dstWorkspace)+"/dir1", dir1Key,
+	err = api.InsertInode(test.RelPath(dstWorkspace)+"/dir1", dir1Key,
 		0777, 0, 0)
 	test.AssertNoErr(err)
 
@@ -438,10 +438,10 @@ func TestWorkspaceDeletion(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		api := test.getApi()
 
-		ws1 := test.newWorkspace()
-		ws2 := test.newWorkspace()
+		ws1 := test.NewWorkspace()
+		ws2 := test.NewWorkspace()
 
-		err := api.DeleteWorkspace(test.relPath(ws1))
+		err := api.DeleteWorkspace(test.RelPath(ws1))
 		test.Assert(err == nil, "Failed to delete workspace: %v", err)
 
 		time.Sleep(200 * time.Millisecond)
@@ -460,7 +460,7 @@ func TestApiGetAndSetBlock(t *testing.T) {
 		api := test.getApi()
 
 		key := []byte("11112222333344445555")
-		data := genData(300)
+		data := GenData(300)
 		err := api.SetBlock(key, data)
 		test.AssertNoErr(err)
 

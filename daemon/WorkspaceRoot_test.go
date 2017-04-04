@@ -45,7 +45,7 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 func testPreparation(test *testHelper, subdirectory string) (string, string,
 	[]byte, []byte) {
 
-	baseWorkspace := test.newWorkspace()
+	baseWorkspace := test.NewWorkspace()
 
 	baseDirName := baseWorkspace + subdirectory + "/dir"
 	err := os.MkdirAll(baseDirName, 0666)
@@ -224,8 +224,8 @@ func TestWorkspaceReadNoWritePermissionAtSubdirectory(t *testing.T) {
 
 func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		workspaceName := test.relPath(workspace)
+		workspace := test.NewWorkspace()
+		workspaceName := test.RelPath(workspace)
 
 		api := test.getApi()
 		err := api.DeleteWorkspace(workspaceName)
@@ -246,7 +246,7 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 // We need isWorkspaceRoot() to be more robust than it has been
 func TestWorkspaceRootChecker(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		wsr := test.getWorkspaceRoot(workspace)
 		var inode Inode
 		inode = wsr

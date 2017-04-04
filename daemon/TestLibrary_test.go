@@ -24,8 +24,8 @@ import "github.com/aristanetworks/quantumfs/testutils"
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	// Precompute a bunch of our genData to save time during tests
-	genData(40 * 1024 * 1024)
+	// Precompute a bunch of our GenData to save time during tests
+	GenData(40 * 1024 * 1024)
 
 	PreTestRuns()
 	result := m.Run()
@@ -63,7 +63,7 @@ func TestTimeout(t *testing.T) {
 func TestGenData(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		hardcoded := "012345678910111213141516171819202122232425262"
-		data := genData(len(hardcoded))
+		data := GenData(len(hardcoded))
 
 		test.Assert(bytes.Equal([]byte(hardcoded), data),
 			"Data gen function off: %s vs %s", hardcoded, data)
@@ -318,7 +318,7 @@ func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
 func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 	string, string) {
 
-	relpath := th.relPath(abspath)
+	relpath := th.RelPath(abspath)
 	components := strings.Split(relpath, "/")
 
 	return components[0], components[1], components[2]
@@ -326,7 +326,7 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 
 // Convert an absolute workspace path to the matching WorkspaceRoot object
 func (th *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
-	parts := strings.Split(th.relPath(workspace), "/")
+	parts := strings.Split(th.RelPath(workspace), "/")
 	wsr, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
 		parts[0], parts[1], parts[2])
 
