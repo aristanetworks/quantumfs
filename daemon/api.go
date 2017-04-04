@@ -500,7 +500,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, true,
+	workspace, ok := c.qfs.getWorkspaceRoot(c, false,
 		dst[0], dst[1], dst[2])
 	if !ok {
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
