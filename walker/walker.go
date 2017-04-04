@@ -22,7 +22,8 @@ func Walk(ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	}
 
 	buf := testutils.NewSimpleBuffer(nil, rootID)
-	err := ds.Get(nil, rootID, buf)
+	c := newCtx()
+	err := ds.Get(c, rootID, buf)
 	if err != nil {
 		return err
 	}
@@ -42,10 +43,10 @@ func Walk(ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	// KeyTypeMetadata which refers to an ObjectType of
 	// DirectoryEntry
 
-	if err = handleHardLinks(ds, wsr.HardlinkEntry(), wf); err != nil {
+	if err = handleHardLinks(c, ds, wsr.HardlinkEntry(), wf); err != nil {
 		return err
 	}
-	return handleDirectoryEntry("/", ds, wsr.BaseLayer(), wf)
+	return handleDirectoryEntry(c, "/", ds, wsr.BaseLayer(), wf)
 }
 
 func key2String(key quantumfs.ObjectKey) string {
@@ -64,8 +65,8 @@ func key2String(key quantumfs.ObjectKey) string {
 	}
 }
 
-func handleHardLinks(ds quantumfs.DataStore, hle quantumfs.HardlinkEntry,
-	wf walkFunc) error {
+func handleHardLinks(c *quantumfs.Ctx, ds quantumfs.DataStore,
+	hle quantumfs.HardlinkEntry, wf walkFunc) error {
 
 	for {
 		//  Go through all records in this entry.
@@ -74,7 +75,7 @@ func handleHardLinks(ds quantumfs.DataStore, hle quantumfs.HardlinkEntry,
 			hlr := hle.Entry(idx)
 			dr := hlr.Record()
 			linkPath := dr.Filename()
-			err := handleDirectoryRecord(linkPath, ds, dr, wf)
+			err := handleDirectoryRecord(c, linkPath, ds, dr, wf)
 			if err != nil {
 				return err
 			}
@@ -87,7 +88,7 @@ func handleHardLinks(ds quantumfs.DataStore, hle quantumfs.HardlinkEntry,
 
 		key := hle.Next()
 		buf := testutils.NewSimpleBuffer(nil, key)
-		err := ds.Get(nil, key, buf)
+		err := ds.Get(c, key, buf)
 		if err != nil {
 			return err
 		}
@@ -107,10 +108,10 @@ func handleHardLinks(ds quantumfs.DataStore, hle quantumfs.HardlinkEntry,
 
 }
 
-func handleMultiBlockFile(path string, ds quantumfs.DataStore,
+func handleMultiBlockFile(c *quantumfs.Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc) error {
 	buf := testutils.NewSimpleBuffer(nil, key)
-	if err := ds.Get(nil, key, buf); err != nil {
+	if err := ds.Get(c, key, buf); err != nil {
 		return err
 	}
 
@@ -139,11 +140,11 @@ func handleMultiBlockFile(path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleVeryLargeFile(path string, ds quantumfs.DataStore,
+func handleVeryLargeFile(c *quantumfs.Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc) error {
 
 	buf := testutils.NewSimpleBuffer(nil, key)
-	err := ds.Get(nil, key, buf)
+	err := ds.Get(c, key, buf)
 	if err != nil {
 		return err
 	}
@@ -159,8 +160,8 @@ func handleVeryLargeFile(path string, ds quantumfs.DataStore,
 
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
-		err = handleMultiBlockFile(path, ds, vlf.LargeFileKey(part),
-			wf)
+		err = handleMultiBlockFile(c, path, ds,
+			vlf.LargeFileKey(part), wf)
 		if err != nil {
 			return err
 		}
@@ -171,11 +172,11 @@ func handleVeryLargeFile(path string, ds quantumfs.DataStore,
 
 var totalFilesWalked uint64
 
-func handleDirectoryEntry(path string, ds quantumfs.DataStore,
+func handleDirectoryEntry(c *quantumfs.Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc) error {
 
 	buf := testutils.NewSimpleBuffer(nil, key)
-	err := ds.Get(nil, key, buf)
+	err := ds.Get(c, key, buf)
 	if err != nil {
 		return err
 	}
@@ -191,7 +192,7 @@ func handleDirectoryEntry(path string, ds quantumfs.DataStore,
 
 	de := buf.AsDirectoryEntry()
 	for i := 0; i < de.NumEntries(); i++ {
-		err = handleDirectoryRecord(path, ds, de.Entry(i), wf)
+		err = handleDirectoryRecord(c, path, ds, de.Entry(i), wf)
 		if err != nil {
 			return err
 		}
@@ -200,7 +201,7 @@ func handleDirectoryEntry(path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleDirectoryRecord(path string, ds quantumfs.DataStore,
+func handleDirectoryRecord(c *quantumfs.Ctx, path string, ds quantumfs.DataStore,
 	dr *quantumfs.DirectRecord, wf walkFunc) error {
 
 	fpath := filepath.Join(path, dr.Filename())
@@ -211,12 +212,12 @@ func handleDirectoryRecord(path string, ds quantumfs.DataStore,
 	case quantumfs.ObjectTypeMediumFile:
 		fallthrough
 	case quantumfs.ObjectTypeLargeFile:
-		if err := handleMultiBlockFile(fpath,
+		if err := handleMultiBlockFile(c, fpath,
 			ds, dr.ID(), wf); err != nil {
 			return err
 		}
 	case quantumfs.ObjectTypeVeryLargeFile:
-		if err := handleVeryLargeFile(fpath,
+		if err := handleVeryLargeFile(c, fpath,
 			ds, dr.ID(), wf); err != nil {
 			return err
 		}
@@ -230,7 +231,7 @@ func handleDirectoryRecord(path string, ds quantumfs.DataStore,
 		}
 	case quantumfs.ObjectTypeDirectoryEntry:
 		if !dr.ID().IsEqualTo(quantumfs.EmptyDirKey) {
-			if err := handleDirectoryEntry(fpath,
+			if err := handleDirectoryEntry(c, fpath,
 				ds, dr.ID(), wf); err != nil {
 				return err
 			}
