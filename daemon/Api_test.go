@@ -106,7 +106,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	PermissionA = syscall.S_IXUSR | syscall.S_IWGRP | syscall.S_IROTH
 	PermissionB = syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO
 
-	err := os.MkdirAll(dirName1, os.FileMode(PermissionA))
+	err := utils.MkdirAll(dirName1, os.FileMode(PermissionA))
 	test.Assert(err == nil, "Error creating directories: %v", err)
 
 	fd, err := syscall.Creat(testFilename, PermissionB)
@@ -139,7 +139,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	keyP := getExtendedKeyHelper(test, spFilename, "pipe")
 
 	dirNameD := test.absPath(dst + "/test/a")
-	err = os.MkdirAll(dirNameD, os.FileMode(PermissionA))
+	err = utils.MkdirAll(dirNameD, os.FileMode(PermissionA))
 	test.Assert(err == nil, "Error creating target directories: %v", err)
 
 	// Ensure the workspace root cannot be duplicated
@@ -358,7 +358,7 @@ func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
 	dir2 := dir1 + "/dir2"
 	dir3 := dir2 + "/dir3"
 
-	err := os.MkdirAll(srcWorkspace+"/dir1/dir2/dir3", 0777)
+	err := utils.MkdirAll(srcWorkspace+"/dir1/dir2/dir3", 0777)
 	test.AssertNoErr(err)
 
 	err = testutils.PrintToFile(dir1+"/file1", "")

@@ -634,7 +634,7 @@ func TestFileOwnership(t *testing.T) {
 		workspace := test.newWorkspace()
 
 		dirName := workspace + "/testdir"
-		err := os.MkdirAll(dirName, 0777)
+		err := utils.MkdirAll(dirName, 0777)
 		test.AssertNoErr(err)
 
 		data := string(genData(2000))
