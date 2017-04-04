@@ -5,7 +5,6 @@ package qlog
 
 // Test the logging subsystem
 
-import "fmt"
 import "io/ioutil"
 import "reflect"
 import "strconv"
