@@ -15,6 +15,7 @@ func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (link *Symlink) Sync_DOWN(c *ctx) fuse.Status {
+	defer c.funcIn("Symlink::Sync_DOWN").out()
 	link.flush(c)
 
 	return fuse.OK

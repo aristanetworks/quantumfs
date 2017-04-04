@@ -14,6 +14,7 @@ type SmallFile struct {
 }
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
+	defer c.FuncIn("newSmallAccessor", "size %d", size).out()
 	var rtn SmallFile
 	rtn.buf = c.dataStore.Get(&c.Ctx, key)
 	if rtn.buf != nil {
@@ -25,6 +26,9 @@ func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
 
 func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
 	error) {
+
+	defer c.FuncIn("SmallFile::readBlock", "block %d offset %d", blockIdx,
+		offset).out()
 
 	// Sanity checks
 	if offset >= uint64(quantumfs.MaxBlockSize) {
@@ -42,6 +46,9 @@ func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 
 func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
+
+	defer c.FuncIn("SmallFile::writeBlock", "block %d offset %d", blockIdx,
+		offset).out()
 
 	// Sanity checks
 	if blockIdx > 0 {
@@ -66,6 +73,8 @@ func (fi *SmallFile) fileLength() uint64 {
 }
 
 func (fi *SmallFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
+	defer c.FuncIn("SmallFile::blockIdxInfo", "offset %d", absOffset).out()
+
 	blkIdx := absOffset / uint64(quantumfs.MaxBlockSize)
 	remainingOffset := absOffset % uint64(quantumfs.MaxBlockSize)
 
@@ -73,8 +82,7 @@ func (fi *SmallFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 }
 
 func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
-	c.vlog("SmallFile::sync Enter")
-	defer c.vlog("SmallFile::sync Exit")
+	defer c.funcIn("SmallFile::sync").out()
 
 	// No metadata to marshal for small files
 	key, err := fi.buf.Key(&c.Ctx)
@@ -91,8 +99,7 @@ func (fi *SmallFile) getType() quantumfs.ObjectType {
 func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	input MultiBlockFile) MultiBlockFile {
 
-	c.vlog("SmallFile::convertToMultiBlock Enter")
-	defer c.vlog("SmallFile::convertToMultiBlock Exit")
+	defer c.funcIn("SmallFile::convertToMultiBlock").out()
 
 	input.metadata.BlockSize = uint32(quantumfs.MaxBlockSize)
 
@@ -113,8 +120,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 }
 
 func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
-	c.vlog("SmallFile::convertTo %v Enter", newType)
-	defer c.vlog("SmallFile::convertTo Exit")
+	defer c.FuncIn("SmallFile::convertTo", "newType %d", newType).out()
 
 	if newType == quantumfs.ObjectTypeSmallFile {
 		return fi
@@ -144,6 +150,7 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 }
 
 func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
+	defer c.FuncIn("SmallFile::truncate", "new size %d", newLengthBytes).out()
 	fi.buf.SetSize(int(newLengthBytes))
 	return nil
 }

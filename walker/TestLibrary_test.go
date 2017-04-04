@@ -124,17 +124,17 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
-func (test *testHelper) readWalkCompare(workspace string) {
+func (th *testHelper) readWalkCompare(workspace string) {
 
-	test.SyncAllWorkspaces()
+	th.SyncAllWorkspaces()
 
 	// Restart QFS
-	err := test.RestartQuantumFs()
-	test.Assert(err == nil, "Error restarting QuantumFs: %v", err)
-	db := test.GetWorkspaceDB()
-	ds := test.GetDataStore()
-	tds := newTestDataStore(test, ds)
-	test.SetDataStore(tds)
+	err := th.RestartQuantumFs()
+	th.Assert(err == nil, "Error restarting QuantumFs: %v", err)
+	db := th.GetWorkspaceDB()
+	ds := th.GetDataStore()
+	tds := newTestDataStore(th, ds)
+	th.SetDataStore(tds)
 
 	// Read all files in this workspace.
 	readFile := func(path string, info os.FileInfo, err error) error {
@@ -148,16 +148,16 @@ func (test *testHelper) readWalkCompare(workspace string) {
 		return nil
 	}
 	err = filepath.Walk(workspace, readFile)
-	test.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
+	th.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
 
 	// Save the keys intercepted during filePath walk.
 	getMap := tds.GetKeyList()
 	tds.FlushKeyList()
 
 	// Use Walker to walk all the blocks in the workspace.
-	root := strings.Split(test.RelPath(workspace), "/")
-	rootID, err := db.Workspace(nil, root[0], root[1], root[2])
-	test.Assert(err == nil, "Error getting rootID for %v: %v",
+	root := strings.Split(th.RelPath(workspace), "/")
+	rootID, err := db.Workspace(newCtx(), root[0], root[1], root[2])
+	th.Assert(err == nil, "Error getting rootID for %v: %v",
 		root, err)
 
 	var walkerMap = make(map[string]int)
@@ -167,10 +167,10 @@ func (test *testHelper) readWalkCompare(workspace string) {
 	}
 
 	err = Walk(ds, rootID, walkFunc)
-	test.Assert(err == nil, "Error in walk: %v", err)
+	th.Assert(err == nil, "Error in walk: %v", err)
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
-	test.Assert(eq == true, "2 maps are not equal")
+	th.Assert(eq == true, "2 maps are not equal")
 }
 
 func TestMain(m *testing.M) {
@@ -181,4 +181,16 @@ func TestMain(m *testing.M) {
 	daemon.PostTestRuns()
 
 	os.Exit(result)
+}
+
+func newCtx() *quantumfs.Ctx {
+	// Create  Ctx with random RequestId
+	Qlog := qlog.NewQlogTiny()
+	requestId := qlog.TestReqId
+	ctx := &quantumfs.Ctx{
+		Qlog:      Qlog,
+		RequestId: requestId,
+	}
+
+	return ctx
 }

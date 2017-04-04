@@ -105,8 +105,8 @@ func runTestNoQfs(t *testing.T, test quantumFsTest) {
 	runTestCommon(t, test, false, nil)
 }
 
-// configModifier is a function which is given the default configuration and should
-// make whichever modifications the test requires in place.
+// configModifier is a function which is given the default configuration
+// and should make whichever modifications the test requires in place.
 type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
 
 // If you need to initialize QuantumFS with a special configuration, but not poke
