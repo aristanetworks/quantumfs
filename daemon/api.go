@@ -619,9 +619,9 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 		return
 	}
 
-	immutable, ok := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
+	immutable, err := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
 		dst[0], dst[1], dst[2])
-	if ok != nil {
+	if err != nil {
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"Failed to get immutability of WorkspaceRoot %s",
 			workspacePath)
@@ -631,13 +631,14 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 	c.vlog("Setting immutable")
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
-	c.qfs.workspaceMutability[workspacePath] = !immutable
 	if immutable {
+		delete(c.qfs.workspaceMutability, workspacePath)
 		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"WorkspaceRoot has already been set immutable")
 		return
 	}
 
+	c.qfs.workspaceMutability[workspacePath] = true
 	api.queueErrorResponse(quantumfs.ErrorOK,
 		"Enable workspace write permission succeeded")
 }
@@ -778,7 +779,7 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) {
 	}
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
-	c.qfs.workspaceMutability[workspacePath] = false
+	delete(c.qfs.workspaceMutability, workspacePath)
 
 	api.queueErrorResponse(quantumfs.ErrorOK,
 		"Making workspace immutable succeeded")

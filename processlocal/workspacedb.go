@@ -253,7 +253,8 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	return nil
 }
 
-func deleteWorkspaceRecord(c *quantumfs.Ctx, cache workspaceMap,
+// The given cache must be locked by its corresponding mutex
+func deleteWorkspaceRecord_(c *quantumfs.Ctx, cache workspaceMap,
 	typespace string, namespace string, workspace string) error {
 
 	_, ok := cache[typespace]
@@ -299,7 +300,7 @@ func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	err := func() error {
 		wsdb.cacheMutex.Lock()
 		defer wsdb.cacheMutex.Unlock()
-		return deleteWorkspaceRecord(c, wsdb.cache, typespace,
+		return deleteWorkspaceRecord_(c, wsdb.cache, typespace,
 			namespace, workspace)
 	}()
 	if err != nil {
@@ -308,7 +309,7 @@ func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 
 	wsdb.stateMutex.Lock()
 	defer wsdb.stateMutex.Unlock()
-	return deleteWorkspaceRecord(c, wsdb.state, typespace, namespace, workspace)
+	return deleteWorkspaceRecord_(c, wsdb.state, typespace, namespace, workspace)
 }
 
 func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
