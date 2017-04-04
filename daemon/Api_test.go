@@ -187,30 +187,8 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 
 	// Duplicate the directory in the given path
 	err = api.InsertInode(dst+"/test/a/dirtest", keyD, PermissionA, uid, gid)
-	test.Assert(err == nil,
-		"Error duplicating a directory to target workspace: %v",
-		err)
-
-	err = syscall.Stat(workspaceDst+"/test/a/dirtest", &stat)
-	test.Assert(err == nil, "Error getting status of directory: %v",
-		err)
-
-	// check the mode of directory
-	expectedMode = syscall.S_IFDIR | PermissionA
-	test.Assert(stat.Mode == expectedMode,
-		"Directory mode incorrect. Expected %x got %x",
-		expectedMode, stat.Mode)
-
-	// testing the file inside of the directory
-	err = syscall.Stat(workspaceDst+"/test/a/dirtest/test", &stat)
-	test.Assert(err == nil, "Error getting status of child file: %v",
-		err)
-
-	// check the child is a file
-	expectedMode = syscall.S_IFREG | PermissionB
-	test.Assert(stat.Mode == expectedMode,
-		"Directory's file mode incorrect. Expected %x got %x",
-		expectedMode, stat.Mode)
+	test.Assert(err != nil,
+		"Succeeded duplicating a directory to target workspace:")
 
 	// Ensure the symlink in the given path
 	err = api.InsertInode(dst+"/symlink", string(keyS), PermissionB, uid, gid)
