@@ -874,18 +874,18 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-// In order to run getWorkspaceRoot, we must set a proper value for variable
-// instantiate. If the workspace doesn't have to instantiate children in future, it
-// doesn't need to instantiate itself either, so we can forget it by setting a false
-// instantiate. Otherwise, it should stay instantiated with a true value.
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, instantiate bool, typespace string,
-	namespace string, workspace string) (*WorkspaceRoot, bool) {
+// In order to run getWorkspaceRoot, we must set a proper value for the variable
+// increaseLookupCount. If the function is called internally, it  doesn't need to
+// increase the lookupCount. Only if it is triggered by kernel, should lookupCount be
+// increased by one. Therefore, lookupCount's in quantumFS and kernel can match.
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, increaseLookupCount bool,
+	typespace, namespace, workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Enter Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
 
 	var nLookup uint64 = 1
-	if instantiate {
+	if increaseLookupCount {
 		nLookup = 0
 	}
 
