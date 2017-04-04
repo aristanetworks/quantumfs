@@ -608,8 +608,9 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer nsl.Lock().Unlock()
 
 	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
-	children := snapshotChildren(c, nsl, &nsl.namespacesByName, nsl.typespaceName,
-		"", fillNamespaceAttr, fillTypespaceAttr, fillRootAttrWrapper)
+	children := snapshotChildren(c, nsl, &nsl.namespacesByName,
+		nsl.typespaceName, "", fillNamespaceAttr, fillTypespaceAttr,
+		fillRootAttrWrapper)
 
 	return children
 }
