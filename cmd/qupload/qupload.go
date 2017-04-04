@@ -66,7 +66,7 @@ version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
-	       [ -progress -advance <wsname> -logfile <path> ]
+	       [ -progress -advance <wsname> -logdir <path> ]
 	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
@@ -256,7 +256,8 @@ func main() {
 		os.Exit(exitErrUpload)
 	}
 
-	finalMsg := fmt.Sprintf("\nUpload completed. Total: %d bytes "+
+	ctx.Vlog(qlog.LogTool, "Upload completed")
+	fmt.Printf("\nUpload completed. Total: %d bytes "+
 		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
 		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
 		qwr.DataBytesWritten,
@@ -266,7 +267,4 @@ func main() {
 		(qwr.MetadataBytesWritten*100)/
 			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
 		time.Since(start).Seconds(), cliParams.ws)
-
-	ctx.Vlog(qlog.LogTool, finalMsg)
-	fmt.Println(finalMsg)
 }

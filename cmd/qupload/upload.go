@@ -17,6 +17,7 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 // Design notes about qupload parallelism:
 //
@@ -86,6 +87,7 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 		if len(tracker.records) != cap(tracker.records) {
 			return nil
 		}
+		qctx.Vlog(qlog.LogTool, "Writing %s", path)
 		record, err = qwr.WriteDirectory(qctx, path, tracker.info,
 			tracker.records, dataStore)
 		if err != nil {
@@ -123,6 +125,7 @@ func pathWorker(ctx context.Context, qctx *quantumfs.Ctx,
 			// WriteFile() will detect the file type based on
 			// stat information and setup appropriate data
 			// and metadata for the file in storage
+			qctx.Vlog(qlog.LogTool, "Writing %s", msg.path)
 			record, err = qwr.WriteFile(qctx, dataStore,
 				msg.info, msg.path)
 			if err != nil {
