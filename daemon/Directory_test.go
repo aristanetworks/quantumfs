@@ -258,7 +258,18 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		test.SetUidGid(99, 99)
 		defer test.SetUidGidToDefault()
 	}
-
+/*
+	// first check if we can rename
+	newName := testFile + "b"
+	err = os.Rename(testFile, newName)
+	if mustSucceed {
+		test.Assert(err == nil, "Failed to rename file: %v", err)
+		testFile = newName
+	} else {
+		test.Assert(err == syscall.EACCES, "Wrong error when renaming: %v",
+			err)
+	}
+*/
 	err = syscall.Unlink(testFile)
 	if mustSucceed {
 		test.Assert(err == nil, "Failed to unlink file: %v", err)
@@ -333,8 +344,8 @@ func TestUnlinkPermissionsAsUserUserWrite(t *testing.T) {
 
 func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0755,
-			false)
+		testUnlinkPermissions(test, true, false, false, false, true, 0777,
+			true)
 	})
 }
 
