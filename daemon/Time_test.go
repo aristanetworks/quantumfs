@@ -45,7 +45,7 @@ func TestTimeChmod(t *testing.T) {
 		dirName := workspace + "/dir"
 		fileName := workspace + "/file"
 
-		err := os.Mkdir(dirName, 0124)
+		err := syscall.Mkdir(dirName, 0124)
 		test.Assert(err == nil, "Error creating directory: %v", err)
 
 		file, err := os.Create(fileName)
@@ -84,7 +84,7 @@ func TestTimeModification(t *testing.T) {
 		dirName := workspace + "/dir"
 		fileName := workspace + "/dir/file"
 
-		err := os.Mkdir(dirName, 0124)
+		err := syscall.Mkdir(dirName, 0124)
 		test.Assert(err == nil, "Error creating directory: %v", err)
 		mtimeOrig, ctimeOrig := getTimes(dirName)
 
@@ -116,7 +116,7 @@ func TestTimeRecursiveCtime(t *testing.T) {
 		dirName := workspace + "/dir"
 		fileName := workspace + "/dir/file"
 
-		err := os.Mkdir(dirName, 0124)
+		err := syscall.Mkdir(dirName, 0124)
 		test.Assert(err == nil, "Error creating directory: %v", err)
 
 		file, err := os.Create(fileName)
@@ -141,7 +141,7 @@ func TestTimeIntraDirectoryRename(t *testing.T) {
 		testFilename1 := dirName + "/test"
 		testFilename2 := dirName + "/test2"
 
-		err := os.Mkdir(dirName, 0777)
+		err := syscall.Mkdir(dirName, 0777)
 		test.Assert(err == nil, "Error creating directory: %v", err)
 
 		fd, err := os.Create(testFilename1)
@@ -168,9 +168,9 @@ func TestTimeInterDirectoryRename(t *testing.T) {
 		testFilename1 := testDir1 + "/test"
 		testFilename2 := testDir2 + "/test2"
 
-		err := os.Mkdir(testDir1, 0777)
+		err := syscall.Mkdir(testDir1, 0777)
 		test.Assert(err == nil, "Failed to create directory: %v", err)
-		err = os.Mkdir(testDir2, 0777)
+		err = syscall.Mkdir(testDir2, 0777)
 		test.Assert(err == nil, "Failed to create directory: %v", err)
 
 		fd, err := os.Create(testFilename1)
