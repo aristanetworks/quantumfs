@@ -344,7 +344,14 @@ func TestUnlinkPermissionsAsUserUserWrite(t *testing.T) {
 
 func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0777,
+		testUnlinkPermissions(test, true, false, false, false, true, 0755,
+			false)
+	})
+}
+
+func TestUnlinkPermissionsAsUserThinPermsWriteSticky(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testUnlinkPermissions(test, true, false, false, false, true, 0700,
 			true)
 	})
 }
