@@ -249,30 +249,24 @@ func TestLookupCountAfterCommand(t *testing.T) {
 	})
 }
 
-func TestLookupCountAfterInsert(t *testing.T) {
+func TestLookupCountAfterInsertInode(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		srcWorkspace := test.newWorkspace()
 		dir1 := srcWorkspace + "/dir1"
-		dir2 := dir1 + "/dir2"
-		dir3 := dir2 + "/dir3"
 
-		err := os.MkdirAll(srcWorkspace+"/dir1/dir2/dir3", 0777)
+		err := os.MkdirAll(srcWorkspace+"/dir1", 0777)
 		test.AssertNoErr(err)
 
-		err = testutils.PrintToFile(dir1+"/file1", "")
-		test.AssertNoErr(err)
-		err = testutils.PrintToFile(dir2+"/file2", "oienoenoienoin")
-		test.AssertNoErr(err)
-		err = testutils.PrintToFile(dir3+"/file3", "")
-		test.AssertNoErr(err)
-
-		dstWorkspace := test.absPath(test.branchWorkspace(srcWorkspace))
-
+		dstWorkspaceName := test.branchWorkspace(srcWorkspace)
+		dstWorkspace := test.absPath(dstWorkspaceName)
 		// Create one marker file in srcWorkspace and dstWorkspace
-		err = testutils.PrintToFile(dir1+"/srcMarker", "")
+		err = testutils.PrintToFile(dir1+"/srcMarker", "testSomething")
 		test.AssertNoErr(err)
-		err = testutils.PrintToFile(dstWorkspace+"/dir1/dstMarker", "")
-		test.AssertNoErr(err)
+
+		api := test.getApi()
+		key := getExtendedKeyHelper(test, dir1+"/srcMarker", "file")
+		err = api.InsertInode(dstWorkspaceName+"/dir1/dstMarker",
+			key, 0777, 0, 0)
 
 		wsrId := test.getInodeNum(dstWorkspace)
 		fileId := test.getInodeNum(dstWorkspace + "/dir1")
@@ -286,7 +280,7 @@ func TestLookupCountAfterInsert(t *testing.T) {
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
-			"Failed to forgot file inode")
+			"Failed to forgot directory inode")
 
 		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
 		test.Assert(wsrInode == nil,
