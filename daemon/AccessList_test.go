@@ -10,6 +10,8 @@ import "syscall"
 import "reflect"
 import "testing"
 
+import "github.com/aristanetworks/quantumfs/utils"
+
 func TestAccessListFileCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
@@ -143,7 +145,7 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 		dir1 := "/dir1"
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
-		err := os.MkdirAll(path, 0666)
+		err := utils.MkdirAll(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
 		accessList[dir1] = true
 		accessList[dir1+dir2] = true
@@ -159,7 +161,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		dir1 := "/dir1"
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
-		err := os.MkdirAll(path, 0666)
+		err := utils.MkdirAll(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
 
 		accessList := make(map[string]bool)
