@@ -234,13 +234,17 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	// Verify the permission of the inode in order to delete a child
 	// If the sticky bit of a directory is set, the action can only be
 	// performed by file's owner, directory's owner, or root user
-	if stickyAltOwner >= 0 &&
-		record.Type() == quantumfs.ObjectTypeDirectoryEntry &&
-		utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) &&
-		checkUid != inodeOwner && checkUid != uint32(stickyAltOwner) {
+	if stickyAltOwner >= 0 {
+		stickyUid := quantumfs.SystemUid(quantumfs.UID(stickyAltOwner),
+			checkUid)
 
-		c.vlog("Sticky owners don't match: FAIL")
-		return fuse.EACCES
+		if record.Type() == quantumfs.ObjectTypeDirectoryEntry &&
+			utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) &&
+			checkUid != inodeOwner && checkUid != stickyUid {
+
+			c.vlog("Sticky owners don't match: FAIL")
+			return fuse.EACCES
+		}
 	}
 
 	// Get whether current user is OWNER/GRP/OTHER
