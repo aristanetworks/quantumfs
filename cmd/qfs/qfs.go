@@ -49,7 +49,8 @@ func main() {
 		fmt.Println("         - delete <workspace> from the WorkspaceDB")
 		fmt.Println("  enableRootWrite <workspace>")
 		fmt.Println("         - enable <workspace> the write permission")
-
+		fmt.Println("  setWorkspaceImmutable <workspace>")
+		fmt.Println("         - make <workspace> irreversibly immutable")
 		os.Exit(exitBadCmd)
 	}
 
@@ -75,6 +76,8 @@ func main() {
 		deleteWorkspace()
 	case "enableRootWrite":
 		enableRootWrite()
+	case "setWorkspaceImmutable":
+		setWorkspaceImmutable()
 	}
 }
 
@@ -241,6 +244,28 @@ func enableRootWrite() {
 
 	if err := api.EnableRootWrite(workspace); err != nil {
 		fmt.Println("EnableRootWrite failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func setWorkspaceImmutable() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for enable workspace" +
+			" write permission")
+		os.Exit(exitBadArgs)
+	}
+
+	workspace := flag.Arg(1)
+
+	fmt.Printf("Set workspace \"%s\" immutable\n", workspace)
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
+
+	if err := api.SetWorkspaceImmutable(workspace); err != nil {
+		fmt.Println("SetWorkspaceImmutable failed:", err)
 		os.Exit(exitBadArgs)
 	}
 }
