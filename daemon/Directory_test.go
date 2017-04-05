@@ -205,7 +205,7 @@ func TestDirectoryFileDeletion(t *testing.T) {
 	})
 }
 
-func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
+func testPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	directoryUserMatches bool, directoryGroupMatches bool, directorySticky bool,
 	permissions uint32, mustSucceed bool) {
 
@@ -308,170 +308,170 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	}
 }
 
-func TestUnlinkPermissionsAsRootNoPerms(t *testing.T) {
+func TestPermissionsAsRootNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, false, false, false, 0000,
+		testPermissions(test, true, true, false, false, false, 0000,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsRootNoPermsSticky(t *testing.T) {
+func TestPermissionsAsRootNoPermsSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, false, false, true, 0000,
+		testPermissions(test, true, true, false, false, true, 0000,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsRootNoPermsOwner(t *testing.T) {
+func TestPermissionsAsRootNoPermsOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, true, true, false, 0000,
+		testPermissions(test, true, true, true, true, false, 0000,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsRootNoPermsOwnerSticky(t *testing.T) {
+func TestPermissionsAsRootNoPermsOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, true, true, true, true, 0000,
+		testPermissions(test, true, true, true, true, true, 0000,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsUserNoWrite(t *testing.T) {
+func TestPermissionsAsUserNoWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, false, 0555,
+		testPermissions(test, true, false, false, false, false, 0555,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserNoWriteSticky(t *testing.T) {
+func TestPermissionsAsUserNoWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0555,
+		testPermissions(test, true, false, false, false, true, 0555,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserNoWriteOwner(t *testing.T) {
+func TestPermissionsAsUserNoWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, false, 0555,
+		testPermissions(test, true, false, true, true, false, 0555,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserNoWriteOwnerSticky(t *testing.T) {
+func TestPermissionsAsUserNoWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, true, 0555,
+		testPermissions(test, true, false, true, true, true, 0555,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserUserWrite(t *testing.T) {
+func TestPermissionsAsUserUserWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, false, 0755,
+		testPermissions(test, true, false, false, false, false, 0755,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
+func TestPermissionsAsUserUserWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0755,
+		testPermissions(test, true, false, false, false, true, 0755,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserUserWriteOwner(t *testing.T) {
+func TestPermissionsAsUserUserWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, false, 0755,
+		testPermissions(test, true, false, true, true, false, 0755,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsUserUserWriteOwnerSticky(t *testing.T) {
+func TestPermissionsAsUserUserWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, true, 0755,
+		testPermissions(test, true, false, true, true, true, 0755,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsUserGroupWrite(t *testing.T) {
+func TestPermissionsAsUserGroupWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, false, 0575,
+		testPermissions(test, true, false, false, false, false, 0575,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserGroupWriteSticky(t *testing.T) {
+func TestPermissionsAsUserGroupWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0575,
+		testPermissions(test, true, false, false, false, true, 0575,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserGroupWriteOwner(t *testing.T) {
+func TestPermissionsAsUserGroupWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, false, 0575,
+		testPermissions(test, true, false, true, true, false, 0575,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
+func TestPermissionsAsUserGroupWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, true, 0575,
+		testPermissions(test, true, false, true, true, true, 0575,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
+func TestPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, true, false, 0575,
+		testPermissions(test, true, false, false, true, false, 0575,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
+func TestPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, true, true, 0575,
+		testPermissions(test, true, false, false, true, true, 0575,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
+func TestPermissionsAsUserOtherWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, false, 0557,
+		testPermissions(test, true, false, false, false, false, 0557,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsUserOtherWriteSticky(t *testing.T) {
+func TestPermissionsAsUserOtherWriteSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0557,
+		testPermissions(test, true, false, false, false, true, 0557,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserOtherWriteOwner(t *testing.T) {
+func TestPermissionsAsUserOtherWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, false, 0557,
+		testPermissions(test, true, false, true, true, false, 0557,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
+func TestPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, true, true, true, 0557,
+		testPermissions(test, true, false, true, true, true, 0557,
 			false)
 	})
 }
 
-func TestUnlinkPermissionsAsUserInWorkspaceRoot(t *testing.T) {
+func TestPermissionsAsUserInWorkspaceRoot(t *testing.T) {
 	t.Skip()
 	// BUG194878
 	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, false, false, false, false, false, 0000,
+		testPermissions(test, false, false, false, false, false, 0000,
 			true)
 	})
 }
 
-func TestUnlinkPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
+func TestPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
@@ -1330,7 +1330,7 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 	})
 }
 
-func TestTmpDirPerms(t *testing.T) {
+func TestStickyDirPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 		testDir := workspace + "/test"

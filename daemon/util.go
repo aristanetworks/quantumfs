@@ -135,28 +135,21 @@ func findFuseConnection(c *ctx, mountPath string) int {
 	return -1
 }
 
-const permReadAll = quantumfs.PermReadOther | quantumfs.PermReadGroup |
-	quantumfs.PermReadOwner
-const permWriteAll = quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
-	quantumfs.PermWriteOwner
-const permExecAll = quantumfs.PermExecOther | quantumfs.PermExecGroup |
-	quantumfs.PermExecOwner
-
 func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 	gid uint32) fuse.Status {
 
 	// translate access flags into permission flags and return the result
 	var checkFlags uint32
 	if mode&R_OK != 0 {
-		checkFlags |= permReadAll
+		checkFlags |= quantumfs.PermReadAll
 	}
 
 	if mode&W_OK != 0 {
-		checkFlags |= permWriteAll
+		checkFlags |= quantumfs.PermWriteAll
 	}
 
 	if mode&X_OK != 0 {
-		checkFlags |= permExecAll
+		checkFlags |= quantumfs.PermExecAll
 	}
 
 	return hasPermissionIds(c, inode, uid, gid, checkFlags, -1)
@@ -165,7 +158,7 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 func hasDirectoryWritePermSticky(c *ctx, inode Inode,
 	childOwner quantumfs.UID) fuse.Status {
 
-	checkFlags := uint32(permWriteAll | permExecAll)
+	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags,
 		int32(childOwner))
@@ -175,7 +168,7 @@ func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
 	// Directories require execute permission in order to traverse them.
 	// So, we must check both write and execute bits
 
-	checkFlags := uint32(permWriteAll | permExecAll)
+	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
 }
@@ -186,15 +179,16 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	checkFlags := uint32(0)
 	switch openFlags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		checkFlags = permReadAll
+		checkFlags = quantumfs.PermReadAll
 	case syscall.O_WRONLY:
-		checkFlags = permWriteAll
+		checkFlags = quantumfs.PermWriteAll
 	case syscall.O_RDWR:
-		checkFlags = permReadAll | permWriteAll
+		checkFlags = quantumfs.PermReadAll | quantumfs.PermWriteAll
 	}
 
 	if utils.BitFlagsSet(uint(openFlags), FMODE_EXEC) {
-		checkFlags |= permExecAll | quantumfs.PermSUID | quantumfs.PermSGID
+		checkFlags |= quantumfs.PermExecAll | quantumfs.PermSUID |
+			quantumfs.PermSGID
 	}
 
 	owner := c.fuseCtx.Owner
