@@ -1027,6 +1027,22 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		return fuse.EPERM
 	}
 
+	// check write permission for both directories
+	err := hasDirectoryWritePerm(c, dstInode)
+	if err != fuse.OK {
+		return err
+	}
+
+	err = func() fuse.Status {
+		defer dir.childRecordLock.Lock().Unlock()
+
+		record := dir.children.recordByName(c, oldName)
+		return hasDirectoryWritePermSticky(c, dir, record.Owner())
+	} ()
+	if err != fuse.OK {
+		return err
+	}
+
 	result := func() fuse.Status {
 		dst := dstInode.(*Directory)
 
