@@ -887,7 +887,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 // In order to run getWorkspaceRoot, we must set a proper value for the variable
 // increaseLookupCount. If the function is called internally, it  doesn't need to
 // increase the lookupCount. Only if it is triggered by kernel, should lookupCount be
-// increased by one. Therefore, lookupCount's in quantumFS and kernel can match.
+// increased by one. Therefore, lookupCount's in QuantumFS and kernel can match.
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, increaseLookupCount bool,
 	typespace, namespace, workspace string) (*WorkspaceRoot, bool) {
 
