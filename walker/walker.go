@@ -12,7 +12,7 @@ import "github.com/aristanetworks/quantumfs/testutils"
 type walkFunc func(string, quantumfs.ObjectKey, uint64) error
 
 // Walk the workspace hierarchy
-func Walk(ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
+func Walk(c *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf walkFunc) error {
 
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
@@ -22,7 +22,6 @@ func Walk(ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	}
 
 	buf := testutils.NewSimpleBuffer(nil, rootID)
-	c := newCtx()
 	err := ds.Get(c, rootID, buf)
 	if err != nil {
 		return err

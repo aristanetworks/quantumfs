@@ -4,8 +4,10 @@
 package walker
 
 import "flag"
+
 import "io/ioutil"
 import "os"
+
 import "path/filepath"
 import "reflect"
 import "runtime"
@@ -22,7 +24,6 @@ import "github.com/aristanetworks/quantumfs/testutils"
 func runTest(t *testing.T, test walkerTest) {
 	t.Parallel()
 	runTestCommon(t, test, true)
-	//daemon.RunTestCommon(t, th.testHelperUpcast(test))
 }
 
 func runTestCommon(t *testing.T, test walkerTest,
@@ -155,18 +156,19 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	tds.FlushKeyList()
 
 	// Use Walker to walk all the blocks in the workspace.
+	c := &th.TestCtx().Ctx
 	root := strings.Split(th.RelPath(workspace), "/")
-	rootID, err := db.Workspace(newCtx(), root[0], root[1], root[2])
+	rootID, err := db.Workspace(c, root[0], root[1], root[2])
 	th.Assert(err == nil, "Error getting rootID for %v: %v",
 		root, err)
 
 	var walkerMap = make(map[string]int)
-	walkFunc := func(path string, key quantumfs.ObjectKey, size uint64) error {
+	wf := func(path string, key quantumfs.ObjectKey, size uint64) error {
 		walkerMap[key.String()] = 1
 		return nil
 	}
 
-	err = Walk(ds, rootID, walkFunc)
+	err = Walk(c, ds, rootID, wf)
 	th.Assert(err == nil, "Error in walk: %v", err)
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
@@ -181,16 +183,4 @@ func TestMain(m *testing.M) {
 	daemon.PostTestRuns()
 
 	os.Exit(result)
-}
-
-func newCtx() *quantumfs.Ctx {
-	// Create  Ctx with random RequestId
-	Qlog := qlog.NewQlogTiny()
-	requestId := qlog.TestReqId
-	ctx := &quantumfs.Ctx{
-		Qlog:      Qlog,
-		RequestId: requestId,
-	}
-
-	return ctx
 }
