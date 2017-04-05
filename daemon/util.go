@@ -135,41 +135,49 @@ func findFuseConnection(c *ctx, mountPath string) int {
 	return -1
 }
 
+const permReadAll = quantumfs.PermReadOther | quantumfs.PermReadGroup |
+	quantumfs.PermReadOwner
+const permWriteAll = quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
+	quantumfs.PermWriteOwner
+const permExecAll = quantumfs.PermExecOther | quantumfs.PermExecGroup |
+	quantumfs.PermExecOwner
+
 func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 	gid uint32) fuse.Status {
 
 	// translate access flags into permission flags and return the result
 	var checkFlags uint32
 	if mode&R_OK != 0 {
-		checkFlags |= quantumfs.PermReadOther | quantumfs.PermReadGroup |
-			quantumfs.PermReadOwner
+		checkFlags |= permReadAll
 	}
 
 	if mode&W_OK != 0 {
-		checkFlags |= quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
-			quantumfs.PermWriteOwner
+		checkFlags |= permWriteAll
 	}
 
 	if mode&X_OK != 0 {
-		checkFlags |= quantumfs.PermExecOther | quantumfs.PermExecGroup |
-			quantumfs.PermExecOwner
+		checkFlags |= permExecAll
 	}
 
-	return hasPermissionIds(c, inode, uid, gid, checkFlags, false)
+	return hasPermissionIds(c, inode, uid, gid, checkFlags, -1)
 }
 
-func hasDirectoryWritePerm(c *ctx, inode Inode, checkStickyBit bool) fuse.Status {
+func hasDirectoryWritePermSticky(c *ctx, inode Inode,
+	childOwner quantumfs.UID) fuse.Status {
 
-	// Directories require execute permission in order to traverse them.
-	// So, we must check both write and execute bits
-	checkFlags := uint32(0 |
-		quantumfs.PermWriteOther | quantumfs.PermExecOther |
-		quantumfs.PermWriteOwner | quantumfs.PermExecOwner |
-		quantumfs.PermWriteGroup | quantumfs.PermExecGroup)
-
+	checkFlags := uint32(permWriteAll | permExecAll)
 	owner := c.fuseCtx.Owner
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags,
-		checkStickyBit)
+		int32(childOwner))
+}
+
+func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
+	// Directories require execute permission in order to traverse them.
+	// So, we must check both write and execute bits
+
+	checkFlags := uint32(permWriteAll | permExecAll)
+	owner := c.fuseCtx.Owner
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
 }
 
 func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
@@ -178,32 +186,26 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	checkFlags := uint32(0)
 	switch openFlags & syscall.O_ACCMODE {
 	case syscall.O_RDONLY:
-		checkFlags = quantumfs.PermReadOther | quantumfs.PermReadGroup |
-			quantumfs.PermReadOwner
+		checkFlags = permReadAll
 	case syscall.O_WRONLY:
-		checkFlags = quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
-			quantumfs.PermWriteOwner
+		checkFlags = permWriteAll
 	case syscall.O_RDWR:
-		checkFlags = quantumfs.PermWriteOther | quantumfs.PermWriteGroup |
-			quantumfs.PermWriteOwner | quantumfs.PermReadOther |
-			quantumfs.PermReadGroup | quantumfs.PermReadOwner
+		checkFlags = permReadAll | permWriteAll
 	}
 
 	if utils.BitFlagsSet(uint(openFlags), FMODE_EXEC) {
-		checkFlags |= quantumfs.PermExecOther | quantumfs.PermExecGroup |
-			quantumfs.PermExecOwner | quantumfs.PermSUID |
-			quantumfs.PermSGID
+		checkFlags |= permExecAll | quantumfs.PermSUID | quantumfs.PermSGID
 	}
 
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, false)
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
 }
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
-	checkGid uint32, checkFlags uint32, checkStickyBit bool) fuse.Status {
+	checkGid uint32, checkFlags uint32, stickyAltOwner int32) fuse.Status {
 
-	defer c.FuncIn("hasPermissionIds", "%d %d %t %o", checkUid, checkGid,
-		checkStickyBit, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%d %d %d %o", checkUid, checkGid,
+		stickyAltOwner, checkFlags).out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
@@ -232,17 +234,15 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	// Verify the permission of the inode in order to delete a child
 	// If the sticky bit of a directory is set, the action can only be
 	// performed by file's owner, directory's owner, or root user
-	isDir := (record.Type() == quantumfs.ObjectTypeDirectoryEntry ||
-		record.Type() == quantumfs.ObjectTypeWorkspaceRoot)
-
-	if checkStickyBit && isDir && checkUid != inodeOwner &&
-		utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) {
+	if stickyAltOwner >= 0 &&
+		record.Type() == quantumfs.ObjectTypeDirectoryEntry &&
+		utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) &&
+		checkUid != inodeOwner && checkUid != uint32(stickyAltOwner) {
 
 		c.vlog("Sticky owners don't match: FAIL")
 		return fuse.EACCES
 	}
-	c.vlog("iDEBUG %d %d %d %t %t %d", checkUid, inodeOwner, permission, isDir,
-		utils.BitFlagsSet(uint(permission), quantumfs.PermSticky), uint(permission) )
+
 	// Get whether current user is OWNER/GRP/OTHER
 	var permMask uint32
 	if checkUid == inodeOwner {
