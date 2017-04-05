@@ -13,6 +13,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -132,7 +133,7 @@ func TestSymlinkHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.newWorkspace()
 
-		err := os.MkdirAll(workspace+"/dir", 0777)
+		err := utils.MkdirAll(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
 
 		file := workspace + "/dir/file"

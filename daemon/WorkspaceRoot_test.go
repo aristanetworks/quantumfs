@@ -11,6 +11,7 @@ import "syscall"
 import "strings"
 import "testing"
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestWorkspaceRootApiAccess(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -48,7 +49,7 @@ func testPreparation(test *testHelper, subdirectory string) (string, string,
 	baseWorkspace := test.newWorkspace()
 
 	baseDirName := baseWorkspace + subdirectory + "/dir"
-	err := os.MkdirAll(baseDirName, 0666)
+	err := utils.MkdirAll(baseDirName, 0666)
 	test.Assert(err == nil, "Error creating a directory: %v", err)
 
 	content := []byte("This is a test")
@@ -77,7 +78,7 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 	workspace := test.absPath(wsr)
 
 	dirName := workspace + subdirectory + "/dir1"
-	err := os.Mkdir(dirName, 0666)
+	err := syscall.Mkdir(dirName, 0666)
 	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
 		"Error creating directories: %s", err.Error())
 
