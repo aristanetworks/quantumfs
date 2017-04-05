@@ -288,7 +288,6 @@ func worker(c context.Context, keyChan <-chan *workerData, wf walkFunc) error {
 			return err
 		}
 	}
-	return nil
 }
 
 func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
