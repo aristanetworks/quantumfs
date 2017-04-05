@@ -1090,16 +1090,8 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		c.vlog("inode %d doesn't exist", inodeNum)
 	}
 
-	if wsl.typespaceName == quantumfs.NullSpaceName &&
-		wsl.namespaceName == quantumfs.NullSpaceName &&
-		wsl.workspacesById[inodeNum] == quantumfs.NullSpaceName {
-
-		return newNullWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
-			wsl.workspacesById[inodeNum], wsl, inodeNum)
-	} else {
-		return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
-			wsl.workspacesById[inodeNum], wsl, inodeNum)
-	}
+	return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
+		wsl.workspacesById[inodeNum], wsl, inodeNum)
 }
 
 func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
