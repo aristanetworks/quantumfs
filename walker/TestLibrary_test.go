@@ -164,7 +164,6 @@ func (th *testHelper) readWalkCompare(workspace string) {
 		root, err)
 
 	var walkerMap = make(map[string]int)
-	//wf := func(path string, key quantumfs.ObjectKey, size uint64) error {
 	var mapLock utils.DeferableMutex
 	wf := func(path string, key quantumfs.ObjectKey, size uint64) error {
 		defer mapLock.Lock().Unlock()
