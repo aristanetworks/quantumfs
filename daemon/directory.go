@@ -960,6 +960,12 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 					quantumfs.InodeIdInvalid, fuse.ENOENT
 			}
 
+			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			if err != fuse.OK {
+				return quantumfs.InodeIdInvalid,
+					quantumfs.InodeIdInvalid, err
+			}
+
 			dir.self.markAccessed(c, oldName, false)
 
 			if oldName == newName {
