@@ -123,7 +123,7 @@ func TestHardLink(t *testing.T) {
 func TestLargeFileWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		data := daemon.GenData(1024 * 1024 * 33)
+		data := daemon.GenData(1024 * 1024 * 65)
 		workspace := test.NewWorkspace()
 
 		// Write File 1
