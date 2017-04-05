@@ -651,11 +651,11 @@ func TestFileOwnership(t *testing.T) {
 		err = syscall.Chown(testFileB, 99, 99)
 		test.AssertNoErr(err)
 
-		err = syscall.Chmod(testFileA, 660)
+		err = syscall.Chmod(testFileA, 0660)
 		test.AssertNoErr(err)
 
 		// remove write permission on the parent directory
-		err = syscall.Chmod(dirName, 555)
+		err = syscall.Chmod(dirName, 0555)
 		test.AssertNoErr(err)
 
 		test.SetUidGid(99, 99)
