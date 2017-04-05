@@ -12,8 +12,21 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 type systemlocalTest func(path string)
+
+func newCtx() *quantumfs.Ctx {
+	// Create  Ctx with random RequestId
+	Qlog := qlog.NewQlogTiny()
+	requestId := qlog.TestReqId
+	ctx := &quantumfs.Ctx{
+		Qlog:      Qlog,
+		RequestId: requestId,
+	}
+
+	return ctx
+}
 
 func runTest(t *testing.T, test systemlocalTest) {
 	t.Parallel()
@@ -39,59 +52,60 @@ func TestDBInit(t *testing.T) {
 func TestEmptyDB(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
 		var num int
 		var exists bool
 		var err error
 
-		num, err = db.NumTypespaces(nil)
+		num, err = db.NumTypespaces(ctx)
 		utils.Assert(err == nil, "Error in counting typespaces: %v", err)
 		utils.Assert(num == 1, "Too many typespaces")
 
-		exists, err = db.TypespaceExists(nil, quantumfs.NullSpaceName)
+		exists, err = db.TypespaceExists(ctx, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error checking existence of typespace: %v",
 			err)
 		utils.Assert(exists, "Expected typespace not there")
 
-		exists, err = db.TypespaceExists(nil, "test")
+		exists, err = db.TypespaceExists(ctx, "test")
 		utils.Assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		utils.Assert(!exists, "Unexpected namespace")
 
-		num, err = db.NumNamespaces(nil, quantumfs.NullSpaceName)
+		num, err = db.NumNamespaces(ctx, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error in counting namespaces: %v", err)
 		utils.Assert(num == 1, "Too many namespaces")
 
-		exists, err = db.NamespaceExists(nil, quantumfs.NullSpaceName,
+		exists, err = db.NamespaceExists(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		utils.Assert(exists, "Expected namespace not there")
 
-		exists, err = db.NamespaceExists(nil, quantumfs.NullSpaceName,
+		exists, err = db.NamespaceExists(ctx, quantumfs.NullSpaceName,
 			"test")
 		utils.Assert(err == nil, "Error checking existence of namespace: %v",
 			err)
 		utils.Assert(!exists, "Unexpected namespace")
 
-		num, err = db.NumWorkspaces(nil, quantumfs.NullSpaceName,
+		num, err = db.NumWorkspaces(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error in counting workspaces: %v", err)
 		utils.Assert(num == 1, "Too many workspaces")
 
-		exists, err = db.WorkspaceExists(nil, quantumfs.NullSpaceName,
+		exists, err = db.WorkspaceExists(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error checking existence workspace: %v",
 			err)
 		utils.Assert(exists, "Expected workspace not there")
 
-		exists, err = db.WorkspaceExists(nil, quantumfs.NullSpaceName,
+		exists, err = db.WorkspaceExists(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, "other")
 		utils.Assert(err == nil, "Error checking existence of workspace: %v",
 			err)
 		utils.Assert(!exists, "Unexpected workspace")
 
-		key, err := db.Workspace(nil, quantumfs.NullSpaceName,
+		key, err := db.Workspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error fetching key: %v",
 			err)
@@ -103,35 +117,36 @@ func TestEmptyDB(t *testing.T) {
 func TestBranching(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		err := db.BranchWorkspace(nil, "typeA", "notthere", "a", "branch",
+		err := db.BranchWorkspace(ctx, "typeA", "notthere", "a", "branch",
 			"somewhere", "else")
 		utils.Assert(err != nil, "Succeeded branching invalid typespace")
 
-		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName, "notthere",
+		err = db.BranchWorkspace(ctx, quantumfs.NullSpaceName, "notthere",
 			"a", "branch", "somewhere", "else")
 		utils.Assert(err != nil, "Succeeded branching invalid namespace")
 
-		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err = db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, "notthere", "branch", "somewhere",
 			"else")
 		utils.Assert(err != nil, "Succeeded branching invalid workspace")
 
-		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err = db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err == nil, "Error branching null workspace: %v", err)
 
-		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err = db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err != nil, "Succeeded branching to existing workspace")
 
-		err = db.BranchWorkspace(nil, "branch", "test", "a", "duplicate",
+		err = db.BranchWorkspace(ctx, "branch", "test", "a", "duplicate",
 			"test", "b")
 		utils.Assert(err == nil, "Error rebranching workspace: %v", err)
 
-		key, err := db.Workspace(nil, "branch", "test", "a")
+		key, err := db.Workspace(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error fetching key: %v", err)
 		utils.Assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
 			"Branched rootid isn't the empty workspace")
@@ -141,31 +156,32 @@ func TestBranching(t *testing.T) {
 func TestNamespaceList(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err == nil, "Failed branching workspace: %v", err)
 
-		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err = db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "b")
 		utils.Assert(err == nil, "Failed branching workspace: %v", err)
 
-		exists, err := db.WorkspaceExists(nil, "branch", "test", "a")
+		exists, err := db.WorkspaceExists(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error checking if workspace exists: %v",
 			err)
 		utils.Assert(exists, "Workspace not really created")
-		exists, err = db.WorkspaceExists(nil, "branch", "test", "b")
+		exists, err = db.WorkspaceExists(ctx, "branch", "test", "b")
 		utils.Assert(err == nil, "Error checking if workspace exists: %v",
 			err)
 		utils.Assert(exists, "Workspace not really created")
 
-		namespaces, err := db.NamespaceList(nil, "branch")
+		namespaces, err := db.NamespaceList(ctx, "branch")
 		utils.Assert(err == nil, "Error getting list of namespaces: %v", err)
 		utils.Assert(len(namespaces) == 1, "Incorrect number of workspaces")
 
-		workspaces, err := db.WorkspaceList(nil, "branch", "test")
+		workspaces, err := db.WorkspaceList(ctx, "branch", "test")
 		utils.Assert(err == nil, "Error getting list of workspaces: %v", err)
 		utils.Assert(len(workspaces) == 2, "Incorrect number of workspaces")
 
@@ -189,33 +205,34 @@ func TestNamespaceList(t *testing.T) {
 func TestWorkspaceList(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err == nil, "Error branching  workspace: %v", err)
 
-		exists, err := db.TypespaceExists(nil, "branch")
+		exists, err := db.TypespaceExists(ctx, "branch")
 		utils.Assert(err == nil, "Error checking typespace exists: %v", err)
 		utils.Assert(exists, "Typespace not really created")
 
-		typespaces, err := db.TypespaceList(nil)
+		typespaces, err := db.TypespaceList(ctx)
 		utils.Assert(err == nil, "Error getting typespace list: %v", err)
 		utils.Assert(len(typespaces) == 2, "Incorrect number of typespaces")
 
-		exists, err = db.NamespaceExists(nil, "branch", "test")
+		exists, err = db.NamespaceExists(ctx, "branch", "test")
 		utils.Assert(err == nil, "Error checking namespace exists: %v", err)
 		utils.Assert(exists, "Namespace not really created")
 
-		namespaces, err := db.NamespaceList(nil, "branch")
+		namespaces, err := db.NamespaceList(ctx, "branch")
 		utils.Assert(err == nil, "Error getting namespace list: %v", err)
 		utils.Assert(len(namespaces) == 1, "Incorrect number of namespaces")
 
-		exists, err = db.WorkspaceExists(nil, "branch", "test", "a")
+		exists, err = db.WorkspaceExists(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error checking workspace exists: %v", err)
 		utils.Assert(exists, "Workspace not really created")
 
-		workspaces, err := db.WorkspaceList(nil, "branch", "test")
+		workspaces, err := db.WorkspaceList(ctx, "branch", "test")
 		utils.Assert(err == nil, "Error getting workspace list: %v", err)
 		utils.Assert(len(workspaces) == 1, "Incorrect number of workspaces")
 
@@ -233,10 +250,10 @@ func TestWorkspaceList(t *testing.T) {
 		}
 		utils.Assert(_null_ && branch, "Expected typespaces not there")
 
-		err = db.BranchWorkspace(nil, "branch", "test", "a", "branch",
+		err = db.BranchWorkspace(ctx, "branch", "test", "a", "branch",
 			"test2", "b")
 		utils.Assert(err == nil, "Error branching the workspace: %v", err)
-		namespaces, err = db.NamespaceList(nil, "branch")
+		namespaces, err = db.NamespaceList(ctx, "branch")
 		utils.Assert(err == nil, "Error getting namespace list: %v", err)
 		utils.Assert(len(namespaces) == 2, "Incorrect number of namespaces")
 		test := false
@@ -259,17 +276,18 @@ func TestWorkspaceList(t *testing.T) {
 func TestAdvanceOk(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err == nil, "Error branching workspace: %v", err)
 
-		oldRootId, err := db.Workspace(nil, quantumfs.NullSpaceName,
+		oldRootId, err := db.Workspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error getting key: %v", err)
 
-		newRootId, err := db.AdvanceWorkspace(nil, "branch", "test", "a",
+		newRootId, err := db.AdvanceWorkspace(ctx, "branch", "test", "a",
 			oldRootId, quantumfs.EmptyDirKey)
 		utils.Assert(err == nil, "Error when advancing root: %v", err)
 		utils.Assert(newRootId.IsEqualTo(quantumfs.EmptyDirKey),
@@ -280,12 +298,13 @@ func TestAdvanceOk(t *testing.T) {
 func TestAdvanceNotExist(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		oldRootId, err := db.Workspace(nil, quantumfs.NullSpaceName,
+		oldRootId, err := db.Workspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error getting key: %v", err)
 
-		_, err = db.AdvanceWorkspace(nil, "branch", "test", "a", oldRootId,
+		_, err = db.AdvanceWorkspace(ctx, "branch", "test", "a", oldRootId,
 			quantumfs.EmptyDirKey)
 		utils.Assert(err != nil,
 			"Succeeded advancing non-existant workspace")
@@ -295,17 +314,18 @@ func TestAdvanceNotExist(t *testing.T) {
 func TestAdvanceOldRootId(t *testing.T) {
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		err := db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err == nil, "Error branching workspace: %v", err)
 
-		oldRootId, err := db.Workspace(nil, quantumfs.NullSpaceName,
+		oldRootId, err := db.Workspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error getting key: %v", err)
 
-		newRootId, err := db.AdvanceWorkspace(nil, "branch", "test", "a",
+		newRootId, err := db.AdvanceWorkspace(ctx, "branch", "test", "a",
 			quantumfs.EmptyBlockKey, quantumfs.EmptyDirKey)
 		utils.Assert(err != nil, "Succeeded advancing with old rootid")
 		utils.Assert(!newRootId.IsEqualTo(quantumfs.EmptyDirKey),
@@ -319,12 +339,13 @@ func TestDbRestart(t *testing.T) {
 	// Confirm that workspaces created persist across database restarts
 	runTest(t, func(path string) {
 		db := NewWorkspaceDB(path + "/db")
+		ctx := newCtx()
 
-		num, err := db.NumTypespaces(nil)
+		num, err := db.NumTypespaces(ctx)
 		utils.Assert(err == nil, "Error counting typespaces: %v", err)
 		utils.Assert(num == 1, "Too many typespaces")
 
-		err = db.BranchWorkspace(nil, quantumfs.NullSpaceName,
+		err = db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName, "branch",
 			"test", "a")
 		utils.Assert(err == nil, "Error branching workspace: %v", err)
@@ -335,14 +356,14 @@ func TestDbRestart(t *testing.T) {
 
 		db = NewWorkspaceDB(path + "/db")
 
-		exists, err := db.WorkspaceExists(nil, "branch", "test", "a")
+		exists, err := db.WorkspaceExists(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error checking if workspace exists: %v",
 			err)
 		utils.Assert(exists, "Workspace didn't persist across restart")
 	})
 }
 
-func createWorkspaces(wsdb quantumfs.WorkspaceDB) {
+func createWorkspaces(wsdb quantumfs.WorkspaceDB, ctx *quantumfs.Ctx) {
 	workspaces := [...][3]string{
 		[3]string{"type1", "name1", "work1"},
 		[3]string{"type1", "name2", "work2"},
@@ -355,7 +376,7 @@ func createWorkspaces(wsdb quantumfs.WorkspaceDB) {
 	nullWork := quantumfs.NullSpaceName
 
 	for _, workspace := range workspaces {
-		err := wsdb.BranchWorkspace(nil, nullType, nullName, nullWork,
+		err := wsdb.BranchWorkspace(ctx, nullType, nullName, nullWork,
 			workspace[0], workspace[1], workspace[2])
 		utils.Assert(err == nil, "Failed to branch workspace: %v", err)
 	}
@@ -364,18 +385,19 @@ func createWorkspaces(wsdb quantumfs.WorkspaceDB) {
 func TestDeleteWorkspace(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		_, err := wsdb.Workspace(nil, "type1", "name2", "work2")
+		_, err := wsdb.Workspace(ctx, "type1", "name2", "work2")
 		utils.Assert(err == nil, "Expected workspace doesn't exist: %v", err)
 
-		err = wsdb.DeleteWorkspace(nil, "type1", "name2", "work2")
+		err = wsdb.DeleteWorkspace(ctx, "type1", "name2", "work2")
 		utils.Assert(err == nil, "Error deleting workspace: %v", err)
 
-		_, err = wsdb.Workspace(nil, "type1", "name2", "work2")
+		_, err = wsdb.Workspace(ctx, "type1", "name2", "work2")
 		utils.Assert(err != nil, "Workspace still exists!")
 
-		_, err = wsdb.Workspace(nil, "type1", "name2", "work3")
+		_, err = wsdb.Workspace(ctx, "type1", "name2", "work3")
 		utils.Assert(err == nil, "Sibling workspace removed")
 	})
 }
@@ -383,12 +405,13 @@ func TestDeleteWorkspace(t *testing.T) {
 func TestDeleteNamespaceSingleWorkspace(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		err := wsdb.DeleteWorkspace(nil, "type2", "name3", "work4")
+		err := wsdb.DeleteWorkspace(ctx, "type2", "name3", "work4")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ := wsdb.NamespaceExists(nil, "type2", "name3")
+		exists, _ := wsdb.NamespaceExists(ctx, "type2", "name3")
 		utils.Assert(!exists, "Namespace not deleted")
 	})
 }
@@ -396,18 +419,19 @@ func TestDeleteNamespaceSingleWorkspace(t *testing.T) {
 func TestDeleteNamespaceMultipleWorkspace(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		err := wsdb.DeleteWorkspace(nil, "type1", "name2", "work2")
+		err := wsdb.DeleteWorkspace(ctx, "type1", "name2", "work2")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ := wsdb.NamespaceExists(nil, "type1", "name2")
+		exists, _ := wsdb.NamespaceExists(ctx, "type1", "name2")
 		utils.Assert(exists, "Namespace deleted early")
 
-		err = wsdb.DeleteWorkspace(nil, "type1", "name2", "work3")
+		err = wsdb.DeleteWorkspace(ctx, "type1", "name2", "work3")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ = wsdb.NamespaceExists(nil, "type1", "name2")
+		exists, _ = wsdb.NamespaceExists(ctx, "type1", "name2")
 		utils.Assert(!exists, "Namespace not deleted")
 	})
 }
@@ -415,15 +439,74 @@ func TestDeleteNamespaceMultipleWorkspace(t *testing.T) {
 func TestDeleteTypespace(t *testing.T) {
 	runTest(t, func(path string) {
 		wsdb := NewWorkspaceDB(path + "db")
-		createWorkspaces(wsdb)
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
 
-		err := wsdb.DeleteWorkspace(nil, "type2", "name3", "work4")
+		err := wsdb.DeleteWorkspace(ctx, "type2", "name3", "work4")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ := wsdb.NamespaceExists(nil, "type2", "name3")
+		exists, _ := wsdb.NamespaceExists(ctx, "type2", "name3")
 		utils.Assert(!exists, "Namespace not deleted")
 
-		exists, _ = wsdb.TypespaceExists(nil, "type2")
+		exists, _ = wsdb.TypespaceExists(ctx, "type2")
 		utils.Assert(!exists, "Typespace not deleted")
+	})
+}
+
+func TestSetWorkspaceImmutable(t *testing.T) {
+	runTest(t, func(path string) {
+		wsdb := NewWorkspaceDB(path + "db")
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
+
+		immutable, err := wsdb.WorkspaceIsImmutable(ctx,
+			"type1", "name1", "work1")
+		utils.Assert(err == nil && !immutable,
+			"Workspace is either immutable or with error: %v", err)
+
+		err = wsdb.SetWorkspaceImmutable(ctx, "type1", "name1", "work1")
+		utils.Assert(err == nil, "Failed setting workspace immutable")
+
+		immutable, err = wsdb.WorkspaceIsImmutable(ctx,
+			"type1", "name1", "work1")
+		utils.Assert(err == nil && immutable,
+			"Workspace is either mutable or with error: %v", err)
+	})
+}
+
+func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
+	runTest(t, func(path string) {
+		wsdb := NewWorkspaceDB(path + "db")
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
+
+		immutable, err := wsdb.WorkspaceIsImmutable(ctx,
+			"type1", "name1", "work10")
+		utils.Assert(err == nil && !immutable,
+			"Workspace is either immutable or with error: %v", err)
+	})
+}
+
+func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
+	runTest(t, func(path string) {
+		wsdb := NewWorkspaceDB(path + "db")
+		ctx := newCtx()
+		createWorkspaces(wsdb, ctx)
+
+		err := wsdb.SetWorkspaceImmutable(ctx, "type1", "name1", "work1")
+		utils.Assert(err == nil, "Failed setting workspace immutable")
+
+		immutable, err := wsdb.WorkspaceIsImmutable(ctx,
+			"type1", "name1", "work1")
+		utils.Assert(err == nil && immutable,
+			"Workspace is either mutable or with error: %v", err)
+
+		err = wsdb.DeleteWorkspace(ctx, "type1", "name1", "work1")
+		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
+
+		immutable, err = wsdb.WorkspaceIsImmutable(ctx,
+			"type1", "name1", "work1")
+		utils.Assert(err == nil && !immutable,
+			"Workspace is either immutable or with error: %v", err)
 	})
 }

@@ -105,12 +105,16 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 }
 
 func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
+	c.vlog("directorySnapshot::Sync_DOWN doing nothing")
 	return fuse.OK
 }
 
 // Return extended key by combining ObjectKey, inode type, and inode size
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {
+
+	defer c.FuncIn("Directory::generateChildTypeKey_DOWN", "inode %d",
+		inodeNum).out()
 
 	// flush already acquired an Inode lock exclusively. In case of the dead
 	// lock, the Inode lock for reading should be required after releasing its
@@ -131,6 +135,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 // go along the given path to the destination
 // The path is stored in a string slice, each cell index contains an inode
 func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
+	defer c.funcIn("Directory::followPath_DOWN").out()
 
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
