@@ -267,7 +267,7 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		test.SetUidGid(99, 99)
 		defer test.SetUidGidToDefault()
 	}
-/*
+
 	// first check if we can rename
 	newName := testFile + "b"
 	err = os.Rename(testFile, newName)
@@ -275,15 +275,15 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		test.Assert(err == nil, "Failed to rename file: %v", err)
 		testFile = newName
 	} else {
-		test.Assert(err == syscall.EACCES, "Wrong error when renaming: %v",
+		test.Assert(os.IsPermission(err), "Wrong error when renaming: %v",
 			err)
 	}
-*/
+
 	err = syscall.Unlink(testFile)
 	if mustSucceed {
 		test.Assert(err == nil, "Failed to unlink file: %v", err)
 	} else {
-		test.Assert(err == syscall.EACCES, "Wrong error when unlinking: %v",
+		test.Assert(os.IsPermission(err), "Wrong error when unlinking: %v",
 			err)
 	}
 }
