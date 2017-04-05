@@ -14,12 +14,13 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func TestHardlinkReload(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		err := utils.MkdirAll(workspace+"/subdir/grandchild", 0777)
 		test.AssertNoErr(err)
 
 		// Create a couple files so we can copy its directory record
@@ -234,7 +235,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		test.AssertNoErr(err)
 
 		dirName := workspace + "/dir"
-		err = os.Mkdir(dirName, 0777)
+		err = syscall.Mkdir(dirName, 0777)
 		test.AssertNoErr(err)
 
 		linkFile := dirName + "/testLink"
@@ -331,7 +332,7 @@ func TestHardlinkSubdirChain(t *testing.T) {
 
 		data := GenData(2000)
 
-		err := os.Mkdir(workspace+"/dir", 0777)
+		err := syscall.Mkdir(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
 
 		testFile := workspace + "/dir/testFile"
@@ -526,7 +527,7 @@ func TestHardlinkRename(t *testing.T) {
 		test.AssertNoErr(err)
 		linkname = newLink
 
-		err = os.Mkdir(workspace+"/dir", 0777)
+		err = syscall.Mkdir(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
 
 		newLink = workspace + "/dir/linkC"
@@ -591,7 +592,7 @@ func TestHardlinkUninstantiated(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
-		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		err := utils.MkdirAll(workspace+"/subdir/grandchild", 0777)
 		test.AssertNoErr(err)
 
 		filename := workspace + "/subdir/fileA"
@@ -621,7 +622,7 @@ func TestHardlinkUninstantiated(t *testing.T) {
 }
 
 func (test *testHelper) LinkFileExp(path string, filename string) {
-	err := os.MkdirAll(path, 0777)
+	err := utils.MkdirAll(path, 0777)
 	test.AssertNoErr(err)
 
 	// Enough data to consume a multi block file
@@ -695,11 +696,11 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 		workspace := test.NewWorkspace()
 
 		dir1 := workspace + "/dir1/dir1.1"
-		err := os.MkdirAll(dir1, 0777)
+		err := utils.MkdirAll(dir1, 0777)
 		test.AssertNoErr(err)
 
 		dir2 := workspace + "/dir2"
-		err = os.MkdirAll(dir2, 0777)
+		err = utils.MkdirAll(dir2, 0777)
 		test.AssertNoErr(err)
 
 		filename := dir1 + "/fileA"

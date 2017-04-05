@@ -614,7 +614,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 			return recordErr
 		}
 
-		err := hasDirectoryWritePerm(c, dir, false)
+		err := hasDirectoryWritePerm(c, dir)
 		if err != fuse.OK {
 			return err
 		}
@@ -669,7 +669,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return recordErr
 		}
 
-		err := hasDirectoryWritePerm(c, dir, false)
+		err := hasDirectoryWritePerm(c, dir)
 		if err != fuse.OK {
 			return err
 		}
@@ -780,7 +780,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return nil, fuse.Status(syscall.EISDIR)
 		}
 
-		err = hasDirectoryWritePerm(c, dir, true)
+		err = hasDirectoryWritePermSticky(c, dir, recordCopy.Owner())
 		if err != fuse.OK {
 			return nil, err
 		}
@@ -866,7 +866,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return recordErr
 		}
 
-		result := hasDirectoryWritePerm(c, dir, false)
+		result := hasDirectoryWritePerm(c, dir)
 		if result != fuse.OK {
 			return result
 		}
@@ -909,7 +909,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			return recordErr
 		}
 
-		err := hasDirectoryWritePerm(c, dir, false)
+		err := hasDirectoryWritePerm(c, dir)
 		if err != fuse.OK {
 			return err
 		}
@@ -958,6 +958,12 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			if record == nil {
 				return quantumfs.InodeIdInvalid,
 					quantumfs.InodeIdInvalid, fuse.ENOENT
+			}
+
+			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			if err != fuse.OK {
+				return quantumfs.InodeIdInvalid,
+					quantumfs.InodeIdInvalid, err
 			}
 
 			dir.self.markAccessed(c, oldName, false)
@@ -1019,6 +1025,22 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	if _, ok := dstInode.(*NullWorkspaceRoot); ok {
 		c.vlog("Cannot move into null workspace")
 		return fuse.EPERM
+	}
+
+	// check write permission for both directories
+	err := hasDirectoryWritePerm(c, dstInode)
+	if err != fuse.OK {
+		return err
+	}
+
+	err = func() fuse.Status {
+		defer dir.childRecordLock.Lock().Unlock()
+
+		record := dir.children.recordByName(c, oldName)
+		return hasDirectoryWritePermSticky(c, dir, record.Owner())
+	}()
+	if err != fuse.OK {
+		return err
 	}
 
 	result := func() fuse.Status {

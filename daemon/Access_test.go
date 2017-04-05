@@ -10,6 +10,7 @@ import "syscall"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func permTest(test *testHelper, filename string, modeCheck uint32,
 	shouldPass bool) {
@@ -89,7 +90,7 @@ func TestAccessListFileInWsr(t *testing.T) {
 func TestAccessListFileSubdir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		os.MkdirAll(workspace+"/subdir", 0777)
+		utils.MkdirAll(workspace+"/subdir", 0777)
 
 		filename := workspace + "/subdir/testFile"
 		err := testutils.PrintToFile(filename, string(GenData(1000)))
@@ -102,7 +103,7 @@ func TestAccessListFileSubdir(t *testing.T) {
 func TestAccessListHardlinkInWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
+		utils.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace + "/testFile"
 		err := testutils.PrintToFile(filename, string(GenData(1000)))
@@ -119,7 +120,7 @@ func TestAccessListHardlinkInWsr(t *testing.T) {
 func TestAccessListHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
+		utils.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace + "/subdir/testFile"
 		err := testutils.PrintToFile(filename, string(GenData(1000)))
@@ -136,7 +137,7 @@ func TestAccessListHardlink(t *testing.T) {
 func TestAccessSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		os.MkdirAll(workspace+"/subdir/subsubdir", 0777)
+		utils.MkdirAll(workspace+"/subdir/subsubdir", 0777)
 
 		filename := workspace + "/subdir/testFile"
 		err := testutils.PrintToFile(filename, string(GenData(1000)))
@@ -153,7 +154,7 @@ func TestAccessSymlink(t *testing.T) {
 func TestAccessDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		os.MkdirAll(workspace+"/subdir", 0777)
+		utils.MkdirAll(workspace+"/subdir", 0777)
 
 		accessTestBothUsers(test, workspace+"/subdir")
 	})

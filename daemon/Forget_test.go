@@ -14,12 +14,13 @@ import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		os.MkdirAll(workspace+"/dir", 0777)
+		utils.MkdirAll(workspace+"/dir", 0777)
 
 		numFiles := 10
 		data := GenData(255)
@@ -122,7 +123,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		workspace := test.NewWorkspace()
 		dirName := workspace + "/dir"
 
-		err := os.Mkdir(dirName, 0777)
+		err := syscall.Mkdir(dirName, 0777)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
 
 		// Generate a bunch of files
@@ -248,7 +249,7 @@ func TestForgetMarking(t *testing.T) {
 		workspace := test.NewWorkspace()
 
 		// Make a simple one directory two children structure
-		test.AssertNoErr(os.MkdirAll(workspace+"/testdir", 0777))
+		test.AssertNoErr(utils.MkdirAll(workspace+"/testdir", 0777))
 
 		data := GenData(1000)
 		test.AssertNoErr(ioutil.WriteFile(workspace+"/testdir/a", data,
