@@ -48,6 +48,12 @@ type WorkspaceDB interface {
 	DeleteWorkspace(c *Ctx, typespace string, namespace string,
 		workspace string) error
 
+	SetWorkspaceImmutable(c *Ctx, typespace string, namespace string,
+		workspace string) error
+
+	WorkspaceIsImmutable(c *Ctx, typespace string, namespace string,
+		workspace string) (bool, error)
+
 	// AdvanceWorkspace changes the workspace rootID. If the current rootID
 	// doesn't match what the client considers the current rootID then no changes
 	// are made and the current rootID is returned such that the client can merge
