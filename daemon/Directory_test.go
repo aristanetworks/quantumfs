@@ -224,7 +224,8 @@ func testUnlinkPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		if directorySticky {
 			checkInfo, err := os.Stat(testDir)
 			test.AssertNoErr(err)
-			test.Assert(checkInfo.Mode()&os.ModeSticky != 0,
+			test.Assert(utils.BitAnyFlagSet(uint(checkInfo.Mode()),
+				uint(os.ModeSticky)),
 				"Sticky bit missing after mkdir")
 		}
 	}
