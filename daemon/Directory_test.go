@@ -358,13 +358,6 @@ func TestUnlinkPermissionsAsUserUserWriteSticky(t *testing.T) {
 	})
 }
 
-func TestUnlinkPermissionsAsUserThinPermsWriteSticky(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		testUnlinkPermissions(test, true, false, false, false, true, 0777,
-			false)
-	})
-}
-
 func TestUnlinkPermissionsAsUserUserWriteOwner(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, true, true, false, 0755,
@@ -1312,5 +1305,30 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
+	})
+}
+
+func TestTmpDirPerms(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		testDir := workspace + "/test"
+		testFile := testDir + "/testFile"
+
+		// ensure sticky bit is set
+		err := syscall.Mkdir(testDir, 01777)
+		test.AssertNoErr(err)
+
+		err = testutils.PrintToFile(testFile, string(genData(2000)))
+		test.AssertNoErr(err)
+
+		err = os.Chown(testFile, 99, 99)
+		test.AssertNoErr(err)
+
+		test.SetUidGid(99, 99)
+		defer test.SetUidGidToDefault()
+
+		// we should be able to remove it, even though sticky bit is set
+		err = os.Remove(testFile)
+		test.AssertNoErr(err)
 	})
 }
