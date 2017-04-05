@@ -1038,7 +1038,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 		record := dir.children.recordByName(c, oldName)
 		return hasDirectoryWritePermSticky(c, dir, record.Owner())
-	} ()
+	}()
 	if err != fuse.OK {
 		return err
 	}
