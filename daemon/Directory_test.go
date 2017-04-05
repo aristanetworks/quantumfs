@@ -397,10 +397,9 @@ func TestUnlinkPermissionsAsUserGroupWriteGroupMatch(t *testing.T) {
 }
 
 func TestUnlinkPermissionsAsUserGroupWriteGroupMatchSticky(t *testing.T) {
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, true, true, 0575,
-			true)
+			false)
 	})
 }
 
@@ -412,10 +411,9 @@ func TestUnlinkPermissionsAsUserOtherWrite(t *testing.T) {
 }
 
 func TestUnlinkPermissionsAsUserOtherWriteSticky(t *testing.T) {
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, true, false, false, false, true, 0557,
-			true)
+			false)
 	})
 }
 
