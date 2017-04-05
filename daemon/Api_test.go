@@ -6,7 +6,6 @@ package daemon
 // Test the various Api calls
 
 import "bytes"
-import "fmt"
 import "os"
 import "runtime"
 import "syscall"
@@ -14,7 +13,6 @@ import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/utils"
 
 func TestWorkspaceBranching(t *testing.T) {
@@ -189,30 +187,8 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 
 	// Duplicate the directory in the given path
 	err = api.InsertInode(dst+"/test/a/dirtest", keyD, PermissionA, uid, gid)
-	test.Assert(err == nil,
-		"Error duplicating a directory to target workspace: %v",
-		err)
-
-	err = syscall.Stat(workspaceDst+"/test/a/dirtest", &stat)
-	test.Assert(err == nil, "Error getting status of directory: %v",
-		err)
-
-	// check the mode of directory
-	expectedMode = syscall.S_IFDIR | PermissionA
-	test.Assert(stat.Mode == expectedMode,
-		"Directory mode incorrect. Expected %x got %x",
-		expectedMode, stat.Mode)
-
-	// testing the file inside of the directory
-	err = syscall.Stat(workspaceDst+"/test/a/dirtest/test", &stat)
-	test.Assert(err == nil, "Error getting status of child file: %v",
-		err)
-
-	// check the child is a file
-	expectedMode = syscall.S_IFREG | PermissionB
-	test.Assert(stat.Mode == expectedMode,
-		"Directory's file mode incorrect. Expected %x got %x",
-		expectedMode, stat.Mode)
+	test.Assert(err != nil,
+		"Succeeded duplicating a directory to target workspace:")
 
 	// Ensure the symlink in the given path
 	err = api.InsertInode(dst+"/symlink", string(keyS), PermissionB, uid, gid)
@@ -253,154 +229,6 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ApiInsertInodeTest(test, 10100, 10999)
 	})
-}
-
-func TestApiInsertOverExisting(t *testing.T) {
-	configModifier := func(test *testHelper, config *QuantumFsConfig) {
-		cacheTimeout100Ms(test, config)
-		dirtyDelay100Ms(test, config)
-	}
-
-	runTestCustomConfig(t, configModifier, func(test *testHelper) {
-		testApiInsertOverExisting(test, nil, nil)
-	})
-}
-
-func TestApiInsertOverExistingOpenInodes(t *testing.T) {
-	configModifier := func(test *testHelper, config *QuantumFsConfig) {
-		cacheTimeout100Ms(test, config)
-		dirtyDelay100Ms(test, config)
-	}
-
-	runTestCustomConfig(t, configModifier, func(test *testHelper) {
-		var dir2 *os.File
-		var file2 int
-
-		defer func() {
-			syscall.Close(file2)
-			dir2.Close()
-		}()
-
-		openInodes := func(workspace string) {
-			var err error
-			dir2, err = os.Open(workspace + "/dir1/dir2")
-			test.AssertNoErr(err)
-			_, err = dir2.Readdirnames(2)
-			test.AssertNoErr(err)
-
-			file2, err = syscall.Open(workspace+"/dir1/dir2/file2",
-				os.O_RDWR, 0)
-			test.AssertNoErr(err)
-		}
-
-		checkInodes := func(workspace string) {
-			_, err := dir2.Seek(0, os.SEEK_SET)
-			test.AssertNoErr(err)
-			_, err = dir2.Readdirnames(-1)
-			test.AssertNoErr(err)
-
-			test.Log("Reading from file")
-			buf := make([]byte, 100, 100)
-			n, err := syscall.Read(file2, buf)
-			test.AssertNoErr(err)
-			test.Assert(n > 0, "Read no bytes from deleted file: %d", n)
-
-			test.Log("Writing to file")
-			n, err = syscall.Write(file2, []byte("arstarstarst"))
-			test.AssertNoErr(err)
-			test.Assert(n > 0, "Wrote no bytes to deleted file: %d", n)
-		}
-
-		testApiInsertOverExisting(test, openInodes, checkInodes)
-	})
-}
-
-func TestApiInsertOverExistingForget(t *testing.T) {
-	configModifier := func(test *testHelper, config *QuantumFsConfig) {
-		cacheTimeout100Ms(test, config)
-		dirtyDelay100Ms(test, config)
-	}
-
-	runTestCustomConfig(t, configModifier, func(test *testHelper) {
-		messages := make([]testutils.TLA, 0, 10)
-
-		findInodes := func(workspace string) {
-			for _, file := range []string{"/dir1/file1",
-				"/dir1/dir2/file2", "/dir1/dir2/dir3/file3"} {
-
-				inodeNum := test.getInodeNum(workspace + file)
-				msg := fmt.Sprintf("Forget called on inode %d",
-					inodeNum)
-				tla := testutils.TLA{
-					MustContain: true,
-					Text:        msg,
-					FailMsg:     "Subtree inode not forgotten",
-				}
-				messages = append(messages, tla)
-			}
-		}
-
-		triggerForget := func(workspace string) {
-			test.remountFilesystem()
-		}
-
-		testApiInsertOverExisting(test, findInodes, triggerForget)
-
-		test.AssertTestLog(messages)
-	})
-}
-
-func testApiInsertOverExisting(test *testHelper, tamper1 func(workspace string),
-	tamper2 func(workspace string)) {
-
-	srcWorkspace := test.newWorkspace()
-	dir1 := srcWorkspace + "/dir1"
-	dir2 := dir1 + "/dir2"
-	dir3 := dir2 + "/dir3"
-
-	err := os.MkdirAll(srcWorkspace+"/dir1/dir2/dir3", 0777)
-	test.AssertNoErr(err)
-
-	err = testutils.PrintToFile(dir1+"/file1", "")
-	test.AssertNoErr(err)
-	err = testutils.PrintToFile(dir2+"/file2", "oienoenoienoin")
-	test.AssertNoErr(err)
-	err = testutils.PrintToFile(dir3+"/file3", "")
-	test.AssertNoErr(err)
-
-	dstWorkspace := test.absPath(test.branchWorkspace(srcWorkspace))
-
-	// Create one marker file in srcWorkspace and dstWorkspace
-	err = testutils.PrintToFile(dir1+"/srcMarker", "")
-	test.AssertNoErr(err)
-	err = testutils.PrintToFile(dstWorkspace+"/dir1/dstMarker", "")
-	test.AssertNoErr(err)
-
-	if tamper1 != nil {
-		tamper1(dstWorkspace)
-	}
-
-	dir1Key := getExtendedKeyHelper(test, dir1, "dir1 key")
-
-	api := test.getApi()
-
-	err = api.InsertInode(test.relPath(dstWorkspace)+"/dir1", dir1Key,
-		0777, 0, 0)
-	test.AssertNoErr(err)
-
-	time.Sleep(200 * time.Millisecond)
-
-	// Now dir1/dstMarker should not exist and dir1/srcMarker should
-	file, err := os.Open(dstWorkspace + "/dir1/dstMarker")
-	test.Assert(err != nil, "dstMarker still exists!")
-
-	file, err = os.Open(srcWorkspace + "/dir1/srcMarker")
-	test.AssertNoErr(err)
-	defer file.Close()
-
-	if tamper2 != nil {
-		tamper2(dstWorkspace)
-	}
 }
 
 func TestApiNoRequestBlockingRead(t *testing.T) {

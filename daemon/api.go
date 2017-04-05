@@ -536,6 +536,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
+	if type_ == quantumfs.ObjectTypeDirectoryEntry {
+		c.vlog("Attemped to insert a directory")
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"InsertInode with directories is not supporte")
+		return
+	}
+
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
@@ -584,8 +591,9 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 
 	defer parent.Lock().Unlock()
 	if record := parent.children.recordByName(c, target); record != nil {
-		c.vlog("Removing target in preparation for replacement")
-		parent.delChild_(c, target)
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Inode %s should not exist", target)
+		return
 	}
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
