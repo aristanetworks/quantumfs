@@ -32,21 +32,6 @@ class QfsClientTest : public testing::Test {
 	void CreateTestApiFile();
 };
 
-#ifdef REAL_QFS
-// tests to run on a real QuantumFS filesystem
-class QfsClientQFSTest : public testing::Test {
- protected:
-	virtual void SetUp();
-	virtual void TearDown();
-
- protected:
-	ApiImpl *api;
-
-	// path to location in a QuantumFS filesystem
-	std::string location;
-};
-#endif  // REAL_QFS
-
 class QfsClientApiTest : public QfsClientTest, TestHook {
 	virtual void SetUp();
 	virtual void TearDown();

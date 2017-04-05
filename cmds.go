@@ -3,21 +3,125 @@
 
 package quantumfs
 
+import "bufio"
 import "fmt"
 import "encoding/json"
 import "os"
+import "strconv"
 import "strings"
 import "syscall"
 
 // This file contains all the functions which are used by qfs (and other
 // applications) to perform special quantumfs operations. Primarily this is done by
 // marhalling the arguments and passing them to quantumfsd for processing, then
-// interpretting the results.
+// interpreting the results.
 
-func NewApi() *Api {
+func fileIsApi(stat os.FileInfo) bool {
+	stat_t, ok := stat.Sys().(*syscall.Stat_t)
+	if ok && stat_t.Ino == InodeIdApi {
+		// No real filesystem is likely to give out inode 2
+		// for a random file but quantumfs reserves that
+		// inode for all the api files.
+		return true
+	}
+
+	return false
+}
+
+func findApiPathEnvironment() string {
+	path := os.Getenv("QUANTUMFS_API_PATH")
+	if path == "" {
+		return ""
+	}
+
+	if !strings.HasSuffix(path, fmt.Sprintf("%c%s", os.PathSeparator, ApiPath)) {
+		return ""
+	}
+
+	stat, err := os.Lstat(path)
+	if err != nil {
+		return ""
+	}
+
+	if !fileIsApi(stat) {
+		return ""
+	}
+
+	return path
+}
+
+func findApiPathMount() string {
+	// We are look in /proc/self/mountinfo for a line which indicates that
+	// QuantumFS is mounted. That line looks like:
+	//
+	// 138 30 0:32 / /mnt/quantumfs rw,relatime - fuse.QuantumFS QuantumFS ...
+	//
+	// Where the number after the colon (0:32) is the FUSE connection number.
+	// Since it's possible for any filesystem to me bind-mounted to multiple
+	// locations we use that number to discriminate between multiple QuantumFS
+	// mounts.
+
+	mountfile, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return ""
+	}
+
+	mountinfo := bufio.NewReader(mountfile)
+
+	var path string
+	connectionId := int64(-1)
+
+	for {
+		bline, _, err := mountinfo.ReadLine()
+		if err != nil {
+			break
+		}
+
+		line := string(bline)
+
+		if !strings.Contains(line, "fuse.QuantumFS") {
+			continue
+		}
+
+		fields := strings.SplitN(line, " ", 6)
+		connectionS := strings.Split(fields[2], ":")[1]
+		connectionI, err := strconv.ParseInt(connectionS, 10, 64)
+		if err != nil {
+			// We cannot parse this line, but we also know we have a
+			// QuantumFS mount. Play it safe and fail searching for a
+			// mount.
+			return ""
+		}
+		path = fields[4]
+
+		if connectionId != -1 && connectionId != connectionI {
+			// We have a previous QuantumFS mount which doesn't match
+			// this one, thus we have more than one mount. Give up.
+			return ""
+		}
+
+		connectionId = connectionI
+	}
+
+	if connectionId == -1 {
+		// We didn't find a mount
+		return ""
+	}
+
+	// We've found precisely one mount, ensure the file is really the api file.
+	path = fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
+	stat, err := os.Lstat(path)
+	if err != nil || !fileIsApi(stat) {
+		return ""
+	}
+
+	return path
+}
+
+func findApiPathUpwards() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	directories := strings.Split(cwd, "/")
@@ -35,28 +139,62 @@ func NewApi() *Api {
 			continue
 		}
 		if !stat.IsDir() {
-			stat_t := stat.Sys().(*syscall.Stat_t)
-			if stat_t.Ino == InodeIdApi {
-				// No real filesystem is likely to give out inode 2
-				// for a random file but quantumfs reserves that
-				// inode for all the api files.
-				break
+			if fileIsApi(stat) {
+				return path, nil
 			}
 		}
 	}
 
+	return "", nil
+}
+
+func findApiPath() (string, error) {
+	path := findApiPathEnvironment()
+	if path != "" {
+		return path, nil
+	}
+
+	path = findApiPathMount()
+	if path != "" {
+		return path, nil
+	}
+
+	path, err := findApiPathUpwards()
+	if err != nil {
+		return "", err
+	}
+
+	if path != "" {
+		return path, nil
+	}
+
+	// Give up
+	return "", fmt.Errorf("Unable to find API file")
+}
+
+// NewApi searches for the QuantumFS API files. The search order is:
+// 1. The path in the environment variable QUANTUMFS_API_PATH, ie "/qfs/api"
+// 2. The api file at the root of the sole mounted QuantumFS instance. If more than
+//    one instance is mounted none of them will be used.
+// 3. Searching upwards in the directory tree for the api file
+func NewApi() (*Api, error) {
+	path, err := findApiPath()
+	if err != nil {
+		return nil, err
+	}
 	return NewApiWithPath(path)
 }
-func NewApiWithPath(path string) *Api {
+
+func NewApiWithPath(path string) (*Api, error) {
 	api := Api{}
 
 	fd, err := os.OpenFile(path, os.O_RDWR, 0)
 	api.fd = fd
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return &api
+	return &api, nil
 }
 
 type Api struct {
@@ -90,17 +228,18 @@ type CommandCommon struct {
 // IMPORTANT: please do not change the order/values of the above constants, QFSClient
 // depends on the fact that the values should not change !!!!!
 const (
-	CmdInvalid         = 0
-	CmdError           = 1
-	CmdBranchRequest   = 2
-	CmdGetAccessed     = 3
-	CmdClearAccessed   = 4
-	CmdSyncAll         = 5
-	CmdInsertInode     = 6
-	CmdDeleteWorkspace = 7
-	CmdSetBlock        = 8
-	CmdGetBlock        = 9
-	CmdEnableRootWrite = 10
+	CmdInvalid               = 0
+	CmdError                 = 1
+	CmdBranchRequest         = 2
+	CmdGetAccessed           = 3
+	CmdClearAccessed         = 4
+	CmdSyncAll               = 5
+	CmdInsertInode           = 6
+	CmdDeleteWorkspace       = 7
+	CmdSetBlock              = 8
+	CmdGetBlock              = 9
+	CmdEnableRootWrite       = 10
+	CmdSetWorkspaceImmutable = 11
 )
 
 // The various error codes
@@ -176,6 +315,11 @@ type GetBlockRequest struct {
 type GetBlockResponse struct {
 	ErrorResponse
 	Data []byte
+}
+
+type SetWorkspaceImmutableRequest struct {
+	CommandCommon
+	WorkspacePath string
 }
 
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
@@ -366,6 +510,9 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	return nil
 }
 
+// Enable the chosen workspace mutable
+//
+// dst is the path relative to the filesystem root, ie. user/joe/myws
 func (api *Api) EnableRootWrite(dst string) error {
 	if !isWorkspaceNameValid(dst) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
@@ -374,6 +521,41 @@ func (api *Api) EnableRootWrite(dst string) error {
 	cmd := EnableRootWriteRequest{
 		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
 		Workspace:     dst,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Make the chosen workspace irreversibly immutable
+//
+// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
+func (api *Api) SetWorkspaceImmutable(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := SetWorkspaceImmutableRequest{
+		CommandCommon: CommandCommon{CommandId: CmdSetWorkspaceImmutable},
+		WorkspacePath: workspacepath,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)

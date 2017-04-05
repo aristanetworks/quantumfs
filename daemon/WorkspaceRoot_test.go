@@ -29,8 +29,12 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 		src := quantumfs.NullSpaceName + "/" + quantumfs.NullSpaceName +
 			"/" + quantumfs.NullSpaceName
 		dst := "wsrtest/wsrtest/wsrtest"
-		api := quantumfs.NewApiWithPath(apiPath)
+
+		api, err := quantumfs.NewApiWithPath(apiPath)
+
+		test.Assert(err == nil, "Error retrieving Api: %v", err)
 		test.Assert(api != nil, "Api nil")
+
 		err = api.Branch(src, dst)
 		test.Assert(err == nil,
 			"Error branching with api in nullworkspace:%v", err)
@@ -236,5 +240,100 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 		defer syscall.Close(fd)
 		test.Assert(err == syscall.EPERM,
 			"Error creating a small file: %v", err)
+	})
+}
+
+func TestSetWorkspaceImmutable(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		api := test.getApi()
+		err := api.SetWorkspaceImmutable(workspaceName)
+		test.Assert(err == nil, "Failed setting the workspace %s immutable",
+			workspaceName)
+
+		err = api.EnableRootWrite(workspaceName)
+		test.Assert(err != nil, "Unexpected success on enabling workspace"+
+			" %s write permission", workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.Assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
+
+	})
+}
+
+func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		api := test.getApi()
+		err := api.SetWorkspaceImmutable(workspaceName)
+		test.Assert(err == nil, "Failed setting the workspace %s immutable",
+			workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.Assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
+
+		err = api.DeleteWorkspace(workspaceName)
+		test.Assert(err == nil, "Failed deleting the workspace %s",
+			workspaceName)
+
+		err = api.Branch(test.nullWorkspaceRel(), workspaceName)
+		test.Assert(err == nil, "Failed branching workspace: %v", err)
+
+		err = api.EnableRootWrite(workspaceName)
+		test.Assert(err == nil,
+			"Failed to enable write permission in workspace: %v", err)
+
+		fd1, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd1)
+		test.Assert(err == nil, "Error creating a small file: %v", err)
+	})
+}
+
+func TestSetRemoteWorkspaceImmutable(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		workspaceName := test.relPath(workspace)
+
+		// Remotely set the workspace immutable
+		dst := strings.Split(workspaceName, "/")
+		c := test.testCtx()
+		err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx,
+			dst[0], dst[1], dst[2])
+		test.Assert(err == nil, "Workspace %s can't be set immutable",
+			workspaceName)
+
+		delete(test.qfs.workspaceMutability, workspaceName)
+
+		fileName := workspace + "/file"
+		fd, err := syscall.Creat(fileName, 0777)
+		defer syscall.Close(fd)
+		test.Assert(err == syscall.EPERM,
+			"Error creating a small file: %v", err)
+	})
+}
+
+// We need isWorkspaceRoot() to be more robust than it has been
+func TestWorkspaceRootChecker(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.newWorkspace()
+		wsr := test.getWorkspaceRoot(workspace)
+		var inode Inode
+		inode = wsr
+
+		test.Assert(inode.isWorkspaceRoot() == true,
+			"inode interface not routing")
+		test.Assert(wsr.isWorkspaceRoot() == true, "wsr not recognized")
+		test.Assert(wsr.Directory.isWorkspaceRoot() == true,
+			"wsr dir not routing")
 	})
 }
