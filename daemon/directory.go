@@ -1075,8 +1075,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// matter.
 		parent, child := sortParentChild(c, dst, dir)
 		firstLock, lastLock := getLockOrder(dst, dir)
-		asDirectory(firstLock).Lock()
-		asDirectory(lastLock).Lock()
+		firstLock.Lock()
+		lastLock.Lock()
 
 		defer child.lock.Unlock()
 
