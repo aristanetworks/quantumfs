@@ -462,8 +462,8 @@ func TestUnlinkPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
 }
 
 func TestUnlinkPermissionsAsUserInWorkspaceRoot(t *testing.T) {
-t.Skip()
-// BUG194878
+	t.Skip()
+	// BUG194878
 	runTest(t, func(test *testHelper) {
 		testUnlinkPermissions(test, false, false, false, false, false, 0000,
 			true)
