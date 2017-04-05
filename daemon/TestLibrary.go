@@ -214,7 +214,7 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 
 	go serveSafely(th)
 
-	th.fuseConnection = findFuseConnection(th.testCtx(), config.MountPath)
+	th.fuseConnection = findFuseConnection(th.TestCtx(), config.MountPath)
 	th.Assert(th.fuseConnection != -1, "Failed to find mount")
 	th.Log("QuantumFs instance started")
 }
@@ -297,14 +297,10 @@ func (th *TestHelper) newWorkspaceWithoutWritePerm() string {
 	return th.absPath(dst)
 }
 
-func (th *TestHelper) NewWorkspace() string {
-	return th.newWorkspace()
-}
-
 // Create a new workspace to test within
 //
 // Returns the absolute path of the workspace
-func (th *TestHelper) newWorkspace() string {
+func (th *TestHelper) NewWorkspace() string {
 	path := th.newWorkspaceWithoutWritePerm()
 
 	api := th.getApi()
@@ -397,7 +393,7 @@ func init() {
 
 // Produce a test infrastructure ctx variable for use with QuantumFS utility
 // functions.
-func (th *TestHelper) testCtx() *ctx {
+func (th *TestHelper) TestCtx() *ctx {
 	return th.qfs.c.dummyReq(qlog.TestReqId)
 }
 
