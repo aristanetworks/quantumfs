@@ -45,4 +45,4 @@ test: $(TEST_TARGET)
 $(TEST_TARGET): $(TEST_OBJS) $(TARGET)
 	$(CXX) $(TEST_LD_FLAGS) -o $@ $(TEST_OBJS)
 
-.PHONY: all test qfsc-clean
+.PHONY: all test

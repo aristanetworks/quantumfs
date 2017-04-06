@@ -478,3 +478,16 @@ func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 
 	return quantumfs.NewObjectKeyFromBytes(key), nil
 }
+
+func (w *EtherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
+	typespace string, namespace string, workspace string) error {
+
+	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
+		"Ether does not support setting workspaces immutable")
+}
+
+func (w *EtherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
+	typespace string, namespace string, workspace string) (bool, error) {
+
+	return false, nil
+}

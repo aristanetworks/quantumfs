@@ -9,7 +9,7 @@ import "syscall"
 import "testing"
 
 func specialCreate(test *testHelper, filetype uint32) {
-	workspace := test.newWorkspace()
+	workspace := test.NewWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
 		0x12345678)
@@ -79,7 +79,7 @@ func TestFileMknodCreation(t *testing.T) {
 }
 
 func specialCreateFail(test *testHelper, filetype uint32) {
-	workspace := test.newWorkspace()
+	workspace := test.NewWorkspace()
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
 		0x12345678)
