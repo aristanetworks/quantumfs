@@ -13,9 +13,9 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-type walkFunc func(context.Context, string, quantumfs.ObjectKey, uint64) error
+type walkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64) error
 
-type ctx struct {
+type Ctx struct {
 	context.Context
 	qctx *quantumfs.Ctx
 }
@@ -55,13 +55,13 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	group, groupCtx := errgroup.WithContext(context.Background())
 	keyChan := make(chan *workerData, 100)
 
-	c := &ctx{
+	c := &Ctx{
 		Context: groupCtx,
 		qctx:    cq,
 	}
 
 	// Start Workers
-	conc := runtime.NumCPU() / 2
+	conc := runtime.GOMAXPROCS(-1)
 	for i := 0; i < conc; i++ {
 
 		group.Go(func() error {
@@ -107,7 +107,7 @@ func key2String(key quantumfs.ObjectKey) string {
 	}
 }
 
-func handleHardLinks(c *ctx, ds quantumfs.DataStore,
+func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 	hle quantumfs.HardlinkEntry, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -149,7 +149,7 @@ func handleHardLinks(c *ctx, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleMultiBlockFile(c *ctx, path string, ds quantumfs.DataStore,
+func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -184,7 +184,7 @@ func handleMultiBlockFile(c *ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleVeryLargeFile(c *ctx, path string, ds quantumfs.DataStore,
+func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -214,7 +214,7 @@ func handleVeryLargeFile(c *ctx, path string, ds quantumfs.DataStore,
 
 var totalFilesWalked uint64
 
-func handleDirectoryEntry(c *ctx, path string, ds quantumfs.DataStore,
+func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -243,7 +243,7 @@ func handleDirectoryEntry(c *ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleDirectoryRecord(c *ctx, path string, ds quantumfs.DataStore,
+func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	dr *quantumfs.DirectRecord, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -273,7 +273,7 @@ func handleDirectoryRecord(c *ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func worker(c context.Context, keyChan <-chan *workerData, wf walkFunc) error {
+func worker(c *Ctx, keyChan <-chan *workerData, wf walkFunc) error {
 	var keyItem *workerData
 	for {
 		select {
