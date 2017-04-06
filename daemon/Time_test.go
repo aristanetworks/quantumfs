@@ -40,7 +40,7 @@ func getTimeFromFile(file *os.File) (mtime int64, ctime int64) {
 func TestTimeChmod(t *testing.T) {
 	// Change metadata and confirm mtime isn't changed
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/dir"
 		fileName := workspace + "/file"
@@ -79,7 +79,7 @@ func TestTimeChmod(t *testing.T) {
 // Change contents and confirm both ctime and mtime are changed
 func TestTimeModification(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/dir"
 		fileName := workspace + "/dir/file"
@@ -111,7 +111,7 @@ func TestTimeModification(t *testing.T) {
 // doesn't have it's time change
 func TestTimeRecursiveCtime(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/dir"
 		fileName := workspace + "/dir/file"
@@ -136,7 +136,7 @@ func TestTimeRecursiveCtime(t *testing.T) {
 
 func TestTimeIntraDirectoryRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/dir"
 		testFilename1 := dirName + "/test"
 		testFilename2 := dirName + "/test2"
@@ -162,7 +162,7 @@ func TestTimeIntraDirectoryRename(t *testing.T) {
 func TestTimeInterDirectoryRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		interDirectoryRename(test)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir1 := workspace + "/dir1"
 		testDir2 := workspace + "/dir2"
 		testFilename1 := testDir1 + "/test"
@@ -194,7 +194,7 @@ func TestTimeInterDirectoryRename(t *testing.T) {
 
 func TestTimeOrphanedFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// First create a file with some data
@@ -202,7 +202,7 @@ func TestTimeOrphanedFile(t *testing.T) {
 		test.Assert(err == nil, "Error creating test file: %v", err)
 		defer file.Close()
 
-		data := genData(100 * 1024)
+		data := GenData(100 * 1024)
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing data to file: %v", err)
 		err = os.Remove(testFilename)
@@ -223,7 +223,7 @@ func TestTimeOrphanedFile(t *testing.T) {
 		// Change the data to ensure both ctime and mtime are changed
 		mtimeOrig = mtime
 		ctimeOrig = ctime
-		data = genData(100 * 1024)
+		data = GenData(100 * 1024)
 		_, err = file.Seek(100*1024*1024, 0)
 		test.Assert(err == nil, "Error rewinding file: %v", err)
 		_, err = file.Write(data)
@@ -237,11 +237,11 @@ func TestTimeOrphanedFile(t *testing.T) {
 
 func TestTimeHardlinkFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := workspace + "/test"
 
 		// First create a file with some data
-		data := genData(2000)
+		data := GenData(2000)
 		err := testutils.PrintToFile(filename, string(data))
 		test.AssertNoErr(err)
 

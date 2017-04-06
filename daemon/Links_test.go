@@ -19,7 +19,7 @@ func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testData := []byte("arstarst")
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		file1 := workspace + "/orig_file"
 		err := ioutil.WriteFile(file1, testData, 0777)
 		test.Assert(err == nil, "Error creating file: %v", err)
@@ -71,7 +71,7 @@ func TestHardlink(t *testing.T) {
 
 func TestSymlinkCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		err := syscall.Symlink("/usr/bin/arch", link)
 		test.Assert(err == nil, "Error creating symlink: %v", err)
@@ -80,7 +80,7 @@ func TestSymlinkCreate(t *testing.T) {
 
 func TestReadlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
 		err := syscall.Symlink(orig, link)
@@ -95,7 +95,7 @@ func TestReadlink(t *testing.T) {
 
 func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
 		err := syscall.Symlink(orig, link)
@@ -113,7 +113,7 @@ func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 
 func TestSymlinkSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
 		err := syscall.Symlink(orig, link)
@@ -131,7 +131,7 @@ func TestSymlinkSize(t *testing.T) {
 
 func TestSymlinkHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		err := utils.MkdirAll(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
@@ -140,7 +140,7 @@ func TestSymlinkHardlink(t *testing.T) {
 		softlink := workspace + "/dir/symlink"
 		hardlink := workspace + "/dir/hardlink"
 
-		data := genData(2000)
+		data := GenData(2000)
 		err = testutils.PrintToFile(file, string(data))
 		test.AssertNoErr(err)
 
