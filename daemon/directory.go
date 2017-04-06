@@ -1044,7 +1044,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	}
 
 	result := func() fuse.Status {
-		dst := dstInode.(*Directory)
+		dst := asDirectory(dstInode)
 
 		// The locking here is subtle.
 		//
@@ -1075,8 +1075,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// matter.
 		parent, child := sortParentChild(c, dst, dir)
 		firstLock, lastLock := getLockOrder(dst, dir)
-		firstLock.(*Directory).Lock()
-		lastLock.(*Directory).Lock()
+		firstLock.Lock()
+		lastLock.Lock()
 
 		defer child.lock.Unlock()
 
