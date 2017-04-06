@@ -4,6 +4,7 @@
 package daemon
 
 import "bufio"
+import "fmt"
 import "os"
 import "strconv"
 import "strings"
@@ -271,4 +272,16 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 
 	c.vlog("hasPermissionIds (%o & %o) vs %o", checkFlags, permMask, permission)
 	return fuse.EACCES
+}
+
+func asDirectory(inode Inode) *Directory {
+	switch v := inode.(type) {
+	case *WorkspaceRoot:
+		return &v.Directory
+	case *Directory:
+		return v
+	default:
+		// panic like usual
+		panic(fmt.Sprintf("Inode %d is not a Directory", inode.inodeNum()))
+	}
 }

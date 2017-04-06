@@ -364,25 +364,22 @@ func (th *TestHelper) GetDataStore() quantumfs.DataStore {
 	return th.qfs.c.dataStore.durableStore
 }
 
-var genDataMutex sync.RWMutex
+var genDataMutex utils.DeferableMutex
 var precompGenData []byte
 var genDataLast int
 
 func GenData(maxLen int) []byte {
+	defer genDataMutex.Lock().Unlock()
+
 	if maxLen > len(precompGenData) {
 		// we need to expand the array
-		genDataMutex.Lock()
 
 		for len(precompGenData) <= maxLen {
 			precompGenData = append(precompGenData,
 				strconv.Itoa(genDataLast)...)
 			genDataLast++
 		}
-
-		genDataMutex.Unlock()
 	}
-	genDataMutex.RLock()
-	defer genDataMutex.RUnlock()
 
 	return precompGenData[:maxLen]
 }

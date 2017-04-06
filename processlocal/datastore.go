@@ -35,7 +35,9 @@ func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	if data, exists := store.data[key.String()]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
-		buf.Set(data, key.Type())
+		newData := make([]byte, len(data))
+		copy(newData, data)
+		buf.Set(newData, key.Type())
 	}
 	return err
 }
