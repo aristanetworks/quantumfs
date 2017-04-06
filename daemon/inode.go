@@ -162,6 +162,8 @@ type Inode interface {
 
 	inodeNum() InodeId
 
+	Lock() utils.NeedWriteUnlock
+
 	treeLock() *sync.RWMutex
 	LockTree() *sync.RWMutex
 	RLockTree() *sync.RWMutex
