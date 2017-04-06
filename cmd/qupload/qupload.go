@@ -15,9 +15,12 @@ import "path/filepath"
 import "strings"
 import "time"
 
+import "golang.org/x/net/context"
+
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 // Various exit reasons returned to the shell as exit code
 const (
@@ -37,11 +40,47 @@ type params struct {
 	baseDir     string
 	excludeFile string
 	conc        uint
+	logdir      string
 }
 
 var dataStore quantumfs.DataStore
 var wsDB quantumfs.WorkspaceDB
 var version string
+
+type Ctx struct {
+	Qctx *quantumfs.Ctx
+	eCtx context.Context // errgroup context
+}
+
+func (c Ctx) Elog(format string, args ...interface{}) {
+	c.Qctx.Elog(qlog.LogTool, format, args...)
+}
+
+func (c Ctx) Wlog(format string, args ...interface{}) {
+	c.Qctx.Wlog(qlog.LogTool, format, args...)
+}
+
+func (c Ctx) Dlog(format string, args ...interface{}) {
+	c.Qctx.Dlog(qlog.LogTool, format, args...)
+}
+
+func (c Ctx) Vlog(format string, args ...interface{}) {
+	c.Qctx.Vlog(qlog.LogTool, format, args...)
+}
+
+func newCtx(logdir string) *Ctx {
+	var c Ctx
+	log := qlog.NewQlogTiny()
+	if logdir != "" {
+		log = qlog.NewQlog(logdir)
+	}
+
+	c.Qctx = &quantumfs.Ctx{
+		Qlog:      log,
+		RequestId: 1,
+	}
+	return &c
+}
 
 func showUsage() {
 	fmt.Printf(`
@@ -49,18 +88,23 @@ qupload - tool to upload a directory hierarchy to a QFS supported datastore
 version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
-	       -workspace <wsname> [-progress -advance <wsname>]
+	       -workspace <wsname>
+	       [ -progress -advance <wsname> -logdir <path> ]
 	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
-1) qupload -workspace build/eos-trunk/11223344
-		   -basedir /var/Abuild/66778899 -exclude excludeFile
+1) qupload -datastore ether.cql -datastoreconf etherconf
+           -workspaceDB ether.cql -workspaceDBconf etherconf
+	   -workspace build/eos-trunk/11223344
+	   -basedir /var/Abuild/66778899 -exclude excludeFile
 Above command will upload the contents of /var/Abuild/66778899 directory
 to the QFS workspace build/eos-trunk/11223344. The files and directories
 specified by excludeFile are excluded from upload. See below for details about
 the exclude file format.
 
-2) qupload -workspace build/eos-trunk/11223344
-		   -basedir /var/Abuild/66778899 src
+2) qupload -datastore ether.cql -datastoreconf etherconf
+           -workspaceDB ether.cql -workspaceDBconf etherconf
+	   -workspace build/eos-trunk/11223344
+	   -basedir /var/Abuild/66778899 src
 Above command will upload the contents of /var/Abuild/66778899/src directory
 to the QFS workspace build/eos-trunk/11223344. All files and sub-directories
 are included since an exclude file is not specified.
@@ -138,24 +182,6 @@ func validateParams(p *params) error {
 	if err != nil {
 		return err
 	}
-	ws1Parts := strings.Split(p.ws, "/")
-	_, err = wsDB.Workspace(nil,
-		ws1Parts[0], ws1Parts[1], ws1Parts[2])
-	werr, _ := err.(*quantumfs.WorkspaceDbErr)
-	if err == nil {
-		return fmt.Errorf("Workspace %s must not exist\n", p.ws)
-	}
-	if err != nil && werr.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
-		return fmt.Errorf("Error in workspace %s\n", err)
-	}
-	if p.advance != "" {
-		advParts := strings.Split(p.advance, "/")
-		_, err = wsDB.Workspace(nil,
-			advParts[0], advParts[1], advParts[2])
-		if err != nil {
-			return fmt.Errorf("Error in advance workspace %s\n", err)
-		}
-	}
 
 	return nil
 }
@@ -186,7 +212,8 @@ func main() {
 		"Exclude the files and directories specified in this file")
 	flag.UintVar(&cliParams.conc, "concurrency", 10,
 		"Number of concurrent uploaders")
-
+	flag.StringVar(&cliParams.logdir, "logdir", "",
+		"Directory path for logfile")
 	flag.Usage = showUsage
 	flag.Parse()
 
@@ -201,6 +228,10 @@ func main() {
 		os.Exit(exitErrArgs)
 	}
 
+	// setup context
+	c := newCtx(cliParams.logdir)
+
+	// setup exclude information
 	relpath := ""
 	var exInfo *ExcludeInfo
 	if cliParams.excludeFile != "" {
@@ -215,6 +246,7 @@ func main() {
 	}
 
 	if cliParams.progress == true {
+		// setup progress indicator
 		go func() {
 			fmt.Println("Data and Metadata is the size being " +
 				"read by qupload tool for uploading to QFS " +
@@ -237,16 +269,18 @@ func main() {
 		}()
 	}
 
+	// upload
 	start := time.Now()
-	upErr := upload(cliParams.ws, cliParams.advance,
+	upErr := upload(c, cliParams.ws, cliParams.advance,
 		filepath.Join(cliParams.baseDir, relpath), exInfo,
 		cliParams.conc)
 	if upErr != nil {
-		fmt.Println("Upload failed: ", upErr)
+		c.Elog("Upload failed: ", upErr)
 		os.Exit(exitErrUpload)
 	}
 
-	fmt.Printf("Upload completed. Total: %d bytes "+
+	c.Vlog("Upload completed")
+	fmt.Printf("\nUpload completed. Total: %d bytes "+
 		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
 		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
 		qwr.DataBytesWritten,
