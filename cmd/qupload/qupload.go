@@ -15,6 +15,8 @@ import "path/filepath"
 import "strings"
 import "time"
 
+import "golang.org/x/net/context"
+
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/thirdparty_backends"
@@ -45,18 +47,39 @@ var dataStore quantumfs.DataStore
 var wsDB quantumfs.WorkspaceDB
 var version string
 
-func newCtx(logdir string) *quantumfs.Ctx {
+type Ctx struct {
+	Qctx *quantumfs.Ctx
+	eCtx context.Context // errgroup context
+}
+
+func (c Ctx) Elog(format string, args ...interface{}) {
+	c.Qctx.Elog(qlog.LogTool, format, args...)
+}
+
+func (c Ctx) Wlog(format string, args ...interface{}) {
+	c.Qctx.Wlog(qlog.LogTool, format, args...)
+}
+
+func (c Ctx) Dlog(format string, args ...interface{}) {
+	c.Qctx.Dlog(qlog.LogTool, format, args...)
+}
+
+func (c Ctx) Vlog(format string, args ...interface{}) {
+	c.Qctx.Vlog(qlog.LogTool, format, args...)
+}
+
+func newCtx(logdir string) *Ctx {
+	var c Ctx
 	log := qlog.NewQlogTiny()
 	if logdir != "" {
 		log = qlog.NewQlog(logdir)
 	}
 
-	requestId := qlog.MinSpecialReqId + 1
-	ctx := &quantumfs.Ctx{
+	c.Qctx = &quantumfs.Ctx{
 		Qlog:      log,
-		RequestId: requestId,
+		RequestId: 1,
 	}
-	return ctx
+	return &c
 }
 
 func showUsage() {
@@ -206,7 +229,7 @@ func main() {
 	}
 
 	// setup context
-	ctx := newCtx(cliParams.logdir)
+	c := newCtx(cliParams.logdir)
 
 	// setup exclude information
 	relpath := ""
@@ -248,15 +271,15 @@ func main() {
 
 	// upload
 	start := time.Now()
-	upErr := upload(ctx, cliParams.ws, cliParams.advance,
+	upErr := upload(c, cliParams.ws, cliParams.advance,
 		filepath.Join(cliParams.baseDir, relpath), exInfo,
 		cliParams.conc)
 	if upErr != nil {
-		ctx.Elog(qlog.LogTool, "Upload failed: ", upErr)
+		c.Elog("Upload failed: ", upErr)
 		os.Exit(exitErrUpload)
 	}
 
-	ctx.Vlog(qlog.LogTool, "Upload completed")
+	c.Vlog("Upload completed")
 	fmt.Printf("\nUpload completed. Total: %d bytes "+
 		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
 		qwr.DataBytesWritten+qwr.MetadataBytesWritten,

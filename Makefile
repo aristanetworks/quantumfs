@@ -49,7 +49,7 @@ rpm: $(COMMANDS)
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse \
-		./qupload=/usr/sbin/qupload \
+		./qupload=/usr/bin/qupload \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
 include QFSClient/Makefile
