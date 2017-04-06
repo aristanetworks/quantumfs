@@ -219,7 +219,9 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 		return err
 	}
 
-	buf.Set(data, key.Type())
+	newData := make([]byte, len(data))
+	copy(newData, data)
+	buf.Set(newData, key.Type())
 	return nil
 }
 
