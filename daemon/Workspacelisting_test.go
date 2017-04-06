@@ -35,7 +35,7 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		tslInode := test.qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
 		tsl := tslInode.(*TypespaceList)
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		type_, name_, work_ := test.getWorkspaceComponents(workspace)
 		_, exists := tsl.typespacesByName[type_]
 		test.Assert(!exists,
@@ -44,7 +44,7 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		// Creating a file in the new workspace can trigger updateChildren
 		// in workspacelisting. Map within will be updated, so inodes in the
 		// proceeding workspace will be valid right now.
-		workspace1 := test.newWorkspace()
+		workspace1 := test.NewWorkspace()
 		testFilename := workspace1 + "/" + "test"
 		err := syscall.Mkdir(testFilename, 0124)
 		test.Assert(err == nil, "Error creating directories: %v", err)
