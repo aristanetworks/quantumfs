@@ -540,7 +540,59 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.childRecordLock.Lock().Unlock()
 
 	records := dir.children.records()
-	children := make([]directoryContents, 0, len(records))
+	children := make([]directoryContents, 0, len(records)+2)
+
+	c.vlog("Adding .")
+	entryInfo := directoryContents{
+		filename: ".",
+	}
+
+	// If we are a WorkspaceRoot then we need only add some entries,
+	// WorkspaceRoot.getChildSnapShot() will overwrite the first two entries with
+	// the correct data.
+	if !dir.self.isWorkspaceRoot() {
+		entry, err := dir.parentGetChildRecordCopy(c, dir.inodeNum())
+		utils.Assert(err == nil, "Failed to get record for inode %d %s",
+			dir.inodeNum(), err)
+
+		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+			dir.inodeNum(), c.fuseCtx.Owner, entry)
+		entryInfo.fuseType = entryInfo.attr.Mode
+	}
+
+	children = append(children, entryInfo)
+
+	c.vlog("Adding ..")
+	entryInfo = directoryContents{
+		filename: "..",
+	}
+
+	if !dir.self.isWorkspaceRoot() {
+		func() {
+			defer dir.parentLock.RLock().RUnlock()
+			parent := dir.parent_(c)
+
+			if parent.isWorkspaceRoot() {
+				wsr := parent.(*WorkspaceRoot)
+				wsr.fillWorkspaceAttrReal(c, &entryInfo.attr)
+			} else {
+				entry, err := parent.parentGetChildRecordCopy(c,
+					parent.inodeNum())
+				utils.Assert(err == nil,
+					"Failed to get record for inode %d %s",
+					parent.inodeNum(), err)
+
+				c.vlog("Got record from grandparent")
+				fillAttrWithDirectoryRecord(c, &entryInfo.attr,
+					parent.inodeNum(), c.fuseCtx.Owner, entry)
+			}
+			entryInfo.fuseType = entryInfo.attr.Mode
+		}()
+	}
+
+	children = append(children, entryInfo)
+
+	c.vlog("Adding real children")
 	for _, entry := range records {
 		filename := entry.Filename()
 
@@ -1044,7 +1096,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	}
 
 	result := func() fuse.Status {
-		dst := dstInode.(*Directory)
+		dst := asDirectory(dstInode)
 
 		// The locking here is subtle.
 		//
@@ -1075,8 +1127,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// matter.
 		parent, child := sortParentChild(c, dst, dir)
 		firstLock, lastLock := getLockOrder(dst, dir)
-		firstLock.(*Directory).Lock()
-		lastLock.(*Directory).Lock()
+		firstLock.Lock()
+		lastLock.Lock()
 
 		defer child.lock.Unlock()
 
@@ -1702,34 +1754,6 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		c.dlog("Refreshing child list")
 		ds.children = ds.src.getChildSnapshot(c)
 	}
-
-	// Add .
-	if offset == 0 {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: "."}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			return fuse.OK
-		}
-
-		details.NodeId = uint64(ds.FileHandleCommon.inodeNum)
-		fillEntryOutCacheData(c, details)
-		fillRootAttr(c, &details.Attr, ds.FileHandleCommon.inodeNum)
-	}
-	offset++
-
-	// Add ..
-	if offset == 1 {
-		entry := fuse.DirEntry{Mode: fuse.S_IFDIR, Name: ".."}
-		details, _ := out.AddDirLookupEntry(entry)
-		if details == nil {
-			return fuse.OK
-		}
-
-		details.NodeId = uint64(ds.FileHandleCommon.inodeNum)
-		fillEntryOutCacheData(c, details)
-		fillRootAttr(c, &details.Attr, ds.FileHandleCommon.inodeNum)
-	}
-	offset++
 
 	processed := 0
 	for _, child := range ds.children {
