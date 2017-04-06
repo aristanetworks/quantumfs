@@ -463,8 +463,6 @@ func TestPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
 }
 
 func TestPermissionsAsUserInWorkspaceRoot(t *testing.T) {
-	t.Skip()
-	// BUG194878
 	runTest(t, func(test *testHelper) {
 		testPermissions(test, false, false, false, false, false, 0000,
 			true)

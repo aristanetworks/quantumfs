@@ -15,7 +15,7 @@ import "github.com/aristanetworks/quantumfs/utils"
 var DataBytesWritten uint64
 var MetadataBytesWritten uint64
 
-type fileObjectWriter func(string, os.FileInfo,
+type fileObjectWriter func(*quantumfs.Ctx, string, os.FileInfo,
 	quantumfs.DataStore) (quantumfs.ObjectKey, error)
 
 func fileObjectInfo(path string,
@@ -44,7 +44,7 @@ func fileObjectInfo(path string,
 		fmt.Errorf("Unsupported file object type for %q", path)
 }
 
-func WriteFile(ds quantumfs.DataStore,
+func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	finfo os.FileInfo,
 	path string) (quantumfs.DirectoryRecord, error) {
 
@@ -78,7 +78,7 @@ func WriteFile(ds quantumfs.DataStore,
 
 	// use writer to write file blocks and file type
 	// specific metadata
-	fileKey, werr := objWriter(path, finfo, ds)
+	fileKey, werr := objWriter(qctx, path, finfo, ds)
 	if werr != nil {
 		return nil, fmt.Errorf("WriteFile object writer %d "+
 			"for %q failed: %v\n",
@@ -97,7 +97,7 @@ func WriteFile(ds quantumfs.DataStore,
 		fileKey)
 
 	// write xattrs if any
-	xattrsKey, xerr := WriteXAttrs(path, ds)
+	xattrsKey, xerr := WriteXAttrs(qctx, path, ds)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -118,7 +118,7 @@ func WriteFile(ds quantumfs.DataStore,
 }
 
 // caller ensures that file has at least readLen bytes without EOF
-func writeFileBlocks(file *os.File, readLen uint64,
+func writeFileBlocks(qctx *quantumfs.Ctx, file *os.File, readLen uint64,
 	ds quantumfs.DataStore) ([]quantumfs.ObjectKey, uint32, error) {
 
 	var keys []quantumfs.ObjectKey
@@ -156,7 +156,7 @@ func writeFileBlocks(file *os.File, readLen uint64,
 					"Actual %d != Expected %d\n",
 					file.Name(), bytesRead, len(chunk))
 		}
-		key, bErr := writeBlock(chunk, quantumfs.KeyTypeData, ds)
+		key, bErr := writeBlock(qctx, chunk, quantumfs.KeyTypeData, ds)
 		if bErr != nil {
 			return nil, 0, bErr
 		}
