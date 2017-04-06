@@ -15,8 +15,6 @@ import "strings"
 import "testing"
 import "time"
 
-import "golang.org/x/net/context"
-
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/qlog"
@@ -167,7 +165,7 @@ func (th *testHelper) readWalkCompare(workspace string) {
 
 	var walkerMap = make(map[string]int)
 	var mapLock utils.DeferableMutex
-	wf := func(c context.Context, path string, key quantumfs.ObjectKey,
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
 		size uint64) error {
 
 		defer mapLock.Lock().Unlock()
