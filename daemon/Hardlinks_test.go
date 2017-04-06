@@ -14,16 +14,17 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func TestHardlinkReload(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		workspace := test.NewWorkspace()
+		err := utils.MkdirAll(workspace+"/subdir/grandchild", 0777)
 		test.AssertNoErr(err)
 
 		// Create a couple files so we can copy its directory record
-		data := genData(2000)
+		data := GenData(2000)
 		testFileA := workspace + "/subdir/testFile"
 		err = testutils.PrintToFile(testFileA, string(data[:1000]))
 		test.AssertNoErr(err)
@@ -66,11 +67,11 @@ func TestHardlinkReload(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// trigger a sync so the workspace is published
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		workspaceB := "branch/copyWorkspace/test"
 		api := test.getApi()
-		err = api.Branch(test.relPath(workspace), workspaceB)
+		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.Assert(err == nil, "Unable to branch")
 
 		wsrB := test.getWorkspaceRoot(workspaceB)
@@ -129,9 +130,9 @@ func TestHardlinkReload(t *testing.T) {
 
 func TestHardlinkRelay(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		testData := genData(2000)
+		testData := GenData(2000)
 
 		file1 := workspace + "/orig_file"
 		err := ioutil.WriteFile(file1, testData[:1000], 0777)
@@ -187,9 +188,9 @@ func TestHardlinkRelay(t *testing.T) {
 
 func TestHardlinkForget(t *testing.T) {
 	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		data := genData(2000)
+		data := GenData(2000)
 
 		testFile := workspace + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data))
@@ -225,16 +226,16 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 	// instantiated. It is likely being held open by some other directory or
 	// handle.
 	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		data := genData(2000)
+		data := GenData(2000)
 
 		testFile := workspace + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data))
 		test.AssertNoErr(err)
 
 		dirName := workspace + "/dir"
-		err = os.Mkdir(dirName, 0777)
+		err = syscall.Mkdir(dirName, 0777)
 		test.AssertNoErr(err)
 
 		linkFile := dirName + "/testLink"
@@ -278,9 +279,9 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 // into a regular file.
 func TestHardlinkConversion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		data := genData(2000)
+		data := GenData(2000)
 
 		testFile := workspace + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data[:1000]))
@@ -307,7 +308,7 @@ func TestHardlinkConversion(t *testing.T) {
 
 		_, err = os.Stat(linkFile)
 		test.AssertNoErr(err)
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// ensure we can still use the file as normal
 		err = testutils.PrintToFile(linkFile, string(data[1000:]))
@@ -327,11 +328,11 @@ func TestHardlinkConversion(t *testing.T) {
 
 func TestHardlinkSubdirChain(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		data := genData(2000)
+		data := GenData(2000)
 
-		err := os.Mkdir(workspace+"/dir", 0777)
+		err := syscall.Mkdir(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
 
 		testFile := workspace + "/dir/testFile"
@@ -359,9 +360,9 @@ func TestHardlinkSubdirChain(t *testing.T) {
 
 func TestHardlinkWsrChain(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		data := genData(2000)
+		data := GenData(2000)
 
 		testFile := workspace + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data))
@@ -388,10 +389,10 @@ func TestHardlinkWsrChain(t *testing.T) {
 
 func TestHardlinkInterWorkspace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspaceA := test.newWorkspace()
-		workspaceB := test.newWorkspace()
+		workspaceA := test.NewWorkspace()
+		workspaceB := test.NewWorkspace()
 
-		data := genData(1000)
+		data := GenData(1000)
 
 		testFile := workspaceA + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data))
@@ -423,7 +424,7 @@ func TestHardlinkInterWorkspace(t *testing.T) {
 
 func TestHardlinkOpenUnlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		filename := workspace + "/file"
 		linkname := workspace + "/link"
@@ -469,7 +470,7 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 
 func TestHardlinkExtraction(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		filename := workspace + "/file"
 		linkname := workspace + "/link"
@@ -505,14 +506,14 @@ func TestHardlinkExtraction(t *testing.T) {
 
 func TestHardlinkRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		filename := workspace + "/file"
 		linkname := workspace + "/link"
 
 		files := make([]string, 0)
 
-		data := genData(2000)
+		data := GenData(2000)
 		file, err := os.Create(filename)
 		test.AssertNoErr(err)
 		file.WriteString(string(data))
@@ -526,7 +527,7 @@ func TestHardlinkRename(t *testing.T) {
 		test.AssertNoErr(err)
 		linkname = newLink
 
-		err = os.Mkdir(workspace+"/dir", 0777)
+		err = syscall.Mkdir(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
 
 		newLink = workspace + "/dir/linkC"
@@ -560,7 +561,7 @@ func ManualLookup(c *ctx, parent Inode, childName string) {
 
 func TestHardlinkReparentRace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		var stat syscall.Stat_t
 		iterations := 50
@@ -589,14 +590,14 @@ func TestHardlinkReparentRace(t *testing.T) {
 
 func TestHardlinkUninstantiated(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		err := os.MkdirAll(workspace+"/subdir/grandchild", 0777)
+		err := utils.MkdirAll(workspace+"/subdir/grandchild", 0777)
 		test.AssertNoErr(err)
 
 		filename := workspace + "/subdir/fileA"
 		linkname := workspace + "/subdir/grandchild/fileB"
-		data := genData(2000)
+		data := GenData(2000)
 
 		err = testutils.PrintToFile(filename, string(data))
 		test.AssertNoErr(err)
@@ -605,11 +606,11 @@ func TestHardlinkUninstantiated(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// trigger a sync so the workspace is published
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		workspaceB := "branch/copyWorkspace/test"
 		api := test.getApi()
-		err = api.Branch(test.relPath(workspace), workspaceB)
+		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.AssertNoErr(err)
 
 		readData, err := ioutil.ReadFile(test.absPath(workspaceB +
@@ -621,11 +622,11 @@ func TestHardlinkUninstantiated(t *testing.T) {
 }
 
 func (test *testHelper) LinkFileExp(path string, filename string) {
-	err := os.MkdirAll(path, 0777)
+	err := utils.MkdirAll(path, 0777)
 	test.AssertNoErr(err)
 
 	// Enough data to consume a multi block file
-	data := genData(quantumfs.MaxBlockSize + 1000)
+	data := GenData(quantumfs.MaxBlockSize + 1000)
 
 	filepath := path + "/" + filename
 	linkpath := path + "/" + filename + "link"
@@ -648,7 +649,7 @@ func (test *testHelper) LinkFileExp(path string, filename string) {
 
 func TestHardlinkFileExpansionInWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		test.LinkFileExp(workspace, "fileA")
 	})
@@ -656,7 +657,7 @@ func TestHardlinkFileExpansionInWsr(t *testing.T) {
 
 func TestHardlinkFileExpansionOutWsr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		test.LinkFileExp(workspace+"/dirB", "fileB")
 	})
@@ -666,8 +667,8 @@ func TestHardlinkFileExpansionOutWsr(t *testing.T) {
 // unlinked before the record is used. We need to accommodate that.
 func TestHardlinkRecordRace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		data := genData(100)
+		workspace := test.NewWorkspace()
+		data := GenData(100)
 
 		// This is a race condition, so repeat to increase the likelihood
 		for i := 0; i < 100; i++ {
@@ -692,19 +693,19 @@ func TestHardlinkRecordRace(t *testing.T) {
 
 func TestHardlinkDeleteFromDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dir1 := workspace + "/dir1/dir1.1"
-		err := os.MkdirAll(dir1, 0777)
+		err := utils.MkdirAll(dir1, 0777)
 		test.AssertNoErr(err)
 
 		dir2 := workspace + "/dir2"
-		err = os.MkdirAll(dir2, 0777)
+		err = utils.MkdirAll(dir2, 0777)
 		test.AssertNoErr(err)
 
 		filename := dir1 + "/fileA"
 		linkname := dir2 + "/link"
-		data := genData(2000)
+		data := GenData(2000)
 
 		err = testutils.PrintToFile(filename, string(data))
 		test.AssertNoErr(err)

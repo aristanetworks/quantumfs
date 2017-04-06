@@ -55,31 +55,36 @@ json_t *ApiContext::GetResponseJsonObject() const {
 	return response_json_object;
 }
 
-ApiImpl::CommandBuffer::CommandBuffer() {
+CommandBuffer::CommandBuffer() {
 }
 
-ApiImpl::CommandBuffer::~CommandBuffer() {
+CommandBuffer::~CommandBuffer() {
+}
+
+// Copy the contents of the given CommandBuffer into this one
+void CommandBuffer::Copy(const CommandBuffer &source) {
+	this->data = source.data;
 }
 
 // Return a const pointer to the data in the buffer
-const byte *ApiImpl::CommandBuffer::Data() const {
+const byte *CommandBuffer::Data() const {
 	return this->data.data();
 }
 
 // Return the size of the data stored in the buffer
-size_t ApiImpl::CommandBuffer::Size() const {
+size_t CommandBuffer::Size() const {
 	return this->data.size();
 }
 
 // Reset the buffer such that it will contain no data and will
 // have a zero size
-void ApiImpl::CommandBuffer::Reset() {
+void CommandBuffer::Reset() {
 	this->data.clear();
 }
 
 // Append a block of data to the buffer. Returns an error if the
 // buffer would have to be grown too large to add this block
-ErrorCode ApiImpl::CommandBuffer::Append(const byte *data, size_t size) {
+ErrorCode CommandBuffer::Append(const byte *data, size_t size) {
 	try {
 		this->data.insert(this->data.end(), data, data + size);
 	}
@@ -90,12 +95,12 @@ ErrorCode ApiImpl::CommandBuffer::Append(const byte *data, size_t size) {
 	return kSuccess;
 }
 
-// copy a string into the buffer. An error will be returned if
-// the buffer would have to be grown too large to fit the string.
-ErrorCode ApiImpl::CommandBuffer::CopyString(const char *s) {
+// copy a string into the buffer, but without a NUL terminator. An error will
+// be returned if the buffer would have to be grown too large to fit the string.
+ErrorCode CommandBuffer::CopyString(const char *s) {
 	this->data.clear();
 
-	return this->Append((const byte *)s, 1 + strlen(s));
+	return this->Append((const byte *)s, strlen(s));
 }
 
 Error GetApi(Api **api) {
@@ -117,13 +122,13 @@ void ReleaseApi(Api *api) {
 ApiImpl::ApiImpl()
 	: path(""),
 	  api_inode_id(kInodeIdApi),
-	  send_test_hook(NULL) {
+	  test_hook(NULL) {
 }
 
 ApiImpl::ApiImpl(const char *path)
 	: path(path),
 	  api_inode_id(kInodeIdApi),
-	  send_test_hook(NULL) {
+	  test_hook(NULL) {
 }
 
 ApiImpl::~ApiImpl() {
@@ -168,11 +173,18 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 		return err;
 	}
 
-	if (this->send_test_hook) {
-		err = this->send_test_hook->SendTestHook();
+	if (this->test_hook) {
+		Error err = this->test_hook->PostWriteHook();
 		if (err.code != kSuccess) {
 			return err;
 		}
+
+		err = this->test_hook->PreReadHook(response);
+		if (err.code != kSuccess) {
+			return err;
+		}
+
+		return util::getError(kSuccess);
 	}
 
 	return this->ReadResponse(response);
@@ -327,15 +339,18 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 	json_error_t json_error;
 
 	// parse JSON in response into a std::unordered_map<std::string, bool>
-	json_t *response_json = json_loads((const char *)response.Data(),
+	json_t *response_json = json_loadb((const char *)response.Data(),
 					   response.Size(),
+					   0,
 					   &json_error);
 
 	context->SetResponseJsonObject(response_json);
 
 	if (response_json == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			json_error.text, (const char *)response.Data());
+			json_error.text,
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kJsonDecodingError, details);
 	}
 
@@ -350,28 +365,33 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 
 	if (success != 0) {
 		std::string details = util::buildJsonErrorDetails(
-			json_error.text, (const char *)response.Data());
+			json_error.text,
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kJsonDecodingError, details);
 	}
 
 	json_t *error_json_obj = json_object_get(response_json_obj, kErrorCode);
 	if (error_json_obj == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			kErrorCode, (const char *)response.Data());
+			kErrorCode,
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kMissingJsonObject, details);
 	}
 
 	json_t *message_json_obj = json_object_get(response_json_obj, kMessage);
 	if (message_json_obj == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			kMessage, (const char *)response.Data());
+			kMessage, (const char *)response.Data(), response.Size());
 		return util::getError(kMissingJsonObject, details);
 	}
 
 	if (!json_is_integer(error_json_obj)) {
 		std::string details = util::buildJsonErrorDetails(
 			"error code in response JSON is not valid",
-			(const char *)response.Data());
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kJsonDecodingError,
 				      details);
 	}
@@ -383,7 +403,7 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 			json_string_value(message_json_obj));
 
 		std::string details = util::buildJsonErrorDetails(
-			api_error, (const char *)response.Data());
+			api_error, (const char *)response.Data(), response.Size());
 
 		return util::getError(kApiError, details);
 	}

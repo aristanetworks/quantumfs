@@ -135,15 +135,15 @@ TEST_F(QfsClientTest, OpenTest) {
 TEST_F(QfsClientTest, SendCommandTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	ApiImpl::CommandBuffer send;
+	CommandBuffer send;
 	send.CopyString("sausages");
-	ApiImpl::CommandBuffer result;
+	CommandBuffer result;
 
 	Error err = this->api->SendCommand(send, &result);
 
 	ASSERT_EQ(err.code, kSuccess);
 	ASSERT_EQ(send.Size(), result.Size());
-	ASSERT_STREQ((const char *)send.Data(), (const char *)result.Data());
+	ASSERT_EQ(memcmp(send.Data(), result.Data(), send.Size()), 0);
 }
 
 TEST_F(QfsClientTest, SendLargeCommandTest) {
@@ -151,14 +151,14 @@ TEST_F(QfsClientTest, SendLargeCommandTest) {
 
 	const size_t size = 129 * 1024;
 	byte datum = 0x00;
-	ApiImpl::CommandBuffer send;
+	CommandBuffer send;
 
 	for(int i = 0; i < size; i++) {
 		send.Append(&datum, 1);
 		datum++;
 	}
 
-	ApiImpl::CommandBuffer result;
+	CommandBuffer result;
 
 	Error err = this->api->SendCommand(send, &result);
 
@@ -170,9 +170,9 @@ TEST_F(QfsClientTest, SendLargeCommandTest) {
 TEST_F(QfsClientTest, SendCommandNoFileTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	ApiImpl::CommandBuffer send;
+	CommandBuffer send;
 	send.CopyString("sausages");
-	ApiImpl::CommandBuffer result;
+	CommandBuffer result;
 
 	// delete the API file before it ever gets opened, then try to send a
 	// command (SendCommand() will attempt to find and then open the file)
@@ -184,9 +184,9 @@ TEST_F(QfsClientTest, SendCommandNoFileTest) {
 TEST_F(QfsClientTest, WriteCommandFileNotOpenTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	ApiImpl::CommandBuffer send;
+	CommandBuffer send;
 	send.CopyString("sausages");
-	ApiImpl::CommandBuffer result;
+	CommandBuffer result;
 
 	Error err = this->api->WriteCommand(send);
 	ASSERT_EQ(err.code, kApiFileNotOpen);
@@ -228,7 +228,7 @@ void QfsClientApiTest::SetUp() {
 	QfsClientTest::SetUp();
 
 	// set up hook for SendCommand() (see QfsClientApiTest::SendTestHook())
-	this->api->send_test_hook = this;
+	this->api->test_hook = this;
 	this->expected_written_command.Reset();
 	this->actual_written_command.Reset();
 
@@ -250,9 +250,9 @@ void QfsClientApiTest::TearDown() {
 	this->read_command.Reset();
 }
 
-Error QfsClientApiTest::SendTestHook() {
-	// conveniently, we can use ReadResponse() and WriteCommand() to do
-	// the file IO for us. They are already tested by other tests.
+Error QfsClientApiTest::PostWriteHook() {
+	// conveniently, we can use ReadResponse() to do
+	// the file IO for us. This is already tested by other tests.
 
 	// set this->actual_written_command to what's been written to API file
 	Error err = this->api->ReadResponse(&(this->actual_written_command));
@@ -260,12 +260,12 @@ Error QfsClientApiTest::SendTestHook() {
 		return err;
 	}
 
-	// write what's in this->read_command to the API file, ready to be read
-	// by the API function's SendCommand()
-	err = this->api->WriteCommand(this->read_command);
-	if (err.code != kSuccess) {
-		return err;
-	}
+	return util::getError(kSuccess);
+}
+
+Error QfsClientApiTest::PreReadHook(CommandBuffer *read_result) {
+	// copy what's in this->read_command to the supplied command
+	read_result->Copy(this->read_command);
 
 	return util::getError(kSuccess);
 }
@@ -298,8 +298,9 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 	// compare what the API function actually wrote with what we expected
 	ASSERT_EQ(this->actual_written_command.Size(),
 		  this->expected_written_command.Size());
-	ASSERT_STREQ((char*)this->actual_written_command.Data(),
-		     (char*)this->expected_written_command.Data());
+	ASSERT_EQ(memcmp(this->actual_written_command.Data(),
+			 this->expected_written_command.Data(),
+			 this->actual_written_command.Size()), 0);
 }
 
 // This test covers ApiImpl::InsertInode().
@@ -321,6 +322,11 @@ TEST_F(QfsClientApiTest, InsertInodeTest) {
 	this->expected_written_command.CopyString(
 		expected_written_command_json.c_str());
 
+	std::string expected_read_command_json =
+	"{'ErrorCode':0,'Message':'success'}";
+	util::requote(&expected_read_command_json);
+	this->read_command.CopyString(expected_read_command_json.c_str());
+
 	err = this->api->InsertInode("/path/to/some/place/",
 				     "thisisadummyextendedkey01234567890123456",
 				     0765, 2001, 3001);
@@ -329,8 +335,9 @@ TEST_F(QfsClientApiTest, InsertInodeTest) {
 	// compare what the API function actually wrote with what we expected
 	ASSERT_EQ(this->actual_written_command.Size(),
 		  this->expected_written_command.Size());
-	ASSERT_STREQ((char*)this->actual_written_command.Data(),
-		     (char*)this->expected_written_command.Data());
+	ASSERT_EQ(memcmp(this->actual_written_command.Data(),
+			 this->expected_written_command.Data(),
+			 this->actual_written_command.Size()), 0);
 }
 
 // Negative test for ApiImpl::InsertInode(), where we simulate the call returning
@@ -343,7 +350,7 @@ TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
 
 	// set up expected written JSON:
 	std::string expected_written_command_json =
-		"{'CommandId':5,}";
+		"{'CommandId':6,}";
 	util::requote(&expected_written_command_json);
 	this->expected_written_command.CopyString(
 		expected_written_command_json.c_str());
@@ -391,8 +398,9 @@ TEST_F(QfsClientApiTest, BranchTest) {
 	// compare what the API function actually wrote with what we expected
 	ASSERT_EQ(this->actual_written_command.Size(),
 		  this->expected_written_command.Size());
-	ASSERT_STREQ((char*)this->actual_written_command.Data(),
-		     (char*)this->expected_written_command.Data());
+	ASSERT_EQ(memcmp(this->actual_written_command.Data(),
+			 this->expected_written_command.Data(),
+			 this->actual_written_command.Size()), 0);
 }
 
 // This test covers ApiImpl::SetBlock().
@@ -425,8 +433,9 @@ TEST_F(QfsClientApiTest, SetBlockTest) {
 	// compare what the API function actually wrote with what we expected
 	ASSERT_EQ(this->actual_written_command.Size(),
 		  this->expected_written_command.Size());
-	ASSERT_STREQ((char*)this->actual_written_command.Data(),
-		     (char*)this->expected_written_command.Data());
+	ASSERT_EQ(memcmp(this->actual_written_command.Data(),
+			 this->expected_written_command.Data(),
+			 this->actual_written_command.Size()), 0);
 }
 
 // This test covers ApiImpl::GetBlock().
@@ -460,8 +469,9 @@ TEST_F(QfsClientApiTest, GetBlockTest) {
 	// compare what the API function actually wrote with what we expected
 	ASSERT_EQ(this->actual_written_command.Size(),
 		  this->expected_written_command.Size());
-	ASSERT_STREQ((char*)this->actual_written_command.Data(),
-		     (char*)this->expected_written_command.Data());
+	ASSERT_EQ(memcmp(this->actual_written_command.Data(),
+			 this->expected_written_command.Data(),
+			 this->actual_written_command.Size()), 0);
 
 	// also check that GetBlock() returned what we expected
 	ASSERT_EQ(memcmp(data.data(), "lookbehindyou", data.size()), 0);
@@ -495,8 +505,9 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 	// compare what the API function actually wrote with what we expected
 	ASSERT_EQ(this->actual_written_command.Size(),
 		  this->expected_written_command.Size());
-	ASSERT_STREQ((char*)this->actual_written_command.Data(),
-		     (char*)this->expected_written_command.Data());
+	ASSERT_EQ(memcmp(this->actual_written_command.Data(),
+			 this->expected_written_command.Data(),
+			 this->actual_written_command.Size()), 0);
 }
 
 // Test ApiImpl::CheckCommonApiResponse(), which is shared by all API handlers
@@ -513,7 +524,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiResponseTest) {
 TEST_F(QfsClientApiTest, CheckCommonApiResponseBadJsonTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	ApiImpl::CommandBuffer test_response;
+	CommandBuffer test_response;
 
 	// corrupt the JSON that CheckCommonApiResponse will try to parse
 	ASSERT_GT(this->read_command.Size(), 0);  // fail if no JSON
@@ -531,7 +542,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiResponseBadJsonTest) {
 TEST_F(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	ApiImpl::CommandBuffer test_response;
+	CommandBuffer test_response;
 
 	// corrupt ErrorCode in the JSON that CheckCommonApiResponse will try
 	// to parse
@@ -673,13 +684,13 @@ void QfsClientCommandBufferTest::TearDown() {
 }
 
 TEST_F(QfsClientCommandBufferTest, FreshBufferTest) {
-	ApiImpl::CommandBuffer buffer;
+	CommandBuffer buffer;
 
 	ASSERT_EQ(buffer.Size(), 0);
 }
 
 TEST_F(QfsClientCommandBufferTest, ResetTest) {
-	ApiImpl::CommandBuffer buffer;
+	CommandBuffer buffer;
 
 	byte data[] = { 0xDE };
 	buffer.Append(data, 1);
@@ -692,7 +703,7 @@ TEST_F(QfsClientCommandBufferTest, ResetTest) {
 TEST_F(QfsClientCommandBufferTest, AppendAndCopyLotsTest) {
 	const size_t size = 129 * 1024;
 
-	ApiImpl::CommandBuffer buffer;
+	CommandBuffer buffer;
 
 	for(int i = 0; i < size; i++) {
 		byte data[] = { 'z' };
@@ -702,7 +713,7 @@ TEST_F(QfsClientCommandBufferTest, AppendAndCopyLotsTest) {
 	ASSERT_EQ(buffer.Size(), size);
 
 	const std::vector<byte> &data = buffer.data;
-	ApiImpl::CommandBuffer other_buffer;
+	CommandBuffer other_buffer;
 
 	for(size_t j = 0; j < data.size(); j++) {
 		byte datum = buffer.data[j];
@@ -715,7 +726,7 @@ TEST_F(QfsClientCommandBufferTest, AppendAndCopyLotsTest) {
 }
 
 TEST_F(QfsClientCommandBufferTest, AppendTest) {
-	ApiImpl::CommandBuffer buffer;
+	CommandBuffer buffer;
 	byte data[4500];
 	byte datum = 0x00;
 
@@ -733,7 +744,7 @@ TEST_F(QfsClientCommandBufferTest, AppendTest) {
 }
 
 TEST_F(QfsClientCommandBufferTest, CopyStringTest) {
-	ApiImpl::CommandBuffer buffer;
+	CommandBuffer buffer;
 
 	const std::string test_str("all the king's horses and all the king's men");
 
@@ -741,8 +752,10 @@ TEST_F(QfsClientCommandBufferTest, CopyStringTest) {
 	ASSERT_EQ(err, kSuccess);
 
 	const std::vector<byte> &data = buffer.data;
-	ASSERT_EQ(buffer.Size(), 1 + test_str.length());
-	ASSERT_STREQ((reinterpret_cast<const char*>(data.data())), test_str.c_str());
+	ASSERT_EQ(buffer.Size(), test_str.length());
+	ASSERT_EQ(memcmp(data.data(),
+			 test_str.c_str(),
+			 data.size()), 0);
 }
 
 }  // namespace qfsclient
@@ -778,4 +791,3 @@ int main(int argc, char **argv) {
 	listeners.Append(new GoLikePrinter);
 	return RUN_ALL_TESTS();
 }
-
