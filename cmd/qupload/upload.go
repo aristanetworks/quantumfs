@@ -104,16 +104,14 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 	}
 }
 
-func pathWorker(ctx context.Context, qctx *quantumfs.Ctx,
-	piChan <-chan *pathInfo) error {
-
+func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 	var record quantumfs.DirectoryRecord
 	var err error
 	var msg *pathInfo
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.eCtx.Done():
 			return nil
 		case msg = <-piChan:
 			if msg == nil {
@@ -125,8 +123,8 @@ func pathWorker(ctx context.Context, qctx *quantumfs.Ctx,
 			// WriteFile() will detect the file type based on
 			// stat information and setup appropriate data
 			// and metadata for the file in storage
-			qctx.Vlog(qlog.LogTool, "Writing %s", msg.path)
-			record, err = qwr.WriteFile(qctx, dataStore,
+			c.Vlog("Writing %s", msg.path)
+			record, err = qwr.WriteFile(c.Qctx, dataStore,
 				msg.info, msg.path)
 			if err != nil {
 				return err
@@ -148,7 +146,7 @@ func pathWorker(ctx context.Context, qctx *quantumfs.Ctx,
 				quantumfs.EmptyDirKey)
 		}
 
-		err = handleDirRecord(qctx, record, filepath.Dir(msg.path))
+		err = handleDirRecord(c.Qctx, record, filepath.Dir(msg.path))
 		if err != nil {
 			return err
 		}
@@ -169,7 +167,7 @@ func relativePath(path string, base string) (string, error) {
 	return checkPath, nil
 }
 
-func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
+func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error,
 	exInfo *ExcludeInfo) error {
 
@@ -241,7 +239,7 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 
 	// send pathInfo to workers
 	select {
-	case <-ctx.Done():
+	case <-c.eCtx.Done():
 		return errors.New("Exiting walker since qt least one worker " +
 			"has exited with error")
 	case piChan <- &pathInfo{path: path, info: info}:
@@ -249,25 +247,26 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(qctx *quantumfs.Ctx, ws string, advance string, root string,
+func upload(c *Ctx, ws string, advance string, root string,
 	exInfo *ExcludeInfo, conc uint) error {
 
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
-	group, groupCtx := errgroup.WithContext(context.Background())
+	var group *errgroup.Group
+	group, c.eCtx = errgroup.WithContext(context.Background())
 	piChan := make(chan *pathInfo)
 
 	// workers
 	for i := uint(0); i < conc; i++ {
 		group.Go(func() error {
-			return pathWorker(groupCtx, qctx, piChan)
+			return pathWorker(c, piChan)
 		})
 	}
 	// walker
 	group.Go(func() error {
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
-				return pathWalker(groupCtx, piChan, path,
+				return pathWalker(c, piChan, path,
 					root, info, err, exInfo)
 			})
 		close(piChan)
@@ -279,10 +278,10 @@ func upload(qctx *quantumfs.Ctx, ws string, advance string, root string,
 		return err
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(qctx, topDirRecord.ID(),
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, topDirRecord.ID(),
 		dataStore)
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return qwr.CreateWorkspace(qctx, wsDB, ws, advance, wsrKey)
+	return qwr.CreateWorkspace(c.Qctx, wsDB, ws, advance, wsrKey)
 }
