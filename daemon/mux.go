@@ -682,7 +682,6 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
-
 	if !exists {
 		qfs.c.dlog("inode %d has not been instantiated", inodeId)
 		return true
