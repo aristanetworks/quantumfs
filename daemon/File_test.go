@@ -19,7 +19,7 @@ import "github.com/aristanetworks/quantumfs/utils"
 
 func TestFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
@@ -46,7 +46,7 @@ func TestFileCreation(t *testing.T) {
 
 func TestFileWriteBlockSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/" + "testwsize"
 		file, err := os.Create(testFilename)
@@ -54,7 +54,7 @@ func TestFileWriteBlockSize(t *testing.T) {
 			"Error creating file: %v", err)
 		defer file.Close()
 
-		data := genData(131072)
+		data := GenData(131072)
 
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing to new fd: %v", err)
@@ -70,7 +70,7 @@ func TestFileReadWrite(t *testing.T) {
 		//write the test data in two goes
 		textSplit := len(testText) / 2
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/" + "testrw"
 		file, err := os.Create(testFilename)
@@ -170,7 +170,7 @@ func TestFileReadWrite(t *testing.T) {
 
 func TestFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testDir := workspace + "/testDir"
 		testFilename := testDir + "/test"
@@ -241,7 +241,7 @@ func TestFileDescriptorPermissions(t *testing.T) {
 
 func TestRootFileDescriptorPermissions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
@@ -300,7 +300,7 @@ func TestRootFileDescriptorPermissions(t *testing.T) {
 
 func TestFileSizeChanges(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/" + "test"
 
@@ -366,7 +366,7 @@ func TestFileSizeChanges(t *testing.T) {
 func TestFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Create a file and determine its inode numbers
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
@@ -399,7 +399,7 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		test.Assert(err == nil, "Failure modifying small file")
 		fileDescriptor.dirty(c)
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
@@ -414,8 +414,8 @@ func TestFileAttrUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
-		src := test.newWorkspace()
-		src = test.relPath(src)
+		src := test.NewWorkspace()
+		src = test.RelPath(src)
 
 		dst := "dst/attrupdate/test"
 
@@ -452,8 +452,8 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
-		src := test.newWorkspace()
-		src = test.relPath(src)
+		src := test.NewWorkspace()
+		src = test.RelPath(src)
 
 		dst := "dst/attrwriteupdate/test"
 
@@ -492,11 +492,11 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 
 func TestSmallFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
-		data := genData(10 * 1024)
+		data := GenData(10 * 1024)
 		err := testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Error writing tiny data to new fd")
 
@@ -511,14 +511,14 @@ func TestSmallFileZero(t *testing.T) {
 
 func TestFileAccessAfterUnlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// First create a file with some data
 		file, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
 
-		data := genData(100 * 1024)
+		data := GenData(100 * 1024)
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing data to file: %v", err)
 
@@ -542,7 +542,7 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 		test.Assert(bytes.Equal(data, input), "Didn't read same bytes back!")
 
 		// Extend the file and read again
-		data = genData(100 * 1024)
+		data = GenData(100 * 1024)
 		_, err = file.Seek(100*1024*1024, 0)
 		test.Assert(err == nil, "Error rewinding file: %v", err)
 		_, err = file.Write(data)
@@ -560,14 +560,14 @@ func TestFileAccessAfterUnlink(t *testing.T) {
 
 func TestSmallFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// First create a file with some data
 		file, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
 
-		data := genData(100 * 1024)
+		data := GenData(100 * 1024)
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing data to file: %v", err)
 
@@ -583,14 +583,14 @@ func TestSmallFileReadPastEnd(t *testing.T) {
 
 func TestFileStatBlockCount(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// First create a file with some data
 		file, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
 
-		data := genData(1024)
+		data := GenData(1024)
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing data to file: %v", err)
 		defer file.Close()
@@ -608,7 +608,7 @@ func TestFileStatBlockCount(t *testing.T) {
 
 func TestFileReparentRace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		var stat syscall.Stat_t
 		iterations := 100
@@ -631,13 +631,13 @@ func TestFileReparentRace(t *testing.T) {
 
 func TestFileOwnership(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/testdir"
 		err := utils.MkdirAll(dirName, 0777)
 		test.AssertNoErr(err)
 
-		data := string(genData(2000))
+		data := string(GenData(2000))
 		testFileA := dirName + "/test"
 		err = testutils.PrintToFile(testFileA, data)
 		test.AssertNoErr(err)

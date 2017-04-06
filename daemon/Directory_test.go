@@ -19,7 +19,7 @@ import "github.com/aristanetworks/quantumfs/utils"
 
 func TestDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/" + "test"
 		err := syscall.Mkdir(testFilename, 0124)
@@ -45,7 +45,7 @@ func TestDirectoryCreation(t *testing.T) {
 
 func TestRecursiveDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/test/a/b"
 		err := utils.MkdirAll(dirName, 0124)
 		test.Assert(err == nil, "Error creating directories: %v", err)
@@ -70,7 +70,7 @@ func TestRecursiveDirectoryCreation(t *testing.T) {
 
 func TestRecursiveDirectoryFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
 
@@ -102,7 +102,7 @@ func TestRecursiveDirectoryFileCreation(t *testing.T) {
 func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Create a file and determine its inode numbers
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
@@ -140,7 +140,7 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		test.Assert(err == nil, "Failure modifying small file")
 		fileDescriptor.dirty(c)
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
@@ -158,8 +158,8 @@ func TestDirectoryUpdate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
-		src := test.newWorkspace()
-		src = test.relPath(src)
+		src := test.NewWorkspace()
+		src = test.RelPath(src)
 
 		dst := "branch/dirupdate/test"
 
@@ -183,7 +183,7 @@ func TestDirectoryUpdate(t *testing.T) {
 
 func TestDirectoryFileDeletion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating file: %v", err)
@@ -213,7 +213,7 @@ func testPermissions(test *testHelper, onDirectory bool, asRoot bool,
 		permissions |= syscall.S_ISVTX
 	}
 
-	workspace := test.newWorkspace()
+	workspace := test.NewWorkspace()
 	testDir := workspace
 	if onDirectory {
 		testDir = workspace + "/testDir"
@@ -473,7 +473,7 @@ func TestPermissionsAsUserInWorkspaceRoot(t *testing.T) {
 
 func TestPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		test.SetUidGid(99, -1)
 		defer test.SetUidGidToDefault()
@@ -486,7 +486,7 @@ func TestPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 
 func TestDirectoryUnlinkDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/" + "test"
 		err := syscall.Mkdir(testDir, 0124)
 		test.Assert(err == nil, "Error creating directory: %v", err)
@@ -503,7 +503,7 @@ func TestDirectoryUnlinkDirectory(t *testing.T) {
 
 func TestDirectoryRmdirEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0124)
 		test.Assert(err == nil, "Error creating directory: %v", err)
@@ -515,7 +515,7 @@ func TestDirectoryRmdirEmpty(t *testing.T) {
 
 func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0324)
 		test.Assert(err == nil, "Error creating directory: %v", err)
@@ -535,7 +535,7 @@ func TestDirectoryRmdirNewlyEmpty(t *testing.T) {
 
 func TestDirectoryRmdirNotEmpty(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0124)
 		test.Assert(err == nil, "Error creating directory: %v", err)
@@ -553,7 +553,7 @@ func TestDirectoryRmdirNotEmpty(t *testing.T) {
 
 func TestDirectoryRmdirFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFile := workspace + "/test"
 		fd, err := os.Create(testFile)
 		test.Assert(err == nil, "Error creating file: %v", err)
@@ -570,7 +570,7 @@ func TestDirectoryRmdirFile(t *testing.T) {
 // instantiates matches the type of the entry in the directory.
 func TestDirectoryChildTypes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testDir := workspace + "/testdir"
 		testFile := testDir + "/testfile"
@@ -601,7 +601,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 
 func TestLargeDirectory(t *testing.T) {
 	runExpensiveTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testdir := workspace + "/testlargedir"
 		err := syscall.Mkdir(testdir, 0777)
 		test.Assert(err == nil, "Error creating directory:%v", err)
@@ -659,7 +659,7 @@ func TestLargeDirectory(t *testing.T) {
 
 func TestDirectoryChmod(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/testdir"
 
 		err := syscall.Mkdir(testDir, 0)
@@ -682,7 +682,7 @@ func TestDirectoryChmod(t *testing.T) {
 
 func TestIntraDirectoryRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename1 := workspace + "/test"
 		testFilename2 := workspace + "/test2"
 
@@ -712,7 +712,7 @@ func TestInterDirectoryRename(t *testing.T) {
 }
 
 func interDirectoryRename(test *testHelper) {
-	workspace := test.newWorkspace()
+	workspace := test.NewWorkspace()
 	testDir1 := workspace + "/dir1"
 	testDir2 := workspace + "/dir2"
 	testFilename1 := testDir1 + "/test"
@@ -743,7 +743,7 @@ func interDirectoryRename(test *testHelper) {
 
 func TestRenameIntoParent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/child"
 		childFile := child + "/test"
@@ -775,7 +775,7 @@ func TestRenameIntoParent(t *testing.T) {
 
 func TestRenameIntoChild(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/child"
 		parentFile := parent + "/test"
@@ -807,7 +807,7 @@ func TestRenameIntoChild(t *testing.T) {
 
 func TestRenameIntoIndirectParent(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/indirect/child"
 		childFile := child + "/test"
@@ -839,7 +839,7 @@ func TestRenameIntoIndirectParent(t *testing.T) {
 
 func TestRenameIntoIndirectChild(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		parent := workspace + "/parent"
 		child := workspace + "/parent/indirect/child"
 		parentFile := parent + "/test"
@@ -871,7 +871,7 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		fd, err := os.Create(testFilename)
@@ -899,13 +899,13 @@ func TestSUIDPerms(t *testing.T) {
 
 func TestLoadOnDemand(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/layerA/layerB/layerC"
 		fileA := "/layerA/fileA"
 		fileB := "/layerA/layerB/fileB"
 		fileC := "/layerA/layerB/layerC/fileC"
 
-		data := genData(2400)
+		data := GenData(2400)
 		dataA := data[0:800]
 		dataB := data[800:1600]
 		dataC := data[1600:2400]
@@ -965,7 +965,7 @@ func TestLoadOnDemand(t *testing.T) {
 // dummy user is used when viewing the permissions as root.
 func TestChownUserAsRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
@@ -987,7 +987,7 @@ func TestChownUserAsRoot(t *testing.T) {
 // directory was opened.
 func TestDirectorySnapshotRefresh(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		parent := test.newWorkspace()
+		parent := test.NewWorkspace()
 
 		for i := 0; i < 2; i++ {
 			dir, err := os.Open(parent)
@@ -1038,7 +1038,7 @@ func TestDirectorySnapshotRefresh(t *testing.T) {
 // Trigger GetAttr on a directory in order to confirm that it works correctly
 func TestDirectoryGetAttr(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/dir"
 
 		err := syscall.Mkdir(dirName, 0124)
@@ -1107,7 +1107,7 @@ func testInodeCreatePermissions(test *testHelper, testDir string, mustSucceed bo
 
 func TestInodeCreatePermissionsAsRootNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1119,7 +1119,7 @@ func TestInodeCreatePermissionsAsRootNoPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsRootUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1131,7 +1131,7 @@ func TestInodeCreatePermissionsAsRootUserPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsRootGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1143,7 +1143,7 @@ func TestInodeCreatePermissionsAsRootGroupPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsRootOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1155,7 +1155,7 @@ func TestInodeCreatePermissionsAsRootOtherPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1169,7 +1169,7 @@ func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1183,7 +1183,7 @@ func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1197,7 +1197,7 @@ func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1211,7 +1211,7 @@ func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1225,7 +1225,7 @@ func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1240,7 +1240,7 @@ func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1254,7 +1254,7 @@ func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1268,7 +1268,7 @@ func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
 		test.SetUidGid(99, -1)
@@ -1284,7 +1284,7 @@ func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
 		test.SetUidGid(99, -1)
@@ -1300,7 +1300,7 @@ func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
 		test.SetUidGid(99, -1)
@@ -1316,7 +1316,7 @@ func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
 
 func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
 		test.SetUidGid(99, -1)
@@ -1332,7 +1332,7 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 
 func TestStickyDirPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 		testFile := testDir + "/testFile"
 
@@ -1340,7 +1340,7 @@ func TestStickyDirPerms(t *testing.T) {
 		err := syscall.Mkdir(testDir, 01777)
 		test.AssertNoErr(err)
 
-		err = testutils.PrintToFile(testFile, string(genData(2000)))
+		err = testutils.PrintToFile(testFile, string(GenData(2000)))
 		test.AssertNoErr(err)
 
 		err = os.Chown(testFile, 99, 99)

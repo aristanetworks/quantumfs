@@ -39,7 +39,7 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 
 func TestMaxStringFail_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		longStr := string(genData(math.MaxUint16))
+		longStr := string(GenData(math.MaxUint16))
 
 		test.qfs.c.wlog("%s %d", longStr, 255)
 
@@ -52,7 +52,7 @@ func TestMaxStringFail_test(t *testing.T) {
 
 func TestMaxStringLast_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		longStr := string(genData(math.MaxUint16))
+		longStr := string(GenData(math.MaxUint16))
 
 		test.qfs.c.wlog("%s", longStr)
 
@@ -83,13 +83,13 @@ func TestQParse(t *testing.T) {
 		test.qfs.c.wlog(testLogBoundary)
 
 		// Do some stuff that should generate some logs
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
 		test.Assert(err == nil, "Error creating file: %v", err)
 		syscall.Close(fd)
 
-		data := genData(1024)
+		data := GenData(1024)
 		err = testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Couldn't write 1KB data to file")
 
@@ -169,13 +169,13 @@ func TestQParsePartials_test(t *testing.T) {
 		test.qfs.c.Qlog.LogLevels--
 
 		// Do some stuff that should generate some logs
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := syscall.Creat(testFilename, 0124)
 		test.Assert(err == nil, "Error creating file: %v", err)
 		syscall.Close(fd)
 
-		data := genData(1024)
+		data := GenData(1024)
 		err = testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Couldn't write 1KB data to file")
 

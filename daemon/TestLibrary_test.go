@@ -11,9 +11,7 @@ import "io/ioutil"
 import "os"
 import "reflect"
 import "runtime"
-import "strconv"
 import "strings"
-import "sync"
 import "sync/atomic"
 import "syscall"
 import "testing"
@@ -26,8 +24,8 @@ import "github.com/aristanetworks/quantumfs/testutils"
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	// Precompute a bunch of our genData to save time during tests
-	genData(40 * 1024 * 1024)
+	// Precompute a bunch of our GenData to save time during tests
+	GenData(40 * 1024 * 1024)
 
 	PreTestRuns()
 	result := m.Run()
@@ -65,7 +63,7 @@ func TestTimeout(t *testing.T) {
 func TestGenData(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		hardcoded := "012345678910111213141516171819202122232425262"
-		data := genData(len(hardcoded))
+		data := GenData(len(hardcoded))
 
 		test.Assert(bytes.Equal([]byte(hardcoded), data),
 			"Data gen function off: %s vs %s", hardcoded, data)
@@ -107,8 +105,8 @@ func runTestNoQfs(t *testing.T, test quantumFsTest) {
 	runTestCommon(t, test, false, nil)
 }
 
-// configModifier is a function which is given the default configuration and should
-// make whichever modifications the test requires in place.
+// configModifier is a function which is given the default configuration
+// and should make whichever modifications the test requires in place.
 type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
 
 // If you need to initialize QuantumFS with a special configuration, but not poke
@@ -216,29 +214,6 @@ func (th *testHelper) testHelperUpcast(
 	}
 }
 
-var genDataMutex sync.RWMutex
-var precompGenData []byte
-var genDataLast int
-
-func genData(maxLen int) []byte {
-	if maxLen > len(precompGenData) {
-		// we need to expand the array
-		genDataMutex.Lock()
-
-		for len(precompGenData) <= maxLen {
-			precompGenData = append(precompGenData,
-				strconv.Itoa(genDataLast)...)
-			genDataLast++
-		}
-
-		genDataMutex.Unlock()
-	}
-	genDataMutex.RLock()
-	defer genDataMutex.RUnlock()
-
-	return precompGenData[:maxLen]
-}
-
 // testHelper holds the variables important to maintain the state of testing
 // in a package. This helper is more of a namespacing mechanism than a
 // coherent object.
@@ -281,7 +256,6 @@ func (th *testHelper) getInode(path string) Inode {
 	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
-// Retrieve the rootId of the given workspace
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	workspace string) quantumfs.ObjectKey {
 
@@ -344,7 +318,7 @@ func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
 func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 	string, string) {
 
-	relpath := th.relPath(abspath)
+	relpath := th.RelPath(abspath)
 	components := strings.Split(relpath, "/")
 
 	return components[0], components[1], components[2]
@@ -354,7 +328,6 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 func (th *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
 	parts := strings.Split(th.relPath(workspace), "/")
 	wsr, ok := th.qfs.getWorkspaceRoot(&th.qfs.c, parts[0], parts[1], parts[2])
-
 	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
 
 	return wsr
