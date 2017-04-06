@@ -145,8 +145,10 @@ void fperror(std::string function_name, std::string detail) {
 
 // Build an error string from an existing error string but with a related JSON
 // string added for debugging context
-std::string buildJsonErrorDetails(const std::string &error, const char *json) {
-	return error + " (JSON: " + std::string(json) +")";
+std::string buildJsonErrorDetails(const std::string &error,
+				  const char *json,
+				  size_t json_length) {
+	return error + " (JSON: " + std::string(json, json_length) +")";
 }
 
 // replace all single quotes in the given string with double quotes. This is
