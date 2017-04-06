@@ -8,7 +8,7 @@ import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
 
-func vlFileWriter(path string,
+func vlFileWriter(qctx *quantumfs.Ctx, path string,
 	finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
@@ -34,7 +34,7 @@ func vlFileWriter(path string,
 			readSize = remainingSize
 		}
 
-		mbfKey, err := mbFileBlocksWriter(file, readSize, ds)
+		mbfKey, err := mbFileBlocksWriter(qctx, file, readSize, ds)
 		if err != nil {
 			return quantumfs.ZeroKey, err
 		}
@@ -50,7 +50,8 @@ func vlFileWriter(path string,
 		vlf.SetLargeFileKey(i, mbfKeys[i])
 	}
 
-	vlfKey, vlfErr := writeBlock(vlf.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	vlfKey, vlfErr := writeBlock(qctx, vlf.Bytes(),
+		quantumfs.KeyTypeMetadata, ds)
 	if vlfErr != nil {
 		return quantumfs.ZeroKey, vlfErr
 	}
