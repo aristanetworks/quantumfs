@@ -898,16 +898,20 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-// In order to run getWorkspaceRoot, we must set a proper value for the variable
-// increaseLookupCount. If the function is called internally, it  doesn't need to
-// increase the lookupCount. Only if it is triggered by kernel, should lookupCount be
-// increased by one. Therefore, lookupCount's in QuantumFS and kernel can match.
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
 
+	// In order to run getWorkspaceRoot, we must set a proper value for the
+	// variable nLookup. If the function is called internally, it needs to reduce
+	// the increased lookupCount, so set nLookup to 1. Only if it is triggered by
+	// kernel, should lookupCount be increased by one, and nLookup should be 0.
+	// Therefore, lookupCount's in QuantumFS and kernel can match.
+	//
+	// For now, all getWorkspaceRoot() are called from internal functions, so
+	// nLookup is always 1.
 	var nLookup uint64 = 1
 
 	// Get the WorkspaceList Inode number
