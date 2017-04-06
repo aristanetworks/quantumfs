@@ -215,13 +215,13 @@ func TestMultipleLookupCount(t *testing.T) {
 
 func TestLookupCountAfterCommand(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		fileName := workspace + "/test"
 		file, err := os.Create(fileName)
 		test.Assert(err == nil, "Error creating a small file: %v", err)
 		file.Close()
 
-		relpath := test.relPath(workspace)
+		relpath := test.RelPath(workspace)
 
 		// Get inodeId of workspace and namespace
 		wsrId := test.getInodeNum(workspace)
@@ -237,7 +237,7 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		test.remountFilesystem()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
@@ -252,7 +252,7 @@ func TestLookupCountAfterCommand(t *testing.T) {
 
 func TestLookupCountAfterInsertInode(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
-		srcWorkspace := test.newWorkspace()
+		srcWorkspace := test.NewWorkspace()
 		dir1 := srcWorkspace + "/dir1"
 
 		err := os.MkdirAll(srcWorkspace+"/dir1", 0777)
@@ -276,7 +276,7 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.remountFilesystem()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
