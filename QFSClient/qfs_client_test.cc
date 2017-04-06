@@ -701,7 +701,7 @@ TEST_F(QfsClientCommandBufferTest, AppendAndCopyLotsTest) {
 		buffer.Append(data, 1);
 	}
 
-	 ASSERT_EQ(buffer.Size(), size);
+	ASSERT_EQ(buffer.Size(), size);
 
 	const std::vector<byte> &data = buffer.data;
 	ApiImpl::CommandBuffer other_buffer;

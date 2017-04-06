@@ -116,7 +116,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 
 	// Verify that O_DIRECT is actually set
 	if !utils.BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
-		c.elog("FAIL setting O_DIRECT in File descriptor")
+		c.dlog("FAIL setting O_DIRECT in File descriptor")
 		return fuse.EINVAL
 	}
 
