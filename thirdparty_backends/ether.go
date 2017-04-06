@@ -219,7 +219,9 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 		return err
 	}
 
-	buf.Set(data, key.Type())
+	newData := make([]byte, len(data))
+	copy(newData, data)
+	buf.Set(newData, key.Type())
 	return nil
 }
 
@@ -458,8 +460,11 @@ func (w *EtherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 	defer c.Vlog(qlog.LogWorkspaceDb,
 		"Out-- EtherWsdbTranslator::DeleteWorkspace")
 
-	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
-		"Ether does not support deleting workspaces")
+	err := w.wsdb.DeleteWorkspace(typespace, namespace, workspace)
+	if err != nil {
+		return convertWsdbError(err)
+	}
+	return nil
 }
 
 func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,

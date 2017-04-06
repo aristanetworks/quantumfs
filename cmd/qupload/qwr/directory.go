@@ -12,7 +12,7 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 
-func WriteDirectory(path string, info os.FileInfo,
+func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,
 	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
 
@@ -23,7 +23,7 @@ func WriteDirectory(path string, info os.FileInfo,
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			dirEntry.SetNumEntries(entryIdx)
-			key, err := writeBlock(dirEntry.Bytes(),
+			key, err := writeBlock(qctx, dirEntry.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
 				return nil,
@@ -42,7 +42,8 @@ func WriteDirectory(path string, info os.FileInfo,
 	}
 
 	dirEntry.SetNumEntries(entryIdx)
-	key, err := writeBlock(dirEntry.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	key, err := writeBlock(qctx, dirEntry.Bytes(),
+		quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
 		return nil, fmt.Errorf("WriteDirectory %q failed: %v",
 			path, err)
@@ -60,7 +61,7 @@ func WriteDirectory(path string, info os.FileInfo,
 		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
 		key)
 
-	xattrsKey, xerr := WriteXAttrs(path, ds)
+	xattrsKey, xerr := WriteXAttrs(qctx, path, ds)
 	if xerr != nil {
 		return nil, xerr
 	}
