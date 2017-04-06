@@ -1330,7 +1330,7 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 
 func TestDirectoryNlinkValues(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dirs := [...]string{
 			"/a1/b1/c1",
@@ -1344,7 +1344,7 @@ func TestDirectoryNlinkValues(t *testing.T) {
 			test.AssertNoErr(err)
 		}
 
-		w := test.relPath(workspace)
+		w := test.RelPath(workspace)
 
 		checkNlink(test, w+"/a1", 4, 4)
 		checkNlink(test, w+"/a1/.", 4, 4)
