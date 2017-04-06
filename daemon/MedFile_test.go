@@ -17,12 +17,12 @@ import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestMedBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
 		// generate data larger than small file
-		data := genData(int(quantumfs.MaxSmallFileSize()) +
+		data := GenData(int(quantumfs.MaxSmallFileSize()) +
 			quantumfs.MaxBlockSize)
 		// Write the data to the file continually past what
 		// a single block could hold.
@@ -43,10 +43,10 @@ func TestMedBranch(t *testing.T) {
 
 func TestFileExpansion(t *testing.T) {
 	// generate more data than small file size
-	data := genData(int(quantumfs.MaxSmallFileSize()) +
+	data := GenData(int(quantumfs.MaxSmallFileSize()) +
 		quantumfs.MaxBlockSize)
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
@@ -102,7 +102,7 @@ func TestMedFileAttr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
@@ -149,7 +149,7 @@ func TestMedFileAttr(t *testing.T) {
 
 		// Branch the workspace
 		dst := "dst/medattrsparse/test"
-		err = api.Branch(test.relPath(workspace), dst)
+		err = api.Branch(test.RelPath(workspace), dst)
 		test.Assert(err == nil, "Unable to branch")
 
 		// stride offset chosen to allow 20 checks
@@ -160,11 +160,11 @@ func TestMedFileAttr(t *testing.T) {
 
 func TestMedFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
-		data := genData(10 * 1024)
+		data := GenData(10 * 1024)
 		err := testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Error writing tiny data to new fd")
 		// expand this to be medium file type
@@ -182,7 +182,7 @@ func TestMedFileZero(t *testing.T) {
 
 func TestMultiBlockFileReadPastEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// First create a file with some data
@@ -195,7 +195,7 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 		if testDataSize > maxTestDataSize {
 			testDataSize = maxTestDataSize
 		}
-		data := genData(testDataSize)
+		data := GenData(testDataSize)
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing data to file: %v", err)
 

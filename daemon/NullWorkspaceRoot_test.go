@@ -82,7 +82,7 @@ func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
 
 func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFileName := workspace + "/testfile"
 		fd, err := os.Create(testFileName)
 		fd.Close()
@@ -98,7 +98,7 @@ func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 
 func TestNullWorkspaceRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFileName := workspace + "/testfile"
 		fd, err := os.Create(testFileName)
 		fd.Close()

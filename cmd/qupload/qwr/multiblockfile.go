@@ -8,11 +8,11 @@ import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
 
-func mbFileBlocksWriter(file *os.File,
+func mbFileBlocksWriter(qctx *quantumfs.Ctx, file *os.File,
 	readSize uint64,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
-	keys, lastBlockSize, err := writeFileBlocks(file, readSize, ds)
+	keys, lastBlockSize, err := writeFileBlocks(qctx, file, readSize, ds)
 	if err != nil {
 		return quantumfs.ZeroKey, err
 	}
@@ -23,7 +23,8 @@ func mbFileBlocksWriter(file *os.File,
 	mbf.SetListOfBlocks(keys)
 	mbf.SetSizeOfLastBlock(lastBlockSize)
 
-	mbfKey, mbfErr := writeBlock(mbf.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	mbfKey, mbfErr := writeBlock(qctx, mbf.Bytes(),
+		quantumfs.KeyTypeMetadata, ds)
 	if mbfErr != nil {
 		return quantumfs.ZeroKey, err
 	}
@@ -33,7 +34,7 @@ func mbFileBlocksWriter(file *os.File,
 }
 
 // writes multi-block files of type Medium and Large
-func mbFileWriter(path string,
+func mbFileWriter(qctx *quantumfs.Ctx, path string,
 	finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
@@ -43,5 +44,5 @@ func mbFileWriter(path string,
 	}
 	defer file.Close()
 
-	return mbFileBlocksWriter(file, uint64(finfo.Size()), ds)
+	return mbFileBlocksWriter(qctx, file, uint64(finfo.Size()), ds)
 }

@@ -9,7 +9,7 @@ import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
 
-func specialFileWriter(path string, finfo os.FileInfo,
+func specialFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	var hash [quantumfs.ObjectKeyLength - 1]byte

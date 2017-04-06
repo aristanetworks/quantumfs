@@ -46,7 +46,7 @@ func TestWorkspaceRootApiAccess(t *testing.T) {
 func testPreparation(test *testHelper, subdirectory string) (string, string,
 	[]byte, []byte) {
 
-	baseWorkspace := test.newWorkspace()
+	baseWorkspace := test.NewWorkspace()
 
 	baseDirName := baseWorkspace + subdirectory + "/dir"
 	err := utils.MkdirAll(baseDirName, 0666)
@@ -225,8 +225,8 @@ func TestWorkspaceReadNoWritePermissionAtSubdirectory(t *testing.T) {
 
 func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		workspaceName := test.relPath(workspace)
+		workspace := test.NewWorkspace()
+		workspaceName := test.RelPath(workspace)
 
 		api := test.getApi()
 		err := api.DeleteWorkspace(workspaceName)
@@ -246,8 +246,8 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 
 func TestSetWorkspaceImmutable(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		workspaceName := test.relPath(workspace)
+		workspace := test.NewWorkspace()
+		workspaceName := test.RelPath(workspace)
 
 		api := test.getApi()
 		err := api.SetWorkspaceImmutable(workspaceName)
@@ -269,8 +269,8 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 
 func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		workspaceName := test.relPath(workspace)
+		workspace := test.NewWorkspace()
+		workspaceName := test.RelPath(workspace)
 
 		api := test.getApi()
 		err := api.SetWorkspaceImmutable(workspaceName)
@@ -302,12 +302,12 @@ func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
 
 func TestSetRemoteWorkspaceImmutable(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		workspaceName := test.relPath(workspace)
+		workspace := test.NewWorkspace()
+		workspaceName := test.RelPath(workspace)
 
 		// Remotely set the workspace immutable
 		dst := strings.Split(workspaceName, "/")
-		c := test.testCtx()
+		c := test.TestCtx()
 		err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx,
 			dst[0], dst[1], dst[2])
 		test.Assert(err == nil, "Workspace %s can't be set immutable",
@@ -326,7 +326,7 @@ func TestSetRemoteWorkspaceImmutable(t *testing.T) {
 // We need isWorkspaceRoot() to be more robust than it has been
 func TestWorkspaceRootChecker(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		wsr := test.getWorkspaceRoot(workspace)
 		var inode Inode
 		inode = wsr
