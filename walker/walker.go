@@ -286,7 +286,8 @@ func worker(c context.Context, keyChan <-chan *workerData, wf walkFunc) error {
 			}
 
 		}
-		if err := wf(c, keyItem.path, keyItem.key, keyItem.size); err != nil {
+		if err := wf(c, keyItem.path, keyItem.key,
+			keyItem.size); err != nil {
 			return err
 		}
 	}
