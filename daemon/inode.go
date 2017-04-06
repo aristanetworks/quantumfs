@@ -210,6 +210,7 @@ func (inode *InodeCommon) parentId_() InodeId {
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
 // returned Inode is used
 func (inode *InodeCommon) parent_(c *ctx) Inode {
+	defer c.funcIn("InodeCommon::parent_").out()
 	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
 		c.elog("Parent was unloaded before child! %d", inode.parentId)
@@ -220,6 +221,8 @@ func (inode *InodeCommon) parent_(c *ctx) Inode {
 }
 
 func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string, created bool) {
+	defer c.FuncIn("InodeCommon::parentMarkAccessed", "path %s created %t", path,
+		created).out()
 	defer inode.parentLock.RLock().RUnlock()
 
 	inode.parent_(c).markAccessed(c, path, created)
@@ -250,6 +253,8 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
+	defer c.funcIn("InodeCommon::parentSetChildAttr").out()
+
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
 		updateMtime)
@@ -258,12 +263,16 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
+	defer c.funcIn("InodeCommon::parentGetChildXAttrSize").out()
+
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).getChildXAttrSize(c, inodeNum, attr)
 }
 
 func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
+
+	defer c.funcIn("InodeCommon::parentGetChildXAttrData").out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).getChildXAttrData(c, inodeNum, attr)
@@ -272,12 +281,16 @@ func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentListChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
+	defer c.funcIn("InodeCommon::parentListChildXAttr").out()
+
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).listChildXAttr(c, inodeNum)
 }
 
 func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
+
+	defer c.funcIn("InodeCommon::parentSetChildXAttr").out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
@@ -286,12 +299,16 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
+	defer c.funcIn("InodeCommon::parentRemoveChildXAttr").out()
+
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
 }
 
 func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).getChildRecordCopy(c, inodeNum)
@@ -399,6 +416,7 @@ func (inode *InodeCommon) inodeNum() InodeId {
 
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
+	defer c.funcIn("InodeCommon::dirty").out()
 	if inode.isOrphaned() {
 		c.vlog("Not dirtying inode %d because it is orphaned", inode.id)
 		return
@@ -430,6 +448,7 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (inode *InodeCommon) queueToForget(c *ctx) {
+	defer c.funcIn("InodeCommon::queueToForget").out()
 	de := c.qfs.queueInodeToForget(c, inode.self)
 
 	defer inode.dirtyElementLock.Lock().Unlock()
@@ -486,15 +505,14 @@ func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
+	defer c.FuncIn("InodeCommon::markAccessed", "path %s created %t", path,
+		created).out()
 	if inode.isWorkspaceRoot() {
 		panic("Workspaceroot didn't call .self")
 	}
 
 	if inode.isOrphaned() {
-		// If we api.InsertInode() over a pre-existing directory which has
-		// open file or directory handles within it, then we can end up here.
-		c.dlog("Orphaned inode (%s) was marked as accessed", path)
-		return
+		panic("Orphaned file")
 	}
 
 	if path == "" {
@@ -506,6 +524,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 }
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
+	defer c.FuncIn("InodeCommon::markSelfAccessed", "created %t", created).out()
 	ac := inode.accessed()
 	if !created && ac {
 		return
@@ -514,7 +533,8 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
 }
 
 func (inode *InodeCommon) isWorkspaceRoot() bool {
-	return false
+	_, isWsr := inode.self.(*WorkspaceRoot)
+	return isWsr
 }
 
 // Deleting a child may require that we orphan it, and because we *must* lock from

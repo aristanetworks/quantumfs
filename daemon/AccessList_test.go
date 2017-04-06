@@ -10,10 +10,12 @@ import "syscall"
 import "reflect"
 import "testing"
 
+import "github.com/aristanetworks/quantumfs/utils"
+
 func TestAccessListFileCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
@@ -28,7 +30,7 @@ func TestAccessListFileCreate(t *testing.T) {
 
 func TestAccessListFileOpen(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
@@ -61,7 +63,7 @@ func TestAccessListFileOpen(t *testing.T) {
 
 func TestAccessListFileDelete(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
@@ -94,7 +96,7 @@ func TestAccessListFileDelete(t *testing.T) {
 func TestAccessListDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname := "/test"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
@@ -108,7 +110,7 @@ func TestAccessListDirectoryCreate(t *testing.T) {
 
 func TestAccessListDirectoryDelete(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname := "/test"
 		path := workspace + dirname
 		err := syscall.Mkdir(path, 0666)
@@ -139,11 +141,11 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dir1 := "/dir1"
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
-		err := os.MkdirAll(path, 0666)
+		err := utils.MkdirAll(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
 		accessList[dir1] = true
 		accessList[dir1+dir2] = true
@@ -155,11 +157,11 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 
 func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dir1 := "/dir1"
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
-		err := os.MkdirAll(path, 0666)
+		err := utils.MkdirAll(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
 
 		accessList := make(map[string]bool)
@@ -188,7 +190,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 
 func TestAccessListMvChild(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname1 := "/test1"
 		dirname2 := "/test2"
 		filename1 := "/test1.c"
@@ -243,7 +245,7 @@ func TestAccessListMvChild(t *testing.T) {
 
 func TestAccessListRename(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
@@ -286,7 +288,7 @@ func TestAccessListRename(t *testing.T) {
 
 func TestAccessListHardLink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
@@ -329,7 +331,7 @@ func TestAccessListHardLink(t *testing.T) {
 
 func TestAccessListSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
@@ -371,7 +373,7 @@ func TestAccessListSymlink(t *testing.T) {
 func TestAccessSpecialFiles(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		path := workspace + "/test1"
 		err := syscall.Mknod(path, syscall.S_IFBLK|syscall.S_IRWXU,
@@ -412,7 +414,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 
 func TestAccessListReadSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirname := "/test"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
@@ -455,7 +457,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 
 func TestAccessListOverwriteRemoval(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
@@ -491,7 +493,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 func TestAccessListClear(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := make(map[string]bool)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)

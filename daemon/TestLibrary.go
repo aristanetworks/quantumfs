@@ -12,6 +12,7 @@ import "os"
 import "runtime"
 import "runtime/debug"
 import "strings"
+import "strconv"
 import "sync"
 import "time"
 
@@ -49,10 +50,10 @@ func (th *TestHelper) CreateTestDirs() {
 	th.TempDir = TestRunDir + "/" + th.TestName
 
 	mountPath := th.TempDir + "/mnt"
-	os.MkdirAll(mountPath, 0777)
+	utils.MkdirAll(mountPath, 0777)
 	th.Log("Using mountpath %s", mountPath)
 
-	os.MkdirAll(th.TempDir+"/ether", 0777)
+	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 func abortFuse(th *TestHelper) {
@@ -201,7 +202,7 @@ func serveSafely(th *TestHelper) {
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
-	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
+	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
 	}
 
@@ -213,7 +214,7 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 
 	go serveSafely(th)
 
-	th.fuseConnection = findFuseConnection(th.testCtx(), config.MountPath)
+	th.fuseConnection = findFuseConnection(th.TestCtx(), config.MountPath)
 	th.Assert(th.fuseConnection != -1, "Failed to find mount")
 	th.Log("QuantumFs instance started")
 }
@@ -222,17 +223,33 @@ func (th *TestHelper) waitForQuantumFsToFinish() {
 	th.qfsWait.Wait()
 }
 
+func (th *TestHelper) RestartQuantumFs() error {
+
+	config := th.qfs.config
+	th.api.Close()
+	err := th.qfs.server.Unmount()
+	if err != nil {
+		return err
+	}
+	th.waitForQuantumFsToFinish()
+	th.startQuantumFs(config)
+	return nil
+}
+
 func (th *TestHelper) getApi() *quantumfs.Api {
 	if th.api != nil {
 		return th.api
 	}
 
-	th.api = quantumfs.NewApiWithPath(th.absPath(quantumfs.ApiPath))
+	api, err := quantumfs.NewApiWithPath(th.absPath(quantumfs.ApiPath))
+	th.Assert(err == nil, "Error getting api: %v", err)
+	th.api = api
 	return th.api
 }
 
 func (th *TestHelper) getUniqueApi(fdPath string) *quantumfs.Api {
-	api := quantumfs.NewApiWithPath(fdPath)
+	api, err := quantumfs.NewApiWithPath(fdPath)
+	th.Assert(err == nil, "Error getting unique api: %v", err)
 	return api
 }
 
@@ -242,7 +259,7 @@ func (th *TestHelper) absPath(path string) string {
 }
 
 // Make the given path relative to the mount root
-func (th *TestHelper) relPath(path string) string {
+func (th *TestHelper) RelPath(path string) string {
 	return strings.TrimPrefix(path, th.TempDir+"/mnt/")
 }
 
@@ -289,11 +306,11 @@ func (th *TestHelper) newWorkspaceWithoutWritePerm() string {
 // Create a new workspace to test within
 //
 // Returns the absolute path of the workspace
-func (th *TestHelper) newWorkspace() string {
+func (th *TestHelper) NewWorkspace() string {
 	path := th.newWorkspaceWithoutWritePerm()
 
 	api := th.getApi()
-	err := api.EnableRootWrite(th.relPath(path))
+	err := api.EnableRootWrite(th.RelPath(path))
 	th.Assert(err == nil, "Failed to enable write permission in workspace: %v",
 		err)
 
@@ -301,7 +318,7 @@ func (th *TestHelper) newWorkspace() string {
 }
 
 func (th *TestHelper) branchWorkspaceWithoutWritePerm(original string) string {
-	src := th.relPath(original)
+	src := th.RelPath(original)
 	dst := randomNamespaceName(8) + "/" + randomNamespaceName(10) +
 		"/" + randomNamespaceName(8)
 
@@ -328,11 +345,46 @@ func (th *TestHelper) branchWorkspace(original string) string {
 }
 
 // Sync all the active workspaces
-func (th *TestHelper) syncAllWorkspaces() {
+func (th *TestHelper) SyncAllWorkspaces() {
 	api := th.getApi()
 	err := api.SyncAll()
 
 	th.Assert(err == nil, "Error when syncing all workspaces: %v", err)
+}
+
+func (th *TestHelper) GetWorkspaceDB() quantumfs.WorkspaceDB {
+	return th.qfs.config.WorkspaceDB
+}
+
+func (th *TestHelper) SetDataStore(ds quantumfs.DataStore) {
+	th.qfs.c.dataStore.durableStore = ds
+}
+
+func (th *TestHelper) GetDataStore() quantumfs.DataStore {
+	return th.qfs.c.dataStore.durableStore
+}
+
+var genDataMutex sync.RWMutex
+var precompGenData []byte
+var genDataLast int
+
+func GenData(maxLen int) []byte {
+	if maxLen > len(precompGenData) {
+		// we need to expand the array
+		genDataMutex.Lock()
+
+		for len(precompGenData) <= maxLen {
+			precompGenData = append(precompGenData,
+				strconv.Itoa(genDataLast)...)
+			genDataLast++
+		}
+
+		genDataMutex.Unlock()
+	}
+	genDataMutex.RLock()
+	defer genDataMutex.RUnlock()
+
+	return precompGenData[:maxLen]
 }
 
 // Global test request ID incremented for all the running tests
@@ -347,7 +399,7 @@ func init() {
 
 // Produce a test infrastructure ctx variable for use with QuantumFS utility
 // functions.
-func (th *TestHelper) testCtx() *ctx {
+func (th *TestHelper) TestCtx() *ctx {
 	return th.qfs.c.dummyReq(qlog.TestReqId)
 }
 

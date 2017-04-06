@@ -232,6 +232,25 @@ func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
 	return false
 }
 
+func DecodeSpecialKey(key ObjectKey) (fileType uint32, device uint32, err error) {
+	if key.Type() != KeyTypeEmbedded {
+		return 0, 0, fmt.Errorf("Non-embedded key when decoding " +
+			"special file")
+	}
+	hash := key.Hash()
+	fileType = binary.LittleEndian.Uint32(hash[0:4])
+	device = binary.LittleEndian.Uint32(hash[4:8])
+
+	return fileType, device, nil
+}
+
+func EncodeSpecialKey(fileType uint32, device uint32) ObjectKey {
+	var hash [ObjectKeyLength - 1]byte
+	binary.LittleEndian.PutUint32(hash[0:4], fileType)
+	binary.LittleEndian.PutUint32(hash[4:8], device)
+	return NewObjectKey(KeyTypeEmbedded, hash)
+}
+
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
@@ -306,6 +325,37 @@ const (
 	ObjectTypeVeryLargeFile     = 11
 	ObjectTypeSpecial           = 12
 )
+
+func ObjectType2String(typ ObjectType) string {
+	switch typ {
+	case ObjectTypeBuildProduct:
+		return "ObjectTypeBuildProduct"
+	case ObjectTypeDirectoryEntry:
+		return "ObjectTypeDirectoryEntry"
+	case ObjectTypeExtendedAttribute:
+		return "ObjectTypeExtendedAttribute"
+	case ObjectTypeHardlink:
+		return "ObjectTypeHardlink"
+	case ObjectTypeSymlink:
+		return "ObjectTypeSymlink"
+	case ObjectTypeVCSFile:
+		return "ObjectTypeVCSFile"
+	case ObjectTypeWorkspaceRoot:
+		return "ObjectTypeWorkspaceRoot"
+	case ObjectTypeSmallFile:
+		return "ObjectTypeSmallFile"
+	case ObjectTypeMediumFile:
+		return "ObjectTypeMediumFile"
+	case ObjectTypeLargeFile:
+		return "ObjectTypeLargeFile"
+	case ObjectTypeVeryLargeFile:
+		return "ObjectTypeVeryLargeFile"
+	case ObjectTypeSpecial:
+		return "ObjectTypeSpecial"
+	default:
+		return fmt.Sprintf("Unknown ObjectType %d\n", typ)
+	}
+}
 
 // One of the ObjectType* values
 type ObjectType uint8
@@ -668,6 +718,10 @@ const (
 	PermSGID       = 1 << 10
 	PermSUID       = 1 << 11
 )
+
+const PermReadAll = PermReadOther | PermReadGroup | PermReadOwner
+const PermWriteAll = PermWriteOther | PermWriteGroup | PermWriteOwner
+const PermExecAll = PermExecOther | PermExecGroup | PermExecOwner
 
 type DirectoryRecord interface {
 	Filename() string
