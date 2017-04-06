@@ -16,6 +16,7 @@ import "strings"
 import "syscall"
 import "time"
 
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/kardianos/osext"
 
 const (
@@ -118,7 +119,7 @@ func makedest(src, dst string) bool {
 	}
 
 	if srcInfo.IsDir() {
-		if err := os.Mkdir(dst, srcInfo.Mode()); err != nil {
+		if err := syscall.Mkdir(dst, uint32(srcInfo.Mode())); err != nil {
 			fmt.Println("Fail to create a directory: ", err)
 			return false
 		} else {
@@ -264,7 +265,7 @@ func chrootInNsd(rootdir string, svrName string) error {
 	copyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
 
 	dstVar := rootdir + "/var/run/netns"
-	if err := os.MkdirAll(dstVar, 0666); err != nil {
+	if err := utils.MkdirAll(dstVar, 0666); err != nil {
 		return fmt.Errorf("Creating directory %s error: %s",
 			dstVar, err.Error())
 	}
@@ -412,10 +413,17 @@ func copyDirStayOnFs(src string, dst string) error {
 			}
 
 			nameDst := filepath.Join(dst, name[len(src):])
-			errMkdir := os.MkdirAll(nameDst, finfo.Mode())
+			errMkdir := utils.MkdirAll(nameDst, finfo.Mode())
 			if errMkdir != nil {
 				return fmt.Errorf("Create directory %s error: %s",
 					nameDst, errMkdir.Error())
+			}
+			if name == "/dev/shm" {
+				// /dev/shm is generally a tmpfs filesystem full of
+				// things which make no sense to copy into the
+				// chroot. We want to create the directory, but not
+				// copy any of its contents.
+				return filepath.SkipDir
 			}
 		} else if finfo.Mode().IsRegular() {
 			// There should not be any ordinary files in /dev directory,
@@ -521,7 +529,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		dst = rootdir + "/var/run/netns"
-		if err := os.MkdirAll(dst, 0666); err != nil {
+		if err := utils.MkdirAll(dst, 0666); err != nil {
 			return fmt.Errorf("Creating directory %s error: %s",
 				dst, err.Error())
 		}
@@ -531,7 +539,7 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		}
 
 		dst = rootdir + "/tmp"
-		if err := os.MkdirAll(dst, os.ModeSticky|0777); err != nil {
+		if err := utils.MkdirAll(dst, os.ModeSticky|0777); err != nil {
 
 			return fmt.Errorf("Mounting /tmp as tmpfs error: %s",
 				err.Error())

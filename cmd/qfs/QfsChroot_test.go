@@ -14,6 +14,8 @@ import "syscall"
 import "testing"
 import "time"
 
+import "github.com/aristanetworks/quantumfs/utils"
+
 var commandsInUsrBin = []string{
 	umount,
 	setarch,
@@ -72,7 +74,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrBin := dirTest + "/usr/bin"
-	if err := os.MkdirAll(dirUsrBin, 0777); err != nil {
+	if err := utils.MkdirAll(dirUsrBin, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrBin,
 			err.Error())
 	}
@@ -84,13 +86,13 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrSbin := dirTest + "/usr/sbin"
-	if err := os.MkdirAll(dirUsrSbin, 0777); err != nil {
+	if err := utils.MkdirAll(dirUsrSbin, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s",
 			dirUsrSbin, err.Error())
 	}
 
 	dirUsrLib64 := dirTest + "/usr/lib64"
-	if err := os.MkdirAll(dirUsrLib64, 0777); err != nil {
+	if err := utils.MkdirAll(dirUsrLib64, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s",
 			dirUsrLib64, err.Error())
 
@@ -118,7 +120,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrShare := dirTest + "/usr/share"
-	if err := os.MkdirAll(dirUsrShare, 0777); err != nil {
+	if err := utils.MkdirAll(dirUsrShare, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrShare,
 			err.Error())
 	}
@@ -131,13 +133,13 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirUsrMnt := dirTest + "/mnt"
-	if err := os.Mkdir(dirUsrMnt, 0777); err != nil {
+	if err := syscall.Mkdir(dirUsrMnt, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrMnt,
 			err.Error())
 	}
 
 	dirEtc := dirTest + "/etc"
-	if err := os.Mkdir(dirEtc, 0777); err != nil {
+	if err := syscall.Mkdir(dirEtc, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirEtc, err.Error())
 	}
 
@@ -146,7 +148,7 @@ func setupWorkspace(t *testing.T) string {
 	}
 
 	dirTmp := dirTest + "/tmp"
-	if err := os.Mkdir(dirTmp, 0777); err != nil {
+	if err := syscall.Mkdir(dirTmp, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirTmp,
 			err.Error())
 	}

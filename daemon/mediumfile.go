@@ -20,6 +20,7 @@ func newMediumShell() MediumFile {
 }
 
 func newMediumAccessor(c *ctx, key quantumfs.ObjectKey) *MediumFile {
+	defer c.funcIn("newMediumAccessor").out()
 	var rtn MediumFile
 
 	multiFile := newMultiBlockAccessor(c, key, quantumfs.MaxBlocksMediumFile())
@@ -37,6 +38,7 @@ func (fi *MediumFile) getType() quantumfs.ObjectType {
 }
 
 func (fi *MediumFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
+	defer c.funcIn("MediumFile::convertTo").out()
 	if newType <= quantumfs.ObjectTypeMediumFile {
 		return fi
 	}

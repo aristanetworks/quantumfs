@@ -6,6 +6,7 @@ package testutils
 // This file contains a buffer for the testing purpose only. Some interface functions
 // are only briefly implemented with a dummy return value
 
+import "fmt"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/encoding"
 import "github.com/aristanetworks/quantumfs/hash"
@@ -24,6 +25,14 @@ func NewSimpleBuffer(in []byte, q_key quantumfs.ObjectKey) quantumfs.Buffer {
 	return &SimpleBuffer{
 		key:  q_key,
 		data: in,
+	}
+}
+
+func AssertNonZeroBuf(buf quantumfs.Buffer,
+	format string, args ...string) {
+
+	if buf.Size() == 0 {
+		panic(fmt.Sprintf(format, args))
 	}
 }
 

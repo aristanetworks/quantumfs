@@ -14,14 +14,16 @@ import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/hanwen/go-fuse/fuse"
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
-		os.MkdirAll(workspace+"/dir", 0777)
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+"/dir", 0777)
 
 		numFiles := 10
-		data := genData(255)
+		data := GenData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
 			err := testutils.PrintToFile(
@@ -49,10 +51,10 @@ func TestForgetOnDirectory(t *testing.T) {
 
 func TestForgetOnWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		numFiles := 10
-		data := genData(255)
+		data := GenData(255)
 		// Generate a bunch of files
 		for i := 0; i < numFiles; i++ {
 			err := testutils.PrintToFile(
@@ -80,7 +82,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 
 func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		fileName := workspace + "/file"
 		file, err := os.Create(fileName)
@@ -95,7 +97,7 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		test.remountFilesystem()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
@@ -118,15 +120,15 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 	// its not 100% necessary.
 	t.Skip()
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/dir"
 
-		err := os.Mkdir(dirName, 0777)
+		err := syscall.Mkdir(dirName, 0777)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
 
 		// Generate a bunch of files
 		numFiles := 10
-		data := genData(255)
+		data := GenData(255)
 		for i := 0; i < numFiles; i++ {
 			err := testutils.PrintToFile(
 				workspace+"/dir/file"+strconv.Itoa(i), string(data))
@@ -150,7 +152,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 			numFiles)
 		dir.Close()
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// we need to lock to do this without racing
 		test.qfs.mapMutex.Lock()
@@ -183,7 +185,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 func TestMultipleLookupCount(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		file, err := os.Create(testFilename)
@@ -211,37 +213,45 @@ func TestMultipleLookupCount(t *testing.T) {
 	})
 }
 
+// This function is intended to test that hardlink dereferencing and lookup counting
+// works. So, to eliminate any kernel variation, we'll just call Mux::Lookup directly
 func TestLookupCountHardlinks(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
-		linkFilename := workspace + "/link"
 
 		// First lookup
 		file, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating file: %v", err)
 		file.Close()
 
-		// Second lookup
-		err = os.Link(testFilename, linkFilename)
-		test.Assert(err == nil, "Error creating hardlink")
+		inodeNum := test.getInodeNum(testFilename)
+		wsrNum := test.getInodeNum(workspace)
+		var header fuse.InHeader
+		header.NodeId = uint64(wsrNum)
+		var out fuse.EntryOut
 
-		// Forget Inodes
-		test.remountFilesystem()
+		for i := 0; i < 100; i++ {
+			test.qfs.Lookup(&header, "test", &out)
+		}
 
-		test.AssertLogContains("Looked up 2 Times",
-			"Failed to cause a second lookup")
+		count, exists := test.qfs.lookupCount(inodeNum)
+		test.Assert(exists, "Lookup count missing for file")
+
+		// Since we can't guarantee the kernel hasn't looked it up extra by
+		// this point, and we don't want racy tests, only check we're greater
+		test.Assert(count > 100, "Lookup count missing lookups")
 	})
 }
 
 func TestForgetMarking(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		// Make a simple one directory two children structure
-		test.AssertNoErr(os.MkdirAll(workspace+"/testdir", 0777))
+		test.AssertNoErr(utils.MkdirAll(workspace+"/testdir", 0777))
 
-		data := genData(1000)
+		data := GenData(1000)
 		test.AssertNoErr(ioutil.WriteFile(workspace+"/testdir/a", data,
 			0777))
 		test.AssertNoErr(ioutil.WriteFile(workspace+"/testdir/b", data,
@@ -252,7 +262,7 @@ func TestForgetMarking(t *testing.T) {
 		childIdA := test.getInodeNum(workspace + "/testdir/a")
 		childIdB := test.getInodeNum(workspace + "/testdir/b")
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
@@ -270,7 +280,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// Now start Forgetting
 		test.qfs.Forget(uint64(parentId), 1)
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// Parent should still be loaded
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
@@ -279,7 +289,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// Forget one child, not enough to forget the parent
 		test.qfs.Forget(uint64(childIdA), 1)
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
 		test.Assert(parent != nil,
@@ -290,7 +300,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// Now forget the last child, which should unload the parent also
 		test.qfs.Forget(uint64(childIdB), 1)
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
 		test.Assert(childA == nil, "ChildA not forgotten when requested")
@@ -307,22 +317,22 @@ func TestForgetMarking(t *testing.T) {
 
 func TestForgetLookupRace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		data := genData(2000)
+		data := GenData(2000)
 
 		testFile := workspace + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data[:1000]))
 		test.AssertNoErr(err)
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		test.remountFilesystem()
 
 		_, err = os.Stat(testFile)
 		test.AssertNoErr(err)
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// This test will fail here with the error "Unknown inodeId %d" or
 		// "lookupCount less than zero" if the race happened.
