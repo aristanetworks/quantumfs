@@ -152,7 +152,13 @@ func TestSymlinkHardlink(t *testing.T) {
 
 		err = testutils.PrintToFile(softlink, string(data))
 		test.AssertNoErr(err)
-		data = append(data, data...)
+
+		// We cannot modify data directly or we'll interfere with other
+		// tests.
+		newData := make([]byte, 0, 2*len(data))
+		newData = append(newData, data...)
+		newData = append(newData, data...)
+		data = newData
 
 		readData, err := ioutil.ReadFile(softlink)
 		test.AssertNoErr(err)
