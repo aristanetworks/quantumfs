@@ -122,7 +122,7 @@ func getAccessed() {
 		os.Exit(exitApiNotFound)
 	}
 
-	if err := api.GetAccessed(workspaceName); err != nil {
+	if _, err := api.GetAccessed(workspaceName); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}

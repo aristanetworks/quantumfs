@@ -230,7 +230,7 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		// Only need to call one function running MUX::getWorkspaceRoot() to
 		// verify whether the additional lookupCount has been subtracted
 		api := test.getApi()
-		err = api.GetAccessed(relpath)
+		_, err = api.GetAccessed(relpath)
 		test.Assert(err == nil, "Failed call the command")
 
 		// Now force the kernel to drop all cached inodes
