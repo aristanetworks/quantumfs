@@ -512,10 +512,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	}
 
 	if inode.isOrphaned() {
-		// If we api.InsertInode() over a pre-existing directory which has
-		// open file or directory handles within it, then we can end up here.
-		c.dlog("Orphaned inode (%s) was marked as accessed", path)
-		return
+		panic("Orphaned file")
 	}
 
 	if path == "" {

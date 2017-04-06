@@ -5,6 +5,7 @@ package walker
 
 import "fmt"
 import "path/filepath"
+import "runtime"
 
 import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
@@ -12,9 +13,9 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-type walkFunc func(string, quantumfs.ObjectKey, uint64) error
+type walkFunc func(context.Context, string, quantumfs.ObjectKey, uint64) error
 
-type walkerCtx struct {
+type ctx struct {
 	context.Context
 	qctx *quantumfs.Ctx
 }
@@ -26,7 +27,7 @@ type workerData struct {
 }
 
 // Walk the workspace hierarchy
-func Walk(ctx *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
+func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf walkFunc) error {
 
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
@@ -36,7 +37,7 @@ func Walk(ctx *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey
 	}
 
 	buf := testutils.NewSimpleBuffer(nil, rootID)
-	if err := ds.Get(ctx, rootID, buf); err != nil {
+	if err := ds.Get(cq, rootID, buf); err != nil {
 		return err
 	}
 	testutils.AssertNonZeroBuf(buf,
@@ -52,15 +53,15 @@ func Walk(ctx *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey
 	// DirectoryEntry
 
 	group, groupCtx := errgroup.WithContext(context.Background())
-	keyChan := make(chan *workerData)
+	keyChan := make(chan *workerData, 100)
 
-	c := &walkerCtx{
+	c := &ctx{
 		Context: groupCtx,
-		qctx:    ctx,
+		qctx:    cq,
 	}
 
 	// Start Workers
-	conc := 10 // TODO(sid): Decide if this should be tuneable.
+	conc := runtime.NumCPU() / 2
 	for i := 0; i < conc; i++ {
 
 		group.Go(func() error {
@@ -106,7 +107,7 @@ func key2String(key quantumfs.ObjectKey) string {
 	}
 }
 
-func handleHardLinks(c *walkerCtx, ds quantumfs.DataStore,
+func handleHardLinks(c *ctx, ds quantumfs.DataStore,
 	hle quantumfs.HardlinkEntry, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -148,9 +149,10 @@ func handleHardLinks(c *walkerCtx, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleMultiBlockFile(c *walkerCtx, path string, ds quantumfs.DataStore,
+func handleMultiBlockFile(c *ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
+
 	buf := testutils.NewSimpleBuffer(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
@@ -182,7 +184,7 @@ func handleMultiBlockFile(c *walkerCtx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleVeryLargeFile(c *walkerCtx, path string, ds quantumfs.DataStore,
+func handleVeryLargeFile(c *ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -212,7 +214,7 @@ func handleVeryLargeFile(c *walkerCtx, path string, ds quantumfs.DataStore,
 
 var totalFilesWalked uint64
 
-func handleDirectoryEntry(c *walkerCtx, path string, ds quantumfs.DataStore,
+func handleDirectoryEntry(c *ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -241,7 +243,7 @@ func handleDirectoryEntry(c *walkerCtx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleDirectoryRecord(c *walkerCtx, path string, ds quantumfs.DataStore,
+func handleDirectoryRecord(c *ctx, path string, ds quantumfs.DataStore,
 	dr *quantumfs.DirectRecord, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -284,7 +286,7 @@ func worker(c context.Context, keyChan <-chan *workerData, wf walkFunc) error {
 			}
 
 		}
-		if err := wf(keyItem.path, keyItem.key, keyItem.size); err != nil {
+		if err := wf(c, keyItem.path, keyItem.key, keyItem.size); err != nil {
 			return err
 		}
 	}

@@ -50,10 +50,10 @@ func (th *TestHelper) CreateTestDirs() {
 	th.TempDir = TestRunDir + "/" + th.TestName
 
 	mountPath := th.TempDir + "/mnt"
-	os.MkdirAll(mountPath, 0777)
+	utils.MkdirAll(mountPath, 0777)
 	th.Log("Using mountpath %s", mountPath)
 
-	os.MkdirAll(th.TempDir+"/ether", 0777)
+	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 func abortFuse(th *TestHelper) {
@@ -202,7 +202,7 @@ func serveSafely(th *TestHelper) {
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
-	if err := os.MkdirAll(config.CachePath, 0777); err != nil {
+	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
 	}
 

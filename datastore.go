@@ -719,6 +719,10 @@ const (
 	PermSUID       = 1 << 11
 )
 
+const PermReadAll = PermReadOther | PermReadGroup | PermReadOwner
+const PermWriteAll = PermWriteOther | PermWriteGroup | PermWriteOwner
+const PermExecAll = PermExecOther | PermExecGroup | PermExecOwner
+
 type DirectoryRecord interface {
 	Filename() string
 	SetFilename(v string)
