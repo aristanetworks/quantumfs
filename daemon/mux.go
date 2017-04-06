@@ -897,11 +897,21 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
+
+	// In order to run getWorkspaceRoot, we must set a proper value for the
+	// variable nLookup. If the function is called internally, it needs to reduce
+	// the increased lookupCount, so set nLookup to 1. Only if it is triggered by
+	// kernel, should lookupCount be increased by one, and nLookup should be 0.
+	// Therefore, lookupCount's in QuantumFS and kernel can match.
+	//
+	// For now, all getWorkspaceRoot() are called from internal functions, so
+	// nLookup is always 1.
+	var nLookup uint64 = 1
 
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
@@ -910,6 +920,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
 
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
@@ -917,6 +928,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
 
 	// Get the WorkspaceRoot Inode number
 	var workspaceRootAttr fuse.EntryOut
@@ -925,6 +937,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(workspaceRootAttr.NodeId, nLookup)
 
 	// Fetch the WorkspaceRoot object itelf
 	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))

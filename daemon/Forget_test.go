@@ -213,6 +213,82 @@ func TestMultipleLookupCount(t *testing.T) {
 	})
 }
 
+func TestLookupCountAfterCommand(t *testing.T) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fileName := workspace + "/test"
+		file, err := os.Create(fileName)
+		test.Assert(err == nil, "Error creating a small file: %v", err)
+		file.Close()
+
+		relpath := test.RelPath(workspace)
+
+		// Get inodeId of workspace and namespace
+		wsrId := test.getInodeNum(workspace)
+		fileId := test.getInodeNum(fileName)
+
+		// Only need to call one function running MUX::getWorkspaceRoot() to
+		// verify whether the additional lookupCount has been subtracted
+		api := test.getApi()
+		_, err = api.GetAccessed(relpath)
+		test.Assert(err == nil, "Failed call the command")
+
+		// Now force the kernel to drop all cached inodes
+		test.remountFilesystem()
+		test.AssertLogContains("Forget called",
+			"No inode forget triggered during dentry drop.")
+		test.SyncAllWorkspaces()
+
+		// Make sure that the workspace has already been uninstantiated
+		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
+		test.Assert(fileInode == nil,
+			"Failed to forgot file inode")
+
+		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
+		test.Assert(wsrInode == nil,
+			"Failed to forgot workspace inode")
+	})
+}
+
+func TestLookupCountAfterInsertInode(t *testing.T) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
+		srcWorkspace := test.NewWorkspace()
+		dir1 := srcWorkspace + "/dir1"
+
+		err := os.MkdirAll(srcWorkspace+"/dir1", 0777)
+		test.AssertNoErr(err)
+
+		dstWorkspaceName := test.branchWorkspace(srcWorkspace)
+		dstWorkspace := test.absPath(dstWorkspaceName)
+		// Create one marker file in srcWorkspace and dstWorkspace
+		err = testutils.PrintToFile(dir1+"/srcMarker", "testSomething")
+		test.AssertNoErr(err)
+
+		api := test.getApi()
+		key := getExtendedKeyHelper(test, dir1+"/srcMarker", "file")
+		err = api.InsertInode(dstWorkspaceName+"/dir1/dstMarker",
+			key, 0777, 0, 0)
+
+		wsrId := test.getInodeNum(dstWorkspace)
+		fileId := test.getInodeNum(dstWorkspace + "/dir1")
+
+		// Now force the kernel to drop all cached inodes
+		test.remountFilesystem()
+		test.AssertLogContains("Forget called",
+			"No inode forget triggered during dentry drop.")
+		test.SyncAllWorkspaces()
+
+		// Make sure that the workspace has already been uninstantiated
+		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
+		test.Assert(fileInode == nil,
+			"Failed to forgot directory inode")
+
+		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
+		test.Assert(wsrInode == nil,
+			"Failed to forgot workspace inode")
+	})
+}
+
 // This function is intended to test that hardlink dereferencing and lookup counting
 // works. So, to eliminate any kernel variation, we'll just call Mux::Lookup directly
 func TestLookupCountHardlinks(t *testing.T) {
