@@ -329,7 +329,6 @@ func (th *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
 	parts := strings.Split(th.RelPath(workspace), "/")
 	wsr, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
 		parts[0], parts[1], parts[2])
-
 	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
 
 	return wsr
