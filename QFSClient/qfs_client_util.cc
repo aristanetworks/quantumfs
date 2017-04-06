@@ -74,8 +74,8 @@ std::string getErrorMessage(ErrorCode code, const std::string &details) {
 		return "couldn't seek within API file " + details;
 	case kApiFileWriteFail:
 		return "couldn't write to API file " + details;
-	case kBufAlignmentFail:
-		return "couldn't align the buffer ";
+	case kApiFileFlushFail:
+		return "couldn't flush API file " + details;
 	case kApiFileReadFail:
 		return "couldn't read from API file " + details;
 	case kWorkspacePathInvalid:
@@ -145,8 +145,10 @@ void fperror(std::string function_name, std::string detail) {
 
 // Build an error string from an existing error string but with a related JSON
 // string added for debugging context
-std::string buildJsonErrorDetails(const std::string &error, const char *json) {
-	return error + " (JSON: " + std::string(json) +")";
+std::string buildJsonErrorDetails(const std::string &error,
+				  const char *json,
+				  size_t json_length) {
+	return error + " (JSON: " + std::string(json, json_length) +")";
 }
 
 // replace all single quotes in the given string with double quotes. This is

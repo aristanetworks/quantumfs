@@ -42,7 +42,7 @@ enum ErrorCode {
 	kApiFileWriteFail = 6,
 
 	// Writing a command to the API file failed
-	kBufAlignmentFail = 7,
+	kApiFileFlushFail = 7,
 
 	// Reading a command from the API file failed
 	kApiFileReadFail = 8,
