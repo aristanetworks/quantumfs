@@ -477,9 +477,21 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
+	defer c.funcIn("WorkspaceRoot::getChildSnapshot").out()
+
 	children := wsr.Directory.getChildSnapshot(c)
 
-	defer c.funcIn("WorkspaceRoot::getChildSnapshot").out()
+	// Fill in correct data for .
+	wsr.fillWorkspaceAttrReal(c, &children[0].attr)
+	children[0].fuseType = children[0].attr.Mode
+
+	// Fill in correct data for ..
+	func() {
+		defer wsr.getParentLock().RLock().RUnlock()
+		fillNamespaceAttr(c, &children[1].attr, wsr.parentId_(),
+			wsr.typespace, wsr.namespace)
+		children[1].fuseType = children[1].attr.Mode
+	}()
 
 	api := directoryContents{
 		filename: quantumfs.ApiPath,
@@ -544,18 +556,22 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("WorkspaceRoot::GetAttr").out()
 	defer wsr.RLock().RUnlock()
 
+	out.AttrValid = c.config.CacheTimeSeconds
+	out.AttrValidNsec = c.config.CacheTimeNsecs
+	wsr.fillWorkspaceAttrReal(c, &out.Attr)
+	return fuse.OK
+}
+
+func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
 	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
 			numChildDirectories++
 		}
 	}
-	out.AttrValid = c.config.CacheTimeSeconds
-	out.AttrValidNsec = c.config.CacheTimeNsecs
-	fillAttr(&out.Attr, wsr.InodeCommon.id, numChildDirectories)
+	fillAttr(attr, wsr.InodeCommon.id, numChildDirectories)
 
-	out.Attr.Mode = 0777 | fuse.S_IFDIR
-	return fuse.OK
+	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
 func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
