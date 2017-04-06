@@ -429,6 +429,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdEnableRootWrite:
 		c.vlog("Received EnableRootWrite request")
 		api.enableRootWrite(c, buf)
+	case quantumfs.CmdSetWorkspaceImmutable:
+		c.vlog("Received SetWorkspaceImmutable request")
+		api.setWorkspaceImmutable(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -533,6 +536,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
+	if type_ == quantumfs.ObjectTypeDirectoryEntry {
+		c.vlog("Attemped to insert a directory")
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"InsertInode with directories is not supporte")
+		return
+	}
+
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
 	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
@@ -581,8 +591,9 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 
 	defer parent.Lock().Unlock()
 	if record := parent.children.recordByName(c, target); record != nil {
-		c.vlog("Removing target in preparation for replacement")
-		parent.delChild_(c, target)
+		api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Inode %s should not exist", target)
+		return
 	}
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
@@ -616,13 +627,28 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) {
 		return
 	}
 
+	immutable, err := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
+		dst[0], dst[1], dst[2])
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"Failed to get immutability of WorkspaceRoot %s",
+			workspacePath)
+		return
+	}
+
 	c.vlog("Setting immutable")
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
-	c.qfs.workspaceMutability[workspacePath] = true
+	if immutable {
+		delete(c.qfs.workspaceMutability, workspacePath)
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"WorkspaceRoot has already been set immutable")
+		return
+	}
 
+	c.qfs.workspaceMutability[workspacePath] = true
 	api.queueErrorResponse(quantumfs.ErrorOK,
-		"Enable Workspace Write Permission Succeeded")
+		"Enable workspace write permission succeeded")
 }
 
 func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) {
@@ -733,4 +759,36 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) {
 
 	c.vlog("Data length %d, response length %d", buffer.Size(), len(bytes))
 	api.responses <- fuse.ReadResultData(bytes)
+}
+
+func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) {
+	defer c.funcIn("Api::setWorkspaceImmutable").out()
+
+	var cmd quantumfs.SetWorkspaceImmutableRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return
+	}
+
+	workspacePath := cmd.WorkspacePath
+	dst := strings.Split(workspacePath, "/")
+	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
+	if !exists {
+		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist", workspacePath)
+		return
+	}
+
+	err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx, dst[0], dst[1], dst[2])
+	if err != nil {
+		api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Workspace %s can't be set immutable", workspacePath)
+		return
+	}
+
+	defer c.qfs.mutabilityLock.Lock().Unlock()
+	delete(c.qfs.workspaceMutability, workspacePath)
+
+	api.queueErrorResponse(quantumfs.ErrorOK,
+		"Making workspace immutable succeeded")
 }

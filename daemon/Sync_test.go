@@ -19,6 +19,7 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 
 // This test dataStore counts the number of sets, useful for determining when
 // quantumfs is syncing
@@ -104,7 +105,7 @@ func TestSyncToDatastore(t *testing.T) {
 			if data[i] < '3' {
 				folderStack = append(folderStack, "/folder")
 				folderStr := strings.Join(folderStack, "")
-				os.MkdirAll(workspace+folderStr, 0777)
+				utils.MkdirAll(workspace+folderStr, 0777)
 			} else if data[i] < '5' && len(folderStack) > 0 {
 				folderStack = folderStack[:len(folderStack)-1]
 			} else {
@@ -172,7 +173,7 @@ func TestNoImplicitSync(t *testing.T) {
 		testFilename := dirName + "/c"
 
 		// Create a directory
-		err := os.MkdirAll(dirName, 0124)
+		err := utils.MkdirAll(dirName, 0124)
 		test.Assert(err == nil, "Error creating directories: %v", err)
 
 		file, err := os.Create(testFilename)

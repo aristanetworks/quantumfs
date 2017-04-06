@@ -372,7 +372,7 @@ func TestExtendedKeyDirtyChild(t *testing.T) {
 
 		data := GenData(500)
 
-		err := os.Mkdir(dirName, 0777)
+		err := syscall.Mkdir(dirName, 0777)
 		test.Assert(err == nil, "Failed to create directory: %v", err)
 
 		file, err := os.Create(fileName)
@@ -554,7 +554,7 @@ func TestHardlinkXAttr(t *testing.T) {
 		attrData := "user.data"
 		attrDataData := []byte("extendedattributedata")
 
-		err := os.MkdirAll(workspace+"/subdir", 0777)
+		err := utils.MkdirAll(workspace+"/subdir", 0777)
 		test.AssertNoErr(err)
 
 		filename := workspace + "/subdir/file"
