@@ -8,11 +8,11 @@ import "sync/atomic"
 
 import "github.com/aristanetworks/quantumfs"
 
-func WriteWorkspaceRoot(rootDirKey quantumfs.ObjectKey,
+func WriteWorkspaceRoot(qctx *quantumfs.Ctx, rootDirKey quantumfs.ObjectKey,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	// publish all the hardlinks for this wsr
-	hardLinkEntry, herr := writeHardLinkInfo(ds)
+	hardLinkEntry, herr := writeHardLinkInfo(qctx, ds)
 	if herr != nil {
 		return quantumfs.ZeroKey,
 			fmt.Errorf("Write hard info inf failed: %v", herr)
@@ -24,7 +24,8 @@ func WriteWorkspaceRoot(rootDirKey quantumfs.ObjectKey,
 	// to access root's DirectoryEntry object is sufficient
 	wsr.SetBaseLayer(rootDirKey)
 	wsr.SetHardlinkEntry(hardLinkEntry)
-	wKey, werr := writeBlock(wsr.Bytes(), quantumfs.KeyTypeMetadata, ds)
+	wKey, werr := writeBlock(qctx, wsr.Bytes(),
+		quantumfs.KeyTypeMetadata, ds)
 	if werr != nil {
 		return quantumfs.ZeroKey,
 			fmt.Errorf("Write workspace root failed: %v", werr)
