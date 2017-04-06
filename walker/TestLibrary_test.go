@@ -19,6 +19,7 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test walkerTest) {
@@ -163,7 +164,11 @@ func (th *testHelper) readWalkCompare(workspace string) {
 		root, err)
 
 	var walkerMap = make(map[string]int)
-	wf := func(path string, key quantumfs.ObjectKey, size uint64) error {
+	var mapLock utils.DeferableMutex
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+		size uint64) error {
+
+		defer mapLock.Lock().Unlock()
 		walkerMap[key.String()] = 1
 		return nil
 	}

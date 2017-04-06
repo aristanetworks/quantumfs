@@ -463,8 +463,6 @@ func TestPermissionsAsUserOtherWriteOwnerSticky(t *testing.T) {
 }
 
 func TestPermissionsAsUserInWorkspaceRoot(t *testing.T) {
-	t.Skip()
-	// BUG194878
 	runTest(t, func(test *testHelper) {
 		testPermissions(test, false, false, false, false, false, 0000,
 			true)
@@ -1327,6 +1325,36 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
+	})
+}
+
+func TestDirectoryNlinkValues(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		dirs := [...]string{
+			"/a1/b1/c1",
+			"/a1/b2/c1",
+			"/a1/b2/c2",
+			"/a2/b3/c1",
+		}
+
+		for _, path := range dirs {
+			err := os.MkdirAll(workspace+path, 0777)
+			test.AssertNoErr(err)
+		}
+
+		w := test.RelPath(workspace)
+
+		checkNlink(test, w+"/a1", 4, 4)
+		checkNlink(test, w+"/a1/.", 4, 4)
+		checkNlink(test, w+"/a1/b1/..", 4, 4)
+		checkNlink(test, w+"/a1/b1", 3, 3)
+		checkNlink(test, w+"/a1/b1/.", 3, 3)
+		checkNlink(test, w+"/a1/b2", 4, 4)
+		checkNlink(test, w+"/a1/b2/c1/..", 4, 4)
+		checkNlink(test, w+"/a1/b2/c1", 2, 2)
+		checkNlink(test, w+"/a1/b2/c1/.", 2, 2)
 	})
 }
 

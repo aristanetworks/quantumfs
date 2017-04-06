@@ -17,6 +17,7 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/qlog"
 
 // Design notes about qupload parallelism:
 //
@@ -69,7 +70,9 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 	rootTracker = false
 }
 
-func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
+func handleDirRecord(qctx *quantumfs.Ctx,
+	record quantumfs.DirectoryRecord, path string) error {
+
 	var err error
 	defer dirStateMutex.Lock().Unlock()
 
@@ -84,7 +87,8 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 		if len(tracker.records) != cap(tracker.records) {
 			return nil
 		}
-		record, err = qwr.WriteDirectory(path, tracker.info,
+		qctx.Vlog(qlog.LogTool, "Writing %s", path)
+		record, err = qwr.WriteDirectory(qctx, path, tracker.info,
 			tracker.records, dataStore)
 		if err != nil {
 			return err
@@ -100,14 +104,14 @@ func handleDirRecord(record quantumfs.DirectoryRecord, path string) error {
 	}
 }
 
-func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
+func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 	var record quantumfs.DirectoryRecord
 	var err error
 	var msg *pathInfo
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.eCtx.Done():
 			return nil
 		case msg = <-piChan:
 			if msg == nil {
@@ -119,7 +123,8 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 			// WriteFile() will detect the file type based on
 			// stat information and setup appropriate data
 			// and metadata for the file in storage
-			record, err = qwr.WriteFile(dataStore,
+			c.Vlog("Writing %s", msg.path)
+			record, err = qwr.WriteFile(c.Qctx, dataStore,
 				msg.info, msg.path)
 			if err != nil {
 				return err
@@ -141,7 +146,7 @@ func pathWorker(ctx context.Context, piChan <-chan *pathInfo) error {
 				quantumfs.EmptyDirKey)
 		}
 
-		err = handleDirRecord(record, filepath.Dir(msg.path))
+		err = handleDirRecord(c.Qctx, record, filepath.Dir(msg.path))
 		if err != nil {
 			return err
 		}
@@ -162,7 +167,7 @@ func relativePath(path string, base string) (string, error) {
 	return checkPath, nil
 }
 
-func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
+func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error,
 	exInfo *ExcludeInfo) error {
 
@@ -234,7 +239,7 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 
 	// send pathInfo to workers
 	select {
-	case <-ctx.Done():
+	case <-c.eCtx.Done():
 		return errors.New("Exiting walker since qt least one worker " +
 			"has exited with error")
 	case piChan <- &pathInfo{path: path, info: info}:
@@ -242,25 +247,26 @@ func pathWalker(ctx context.Context, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
-	conc uint) error {
+func upload(c *Ctx, ws string, advance string, root string,
+	exInfo *ExcludeInfo, conc uint) error {
 
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
-	group, groupCtx := errgroup.WithContext(context.Background())
+	var group *errgroup.Group
+	group, c.eCtx = errgroup.WithContext(context.Background())
 	piChan := make(chan *pathInfo)
 
 	// workers
 	for i := uint(0); i < conc; i++ {
 		group.Go(func() error {
-			return pathWorker(groupCtx, piChan)
+			return pathWorker(c, piChan)
 		})
 	}
 	// walker
 	group.Go(func() error {
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
-				return pathWalker(groupCtx, piChan, path,
+				return pathWalker(c, piChan, path,
 					root, info, err, exInfo)
 			})
 		close(piChan)
@@ -272,9 +278,10 @@ func upload(ws string, advance string, root string, exInfo *ExcludeInfo,
 		return err
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(topDirRecord.ID(), dataStore)
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, topDirRecord.ID(),
+		dataStore)
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return qwr.CreateWorkspace(wsDB, ws, advance, wsrKey)
+	return qwr.CreateWorkspace(c.Qctx, wsDB, ws, advance, wsrKey)
 }

@@ -7,7 +7,7 @@ import "os"
 
 import "github.com/aristanetworks/quantumfs"
 
-func smallFileWriter(path string,
+func smallFileWriter(qctx *quantumfs.Ctx, path string,
 	finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
@@ -17,7 +17,7 @@ func smallFileWriter(path string,
 	}
 	defer file.Close()
 
-	keys, _, err := writeFileBlocks(file, uint64(finfo.Size()), ds)
+	keys, _, err := writeFileBlocks(qctx, file, uint64(finfo.Size()), ds)
 	if err != nil {
 		return quantumfs.ZeroKey, err
 	}
