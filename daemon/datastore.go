@@ -51,7 +51,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 		if buf, exists := store.cache[key]; exists {
 			store.lru.MoveToBack(buf.lruElement)
-			return buf
+			return buf.clone()
 		}
 		return nil
 	}()
@@ -154,6 +154,26 @@ func initBuffer(buf *buffer, dataStore *dataStore, key quantumfs.ObjectKey) {
 	buf.dataStore = dataStore
 	buf.keyType = key.Type()
 	buf.key = key
+}
+
+// Return a buffer with the same contents, but modified such that there can be no
+// modification to the original backing data.
+func (buf *buffer) clone() *buffer {
+	// For now, just copy the internal data. In theory we can be clever later.
+
+	newBuf := &buffer{
+		dirty:     buf.dirty,
+		keyType:   buf.keyType,
+		key:       buf.key,
+		dataStore: buf.dataStore,
+		// Don't include in cache
+	}
+
+	newData := make([]byte, len(buf.data))
+	copy(newData, buf.data)
+	newBuf.data = newData
+
+	return newBuf
 }
 
 type buffer struct {
