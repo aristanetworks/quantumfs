@@ -16,7 +16,7 @@ import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestLargeFileRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 
 		// Write the data sequence to the file continually past what
@@ -24,7 +24,7 @@ func TestLargeFileRead(t *testing.T) {
 		maxMediumFileSize := int(quantumfs.MaxMediumFileSize())
 		offset := maxMediumFileSize - 2*quantumfs.MaxBlockSize
 		fullLength := maxMediumFileSize + 2*quantumfs.MaxBlockSize
-		data := genData(fullLength - offset)
+		data := GenData(fullLength - offset)
 		err := testutils.PrintToFile(testFilename, string(data[0]))
 		test.Assert(err == nil, "Error creating file")
 		os.Truncate(testFilename, int64(offset))
@@ -52,7 +52,7 @@ func TestLargeFileRead(t *testing.T) {
 
 func TestLargeFileExpansion(t *testing.T) {
 	runExpensiveTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
@@ -61,7 +61,7 @@ func TestLargeFileExpansion(t *testing.T) {
 		maxMediumFileSize := int(quantumfs.MaxMediumFileSize())
 		offset := maxMediumFileSize - 2*quantumfs.MaxBlockSize
 		fullLength := maxMediumFileSize + 2*quantumfs.MaxBlockSize
-		data := genData(fullLength - offset)
+		data := GenData(fullLength - offset)
 		// write 4 blocks at the start of file
 		err := testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Error creating file")
@@ -122,7 +122,7 @@ func TestLargeFileAttr(t *testing.T) {
 	runExpensiveTest(t, func(test *testHelper) {
 		api := test.getApi()
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
@@ -170,7 +170,7 @@ func TestLargeFileAttr(t *testing.T) {
 
 		// Branch the workspace
 		dst := "dst/largeattrsparse/test"
-		err = api.Branch(test.relPath(workspace), dst)
+		err = api.Branch(test.RelPath(workspace), dst)
 		test.Assert(err == nil, "Unable to branch")
 
 		test.checkSparse(test.absPath(dst+"/test"), testFilename,
@@ -180,11 +180,11 @@ func TestLargeFileAttr(t *testing.T) {
 
 func TestLargeFileZero(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		testFilename := workspace + "/test"
 
-		data := genData(10 * 1024)
+		data := GenData(10 * 1024)
 		err := testutils.PrintToFile(testFilename, string(data))
 		test.Assert(err == nil, "Error writing tiny data to new fd")
 		// expand this to Large file type
