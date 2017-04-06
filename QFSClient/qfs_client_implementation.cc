@@ -3,7 +3,6 @@
 
 #include "QFSClient/qfs_client_implementation.h"
 
-#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -56,31 +55,36 @@ json_t *ApiContext::GetResponseJsonObject() const {
 	return response_json_object;
 }
 
-ApiImpl::CommandBuffer::CommandBuffer() {
+CommandBuffer::CommandBuffer() {
 }
 
-ApiImpl::CommandBuffer::~CommandBuffer() {
+CommandBuffer::~CommandBuffer() {
+}
+
+// Copy the contents of the given CommandBuffer into this one
+void CommandBuffer::Copy(const CommandBuffer &source) {
+	this->data = source.data;
 }
 
 // Return a const pointer to the data in the buffer
-const byte *ApiImpl::CommandBuffer::Data() const {
+const byte *CommandBuffer::Data() const {
 	return this->data.data();
 }
 
 // Return the size of the data stored in the buffer
-size_t ApiImpl::CommandBuffer::Size() const {
+size_t CommandBuffer::Size() const {
 	return this->data.size();
 }
 
 // Reset the buffer such that it will contain no data and will
 // have a zero size
-void ApiImpl::CommandBuffer::Reset() {
+void CommandBuffer::Reset() {
 	this->data.clear();
 }
 
 // Append a block of data to the buffer. Returns an error if the
 // buffer would have to be grown too large to add this block
-ErrorCode ApiImpl::CommandBuffer::Append(const byte *data, size_t size) {
+ErrorCode CommandBuffer::Append(const byte *data, size_t size) {
 	try {
 		this->data.insert(this->data.end(), data, data + size);
 	}
@@ -91,12 +95,12 @@ ErrorCode ApiImpl::CommandBuffer::Append(const byte *data, size_t size) {
 	return kSuccess;
 }
 
-// copy a string into the buffer. An error will be returned if
-// the buffer would have to be grown too large to fit the string.
-ErrorCode ApiImpl::CommandBuffer::CopyString(const char *s) {
+// copy a string into the buffer, but without a NUL terminator. An error will
+// be returned if the buffer would have to be grown too large to fit the string.
+ErrorCode CommandBuffer::CopyString(const char *s) {
 	this->data.clear();
 
-	return this->Append((const byte *)s, 1 + strlen(s));
+	return this->Append((const byte *)s, strlen(s));
 }
 
 Error GetApi(Api **api) {
@@ -118,13 +122,13 @@ void ReleaseApi(Api *api) {
 ApiImpl::ApiImpl()
 	: path(""),
 	  api_inode_id(kInodeIdApi),
-	  send_test_hook(NULL) {
+	  test_hook(NULL) {
 }
 
 ApiImpl::ApiImpl(const char *path)
 	: path(path),
 	  api_inode_id(kInodeIdApi),
-	  send_test_hook(NULL) {
+	  test_hook(NULL) {
 }
 
 ApiImpl::~ApiImpl() {
@@ -140,26 +144,22 @@ Error ApiImpl::Open() {
 		}
 	}
 
-	pthread_mutex_lock(&this->fdMutex);
-	if (this->fd < 0) {
-		this->fd = open(this->path.c_str(), O_RDWR|O_DIRECT);
-		if (this->fd < 0) {
-			pthread_mutex_unlock(&this->fdMutex);
+	if (!this->file.is_open()) {
+		this->file.open(this->path.c_str(),
+				std::ios::in | std::ios::out | std::ios::binary);
+
+		if (this->file.fail()) {
 			return util::getError(kCantOpenApiFile, this->path);
 		}
 	}
-	pthread_mutex_unlock(&this->fdMutex);
 
 	return util::getError(kSuccess);
 }
 
 void ApiImpl::Close() {
-	pthread_mutex_lock(&this->fdMutex);
-	if(this->fd >= 0) {
-		close(this->fd);
-		this->fd = -1;
+	if (this->file.is_open()) {
+		this->file.close();
 	}
-	pthread_mutex_unlock(&this->fdMutex);
 }
 
 Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response) {
@@ -173,46 +173,41 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 		return err;
 	}
 
-	if (this->send_test_hook) {
-		err = this->send_test_hook->SendTestHook();
+	if (this->test_hook) {
+		Error err = this->test_hook->PostWriteHook();
 		if (err.code != kSuccess) {
 			return err;
 		}
+
+		err = this->test_hook->PreReadHook(response);
+		if (err.code != kSuccess) {
+			return err;
+		}
+
+		return util::getError(kSuccess);
 	}
 
 	return this->ReadResponse(response);
 }
 
 Error ApiImpl::WriteCommand(const CommandBuffer &command) {
-	// make the input data aligned
-	void *ptr = aligned_alloc(kBlkSize, command.Size());
-	if (ptr == NULL)
-		return util::getError(kBufAlignmentFail);
-
-	char *subblk = reinterpret_cast<char*>(ptr);
-
-	memcpy(subblk, command.Data(), command.Size());
-	int tmpSize = (command.Size()/kBlkSize)*kBlkSize;
-	if(command.Size()%kBlkSize > 0)
-		tmpSize += kBlkSize;
-
-	pthread_mutex_lock(&this->fdMutex);
-	if (this->fd < 0) {
-		pthread_mutex_unlock(&this->fdMutex);
+	if (!this->file.is_open()) {
 		return util::getError(kApiFileNotOpen);
 	}
 
-	int rtn = lseek(this->fd, 0, SEEK_SET);
-	if (rtn == -1) {
-		pthread_mutex_unlock(&this->fdMutex);
+	this->file.seekp(0);
+	if (this->file.fail()) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
-	rtn = write(this->fd, (const char *)subblk, tmpSize);
-	pthread_mutex_unlock(&this->fdMutex);
-	free(subblk);
-	if (rtn != tmpSize) {
+	this->file.write((const char *)command.Data(), command.Size());
+	if (this->file.fail()) {
 		return util::getError(kApiFileWriteFail, this->path);
+	}
+
+	this->file.flush();
+	if (this->file.fail()) {
+		return util::getError(kApiFileFlushFail, this->path);
 	}
 
 	return util::getError(kSuccess);
@@ -221,60 +216,40 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	ErrorCode err = kSuccess;
 
-	// read up to 4k at a time, stopping on EOF
-	command->Reset();
-
-	// make the buffer align to page block for O_DIRECT
-	int tmpSize = 4096;
-	void* ptr = aligned_alloc(kBlkSize, tmpSize);
-	if (ptr == NULL)
-		return util::getError(kBufAlignmentFail);
-	byte* data = reinterpret_cast<byte*>(ptr);
-
-	pthread_mutex_lock(&this->fdMutex);
-	if (this->fd < 0) {
-		pthread_mutex_unlock(&this->fdMutex);
+	if (!this->file.is_open()) {
 		return util::getError(kApiFileNotOpen);
 	}
 
-	int rtn = lseek(this->fd, 0, SEEK_SET);
-	if (rtn == -1) {
-		pthread_mutex_unlock(&this->fdMutex);
+	this->file.seekg(0);
+	if (this->file.fail()) {
 		return util::getError(kApiFileSeekFail);
 	}
 
-	rtn = tmpSize;
-	while(rtn == tmpSize) {
-		// clean the old memory record
-		memset(data, 0, tmpSize);
+	// read up to 4k at a time, stopping on EOF
+	command->Reset();
 
-		rtn = read(this->fd, data, tmpSize);
-		if (rtn == 0) {  // finish the loop when EOF
-			goto end;
-		} else if (rtn < 0) {
+	byte data[4096];
+	while(!this->file.eof()) {
+		this->file.read(reinterpret_cast<char *>(data), sizeof(data));
+
+		if (this->file.fail() && !(this->file.eof())) {
 			// any read failure *except* an EOF is a failure
-			err = kApiFileReadFail;
-			goto end;
+			return util::getError(kApiFileReadFail, this->path);
 		}
 
-		// get the accurate length of the return response
-		rtn = static_cast<int>(strlen((const char*)data));
-		if (rtn < tmpSize)  // take the end of '\0' into account
-			rtn += 1;
-		else
-			rtn = tmpSize;
-
-		size_t size = (size_t)rtn;
+		size_t size = this->file.gcount();
 		err = command->Append(data, size);
 
-		if (err != kSuccess)
-			goto end;
+		if (err != kSuccess) {
+			return util::getError(err);
+		}
 	}
 
-end:
-	pthread_mutex_unlock(&this->fdMutex);
-	free(data);
-	return util::getError(err, this->path);
+	// clear the file stream's state, because it will remain in an error state
+	// after hitting an EOF
+	this->file.clear();
+
+	return util::getError(err);
 }
 
 Error ApiImpl::DeterminePath() {
@@ -364,15 +339,18 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 	json_error_t json_error;
 
 	// parse JSON in response into a std::unordered_map<std::string, bool>
-	json_t *response_json = json_loads((const char *)response.Data(),
+	json_t *response_json = json_loadb((const char *)response.Data(),
 					   response.Size(),
+					   0,
 					   &json_error);
 
 	context->SetResponseJsonObject(response_json);
 
 	if (response_json == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			json_error.text, (const char *)response.Data());
+			json_error.text,
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kJsonDecodingError, details);
 	}
 
@@ -387,28 +365,33 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 
 	if (success != 0) {
 		std::string details = util::buildJsonErrorDetails(
-			json_error.text, (const char *)response.Data());
+			json_error.text,
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kJsonDecodingError, details);
 	}
 
 	json_t *error_json_obj = json_object_get(response_json_obj, kErrorCode);
 	if (error_json_obj == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			kErrorCode, (const char *)response.Data());
+			kErrorCode,
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kMissingJsonObject, details);
 	}
 
 	json_t *message_json_obj = json_object_get(response_json_obj, kMessage);
 	if (message_json_obj == NULL) {
 		std::string details = util::buildJsonErrorDetails(
-			kMessage, (const char *)response.Data());
+			kMessage, (const char *)response.Data(), response.Size());
 		return util::getError(kMissingJsonObject, details);
 	}
 
 	if (!json_is_integer(error_json_obj)) {
 		std::string details = util::buildJsonErrorDetails(
 			"error code in response JSON is not valid",
-			(const char *)response.Data());
+			(const char *)response.Data(),
+			response.Size());
 		return util::getError(kJsonDecodingError,
 				      details);
 	}
@@ -420,7 +403,7 @@ Error ApiImpl::CheckCommonApiResponse(const CommandBuffer &response,
 			json_string_value(message_json_obj));
 
 		std::string details = util::buildJsonErrorDetails(
-			api_error, (const char *)response.Data());
+			api_error, (const char *)response.Data(), response.Size());
 
 		return util::getError(kApiError, details);
 	}
