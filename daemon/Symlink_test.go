@@ -30,7 +30,7 @@ func createSymlink(workspace string, test *testHelper) string {
 // Verify the creation of symlink file
 func TestSymlinkCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		// create a symlink file
 		linkFilename := createSymlink(workspace, test)
@@ -46,7 +46,7 @@ func TestSymlinkCreation(t *testing.T) {
 // Verify the set/get XAttr function for Symlink's own Extended Attributes
 func TestSymlinkXAttrSetGet(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		symlFilename := createSymlink(workspace, test)
 
@@ -97,7 +97,7 @@ func TestSymlinkXAttrSetGet(t *testing.T) {
 // Verify the list/remove XAttr function for Symlink's own Extended Attributes
 func TestSymlinkXAttrListRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		symlFilename := createSymlink(workspace, test)
 
 		const size = 64
@@ -150,7 +150,7 @@ func TestSymlinkXAttrListRemove(t *testing.T) {
 
 func TestSymlinkPermission(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		symlink := createSymlink(workspace, test)
 
 		var stat syscall.Stat_t

@@ -326,6 +326,37 @@ const (
 	ObjectTypeSpecial           = 12
 )
 
+func ObjectType2String(typ ObjectType) string {
+	switch typ {
+	case ObjectTypeBuildProduct:
+		return "ObjectTypeBuildProduct"
+	case ObjectTypeDirectoryEntry:
+		return "ObjectTypeDirectoryEntry"
+	case ObjectTypeExtendedAttribute:
+		return "ObjectTypeExtendedAttribute"
+	case ObjectTypeHardlink:
+		return "ObjectTypeHardlink"
+	case ObjectTypeSymlink:
+		return "ObjectTypeSymlink"
+	case ObjectTypeVCSFile:
+		return "ObjectTypeVCSFile"
+	case ObjectTypeWorkspaceRoot:
+		return "ObjectTypeWorkspaceRoot"
+	case ObjectTypeSmallFile:
+		return "ObjectTypeSmallFile"
+	case ObjectTypeMediumFile:
+		return "ObjectTypeMediumFile"
+	case ObjectTypeLargeFile:
+		return "ObjectTypeLargeFile"
+	case ObjectTypeVeryLargeFile:
+		return "ObjectTypeVeryLargeFile"
+	case ObjectTypeSpecial:
+		return "ObjectTypeSpecial"
+	default:
+		return fmt.Sprintf("Unknown ObjectType %d\n", typ)
+	}
+}
+
 // One of the ObjectType* values
 type ObjectType uint8
 
