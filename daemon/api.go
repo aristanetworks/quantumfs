@@ -477,8 +477,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) {
 
 	wsr := cmd.WorkspaceRoot
 	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, false,
-		parts[0], parts[1], parts[2])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -502,8 +501,7 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) {
 
 	wsr := cmd.WorkspaceRoot
 	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, false,
-		parts[0], parts[1], parts[2])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -546,8 +544,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, false,
-		dst[0], dst[1], dst[2])
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
