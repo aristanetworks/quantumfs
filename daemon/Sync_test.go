@@ -42,11 +42,11 @@ func TestSyncFileOverwrite(t *testing.T) {
 
 		// Make an instance of QuantumFs and put things there
 		test.startQuantumFs(config)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		// Generate some deterministic, pseudorandom data for a folder
 		// structure, treating each number as a command
-		data := genData(500)
+		data := GenData(500)
 		totalWritten := 0
 		dataWidth := 50
 		for i := 0; i < len(data)/dataWidth; i++ {
@@ -63,7 +63,7 @@ func TestSyncFileOverwrite(t *testing.T) {
 			bufferedWriter.Flush()
 			fd.Close()
 
-			test.syncAllWorkspaces()
+			test.SyncAllWorkspaces()
 		}
 		test.Assert(totalWritten == len(data), "Written mismatch")
 
@@ -88,18 +88,18 @@ func TestSyncToDatastore(t *testing.T) {
 
 		// Make an instance of QuantumFs and put things there
 		test.startQuantumFs(config)
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		// Generate some deterministic, pseudorandom data for a folder
-		// structure, treating each number as a command. Ensure genData
+		// structure, treating each number as a command. Ensure GenData
 		// generates a long enough string of natural numbers to ensure at
 		// least a few sync commands occur.
-		data := genData(50)
+		data := GenData(50)
 		folderStack := make([]string, 0)
 		for i := 0; i < len(data); i++ {
 			// and occasionally force a sync
 			if data[i] == '0' {
-				test.syncAllWorkspaces()
+				test.SyncAllWorkspaces()
 			}
 
 			if data[i] < '3' {
@@ -116,7 +116,7 @@ func TestSyncToDatastore(t *testing.T) {
 		}
 
 		// Sync all of the data we've written
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		// Now end quantumfs A, and start B with the same datastore so we
 		// can verify that the data was preserved via the datastore
@@ -167,7 +167,7 @@ func TestNoImplicitSync(t *testing.T) {
 		}
 		test.qfs.c.dataStore.durableStore = &dataStore
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/test/a/b"
 		testFilename := dirName + "/c"
@@ -246,7 +246,7 @@ func TestNoImplicitSync(t *testing.T) {
 
 		// Now we sync everything and confirm that writes to the datastore
 		// happen
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 		setCount = atomic.LoadUint64(&dataStore.setCount)
 		test.Assert(setCount > expectedCount,
 			"Datastore sets didn't happen! %d", setCount)
