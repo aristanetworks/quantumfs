@@ -13,12 +13,13 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		testData := []byte("arstarst")
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		file1 := workspace + "/orig_file"
 		err := ioutil.WriteFile(file1, testData, 0777)
 		test.Assert(err == nil, "Error creating file: %v", err)
@@ -70,7 +71,7 @@ func TestHardlink(t *testing.T) {
 
 func TestSymlinkCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		err := syscall.Symlink("/usr/bin/arch", link)
 		test.Assert(err == nil, "Error creating symlink: %v", err)
@@ -79,7 +80,7 @@ func TestSymlinkCreate(t *testing.T) {
 
 func TestReadlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
 		err := syscall.Symlink(orig, link)
@@ -94,7 +95,7 @@ func TestReadlink(t *testing.T) {
 
 func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
 		err := syscall.Symlink(orig, link)
@@ -112,7 +113,7 @@ func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 
 func TestSymlinkSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		link := workspace + "/symlink"
 		orig := "/usr/bin/arch"
 		err := syscall.Symlink(orig, link)
@@ -130,16 +131,16 @@ func TestSymlinkSize(t *testing.T) {
 
 func TestSymlinkHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
-		err := os.MkdirAll(workspace+"/dir", 0777)
+		err := utils.MkdirAll(workspace+"/dir", 0777)
 		test.AssertNoErr(err)
 
 		file := workspace + "/dir/file"
 		softlink := workspace + "/dir/symlink"
 		hardlink := workspace + "/dir/hardlink"
 
-		data := genData(2000)
+		data := GenData(2000)
 		err = testutils.PrintToFile(file, string(data))
 		test.AssertNoErr(err)
 
@@ -151,7 +152,13 @@ func TestSymlinkHardlink(t *testing.T) {
 
 		err = testutils.PrintToFile(softlink, string(data))
 		test.AssertNoErr(err)
-		data = append(data, data...)
+
+		// We cannot modify data directly or we'll interfere with other
+		// tests.
+		newData := make([]byte, 0, 2*len(data))
+		newData = append(newData, data...)
+		newData = append(newData, data...)
+		data = newData
 
 		readData, err := ioutil.ReadFile(softlink)
 		test.AssertNoErr(err)

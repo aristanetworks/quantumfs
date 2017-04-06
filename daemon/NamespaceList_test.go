@@ -51,7 +51,7 @@ func TestWorkspaceListing(t *testing.T) {
 
 func TestNullWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		path := test.newWorkspace()
+		path := test.NewWorkspace()
 
 		entries, err := ioutil.ReadDir(path)
 		test.Assert(err == nil, "Couldn't read workspace listing")

@@ -41,16 +41,9 @@ class ApiContext {
 	json_t *response_json_object;
 };
 
-// Class to be implemented by tests ONLY that a test can supply; if an instance
-// of this class is supplied, then its SendTestHook() method will be called
-// by SendCommand() in between writing a command and reading the
-// response. This allows a test to check exactly what got written to the
-// api file by WriteCommand() and to place a test response in the same
-// file to be read back by ReadCommand().
-class SendCommandHook {
- public:
-	virtual Error SendTestHook() = 0;
-};
+// forward declarations
+class CommandBuffer;
+class TestHook;
 
 // ApiImpl provides the concrete implentation for QuantumFS API calls and whatever
 // related support logic they need. If an ApiImpl object is constructed with no
@@ -90,42 +83,6 @@ class ApiImpl: public Api {
 			       std::vector<byte> *data);
 
  private:
-	// CommandBuffer is used internally to store the raw content of a command to
-	// send to (or a response received from) the API - typically in JSON format.
-	class CommandBuffer {
-	 public:
-		CommandBuffer();
-		virtual ~CommandBuffer();
-
-		// Return a const pointer to the data in the buffer
-		const byte *Data() const;
-
-		// Return the size of the data stored in the buffer
-		size_t Size() const;
-
-		// Reset the buffer such that it will contain no data and will
-		// have a zero size
-		void Reset();
-
-		// Append a block of data to the buffer. Returns an error if the
-		// buffer would have to be grown too large to add this block
-		ErrorCode Append(const byte *data, size_t size);
-
-		// Copy a string into the buffer. An error will be returned if
-		// the buffer would have to be grown too large to fit the string.
-		ErrorCode CopyString(const char *s);
-
-	 private:
-		std::vector<byte> data;
-
-		FRIEND_TEST(QfsClientApiTest, CheckCommonApiResponseBadJsonTest);
-		FRIEND_TEST(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest);
-
-		FRIEND_TEST(QfsClientCommandBufferTest, AppendTest);
-		FRIEND_TEST(QfsClientCommandBufferTest, AppendAndCopyLotsTest);
-		FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
-	};
-
 	// Work out the location of the api file (which must be called 'api'
 	// and have an inode ID of 2) by looking in the current directory
 	// and walking up the directory tree towards the root until it's found.
@@ -170,10 +127,10 @@ class ApiImpl: public Api {
 	// advance)
 	ino_t api_inode_id;
 
-	// Pointer to a SendCommandHook instance (used for testing ONLY). The
-	// purpose of the SendCommandHook class is described along with its
+	// Pointer to a TestHook instance (used for testing ONLY). The
+	// purpose of the TestHook class is described along with its
 	// definition.
-	SendCommandHook *send_test_hook;
+	TestHook *test_hook;
 
 	// Internal member function to perform processing common to all API calls,
 	// such as parsing JSON and checking for response errors
@@ -226,6 +183,57 @@ class ApiImpl: public Api {
 	FRIEND_TEST(QfsClientCommandBufferTest, AppendTest);
 	FRIEND_TEST(QfsClientCommandBufferTest, AppendAndCopyLotsTest);
 	FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
+};
+
+// CommandBuffer is used internally to store the raw content of a command to
+// send to (or a response received from) the API - typically in JSON format.
+class CommandBuffer {
+ public:
+	CommandBuffer();
+	virtual ~CommandBuffer();
+
+	// Copy the contents of the given CommandBuffer into this one
+	void Copy(const CommandBuffer &source);
+
+	// Return a const pointer to the data in the buffer
+	const byte *Data() const;
+
+	// Return the size of the data stored in the buffer
+	size_t Size() const;
+
+	// Reset the buffer such that it will contain no data and will
+	// have a zero size
+	void Reset();
+
+	// Append a block of data to the buffer. Returns an error if the
+	// buffer would have to be grown too large to add this block
+	ErrorCode Append(const byte *data, size_t size);
+
+	// Copy a string into the buffer. An error will be returned if
+	// the buffer would have to be grown too large to fit the string.
+	ErrorCode CopyString(const char *s);
+
+ private:
+	std::vector<byte> data;
+
+	FRIEND_TEST(QfsClientApiTest, CheckCommonApiResponseBadJsonTest);
+	FRIEND_TEST(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest);
+
+	FRIEND_TEST(QfsClientCommandBufferTest, AppendTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, AppendAndCopyLotsTest);
+	FRIEND_TEST(QfsClientCommandBufferTest, CopyStringTest);
+};
+
+// Class to be implemented by tests ONLY that a test can supply; if an instance
+// of this class is supplied, then its PostWriteHook() method will be called
+// by SendCommand() after writing a command, and PreReadHook() will be called
+// before reading the response. This allows a test to check exactly what got
+// written to the api file by WriteCommand() and to place a test response for use
+// by ReadCommand() instead of having ReadCommand() read from the API file.
+class TestHook {
+ public:
+	virtual Error PostWriteHook() = 0;
+	virtual Error PreReadHook(CommandBuffer *read_result) = 0;
 };
 
 }  // namespace qfsclient

@@ -1,5 +1,5 @@
-COMMANDS=quantumfsd qfs qparse emptykeys qupload
-PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal
+COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker
+PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal walker
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
@@ -49,6 +49,7 @@ rpm: $(COMMANDS)
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse \
+		./qupload=/usr/bin/qupload \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
 include QFSClient/Makefile
