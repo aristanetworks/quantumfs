@@ -1138,7 +1138,9 @@ type ConstDataStore struct {
 
 func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	if data, ok := store.store[key.String()]; ok {
-		buf.Set(data, key.Type())
+		newData := make([]byte, len(data))
+		copy(newData, data)
+		buf.Set(newData, key.Type())
 		return nil
 	}
 	return fmt.Errorf("Object not found")
