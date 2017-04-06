@@ -83,6 +83,14 @@ type QuantumFs struct {
 	fileHandleNum uint64
 	c             ctx
 
+	// We present the sum of the size of all responses waiting on the api file as
+	// the size of that file because the kernel will clear any reads beyond what
+	// is believed to be the file length. Thus the file length needs to be at
+	// least as long as the largest response and using the sum of all response
+	// lengths is more efficient than computing the maximum response length over
+	// a large number of ApiHandles.
+	apiFileSize int64
+
 	mapMutex    utils.DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
@@ -710,6 +718,12 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
 	} else {
+		// clean up any remaining response queue size from the apiFileSize
+		fileHandle = qfs.fileHandles[id]
+		if api, ok := fileHandle.(*ApiHandle); ok {
+			api.drainResponseData(c)
+		}
+
 		delete(qfs.fileHandles, id)
 	}
 }
@@ -1676,4 +1690,19 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
+}
+
+func (qfs *QuantumFs) increaseApiFileSize(c *ctx, offset int) {
+	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset))
+	c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
+}
+
+func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
+	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
+	c.vlog("QuantumFs::APIFileSize subtract %d downto %d", offset, result)
+	if result < 0 {
+		c.elog("ERROR: PANIC Global variable %d should"+
+			" be greater than zero", result)
+		atomic.StoreInt64(&qfs.apiFileSize, 0)
+	}
 }
