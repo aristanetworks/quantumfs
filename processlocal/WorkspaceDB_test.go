@@ -9,7 +9,20 @@ package processlocal
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
+
+func newCtx() *quantumfs.Ctx {
+	// Create  Ctx with random RequestId
+	Qlog := qlog.NewQlogTiny()
+	requestId := qlog.TestReqId
+	ctx := &quantumfs.Ctx{
+		Qlog:      Qlog,
+		RequestId: requestId,
+	}
+
+	return ctx
+}
 
 func createWorkspaces(ctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB) {
 	workspaces := [...][3]string{
