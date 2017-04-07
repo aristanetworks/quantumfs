@@ -83,6 +83,14 @@ type QuantumFs struct {
 	fileHandleNum uint64
 	c             ctx
 
+	// We present the sum of the size of all responses waiting on the api file as
+	// the size of that file because the kernel will clear any reads beyond what
+	// is believed to be the file length. Thus the file length needs to be at
+	// least as long as the largest response and using the sum of all response
+	// lengths is more efficient than computing the maximum response length over
+	// a large number of ApiHandles.
+	apiFileSize int64
+
 	mapMutex    utils.DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
@@ -136,9 +144,10 @@ type QuantumFs struct {
 	lookupCounts    map[InodeId]uint64
 
 	// The workspaceMutability defines whether all inodes in each of the local
-	// workspace is mutable(write-permitted). Once if a workspace is set to be
-	// mutable, should it be put into the map, and all others are default to
-	// false
+	// workspace is mutable(write-permitted). Once if a workspace is not
+	// immutable, can it be set mutable, so TRUE should be put into the map.
+	// Empty entires are default as read-only.  When set the workspace immutable,
+	// delete the entry from the map
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]bool
 }
@@ -709,6 +718,12 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
 	} else {
+		// clean up any remaining response queue size from the apiFileSize
+		fileHandle = qfs.fileHandles[id]
+		if api, ok := fileHandle.(*ApiHandle); ok {
+			api.drainResponseData(c)
+		}
+
 		delete(qfs.fileHandles, id)
 	}
 }
@@ -882,11 +897,21 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace string,
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
+
+	// In order to run getWorkspaceRoot, we must set a proper value for the
+	// variable nLookup. If the function is called internally, it needs to reduce
+	// the increased lookupCount, so set nLookup to 1. Only if it is triggered by
+	// kernel, should lookupCount be increased by one, and nLookup should be 0.
+	// Therefore, lookupCount's in QuantumFS and kernel can match.
+	//
+	// For now, all getWorkspaceRoot() are called from internal functions, so
+	// nLookup is always 1.
+	var nLookup uint64 = 1
 
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
@@ -895,6 +920,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
 
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
@@ -902,6 +928,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
 
 	// Get the WorkspaceRoot Inode number
 	var workspaceRootAttr fuse.EntryOut
@@ -910,6 +937,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace string, namespace strin
 	if result != fuse.OK {
 		return nil, false
 	}
+	defer qfs.Forget(workspaceRootAttr.NodeId, nLookup)
 
 	// Fetch the WorkspaceRoot object itelf
 	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
@@ -962,12 +990,9 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	defer qfs.mutabilityLock.RLock().RUnlock()
 
 	key := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
-	rootMutability, exists := qfs.workspaceMutability[key]
-	if !exists {
-		return false
-	}
+	_, exists := qfs.workspaceMutability[key]
 
-	return rootMutability
+	return exists
 
 }
 
@@ -1678,4 +1703,19 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 }
 
 func (qfs *QuantumFs) Init(*fuse.Server) {
+}
+
+func (qfs *QuantumFs) increaseApiFileSize(c *ctx, offset int) {
+	result := atomic.AddInt64(&qfs.apiFileSize, int64(offset))
+	c.vlog("QuantumFs::APIFileSize adds %d upto %d", offset, result)
+}
+
+func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
+	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
+	c.vlog("QuantumFs::APIFileSize subtract %d downto %d", offset, result)
+	if result < 0 {
+		c.elog("ERROR: PANIC Global variable %d should"+
+			" be greater than zero", result)
+		atomic.StoreInt64(&qfs.apiFileSize, 0)
+	}
 }

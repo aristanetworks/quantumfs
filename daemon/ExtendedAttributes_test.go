@@ -18,7 +18,7 @@ import "github.com/aristanetworks/quantumfs/utils"
 
 func TestExtendedAttrReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -67,7 +67,7 @@ func TestExtendedAttrReadWrite(t *testing.T) {
 
 func TestExtendedAttrList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -111,7 +111,7 @@ func TestExtendedAttrList(t *testing.T) {
 
 func TestExtendedAttrReadNonExist(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -131,7 +131,7 @@ func TestExtendedAttrReadNonExist(t *testing.T) {
 
 func TestExtendedAttrRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/" + "test"
 		fd, err := os.Create(testFilename)
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -224,7 +224,7 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 func TestXAttrExtendedKeyGet(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.Assert(err == nil, "Error creating a small file: %v", err)
@@ -315,7 +315,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 func TestXAttrTypeKeySetRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		test.Assert(err == nil, "Error creating a small file: %v", err)
@@ -339,7 +339,7 @@ func TestXAttrTypeKeySetRemove(t *testing.T) {
 func TestXAttrTypeKeyList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		testFilename := workspace + "/test"
 		fd, err := syscall.Creat(testFilename, 0777)
 		syscall.Close(fd)
@@ -366,19 +366,19 @@ func TestXAttrTypeKeyList(t *testing.T) {
 
 func TestExtendedKeyDirtyChild(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 		dirName := workspace + "/dir"
 		fileName := dirName + "/file"
 
-		data := genData(500)
+		data := GenData(500)
 
-		err := os.Mkdir(dirName, 0777)
+		err := syscall.Mkdir(dirName, 0777)
 		test.Assert(err == nil, "Failed to create directory: %v", err)
 
 		file, err := os.Create(fileName)
 		test.Assert(err == nil, "Failed to create file: %v", err)
 
-		test.syncAllWorkspaces()
+		test.SyncAllWorkspaces()
 
 		buf := make([]byte, quantumfs.ExtendedKeyLength)
 		_, err = syscall.Getxattr(dirName, quantumfs.XAttrTypeKey, buf)
@@ -413,7 +413,7 @@ func init() {
 
 func initOrphanedFileExtendedAttributes(test *testHelper) (fd int) {
 	// Create the file
-	workspace := test.newWorkspace()
+	workspace := test.NewWorkspace()
 	filename := workspace + "/file"
 	fd, err := syscall.Creat(filename, 0777)
 	test.Assert(err == nil, "Error creating file: %v", err)
@@ -547,18 +547,18 @@ func TestOrphanFileXAttrRemove(t *testing.T) {
 
 func TestHardlinkXAttr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.newWorkspace()
+		workspace := test.NewWorkspace()
 
 		attrNoData := "user.nodata"
 		attrPrevData := "user.prevdata"
 		attrData := "user.data"
 		attrDataData := []byte("extendedattributedata")
 
-		err := os.MkdirAll(workspace+"/subdir", 0777)
+		err := utils.MkdirAll(workspace+"/subdir", 0777)
 		test.AssertNoErr(err)
 
 		filename := workspace + "/subdir/file"
-		err = testutils.PrintToFile(filename, string(genData(2000)))
+		err = testutils.PrintToFile(filename, string(GenData(2000)))
 		test.AssertNoErr(err)
 
 		err = syscall.Setxattr(filename, attrPrevData, attrDataData, 0)

@@ -3,10 +3,14 @@
 
 package processlocal
 
+import "bytes"
+import "crypto/md5"
+import "encoding/hex"
 import "fmt"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 func NewDataStore(conf string) quantumfs.DataStore {
@@ -35,7 +39,9 @@ func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	if data, exists := store.data[key.String()]; !exists {
 		err = fmt.Errorf("Key does not exist")
 	} else {
-		buf.Set(data, key.Type())
+		newData := make([]byte, len(data))
+		copy(newData, data)
+		buf.Set(newData, key.Type())
 	}
 	return err
 }
@@ -51,9 +57,27 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	}
 
 	store.mutex.RLock()
-	_, exists := store.data[key.String()]
+	data, exists := store.data[key.String()]
 	store.mutex.RUnlock()
 	if exists {
+		if !bytes.Equal(buffer.Get(), data) {
+			c.Elog(qlog.LogDatastore, "ERROR: Key Collision! %s",
+				key.String())
+			digest := md5.Sum(data)
+			qhash := hash.Hash(data)
+			c.Elog(qlog.LogDatastore, "Original data: %s %s %s",
+				hex.EncodeToString(digest[:]),
+				hex.EncodeToString(qhash[:]),
+				quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata,
+					qhash).String())
+			digest = md5.Sum(buffer.Get())
+			qhash = hash.Hash(buffer.Get())
+			c.Elog(qlog.LogDatastore, "New data:      %s %s %s",
+				hex.EncodeToString(digest[:]),
+				hex.EncodeToString(qhash[:]),
+				quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata,
+					qhash).String())
+		}
 		return nil
 	}
 
