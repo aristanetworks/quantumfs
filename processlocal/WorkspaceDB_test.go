@@ -9,7 +9,20 @@ package processlocal
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
+
+func newCtx() *quantumfs.Ctx {
+	// Create  Ctx with random RequestId
+	Qlog := qlog.NewQlogTiny()
+	requestId := qlog.TestReqId
+	ctx := &quantumfs.Ctx{
+		Qlog:      Qlog,
+		RequestId: requestId,
+	}
+
+	return ctx
+}
 
 func createWorkspaces(ctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB) {
 	workspaces := [...][3]string{
@@ -91,4 +104,51 @@ func TestDeleteTypespace(t *testing.T) {
 
 	exists, _ = wsdb.TypespaceExists(ctx, "type2")
 	utils.Assert(!exists, "Typespace not deleted")
+}
+
+func TestSetWorkspaceImmutable(t *testing.T) {
+	wsdb := NewWorkspaceDB("")
+	ctx := newCtx()
+	createWorkspaces(ctx, wsdb)
+
+	immutable, err := wsdb.WorkspaceIsImmutable(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil && !immutable,
+		"Workspace is either immutable or with error: %v", err)
+
+	err = wsdb.SetWorkspaceImmutable(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil, "Failed setting workspace immutable")
+
+	immutable, err = wsdb.WorkspaceIsImmutable(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil && immutable,
+		"Workspace is either mutable or with error: %v", err)
+}
+
+func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
+	wsdb := NewWorkspaceDB("")
+	ctx := newCtx()
+	createWorkspaces(ctx, wsdb)
+
+	immutable, err := wsdb.WorkspaceIsImmutable(ctx, "type1", "name1", "work10")
+	utils.Assert(err == nil && !immutable,
+		"Workspace is either immutable or with error: %v", err)
+}
+
+func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
+	wsdb := NewWorkspaceDB("")
+	ctx := newCtx()
+	createWorkspaces(ctx, wsdb)
+
+	err := wsdb.SetWorkspaceImmutable(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil, "Failed setting workspace immutable")
+
+	immutable, err := wsdb.WorkspaceIsImmutable(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil && immutable,
+		"Workspace is either mutable or with error: %v", err)
+
+	err = wsdb.DeleteWorkspace(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil, "Failed deleting workspace: %v", err)
+
+	immutable, err = wsdb.WorkspaceIsImmutable(ctx, "type1", "name1", "work1")
+	utils.Assert(err == nil && !immutable,
+		"Workspace is either immutable or with error: %v", err)
 }

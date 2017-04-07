@@ -188,7 +188,7 @@ func NewApi() (*Api, error) {
 func NewApiWithPath(path string) (*Api, error) {
 	api := Api{}
 
-	fd, err := os.OpenFile(path, os.O_RDWR, 0)
+	fd, err := os.OpenFile(path, os.O_RDWR|syscall.O_DIRECT, 0)
 	api.fd = fd
 	if err != nil {
 		return nil, err
@@ -228,17 +228,18 @@ type CommandCommon struct {
 // IMPORTANT: please do not change the order/values of the above constants, QFSClient
 // depends on the fact that the values should not change !!!!!
 const (
-	CmdInvalid         = 0
-	CmdError           = 1
-	CmdBranchRequest   = 2
-	CmdGetAccessed     = 3
-	CmdClearAccessed   = 4
-	CmdSyncAll         = 5
-	CmdInsertInode     = 6
-	CmdDeleteWorkspace = 7
-	CmdSetBlock        = 8
-	CmdGetBlock        = 9
-	CmdEnableRootWrite = 10
+	CmdInvalid               = 0
+	CmdError                 = 1
+	CmdBranchRequest         = 2
+	CmdGetAccessed           = 3
+	CmdClearAccessed         = 4
+	CmdSyncAll               = 5
+	CmdInsertInode           = 6
+	CmdDeleteWorkspace       = 7
+	CmdSetBlock              = 8
+	CmdGetBlock              = 9
+	CmdEnableRootWrite       = 10
+	CmdSetWorkspaceImmutable = 11
 )
 
 // The various error codes
@@ -254,6 +255,8 @@ const (
 	ErrorBlockTooLarge     = 6 // SetBlock was passed a block that's too large
 	ErrorWorkspaceNotFound = 7 // The workspace cannot be found in QuantumFS
 )
+
+const BufferSize = 4096
 
 type ErrorResponse struct {
 	CommandCommon
@@ -316,6 +319,11 @@ type GetBlockResponse struct {
 	Data []byte
 }
 
+type SetWorkspaceImmutableRequest struct {
+	CommandCommon
+	WorkspacePath string
+}
+
 func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
 	if err != nil {
@@ -323,14 +331,19 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	}
 
 	api.fd.Seek(0, 0)
-	buf = make([]byte, 4096)
-	n, err := api.fd.Read(buf)
-	if err != nil {
-		return nil, err
+	size := BufferSize
+	buf = make([]byte, BufferSize)
+	result := make([]byte, 0)
+	for size == BufferSize {
+		size, err = api.fd.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, buf[:size]...)
 	}
 
-	buf = buf[:n]
-	return buf, nil
+	return result, nil
 }
 
 // branch the src workspace into a new workspace called dst.
@@ -372,9 +385,10 @@ func (api *Api) Branch(src string, dst string) error {
 }
 
 // Get the list of accessed file from workspaceroot
-func (api *Api) GetAccessed(wsr string) error {
+func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
+		return nil, fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
+			wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -384,31 +398,31 @@ func (api *Api) GetAccessed(wsr string) error {
 
 	cmdBuf, err := json.Marshal(cmd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	buf, err := api.sendCmd(cmdBuf)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
 	var accesslistResponse AccessListResponse
 	err = json.Unmarshal(buf, &accesslistResponse)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	printAccessList(accesslistResponse.AccessList)
-	return nil
+	return accesslistResponse.AccessList, nil
 }
 
 // clear the list of accessed files in workspaceroot
@@ -504,6 +518,9 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 	return nil
 }
 
+// Enable the chosen workspace mutable
+//
+// dst is the path relative to the filesystem root, ie. user/joe/myws
 func (api *Api) EnableRootWrite(dst string) error {
 	if !isWorkspaceNameValid(dst) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
@@ -512,6 +529,41 @@ func (api *Api) EnableRootWrite(dst string) error {
 	cmd := EnableRootWriteRequest{
 		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
 		Workspace:     dst,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
+	}
+	return nil
+}
+
+// Make the chosen workspace irreversibly immutable
+//
+// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
+func (api *Api) SetWorkspaceImmutable(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := SetWorkspaceImmutableRequest{
+		CommandCommon: CommandCommon{CommandId: CmdSetWorkspaceImmutable},
+		WorkspacePath: workspacepath,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)

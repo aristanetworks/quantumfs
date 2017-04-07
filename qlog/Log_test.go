@@ -54,25 +54,31 @@ func TestLogSet(t *testing.T) {
 	}
 }
 
-func TestLoadLevels(t *testing.T) {
+func TestLogLevels(t *testing.T) {
 	qlog := NewQlogTiny()
 
+	qlog.SetLogLevels("")
+	defaultLevels := qlog.LogLevels
+
 	qlog.SetLogLevels("Daemon/*")
-	if qlog.LogLevels != 0x1111F {
-		t.Fatalf("Wildcard log levels incorrectly set: %x != %x", 0x1111f,
-			qlog.LogLevels)
+	expLevels := (defaultLevels & ^(uint32(0xF))) | uint32(0xF)
+	if qlog.LogLevels != expLevels {
+		t.Fatalf("Wildcard log levels incorrectly set: %x != %x",
+			expLevels, qlog.LogLevels)
 	}
 
 	// test out of order, combo setting, and general bitmask
 	qlog.SetLogLevels("Daemon/1,WorkspaceDb/*,Datastore|10")
-	if qlog.LogLevels != 0x11FA3 {
+	expLevels = (defaultLevels & ^(uint32(0xFFF))) | uint32(0xFA3)
+	if qlog.LogLevels != expLevels {
 		t.Fatalf("Out of order, combo setting, or general bitmask broken %x",
 			qlog.LogLevels)
 	}
 
 	// test misspelling ignores misspelt entry. Ensure case insensitivity
 	qlog.SetLogLevels("DaeMAN/1,WORKSPACEDB/*,Datastored|10")
-	if qlog.LogLevels != 0x11F11 {
+	expLevels = (defaultLevels & ^(uint32(0xFFF))) | uint32(0xF11)
+	if qlog.LogLevels != expLevels {
 		t.Fatalf("Case insensitivity broken / mis-spelling not ignored %x",
 			qlog.LogLevels)
 	}

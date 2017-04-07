@@ -10,7 +10,7 @@ import "sync/atomic"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 
-func WriteXAttrs(path string,
+func WriteXAttrs(qctx *quantumfs.Ctx, path string,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	sizeofXAttrs, err, _ := utils.LListXattr(path, 0)
@@ -63,7 +63,8 @@ func WriteXAttrs(path string,
 					path, err)
 		}
 
-		dataKey, bErr := writeBlock(xattrData, quantumfs.KeyTypeData, ds)
+		dataKey, bErr := writeBlock(qctx, xattrData,
+			quantumfs.KeyTypeData, ds)
 		if bErr != nil {
 			return quantumfs.EmptyBlockKey,
 				fmt.Errorf("Write xattrs (block write) %q "+
@@ -76,7 +77,7 @@ func WriteXAttrs(path string,
 		xattrMetadata.SetNumAttributes(i + 1)
 	}
 
-	xKey, xerr := writeBlock(xattrMetadata.Bytes(),
+	xKey, xerr := writeBlock(qctx, xattrMetadata.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if xerr != nil {
 		return quantumfs.EmptyBlockKey,
