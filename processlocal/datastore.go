@@ -71,7 +71,7 @@ func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 				quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata,
 					qhash).String())
 			digest = md5.Sum(buffer.Get())
-			qhash = hash.Hash(data)
+			qhash = hash.Hash(buffer.Get())
 			c.Elog(qlog.LogDatastore, "New data:      %s %s %s",
 				hex.EncodeToString(digest[:]),
 				hex.EncodeToString(qhash[:]),
