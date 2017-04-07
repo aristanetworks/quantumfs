@@ -49,8 +49,7 @@ func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
 func (tsl *TypespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on TypespaceList")
-	return fuse.ENOSYS
+	return fuse.OK
 }
 
 func (tsl *TypespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -555,8 +554,7 @@ func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on NamespaceList")
-	return fuse.ENOSYS
+	return fuse.OK
 }
 
 func (nsl *NamespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -875,8 +873,7 @@ func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
-	c.elog("Unsupported Access on WorkspaceList")
-	return fuse.ENOSYS
+	return fuse.OK
 }
 
 func (wsl *WorkspaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
