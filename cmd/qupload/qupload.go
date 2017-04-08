@@ -256,7 +256,7 @@ func main() {
 		}
 
 		if err == nil {
-			fmt.Printf("Workspace %q exists. Skipping upload.",
+			fmt.Printf("Workspace %q exists. Skipping upload.\n",
 				cliParams.ws)
 			fmt.Println("Use -wsforce flag to upload data.")
 			// this is not treated as error condition
