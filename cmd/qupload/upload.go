@@ -287,19 +287,14 @@ func upload(c *Ctx, ws string, advance string, root string,
 	return uploadCompleted(c.Qctx, wsDB, ws, advance, wsrKey)
 }
 
-// It is possible for multiple uploads to be destined to the same
-// workspace. At the same time, re-trying a failed upload into same
-// workspace must be supported.
+// Uploads to existing workspaces should be supported.
 //
-// When multiple uploads are uploading to same workspace only one will
-// succeed, others will get WSDB_OUT_OF_DATE error from Advance API and
-// such uploads are failed since their content won't be accessible without
-// a successful Advance.
-//
-// WSDB_WORKSPACE_EXISTS error in Branch API can happen during multi-upload
-// or upload-retry scenarios. The error should be ignored in upload-rety
-// scenario. The error can be ignored in multi-upload scenario too since such
-// scenarios are handled by error check in Advance API.
+// WSDB_WORKSPACE_EXISTS error in Branch API can happen if the workspace got
+// created during upload, workspace already existed (use of -wsforce option) etc.
+// The error should be ignored in case -wsforce option is being used.
+// The error can be ignored if the workspace was created during upload since
+// the upload _may_ fail during advance. The advance API may return
+// WSDB_OUT_OF_DATE error and the upload will be failed.
 func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 	wsname string,
 	newKey quantumfs.ObjectKey) error {
