@@ -41,6 +41,7 @@ type params struct {
 	excludeFile string
 	conc        uint
 	logdir      string
+	wsforce     bool
 }
 
 var dataStore quantumfs.DataStore
@@ -92,7 +93,7 @@ usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
 	       [ -advance <wsname> -progress -logdir <logpath>
-	         -concurrency <count> ]
+	         -concurrency <count> -wsforce ]
 	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
@@ -161,7 +162,7 @@ func validateParams(p *params) error {
 		if strings.HasPrefix(qFlags.Arg(0), "/") {
 			return errors.New("Directory argument must be " +
 				"relative to the base directory. Do not " +
-				"absolute path")
+				"use absolute path")
 		}
 		root = filepath.Join(p.baseDir, qFlags.Arg(0))
 	}
@@ -215,6 +216,14 @@ func main() {
 		"Directory path for logfile")
 	qFlags.UintVar(&cliParams.conc, "concurrency", 10,
 		"Number of concurrent uploaders")
+	// This flag depends on a racy check, in other words, its possible for the
+	// workspace to be created during upload.
+	// The purpose is to caution the callers of qupload that the
+	// workspace they intend to upload the data into, already exists.
+	// If they choose to upload data into existing workspaces then they
+	// must use -wsforce option
+	qFlags.BoolVar(&cliParams.wsforce, "wsforce", false,
+		"Upload into workspace even if it already exists")
 
 	qFlags.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
@@ -236,6 +245,28 @@ func main() {
 
 	// setup context
 	c := newCtx(cliParams.logdir)
+
+	// check forced upload into workspace
+	if !cliParams.wsforce {
+		wsParts := strings.Split(cliParams.ws, "/")
+		_, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
+			wsParts[2])
+		if err != nil {
+			wE, ok := err.(*quantumfs.WorkspaceDbErr)
+			if ok && wE.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+				fmt.Println(err)
+				os.Exit(exitErrArgs)
+			}
+		}
+
+		if err == nil {
+			fmt.Printf("Workspace %q exists. Skipping upload.\n",
+				cliParams.ws)
+			fmt.Println("Use -wsforce flag to upload data.")
+			// this is not treated as error condition
+			os.Exit(0)
+		}
+	}
 
 	// setup exclude information
 	relpath := ""
