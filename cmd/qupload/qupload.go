@@ -82,6 +82,8 @@ func newCtx(logdir string) *Ctx {
 	return &c
 }
 
+var qFlags = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
 func showUsage() {
 	fmt.Printf(`
 qupload - tool to upload a directory hierarchy to a QFS supported datastore
@@ -89,7 +91,8 @@ version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
-	       [ -progress -advance <wsname> -logdir <path> ]
+	       [ -advance <wsname> -progress -logdir <logpath>
+	         -concurrency <count> ]
 	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
@@ -118,8 +121,9 @@ Absolute paths are not allowed
 To create a directory without it's contents, specify / at the end of path
 To skip directory completely, specify directory name without trailing /
 Comments and empty lines are allowed. A comment is any line that starts with #
+
 `, version)
-	flag.PrintDefaults()
+	qFlags.PrintDefaults()
 }
 
 func validateParams(p *params) error {
@@ -141,25 +145,25 @@ func validateParams(p *params) error {
 			"contain precisely two \"/\"")
 	}
 
-	if (p.excludeFile == "" && flag.NArg() == 0) ||
-		(p.excludeFile != "" && flag.NArg() > 0) {
+	if (p.excludeFile == "" && qFlags.NArg() == 0) ||
+		(p.excludeFile != "" && qFlags.NArg() > 0) {
 		return errors.New("One of exclude file or directory " +
 			"argument must be specified")
 	}
 
-	if flag.NArg() > 1 {
+	if qFlags.NArg() > 1 {
 		return errors.New("At most 1 directory or exclude file " +
 			"must be specified")
 	}
 
 	root := p.baseDir
-	if flag.NArg() == 1 {
-		if strings.HasPrefix(flag.Arg(0), "/") {
+	if qFlags.NArg() == 1 {
+		if strings.HasPrefix(qFlags.Arg(0), "/") {
 			return errors.New("Directory argument must be " +
 				"relative to the base directory. Do not " +
 				"absolute path")
 		}
-		root = filepath.Join(p.baseDir, flag.Arg(0))
+		root = filepath.Join(p.baseDir, qFlags.Arg(0))
 	}
 
 	info, err := os.Lstat(root)
@@ -191,34 +195,36 @@ func main() {
 	var cliParams params
 	var err error
 
-	flag.BoolVar(&cliParams.progress, "progress", false,
-		"Show the data and metadata sizes uploaded")
-	flag.StringVar(&cliParams.dsName, "datastore", "",
+	qFlags.StringVar(&cliParams.dsName, "datastore", "",
 		"Name of the datastore to use")
-	flag.StringVar(&cliParams.dsConf, "datastoreconf", "",
+	qFlags.StringVar(&cliParams.dsConf, "datastoreconf", "",
 		"Options to pass to datastore")
-	flag.StringVar(&cliParams.wsdbName, "workspaceDB", "",
+	qFlags.StringVar(&cliParams.wsdbName, "workspaceDB", "",
 		"Name of the workspace DB to use")
-	flag.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "",
+	qFlags.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "",
 		"Options to pass to workspace DB")
-	flag.StringVar(&cliParams.ws, "workspace", "",
+	qFlags.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
-	flag.StringVar(&cliParams.advance, "advance", "",
+
+	qFlags.StringVar(&cliParams.advance, "advance", "",
 		"Name of workspace which'll be advanced to point"+
 			"to uploaded workspace")
-	flag.StringVar(&cliParams.baseDir, "basedir", "",
-		"All directory arguments are relative to this base directory")
-	flag.StringVar(&cliParams.excludeFile, "exclude", "",
-		"Exclude the files and directories specified in this file")
-	flag.UintVar(&cliParams.conc, "concurrency", 10,
-		"Number of concurrent uploaders")
-	flag.StringVar(&cliParams.logdir, "logdir", "",
+	qFlags.BoolVar(&cliParams.progress, "progress", false,
+		"Show the data and metadata sizes uploaded")
+	qFlags.StringVar(&cliParams.logdir, "logdir", "",
 		"Directory path for logfile")
-	flag.Usage = showUsage
-	flag.Parse()
+	qFlags.UintVar(&cliParams.conc, "concurrency", 10,
+		"Number of concurrent uploaders")
 
-	if flag.NFlag() == 0 {
-		flag.Usage()
+	qFlags.StringVar(&cliParams.baseDir, "basedir", "",
+		"All directory arguments are relative to this base directory")
+	qFlags.StringVar(&cliParams.excludeFile, "exclude", "",
+		"Exclude the files and directories specified in this file")
+
+	qFlags.Usage = showUsage
+	qFlags.Parse(os.Args[1:])
+	if qFlags.NFlag() == 0 {
+		qFlags.Usage()
 		os.Exit(0)
 	}
 
@@ -242,7 +248,7 @@ func main() {
 			os.Exit(exitErrArgs)
 		}
 	} else {
-		relpath = flag.Arg(0)
+		relpath = qFlags.Arg(0)
 	}
 
 	if cliParams.progress == true {
