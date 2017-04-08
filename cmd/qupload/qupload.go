@@ -248,12 +248,15 @@ func main() {
 		_, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
 			wsParts[2])
 		if err != nil {
-			fmt.Println("Workspace error: ", err)
-			os.Exit(exitErrArgs)
+			wE, ok := err.(*quantumfs.WorkspaceDbErr)
+			if ok && wE.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+				fmt.Println(err)
+				os.Exit(exitErrArgs)
+			}
 		}
 
 		if err == nil {
-			fmt.Println("Workspace %q exists. Skipping upload.",
+			fmt.Printf("Workspace %q exists. Skipping upload.",
 				cliParams.ws)
 			fmt.Println("Use -wsforce flag to upload data.")
 			// this is not treated as error condition
