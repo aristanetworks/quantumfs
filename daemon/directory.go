@@ -537,10 +537,8 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	dir.self.markSelfAccessed(c, false)
 
 	defer dir.RLock().RUnlock()
-	defer dir.childRecordLock.Lock().Unlock()
 
-	records := dir.children.records()
-	children := make([]directoryContents, 0, len(records)+2)
+	children := make([]directoryContents, 0, 200) // 200 arbitrarily chosen
 
 	c.vlog("Adding .")
 	entryInfo := directoryContents{
@@ -559,7 +557,6 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 			dir.inodeNum(), c.fuseCtx.Owner, entry)
 		entryInfo.fuseType = entryInfo.attr.Mode
 	}
-
 	children = append(children, entryInfo)
 
 	c.vlog("Adding ..")
@@ -589,10 +586,13 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 			entryInfo.fuseType = entryInfo.attr.Mode
 		}()
 	}
-
 	children = append(children, entryInfo)
 
 	c.vlog("Adding real children")
+
+	defer dir.childRecordLock.Lock().Unlock()
+	records := dir.children.records()
+
 	for _, entry := range records {
 		filename := entry.Filename()
 
