@@ -8,6 +8,7 @@ import "fmt"
 import "os"
 import "io/ioutil"
 import "path/filepath"
+import "strings"
 import "syscall"
 import "time"
 
@@ -283,5 +284,67 @@ func upload(c *Ctx, ws string, advance string, root string,
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return qwr.CreateWorkspace(c.Qctx, wsDB, ws, advance, wsrKey)
+	return uploadCompleted(c.Qctx, wsDB, ws, advance, wsrKey)
+}
+
+// Uploads to existing workspaces should be supported.
+//
+// WSDB_WORKSPACE_EXISTS error in Branch API can happen if the workspace got
+// created during upload, workspace already existed (use of -wsforce option) etc.
+// The error should be ignored in case -wsforce option is being used.
+// The error can be ignored if the workspace was created during upload since
+// the upload _may_ fail during advance. The advance API may return
+// WSDB_OUT_OF_DATE error and the upload will be failed.
+func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
+	wsname string,
+	newKey quantumfs.ObjectKey) error {
+
+	wsParts := strings.Split(wsname, "/")
+	err := wsdb.BranchWorkspace(qctx,
+		quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName,
+		wsParts[0], wsParts[1], wsParts[2])
+	if err != nil {
+		if wsdbErrCode, ok := err.(*quantumfs.WorkspaceDbErr); ok {
+			if wsdbErrCode.Code != quantumfs.WSDB_WORKSPACE_EXISTS {
+				// see note above on why we can ignore
+				// this error
+				return err
+			}
+		}
+	}
+
+	var curKey quantumfs.ObjectKey
+	curKey, err = wsdb.Workspace(qctx,
+		wsParts[0], wsParts[1], wsParts[2])
+	if err != nil {
+		return err
+	}
+	_, err = wsdb.AdvanceWorkspace(qctx,
+		wsParts[0], wsParts[1], wsParts[2],
+		curKey, newKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
+	advance string, newWsrKey quantumfs.ObjectKey) error {
+
+	err := branchThenAdvance(qctx, wsdb, ws, newWsrKey)
+	if err != nil {
+		return err
+	}
+
+	if advance != "" {
+		err := branchThenAdvance(qctx, wsdb, advance, newWsrKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

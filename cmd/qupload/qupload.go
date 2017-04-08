@@ -41,6 +41,7 @@ type params struct {
 	excludeFile string
 	conc        uint
 	logdir      string
+	wsforce     bool
 }
 
 var dataStore quantumfs.DataStore
@@ -82,6 +83,8 @@ func newCtx(logdir string) *Ctx {
 	return &c
 }
 
+var qFlags = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
 func showUsage() {
 	fmt.Printf(`
 qupload - tool to upload a directory hierarchy to a QFS supported datastore
@@ -89,8 +92,9 @@ version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
-	       [ -progress -advance <wsname> -logdir <path> ]
-	       -basedir <path> [ -exclude <file> | <reldirpath> ]
+	       [ -progress -concurrency <count> -advance <wsname>
+	         -logdir <path> -wsforce ]
+	       -basedir <path> [ -exclude <file> | <relpath> ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
            -workspaceDB ether.cql -workspaceDBconf etherconf
@@ -119,7 +123,7 @@ To create a directory without it's contents, specify / at the end of path
 To skip directory completely, specify directory name without trailing /
 Comments and empty lines are allowed. A comment is any line that starts with #
 `, version)
-	flag.PrintDefaults()
+	qFlags.PrintDefaults()
 }
 
 func validateParams(p *params) error {
@@ -141,25 +145,25 @@ func validateParams(p *params) error {
 			"contain precisely two \"/\"")
 	}
 
-	if (p.excludeFile == "" && flag.NArg() == 0) ||
-		(p.excludeFile != "" && flag.NArg() > 0) {
+	if (p.excludeFile == "" && qFlags.NArg() == 0) ||
+		(p.excludeFile != "" && qFlags.NArg() > 0) {
 		return errors.New("One of exclude file or directory " +
 			"argument must be specified")
 	}
 
-	if flag.NArg() > 1 {
+	if qFlags.NArg() > 1 {
 		return errors.New("At most 1 directory or exclude file " +
 			"must be specified")
 	}
 
 	root := p.baseDir
-	if flag.NArg() == 1 {
-		if strings.HasPrefix(flag.Arg(0), "/") {
+	if qFlags.NArg() == 1 {
+		if strings.HasPrefix(qFlags.Arg(0), "/") {
 			return errors.New("Directory argument must be " +
 				"relative to the base directory. Do not " +
-				"absolute path")
+				"use absolute path")
 		}
-		root = filepath.Join(p.baseDir, flag.Arg(0))
+		root = filepath.Join(p.baseDir, qFlags.Arg(0))
 	}
 
 	info, err := os.Lstat(root)
@@ -191,34 +195,41 @@ func main() {
 	var cliParams params
 	var err error
 
-	flag.BoolVar(&cliParams.progress, "progress", false,
-		"Show the data and metadata sizes uploaded")
-	flag.StringVar(&cliParams.dsName, "datastore", "",
+	qFlags.StringVar(&cliParams.dsName, "datastore", "",
 		"Name of the datastore to use")
-	flag.StringVar(&cliParams.dsConf, "datastoreconf", "",
+	qFlags.StringVar(&cliParams.dsConf, "datastoreconf", "",
 		"Options to pass to datastore")
-	flag.StringVar(&cliParams.wsdbName, "workspaceDB", "",
+	qFlags.StringVar(&cliParams.wsdbName, "workspaceDB", "",
 		"Name of the workspace DB to use")
-	flag.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "",
+	qFlags.StringVar(&cliParams.wsdbConf, "workspaceDBconf", "",
 		"Options to pass to workspace DB")
-	flag.StringVar(&cliParams.ws, "workspace", "",
+	qFlags.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
-	flag.StringVar(&cliParams.advance, "advance", "",
+
+	qFlags.BoolVar(&cliParams.progress, "progress", false,
+		"Show the data and metadata sizes uploaded")
+	qFlags.UintVar(&cliParams.conc, "concurrency", 10,
+		"Number of concurrent uploaders")
+	qFlags.StringVar(&cliParams.advance, "advance", "",
 		"Name of workspace which'll be advanced to point"+
 			"to uploaded workspace")
-	flag.StringVar(&cliParams.baseDir, "basedir", "",
+	// This flag depends on a racy check, in other words, its possible for the
+	// workspace to be created during upload.
+	// The purpose is to caution the callers of qupload that the
+	// workspace they intend to upload the data into, already exists.
+	// If they choose to upload data into existing workspaces then they
+	// must use -wsforce option
+	qFlags.BoolVar(&cliParams.wsforce, "wsforce", false,
+		"Upload into workspace even if it already exists")
+	qFlags.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
-	flag.StringVar(&cliParams.excludeFile, "exclude", "",
+	qFlags.StringVar(&cliParams.excludeFile, "exclude", "",
 		"Exclude the files and directories specified in this file")
-	flag.UintVar(&cliParams.conc, "concurrency", 10,
-		"Number of concurrent uploaders")
-	flag.StringVar(&cliParams.logdir, "logdir", "",
-		"Directory path for logfile")
-	flag.Usage = showUsage
-	flag.Parse()
 
-	if flag.NFlag() == 0 {
-		flag.Usage()
+	qFlags.Usage = showUsage
+	qFlags.Parse(os.Args[1:])
+	if qFlags.NFlag() == 0 {
+		qFlags.Usage()
 		os.Exit(0)
 	}
 
@@ -231,6 +242,25 @@ func main() {
 	// setup context
 	c := newCtx(cliParams.logdir)
 
+	// check forced upload into workspace
+	if !cliParams.wsforce {
+		wsParts := strings.Split(cliParams.ws, "/")
+		_, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
+			wsParts[2])
+		if err != nil {
+			fmt.Println("Workspace error: ", err)
+			os.Exit(exitErrArgs)
+		}
+
+		if err == nil {
+			fmt.Println("Workspace %q exists. Skipping upload.",
+				cliParams.ws)
+			fmt.Println("Use -wsforce flag to upload data.")
+			// this is not treated as error condition
+			os.Exit(0)
+		}
+	}
+
 	// setup exclude information
 	relpath := ""
 	var exInfo *ExcludeInfo
@@ -242,7 +272,7 @@ func main() {
 			os.Exit(exitErrArgs)
 		}
 	} else {
-		relpath = flag.Arg(0)
+		relpath = qFlags.Arg(0)
 	}
 
 	if cliParams.progress == true {
