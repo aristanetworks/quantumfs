@@ -92,9 +92,9 @@ version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
-	       [ -progress -concurrency <count> -advance <wsname>
-	         -logdir <path> -wsforce ]
-	       -basedir <path> [ -exclude <file> | <relpath> ]
+	       [ -advance <wsname> -progress -logdir <logpath>
+	         -concurrency <count> -wsforce ]
+	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
            -workspaceDB ether.cql -workspaceDBconf etherconf
@@ -122,6 +122,7 @@ Absolute paths are not allowed
 To create a directory without it's contents, specify / at the end of path
 To skip directory completely, specify directory name without trailing /
 Comments and empty lines are allowed. A comment is any line that starts with #
+
 `, version)
 	qFlags.PrintDefaults()
 }
@@ -206,13 +207,15 @@ func main() {
 	qFlags.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
 
-	qFlags.BoolVar(&cliParams.progress, "progress", false,
-		"Show the data and metadata sizes uploaded")
-	qFlags.UintVar(&cliParams.conc, "concurrency", 10,
-		"Number of concurrent uploaders")
 	qFlags.StringVar(&cliParams.advance, "advance", "",
 		"Name of workspace which'll be advanced to point"+
 			"to uploaded workspace")
+	qFlags.BoolVar(&cliParams.progress, "progress", false,
+		"Show the data and metadata sizes uploaded")
+	qFlags.StringVar(&cliParams.logdir, "logdir", "",
+		"Directory path for logfile")
+	qFlags.UintVar(&cliParams.conc, "concurrency", 10,
+		"Number of concurrent uploaders")
 	// This flag depends on a racy check, in other words, its possible for the
 	// workspace to be created during upload.
 	// The purpose is to caution the callers of qupload that the
@@ -221,6 +224,7 @@ func main() {
 	// must use -wsforce option
 	qFlags.BoolVar(&cliParams.wsforce, "wsforce", false,
 		"Upload into workspace even if it already exists")
+
 	qFlags.StringVar(&cliParams.baseDir, "basedir", "",
 		"All directory arguments are relative to this base directory")
 	qFlags.StringVar(&cliParams.excludeFile, "exclude", "",
