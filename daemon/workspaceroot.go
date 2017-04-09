@@ -89,7 +89,12 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
-	wsr.initHardlinks(c, workspaceRoot.HardlinkEntry())
+	func () {
+		defer wsr.linkLock.Lock().Unlock()
+		wsr.hardlinks, wsr.nextHardlinkId = loadHardlinks(c,
+			workspaceRoot.HardlinkEntry())
+		wsr.inodeToLink = make(map[InodeId]HardlinkId)
+	} ()
 	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
 		&wsr.realTreeLock)
@@ -359,13 +364,13 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 	fnSetter(link.record)
 }
 
-func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
-	defer c.funcIn("WorkspaceRoot::initHardlinks").out()
-	defer wsr.linkLock.Lock().Unlock()
+func loadHardlinks(c *ctx,
+	entry quantumfs.HardlinkEntry) (map[HardlinkId]linkEntry, HardlinkId) {
 
-	wsr.hardlinks = make(map[HardlinkId]linkEntry)
-	wsr.inodeToLink = make(map[InodeId]HardlinkId)
-	wsr.nextHardlinkId = 0
+	defer c.funcIn("WorkspaceRoot::loadHardlinks").out()
+
+	hardlinks := make(map[HardlinkId]linkEntry)
+	nextHardlinkId := HardlinkId(0)
 
 	for {
 		for i := 0; i < entry.NumEntries(); i++ {
@@ -373,10 +378,10 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 			newLink := newLinkEntry(hardlink.Record())
 			newLink.nlink = hardlink.Nlinks()
 			id := HardlinkId(hardlink.HardlinkID())
-			wsr.hardlinks[id] = newLink
+			hardlinks[id] = newLink
 
-			if id >= wsr.nextHardlinkId {
-				wsr.nextHardlinkId = id + 1
+			if id >= nextHardlinkId{
+				nextHardlinkId = id + 1
 			}
 		}
 
@@ -391,6 +396,8 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 
 		entry = buffer.AsHardlinkEntry()
 	}
+
+	return hardlinks, nextHardlinkId
 }
 
 func publishHardlinkMap(c *ctx,
@@ -480,6 +487,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			wsr.Merge(c, wsr.rootId, currentRootId, newRootId)
 			// Recalculate the new rootId
 			newRootId = wsr.publishBuffer_(c)
+			wsr.rootId = currentRootId
 		}
 
 		if !newRootId.IsEqualTo(wsr.rootId) {
@@ -664,4 +672,20 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
 
+	buffer := c.dataStore.Get(&c.Ctx, base)
+	baseWsr := buffer.AsWorkspaceRoot()
+	baseHardlinks, _ := loadHardlinks(c, baseWsr.HardlinkEntry())
+	buffer = c.dataStore.Get(&c.Ctx, remote)
+	remoteWsr := buffer.AsWorkspaceRoot()
+	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
+	buffer = c.dataStore.Get(&c.Ctx, local)
+	localWsr := buffer.AsWorkspaceRoot()
+	localHardlinks, _ := loadHardlinks(c, localWsr.HardlinkEntry())
+
+	newHardlinks := make(map[HardlinkId]linkEntry, len(wsr.hardlinks))
+	mergeGeneric(wrapHardlinkMap(&baseHardlinks),
+		wrapHardlinkMap(&remoteHardlinks),
+		wrapHardlinkMap(&localHardlinks),
+		wrapHardlinkMap(&newHardlinks))
+	wsr.hardlinks = newHardlinks
 }
