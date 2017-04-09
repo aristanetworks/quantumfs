@@ -436,14 +436,8 @@ func publishHardlinkMap(c *ctx,
 	return baseLayer
 }
 
-func (wsr *WorkspaceRoot) publish(c *ctx) {
-	defer c.funcIn("WorkspaceRoot::publish").out()
-
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
-	defer wsr.linkLock.RLock().RUnlock()
-
-	// Upload the workspaceroot object
+// requires wsr lock and wsr link lock
+func (wsr *WorkspaceRoot) publishBuffer_(c *ctx) quantumfs.ObjectKey {
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
 	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
@@ -457,22 +451,63 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 		panic("Failed to upload new workspace root")
 	}
 
-	// Update workspace rootId
-	if newRootId != wsr.rootId {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
+	return newRootId
+}
+
+// Treelock must be locked for writing
+func (wsr *WorkspaceRoot) publish(c *ctx) {
+	defer c.funcIn("WorkspaceRoot::publish").out()
+
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+	defer wsr.linkLock.RLock().RUnlock()
+
+	// Upload the workspaceroot object
+	newRootId := wsr.publishBuffer_(c)
+	origRootId := wsr.rootId
+
+	lastRootId := quantumfs.EmptyBlockKey
+	for {
+		currentRootId, err := c.workspaceDB.Workspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace)
 
 		if err != nil {
-			msg := fmt.Sprintf("Unexpected workspace rootID update "+
-				"failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.String(), newRootId.String(),
-				wsr.rootId.String(), err.Error())
-			panic(msg)
+			panic("Unable to get current rootId for workspace")
 		}
 
-		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
-			rootId.String())
-		wsr.rootId = rootId
+		if !currentRootId.IsEqualTo(wsr.rootId) {
+			// We need to pull in the new rootId changes
+			wsr.Merge(c, wsr.rootId, currentRootId, newRootId)
+			// Recalculate the new rootId
+			newRootId = wsr.publishBuffer_(c)
+		}
+
+		if !newRootId.IsEqualTo(wsr.rootId) {
+			// Try to advance
+			rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx,
+				wsr.typespace, wsr.namespace, wsr.workspace,
+				wsr.rootId, newRootId)
+
+			if err == nil {
+				// Great, we're all done
+				c.dlog("Advanced rootId %s -> %s",
+					origRootId.String(), rootId.String())
+				wsr.rootId = rootId
+				return
+			}
+
+			// if there was an error, then check to see if this is the
+			// second time that we've tried to advance given this rootId
+			if currentRootId.IsEqualTo(lastRootId) {
+				panic(fmt.Sprintf("Failed to advance twice for "+
+					"rootId: %s", err))
+			}
+		} else {
+			// nothing to do
+			return
+		}
+
+		lastRootId = currentRootId
 	}
 }
 
@@ -624,4 +659,9 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	}
 
 	return directChildren
+}
+
+func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
 }
