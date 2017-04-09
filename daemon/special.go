@@ -277,6 +277,11 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
+func (special *Special) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+}
+
 func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
 	attr.Size = 0
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)

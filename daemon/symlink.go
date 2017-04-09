@@ -263,3 +263,8 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 
 	return link.key
 }
+
+func (link *Symlink) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+}

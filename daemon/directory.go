@@ -1707,6 +1707,11 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	return dir.baseLayerId
 }
 
+func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+}
+
 type directoryContents struct {
 	// All immutable after creation
 	filename string

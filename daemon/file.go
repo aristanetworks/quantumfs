@@ -741,6 +741,11 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
+func (fi *File) Merge(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
+	local quantumfs.ObjectKey) {
+
+}
+
 func newFileDescriptor(file *File, inodeNum InodeId,
 	fileHandleId FileHandleId, treeLock *sync.RWMutex) FileHandle {
 

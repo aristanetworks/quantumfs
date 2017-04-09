@@ -511,6 +511,12 @@ func (tsl *TypespaceList) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
+func (tsl *TypespaceList) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+	c.elog("Invalid Merge on TypespaceList")
+}
+
 func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
@@ -826,6 +832,12 @@ func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
 func (nsl *NamespaceList) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("NamespaceList::flush").out()
 	return quantumfs.EmptyBlockKey
+}
+
+func (nsl *NamespaceList) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+	c.elog("Invalid Merge on NamespaceList")
 }
 
 func newWorkspaceList(c *ctx, typespace string, namespace string, workspace string,
@@ -1146,7 +1158,14 @@ func (wsl *WorkspaceList) markAccessed(c *ctx, path string, created bool) {
 	c.elog("Invalid markAccessed on WorkspaceList")
 	return
 }
+
 func (wsl *WorkspaceList) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("WorkspaceList::flush").out()
 	return quantumfs.EmptyBlockKey
+}
+
+func (wsl *WorkspaceList) Merge(c *ctx, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+	c.elog("Invalid Merge on WorkspaceList")
 }
