@@ -697,7 +697,7 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 	if exists && mutability == workspaceImmutableUntilRestart {
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"Another user is writing to this workspace. Writes are "+
-			"disabled, some changes already made may be lost.")
+				"disabled, some changes already made may be lost.")
 	}
 
 	c.qfs.workspaceMutability[workspacePath] = workspaceMutable
@@ -811,7 +811,7 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 	if exists && mutability == workspaceImmutableUntilRestart {
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"Another user is writing to this workspace. Writes are "+
-			"disabled, some changes already made may be lost.")
+				"disabled, some changes already made may be lost.")
 	}
 
 	delete(c.qfs.workspaceMutability, workspacePath)
