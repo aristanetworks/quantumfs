@@ -484,7 +484,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 		if !currentRootId.IsEqualTo(wsr.rootId) {
 			// We need to pull in the new rootId changes
-			wsr.Merge(c, wsr.rootId, currentRootId, newRootId)
+			wsr.Merge(c, wsr.rootId, currentRootId)
 			// Recalculate the new rootId
 			newRootId = wsr.publishBuffer_(c)
 			wsr.rootId = currentRootId
@@ -670,7 +670,7 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 }
 
 func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+	remote quantumfs.ObjectKey) {
 
 	buffer := c.dataStore.Get(&c.Ctx, base)
 	baseWsr := buffer.AsWorkspaceRoot()
@@ -678,14 +678,10 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	buffer = c.dataStore.Get(&c.Ctx, remote)
 	remoteWsr := buffer.AsWorkspaceRoot()
 	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
-	buffer = c.dataStore.Get(&c.Ctx, local)
-	localWsr := buffer.AsWorkspaceRoot()
-	localHardlinks, _ := loadHardlinks(c, localWsr.HardlinkEntry())
 
-	newHardlinks := make(map[HardlinkId]linkEntry, len(wsr.hardlinks))
-	mergeGeneric(wrapHardlinkMap(&baseHardlinks),
+	mergeMapGeneric(wrapHardlinkMap(&baseHardlinks),
 		wrapHardlinkMap(&remoteHardlinks),
-		wrapHardlinkMap(&localHardlinks),
-		wrapHardlinkMap(&newHardlinks))
-	wsr.hardlinks = newHardlinks
+		wrapHardlinkMap(&wsr.hardlinks))
+
+	wsr.Directory.Merge(c, baseWsr.BaseLayer(), remoteWsr.BaseLayer())
 }

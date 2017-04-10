@@ -278,7 +278,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (special *Special) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+	remote quantumfs.ObjectKey) {
 
 }
 

@@ -1708,9 +1708,15 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
-
-}
+	remote quantumfs.ObjectKey) {
+/*
+	buffer := c.dataStore.Get(&c.Ctx, base)
+	baseDir := buffer.AsDirectory()
+	baseDirInst := initDirectory(baseDir)
+	buffer = c.dataStore.Get(&c.Ctx, remote)
+	remoteDir := buffer.AsDirectory()
+	remoteDirInst := initDirectory(remoteDir)
+*/}
 
 type directoryContents struct {
 	// All immutable after creation

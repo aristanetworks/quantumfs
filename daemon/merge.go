@@ -37,6 +37,10 @@ func (hl hardlinkMap) Set(key interface{}, value interface{}) {
 	(*hl.hardlinks)[key.(HardlinkId)] = value.(linkEntry)
 }
 
+func (hl hardlinkMap) Delete(key interface{}) {
+	delete((*hl.hardlinks), key.(HardlinkId))
+}
+
 type mergeValue interface {
 	Merge(remote interface{}, local interface{}) interface{}
 }
@@ -45,27 +49,29 @@ type mergeable interface {
 	Keys() []interface{}
 	Get(key interface{}) (value interface{}, exists bool)
 	Set(key interface{}, value interface{})
+	Delete(key interface{})
 }
 
 // Mergeable data structures should have universeally unique keys.
 // Otherwise, you'll just get weirdness where items made at the same
 // time on different quantumfs instances all become linked.
-func mergeGeneric(base mergeable, remote mergeable, local mergeable,
-	output mergeable) {
-
+func mergeMapGeneric(base mergeable, remote mergeable, localOut mergeable) {
 	for _, k := range base.Keys() {
 		// if something exists in both remote and local, then neither ws
 		// deleted it so just merge it
 		remoteLink, remoteExists := remote.Get(k)
-		localLink, localExists := local.Get(k)
+		localLink, localExists := localOut.Get(k)
 		if remoteExists && localExists {
 			baseItem, _ := base.Get(k)
-			output.Set(k, baseItem.(mergeValue).Merge(remoteLink,
+			localOut.Set(k, baseItem.(mergeValue).Merge(remoteLink,
 				localLink))
+		} else if !remoteExists && localExists {
+			// Remote deleted
+			localOut.Delete(k)
 		}
 	}
 
-	// Now handle new entries in both maps
+	// Now handle new entries in remote map
 	for _, k := range remote.Keys() {
 		_, baseExists := base.Get(k)
 		if baseExists {
@@ -73,15 +79,6 @@ func mergeGeneric(base mergeable, remote mergeable, local mergeable,
 		}
 
 		remoteItem, _ := remote.Get(k)
-		output.Set(k, remoteItem)
-	}
-	for _, k := range local.Keys() {
-		_, baseExists := base.Get(k)
-		if baseExists {
-			continue
-		}
-
-		localItem, _ := local.Get(k)
-		output.Set(k, localItem)
+		localOut.Set(k, remoteItem)
 	}
 }
