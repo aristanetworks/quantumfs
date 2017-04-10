@@ -470,10 +470,10 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 				"failure, wsdb %s, new %s, wsr %s: %s",
 				rootId.String(), newRootId.String(),
 				wsr.rootId.String(), err.Error())
-			c.elog("Another quantumfs instance is writing to this " +
-				"workspace. Your changes will be lost. " +
+			c.elog("Another quantumfs instance is writing to %s, " +
+				"your changes will be lost. " +
 				"Unable to sync to datastore - save your work " +
-				"somewhere else.")
+				"somewhere else.", workspacePath)
 
 			// Lock the user out of the workspace
 			defer c.qfs.mutabilityLock.Lock().Unlock()
