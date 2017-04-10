@@ -267,4 +267,5 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 func (link *Symlink) Merge(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey) {
 
+	c.elog("Invalid Merge on Symlink")
 }
