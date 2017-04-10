@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -49,13 +50,15 @@ func main() {
 		fmt.Println("           - count the diff in number of keys in between")
 		fmt.Println("	          the given workspaces")
 		fmt.Println("  du <workspace>  <path>")
-		fmt.Println("           - calculate the size on disk for the given workspace")
+		fmt.Println("           - calculate the size on disk for the given workspace.")
+		fmt.Println("             path is from the root of workspace")
 		fmt.Println("  ttl <workspace>")
 		fmt.Println("           - update TTL of all the blocks in the worksace as ")
 		fmt.Println("             per the TTL values in the config file")
 		fmt.Println("  setttl <workspace> <path> <threshold ttl(hrs)> <new ttl(hrs)>")
 		fmt.Println("           - update TTL of all the blocks in the worksace ")
-		fmt.Println("             in the given path to the given TTL value")
+		fmt.Println("             in the given path to the given TTL value.")
+		fmt.Println("             path is from the root of workspace")
 		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
@@ -136,11 +139,7 @@ func handleDiskUsage(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 
 	wsname := walkFlags.Arg(1)
 	searchPath := walkFlags.Arg(2)
-	if ok := path.IsAbs(searchPath); !ok {
-		fmt.Println("Path should be abolute")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
-	}
+	searchPath = filepath.Clean("/" + searchPath)
 
 	// Get RootID
 	var err error
@@ -213,6 +212,7 @@ func handleKeyCount(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	return nil
 }
 
+// TODO(sid) combine this with handleKeyCount
 func handleKeyDiffCount(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	qfsdb quantumfs.WorkspaceDB) error {
 
@@ -339,11 +339,8 @@ func handleSetTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	}
 	wsname := walkFlags.Arg(1)
 	searchPath := walkFlags.Arg(2)
-	if ok := path.IsAbs(searchPath); !ok {
-		fmt.Println("Path should be abolute")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
-	}
+	searchPath = filepath.Clean("/" + searchPath)
+
 	var err error
 	var setTTL int64
 	if setTTL, err = strconv.ParseInt(walkFlags.Arg(3), 10, 64); err != nil {
