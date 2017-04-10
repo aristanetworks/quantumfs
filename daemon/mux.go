@@ -76,6 +76,7 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 }
 
 type workspaceState int
+
 const (
 	workspaceImmutable workspaceState = iota
 	workspaceMutable
@@ -1001,7 +1002,7 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	if !exists || mutability != workspaceMutable {
 		return false
 	}
-	
+
 	return true
 
 }
