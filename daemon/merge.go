@@ -6,7 +6,23 @@ package daemon
 // This file contains functions to help with merging.
 
 func (le *linkEntry) Merge(remote interface{}, local interface{}) interface{} {
-	return remote
+	remoteLink := remote.(linkEntry)
+	localLink := local.(linkEntry)
+
+	// This counter should be replaced with a set of hashes
+	if remoteLink.nlink > le.nlink {
+		le.nlink = remoteLink.nlink
+	}
+	if localLink.nlink > le.nlink {
+		le.nlink = localLink.nlink
+	}
+
+	if remoteLink.record.ModificationTime() > le.record.ModificationTime() {
+		le.record = remoteLink.record
+	}
+	if localLink.record.ModificationTime() > le.record.ModificationTime() {
+		le.record = localLink.record
+	}
 }
 
 type hardlinkMap struct {
