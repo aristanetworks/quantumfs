@@ -669,6 +669,23 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	return directChildren
 }
 
+func (wsr *WorkspaceRoot) mergeLink(c *ctx, link HardlinkId, remote linkEntry) {
+	entry := wsr.hardlinks[link]
+	// This counter should be replaced with a set of hashes
+	if remote.nlink > entry.nlink {
+		wsr.hardlinks[link].nlink = remote.nlink
+	}
+
+	if remote.record.ModificationTime() > entry.record.ModificationTime() {
+		// reinstantiate it, if necessary
+		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
+		// if inode isn't instantiated, great we're done
+		if inode == nil {
+			wsr.hardlinks[link].record = remote.record
+		}
+	}
+}
+
 func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey) {
 
@@ -679,9 +696,33 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	remoteWsr := buffer.AsWorkspaceRoot()
 	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
 
-	mergeMapGeneric(wrapHardlinkMap(&baseHardlinks),
-		wrapHardlinkMap(&remoteHardlinks),
-		wrapHardlinkMap(&wsr.hardlinks))
+	toRemove := make([]HardlinkId, 0)
+	for k, v := range baseHardlinks {
+		// if something exists in both remote and local, then neither ws
+		// deleted it so just merge it
+		remoteLink, remoteExists := remoteHardlinks[k]
+		localLink, localExists := wsr.hardlinks[k]
+		if remoteExists && localExists {
+			wsr.hardlinks[k] = wsr.mergeLink(c, k, remoteLink)
+		} else if !remoteExists && localExists {
+			// Remote deleted
+			toRemove = append(toRemove, k)
+		}
+	}
+
+	// Now handle new entries in remote map
+	for k, v := range remoteHardlinks {
+		_, baseExists := baseHardlinks[k]
+		if baseExists {
+			continue
+		}
+
+		wsr.hardlinks[k] = v
+	}
+
+	for _, v := range toRemove {
+		delete(wsr.hardlinks, v)
+	}
 
 	wsr.Directory.Merge(c, baseWsr.BaseLayer(), remoteWsr.BaseLayer())
 }

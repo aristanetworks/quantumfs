@@ -59,9 +59,18 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.treeLock_ = treeLock
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
+	var uninstantiated []InodeId
+	dir.children, uninstantiated = loadChildMap(baseLayerId)
 
+	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
+
+	return uninstantiated
+}
+
+func loadChildMap(c *ctx, baseLayerId quantumfs.ObjectKey) (ChildMap, []InodeId) {
+	var rtnMap *ChildMap
 	uninstantiated := make([]InodeId, 0)
-
+	
 	key := baseLayerId
 	for {
 		c.vlog("Fetching baselayer %s", key.String())
@@ -72,17 +81,14 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 
 		baseLayer := buffer.AsDirectoryEntry()
 
-		if dir.children == nil {
-			dir.children = newChildMap(baseLayer.NumEntries(), wsr, dir)
+		if rtnMap == nil {
+			rtnMap = newChildMap(baseLayer.NumEntries(), wsr, dir)
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			childInodeNum := func() InodeId {
-				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.loadChild(c, baseLayer.Entry(i),
-					quantumfs.InodeIdInvalid)
-			}()
-			c.vlog("initDirectory %d getting child %d", inodeNum,
+			childInodeNum := dir.children.loadChild(c,
+				baseLayer.Entry(i), quantumfs.InodeIdInvalid)
+			c.vlog("loadChildMap %d getting child %d", inodeNum,
 				childInodeNum)
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
@@ -96,9 +102,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 		}
 	}
 
-	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
-
-	return uninstantiated
+	return rtnMap, uninstantiated
 }
 
 func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
@@ -1712,11 +1716,15 @@ func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
 /*
 	buffer := c.dataStore.Get(&c.Ctx, base)
 	baseDir := buffer.AsDirectory()
-	baseDirInst := initDirectory(baseDir)
+	baseChildMap := loadChildMap(c, baseDir)
 	buffer = c.dataStore.Get(&c.Ctx, remote)
 	remoteDir := buffer.AsDirectory()
-	remoteDirInst := initDirectory(remoteDir)
-*/}
+	remoteChildMap := loadChildMap(c, remoteDir)A
+
+	mergeMapGeneric(wrapHardlinkMap(&baseHardlinks),
+		wrapHardlinkMap(&remoteHardlinks),
+		wrapHardlinkMap(&wsr.hardlinks)) */
+}
 
 type directoryContents struct {
 	// All immutable after creation
