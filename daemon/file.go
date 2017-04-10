@@ -742,7 +742,7 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (fi *File) Merge(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey) {
-
+	c.elog("Invalid Merge on File")
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
