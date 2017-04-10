@@ -67,9 +67,9 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	err := loadCqlAdapterConfig(*config)
+	err := loadCqlWalkerConfig(*config)
 	if err != nil {
-		fmt.Printf("Failed to init ether.cql TTY values: %s\n",
+		fmt.Printf("Failed to init ether.cql TTL values: %s\n",
 			err.Error())
 		os.Exit(exitBadConfig)
 	}

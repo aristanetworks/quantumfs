@@ -41,7 +41,7 @@ func (d *ttlDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type cqlAdapterConfig struct {
+type cqlWalkerConfig struct {
 	// CqlTTLRefreshTime controls when a block's TTL is refreshed
 	// A block's TTL is refreshed when its TTL is <= CqlTTLRefreshTime
 	// ttlrefreshtime is a string accepted by
@@ -68,9 +68,9 @@ var refreshTTLTimeSecs int64
 var refreshTTLValueSecs int64
 var defaultTTLValueSecs int64
 
-func loadCqlAdapterConfig(path string) error {
+func loadCqlWalkerConfig(path string) error {
 	var c struct {
-		A cqlAdapterConfig `json:"adapter"`
+		A cqlWalkerConfig `json:"walker"`
 	}
 
 	f, err := os.Open(path)
