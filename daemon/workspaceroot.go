@@ -463,11 +463,24 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
-			msg := fmt.Sprintf("Unexpected workspace rootID update "+
+			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
+				wsr.workspace
+
+			c.elog("Unexpected workspace rootID update "+
 				"failure, wsdb %s, new %s, wsr %s: %s",
 				rootId.String(), newRootId.String(),
 				wsr.rootId.String(), err.Error())
-			panic(msg)
+			c.elog("Another quantumfs instance is writing to this "+
+				"workspace. Your changes will be lost. "+
+				"Unable to sync to datastore - save your work " +
+				"somewhere else.")
+
+			// Lock the user out of the workspace
+			defer c.qfs.mutabilityLock.Lock().Unlock()
+			c.qfs.workspaceMutability[workspacePath] = 0 +
+				workspaceImmutableUntilRestart
+
+			return
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
