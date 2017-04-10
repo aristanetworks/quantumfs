@@ -11,7 +11,7 @@ import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 type walkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64) error
 
@@ -36,11 +36,11 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			rootID.String(), key2String(rootID))
 	}
 
-	buf := testutils.NewSimpleBuffer(nil, rootID)
+	buf := utils.NewSimpleBuffer(nil, rootID)
 	if err := ds.Get(cq, rootID, buf); err != nil {
 		return err
 	}
-	testutils.AssertNonZeroBuf(buf,
+	utils.AssertNonZeroBuf(buf,
 		"WorkspaceRoot buffer %s",
 		key2String(rootID))
 
@@ -130,12 +130,12 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		}
 
 		key := hle.Next()
-		buf := testutils.NewSimpleBuffer(nil, key)
+		buf := utils.NewSimpleBuffer(nil, key)
 		if err := ds.Get(c.qctx, key, buf); err != nil {
 			return err
 		}
 
-		testutils.AssertNonZeroBuf(buf,
+		utils.AssertNonZeroBuf(buf,
 			"WorkspaceRoot buffer %s",
 			key2String(key))
 
@@ -153,12 +153,12 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := testutils.NewSimpleBuffer(nil, key)
+	buf := utils.NewSimpleBuffer(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	testutils.AssertNonZeroBuf(buf,
+	utils.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s",
 		key2String(key))
 
@@ -188,12 +188,12 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := testutils.NewSimpleBuffer(nil, key)
+	buf := utils.NewSimpleBuffer(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	testutils.AssertNonZeroBuf(buf,
+	utils.AssertNonZeroBuf(buf,
 		"VeryLargeFile buffer %s",
 		key2String(key))
 
@@ -218,12 +218,12 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf walkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := testutils.NewSimpleBuffer(nil, key)
+	buf := utils.NewSimpleBuffer(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	testutils.AssertNonZeroBuf(buf,
+	utils.AssertNonZeroBuf(buf,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
