@@ -278,7 +278,7 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (api *ApiInode) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+	remote quantumfs.ObjectKey) {
 
 	c.elog("Invalid Merge against ApiHandle")
 }
