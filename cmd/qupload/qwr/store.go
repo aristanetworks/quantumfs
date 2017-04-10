@@ -5,12 +5,12 @@ package qwr
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/hash"
-import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/utils"
 
 func writeBlock(qctx *quantumfs.Ctx, data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
 
 	key := quantumfs.NewObjectKey(keyType, hash.Hash(data))
-	buf := testutils.NewSimpleBuffer(data, key)
+	buf := utils.NewSimpleBuffer(data, key)
 	return key, ds.Set(qctx, key, buf)
 }
