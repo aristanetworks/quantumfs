@@ -14,22 +14,23 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 
-// SkipDir is used as a return value from WalkFuncs to indicate that
+// SkipDir is used as a return value from WalkFunc to indicate that
 // the directory named in the call is to be skipped. It is not returned
 // as an error by any function.
 var SkipDir = errors.New("skip this directory")
 
 // WalkFunc is the type of the function called for each block data under the
-// Worspace. A WalkFunc can return a SkipDir, in which case the dir on
-// which WalkFunc was called will not be walked further.
+// Workspace.
 //
-// NOTE: One key difference from golangs path/filepath/SkipDir is that
-// If the filepath.Walkunc returns SkipDir when invoked on a non-directory
-// file, Walk skips the remaining files in the containing directory.
+// NOTE: One key difference from golangs path/filepath/SkipDir is that,
+// in the golang version if filepath.Walkunc returns SkipDir when invoked
+// on a non-directory file, Walk skips the remaining files in the
+// containing directory.
 //
-// This walker in this packages honors SkipDir only when walkFunc is
-// called for directories.
-type WalkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64) error
+// This is not the case for the walker implemented by this package.
+// This walker honors SkipDir only when walkFunc is called for a
+// directory.
+type WalkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64, bool) error
 
 type Ctx struct {
 	context.Context
@@ -246,7 +247,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
-	if err := wf(c, path, key, uint64(buf.Size())); err != nil {
+	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
 		if err == SkipDir {
 			return nil
 		}
@@ -308,7 +309,7 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
-			keyItem.size); err != nil {
+			keyItem.size, false); err != nil {
 			return err
 		}
 	}
