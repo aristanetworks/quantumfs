@@ -1,10 +1,10 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package testutils
+package utils
 
-// This file contains a buffer for the testing purpose only. Some interface functions
-// are only briefly implemented with a dummy return value
+// This file contains a buffer for use in testing, walker, and uploader.
+// Some interface functions are only briefly implemented with a dummy return value.
 
 import "fmt"
 import "github.com/aristanetworks/quantumfs"
