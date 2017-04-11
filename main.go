@@ -152,7 +152,8 @@ func handleDiskUsage(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	}
 
 	var totalSize uint64
-	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey, size uint64) error {
+	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
 		if !strings.HasPrefix(path, searchPath) {
 			return nil
 		}
@@ -183,7 +184,8 @@ func handleKeyCount(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	var totalKeys, totalSize, uniqKeys, uniqSize uint64
 	var mapLock utils.DeferableMutex
 	keysRecorded := make(map[string]bool)
-	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey, size uint64) error {
+	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
 
 		defer mapLock.Lock().Unlock()
 		if _, exists := keysRecorded[key.String()]; !exists {
@@ -242,7 +244,8 @@ func handleKeyDiffCount(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 
 	keys := make(map[string]uint64)
 	var mapLock utils.DeferableMutex
-	keyRecorder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey, size uint64) error {
+	keyRecorder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
 		defer mapLock.Lock().Unlock()
 		keys[key.String()] = size
 		return nil
@@ -301,7 +304,7 @@ func handleTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	}
 	// Internal Walker for TTL.
 	var ttlWalker = func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64) error {
+		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		if key.Type() == quantumfs.KeyTypeConstant ||
 			key.Type() == quantumfs.KeyTypeEmbedded {
@@ -362,7 +365,7 @@ func handleSetTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 
 	// Internal Walker for TTL.
 	var ttlWalker = func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64) error {
+		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		if !strings.HasPrefix(path, searchPath) {
 			return nil
