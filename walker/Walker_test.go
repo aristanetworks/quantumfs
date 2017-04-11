@@ -202,3 +202,49 @@ func TestMiscWalk(t *testing.T) {
 		test.readWalkCompare(workspace)
 	})
 }
+
+func TestMiscWalkWithSkipDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(50)
+		workspace := test.NewWorkspace()
+
+		// Write Dir1
+		dirname := workspace + "/dir1"
+		err := os.MkdirAll(dirname, 0777)
+		test.Assert(err == nil, "Mkdir failed (%s): %s",
+			dirname, err)
+
+		// Write File 1
+		filename := workspace + "/file1"
+		err = ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		// Write File in dir
+		filename = dirname + "/file1"
+		err = ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		// Write file 2 in dir
+		filename2 := dirname + "/file2"
+		err = ioutil.WriteFile(filename2, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename2, err)
+
+		// Mark Hard Link 1
+		link := workspace + "/filelink"
+		err = os.Link(filename, link)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link, err)
+
+		// Mark Hard Link 2
+		link = workspace + "/filelink2"
+		err = os.Link(filename2, link)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link, err)
+
+		test.readWalkCompareSkip(workspace)
+	})
+}
