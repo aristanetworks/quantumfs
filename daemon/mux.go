@@ -44,7 +44,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		flushComplete:          make(chan struct{}),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
-		workspaceMutability:    make(map[string]bool),
+		workspaceMutability:    make(map[string]workspaceState),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -74,6 +74,14 @@ func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
 	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
 		config.MemLogBytes, qlog.PrintToStdout))
 }
+
+type workspaceState int
+
+const (
+	workspaceImmutable workspaceState = iota
+	workspaceMutable
+	workspaceImmutableUntilRestart
+)
 
 type QuantumFs struct {
 	fuse.RawFileSystem
@@ -149,7 +157,7 @@ type QuantumFs struct {
 	// Empty entires are default as read-only.  When set the workspace immutable,
 	// delete the entry from the map
 	mutabilityLock      utils.DeferableRwMutex
-	workspaceMutability map[string]bool
+	workspaceMutability map[string]workspaceState
 }
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
@@ -996,9 +1004,12 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	defer qfs.mutabilityLock.RLock().RUnlock()
 
 	key := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
-	_, exists := qfs.workspaceMutability[key]
+	mutability, exists := qfs.workspaceMutability[key]
+	if !exists || mutability != workspaceMutable {
+		return false
+	}
 
-	return exists
+	return true
 
 }
 
