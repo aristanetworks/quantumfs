@@ -670,18 +670,32 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 }
 
 func (wsr *WorkspaceRoot) mergeLink(c *ctx, link HardlinkId, remote linkEntry) {
-	entry := wsr.hardlinks[link]
-	// This counter should be replaced with a set of hashes
-	if remote.nlink > entry.nlink {
-		wsr.hardlinks[link].nlink = remote.nlink
-	}
+	inodeId, reinstantiate := func () (InodeId, bool) {
+		defer wsr.linkLock.Lock().Unlock()
+		entry := wsr.hardlinks[link]
 
-	if remote.record.ModificationTime() > entry.record.ModificationTime() {
-		// reinstantiate it, if necessary
-		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
-		// if inode isn't instantiated, great we're done
-		if inode == nil {
-			wsr.hardlinks[link].record = remote.record
+		// This counter should be replaced with a set of hashes
+		if remote.nlink > entry.nlink {
+			entry.nlink = remote.nlink
+			wsr.hardlinks[link] = entry
+		}
+
+		localModTime := entry.record.ModificationTime()
+		if remote.record.ModificationTime() > localModTime {
+			entry.record = remote.record
+			wsr.hardlinks[link] = entry
+			return entry.inodeId, true
+		}
+
+		return entry.inodeId, false
+	} ()
+
+	if reinstantiate {
+		inode := c.qfs.inodeNoInstantiate(c, inodeId)
+		// if it has been instantiated, we need to reinstantiate it
+		if inode != nil {
+			c.qfs.setInode(c, inodeId, nil)
+			c.qfs.inode(c, inodeId)
 		}
 	}
 }
@@ -697,13 +711,15 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
 
 	toRemove := make([]HardlinkId, 0)
-	for k, v := range baseHardlinks {
+	for k, _ := range baseHardlinks {
 		// if something exists in both remote and local, then neither ws
 		// deleted it so just merge it
+
 		remoteLink, remoteExists := remoteHardlinks[k]
-		localLink, localExists := wsr.hardlinks[k]
+		_, localExists := wsr.hardlinks[k]
+
 		if remoteExists && localExists {
-			wsr.hardlinks[k] = wsr.mergeLink(c, k, remoteLink)
+			wsr.mergeLink(c, k, remoteLink)
 		} else if !remoteExists && localExists {
 			// Remote deleted
 			toRemove = append(toRemove, k)
