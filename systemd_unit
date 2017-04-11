@@ -14,4 +14,4 @@ ExecStop=/bin/bash -c 'while grep -q QuantumFS /proc/self/mountinfo; do sleep 1;
 User=root
 
 [Install]
-
+WantedBy=multi-user.target
