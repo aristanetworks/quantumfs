@@ -58,6 +58,8 @@ func main() {
 		fmt.Println("           - update TTL of all the blocks in the worksace ")
 		fmt.Println("             in the given path to the given TTL value.")
 		fmt.Println("             path is from the root of workspace")
+		fmt.Println("  list")
+		fmt.Println("           - list all workspaces")
 		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
@@ -111,6 +113,8 @@ func main() {
 		err = handleTTL(c, qfsds, cqlds, qfsdb)
 	case "setttl":
 		err = handleSetTTL(c, qfsds, cqlds, qfsdb)
+	case "list":
+		err = printList(c, qfsds, cqlds, qfsdb)
 	default:
 		fmt.Println("Unsupported walk sub-command: ", walkFlags.Arg(0))
 		walkFlags.Usage()
@@ -321,6 +325,7 @@ func handleTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
+		fmt.Println("Walk failed for ttl with rootID: ", rootID)
 		return err
 	}
 	return nil
@@ -387,6 +392,45 @@ func handleSetTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	refreshTTLTimeSecs = setTTL
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
 		return err
+	}
+	return nil
+}
+
+func printList(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
+	cqlds blobstore.BlobStore, wsdb quantumfs.WorkspaceDB) error {
+
+	// Cleanup Args
+	if walkFlags.NArg() != 1 {
+		walkFlags.Usage()
+		os.Exit(exitBadCmd)
+	}
+
+	tsl, err := wsdb.TypespaceList(c)
+	if err != nil {
+		fmt.Println("Error in getting list of Typespaces")
+		return err
+	}
+	for _, ts := range tsl {
+		// Assuming we do not have _/X/Y
+		if ts == quantumfs.NullSpaceName {
+			continue
+		}
+		nsl, err := wsdb.NamespaceList(c, ts)
+		if err != nil {
+			fmt.Printf("Error in getting list of Namespaces for TS:%s\n", ts)
+			continue
+		}
+		for _, ns := range nsl {
+			wsl, err := wsdb.WorkspaceList(c, ts, ns)
+			if err != nil {
+				fmt.Println("Error in getting list of Workspaces "+
+					"for TS:%s NS:%s", ts, ns)
+				continue
+			}
+			for _, ws := range wsl {
+				fmt.Printf("%s/%s/%s\n", ts, ns, ws)
+			}
+		}
 	}
 	return nil
 }
