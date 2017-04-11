@@ -443,8 +443,11 @@ func publishHardlinkMap(c *ctx,
 	return baseLayer
 }
 
-// requires wsr lock and wsr link lock
-func (wsr *WorkspaceRoot) publishBuffer_(c *ctx) quantumfs.ObjectKey {
+func (wsr *WorkspaceRoot) publishBuffer(c *ctx) quantumfs.ObjectKey {
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+	defer wsr.linkLock.RLock().RUnlock()
+
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
 	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
@@ -465,12 +468,8 @@ func (wsr *WorkspaceRoot) publishBuffer_(c *ctx) quantumfs.ObjectKey {
 func (wsr *WorkspaceRoot) publish(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::publish").out()
 
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
-	defer wsr.linkLock.RLock().RUnlock()
-
 	// Upload the workspaceroot object
-	newRootId := wsr.publishBuffer_(c)
+	newRootId := wsr.publishBuffer(c)
 	origRootId := wsr.rootId
 
 	lastRootId := quantumfs.EmptyBlockKey
@@ -485,8 +484,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 		if !currentRootId.IsEqualTo(wsr.rootId) {
 			// We need to pull in the new rootId changes
 			wsr.Merge(c, wsr.rootId, currentRootId)
-			// Recalculate the new rootId
-			newRootId = wsr.publishBuffer_(c)
+			// Recalculate the new rootId after re-flushing
+			wsr.Directory.flush(c)
+			newRootId = wsr.publishBuffer(c)
 			wsr.rootId = currentRootId
 		}
 
@@ -741,4 +741,6 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	wsr.Directory.Merge(c, baseWsr.BaseLayer(), remoteWsr.BaseLayer())
+
+	wsr.self.dirty(c)
 }
