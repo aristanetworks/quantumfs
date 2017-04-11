@@ -60,14 +60,17 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 	var uninstantiated []InodeId
-	dir.children, uninstantiated = loadChildMap(baseLayerId)
+	children, uninstantiated := dir.newChildMap(c, baseLayerId)
+	dir.children = children
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 
 	return uninstantiated
 }
 
-func loadChildMap(c *ctx, baseLayerId quantumfs.ObjectKey) (ChildMap, []InodeId) {
+func (dir *Directory) newChildMap(c *ctx,
+	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
+
 	var rtnMap *ChildMap
 	uninstantiated := make([]InodeId, 0)
 	
@@ -82,13 +85,13 @@ func loadChildMap(c *ctx, baseLayerId quantumfs.ObjectKey) (ChildMap, []InodeId)
 		baseLayer := buffer.AsDirectoryEntry()
 
 		if rtnMap == nil {
-			rtnMap = newChildMap(baseLayer.NumEntries(), wsr, dir)
+			rtnMap = newChildMap(baseLayer.NumEntries(), dir.wsr, dir)
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := dir.children.loadChild(c,
 				baseLayer.Entry(i), quantumfs.InodeIdInvalid)
-			c.vlog("loadChildMap %d getting child %d", inodeNum,
+			c.vlog("newChildMap %d getting child %d", dir.inodeNum(),
 				childInodeNum)
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
@@ -1716,10 +1719,10 @@ func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
 /*
 	buffer := c.dataStore.Get(&c.Ctx, base)
 	baseDir := buffer.AsDirectory()
-	baseChildMap := loadChildMap(c, baseDir)
+	baseChildMap := dir.newChildMap(c, baseDir)
 	buffer = c.dataStore.Get(&c.Ctx, remote)
 	remoteDir := buffer.AsDirectory()
-	remoteChildMap := loadChildMap(c, remoteDir)A
+	remoteChildMap := dir.newChildMap(c, remoteDir)A
 
 	mergeMapGeneric(wrapHardlinkMap(&baseHardlinks),
 		wrapHardlinkMap(&remoteHardlinks),
