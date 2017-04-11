@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -98,9 +97,9 @@ func main() {
 
 	c := newCtx()
 	start := time.Now()
-	// TODO: build a progress bar to indicate tool progress
-	fmt.Println("Started walk...")
 
+	// TODO: build a progress bar to indicate tool progress
+	// With option only
 	switch walkFlags.Arg(0) {
 	case "du":
 		err = handleDiskUsage(c, qfsds, qfsdb)
@@ -118,13 +117,13 @@ func main() {
 		os.Exit(exitBadCmd)
 	}
 
+	walkTime := time.Since(start)
 	if err != nil {
-		fmt.Println("Walk failed with error: ", err.Error())
+		fmt.Printf("Walk failed after %v with error: %v\n", walkTime, err.Error())
 		os.Exit(exitBadCmd)
 	}
 
-	walkTime := time.Since(start)
-	fmt.Println("Walk completed successfully in ", walkTime)
+	fmt.Printf("Walk completed successfully after %v\n", walkTime)
 }
 
 func handleDiskUsage(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
