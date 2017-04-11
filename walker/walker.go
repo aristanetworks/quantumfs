@@ -3,6 +3,7 @@
 
 package walker
 
+import "errors"
 import "fmt"
 import "path/filepath"
 import "runtime"
@@ -13,7 +14,24 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 
-type walkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64) error
+// SkipDir is used as a return value from WalkFunc to indicate that
+// the directory named in the call is to be skipped. It is not returned
+// as an error by any function.
+var SkipDir = errors.New("skip this directory")
+
+// WalkFunc is the type of the function called for each data block under the
+// Workspace.
+//
+// NOTE
+// Walker in this package honors SkipDir only when walkFunc is called for a
+// directory.
+//
+// This is a key difference from path/filepath.Walk,
+// in which if filepath.Walkunc returns SkipDir when invoked on a
+// non-directory file, Walk skips the remaining files in the
+// containing directory.
+type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
+	size uint64, isDir bool) error
 
 type Ctx struct {
 	context.Context
@@ -28,7 +46,7 @@ type workerData struct {
 
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
-	wf walkFunc) error {
+	wf WalkFunc) error {
 
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
 		return fmt.Errorf(
@@ -76,8 +94,12 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			return err
 		}
 
+		// Skip WSR
 		if err := handleDirectoryEntry(c, "/", ds, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
+			if err == SkipDir {
+				return nil
+			}
 			return err
 		}
 		return nil
@@ -108,7 +130,7 @@ func key2String(key quantumfs.ObjectKey) string {
 }
 
 func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
-	hle quantumfs.HardlinkEntry, wf walkFunc,
+	hle quantumfs.HardlinkEntry, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	for {
@@ -150,7 +172,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 }
 
 func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf walkFunc,
+	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	buf := utils.NewSimpleBuffer(nil, key)
@@ -185,7 +207,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 }
 
 func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf walkFunc,
+	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	buf := utils.NewSimpleBuffer(nil, key)
@@ -215,7 +237,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 var totalFilesWalked uint64
 
 func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf walkFunc,
+	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	buf := utils.NewSimpleBuffer(nil, key)
@@ -227,8 +249,11 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
-	if err := writeToChan(c, keyChan, path, key,
-		uint64(buf.Size())); err != nil {
+	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
+	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
+		if err == SkipDir {
+			return nil
+		}
 		return err
 	}
 
@@ -244,7 +269,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 }
 
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
-	dr *quantumfs.DirectRecord, wf walkFunc,
+	dr *quantumfs.DirectRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	fpath := filepath.Join(path, dr.Filename())
@@ -273,7 +298,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func worker(c *Ctx, keyChan <-chan *workerData, wf walkFunc) error {
+func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 	var keyItem *workerData
 	for {
 		select {
@@ -287,7 +312,7 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf walkFunc) error {
 
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
-			keyItem.size); err != nil {
+			keyItem.size, false); err != nil {
 			return err
 		}
 	}
