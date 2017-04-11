@@ -144,6 +144,10 @@ func init() {
 		if err := os.Chmod(TestRunDir, 0777); err != nil {
 			continue
 		}
+		if utils.WriteRecords("tmpRecord", TestRunDir) != nil {
+			continue
+		}
+
 		return
 	}
 	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))

@@ -5,7 +5,7 @@ version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
-all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
+all: cleanup lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -15,6 +15,9 @@ fetch:
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
+
+cleanup:
+	./cleanup.sh &
 
 lockcheck:
 	./lockcheck.sh
