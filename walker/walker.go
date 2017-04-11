@@ -19,18 +19,19 @@ import "github.com/aristanetworks/quantumfs/utils"
 // as an error by any function.
 var SkipDir = errors.New("skip this directory")
 
-// WalkFunc is the type of the function called for each block data under the
+// WalkFunc is the type of the function called for each data block under the
 // Workspace.
 //
-// NOTE: One key difference from golangs path/filepath/SkipDir is that,
-// in the golang version if filepath.Walkunc returns SkipDir when invoked
-// on a non-directory file, Walk skips the remaining files in the
-// containing directory.
-//
-// This is not the case for the walker implemented by this package.
-// This walker honors SkipDir only when walkFunc is called for a
+// NOTE
+// Walker in this package honors SkipDir only when walkFunc is called for a
 // directory.
-type WalkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64, bool) error
+//
+// This is a key difference from path/filepath.Walk,
+// in which if filepath.Walkunc returns SkipDir when invoked on a
+// non-directory file, Walk skips the remaining files in the
+// containing directory.
+type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
+	size uint64, isDir bool) error
 
 type Ctx struct {
 	context.Context
@@ -93,6 +94,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			return err
 		}
 
+		// Skip WSR
 		if err := handleDirectoryEntry(c, "/", ds, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
 			if err == SkipDir {
@@ -247,6 +249,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
+	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
 	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
 		if err == SkipDir {
 			return nil
