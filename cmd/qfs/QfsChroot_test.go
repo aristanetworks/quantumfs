@@ -68,6 +68,12 @@ func setupWorkspace(t *testing.T) string {
 			err.Error())
 	}
 
+	err = utils.WriteRecords("chrootRecord", dirTest)
+	if err != nil {
+		t.Fatalf("Creating cleanup record %s error: %s", dirTest,
+			err.Error())
+	}
+
 	if err := os.Chmod(dirTest, 0777); err != nil {
 		t.Fatalf("Changing mode of directory %s error: %s",
 			dirTest, err.Error())

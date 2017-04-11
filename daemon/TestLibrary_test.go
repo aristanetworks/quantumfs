@@ -19,6 +19,7 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestMain(m *testing.M) {
@@ -280,6 +281,9 @@ func init() {
 			continue
 		}
 		if err := os.Chmod(testRunDir, 777); err != nil {
+			continue
+		}
+		if utils.WriteRecords("devRecord", testRunDir) != nil {
 			continue
 		}
 		return

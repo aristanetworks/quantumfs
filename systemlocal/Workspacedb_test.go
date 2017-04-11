@@ -37,6 +37,7 @@ func runTest(t *testing.T, test systemlocalTest) {
 		panic(fmt.Sprintf("Unable to create test directory: %v", err))
 	}
 
+	utils.WriteRecords("systemRecord", testDir)
 	test(testDir)
 
 	os.RemoveAll(testDir)
