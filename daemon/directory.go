@@ -89,7 +89,7 @@ func (dir *Directory) newChildMap(c *ctx,
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			childInodeNum := dir.children.loadChild(c,
+			childInodeNum := rtnMap.loadChild(c,
 				baseLayer.Entry(i), quantumfs.InodeIdInvalid)
 			c.vlog("newChildMap %d getting child %d", dir.inodeNum(),
 				childInodeNum)
@@ -1722,11 +1722,8 @@ func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
 	baseChildMap := dir.newChildMap(c, baseDir)
 	buffer = c.dataStore.Get(&c.Ctx, remote)
 	remoteDir := buffer.AsDirectory()
-	remoteChildMap := dir.newChildMap(c, remoteDir)A
-
-	mergeMapGeneric(wrapHardlinkMap(&baseHardlinks),
-		wrapHardlinkMap(&remoteHardlinks),
-		wrapHardlinkMap(&wsr.hardlinks)) */
+	remoteChildMap := dir.newChildMap(c, remoteDir)
+*/
 }
 
 type directoryContents struct {
