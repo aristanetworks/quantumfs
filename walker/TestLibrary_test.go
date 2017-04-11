@@ -4,11 +4,8 @@
 package walker
 
 import "flag"
-import "fmt"
-
 import "io/ioutil"
 import "os"
-
 import "path/filepath"
 import "reflect"
 import "runtime"
@@ -179,8 +176,8 @@ func (th *testHelper) readWalkCompare(workspace string) {
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
 	if eq != true {
-		printMap("Original Map", getMap)
-		printMap("Walker Map", walkerMap)
+		th.printMap("Original Map", getMap)
+		th.printMap("Walker Map", walkerMap)
 	}
 	th.Assert(eq == true, "2 maps are not equal")
 }
@@ -203,7 +200,7 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 			return nil
 		}
 
-		if info.IsDir() && path == "/dir1" {
+		if info.IsDir() && strings.HasSuffix(path, "/dir1") {
 			return filepath.SkipDir
 		}
 
@@ -233,12 +230,13 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 
 		defer mapLock.Lock().Unlock()
 
-		walkerMap[key.String()] = 1
 		// NOTE: In the TTL walker this path comparison will be
 		// replaced by a TTL comparison.
-		if isDir && path == "/dir1" {
+		if isDir && strings.HasSuffix(path, "/dir1") {
 			return SkipDir
 		}
+
+		walkerMap[key.String()] = 1
 		return nil
 	}
 
@@ -247,17 +245,17 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
 	if eq != true {
-		printMap("Original Map", getMap)
-		printMap("Walker Map", walkerMap)
+		th.printMap("Original Map", getMap)
+		th.printMap("Walker Map", walkerMap)
 	}
 	th.Assert(eq == true, "2 maps are not equal")
 }
 
-func printMap(name string, m map[string]int) {
+func (th *testHelper) printMap(name string, m map[string]int) {
 
-	fmt.Println(name, ":")
+	th.Log("%v: ", name)
 	for k, v := range m {
-		fmt.Println(k, ": ", v)
+		th.Log("%v: %v", k, v)
 	}
 }
 
