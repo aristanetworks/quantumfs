@@ -178,6 +178,10 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	th.Assert(err == nil, "Error in walk: %v", err)
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
+	if eq != true {
+		printMap("Original Map", getMap)
+		printMap("Walker Map", walkerMap)
+	}
 	th.Assert(eq == true, "2 maps are not equal")
 }
 
@@ -242,6 +246,10 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 	th.Assert(err == nil, "Error in walk: %v", err)
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
+	if eq != true {
+		printMap("Original Map", getMap)
+		printMap("Walker Map", walkerMap)
+	}
 	th.Assert(eq == true, "2 maps are not equal")
 }
 
