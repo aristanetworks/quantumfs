@@ -54,7 +54,7 @@ func main() {
 		fmt.Println("  ttl <workspace>")
 		fmt.Println("           - update TTL of all the blocks in the worksace as ")
 		fmt.Println("             per the TTL values in the config file")
-		fmt.Println("  setttl <workspace> <path> <threshold ttl(hrs)> <new ttl(hrs)>")
+		fmt.Println("  forceTTL <workspace> <path> <threshold ttl(hrs)> <new ttl(hrs)>")
 		fmt.Println("           - update TTL of all the blocks in the worksace ")
 		fmt.Println("             in the given path to the given TTL value.")
 		fmt.Println("             path is from the root of workspace")
@@ -111,8 +111,8 @@ func main() {
 		err = handleKeyDiffCount(c, qfsds, qfsdb)
 	case "ttl":
 		err = handleTTL(c, qfsds, cqlds, qfsdb)
-	case "setttl":
-		err = handleSetTTL(c, qfsds, cqlds, qfsdb)
+	case "forceTTL":
+		err = handleForceTTL(c, qfsds, cqlds, qfsdb)
 	case "list":
 		err = printList(c, qfsds, cqlds, qfsdb)
 	default:
@@ -334,12 +334,12 @@ func handleTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	return nil
 }
 
-func handleSetTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
+func handleForceTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	cqlds blobstore.BlobStore, qfsdb quantumfs.WorkspaceDB) error {
 
 	// Cleanup Args
 	if walkFlags.NArg() != 5 {
-		fmt.Println("setttl subcommand takes 4 arg: wsname path " +
+		fmt.Println("forceTTL subcommand takes 4 arg: wsname path " +
 			" <threshold TTL(hrs)> <new TTL(hrs)>")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
@@ -352,7 +352,7 @@ func handleSetTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	var setTTL int64
 	if setTTL, err = strconv.ParseInt(walkFlags.Arg(3), 10, 64); err != nil {
 		fmt.Println("TTL val is not a valid integer")
-		fmt.Println("setttl subcommand takes 2 args: wsname path")
+		fmt.Println("forceTTL subcommand takes 2 args: wsname path")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
