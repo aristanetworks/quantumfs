@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mkdir History 
+mkdir History
 
 # The go-test should be no longer than 2 min; otherwise, it is hanging
 sleep 120
@@ -46,7 +46,7 @@ done <$chrootRecord
 
 # Clean up the left-over temporary workspace in /dev/shm
 while IFS= read line
-do sudo rm -rf $line 
+do sudo rm -rf $line
 done <$devRecord
 
 # Clean up the rest left-over of quantumfsTest
