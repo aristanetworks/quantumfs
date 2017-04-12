@@ -682,9 +682,12 @@ func (wsr *WorkspaceRoot) mergeLink(c *ctx, link HardlinkId, remote linkEntry) {
 
 		localModTime := entry.record.ModificationTime()
 		if remote.record.ModificationTime() > localModTime {
+			keySame := remote.record.ID().IsEqualTo(entry.record.ID())
 			entry.record = remote.record
 			wsr.hardlinks[link] = entry
-			return entry.inodeId, true
+
+			// if object key has changed, we must reinstantiate
+			return entry.inodeId, !keySame
 		}
 
 		return entry.inodeId, false
@@ -710,35 +713,42 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 	remoteWsr := buffer.AsWorkspaceRoot()
 	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
 
-	toRemove := make([]HardlinkId, 0)
-	for k, _ := range baseHardlinks {
-		// if something exists in both remote and local, then neither ws
-		// deleted it so just merge it
+	func () {
+		wsr.lock.RLock()
+		defer wsr.lock.RUnlock()
+		defer wsr.linkLock.RLock().RUnlock()
 
-		remoteLink, remoteExists := remoteHardlinks[k]
-		_, localExists := wsr.hardlinks[k]
+		// There are only three states we need to check: added, removed,
+		// changed
+		toRemove := make([]HardlinkId, 0)
+		for k, _ := range baseHardlinks {
+			remoteLink, remoteExists := remoteHardlinks[k]
+			_, localExists := wsr.hardlinks[k]
 
-		if remoteExists && localExists {
-			wsr.mergeLink(c, k, remoteLink)
-		} else if !remoteExists && localExists {
-			// Remote deleted
-			toRemove = append(toRemove, k)
-		}
-	}
-
-	// Now handle new entries in remote map
-	for k, v := range remoteHardlinks {
-		_, baseExists := baseHardlinks[k]
-		if baseExists {
-			continue
+			if remoteExists && localExists {
+				// changed
+				wsr.mergeLink(c, k, remoteLink)
+			} else if !remoteExists && localExists {
+				// removed
+				toRemove = append(toRemove, k)
+			}
 		}
 
-		wsr.hardlinks[k] = v
-	}
+		// Now handle new entries in remote map
+		for k, v := range remoteHardlinks {
+			_, baseExists := baseHardlinks[k]
+			if baseExists {
+				continue
+			}
 
-	for _, v := range toRemove {
-		delete(wsr.hardlinks, v)
-	}
+			// added
+			wsr.hardlinks[k] = v
+		}
+
+		for _, v := range toRemove {
+			delete(wsr.hardlinks, v)
+		}
+	} ()
 
 	wsr.Directory.Merge(c, baseWsr.BaseLayer(), remoteWsr.BaseLayer())
 

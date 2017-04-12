@@ -854,6 +854,33 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	return result
 }
 
+func (dir *Directory) internalRmRf(c *ctx, name string) {
+	defer c.funcIn("Directory::internalRmRf").out()
+
+	childId := func() InodeId {
+		defer dir.childRecordLock.Lock().Unlock()
+		return dir.children.inodeNum(name)
+	}()
+	child := c.qfs.inode(c, childId)
+
+	if childDir, isDir := child.(*Directory); isDir {
+		// clear the children first
+		for _, v := range dir.children.records() {
+			childDir.internalRmRf(c, v.Filename())
+		}
+
+		err := dir.Rmdir(c, name)
+		if err != fuse.OK {
+			panic(fmt.Sprintf("Unable to Rmdir %s", name))
+		}
+	} else {
+		err := dir.Unlink(c, name)
+		if err != fuse.OK {
+			panic(fmt.Sprintf("Unable to Unlink %s", name))
+		}
+	}
+}
+
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Rmdir", "%s", name).out()
 
@@ -1714,16 +1741,82 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	return dir.baseLayerId
 }
 
+func (dir *Directory) mergeRecord(c *ctx, name string,
+	base quantumfs.DirectoryRecord, remote quantumfs.DirectoryRecord) {
+
+	inodeNum, localCopy := func () (InodeId, quantumfs.DirectoryRecord) {
+		defer dir.childRecordLock.Lock().Unlock()
+		num := dir.children.inodeNum(name)
+		return num, dir.children.record(num).ShallowCopy()
+	} ()
+
+	child := c.qfs.inode(c, inodeNum)
+
+	if remote.ModificationTime() > localCopy.ModificationTime() {
+		func () {
+			defer dir.childRecordLock.Lock().Unlock()
+			dir.children.loadChild(c, remote, inodeNum)
+		} ()
+	}
+
+	if !remote.ID().IsEqualTo(localCopy.ID()) {
+		child.Merge(c, base.ID(), remote.ID())
+	}
+}
+
 func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey) {
-/*
-	buffer := c.dataStore.Get(&c.Ctx, base)
-	baseDir := buffer.AsDirectory()
-	baseChildMap := dir.newChildMap(c, baseDir)
-	buffer = c.dataStore.Get(&c.Ctx, remote)
-	remoteDir := buffer.AsDirectory()
-	remoteChildMap := dir.newChildMap(c, remoteDir)
-*/
+
+	toRemove := func () []string {
+		defer dir.Lock().Unlock()
+
+		baseChildMap, _ := dir.newChildMap(c, base)
+		remoteChildMap, _ := dir.newChildMap(c, remote)
+
+		toRemove := make([]string, 0)
+		baseChildren := baseChildMap.records()
+		for _, v := range baseChildren {
+			remoteChild := remoteChildMap.recordByName(c, v.Filename())
+			localChild := func () quantumfs.DirectoryRecord {
+				defer dir.childRecordLock.Lock().Unlock()
+				record := dir.children.recordByName(c, v.Filename())
+				if record == nil {
+					return nil
+				}
+
+				return record.ShallowCopy()
+			}
+
+			if remoteChild != nil && localChild != nil {
+				// changed
+				dir.mergeRecord(c, v.Filename(), v, remoteChild)
+			} else if remoteChild == nil && localChild != nil {
+				// removed
+				toRemove = append(toRemove, v.Filename())
+			}
+		}
+
+		remoteChildren := remoteChildMap.records()
+		defer dir.childRecordLock.Lock().Unlock()
+		for _, v := range remoteChildren {
+			baseChild := baseChildMap.recordByName(c, v.Filename())
+			if baseChild != nil {
+				continue
+			}
+
+			// added
+			inodeNum := dir.children.loadChild(c, v,
+				quantumfs.InodeIdInvalid)
+			c.qfs.addUninstantiated(c, []InodeId{inodeNum},
+				dir.inodeNum())
+		}
+
+		return toRemove
+	} ()
+
+	for _, v := range toRemove {
+		dir.internalRmRf(c, v)
+	}
 }
 
 type directoryContents struct {
