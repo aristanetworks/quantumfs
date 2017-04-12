@@ -63,16 +63,16 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 func (b *cqlBlobStore) Insert(key string, value []byte,
 	metadata map[string]string) error {
 
-	//TODO(krishna): after adjusting ether adapter in QFS
-	//  make metadata mandatory
-	keyExists := false
-	ttl := "0"
-	if metadata != nil {
-		ttl, keyExists = metadata[TimeToLive]
-		if !keyExists {
-			return blobstore.NewError(blobstore.ErrBadArguments,
-				"metadata is invalid: %v", metadata)
-		}
+	if metadata == nil {
+		return blobstore.NewError(blobstore.ErrBadArguments,
+			"metadata is nil")
+	}
+
+	ttl, keyExists := metadata[TimeToLive]
+	if !keyExists {
+		return blobstore.NewError(blobstore.ErrBadArguments,
+			"%s not found in metadata %v",
+			TimeToLive, metadata)
 	}
 
 	queryStr := fmt.Sprintf(`INSERT
