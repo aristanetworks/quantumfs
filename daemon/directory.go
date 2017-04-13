@@ -1758,12 +1758,46 @@ func (dir *Directory) mergeRecord(c *ctx, name string,
 	} ()
 
 	// Don't merge if remote indicates no changes
-	if !remote.ID().IsEqualTo(localCopy.ID()) &&
-		!remote.ID().IsEqualTo(base.ID()) {
+	if remote.ID().IsEqualTo(localCopy.ID()) ||
+		remote.ID().IsEqualTo(base.ID()) {
 
+		return
+	}
+
+	// Merge differently depending on if the type is preserved
+	if typesMatch(localCopy.Type(), remote.Type()) &&
+		typesMatch(localCopy.Type(), base.Type()) {
+
+		// if all types match, great, we can defer Merging to the type's
+		// implementation
 		child := c.qfs.inode(c, inodeNum)
 		child.Merge(c, base, remote)
+	} else if remote.ModificationTime() > localCopy.ModificationTime() {
+		// The type changed in some way, so we have to do a full replacement
+		// based on modification time. If the local is newer than the remote,
+		// we just keep the local
+		dir.internalRmRf(c, name)
+		inodeNum := dir.children.loadChild(c, remote,
+			quantumfs.InodeIdInvalid)
+		c.qfs.addUninstantiated(c, []InodeId{inodeNum},
+			dir.inodeNum())
 	}
+}
+
+func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
+	// consolidate file types into one
+	if a == quantumfs.ObjectTypeSmallFile ||
+		a == quantumfs.ObjectTypeMediumFile ||
+		a == quantumfs.ObjectTypeLargeFile ||
+		a == quantumfs.ObjectTypeVeryLargeFile {
+
+		return (b == quantumfs.ObjectTypeSmallFile ||
+			b == quantumfs.ObjectTypeMediumFile ||
+			b == quantumfs.ObjectTypeLargeFile ||
+			b == quantumfs.ObjectTypeVeryLargeFile)
+	}
+
+	return a == b
 }
 
 func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
