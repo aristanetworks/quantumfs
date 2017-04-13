@@ -133,11 +133,10 @@ func (th *TestHelper) WaitForResult() string {
 var TestRunDir string
 
 func init() {
-
 	syscall.Umask(0)
 	var err error
 	for i := 0; i < 100; i++ {
-		TestRunDir, err = ioutil.TempDir("", "quantumfsTest")
+		TestRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
 		if err != nil {
 			continue
 		}
