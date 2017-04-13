@@ -173,8 +173,11 @@ func main() {
 	// memory to use.
 	//
 	// If we expect quantumfsd to consume about 30G of memory legitimately, then
-	// a 1% increase is about 300M.
-	debug.SetGCPercent(1)
+	// a 10% increase is about 3G. We cannot use a significantly smaller constant
+	// value because when we first start QuantumFS its memory usage will be tiny,
+	// and, say, 1% of 1G results in constantly running GC and not making
+	// substantial forward progress.
+	debug.SetGCPercent(10)
 
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
