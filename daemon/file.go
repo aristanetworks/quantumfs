@@ -7,6 +7,7 @@ package daemon
 
 import "bytes"
 import "errors"
+import "fmt"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
@@ -744,7 +745,20 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 func (fi *File) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
 
-	// Do all merging byte by byte
+	localCopy, err := fi.parentGetChildRecordCopy(c, fi.InodeCommon.id)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to get record from parent for inode %d",
+			fi.id))
+	}
+
+	// For now, just take the newer file
+	if remote.ModificationTime() > localCopy.ModificationTime() {
+		var dummyParent Directory
+		remoteInode, _ := recordToInode(c, fi.inodeNum(), remote,
+			&dummyParent)
+		remoteFile := remoteInode.(*File)
+		fi.accessor = remoteFile.accessor
+	}
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,

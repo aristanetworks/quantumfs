@@ -1608,40 +1608,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 			inodeNum, hardlink.linkId))
 	}
 
-	return dir.recordToChild(c, inodeNum, entry)
-}
-
-func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
-	entry quantumfs.DirectoryRecord) (Inode, []InodeId) {
-
-	defer c.FuncIn("DirectoryRecord::recordToChild", "name %s inode %d",
-		entry.Filename(), inodeNum).out()
-
-	var constructor InodeConstructor
-	switch entry.Type() {
-	default:
-		c.elog("Unknown InodeConstructor type: %d", entry.Type())
-		panic("Unknown InodeConstructor type")
-	case quantumfs.ObjectTypeDirectoryEntry:
-		constructor = newDirectory
-	case quantumfs.ObjectTypeSmallFile:
-		constructor = newSmallFile
-	case quantumfs.ObjectTypeMediumFile:
-		constructor = newMediumFile
-	case quantumfs.ObjectTypeLargeFile:
-		constructor = newLargeFile
-	case quantumfs.ObjectTypeVeryLargeFile:
-		constructor = newVeryLargeFile
-	case quantumfs.ObjectTypeSymlink:
-		constructor = newSymlink
-	case quantumfs.ObjectTypeSpecial:
-		constructor = newSpecial
-	}
-
-	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
-
-	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
-		dir.self, 0, 0, nil)
+	return recordToInode(c, inodeNum, entry, dir)
 }
 
 // Do a similar work like  Lookup(), but it does not interact with fuse, and return
@@ -1803,13 +1770,14 @@ func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
 func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
 
-	toRemove := func () []string {
+	baseChildMap, _ := dir.newChildMap(c, base.ID())
+	remoteChildMap, _ := dir.newChildMap(c, remote.ID())
+
+	toRemove, toMerge := func () ([]string, []string) {
 		defer dir.Lock().Unlock()
 
-		baseChildMap, _ := dir.newChildMap(c, base.ID())
-		remoteChildMap, _ := dir.newChildMap(c, remote.ID())
-
 		toRemove := make([]string, 0)
+		toMerge := make([]string, 0)
 		baseChildren := baseChildMap.records()
 		for _, v := range baseChildren {
 			remoteChild := remoteChildMap.recordByName(c, v.Filename())
@@ -1825,7 +1793,7 @@ func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
 
 			if remoteChild != nil && localChild != nil {
 				// changed
-				dir.mergeRecord(c, v.Filename(), v, remoteChild)
+				toMerge = append(toMerge, v.Filename())
 			} else if remoteChild == nil && localChild != nil {
 				// removed
 				toRemove = append(toRemove, v.Filename())
@@ -1847,8 +1815,15 @@ func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
 				dir.inodeNum())
 		}
 
-		return toRemove
+		return toRemove, toMerge
 	} ()
+
+	// Do all Merging and Removing outside of the parent being locked
+	for _, v := range toMerge {
+		baseChild := baseChildMap.recordByName(c, v)
+		remoteChild := remoteChildMap.recordByName(c, v)
+		dir.mergeRecord(c, v, baseChild, remoteChild)
+	}
 
 	for _, v := range toRemove {
 		dir.internalRmRf(c, v)
