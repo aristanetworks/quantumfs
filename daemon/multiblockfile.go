@@ -162,7 +162,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	return 0, errors.New("writeBlock attempt with zero data")
 }
 
-func (fi *MultiBlockFile) fileLength() uint64 {
+func (fi *MultiBlockFile) fileLength(c *ctx) uint64 {
 	return (uint64(fi.metadata.BlockSize) * uint64(len(fi.metadata.Blocks)-1)) +
 		uint64(fi.metadata.LastBlockBytes)
 }
