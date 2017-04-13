@@ -855,7 +855,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 }
 
 func (dir *Directory) internalRmRf(c *ctx, name string) {
-	defer c.funcIn("Directory::internalRmRf").out()
+	defer c.FuncIn("Directory::internalRmRf", "%s", name).out()
 
 	childId := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
@@ -1711,6 +1711,8 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 func (dir *Directory) mergeRecord(c *ctx, name string,
 	base quantumfs.DirectoryRecord, remote quantumfs.DirectoryRecord) {
 
+	defer c.FuncIn("Directory::mergeRecord", "%s", name).out()
+
 	inodeNum, localCopy := func () (InodeId, quantumfs.DirectoryRecord) {
 		defer dir.childRecordLock.Lock().Unlock()
 
@@ -1769,6 +1771,8 @@ func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
 
 func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
+
+	defer c.funcIn("Directory::Merge").out()
 
 	baseChildMap, _ := dir.newChildMap(c, base.ID())
 	remoteChildMap, _ := dir.newChildMap(c, remote.ID())

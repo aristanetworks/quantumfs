@@ -710,6 +710,8 @@ func (wsr *WorkspaceRoot) mergeLink(c *ctx, link HardlinkId, remote linkEntry) {
 func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
 
+	defer c.funcIn("WorkspaceRoot::Merge").out()
+
 	buffer := c.dataStore.Get(&c.Ctx, base.ID())
 	baseWsr := buffer.AsWorkspaceRoot()
 	baseHardlinks, _ := loadHardlinks(c, baseWsr.HardlinkEntry())
