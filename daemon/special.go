@@ -277,8 +277,8 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func (special *Special) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey) {
+func (special *Special) Merge(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) {
 
 	c.elog("Invalid Merge on Special")
 }

@@ -483,7 +483,11 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 		if !currentRootId.IsEqualTo(wsr.rootId) {
 			// We need to pull in the new rootId changes
-			wsr.Merge(c, wsr.rootId, currentRootId)
+			baseRecord := quantumfs.NewDirectoryRecord()
+			baseRecord.SetID(wsr.rootId)
+			remoteRecord := quantumfs.NewDirectoryRecord()
+			remoteRecord.SetID(currentRootId)
+			wsr.Merge(c, baseRecord, remoteRecord)
 			// Recalculate the new rootId after re-flushing
 			wsr.Directory.flush(c)
 			newRootId = wsr.publishBuffer(c)
@@ -703,13 +707,13 @@ func (wsr *WorkspaceRoot) mergeLink(c *ctx, link HardlinkId, remote linkEntry) {
 	}
 }
 
-func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey) {
+func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) {
 
-	buffer := c.dataStore.Get(&c.Ctx, base)
+	buffer := c.dataStore.Get(&c.Ctx, base.ID())
 	baseWsr := buffer.AsWorkspaceRoot()
 	baseHardlinks, _ := loadHardlinks(c, baseWsr.HardlinkEntry())
-	buffer = c.dataStore.Get(&c.Ctx, remote)
+	buffer = c.dataStore.Get(&c.Ctx, remote.ID())
 	remoteWsr := buffer.AsWorkspaceRoot()
 	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
 
@@ -750,7 +754,13 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.ObjectKey,
 		}
 	} ()
 
-	wsr.Directory.Merge(c, baseWsr.BaseLayer(), remoteWsr.BaseLayer())
+	// make some placeholder directory records for the wsr
+	baseRecord := quantumfs.NewDirectoryRecord()
+	baseRecord.SetID(baseWsr.BaseLayer())
+	remoteRecord := quantumfs.NewDirectoryRecord()
+	remoteRecord.SetID(remoteWsr.BaseLayer())
+
+	wsr.Directory.Merge(c, baseRecord, remoteRecord)
 
 	wsr.self.dirty(c)
 }

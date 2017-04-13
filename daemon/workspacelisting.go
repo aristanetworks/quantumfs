@@ -511,8 +511,8 @@ func (tsl *TypespaceList) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func (tsl *TypespaceList) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey) {
+func (tsl *TypespaceList) Merge(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) {
 
 	c.elog("Invalid Merge on TypespaceList")
 }
@@ -834,8 +834,8 @@ func (nsl *NamespaceList) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func (nsl *NamespaceList) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey) {
+func (nsl *NamespaceList) Merge(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) {
 
 	c.elog("Invalid Merge on NamespaceList")
 }
@@ -1164,8 +1164,8 @@ func (wsl *WorkspaceList) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func (wsl *WorkspaceList) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey) {
+func (wsl *WorkspaceList) Merge(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) {
 
 	c.elog("Invalid Merge on WorkspaceList")
 }
