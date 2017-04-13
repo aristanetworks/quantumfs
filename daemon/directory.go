@@ -1746,20 +1746,22 @@ func (dir *Directory) mergeRecord(c *ctx, name string,
 
 	inodeNum, localCopy := func () (InodeId, quantumfs.DirectoryRecord) {
 		defer dir.childRecordLock.Lock().Unlock()
+
 		num := dir.children.inodeNum(name)
-		return num, dir.children.record(num).ShallowCopy()
+		local := dir.children.record(num).ShallowCopy()
+
+		if remote.ModificationTime() > local.ModificationTime() {
+			dir.children.loadChild(c, remote, num)
+		}
+
+		return num, local
 	} ()
 
-	child := c.qfs.inode(c, inodeNum)
+	// Don't merge if remote indicates no changes
+	if !remote.ID().IsEqualTo(localCopy.ID()) &&
+		!remote.ID().IsEqualTo(base.ID()) {
 
-	if remote.ModificationTime() > localCopy.ModificationTime() {
-		func () {
-			defer dir.childRecordLock.Lock().Unlock()
-			dir.children.loadChild(c, remote, inodeNum)
-		} ()
-	}
-
-	if !remote.ID().IsEqualTo(localCopy.ID()) {
+		child := c.qfs.inode(c, inodeNum)
 		child.Merge(c, base, remote)
 	}
 }

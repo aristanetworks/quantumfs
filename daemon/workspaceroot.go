@@ -716,6 +716,8 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	buffer = c.dataStore.Get(&c.Ctx, remote.ID())
 	remoteWsr := buffer.AsWorkspaceRoot()
 	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
+	buffer = c.dataStore.Get(&c.Ctx, wsr.rootId)
+	localWsr := buffer.AsWorkspaceRoot()
 
 	func () {
 		wsr.lock.RLock()
@@ -754,13 +756,17 @@ func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.DirectoryRecord,
 		}
 	} ()
 
-	// make some placeholder directory records for the wsr
-	baseRecord := quantumfs.NewDirectoryRecord()
-	baseRecord.SetID(baseWsr.BaseLayer())
-	remoteRecord := quantumfs.NewDirectoryRecord()
-	remoteRecord.SetID(remoteWsr.BaseLayer())
+	if !remote.ID().IsEqualTo(localWsr.BaseLayer()) &&
+		!remote.ID().IsEqualTo(base.ID()) {
 
-	wsr.Directory.Merge(c, baseRecord, remoteRecord)
+		// make some placeholder directory records for the wsr
+		baseRecord := quantumfs.NewDirectoryRecord()
+		baseRecord.SetID(baseWsr.BaseLayer())
+		remoteRecord := quantumfs.NewDirectoryRecord()
+		remoteRecord.SetID(remoteWsr.BaseLayer())
+
+		wsr.Directory.Merge(c, baseRecord, remoteRecord)
+	}
 
 	wsr.self.dirty(c)
 }
