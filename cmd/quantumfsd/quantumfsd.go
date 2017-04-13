@@ -8,6 +8,7 @@ import "flag"
 import "fmt"
 import "time"
 import "os"
+import "runtime/debug"
 import "runtime/pprof"
 
 import "github.com/aristanetworks/quantumfs"
@@ -166,6 +167,17 @@ func main() {
 		pprof.StartCPUProfile(profileFile)
 		defer pprof.StopCPUProfile()
 	}
+
+	// Reduce the amount of "unused memory" QuantumFS uses when running as a
+	// daemon. Doubling memory use before running GC is an excessive amount of
+	// memory to use.
+	//
+	// If we expect quantumfsd to consume about 30G of memory legitimately, then
+	// a 10% increase is about 3G. We cannot use a significantly smaller constant
+	// value because when we first start QuantumFS its memory usage will be tiny,
+	// and, say, 1% of 1G results in constantly running GC and not making
+	// substantial forward progress.
+	debug.SetGCPercent(10)
 
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
