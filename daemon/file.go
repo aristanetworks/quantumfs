@@ -744,7 +744,7 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 func (fi *File) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
 
-	// Do all the merging by block, staying accessor unaware
+	// Do all merging byte by byte
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
