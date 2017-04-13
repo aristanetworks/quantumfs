@@ -1,6 +1,8 @@
 /quantumfsd
 /qfs
 /qparse
+/qupload
+/qwalker
 /emptykeys
 /contentcheck
 /QuantumFS*.rpm
