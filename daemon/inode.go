@@ -170,7 +170,8 @@ type Inode interface {
 
 	isWorkspaceRoot() bool
 
-	Merge(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey)
+	Merge(c *ctx, base quantumfs.DirectoryRecord,
+		remote quantumfs.DirectoryRecord)
 }
 
 type inodeHolder interface {

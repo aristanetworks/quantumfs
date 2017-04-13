@@ -1760,18 +1760,18 @@ func (dir *Directory) mergeRecord(c *ctx, name string,
 	}
 
 	if !remote.ID().IsEqualTo(localCopy.ID()) {
-		child.Merge(c, base.ID(), remote.ID())
+		child.Merge(c, base, remote)
 	}
 }
 
-func (dir *Directory) Merge(c *ctx, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey) {
+func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) {
 
 	toRemove := func () []string {
 		defer dir.Lock().Unlock()
 
-		baseChildMap, _ := dir.newChildMap(c, base)
-		remoteChildMap, _ := dir.newChildMap(c, remote)
+		baseChildMap, _ := dir.newChildMap(c, base.ID())
+		remoteChildMap, _ := dir.newChildMap(c, remote.ID())
 
 		toRemove := make([]string, 0)
 		baseChildren := baseChildMap.records()
