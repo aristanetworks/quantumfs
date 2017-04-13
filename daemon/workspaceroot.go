@@ -242,7 +242,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 		return wsr.hardlinks[id].record
 	}()
 	if hardlinkRecord != nil {
-		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
+		return recordToInode(c, inodeNum, hardlinkRecord, &wsr.Directory)
 	}
 
 	// This isn't a hardlink, so proceed as normal

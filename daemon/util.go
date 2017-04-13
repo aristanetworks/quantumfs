@@ -285,3 +285,36 @@ func asDirectory(inode Inode) *Directory {
 		panic(fmt.Sprintf("Inode %d is not a Directory", inode.inodeNum()))
 	}
 }
+
+func recordToInode(c *ctx, inodeNum InodeId, entry quantumfs.DirectoryRecord,
+	parent *Directory) (Inode, []InodeId) {
+
+	defer c.FuncIn("util::recordToInode", "name %s inode %d",
+		entry.Filename(), inodeNum).out()
+
+	var constructor InodeConstructor
+	switch entry.Type() {
+	default:
+		c.elog("Unknown InodeConstructor type: %d", entry.Type())
+		panic("Unknown InodeConstructor type")
+	case quantumfs.ObjectTypeDirectoryEntry:
+		constructor = newDirectory
+	case quantumfs.ObjectTypeSmallFile:
+		constructor = newSmallFile
+	case quantumfs.ObjectTypeMediumFile:
+		constructor = newMediumFile
+	case quantumfs.ObjectTypeLargeFile:
+		constructor = newLargeFile
+	case quantumfs.ObjectTypeVeryLargeFile:
+		constructor = newVeryLargeFile
+	case quantumfs.ObjectTypeSymlink:
+		constructor = newSymlink
+	case quantumfs.ObjectTypeSpecial:
+		constructor = newSpecial
+	}
+
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
+
+	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
+		parent, 0, 0, nil)
+}
