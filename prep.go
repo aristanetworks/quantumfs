@@ -172,6 +172,7 @@ func (ebt *blobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 func (ebt *blobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
+	// TODO(sid): Write Setting metadata has to be preserved.
 	return ebt.blobstore.Insert(key.String(), buf.Get(), nil)
 }
 

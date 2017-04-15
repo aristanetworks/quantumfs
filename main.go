@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -44,22 +45,26 @@ func main() {
 		fmt.Println("usage: walker <config> <command> ARG1[,ARG2[,...]]")
 
 		fmt.Println("  keycount <workspace>")
-		fmt.Println("           - count the number of keys in given workspace")
+		fmt.Println("           - count the number of keys in given workspace.")
 		fmt.Println("  keydiffcount <workspace1> <workspace2>")
 		fmt.Println("           - count the diff in number of keys in between")
-		fmt.Println("	          the given workspaces")
+		fmt.Println("	          the given workspaces.")
 		fmt.Println("  du <workspace>  <path>")
 		fmt.Println("           - calculate the size on disk for the given workspace.")
-		fmt.Println("             path is from the root of workspace")
+		fmt.Println("             path is from the root of workspace.")
 		fmt.Println("  ttl <workspace>")
-		fmt.Println("           - update TTL of all the blocks in the worksace as ")
-		fmt.Println("             per the TTL values in the config file")
-		fmt.Println("  forceTTL <workspace> <path> <threshold ttl(hrs)> <new ttl(hrs)>")
-		fmt.Println("           - update TTL of all the blocks in the worksace ")
+		fmt.Println("           - update TTL of all the blocks in the workspace as")
+		fmt.Println("             per the TTL values in the config file.")
+		fmt.Println("  forceTTL <workspace> <new ttl(hrs)>")
+		fmt.Println("           - update TTL of all the blocks in the workspace")
 		fmt.Println("             in the given path to the given TTL value.")
-		fmt.Println("             path is from the root of workspace")
+		fmt.Println("             TTL is updated only if it is less than new TTL value.")
+		fmt.Println("             path is from the root of workspace.")
 		fmt.Println("  list")
 		fmt.Println("           - list all workspaces")
+		fmt.Println("  ttlHistogram <workspace>")
+		fmt.Println("           - bucket all the blocks in the workspace")
+		fmt.Println("             into different TTL values.")
 		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
@@ -115,6 +120,8 @@ func main() {
 		err = handleForceTTL(c, qfsds, cqlds, qfsdb)
 	case "list":
 		err = printList(c, qfsds, cqlds, qfsdb)
+	case "ttlHistogram":
+		err = printTTLHistogram(c, qfsds, cqlds, qfsdb)
 	default:
 		fmt.Println("Unsupported walk sub-command: ", walkFlags.Arg(0))
 		walkFlags.Usage()
@@ -338,24 +345,26 @@ func handleForceTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	cqlds blobstore.BlobStore, qfsdb quantumfs.WorkspaceDB) error {
 
 	// Cleanup Args
-	if walkFlags.NArg() != 5 {
-		fmt.Println("forceTTL subcommand takes 4 arg: wsname path " +
-			" <threshold TTL(hrs)> <new TTL(hrs)>")
+	if walkFlags.NArg() != 3 {
+		fmt.Println("forceTTL subcommand takes 2 arg: wsname <new TTL(hrs)>")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 	wsname := walkFlags.Arg(1)
-	searchPath := walkFlags.Arg(2)
-	searchPath = filepath.Clean("/" + searchPath)
 
 	var err error
 	var setTTL int64
-	if setTTL, err = strconv.ParseInt(walkFlags.Arg(3), 10, 64); err != nil {
+	if setTTL, err = strconv.ParseInt(walkFlags.Arg(2), 10, 64); err != nil {
 		fmt.Println("TTL val is not a valid integer")
-		fmt.Println("forceTTL subcommand takes 2 args: wsname path")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
+
+	// Walk with these new thresholds
+	setTTL = setTTL * 3600 // Hours to seconds
+	refreshTTLValueSecs = setTTL
+	refreshTTLTimeSecs = setTTL
+	defaultTTLValueSecs = setTTL
 
 	// Get RootID
 	var rootID quantumfs.ObjectKey
@@ -366,10 +375,6 @@ func handleForceTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	// Internal Walker for TTL.
 	var ttlWalker = func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
-
-		if !strings.HasPrefix(path, searchPath) {
-			return nil
-		}
 
 		if key.Type() == quantumfs.KeyTypeConstant ||
 			key.Type() == quantumfs.KeyTypeEmbedded {
@@ -390,9 +395,6 @@ func handleForceTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 		//  TODO if isDir() and TTL is good, return walker.SkipDir
 		return nil
 	}
-	// Walk with these new thresholds
-	refreshTTLValueSecs = setTTL
-	refreshTTLTimeSecs = setTTL
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
 		return err
 	}
@@ -436,4 +438,84 @@ func printList(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 		}
 	}
 	return nil
+}
+
+func printTTLHistogram(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
+	cqlds blobstore.BlobStore, qfsdb quantumfs.WorkspaceDB) error {
+
+	// Cleanup Args
+	if walkFlags.NArg() != 2 {
+		fmt.Println("keycount subcommand takes 1 args: wsname ")
+		walkFlags.Usage()
+		os.Exit(exitBadCmd)
+	}
+	wsname := walkFlags.Arg(1)
+
+	var mapLock utils.DeferableMutex
+	keysMap := make(map[int64]int)
+	var totalKeys uint64
+	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		if key.Type() == quantumfs.KeyTypeConstant ||
+			key.Type() == quantumfs.KeyTypeEmbedded {
+			return nil
+		}
+
+		ks := key.String()
+		metadata, err := cqlds.Metadata(ks)
+		if err != nil {
+			return err
+		}
+		if metadata == nil {
+			return fmt.Errorf("Store must have metadata")
+		}
+		ttl, ok := metadata[cql.TimeToLive]
+		if !ok {
+			return fmt.Errorf("Store must return metadata with " +
+				"TimeToLive")
+		}
+		ttlVal, err := strconv.ParseInt(ttl, 10, 64)
+		if err != nil {
+			return fmt.Errorf("Invalid TTL value in metadata %s ",
+				ttl)
+		}
+
+		oneDay := int64(24 * 60 * 60)
+		defer mapLock.Lock().Unlock()
+
+		idx := ttlVal / oneDay
+		keysMap[idx]++
+		totalKeys++
+		return nil
+	}
+
+	// Get RootID
+	var err error
+	var rootID quantumfs.ObjectKey
+	if rootID, err = getWorkspaceRootID(c, qfsdb, wsname); err != nil {
+		return err
+	}
+
+	// Walk
+	if err = walker.Walk(c, qfsds, rootID, bucketer); err != nil {
+		return err
+	}
+
+	printMapSorted(keysMap)
+	fmt.Println("Total Keys: ", totalKeys)
+	return nil
+}
+
+func printMapSorted(m map[int64]int) {
+
+	var keys []int
+	for k := range m {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	for _, k := range keys {
+		fmt.Printf("%v\t\t: %v day(s)\n", m[int64(k)], k)
+	}
+
 }
