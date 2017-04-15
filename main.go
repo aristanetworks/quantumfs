@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -43,13 +44,14 @@ func main() {
 			"and executes a subcommand on selected objects")
 
 		fmt.Println("Available commands:")
-		fmt.Println("usage: walker <-cfg config> [-progress] <command> ARG1[,ARG2[,...]]")
-
-		fmt.Println("  keycount <workspace>")
-		fmt.Println("           - count the number of keys in given workspace.")
-		fmt.Println("  keydiffcount <workspace1> <workspace2>")
+		fmt.Println("usage: walker -cfg <config> [-progress] <command> ARG1[,ARG2[,...]]")
+		fmt.Println("  keycount <workspace> [dedupe]")
+		fmt.Println("           - count the number of keys in given workspace")
+		fmt.Println("           - optionally show the dedupe details within this workspace")
+		fmt.Println("  keydiffcount <workspace1> <workspace2> [keys]")
 		fmt.Println("           - count the diff in number of keys in between")
-		fmt.Println("	          the given workspaces.")
+		fmt.Println("	          the given workspaces")
+		fmt.Println("           - optionally show the unique keys")
 		fmt.Println("  du <workspace>  <path>")
 		fmt.Println("           - calculate the size on disk for the given workspace.")
 		fmt.Println("             path is from the root of workspace.")
@@ -156,16 +158,20 @@ func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 	}
 
 	start := time.Now()
-	var totalSize, totalKeys uint64
+	var totalKeys uint64
+	tracker := newTracker(false)
+	var mapLock utils.DeferableMutex
 	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
+		defer mapLock.Lock().Unlock()
 		if !strings.HasPrefix(path, searchPath) {
 			return nil
 		}
-		totalSize += size
+		tracker.addKey(hex.EncodeToString(key.Value()),
+			path, size)
 		return nil
 	}
 
@@ -175,7 +181,7 @@ func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 	}
 
 	fmt.Println()
-	fmt.Println("Total Size = ", humanizeBytes(totalSize))
+	fmt.Println("Total Size = ", humanizeBytes(tracker.totalSize()))
 	return nil
 }
 
@@ -183,29 +189,28 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
 
 	// Cleanup Args
-	if walkFlags.NArg() != 2 {
-		fmt.Println("keycount subcommand takes 1 args: wsname ")
+	if walkFlags.NArg() < 2 || walkFlags.NArg() > 3 {
+		fmt.Println("keycount subcommand args: wsname [dedupe]")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 	wsname := walkFlags.Arg(1)
 	start := time.Now()
+	showDedupeInfo := false
+	if walkFlags.Arg(2) == "dedupe" {
+		showDedupeInfo = true
+	}
 
-	var totalKeys, totalSize, uniqKeys, uniqSize uint64
 	var mapLock utils.DeferableMutex
-	keysRecorded := make(map[string]bool)
+	var totalKeys uint64
+	tracker := newTracker(showDedupeInfo)
 	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
+		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
 		defer mapLock.Lock().Unlock()
-		if _, exists := keysRecorded[key.String()]; !exists {
-			keysRecorded[key.String()] = true
-			uniqKeys++
-			uniqSize += size
-		}
-		totalSize += size
-		atomic.AddUint64(&totalKeys, 1)
+		tracker.addKey(hex.EncodeToString(key.Value()), path, size)
 		return nil
 	}
 
@@ -222,10 +227,11 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 	}
 
 	fmt.Println()
-	fmt.Println("Unique Keys = ", uniqKeys)
-	fmt.Println("Unique Size = ", humanizeBytes(uniqSize))
-	fmt.Println("Total Keys = ", totalKeys)
-	fmt.Println("Total Size = ", humanizeBytes(totalSize))
+	fmt.Println("Unique Keys = ", tracker.uniqueKeys())
+	fmt.Println("Unique Size = ", humanizeBytes(tracker.uniqueSize()))
+	fmt.Println("Total Keys = ", tracker.totalKeys())
+	fmt.Println("Total Size = ", humanizeBytes(tracker.totalSize()))
+	tracker.printDedupeReport()
 	return nil
 }
 
@@ -234,8 +240,8 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
 
 	// Cleanup Args
-	if walkFlags.NArg() != 3 {
-		fmt.Println("keydiffcount subcommand takes 2 args: wsname1 wsname2 ")
+	if walkFlags.NArg() < 3 || walkFlags.NArg() > 4 {
+		fmt.Println("keydiffcount subcommand args: wsname1 wsname2 [keys]")
 		fmt.Println()
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
@@ -245,6 +251,10 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 	wsname1 := walkFlags.Arg(1)
 	wsname2 := walkFlags.Arg(2)
 	start := time.Now()
+	showKeys := false
+	if walkFlags.Arg(3) == "keys" {
+		showKeys = true
+	}
 	var rootID1, rootID2 quantumfs.ObjectKey
 	var totalKeys uint64
 	var err error
@@ -252,11 +262,7 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 		return err
 	}
 
-	if rootID2, err = getWorkspaceRootID(c, qfsdb, wsname2); err != nil {
-		return err
-	}
-
-	keys := make(map[string]uint64)
+	tracker := newTracker(showKeys)
 	var mapLock utils.DeferableMutex
 	keyRecorder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
@@ -264,29 +270,37 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
 		defer mapLock.Lock().Unlock()
-		keys[key.String()] = size
+		tracker.addKey(hex.EncodeToString(key.Value()), path, size)
 		return nil
 	}
-
 	if err = walker.Walk(c, qfsds, rootID1, keyRecorder); err != nil {
 		return err
 	}
-	keysRootID1 := keys
-	keys = make(map[string]uint64)
+	tracker1 := tracker
 
+	if rootID2, err = getWorkspaceRootID(c, qfsdb, wsname2); err != nil {
+		return err
+	}
+
+	tracker = newTracker(showKeys)
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID2, keyRecorder); err != nil {
 		return err
 	}
-	keysRootID2 := keys
+	tracker2 := tracker
 
 	fmt.Println()
 	fmt.Printf("UniqueKeys\t\tUniqueSize\n")
 	fmt.Printf("==========\t\t==========\n")
-	diffKey, diffSize := mapCompare(keysRootID1, keysRootID2)
-	fmt.Printf("%v\t\t%v in %v\n", diffKey, humanizeBytes(diffSize), wsname1)
-	diffKey, diffSize = mapCompare(keysRootID2, keysRootID1)
-	fmt.Printf("%v\t\t%v in %v\n", diffKey, humanizeBytes(diffSize), wsname2)
+	diffKeys, diffSize := tracker1.trackerKeyDiff(tracker2)
+	fmt.Printf("%v\t\t%v in %v\n",
+		len(diffKeys), humanizeBytes(diffSize), wsname1)
+	tracker1.printKeyPathInfo(diffKeys)
+
+	diffKeys, diffSize = tracker2.trackerKeyDiff(tracker1)
+	fmt.Printf("%v\t\t%v in %v\n",
+		len(diffKeys), humanizeBytes(diffSize), wsname2)
+	tracker2.printKeyPathInfo(diffKeys)
 	return nil
 }
 
@@ -374,7 +388,6 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 	if rootID, err = getWorkspaceRootID(c, qfsdb, wsname); err != nil {
 		return err
 	}
-
 	// Internal Walker for TTL.
 	var ttlWalker = func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
@@ -432,7 +445,7 @@ func printList(c *quantumfs.Ctx, progress bool, qfsds quantumfs.DataStore,
 		for _, ns := range nsl {
 			wsl, err := wsdb.WorkspaceList(c, ts, ns)
 			if err != nil {
-				fmt.Println("Error in getting list of Workspaces "+
+				fmt.Printf("Error in getting list of Workspaces "+
 					"for TS:%s NS:%s", ts, ns)
 				continue
 			}

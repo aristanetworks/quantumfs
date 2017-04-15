@@ -181,19 +181,6 @@ func getWorkspaceRootID(c *quantumfs.Ctx, db quantumfs.WorkspaceDB,
 	return db.Workspace(c, parts[0], parts[1], parts[2])
 }
 
-// Given 2 maps m1 and m2, return the (numKeys, numSize) unique to m1 wrt m2
-func mapCompare(m1 map[string]uint64, m2 map[string]uint64) (uint64, uint64) {
-
-	var uniqueKey, uniqueSize uint64
-	for k, size := range m1 {
-		if _, seen := m2[k]; !seen {
-			uniqueKey++
-			uniqueSize += size
-		}
-	}
-	return uniqueKey, uniqueSize
-}
-
 // A simple histogram impl.
 type histogram struct {
 	mapLock   utils.DeferableMutex
