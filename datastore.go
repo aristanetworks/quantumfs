@@ -8,7 +8,6 @@ import "encoding/base64"
 import "encoding/binary"
 import "encoding/hex"
 import "fmt"
-import "sort"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
@@ -770,27 +769,18 @@ type DirectoryRecord interface {
 	Clone() DirectoryRecord
 }
 
-type dirRecordSorter struct {
-	records []DirectoryRecord
+type DirectoryRecordSorterByName []DirectoryRecord
+
+func (s DirectoryRecordSorterByName) Len() int {
+	return len(s)
 }
 
-func (s *dirRecordSorter) Len() int {
-	return len(s.records)
+func (s DirectoryRecordSorterByName) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
 
-func (s *dirRecordSorter) Swap(i, j int) {
-	s.records[i], s.records[j] = s.records[j], s.records[i]
-}
-
-func (s *dirRecordSorter) Less(i, j int) bool {
-	return s.records[i].Filename() < s.records[j].Filename()
-}
-
-func SortDirectoryRecordsByName(sr []DirectoryRecord) {
-	s := &dirRecordSorter{
-		records: sr,
-	}
-	sort.Sort(s)
+func (s DirectoryRecordSorterByName) Less(i, j int) bool {
+	return s[i].Filename() < s[j].Filename()
 }
 
 func NewDirectoryRecord() *DirectRecord {
