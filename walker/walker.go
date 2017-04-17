@@ -145,9 +145,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 				return err
 			}
 		}
-		// Go to next Entry
-		if hle.Next().IsEqualTo(quantumfs.EmptyDirKey) ||
-			hle.NumEntries() == 0 {
+		if !hle.HasNext() {
 			break
 		}
 
