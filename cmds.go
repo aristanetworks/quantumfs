@@ -240,6 +240,7 @@ const (
 	CmdGetBlock              = 9
 	CmdEnableRootWrite       = 10
 	CmdSetWorkspaceImmutable = 11
+	CmdMergeRequest          = 12
 )
 
 // The various error codes
@@ -273,6 +274,12 @@ type BranchRequest struct {
 	CommandCommon
 	Src string
 	Dst string
+}
+
+type MergeRequest struct {
+	CommandCommon
+	Remote string
+	Local string
 }
 
 type AccessedRequest struct {
@@ -360,6 +367,44 @@ func (api *Api) Branch(src string, dst string) error {
 		CommandCommon: CommandCommon{CommandId: CmdBranchRequest},
 		Src:           src,
 		Dst:           dst,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+
+	return nil
+}
+
+func (api *Api) Merge(remote string, local string) error {
+	if !isWorkspaceNameValid(remote) {
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
+			remote)
+	}
+
+	if !isWorkspaceNameValid(local) {
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", local)
+	}
+
+	cmd := MergeRequest{
+		CommandCommon: CommandCommon{CommandId: CmdMergeRequest},
+		Remote:           remote,
+		Local:            local,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)
