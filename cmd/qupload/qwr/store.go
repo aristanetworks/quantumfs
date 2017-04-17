@@ -5,7 +5,6 @@ package qwr
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/hash"
-import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 
 func writeBlock(qctx *quantumfs.Ctx, data []byte, keyType quantumfs.KeyType,

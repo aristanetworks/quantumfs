@@ -12,7 +12,7 @@ import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 
 // SkipDir is used as a return value from WalkFunc to indicate that
 // the directory named in the call is to be skipped. It is not returned
