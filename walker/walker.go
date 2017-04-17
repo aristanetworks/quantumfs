@@ -54,11 +54,11 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			rootID.String(), key2String(rootID))
 	}
 
-	buf := utils.NewSimpleBuffer(nil, rootID)
+	buf := simplebuffer.New(nil, rootID)
 	if err := ds.Get(cq, rootID, buf); err != nil {
 		return err
 	}
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"WorkspaceRoot buffer %s",
 		key2String(rootID))
 
@@ -152,12 +152,12 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		}
 
 		key := hle.Next()
-		buf := utils.NewSimpleBuffer(nil, key)
+		buf := simplebuffer.New(nil, key)
 		if err := ds.Get(c.qctx, key, buf); err != nil {
 			return err
 		}
 
-		utils.AssertNonZeroBuf(buf,
+		simplebuffer.AssertNonZeroBuf(buf,
 			"WorkspaceRoot buffer %s",
 			key2String(key))
 
@@ -175,12 +175,12 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s",
 		key2String(key))
 
@@ -210,12 +210,12 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"VeryLargeFile buffer %s",
 		key2String(key))
 
@@ -240,12 +240,12 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
