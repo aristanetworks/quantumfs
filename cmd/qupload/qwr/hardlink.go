@@ -5,6 +5,7 @@ package qwr
 
 import "encoding/binary"
 import "os"
+import "sort"
 import "sync/atomic"
 import "syscall"
 
@@ -23,7 +24,20 @@ type HardLinkInfo struct {
 // assumes that the inodes being checked
 // belong to the same filesystem
 var hardLinkInfoMap = make(map[uint64]*HardLinkInfo)
-var hardLinkInfoNextID HardLinkID
+
+type inodeSlice []uint64
+
+func (is inodeSlice) Len() int {
+	return len(is)
+}
+
+func (is inodeSlice) Swap(i, j int) {
+	is[i], is[j] = is[j], is[i]
+}
+
+func (is inodeSlice) Less(i, j int) bool {
+	return is[i] < is[j]
+}
 
 // needed for a concurrent client of qwr
 var hardLinkInfoMutex utils.DeferableMutex
@@ -42,7 +56,11 @@ func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
 	hlinfo, exists := hardLinkInfoMap[stat.Ino]
 	if !exists {
 
-		hardLinkInfoNextID++
+		// Use stat.Ino as the HardLinkID
+		// This ensures that repeated runs of qupload
+		// on same source dir will use the same HardLinkID
+		// for same inode
+
 		// the FileInfo.Stat already indicates the
 		// final link count for path but we start with 1
 		// since its possible that a writer selects only
@@ -51,7 +69,7 @@ func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
 		// datastore
 		hlinfo := &HardLinkInfo{
 			record: nil,
-			id:     HardLinkID(hardLinkInfoNextID),
+			id:     HardLinkID(stat.Ino),
 			nlinks: 1,
 		}
 		// actual record is stored in SetHardLink
@@ -94,6 +112,15 @@ func SetHardLink(finfo os.FileInfo,
 	return newDirRecord
 }
 
+func sortByInode(m map[uint64]*HardLinkInfo) inodeSlice {
+	is := make(inodeSlice, 0)
+	for i := range m {
+		is = append(is, i)
+	}
+	sort.Sort(is)
+	return is
+}
+
 func writeHardLinkInfo(qctx *quantumfs.Ctx,
 	ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error) {
 
@@ -102,7 +129,12 @@ func writeHardLinkInfo(qctx *quantumfs.Ctx,
 	hleKey := quantumfs.EmptyDirKey
 	entryIdx := 0
 	var err error
-	for _, hlinfo := range hardLinkInfoMap {
+	// sort the hardLinkInfoMap based on stat.Ino
+	// to ensure repeated quploads of same source dir
+	// create same HardLinkEntry
+	hardLinkInfo := sortByInode(hardLinkInfoMap)
+	for _, hlinfoIdx := range hardLinkInfo {
+		hlinfo := hardLinkInfoMap[hlinfoIdx]
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			hle.SetNumEntries(entryIdx)
