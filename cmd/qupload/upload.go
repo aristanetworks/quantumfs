@@ -8,6 +8,7 @@ import "fmt"
 import "os"
 import "io/ioutil"
 import "path/filepath"
+import "sort"
 import "strings"
 import "syscall"
 import "time"
@@ -88,6 +89,13 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 		if len(tracker.records) != cap(tracker.records) {
 			return nil
 		}
+		// In each run of qupload, same directoryEntry can be filled
+		// by different pathWorker goroutines in different order. This
+		// leads to different directoryEntry object for same source
+		// directory. To avoid this, promote dedupe, sort the directory
+		// records by Filename before writing DirectoryEntry.
+		// Note: This is not same as source directory but thats ok.
+		sort.Sort(quantumfs.DirectoryRecordSorterByName(tracker.records))
 		qctx.Vlog(qlog.LogTool, "Writing %s", path)
 		record, err = qwr.WriteDirectory(qctx, path, tracker.info,
 			tracker.records, dataStore)
