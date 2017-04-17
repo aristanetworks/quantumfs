@@ -305,6 +305,10 @@ func (dir *DirectoryEntry) Next() ObjectKey {
 	return overlayObjectKey(dir.dir.Next())
 }
 
+func (dir *DirectoryEntry) HasNext() bool {
+	return !dir.Next().IsEqualTo(EmptyDirKey) && dir.NumEntries() > 0
+}
+
 func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 	dir.dir.SetNext(key.key)
 }
