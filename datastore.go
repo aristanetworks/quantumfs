@@ -769,6 +769,20 @@ type DirectoryRecord interface {
 	Clone() DirectoryRecord
 }
 
+type DirectoryRecordSorterByName []DirectoryRecord
+
+func (s DirectoryRecordSorterByName) Len() int {
+	return len(s)
+}
+
+func (s DirectoryRecordSorterByName) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s DirectoryRecordSorterByName) Less(i, j int) bool {
+	return s[i].Filename() < s[j].Filename()
+}
+
 func NewDirectoryRecord() *DirectRecord {
 	segment := capn.NewBuffer(nil)
 
