@@ -9,7 +9,6 @@ import "bytes"
 import "errors"
 import "fmt"
 import "io"
-import "io/ioutil"
 import "os"
 import "runtime"
 import "runtime/debug"
@@ -135,21 +134,11 @@ var TestRunDir string
 func init() {
 	syscall.Umask(0)
 	var err error
-	for i := 0; i < 100; i++ {
-		TestRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
-		if err != nil {
-			continue
-		}
-		if err := os.Chmod(TestRunDir, 0777); err != nil {
-			continue
-		}
-		if utils.WriteRecords("tmpRecord", TestRunDir) != nil {
-			continue
-		}
-
-		return
+	TestRunDir, err = utils.SetupTestspace(100, "quantumfsTest")
+	if err != nil {
+		panic(fmt.Sprintf("Unable to create temporary test directory: %v",
+			err))
 	}
-	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
 }
 
 type TLA struct {
