@@ -11,8 +11,8 @@ mountPath=/sys/fs/fuse/connections
 sleep 180
 
 # Force to kill the parent process "make all" because it has hung too long
-for pid in `ps ux | grep --color=never 'make all' | awk '{print $2}'`; do 
-	if [ $ppid -eq $pid ]; then 
+for pid in `ps ux | grep --color=never 'make all' | awk '{print $2}'`; do
+	if [ $ppid -eq $pid ]; then
 		kill -9 $pid
 	fi
 done
