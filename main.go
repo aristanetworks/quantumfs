@@ -311,8 +311,7 @@ func handleTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	var ttlWalker = func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		if key.Type() == quantumfs.KeyTypeConstant ||
-			key.Type() == quantumfs.KeyTypeEmbedded {
+		if skipKey(c, key) {
 			return nil
 		}
 
@@ -374,8 +373,7 @@ func handleForceTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	var ttlWalker = func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		if key.Type() == quantumfs.KeyTypeConstant ||
-			key.Type() == quantumfs.KeyTypeEmbedded {
+		if skipKey(c, key) {
 			return nil
 		}
 
@@ -455,8 +453,7 @@ func printTTLHistogram(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		if key.Type() == quantumfs.KeyTypeConstant ||
-			key.Type() == quantumfs.KeyTypeEmbedded {
+		if skipKey(c, key) {
 			return nil
 		}
 
