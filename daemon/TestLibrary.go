@@ -14,7 +14,6 @@ import "runtime/debug"
 import "strings"
 import "strconv"
 import "sync"
-import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -29,11 +28,6 @@ const fusectlPath = "/sys/fs/fuse/"
 
 type QuantumFsTest func(test *TestHelper)
 
-//NoStdOut prints nothing to stdout
-func NoStdOut(format string, args ...interface{}) error {
-	return nil
-}
-
 // TestHelper holds the variables important to maintain the state of testing
 // in a package which intends to use a QFS instance. daemon.TestHelper will
 // need to be embedded in that package's testHelper.
@@ -43,21 +37,6 @@ type TestHelper struct {
 	qfsWait        sync.WaitGroup
 	fuseConnection int
 	api            *quantumfs.Api
-}
-
-func NewTestHelper(testName string, t *testing.T) TestHelper {
-	cachePath := TestRunDir + "/" + testName
-	return TestHelper{
-		TestHelper: testutils.TestHelper{
-			T:          t,
-			TestName:   testName,
-			TestResult: make(chan string, 2), // must be buffered
-			StartTime:  time.Now(),
-			CachePath:  cachePath,
-			Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-				60*10000*24, NoStdOut),
-		},
-	}
 }
 
 // CreateTestDirs makes the required directories for the test.
