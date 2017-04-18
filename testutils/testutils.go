@@ -47,17 +47,13 @@ type TestHelper struct {
 	ShouldFailLogscan bool
 }
 
-// Since we grab the test name from the backtrace, it must always be an
-// identical number of frames back to the name of the test. Otherwise
-// multiple tests will end up using the same temporary directory and nothing
-// will work.
-//
-// 3 <testname>
-// 2 runTest
-// 1 runTestCommon (sets up the testutils.TestHelper)
-// 0 testutils.TestName
-func TestName() string {
-	testPc, _, _, _ := runtime.Caller(3)
+// TestName returns name of the test by looking
+// back through the call-stack. The testNameDepth
+// argument refers to the stack depth where test name
+// is available in the _caller_. Hence +1 to the depth
+// accounts for testutils.TestName function on the stack.
+func TestName(testNameDepth int) string {
+	testPc, _, _, _ := runtime.Caller(testNameDepth + 1)
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
 	testName = testName[lastSlash+1:]
