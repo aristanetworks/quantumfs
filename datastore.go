@@ -282,13 +282,13 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 	return dir
 }
 
-func (dir *DirectoryEntry) SortByName() {
-	recs := make([]*DirectRecord, dir.NumEntries())
+func (dir *DirectoryEntry) SortRecordsByName() {
+	recs := make([]*DirectRecord, 0, dir.NumEntries())
 	for recIdx := 0; recIdx < dir.NumEntries(); recIdx++ {
 		recs = append(recs, dir.Entry(recIdx))
 	}
 	sort.Sort(dirRecordSorterByName(recs))
-	for recIdx := 0; recIdx < dir.NumEntries(); recIdx++ {
+	for recIdx := 0; recIdx < len(recs); recIdx++ {
 		dir.SetEntry(recIdx, recs[recIdx])
 	}
 }
