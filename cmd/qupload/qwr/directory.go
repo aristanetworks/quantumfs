@@ -12,14 +12,6 @@ import "time"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 
-func dumpDirectoryEntry(msg string, de *quantumfs.DirectoryEntry) {
-	fmt.Println(msg)
-	for dr := 0; dr < de.NumEntries(); dr++ {
-		d := de.Entry(dr)
-		fmt.Println(dr, " ", d.Filename())
-	}
-}
-
 func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,
 	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
@@ -37,9 +29,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			dirEntry.SetNumEntries(entryIdx)
-			dumpDirectoryEntry("before sort", dirEntry)
 			dirEntry.SortRecordsByName()
-			dumpDirectoryEntry("after sort", dirEntry)
 			key, err := writeBlock(qctx, dirEntry.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
@@ -58,10 +48,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	}
 
 	dirEntry.SetNumEntries(entryIdx)
-	dumpDirectoryEntry("before sort", dirEntry)
 	dirEntry.SortRecordsByName()
-	dumpDirectoryEntry("after sort", dirEntry)
-
 	key, err := writeBlock(qctx, dirEntry.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
