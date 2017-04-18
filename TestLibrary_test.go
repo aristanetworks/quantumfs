@@ -5,7 +5,6 @@ package quantumfs
 
 import "testing"
 
-import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/utils"
 
@@ -26,12 +25,14 @@ func runTestCommon(t *testing.T, test qfsTest) {
 	// runTest
 	// runTestCommon
 	testName := testutils.TestName(2)
-	th := testutils.NewTestHelper(testName,
-		testutils.TestRunDir, t)
+	th := &testHelper{
+		TestHelper: testutils.NewTestHelper(testName,
+			testutils.TestRunDir, t),
+	}
 	th.CreateTestDirs()
 	defer th.EndTest()
 
-	th.RunTestCommonEpilog(th.testHelperUpcast(test))
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
 func (th *testHelper) testHelperUpcast(
