@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -350,18 +349,17 @@ func handleForceTTL(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 	wsname := walkFlags.Arg(1)
 
 	var err error
-	var setTTL int64
-	if setTTL, err = strconv.ParseInt(walkFlags.Arg(2), 10, 64); err != nil {
+	var newTTL int64
+	if newTTL, err = strconv.ParseInt(walkFlags.Arg(2), 10, 64); err != nil {
 		fmt.Println("TTL val is not a valid integer")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
+	newTTL = newTTL * 3600 // Hours to seconds
 
 	// Walk with these new thresholds
-	setTTL = setTTL * 3600 // Hours to seconds
-	refreshTTLValueSecs = setTTL
-	refreshTTLTimeSecs = setTTL
-	defaultTTLValueSecs = setTTL
+	refreshTTLTimeSecs = newTTL  // new val
+	refreshTTLValueSecs = newTTL // threshold
 
 	// Get RootID
 	var rootID quantumfs.ObjectKey
@@ -441,15 +439,13 @@ func printTTLHistogram(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 2 {
-		fmt.Println("keycount subcommand takes 1 args: wsname ")
+		fmt.Println("ttlHistogram subcommand takes 1 args: wsname ")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 	wsname := walkFlags.Arg(1)
 
-	var mapLock utils.DeferableMutex
-	keysMap := make(map[int64]int)
-	var totalKeys uint64
+	hist := newHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
@@ -462,9 +458,6 @@ func printTTLHistogram(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 		if err != nil {
 			return err
 		}
-		if metadata == nil {
-			return fmt.Errorf("Store must have metadata")
-		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
 			return fmt.Errorf("Store must return metadata with " +
@@ -476,12 +469,9 @@ func printTTLHistogram(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 				ttl)
 		}
 
-		oneDay := int64(24 * 60 * 60)
-		defer mapLock.Lock().Unlock()
-
-		idx := ttlVal / oneDay
-		keysMap[idx]++
-		totalKeys++
+		oneDaySecs := int64((24 * time.Hour) / time.Second)
+		bucket := ttlVal / oneDaySecs
+		hist.Increment(bucket)
 		return nil
 	}
 
@@ -497,20 +487,6 @@ func printTTLHistogram(c *quantumfs.Ctx, qfsds quantumfs.DataStore,
 		return err
 	}
 
-	printMapSorted(keysMap)
-	fmt.Println("Total Keys: ", totalKeys)
+	hist.Print()
 	return nil
-}
-
-func printMapSorted(m map[int64]int) {
-
-	var keys []int
-	for k := range m {
-		keys = append(keys, int(k))
-	}
-	sort.Ints(keys)
-	for _, k := range keys {
-		fmt.Printf("%v\t\t: %v day(s)\n", m[int64(k)], k)
-	}
-
 }

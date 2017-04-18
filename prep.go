@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
@@ -68,7 +70,6 @@ type cqlWalkerConfig struct {
 
 var refreshTTLTimeSecs int64
 var refreshTTLValueSecs int64
-var defaultTTLValueSecs int64
 
 func loadCqlWalkerConfig(path string) error {
 	var c struct {
@@ -88,12 +89,9 @@ func loadCqlWalkerConfig(path string) error {
 
 	refreshTTLTimeSecs = int64(c.A.TTLRefreshTime.Duration.Seconds())
 	refreshTTLValueSecs = int64(c.A.TTLRefreshValue.Duration.Seconds())
-	defaultTTLValueSecs = int64(c.A.TTLDefaultValue.Duration.Seconds())
 
-	if refreshTTLTimeSecs == 0 || refreshTTLValueSecs == 0 ||
-		defaultTTLValueSecs == 0 {
-		return fmt.Errorf("ttldefaultvalue, ttlrefreshvalue and " +
-			"ttlrefreshtime must be non-zero")
+	if refreshTTLTimeSecs == 0 || refreshTTLValueSecs == 0 {
+		return fmt.Errorf("ttlrefreshvalue and ttlrefreshtime must be non-zero")
 	}
 
 	// we can add more checks here later on eg: min of 1 day etc
@@ -109,8 +107,6 @@ func loadCqlWalkerConfig(path string) error {
 //  key exists and current TTL < refreshTTLTimeSecs
 func refreshTTL(b blobstore.BlobStore, key string,
 	metadata map[string]string) error {
-
-	setTTL := defaultTTLValueSecs
 
 	if metadata == nil {
 		return fmt.Errorf("Store must have metadata")
@@ -131,11 +127,7 @@ func refreshTTL(b blobstore.BlobStore, key string,
 	if ttlVal >= refreshTTLTimeSecs {
 		return nil
 	}
-	// if key exists but TTL needs to be refreshed then
-	// calculate new TTL.
-	setTTL = refreshTTLValueSecs
 
-	// if key doesn't exist then use default TTL and Insert
 	buf, _, err := b.Get(key)
 	if err != nil {
 		return fmt.Errorf("Err if blobstore.Get() for key %v",
@@ -143,7 +135,7 @@ func refreshTTL(b blobstore.BlobStore, key string,
 
 	}
 	newmetadata := make(map[string]string)
-	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", setTTL)
+	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", refreshTTLValueSecs)
 	return b.Insert(key, buf, newmetadata)
 }
 
@@ -201,10 +193,43 @@ func skipKey(c *walker.Ctx, key quantumfs.ObjectKey) bool {
 	}
 
 	cds := quantumfs.ConstantStore
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 
 	if err := cds.Get(nil, key, buf); err != nil {
 		return false // Not a ConstKey, so do not Skip.
 	}
 	return true
+}
+
+// A simple histogram impl.
+type histogram struct {
+	mapLock   utils.DeferableMutex
+	keysMap   map[int64]int
+	totalKeys uint64
+}
+
+func newHistogram() *histogram {
+	return &histogram{
+		keysMap: make(map[int64]int),
+	}
+}
+
+func (h *histogram) Increment(idx int64) {
+	defer h.mapLock.Lock().Unlock()
+	h.keysMap[idx]++
+	h.totalKeys++
+}
+
+func (h *histogram) Print() {
+
+	m := h.keysMap
+	var keys []int
+	for k := range m {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	for _, k := range keys {
+		fmt.Printf("%20v days(s) : %v\n", k, m[int64(k)])
+	}
+	fmt.Printf("%20v : %v\n", "Total Keys", h.totalKeys)
 }
