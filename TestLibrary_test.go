@@ -21,9 +21,9 @@ func runTest(t *testing.T, test qfsTest) {
 
 func runTestCommon(t *testing.T, test qfsTest) {
 	// call-stack until test should be
-	// test
-	// runTest
-	// runTestCommon
+	// 2 <testname>
+	// 1 runTest
+	// 0 runTestCommon
 	testName := testutils.TestName(2)
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
