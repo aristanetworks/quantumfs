@@ -23,6 +23,13 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			dirEntry.SetNumEntries(entryIdx)
+			// To promote dedupe, sort the directory
+			// records by Filename before writing DirectoryEntry.
+			// Sorting ensures that, for a given set of records in
+			// childRecords, even in the presence of parallelism,
+			// the DirectoryEntry object will be same.
+			// Note: This is not same as source directory but thats ok.
+			dirEntry.SortByName()
 			key, err := writeBlock(qctx, dirEntry.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
