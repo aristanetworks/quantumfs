@@ -64,6 +64,28 @@ func TestName() string {
 	return testName
 }
 
+//NoStdOut prints nothing to stdout
+func NoStdOut(format string, args ...interface{}) error {
+	return nil
+}
+
+// NewTestHelper creates a TestHelper with reasonable
+// defaults
+func NewTestHelper(testName string, testRunDir string,
+	t *testing.T) TestHelper {
+
+	cachePath := testRunDir + "/" + testName
+	return TestHelper{
+		T:          t,
+		TestName:   testName,
+		TestResult: make(chan string, 2), // must be buffered
+		StartTime:  time.Now(),
+		CachePath:  cachePath,
+		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
+			60*10000*24, NoStdOut),
+	}
+}
+
 func (th *TestHelper) RunTestCommonEpilog(testName string,
 	testArg QuantumFsTest) {
 
