@@ -47,6 +47,72 @@ type TestHelper struct {
 	ShouldFailLogscan bool
 }
 
+// Since we grab the test name from the backtrace, it must always be an
+// identical number of frames back to the name of the test. Otherwise
+// multiple tests will end up using the same temporary directory and nothing
+// will work.
+//
+// 3 <testname>
+// 2 runTest
+// 1 runTestCommon (sets up the testutils.TestHelper)
+// 0 testutils.TestName
+func TestName() string {
+	testPc, _, _, _ := runtime.Caller(3)
+	testName := runtime.FuncForPC(testPc).Name()
+	lastSlash := strings.LastIndex(testName, "/")
+	testName = testName[lastSlash+1:]
+	return testName
+}
+
+//NoStdOut prints nothing to stdout
+func NoStdOut(format string, args ...interface{}) error {
+	return nil
+}
+
+// NewTestHelper creates a TestHelper with reasonable
+// defaults
+func NewTestHelper(testName string, testRunDir string,
+	t *testing.T) TestHelper {
+
+	cachePath := testRunDir + "/" + testName
+	return TestHelper{
+		T:          t,
+		TestName:   testName,
+		TestResult: make(chan string, 2), // must be buffered
+		StartTime:  time.Now(),
+		CachePath:  cachePath,
+		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
+			60*10000*24, NoStdOut),
+	}
+}
+
+func (th *TestHelper) RunTestCommonEpilog(testName string,
+	testArg QuantumFsTest) {
+
+	th.Log("Finished test preamble, starting test proper")
+	beforeTest := time.Now()
+
+	go th.Execute(testArg)
+
+	testResult := th.WaitForResult()
+
+	// Record how long the test took so we can make a histogram
+	afterTest := time.Now()
+	TimeMutex.Lock()
+	TimeBuckets = append(TimeBuckets,
+		TimeData{
+			Duration: afterTest.Sub(beforeTest),
+			TestName: testName,
+		})
+	TimeMutex.Unlock()
+
+	if !th.ShouldFail && testResult != "" {
+		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
+	} else if th.ShouldFail && testResult == "" {
+		th.Log("ERROR: Test is expected to fail, but didn't")
+	}
+}
+
 // Assert the condition is true. If it is not true then fail the test with the given
 // message
 func (th *TestHelper) Assert(condition bool, format string, args ...interface{}) {

@@ -8,6 +8,7 @@ import "encoding/base64"
 import "encoding/binary"
 import "encoding/hex"
 import "fmt"
+import "sort"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
@@ -279,6 +280,17 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 		dir: edir,
 	}
 	return dir
+}
+
+func (dir *DirectoryEntry) SortByName() {
+	recs := make([]*DirectRecord, dir.NumEntries())
+	for recIdx := 0; recIdx < dir.NumEntries(); recIdx++ {
+		recs = append(recs, dir.Entry(recIdx))
+	}
+	sort.Sort(dirRecordSorterByName(recs))
+	for recIdx := 0; recIdx < dir.NumEntries(); recIdx++ {
+		dir.SetEntry(recIdx, recs[recIdx])
+	}
 }
 
 func (dir *DirectoryEntry) Bytes() []byte {
@@ -769,17 +781,17 @@ type DirectoryRecord interface {
 	Clone() DirectoryRecord
 }
 
-type DirectoryRecordSorterByName []DirectoryRecord
+type dirRecordSorterByName []*DirectRecord
 
-func (s DirectoryRecordSorterByName) Len() int {
+func (s dirRecordSorterByName) Len() int {
 	return len(s)
 }
 
-func (s DirectoryRecordSorterByName) Swap(i, j int) {
+func (s dirRecordSorterByName) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s DirectoryRecordSorterByName) Less(i, j int) bool {
+func (s dirRecordSorterByName) Less(i, j int) bool {
 	return s[i].Filename() < s[j].Filename()
 }
 
