@@ -380,7 +380,7 @@ func (wsr *WorkspaceRoot) initHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
 			}
 		}
 
-		if entry.Next() == quantumfs.EmptyDirKey || entry.NumEntries() == 0 {
+		if !entry.HasNext() {
 			break
 		}
 

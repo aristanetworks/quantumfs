@@ -6,9 +6,11 @@ package main
 
 import "flag"
 import "fmt"
-import "time"
+import "net/http"
+import _ "net/http/pprof"
 import "os"
-import "runtime/pprof"
+import "runtime/debug"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
@@ -33,7 +35,6 @@ var cacheSizeString string
 var cacheTimeNsecs uint
 var memLogMegabytes uint
 var config daemon.QuantumFsConfig
-var cpuProfileFile string
 var showMaxSizes bool
 
 func init() {
@@ -76,9 +77,6 @@ func init() {
 		"Name of the WorkspaceDB to use")
 	flag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf", "",
 		"Options to pass to workspaceDB")
-
-	flag.StringVar(&cpuProfileFile, "profilePath", "",
-		"File to write CPU Profiling data to")
 
 	flag.BoolVar(&showMaxSizes, "showMaxSizes", false,
 		"Show max block counts, metadata entries and max file sizes")
@@ -158,14 +156,20 @@ func processArgs() {
 func main() {
 	processArgs()
 
-	if cpuProfileFile != "" {
-		profileFile, err := os.Create(cpuProfileFile)
-		if err != nil {
-			os.Exit(exitProfileFail)
-		}
-		pprof.StartCPUProfile(profileFile)
-		defer pprof.StopCPUProfile()
-	}
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	// Reduce the amount of "unused memory" QuantumFS uses when running as a
+	// daemon. Doubling memory use before running GC is an excessive amount of
+	// memory to use.
+	//
+	// If we expect quantumfsd to consume about 30G of memory legitimately, then
+	// a 10% increase is about 3G. We cannot use a significantly smaller constant
+	// value because when we first start QuantumFS its memory usage will be tiny,
+	// and, say, 1% of 1G results in constantly running GC and not making
+	// substantial forward progress.
+	debug.SetGCPercent(10)
 
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
