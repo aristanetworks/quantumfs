@@ -111,7 +111,7 @@ func (fi *VeryLargeFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	return fi.parts[partIdx].writeBlock(c, blockIdxRem, offset, buf)
 }
 
-func (fi *VeryLargeFile) fileLength() uint64 {
+func (fi *VeryLargeFile) fileLength(c *ctx) uint64 {
 	var length uint64
 
 	// Count everything except the last block as being full
@@ -121,7 +121,7 @@ func (fi *VeryLargeFile) fileLength() uint64 {
 	}
 
 	// And add what's in the last block
-	length += fi.parts[len(fi.parts)-1].fileLength()
+	length += fi.parts[len(fi.parts)-1].fileLength(c)
 
 	return length
 }
