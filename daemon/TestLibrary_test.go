@@ -135,9 +135,11 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 	configModifier configModifierFunc) {
 
 	testName := testutils.TestName()
-
 	th := &testHelper{
-		TestHelper: NewTestHelper(testName, t),
+		TestHelper: TestHelper{
+			TestHelper: testutils.NewTestHelper(testName,
+				TestRunDir, t),
+		},
 	}
 	th.CreateTestDirs()
 	defer th.EndTest()

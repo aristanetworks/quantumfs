@@ -27,7 +27,10 @@ func runTestCommon(t *testing.T, test walkerTest,
 
 	testName := testutils.TestName()
 	th := &testHelper{
-		TestHelper: daemon.NewTestHelper(testName, t),
+		TestHelper: daemon.TestHelper{
+			TestHelper: testutils.NewTestHelper(testName,
+				daemon.TestRunDir, t),
+		},
 	}
 
 	th.CreateTestDirs()
