@@ -134,7 +134,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 	keyChan chan<- *workerData) error {
 
 	for {
-		//  Go through all records in this entry.
+		// Go through all records in this entry.
 		for idx := 0; idx < hle.NumEntries(); idx++ {
 
 			hlr := hle.Entry(idx)
@@ -232,8 +232,6 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-var totalFilesWalked uint64
-
 func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
@@ -301,13 +299,12 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 	for {
 		select {
 		case <-c.Done():
-			return fmt.Errorf("Quiting in worker because at least one " +
+			return fmt.Errorf("Quitting worker because at least one " +
 				"goroutine failed with an error")
 		case keyItem = <-keyChan:
 			if keyItem == nil {
 				return nil
 			}
-
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
 			keyItem.size, false); err != nil {
@@ -321,7 +318,7 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 
 	select {
 	case <-c.Done():
-		return fmt.Errorf("Quiting in writeToChan because at least one " +
+		return fmt.Errorf("Quitting writeToChan because at least one " +
 			"goroutine failed with an error")
 	case keyChan <- &workerData{path: p, key: k, size: s}:
 	}
