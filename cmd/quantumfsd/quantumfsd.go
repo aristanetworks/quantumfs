@@ -6,10 +6,11 @@ package main
 
 import "flag"
 import "fmt"
-import "time"
+import "net/http"
+import _ "net/http/pprof"
 import "os"
 import "runtime/debug"
-import "runtime/pprof"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
@@ -34,7 +35,6 @@ var cacheSizeString string
 var cacheTimeNsecs uint
 var memLogMegabytes uint
 var config daemon.QuantumFsConfig
-var cpuProfileFile string
 var showMaxSizes bool
 
 func init() {
@@ -77,9 +77,6 @@ func init() {
 		"Name of the WorkspaceDB to use")
 	flag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf", "",
 		"Options to pass to workspaceDB")
-
-	flag.StringVar(&cpuProfileFile, "profilePath", "",
-		"File to write CPU Profiling data to")
 
 	flag.BoolVar(&showMaxSizes, "showMaxSizes", false,
 		"Show max block counts, metadata entries and max file sizes")
@@ -159,14 +156,9 @@ func processArgs() {
 func main() {
 	processArgs()
 
-	if cpuProfileFile != "" {
-		profileFile, err := os.Create(cpuProfileFile)
-		if err != nil {
-			os.Exit(exitProfileFail)
-		}
-		pprof.StartCPUProfile(profileFile)
-		defer pprof.StopCPUProfile()
-	}
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	// Reduce the amount of "unused memory" QuantumFS uses when running as a
 	// daemon. Doubling memory use before running GC is an excessive amount of
