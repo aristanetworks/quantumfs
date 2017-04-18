@@ -25,7 +25,12 @@ func runTest(t *testing.T, test walkerTest) {
 func runTestCommon(t *testing.T, test walkerTest,
 	startDefaultQfs bool) {
 
-	testName := testutils.TestName()
+	// the stack depth of test name for all callers of runTestCommon
+	// is 2. Since the stack looks as follows:
+	// test name
+	// runTest
+	// runTestCommon
+	testName := testutils.TestName(2)
 	th := &testHelper{
 		TestHelper: daemon.TestHelper{
 			TestHelper: testutils.NewTestHelper(testName,
