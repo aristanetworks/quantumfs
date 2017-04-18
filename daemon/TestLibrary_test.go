@@ -134,7 +134,12 @@ func runExpensiveTest(t *testing.T, test quantumFsTest) {
 func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 	configModifier configModifierFunc) {
 
-	testName := testutils.TestName()
+	// the stack depth of test name for all callers of runTestCommon
+	// is 2. Since the stack looks as follows:
+	// test name
+	// runTest
+	// runTestCommon
+	testName := testutils.TestName(2)
 	th := &testHelper{
 		TestHelper: TestHelper{
 			TestHelper: testutils.NewTestHelper(testName,

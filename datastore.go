@@ -282,15 +282,27 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 	return dir
 }
 
+type sortDirRecordsByName struct {
+	de *DirectoryEntry
+}
+
+func (s sortDirRecordsByName) Len() int {
+	return int(s.de.dir.NumEntries())
+}
+
+func (s sortDirRecordsByName) Swap(i, j int) {
+	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).ShallowCopy()
+	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).ShallowCopy()
+	s.de.dir.Entries().Set(i, curj.Record().record)
+	s.de.dir.Entries().Set(j, oldi.Record().record)
+}
+
+func (s sortDirRecordsByName) Less(i, j int) bool {
+	return s.de.dir.Entries().At(i).Filename() < s.de.dir.Entries().At(j).Filename()
+}
+
 func (dir *DirectoryEntry) SortRecordsByName() {
-	recs := make([]*DirectRecord, 0, dir.NumEntries())
-	for recIdx := 0; recIdx < dir.NumEntries(); recIdx++ {
-		recs = append(recs, dir.Entry(recIdx))
-	}
-	sort.Sort(dirRecordSorterByName(recs))
-	for recIdx := 0; recIdx < len(recs); recIdx++ {
-		dir.SetEntry(recIdx, recs[recIdx])
-	}
+	sort.Sort(sortDirRecordsByName{de: dir})
 }
 
 func (dir *DirectoryEntry) Bytes() []byte {
@@ -779,20 +791,6 @@ type DirectoryRecord interface {
 	// returns a real copy, which can result in future changes changing the
 	// original depending on the underlying class.
 	Clone() DirectoryRecord
-}
-
-type dirRecordSorterByName []*DirectRecord
-
-func (s dirRecordSorterByName) Len() int {
-	return len(s)
-}
-
-func (s dirRecordSorterByName) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s dirRecordSorterByName) Less(i, j int) bool {
-	return s[i].Filename() < s[j].Filename()
 }
 
 func NewDirectoryRecord() *DirectRecord {
