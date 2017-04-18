@@ -14,6 +14,7 @@ import "runtime/debug"
 import "strings"
 import "strconv"
 import "sync"
+import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -42,6 +43,21 @@ type TestHelper struct {
 	qfsWait        sync.WaitGroup
 	fuseConnection int
 	api            *quantumfs.Api
+}
+
+func NewTestHelper(testName string, t *testing.T) TestHelper {
+	cachePath := TestRunDir + "/" + testName
+	return TestHelper{
+		TestHelper: testutils.TestHelper{
+			T:          t,
+			TestName:   testName,
+			TestResult: make(chan string, 2), // must be buffered
+			StartTime:  time.Now(),
+			CachePath:  cachePath,
+			Logger: qlog.NewQlogExt(cachePath+"/ramfs",
+				60*10000*24, NoStdOut),
+		},
+	}
 }
 
 // CreateTestDirs makes the required directories for the test.
