@@ -3,31 +3,33 @@
 
 package quantumfs
 
-import "sort"
 import "testing"
 
 func TestDirectoryRecordSort(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		records := make([]DirectoryRecord, 0)
+		dirEntry := NewDirectoryEntry()
+		dirEntry.SetNumEntries(3)
+
 		dr1 := NewDirectoryRecord()
 		dr1.SetFilename("name2")
-		records = append(records, dr1)
+		dirEntry.SetEntry(0, dr1)
 		dr2 := NewDirectoryRecord()
 		dr2.SetFilename("name1")
-		records = append(records, dr2)
+		dirEntry.SetEntry(1, dr2)
 		dr3 := NewDirectoryRecord()
 		dr3.SetFilename("anothername")
-		records = append(records, dr3)
+		dirEntry.SetEntry(2, dr3)
 
-		sort.Sort(DirectoryRecordSorterByName(records))
-		test.Assert(records[0].Filename() == "anothername",
+		dirEntry.SortByName()
+
+		test.Assert(dirEntry.Entry(0).Filename() == "anothername",
 			"Wrong sort. Found %s expects \"anothername\"",
-			records[0].Filename())
-		test.Assert(records[1].Filename() == "name1",
+			dirEntry.Entry(0).Filename())
+		test.Assert(dirEntry.Entry(1).Filename() == "name1",
 			"Wrong sort. Found %s expects \"name1\"",
-			records[1].Filename())
-		test.Assert(records[2].Filename() == "name2",
+			dirEntry.Entry(1).Filename())
+		test.Assert(dirEntry.Entry(2).Filename() == "name2",
 			"Wrong sort. Found %s expects \"name2\"",
-			records[2].Filename())
+			dirEntry.Entry(2).Filename())
 	})
 }
