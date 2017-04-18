@@ -83,17 +83,15 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	cqlds, err := cql.NewCqlBlobStore(*config)
+	qfsds, err := thirdparty_backends.ConnectDatastore("ether.cql", *config)
 	if err != nil {
-		fmt.Printf("Failed to init ether.cql datastore: %s\n",
-			err.Error())
+		fmt.Printf("Connection to DataStore failed")
 		os.Exit(exitBadConfig)
 	}
-
-	qfsds := getDataStore(cqlds)
-	if qfsds == nil {
-		fmt.Printf("Connection to dataStore failed")
-		os.Exit(exitBadConfig)
+	var cqlds blobstore.BlobStore
+	if v, ok := qfsds.(*thirdparty_backends.EtherBlobStoreTranslator); ok {
+		cqlds = v.Blobstore
+		v.ApplyTTLPolicy = false
 	}
 
 	qfsdb, err := thirdparty_backends.ConnectWorkspaceDB("ether.cql", *config)

@@ -145,37 +145,6 @@ func refreshTTL(b blobstore.BlobStore, key string,
 	return b.Insert(key, buf, newmetadata)
 }
 
-// TODO(sid): Change this to push blobStoreTranslator
-// as RawEtherBlobStoreTranslator into
-// quantumfs/thirdparty_backends/ether.go
-type blobStoreTranslator struct {
-	blobstore blobstore.BlobStore
-}
-
-func getDataStore(db blobstore.BlobStore) quantumfs.DataStore {
-
-	translator := blobStoreTranslator{blobstore: db}
-	return &translator
-}
-
-func (ebt *blobStoreTranslator) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	buf quantumfs.Buffer) error {
-
-	data, _, err := ebt.blobstore.Get(key.String())
-	if err != nil {
-		return err
-	}
-	buf.Set(data, key.Type())
-	return nil
-}
-
-func (ebt *blobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	buf quantumfs.Buffer) error {
-
-	// TODO(sid): Write Setting metadata has to be preserved.
-	return ebt.blobstore.Insert(key.String(), buf.Get(), nil)
-}
-
 func humanizeBytes(size uint64) string {
 
 	suffix := []string{"B", "KB", "MB", "GB"}
