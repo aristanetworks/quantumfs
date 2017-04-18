@@ -21,8 +21,9 @@ func init() {
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	return &dataStore{
 		durableStore: durableStore,
-		cache:        make(map[quantumfs.ObjectKey]*buffer, cacheSize),
+		cache:        make(map[quantumfs.ObjectKey]*buffer),
 		cacheSize:    cacheSize,
+		freeSpace:    cacheSize,
 	}
 }
 
@@ -33,6 +34,7 @@ type dataStore struct {
 	lru       list.List // Back is most recently used
 	cache     map[quantumfs.ObjectKey]*buffer
 	cacheSize int
+	freeSpace int
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
@@ -71,11 +73,21 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
+		size := len(buf.data)
+
 		// Store in cache
 		defer store.cacheLock.Lock().Unlock()
 
-		if store.lru.Len() >= store.cacheSize {
+		if size > store.cacheSize {
+			c.Vlog(qlog.LogDaemon, "The size of content is greater than"+
+				" total capacity of the cache")
+			return &buf
+		}
+
+		store.freeSpace -= size
+		for store.freeSpace < 0 {
 			evictedBuf := store.lru.Remove(store.lru.Front())
+			store.freeSpace += len(evictedBuf.(buffer).data)
 			delete(store.cache, evictedBuf.(buffer).key)
 		}
 		store.cache[buf.key] = &buf
