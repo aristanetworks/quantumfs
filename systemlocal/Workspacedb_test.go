@@ -6,7 +6,6 @@ package systemlocal
 // Test the systemlocal WorkspaceDB
 
 import "fmt"
-import "io/ioutil"
 import "os"
 import "testing"
 
@@ -32,12 +31,11 @@ func runTest(t *testing.T, test systemlocalTest) {
 	t.Parallel()
 
 	// Create a temporary directory to contain the database
-	testDir, err := ioutil.TempDir("", "systemlocalTest")
+	testDir, err := utils.SetupTestspace(1, "systemlocalTest")
 	if err != nil {
 		panic(fmt.Sprintf("Unable to create test directory: %v", err))
 	}
 
-	utils.WriteRecords("systemRecord", testDir)
 	test(testDir)
 
 	os.RemoveAll(testDir)

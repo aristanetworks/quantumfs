@@ -2,6 +2,9 @@ COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker
 PKGS_TO_TEST=daemon qlog thirdparty_backends systemlocal processlocal walker
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
+ppid:=$(shell ps -o ppid= $$$$)
+ROOTDIRNAME:=$(shell echo -e "$(USER)-RootContainer-$(ppid)" | tr -d '[:space:]')
+export ROOTDIRNAME
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
@@ -17,7 +20,7 @@ fetch:
 	done
 
 cleanup:
-	./cleanup.sh &
+	./cleanup.sh $(ppid) $(ROOTDIRNAME)  &
 
 lockcheck:
 	./lockcheck.sh

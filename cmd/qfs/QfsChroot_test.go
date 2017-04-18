@@ -62,21 +62,10 @@ func init() {
 
 // setup a minimal workspace
 func setupWorkspace(t *testing.T) string {
-	dirTest, err := ioutil.TempDir("", "TestChroot")
+	dirTest, err := utils.SetupTestspace(1, "TestChroot")
 	if err != nil {
-		t.Fatalf("Creating directory %s error: %s", dirTest,
+		t.Fatalf("Setting up testing environment of %s error: %s", dirTest,
 			err.Error())
-	}
-
-	err = utils.WriteRecords("chrootRecord", dirTest)
-	if err != nil {
-		t.Fatalf("Creating cleanup record %s error: %s", dirTest,
-			err.Error())
-	}
-
-	if err := os.Chmod(dirTest, 0777); err != nil {
-		t.Fatalf("Changing mode of directory %s error: %s",
-			dirTest, err.Error())
 	}
 
 	dirUsrBin := dirTest + "/usr/bin"
