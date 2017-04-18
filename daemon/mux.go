@@ -1078,7 +1078,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.SetAttr(c, input, out)
@@ -1101,7 +1101,7 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Mknod(c, name, input, out)
@@ -1124,7 +1124,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Mkdir(c, name, input, out)
@@ -1147,7 +1147,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Unlink(c, name)
@@ -1170,7 +1170,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Rmdir(c, name)
@@ -1193,7 +1193,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	}
 
 	if !qfs.workspaceIsMutable(c, srcInode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	if input.NodeId == input.Newdir {
@@ -1207,7 +1207,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		}
 
 		if !qfs.workspaceIsMutable(c, dstInode) {
-			return fuse.EPERM
+			return fuse.EROFS
 		}
 
 		return srcInode.MvChild(c, dstInode, oldName, newName)
@@ -1235,7 +1235,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	}
 
 	if !qfs.workspaceIsMutable(c, dstInode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	// Via races, srcInode and dstInode can be forgotten here
@@ -1282,7 +1282,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Symlink(c, pointedTo, linkName, out)
@@ -1445,7 +1445,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.SetXAttr(c, attr, data)
@@ -1472,7 +1472,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.RemoveXAttr(c, attr)
@@ -1496,7 +1496,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	}
 
 	if !qfs.workspaceIsMutable(c, inode) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Create(c, input, name, out)
@@ -1519,7 +1519,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 	}
 
 	if !qfs.workspaceIsMutableAtOpen(c, inode, input.Flags) {
-		return fuse.EPERM
+		return fuse.EROFS
 	}
 
 	return inode.Open(c, input.Flags, input.Mode, out)
