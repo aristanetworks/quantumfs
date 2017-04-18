@@ -3,12 +3,8 @@
 
 package quantumfs
 
-import "runtime"
-import "strings"
 import "testing"
-import "time"
 
-import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/utils"
 
@@ -24,13 +20,19 @@ func runTest(t *testing.T, test qfsTest) {
 }
 
 func runTestCommon(t *testing.T, test qfsTest) {
-	testName := testutils.TestName()
-	th := testutils.NewTestHelper(testName,
-		testutils.TestRunDir, t)
+	// call-stack until test should be
+	// test
+	// runTest
+	// runTestCommon
+	testName := testutils.TestName(2)
+	th := &testHelper{
+		TestHelper: testutils.NewTestHelper(testName,
+			testutils.TestRunDir, t),
+	}
 	th.CreateTestDirs()
 	defer th.EndTest()
 
-	th.RunTestCommonEpilog(th.testHelperUpcast(test))
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
 func (th *testHelper) testHelperUpcast(
