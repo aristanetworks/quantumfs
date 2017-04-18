@@ -84,7 +84,7 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 				"exist for %q", path))
 		}
 
-		fmt.Println("Appending ", record.Filename())
+		fmt.Println("Appending ", record.Filename(), " to ", path)
 		tracker.records = append(tracker.records, record)
 		if len(tracker.records) != cap(tracker.records) {
 			return nil
