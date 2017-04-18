@@ -49,6 +49,14 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	}
 
 	dirEntry.SetNumEntries(entryIdx)
+	dirEntry.SortByName()
+	{
+		for dr := 0; dr < dirEntry.NumEntries(); dr++ {
+			d := dirEntry.Entry(dr)
+			fmt.Println(dr, " ", d.Filename())
+		}
+	}
+
 	key, err := writeBlock(qctx, dirEntry.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
