@@ -40,15 +40,19 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 }
 
 func fillDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataStore,
-	datastore *dataStore, cacheSize int,
-	keys map[int]quantumfs.ObjectKey) {
+	datastore *dataStore, entryNum int, keys map[int]quantumfs.ObjectKey) {
 
-	for i := 1; i < 2*cacheSize; i++ {
+	for i := 1; i < 2*entryNum; i++ {
 		bytes := make([]byte, quantumfs.ObjectKeyLength)
 		bytes[1] = byte(i % 256)
 		bytes[2] = byte(i / 256)
 		key := quantumfs.NewObjectKeyFromBytes(bytes)
 		keys[i] = key
+		if i == 1 || i == entryNum {
+			bytes = make([]byte, 2*len(bytes))
+			bytes[1] = byte(i % 256)
+			bytes[2] = byte(i / 256)
+		}
 		buf := &buffer{
 			data:      bytes,
 			dirty:     false,
@@ -61,14 +65,14 @@ func fillDatastore(c *quantumfs.Ctx, test *testHelper, backingStore *testDataSto
 	}
 }
 
-func createDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
+func createDatastore(test *testHelper, entryNum, cacheSize int) (c *quantumfs.Ctx,
 	backingStore *testDataStore, datastore *dataStore,
 	keys map[int]quantumfs.ObjectKey) {
 
 	backingStore = newTestDataStore(test)
 	datastore = newDataStore(backingStore, cacheSize)
 
-	keys = make(map[int]quantumfs.ObjectKey, 2*cacheSize)
+	keys = make(map[int]quantumfs.ObjectKey, entryNum)
 
 	ctx := ctx{
 		Ctx: quantumfs.Ctx{
@@ -84,7 +88,8 @@ func createDatastore(test *testHelper, cacheSize int) (c *quantumfs.Ctx,
 func TestCacheLru(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		cacheSize := 256
-		c, backingStore, datastore, keys := createDatastore(test, cacheSize)
+		c, backingStore, datastore, keys := createDatastore(test,
+			cacheSize, cacheSize)
 		fillDatastore(c, test, backingStore, datastore, cacheSize, keys)
 
 		// Prime the LRU by reading every entry in reverse order. At the end
@@ -95,23 +100,25 @@ func TestCacheLru(t *testing.T) {
 			test.Assert(buf != nil, "Failed retrieving block %d", i)
 		}
 		test.Log("Verifying cache")
-		test.Assert(len(datastore.cache) == cacheSize,
-			"Cache size incorrect %d != %d", len(datastore.cache),
-			cacheSize)
+		test.Assert(datastore.cacheSize == cacheSize,
+			"Cache size incorrect %d != %d", cacheSize,
+			datastore.cacheSize)
+		lruSize := cacheSize/quantumfs.ObjectKeyLength - 1
 		for _, v := range datastore.cache {
 			i := int(v.data[1]) + int(v.data[2])*256
-			test.Assert(i <= cacheSize+1,
+			test.Assert(i <= lruSize,
 				"Unexpected block in cache %d", i)
 		}
 		test.Log("Verifying LRU")
-		test.Assert(datastore.lru.Len() == cacheSize,
-			"Lru size incorrect %d != %d", datastore.lru.Len(),
-			cacheSize)
+		freeSpace := cacheSize % quantumfs.ObjectKeyLength
+		test.Assert(datastore.lru.Len() == lruSize && datastore.freeSpace ==
+			freeSpace, "Lru size incorrect %d != %d free space %d != %d",
+			lruSize, datastore.lru.Len(), freeSpace, datastore.freeSpace)
 		num := 1
 		for e := datastore.lru.Back(); e != nil; e = e.Prev() {
 			buf := e.Value.(buffer)
 			i := int(buf.data[1]) + int(buf.data[2])*256
-			test.Assert(i <= cacheSize+1,
+			test.Assert(i <= lruSize,
 				"Unexpected block in lru %d", i)
 			test.Assert(i == num, "Out of order block %d not %d", i, num)
 			num++
@@ -123,31 +130,38 @@ func TestCacheLru(t *testing.T) {
 
 		data := datastore.lru.Back().Value.(buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
-		test.Assert(i == 256, "Incorrect most recent block %d != 256", i)
+		test.Assert(i == 256, "Wrong most recent block %d != 256", i)
 
 		data = datastore.lru.Front().Value.(buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
-		test.Assert(i == 255, "Incorrect least recent block %d != 255", i)
+		test.Assert(i == lruSize-2, "Wrong least recent block %d != 255", i)
 	})
 }
 
 func TestCacheCaching(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
-		cacheSize := 256
-		c, backingStore, datastore, keys := createDatastore(test, cacheSize)
-		fillDatastore(c, test, backingStore, datastore, cacheSize, keys)
+		entrySize := 256
+		c, backingStore, datastore, keys := createDatastore(test,
+			entrySize, 100*quantumfs.ObjectKeyLength)
+		fillDatastore(c, test, backingStore, datastore, entrySize, keys)
 
 		// Prime the cache
-		for i := 1; i < 100; i++ {
+		for i := 1; i <= 100; i++ {
 			buf := datastore.Get(c, keys[i])
 			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
+
+		test.Assert(datastore.freeSpace == quantumfs.ObjectKeyLength,
+			"Failed memory management: %d != %d", datastore.freeSpace,
+			quantumfs.ObjectKeyLength)
 
 		backingStore.shouldRead = false
 
 		// Reading again should come entirely from the cache. If not
 		// testDataStore will assert.
-		for i := 1; i < 100; i++ {
+		_, exists := datastore.cache[keys[1]]
+		test.Assert(!exists, "Failed to forget block 1")
+		for i := 2; i <= 100; i++ {
 			buf := datastore.Get(c, keys[i])
 			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
