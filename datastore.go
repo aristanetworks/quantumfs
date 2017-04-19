@@ -298,7 +298,8 @@ func (s sortDirRecordsByName) Swap(i, j int) {
 }
 
 func (s sortDirRecordsByName) Less(i, j int) bool {
-	return s.de.dir.Entries().At(i).Filename() < s.de.dir.Entries().At(j).Filename()
+	return s.de.dir.Entries().At(i).Filename() <
+		s.de.dir.Entries().At(j).Filename()
 }
 
 func (dir *DirectoryEntry) SortRecordsByName() {
