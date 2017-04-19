@@ -6,21 +6,26 @@ package utils
 import "fmt"
 import "io/ioutil"
 import "os"
+import "strings"
 
 var rootDir string
 
 func init() {
 	// We must use a ramfs or else we get IO lag spikes of > 1 second
 	rootDir = "/dev/shm/" + os.Getenv("ROOTDIRNAME")
+	if !strings.Contains(rootDir, "-RootContainer-") {
+		panic(fmt.Sprintf("Environmental variable ROOTDIRNAME is wrong: %s",
+			rootDir))
+	}
 
 	err := os.MkdirAll(rootDir, 0777)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to create temporary directories in"+
-			" /dev/shm: %v", err))
+			" /dev/shm: %s", err.Error()))
 	}
 }
 
-// Leave a record of the temperary directory's name
+// Leave a record of the temporary directory's name
 func SetupTestspace(itr int, testName string) (string, error) {
 	var err error = nil
 	var testRunDir string = ""
