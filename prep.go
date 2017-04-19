@@ -201,6 +201,19 @@ func skipKey(c *walker.Ctx, key quantumfs.ObjectKey) bool {
 	return true
 }
 
+// Given 2 maps m1 and m2, return the (numKeys, numSize) unique to m1 wrt m2
+func mapCompare(m1 map[string]uint64, m2 map[string]uint64) (uint64, uint64) {
+
+	var uniqueKey, uniqueSize uint64
+	for k, size := range m1 {
+		if _, seen := m2[k]; !seen {
+			uniqueKey++
+			uniqueSize += size
+		}
+	}
+	return uniqueKey, uniqueSize
+}
+
 // A simple histogram impl.
 type histogram struct {
 	mapLock   utils.DeferableMutex
@@ -227,9 +240,18 @@ func (h *histogram) Print() {
 	for k := range m {
 		keys = append(keys, int(k))
 	}
+	fmt.Println()
 	sort.Ints(keys)
 	for _, k := range keys {
 		fmt.Printf("%20v days(s) : %v\n", k, m[int64(k)])
 	}
 	fmt.Printf("%20v : %v\n", "Total Keys", h.totalKeys)
+}
+
+func showProgress(progress bool, start time.Time, totalKeys uint64) {
+
+	if progress {
+		fmt.Printf("\r %10v %v %20v %v",
+			"Time", time.Since(start), "Keys Walked", totalKeys)
+	}
 }
