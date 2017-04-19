@@ -49,10 +49,12 @@ type TestHelper struct {
 
 // TestName returns name of the test by looking
 // back through the call-stack. The testNameDepth
-// argument refers to the stack depth where test name
-// is available in the _caller_. Hence +1 to the depth
-// accounts for testutils.TestName function on the stack.
+// argument refers to the stack depth from
+// caller's (caller of TestName) frame to the frame
+// of the test function
 func TestName(testNameDepth int) string {
+	// The +1 to the depth accounts for testutils.TestName
+	// function on the stack.
 	testPc, _, _, _ := runtime.Caller(testNameDepth + 1)
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
