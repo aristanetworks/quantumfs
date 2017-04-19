@@ -5,53 +5,20 @@ package systemlocal
 
 // Test the systemlocal WorkspaceDB
 
-import "fmt"
-import "io/ioutil"
-import "os"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/aristanetworks/quantumfs/qlog"
-
-type systemlocalTest func(path string)
-
-func newCtx() *quantumfs.Ctx {
-	// Create  Ctx with random RequestId
-	Qlog := qlog.NewQlogTiny()
-	requestId := qlog.TestReqId
-	ctx := &quantumfs.Ctx{
-		Qlog:      Qlog,
-		RequestId: requestId,
-	}
-
-	return ctx
-}
-
-func runTest(t *testing.T, test systemlocalTest) {
-	t.Parallel()
-
-	// Create a temporary directory to contain the database
-	testDir, err := ioutil.TempDir("", "systemlocalTest")
-	if err != nil {
-		panic(fmt.Sprintf("Unable to create test directory: %v", err))
-	}
-
-	test(testDir)
-
-	os.RemoveAll(testDir)
-}
 
 func TestDBInit(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
-		utils.Assert(db != nil, "Failed to init")
+	runTest(t, func(test *testHelper) {
+		utils.Assert(test.db != nil, "Failed to init")
 	})
 }
 
 func TestEmptyDB(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		var num int
@@ -115,8 +82,8 @@ func TestEmptyDB(t *testing.T) {
 }
 
 func TestBranching(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		err := db.BranchWorkspace(ctx, "typeA", "notthere", "a", "branch",
@@ -154,8 +121,8 @@ func TestBranching(t *testing.T) {
 }
 
 func TestNamespaceList(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
@@ -203,8 +170,8 @@ func TestNamespaceList(t *testing.T) {
 }
 
 func TestWorkspaceList(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
@@ -256,7 +223,7 @@ func TestWorkspaceList(t *testing.T) {
 		namespaces, err = db.NamespaceList(ctx, "branch")
 		utils.Assert(err == nil, "Error getting namespace list: %v", err)
 		utils.Assert(len(namespaces) == 2, "Incorrect number of namespaces")
-		test := false
+		test1 := false
 		test2 := false
 
 		for _, namespace := range namespaces {
@@ -265,17 +232,17 @@ func TestWorkspaceList(t *testing.T) {
 			}
 
 			if namespace == "test" {
-				test = true
+				test1 = true
 			}
 		}
 
-		utils.Assert(test && test2, "Expected namespaces not there")
+		utils.Assert(test1 && test2, "Expected namespaces not there")
 	})
 }
 
 func TestAdvanceOk(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
@@ -296,8 +263,8 @@ func TestAdvanceOk(t *testing.T) {
 }
 
 func TestAdvanceNotExist(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		oldRootId, err := db.Workspace(ctx, quantumfs.NullSpaceName,
@@ -312,8 +279,8 @@ func TestAdvanceNotExist(t *testing.T) {
 }
 
 func TestAdvanceOldRootId(t *testing.T) {
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		err := db.BranchWorkspace(ctx, quantumfs.NullSpaceName,
@@ -337,8 +304,8 @@ func TestAdvanceOldRootId(t *testing.T) {
 
 func TestDbRestart(t *testing.T) {
 	// Confirm that workspaces created persist across database restarts
-	runTest(t, func(path string) {
-		db := NewWorkspaceDB(path + "/db")
+	runTest(t, func(test *testHelper) {
+		db := test.db
 		ctx := newCtx()
 
 		num, err := db.NumTypespaces(ctx)
@@ -354,7 +321,7 @@ func TestDbRestart(t *testing.T) {
 		err = systemdb.db.Close()
 		utils.Assert(err == nil, "Error closing database: %v", err)
 
-		db = NewWorkspaceDB(path + "/db")
+		db = NewWorkspaceDB(test.path + "/db")
 
 		exists, err := db.WorkspaceExists(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error checking if workspace exists: %v",
@@ -383,8 +350,8 @@ func createWorkspaces(wsdb quantumfs.WorkspaceDB, ctx *quantumfs.Ctx) {
 }
 
 func TestDeleteWorkspace(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 
@@ -403,8 +370,8 @@ func TestDeleteWorkspace(t *testing.T) {
 }
 
 func TestDeleteNamespaceSingleWorkspace(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 
@@ -417,8 +384,8 @@ func TestDeleteNamespaceSingleWorkspace(t *testing.T) {
 }
 
 func TestDeleteNamespaceMultipleWorkspace(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 
@@ -437,8 +404,8 @@ func TestDeleteNamespaceMultipleWorkspace(t *testing.T) {
 }
 
 func TestDeleteTypespace(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 
@@ -454,8 +421,8 @@ func TestDeleteTypespace(t *testing.T) {
 }
 
 func TestSetWorkspaceImmutable(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 
@@ -475,8 +442,8 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 }
 
 func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 
@@ -488,8 +455,8 @@ func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
 }
 
 func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
-	runTest(t, func(path string) {
-		wsdb := NewWorkspaceDB(path + "db")
+	runTest(t, func(test *testHelper) {
+		wsdb := test.db
 		ctx := newCtx()
 		createWorkspaces(wsdb, ctx)
 

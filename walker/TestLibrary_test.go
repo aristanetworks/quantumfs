@@ -4,20 +4,15 @@
 package walker
 
 import "flag"
-
 import "io/ioutil"
 import "os"
-
 import "path/filepath"
 import "reflect"
-import "runtime"
 import "strings"
 import "testing"
-import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
-import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
 import "github.com/aristanetworks/quantumfs/utils"
 
@@ -29,31 +24,17 @@ func runTest(t *testing.T, test walkerTest) {
 
 func runTestCommon(t *testing.T, test walkerTest,
 	startDefaultQfs bool) {
-	// Since we grab the test name from the backtrace, it must always be an
-	// identical number of frames back to the name of the test. Otherwise
-	// multiple tests will end up using the same temporary directory and nothing
-	// will work.
-	//
+
+	// the stack depth of test name for all callers of runTestCommon
+	// is 2. Since the stack looks as follows:
 	// 2 <testname>
 	// 1 runTest
 	// 0 runTestCommon
-	testPc, _, _, _ := runtime.Caller(2)
-	testName := runtime.FuncForPC(testPc).Name()
-	lastSlash := strings.LastIndex(testName, "/")
-	testName = testName[lastSlash+1:]
-	cachePath := daemon.TestRunDir + "/" + testName
-
+	testName := testutils.TestName(2)
 	th := &testHelper{
 		TestHelper: daemon.TestHelper{
-			TestHelper: testutils.TestHelper{
-				T:          t,
-				TestName:   testName,
-				TestResult: make(chan string, 2), // must be buffered
-				StartTime:  time.Now(),
-				CachePath:  cachePath,
-				Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-					60*10000*24, daemon.NoStdOut),
-			},
+			TestHelper: testutils.NewTestHelper(testName,
+				daemon.TestRunDir, t),
 		},
 	}
 
@@ -64,16 +45,7 @@ func runTestCommon(t *testing.T, test walkerTest,
 		th.StartDefaultQuantumFs()
 	}
 
-	th.Log("Finished test preamble, starting test proper")
-	go th.Execute(th.testHelperUpcast(test))
-
-	testResult := th.WaitForResult()
-
-	if !th.ShouldFail && testResult != "" {
-		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
-	} else if th.ShouldFail && testResult == "" {
-		th.Log("ERROR: Test is expected to fail, but didn't")
-	}
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
 type testHelper struct {
@@ -166,7 +138,7 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	var walkerMap = make(map[string]int)
 	var mapLock utils.DeferableMutex
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64) error {
+		size uint64, isDir bool) error {
 
 		defer mapLock.Lock().Unlock()
 		walkerMap[key.String()] = 1
@@ -177,7 +149,88 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	th.Assert(err == nil, "Error in walk: %v", err)
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
+	if eq != true {
+		th.printMap("Original Map", getMap)
+		th.printMap("Walker Map", walkerMap)
+	}
 	th.Assert(eq == true, "2 maps are not equal")
+}
+
+func (th *testHelper) readWalkCompareSkip(workspace string) {
+
+	th.SyncAllWorkspaces()
+
+	// Restart QFS
+	err := th.RestartQuantumFs()
+	th.Assert(err == nil, "Error restarting QuantumFs: %v", err)
+	db := th.GetWorkspaceDB()
+	ds := th.GetDataStore()
+	tds := newTestDataStore(th, ds)
+	th.SetDataStore(tds)
+
+	// Read all files in this workspace.
+	readFile := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if info.IsDir() && strings.HasSuffix(path, "/dir1") {
+			return filepath.SkipDir
+		}
+
+		if !info.IsDir() {
+			ioutil.ReadFile(path)
+		}
+		return nil
+	}
+	err = filepath.Walk(workspace, readFile)
+	th.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
+
+	// Save the keys intercepted during filePath walk.
+	getMap := tds.GetKeyList()
+	tds.FlushKeyList()
+
+	// Use Walker to walk all the blocks in the workspace.
+	c := &th.TestCtx().Ctx
+	root := strings.Split(th.RelPath(workspace), "/")
+	rootID, err := db.Workspace(c, root[0], root[1], root[2])
+	th.Assert(err == nil, "Error getting rootID for %v: %v",
+		root, err)
+
+	var walkerMap = make(map[string]int)
+	var mapLock utils.DeferableMutex
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		defer mapLock.Lock().Unlock()
+
+		// NOTE: In the TTL walker this path comparison will be
+		// replaced by a TTL comparison.
+		if isDir && strings.HasSuffix(path, "/dir1") {
+			return SkipDir
+		}
+
+		walkerMap[key.String()] = 1
+		return nil
+	}
+
+	err = Walk(c, ds, rootID, wf)
+	th.Assert(err == nil, "Error in walk: %v", err)
+
+	eq := reflect.DeepEqual(getMap, walkerMap)
+	if eq != true {
+		th.printMap("Original Map", getMap)
+		th.printMap("Walker Map", walkerMap)
+	}
+	th.Assert(eq == true, "2 maps are not equal")
+}
+
+func (th *testHelper) printMap(name string, m map[string]int) {
+
+	th.Log("%v: ", name)
+	for k, v := range m {
+		th.Log("%v: %v", k, v)
+	}
 }
 
 func TestMain(m *testing.M) {

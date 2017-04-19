@@ -28,11 +28,6 @@ const fusectlPath = "/sys/fs/fuse/"
 
 type QuantumFsTest func(test *TestHelper)
 
-//NoStdOut prints nothing to stdout
-func NoStdOut(format string, args ...interface{}) error {
-	return nil
-}
-
 // TestHelper holds the variables important to maintain the state of testing
 // in a package which intends to use a QFS instance. daemon.TestHelper will
 // need to be embedded in that package's testHelper.
@@ -42,18 +37,6 @@ type TestHelper struct {
 	qfsWait        sync.WaitGroup
 	fuseConnection int
 	api            *quantumfs.Api
-}
-
-// CreateTestDirs makes the required directories for the test.
-// These directories are inside TestRunDir
-func (th *TestHelper) CreateTestDirs() {
-	th.TempDir = TestRunDir + "/" + th.TestName
-
-	mountPath := th.TempDir + "/mnt"
-	utils.MkdirAll(mountPath, 0777)
-	th.Log("Using mountpath %s", mountPath)
-
-	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 func abortFuse(th *TestHelper) {

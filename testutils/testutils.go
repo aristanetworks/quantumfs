@@ -47,6 +47,82 @@ type TestHelper struct {
 	ShouldFailLogscan bool
 }
 
+// TestName returns name of the test by looking
+// back through the call-stack. The testNameDepth
+// argument refers to the stack depth from
+// caller's (caller of TestName) frame to the frame
+// of the test function
+func TestName(testNameDepth int) string {
+	// The +1 to the depth accounts for testutils.TestName
+	// function on the stack.
+	testPc, _, _, _ := runtime.Caller(testNameDepth + 1)
+	testName := runtime.FuncForPC(testPc).Name()
+	lastSlash := strings.LastIndex(testName, "/")
+	testName = testName[lastSlash+1:]
+	return testName
+}
+
+//NoStdOut prints nothing to stdout
+func NoStdOut(format string, args ...interface{}) error {
+	return nil
+}
+
+// NewTestHelper creates a TestHelper with reasonable
+// defaults
+func NewTestHelper(testName string, testRunDir string,
+	t *testing.T) TestHelper {
+
+	cachePath := testRunDir + "/" + testName
+	return TestHelper{
+		T:          t,
+		TestName:   testName,
+		TestResult: make(chan string, 2), // must be buffered
+		StartTime:  time.Now(),
+		CachePath:  cachePath,
+		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
+			60*10000*24, NoStdOut),
+	}
+}
+
+// CreateTestDirs makes the required directories for the test.
+// These directories are inside TestRunDir
+func (th *TestHelper) CreateTestDirs() {
+	th.TempDir = TestRunDir + "/" + th.TestName
+
+	mountPath := th.TempDir + "/mnt"
+	utils.MkdirAll(mountPath, 0777)
+	th.Log("Using mountpath %s", mountPath)
+
+	utils.MkdirAll(th.TempDir+"/ether", 0777)
+}
+
+func (th *TestHelper) RunTestCommonEpilog(testName string,
+	testArg QuantumFsTest) {
+
+	th.Log("Finished test preamble, starting test proper")
+	beforeTest := time.Now()
+
+	go th.Execute(testArg)
+
+	testResult := th.WaitForResult()
+
+	// Record how long the test took so we can make a histogram
+	afterTest := time.Now()
+	TimeMutex.Lock()
+	TimeBuckets = append(TimeBuckets,
+		TimeData{
+			Duration: afterTest.Sub(beforeTest),
+			TestName: testName,
+		})
+	TimeMutex.Unlock()
+
+	if !th.ShouldFail && testResult != "" {
+		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
+	} else if th.ShouldFail && testResult == "" {
+		th.Log("ERROR: Test is expected to fail, but didn't")
+	}
+}
+
 // Assert the condition is true. If it is not true then fail the test with the given
 // message
 func (th *TestHelper) Assert(condition bool, format string, args ...interface{}) {
@@ -133,11 +209,10 @@ func (th *TestHelper) WaitForResult() string {
 var TestRunDir string
 
 func init() {
-
 	syscall.Umask(0)
 	var err error
 	for i := 0; i < 100; i++ {
-		TestRunDir, err = ioutil.TempDir("", "quantumfsTest")
+		TestRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
 		if err != nil {
 			continue
 		}

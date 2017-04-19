@@ -3,6 +3,7 @@
 
 package walker
 
+import "errors"
 import "fmt"
 import "path/filepath"
 import "runtime"
@@ -11,9 +12,26 @@ import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 
-type walkFunc func(*Ctx, string, quantumfs.ObjectKey, uint64) error
+// SkipDir is used as a return value from WalkFunc to indicate that
+// the directory named in the call is to be skipped. It is not returned
+// as an error by any function.
+var SkipDir = errors.New("skip this directory")
+
+// WalkFunc is the type of the function called for each data block under the
+// Workspace.
+//
+// NOTE
+// Walker in this package honors SkipDir only when walkFunc is called for a
+// directory.
+//
+// This is a key difference from path/filepath.Walk,
+// in which if filepath.Walkunc returns SkipDir when invoked on a
+// non-directory file, Walk skips the remaining files in the
+// containing directory.
+type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
+	size uint64, isDir bool) error
 
 type Ctx struct {
 	context.Context
@@ -28,7 +46,7 @@ type workerData struct {
 
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
-	wf walkFunc) error {
+	wf WalkFunc) error {
 
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
 		return fmt.Errorf(
@@ -36,11 +54,11 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			rootID.String(), key2String(rootID))
 	}
 
-	buf := utils.NewSimpleBuffer(nil, rootID)
+	buf := simplebuffer.New(nil, rootID)
 	if err := ds.Get(cq, rootID, buf); err != nil {
 		return err
 	}
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"WorkspaceRoot buffer %s",
 		key2String(rootID))
 
@@ -76,8 +94,12 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			return err
 		}
 
+		// Skip WSR
 		if err := handleDirectoryEntry(c, "/", ds, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
+			if err == SkipDir {
+				return nil
+			}
 			return err
 		}
 		return nil
@@ -108,11 +130,11 @@ func key2String(key quantumfs.ObjectKey) string {
 }
 
 func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
-	hle quantumfs.HardlinkEntry, wf walkFunc,
+	hle quantumfs.HardlinkEntry, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	for {
-		//  Go through all records in this entry.
+		// Go through all records in this entry.
 		for idx := 0; idx < hle.NumEntries(); idx++ {
 
 			hlr := hle.Entry(idx)
@@ -123,19 +145,17 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 				return err
 			}
 		}
-		// Go to next Entry
-		if hle.Next().IsEqualTo(quantumfs.EmptyDirKey) ||
-			hle.NumEntries() == 0 {
+		if !hle.HasNext() {
 			break
 		}
 
 		key := hle.Next()
-		buf := utils.NewSimpleBuffer(nil, key)
+		buf := simplebuffer.New(nil, key)
 		if err := ds.Get(c.qctx, key, buf); err != nil {
 			return err
 		}
 
-		utils.AssertNonZeroBuf(buf,
+		simplebuffer.AssertNonZeroBuf(buf,
 			"WorkspaceRoot buffer %s",
 			key2String(key))
 
@@ -150,15 +170,15 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 }
 
 func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf walkFunc,
+	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s",
 		key2String(key))
 
@@ -185,15 +205,15 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 }
 
 func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf walkFunc,
+	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"VeryLargeFile buffer %s",
 		key2String(key))
 
@@ -212,23 +232,24 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-var totalFilesWalked uint64
-
 func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf walkFunc,
+	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
-	if err := writeToChan(c, keyChan, path, key,
-		uint64(buf.Size())); err != nil {
+	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
+	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
+		if err == SkipDir {
+			return nil
+		}
 		return err
 	}
 
@@ -244,7 +265,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 }
 
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
-	dr *quantumfs.DirectRecord, wf walkFunc,
+	dr *quantumfs.DirectRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	fpath := filepath.Join(path, dr.Filename())
@@ -273,21 +294,20 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func worker(c *Ctx, keyChan <-chan *workerData, wf walkFunc) error {
+func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 	var keyItem *workerData
 	for {
 		select {
 		case <-c.Done():
-			return fmt.Errorf("Quiting in worker because at least one " +
+			return fmt.Errorf("Quitting worker because at least one " +
 				"goroutine failed with an error")
 		case keyItem = <-keyChan:
 			if keyItem == nil {
 				return nil
 			}
-
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
-			keyItem.size); err != nil {
+			keyItem.size, false); err != nil {
 			return err
 		}
 	}
@@ -298,7 +318,7 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 
 	select {
 	case <-c.Done():
-		return fmt.Errorf("Quiting in writeToChan because at least one " +
+		return fmt.Errorf("Quitting writeToChan because at least one " +
 			"goroutine failed with an error")
 	case keyChan <- &workerData{path: p, key: k, size: s}:
 	}
