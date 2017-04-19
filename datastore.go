@@ -330,6 +330,10 @@ func (dir *DirectoryEntry) Next() ObjectKey {
 	return overlayObjectKey(dir.dir.Next())
 }
 
+func (dir *DirectoryEntry) HasNext() bool {
+	return !dir.Next().IsEqualTo(EmptyDirKey) && dir.NumEntries() > 0
+}
+
 func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 	dir.dir.SetNext(key.key)
 }
@@ -661,6 +665,10 @@ func (dir *HardlinkEntry) SetEntry(i int, record *HardlinkRecord) {
 
 func (dir *HardlinkEntry) Next() ObjectKey {
 	return overlayObjectKey(dir.entry.Next())
+}
+
+func (dir *HardlinkEntry) HasNext() bool {
+	return !dir.Next().IsEqualTo(EmptyDirKey) && dir.NumEntries() > 0
 }
 
 func (dir *HardlinkEntry) SetNext(key ObjectKey) {
