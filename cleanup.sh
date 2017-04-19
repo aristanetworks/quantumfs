@@ -1,8 +1,8 @@
 #!/bin/bash
-
 # Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 # Arista Networks, Inc. Confidential and Proprietary.
 
+set -e
 ppid=$1
 rootContainer=/dev/shm/$2
 mountPath=/sys/fs/fuse/connections
@@ -17,18 +17,25 @@ for pid in `ps ux | grep --color=never 'make all' | awk '{print $2}'`; do
 	fi
 done
 
-# Clean up the rest left-over of quantumfsTest
-for l in `ls -l $rootContainer | grep -i 'quantumfsTest' | awk '{print $9}'`; do
+# Prevent $rootContainer is accidentally set as /dev/shm or even /
+if [[ $rootContainer != /dev/shm/$USER-RootContainer-$ppid ]]; then
+	echo "The temporary directory /dev/shm/$rootContainer is not properly named"
+	exit 1
+fi
+
+# Clean up the rest left-over of mount point until no mount point left
+while [ `mount | grep $rootContainer | wc -l` -gt 0 ]; do
 	# Remove the hanging mount point
-	for i in `grep $l /proc/self/mountinfo | sed 's/^.*0:\([0-9]\+\).*$/\1/'`; do
-		echo 1 | sudo tee $mountPath/$i/abort > /dev/null
+	for abort in `grep $rootContainer /proc/self/mountinfo | \
+		sed 's/^.*0:\([0-9]\+\).*$/\1/'`; do
+			echo 1 | sudo tee $mountPath/$abort/abort > /dev/null
 	done
 
 	# Remove the records in mount
-	for i in `mount | grep $l | awk '{print $3}'`; do
-		sudo fusermount -u $i
+	for abort in `mount | grep $rootContainer | awk '{print $3}'`; do
+		sudo fusermount -u $abort
 	done
 done
 
 # Clean up the rootContainder in /dev/shm
-sudo rm -rf $rootContainer
+sudo rm -r $rootContainer
