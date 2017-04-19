@@ -1,5 +1,7 @@
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker
-PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog quantumfs/thirdparty_backends quantumfs/systemlocal quantumfs/processlocal quantumfs/walker
+PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
+PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
+PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
