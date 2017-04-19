@@ -28,11 +28,6 @@ const fusectlPath = "/sys/fs/fuse/"
 
 type QuantumFsTest func(test *TestHelper)
 
-//NoStdOut prints nothing to stdout
-func NoStdOut(format string, args ...interface{}) error {
-	return nil
-}
-
 // TestHelper holds the variables important to maintain the state of testing
 // in a package which intends to use a QFS instance. daemon.TestHelper will
 // need to be embedded in that package's testHelper.
