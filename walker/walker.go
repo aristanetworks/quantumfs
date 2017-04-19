@@ -48,6 +48,10 @@ type workerData struct {
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
+	if rootID.IsEqualTo(quantumfs.EmptyWorkspaceKey) {
+		return nil
+	}
+
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
 		return fmt.Errorf(
 			"Type of rootID %s is %s instead of KeyTypeMetadata",
