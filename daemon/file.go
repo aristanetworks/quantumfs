@@ -745,6 +745,8 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 func (fi *File) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
 
+	defer c.FuncIn("File::Merge", "%s", fi.name_).out()
+
 	localCopy, err := fi.parentGetChildRecordCopy(c, fi.InodeCommon.id)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to get record from parent for inode %d",
@@ -754,10 +756,14 @@ func (fi *File) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	// For now, just take the newer file
 	if remote.ModificationTime() > localCopy.ModificationTime() {
 		var dummyParent Directory
+		dummyParent.treeLock_ = fi.treeLock_
 		remoteInode, _ := recordToInode(c, fi.inodeNum(), remote,
 			&dummyParent)
 		remoteFile := remoteInode.(*File)
 		fi.accessor = remoteFile.accessor
+		c.vlog("taking remote copy of %s", fi.name_)
+	} else {
+		c.vlog("keeping local copy of %s %d %d", fi.name_)
 	}
 }
 

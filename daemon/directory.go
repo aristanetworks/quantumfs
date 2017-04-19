@@ -1719,11 +1719,16 @@ func (dir *Directory) mergeRecord(c *ctx, name string,
 		num := dir.children.inodeNum(name)
 		local := dir.children.record(num).ShallowCopy()
 
-		if remote.ModificationTime() > local.ModificationTime() {
-			dir.children.loadChild(c, remote, num)
-		}
-
 		return num, local
+	} ()
+
+	// We want the last thing we do to be updating / modifying the local record
+	defer func () {
+		defer dir.childRecordLock.Lock().Unlock()
+
+		if remote.ModificationTime() > localCopy.ModificationTime() {
+			dir.children.loadChild(c, remote, inodeNum)
+		}
 	} ()
 
 	// Don't merge if remote indicates no changes
