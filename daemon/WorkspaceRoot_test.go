@@ -101,12 +101,12 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 
 	targetFile := workspace + subdirectory + "/file"
 	linkName := workspace + subdirectory + "/link"
-	err = os.Symlink(targetFile, linkName)
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	err = syscall.Symlink(targetFile, linkName)
+	test.Assert(err == syscall.EROFS,
 		"Error creating symlink: %v", err)
 
-	err = os.Link(targetFile, linkName)
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	err = syscall.Link(targetFile, linkName)
+	test.Assert(err == syscall.EROFS,
 		"Error creating hardlink: %v", err)
 
 	err = os.RemoveAll(targetFile)
@@ -118,26 +118,26 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 	test.Assert(strings.Contains(err.Error(), "read-only file system"),
 		"Error unlinking directory: %v", err)
 
-	file, err := os.OpenFile(targetFile, os.O_RDWR, 0)
-	file.Close()
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	file, err := syscall.Open(targetFile, syscall.O_RDWR, 0)
+	syscall.Close(file)
+	test.Assert(err == syscall.EROFS,
 		"Error opening the file: %v", err)
 
-	err = os.Rename(targetFile, workspace+"/newFile")
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	err = syscall.Rename(targetFile, workspace+"/newFile")
+	test.Assert(err == syscall.EROFS,
 		"Error renaming file: %v", err)
 
 	attrDataData = []byte("extendedattributedata")
 	err = syscall.Setxattr(targetFile, attrData, attrDataData, 0)
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	test.Assert(err == syscall.EROFS,
 		"Error setting data XAttr: %v", err)
 
 	err = syscall.Removexattr(targetFile, attrData)
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	test.Assert(err == syscall.EROFS,
 		"Error deleting data XAttr: %v", err)
 
 	err = syscall.Chmod(targetFile, 0123)
-	test.Assert(strings.Contains(err.Error(), "read-only file system"),
+	test.Assert(err == syscall.EROFS,
 		"Error Set file permission attribute: %v", err)
 }
 
