@@ -9,7 +9,6 @@ import "fmt"
 import "io"
 import "os"
 import "reflect"
-import "runtime"
 import "strings"
 import "sync/atomic"
 import "syscall"
@@ -135,34 +134,18 @@ func runExpensiveTest(t *testing.T, test quantumFsTest) {
 func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 	configModifier configModifierFunc) {
 
-	// Since we grab the test name from the backtrace, it must always be an
-	// identical number of frames back to the name of the test. Otherwise
-	// multiple tests will end up using the same temporary directory and nothing
-	// will work.
-	//
+	// the stack depth of test name for all callers of runTestCommon
+	// is 2. Since the stack looks as follows:
 	// 2 <testname>
-	// 1 runTest/runExpensiveTest
+	// 1 runTest
 	// 0 runTestCommon
-	testPc, _, _, _ := runtime.Caller(2)
-	testName := runtime.FuncForPC(testPc).Name()
-	lastSlash := strings.LastIndex(testName, "/")
-	testName = testName[lastSlash+1:]
-	cachePath := TestRunDir + "/" + testName
-
+	testName := testutils.TestName(2)
 	th := &testHelper{
 		TestHelper: TestHelper{
-			TestHelper: testutils.TestHelper{
-				T:          t,
-				TestName:   testName,
-				TestResult: make(chan string, 2), // must be buffered
-				StartTime:  time.Now(),
-				CachePath:  cachePath,
-				Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-					60*10000*24, NoStdOut),
-			},
+			TestHelper: testutils.NewTestHelper(testName,
+				TestRunDir, t),
 		},
 	}
-
 	th.CreateTestDirs()
 	defer th.EndTest()
 
@@ -180,28 +163,7 @@ func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
 		th.startQuantumFs(config)
 	}
 
-	th.Log("Finished test preamble, starting test proper")
-	beforeTest := time.Now()
-
-	go th.Execute(th.testHelperUpcast(test))
-
-	testResult := th.WaitForResult()
-
-	// Record how long the test took so we can make a histogram
-	afterTest := time.Now()
-	testutils.TimeMutex.Lock()
-	testutils.TimeBuckets = append(testutils.TimeBuckets,
-		testutils.TimeData{
-			Duration: afterTest.Sub(beforeTest),
-			TestName: testName,
-		})
-	testutils.TimeMutex.Unlock()
-
-	if !th.ShouldFail && testResult != "" {
-		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
-	} else if th.ShouldFail && testResult == "" {
-		th.Log("ERROR: Test is expected to fail, but didn't")
-	}
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
 type quantumFsTest func(test *testHelper)
