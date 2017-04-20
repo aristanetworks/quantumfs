@@ -49,7 +49,7 @@ func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := EtherBlobStoreTranslator{blobstore: blobstore}
+	translator := EtherBlobStoreTranslator{Blobstore: blobstore}
 	return &translator
 }
 
@@ -149,12 +149,16 @@ func NewEtherCqlStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := EtherBlobStoreTranslator{blobstore: blobstore}
+	translator := EtherBlobStoreTranslator{
+		Blobstore:      blobstore,
+		ApplyTTLPolicy: true,
+	}
 	return &translator
 }
 
 type EtherBlobStoreTranslator struct {
-	blobstore blobstore.BlobStore
+	Blobstore      blobstore.BlobStore
+	ApplyTTLPolicy bool
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
@@ -209,14 +213,16 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
 
 	ks := key.String()
-	data, metadata, err := ebt.blobstore.Get(ks)
+	data, metadata, err := ebt.Blobstore.Get(ks)
 	if err != nil {
 		return err
 	}
 
-	err = refreshTTL(ebt.blobstore, true, ks, metadata, data)
-	if err != nil {
-		return err
+	if ebt.ApplyTTLPolicy {
+		err = refreshTTL(ebt.Blobstore, true, ks, metadata, data)
+		if err != nil {
+			return err
+		}
 	}
 
 	newData := make([]byte, len(data))
@@ -232,14 +238,14 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Set")
 
 	ks := key.String()
-	metadata, err := ebt.blobstore.Metadata(ks)
+	metadata, err := ebt.Blobstore.Metadata(ks)
 
 	switch {
 	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
-		return refreshTTL(ebt.blobstore, false, ks, nil, buf.Get())
+		return refreshTTL(ebt.Blobstore, false, ks, nil, buf.Get())
 
 	case err == nil:
-		return refreshTTL(ebt.blobstore, true, ks, metadata, buf.Get())
+		return refreshTTL(ebt.Blobstore, true, ks, metadata, buf.Get())
 
 	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
 		// if metadata error other than ErrKeyNotFound then fail
