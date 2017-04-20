@@ -762,8 +762,10 @@ func (fi *File) Merge(c *ctx, base quantumfs.DirectoryRecord,
 		remoteFile := remoteInode.(*File)
 		fi.accessor = remoteFile.accessor
 		c.vlog("taking remote copy of %s", fi.name_)
+
+		inodeNotify(c, fi.id)
 	} else {
-		c.vlog("keeping local copy of %s %d %d", fi.name_)
+		c.vlog("keeping local copy of %s", fi.name_)
 	}
 }
 

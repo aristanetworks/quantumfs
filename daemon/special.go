@@ -280,10 +280,34 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 func (special *Special) Merge(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) {
 
-	c.elog("Invalid Merge on Special")
+	defer c.FuncIn("Special::Merge", "%s", special.name_).out()
+
+	localCopy, err := special.parentGetChildRecordCopy(c, special.InodeCommon.id)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to get record from parent for inode %d",
+			special.id))
+	}
+
+	// Take the newer file
+	if remote.ModificationTime() > localCopy.ModificationTime() {
+		var dummyParent Directory
+		dummyParent.treeLock_ = special.treeLock_
+		remoteInode, _ := recordToInode(c, special.inodeNum(), remote,
+			&dummyParent)
+		remoteSpecial := remoteInode.(*Special)
+		special.filetype = remoteSpecial.filetype
+		special.device = remoteSpecial.device
+		c.vlog("taking remote copy of %s", special.name_)
+
+		inodeNotify(c, special.id)
+	} else {
+		c.vlog("keeping local copy of %s", special.name_)
+	}
 }
 
-func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
+func specialOverrideAttr(c *ctx, entry quantumfs.DirectoryRecord,
+	attr *fuse.Attr) uint32 {
+
 	attr.Size = 0
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
@@ -294,6 +318,8 @@ func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint3
 			err))
 	}
 	attr.Rdev = dev
+
+	c.vlog("SpecialOverride %x %d", attr.Rdev, filetype)
 
 	return filetype
 }

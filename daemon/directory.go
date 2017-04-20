@@ -200,7 +200,8 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).out()
+	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d, %s", inodeNum,
+		entry.Filename()).out()
 
 	// Ensure we're working with a shallow copy for objectTypeToFileType
 	entry = entry.ShallowCopy()
@@ -219,7 +220,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 		attr.Nlink = uint32(entry.Size()) + 2
 	case fuse.S_IFIFO:
-		fileType = specialOverrideAttr(entry, attr)
+		fileType = specialOverrideAttr(c, entry, attr)
 	default:
 		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -879,6 +880,8 @@ func (dir *Directory) internalRmRf(c *ctx, name string) {
 			panic(fmt.Sprintf("Unable to Unlink %s", name))
 		}
 	}
+
+	inodeNotify(c, dir.id)
 }
 
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
@@ -1728,6 +1731,10 @@ func (dir *Directory) mergeRecord(c *ctx, name string,
 
 		if remote.ModificationTime() > localCopy.ModificationTime() {
 			dir.children.loadChild(c, remote, inodeNum)
+			inodeNotify(c, inodeNum)
+			c.vlog("taking remote record for %s", name)
+		} else {
+			c.vlog("keeping local record for %s", name)
 		}
 	} ()
 
@@ -1755,6 +1762,7 @@ func (dir *Directory) mergeRecord(c *ctx, name string,
 			quantumfs.InodeIdInvalid)
 		c.qfs.addUninstantiated(c, []InodeId{inodeNum},
 			dir.inodeNum())
+		inodeNotify(c, inodeNum)
 	}
 }
 
