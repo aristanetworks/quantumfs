@@ -26,11 +26,11 @@ func init() {
 }
 
 // Leave a record of the temporary directory's name
-func SetupTestspace(itr int, testName string) (string, error) {
+func SetupTestspace(testName string) (string, error) {
 	var err error = nil
 	var testRunDir string = ""
 
-	for i := 0; i < itr; i++ {
+	for i := 0; i < 10; i++ {
 		testRunDir, err = ioutil.TempDir(rootDir, testName)
 
 		if err != nil {

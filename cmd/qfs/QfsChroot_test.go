@@ -62,7 +62,7 @@ func init() {
 
 // setup a minimal workspace
 func setupWorkspace(t *testing.T) string {
-	dirTest, err := utils.SetupTestspace(1, "TestChroot")
+	dirTest, err := utils.SetupTestspace("TestChroot")
 	if err != nil {
 		t.Fatalf("Setting up testing environment of %s error: %s", dirTest,
 			err.Error())

@@ -8,7 +8,7 @@ export ROOTDIRNAME
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
-all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
+all: cleanup lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -31,7 +31,7 @@ cppstyle:
 encoding/metadata.capnp.go: encoding/metadata.capnp
 	cd encoding; capnp compile -ogo metadata.capnp
 
-$(COMMANDS): encoding/metadata.capnp.go
+$(COMMANDS): cleanup encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
