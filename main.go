@@ -115,10 +115,6 @@ func walkFullWSDB(c *quantumfs.Ctx, db quantumfs.WorkspaceDB) {
 		Log(c, logErr, "Error in geting List of Typespaces")
 	}
 	for _, ts := range tsl {
-		// Assuming we do not have _/X/Y
-		if ts == quantumfs.NullSpaceName {
-			continue
-		}
 		nsl, err := db.NamespaceList(c, ts)
 		if err != nil {
 			Log(c, logErr, "Error in geting List of Namespaces for TS:%s", ts)
