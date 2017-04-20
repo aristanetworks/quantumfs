@@ -198,7 +198,7 @@ var TestRunDir string
 func init() {
 	syscall.Umask(0)
 	var err error
-	TestRunDir, err = utils.SetupTestspace(100, "quantumfsTest")
+	TestRunDir, err = utils.SetupTestspace("quantumfsTest")
 	if err != nil {
 		panic(fmt.Sprintf("Unable to create temporary test directory: %v",
 			err))

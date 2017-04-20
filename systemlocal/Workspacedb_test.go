@@ -31,7 +31,7 @@ func runTest(t *testing.T, test systemlocalTest) {
 	t.Parallel()
 
 	// Create a temporary directory to contain the database
-	testDir, err := utils.SetupTestspace(1, "systemlocalTest")
+	testDir, err := utils.SetupTestspace("systemlocalTest")
 	if err != nil {
 		panic(fmt.Sprintf("Unable to create test directory: %v", err))
 	}
