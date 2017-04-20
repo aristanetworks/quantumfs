@@ -8,6 +8,7 @@ import "encoding/base64"
 import "encoding/binary"
 import "encoding/hex"
 import "fmt"
+import "sort"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
@@ -279,6 +280,30 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 		dir: edir,
 	}
 	return dir
+}
+
+type sortDirRecordsByName struct {
+	de *DirectoryEntry
+}
+
+func (s sortDirRecordsByName) Len() int {
+	return int(s.de.dir.NumEntries())
+}
+
+func (s sortDirRecordsByName) Swap(i, j int) {
+	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).ShallowCopy()
+	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).ShallowCopy()
+	s.de.dir.Entries().Set(i, curj.Record().record)
+	s.de.dir.Entries().Set(j, oldi.Record().record)
+}
+
+func (s sortDirRecordsByName) Less(i, j int) bool {
+	return s.de.dir.Entries().At(i).Filename() <
+		s.de.dir.Entries().At(j).Filename()
+}
+
+func (dir *DirectoryEntry) SortRecordsByName() {
+	sort.Sort(sortDirRecordsByName{de: dir})
 }
 
 func (dir *DirectoryEntry) Bytes() []byte {
