@@ -291,6 +291,22 @@ func (th *testHelper) CheckData(filepath string, data []byte) {
 	th.Assert(bytes.Equal(readData, data), "Data changed in CheckData")
 }
 
+func (th *testHelper) SysStat(filepath string) syscall.Stat_t {
+	var stat syscall.Stat_t
+	err := syscall.Stat(filepath, &stat)
+	th.AssertNoErr(err)
+
+	return stat
+}
+
+func (th *testHelper) SysLstat(filepath string) syscall.Stat_t {
+	var stat syscall.Stat_t
+	err := syscall.Lstat(filepath, &stat)
+	th.AssertNoErr(err)
+
+	return stat
+}
+
 // Temporary directory for this test run
 var testRunDir string
 
