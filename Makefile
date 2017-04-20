@@ -8,7 +8,7 @@ export ROOTDIRNAME
 
 .PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
-all: cleanup lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -20,7 +20,7 @@ fetch:
 	done
 
 cleanup:
-	./cleanup.sh $(ppid) $(ROOTDIRNAME)  &
+	./cleanup.sh $(ppid) &
 
 lockcheck:
 	./lockcheck.sh
@@ -37,7 +37,7 @@ $(COMMANDS): encoding/metadata.capnp.go
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo go test github.com/aristanetworks/quantumfs/cmd/$@
 
-$(PKGS_TO_TEST): encoding/metadata.capnp.go
+$(PKGS_TO_TEST): cleanup encoding/metadata.capnp.go
 	sudo go test -gcflags '-e' github.com/aristanetworks/quantumfs/$@
 
 rpm: $(COMMANDS)
