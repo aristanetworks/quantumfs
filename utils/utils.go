@@ -12,7 +12,7 @@ func FileSize(filename string) (int64, error) {
 	var stat syscall.Stat_t
 	err := syscall.Stat(filename, &stat)
 	if err != nil {
-		return -1, fmt.Errorf("error in stating file %s:%s", filename, err)
+		return -1, fmt.Errorf("error in stating file %s:%v", filename, err)
 	}
 	return stat.Size, nil
 }
@@ -49,8 +49,7 @@ func BytesToString(data []byte) string {
 
 // StringToBytes256 converts the given null terminated string into a
 // [256]byte array.
-func StringToBytes256(data string) [256]byte {
-	var out [256]byte
+func StringToBytes256(data string) (out [256]byte) {
 	in := []byte(data)
 	for i := range in {
 		out[i] = in[i]
