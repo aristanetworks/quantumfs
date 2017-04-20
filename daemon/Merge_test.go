@@ -80,6 +80,12 @@ func TestSpecialsMerge(t *testing.T) {
 		err = syscall.Mknod(specialB, syscall.S_IFBLK, 0x11111111)
 		test.AssertNoErr(err)
 
+		statA := test.SysStat(fileA)
+		statB := test.SysStat(fileB)
+		statLinkB := test.SysLstat(symlinkB)
+		statLinkA2 := test.SysLstat(symlinkA2)
+		statSpecB := test.SysStat(specialB)
+
 		test.SyncAllWorkspaces()
 
 		api := test.getApi()
@@ -93,13 +99,15 @@ func TestSpecialsMerge(t *testing.T) {
 		// remote should have been overwritten this time
 		test.CheckData(symlinkA2, dataA)
 
-		// Check that the remote special was taken
-		var stat syscall.Stat_t
-		err = syscall.Stat(specialA, &stat)
-		err = syscall.Stat(specialA, &stat)
-		test.AssertNoErr(err)
-		test.Assert(stat.Rdev == 0x11111111,
-			"remote didn't overwrite local %x", stat.Rdev)
-		test.Assert(stat.Mode == syscall.S_IFBLK, "remote mode mismatch")
+		// Check the stats
+		test.Assert(test.SysStat(fileA) == statA, "fileA changed")
+		test.Assert(test.SysStat(fileB) == statB, "fileB changed")
+		test.Assert(test.SysLstat(symlinkA) == statLinkB,
+			"symlink not changed")
+		test.Assert(test.SysLstat(symlinkA2) == statLinkA2,
+			"symlink not preserved")
+		test.Assert(test.SysStat(specialB) == statSpecB,
+			"special not changed")
+
 	})
 }

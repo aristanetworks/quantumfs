@@ -281,7 +281,7 @@ func (link *Symlink) Merge(c *ctx, base quantumfs.DirectoryRecord,
 		link.key = remote.ID()
 		c.vlog("taking remote copy of %s", link.name_)
 
-		inodeNotify(c, symlink.id)
+		inodeNotify(c, link.id)
 	} else {
 		c.vlog("keeping local copy of %s", link.name_)
 	}
