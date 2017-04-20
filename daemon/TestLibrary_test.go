@@ -266,6 +266,31 @@ func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	return key
 }
 
+func (th *testHelper) MakeFile(filepath string) (data []byte) {
+	// choose an offset and length based on the filepath so that it varies, but
+	// is consistent from run to run
+	charSum := 100
+	for i := 0; i < len(filepath); i++ {
+		charSum += int(filepath[i] - 'a')
+	}
+
+	offset := charSum
+	length := offset
+
+	data = GenData(offset+length)[offset:]
+	err := testutils.PrintToFile(filepath, string(data))
+	th.AssertNoErr(err)
+
+	return data
+
+}
+
+func (th *testHelper) CheckData(filepath string, data []byte) {
+	readData, err := ioutil.ReadFile(filepath)
+	th.AssertNoErr(err)
+	th.Assert(bytes.Equal(readData, data), "Data changed in CheckData")
+}
+
 // Temporary directory for this test run
 var testRunDir string
 
