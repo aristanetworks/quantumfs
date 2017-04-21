@@ -15,6 +15,7 @@ import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/testutils"
 
 var commandsInUsrBin = []string{
 	umount,
@@ -62,11 +63,7 @@ func init() {
 
 // setup a minimal workspace
 func setupWorkspace(t *testing.T) string {
-	dirTest, err := utils.SetupTestspace("TestChroot")
-	if err != nil {
-		t.Fatalf("Setting up testing environment of %s error: %s", dirTest,
-			err.Error())
-	}
+	dirTest := testutils.SetupTestspace("TestChroot")
 
 	dirUsrBin := dirTest + "/usr/bin"
 	if err := utils.MkdirAll(dirUsrBin, 0777); err != nil {

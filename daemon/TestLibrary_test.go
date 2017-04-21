@@ -17,7 +17,6 @@ import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 func TestMain(m *testing.M) {
@@ -233,12 +232,7 @@ var testRunDir string
 
 func init() {
 	syscall.Umask(0)
-	var err error
-	testRunDir, err = utils.SetupTestspace("daemonQuantumfsTest")
-	if err != nil {
-		panic(fmt.Sprintf("Unable to create temporary test directory: %v",
-			err))
-	}
+	testRunDir = testutils.SetupTestspace("daemonQuantumfsTest")
 }
 
 // Produce a request specific ctx variable to use for quantumfs internal calls

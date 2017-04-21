@@ -8,7 +8,7 @@ ppid:=$(shell ps -o ppid= $$$$)
 ROOTDIRNAME:=$(shell echo -e "$(USER)-RootContainer-$(ppid)" | tr -d '[:space:]')
 export ROOTDIRNAME
 
-.PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
+.PHONY: all cleanup $(COMMANDS) $(PKGS_TO_TEST)
 
 all: cleanup lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
 
