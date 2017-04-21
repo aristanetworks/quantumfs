@@ -34,6 +34,17 @@ func TestFileWalk(t *testing.T) {
 	})
 }
 
+func TestEmptyWSR(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+
+		// Add nothing to workspace
+
+		test.readWalkCompare(workspace)
+	})
+}
+
 func TestDirWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -44,6 +55,27 @@ func TestDirWalk(t *testing.T) {
 		err := os.MkdirAll(dirname, 0777)
 		test.Assert(err == nil, "Mkdir failed (%s): %s",
 			dirname, err)
+		test.readWalkCompare(workspace)
+	})
+}
+
+func TestNestedDirWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+
+		// Write Dir
+		dirname := workspace + "/dir"
+		err := os.MkdirAll(dirname, 0777)
+		test.Assert(err == nil, "Mkdir failed (%s): %s",
+			dirname, err)
+
+		// Empty Dir
+		dirname = dirname + "/dir2"
+		err = os.MkdirAll(dirname, 0777)
+		test.Assert(err == nil, "Mkdir failed (%s): %s",
+			dirname, err)
+
 		test.readWalkCompare(workspace)
 	})
 }
@@ -66,10 +98,15 @@ func TestDirFilesWalk(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
-		// Write File 2
+		// Write File 2, empty File
 		filename = dirname + "/file2"
-		err = ioutil.WriteFile(filename, []byte(data), os.ModePerm)
-		test.Assert(err == nil, "Write failed (%s): %s",
+		f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
+		test.Assert(err == nil, "File create failed (%s): %s",
+			filename, err)
+		test.Assert(f != nil, "File create failed (%s): %s",
+			filename, err)
+		err = f.Close()
+		test.Assert(err == nil, "File close failed (%s): %s",
 			filename, err)
 
 		test.readWalkCompare(workspace)
