@@ -17,8 +17,6 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
-	"github.com/aristanetworks/quantumfs/walker"
 )
 
 // The JSON decoder, by default, doesn't unmarshal time.Duration from a
@@ -181,24 +179,6 @@ func getWorkspaceRootID(c *quantumfs.Ctx, db quantumfs.WorkspaceDB,
 	}
 
 	return db.Workspace(c, parts[0], parts[1], parts[2])
-}
-
-// If the Key is in Constant DataStore, or
-// If the Key is of Type Embedded,
-// Skip it.
-func skipKey(c *walker.Ctx, key quantumfs.ObjectKey) bool {
-
-	if key.Type() == quantumfs.KeyTypeEmbedded {
-		return true
-	}
-
-	cds := quantumfs.ConstantStore
-	buf := simplebuffer.New(nil, key)
-
-	if err := cds.Get(nil, key, buf); err != nil {
-		return false // Not a ConstKey, so do not Skip.
-	}
-	return true
 }
 
 // Given 2 maps m1 and m2, return the (numKeys, numSize) unique to m1 wrt m2

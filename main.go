@@ -318,7 +318,7 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
-		if skipKey(c, key) {
+		if walker.SkipKey(c, key) {
 			return nil
 		}
 
@@ -384,7 +384,7 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
-		if skipKey(c, key) {
+		if walker.SkipKey(c, key) {
 			return nil
 		}
 
@@ -467,7 +467,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
-		if skipKey(c, key) {
+		if walker.SkipKey(c, key) {
 			return nil
 		}
 
