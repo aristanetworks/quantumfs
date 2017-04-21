@@ -6,7 +6,6 @@ package daemon
 // This file holds the Symlink type, which represents symlinks
 
 import "errors"
-import "fmt"
 import "syscall"
 
 import "github.com/aristanetworks/quantumfs"
@@ -265,24 +264,17 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	return link.key
 }
 
-func (link *Symlink) Merge(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord) {
+func mergeSymlink(c *ctx, remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
 
-	defer c.FuncIn("Symlink::Merge", "%s", link.name_).out()
-
-	localCopy, err := link.parentGetChildRecordCopy(c, link.InodeCommon.id)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to get record from parent for inode %d",
-			link.id))
-	}
+	defer c.FuncIn("mergeSymlink", "%s", local.Filename()).out()
 
 	// Take the newer file
-	if remote.ModificationTime() > localCopy.ModificationTime() {
-		link.key = remote.ID()
-		c.vlog("taking remote copy of %s", link.name_)
-
-		inodeNotify(c, link.id)
-	} else {
-		c.vlog("keeping local copy of %s", link.name_)
+	if remote.ModificationTime() > local.ModificationTime() {
+		c.vlog("taking remote copy of %s", remote.Filename())
+		return remote.ID()
 	}
+
+	c.vlog("keeping local copy of %s", local.Filename())
+	return local.ID()
 }

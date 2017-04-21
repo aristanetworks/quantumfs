@@ -11,7 +11,6 @@ import "github.com/hanwen/go-fuse/fuse"
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
 	wsr *WorkspaceRoot
-	dir *Directory
 
 	// can be many to one
 	children map[string]InodeId
@@ -19,10 +18,9 @@ type ChildMap struct {
 	childrenRecords map[InodeId][]quantumfs.DirectoryRecord
 }
 
-func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
+func newChildMap(numEntries int, wsr_ *WorkspaceRoot) *ChildMap {
 	return &ChildMap{
 		wsr:      wsr_,
-		dir:      owner,
 		children: make(map[string]InodeId, numEntries),
 		childrenRecords: make(map[InodeId][]quantumfs.DirectoryRecord,
 			numEntries),

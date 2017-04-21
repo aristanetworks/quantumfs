@@ -7,7 +7,6 @@ package daemon
 
 import "bytes"
 import "errors"
-import "fmt"
 import "sync"
 
 import "github.com/aristanetworks/quantumfs"
@@ -742,31 +741,19 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func (fi *File) Merge(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord) {
+func mergeFile(c *ctx, remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
 
-	defer c.FuncIn("File::Merge", "%s", fi.name_).out()
-
-	localCopy, err := fi.parentGetChildRecordCopy(c, fi.InodeCommon.id)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to get record from parent for inode %d",
-			fi.id))
-	}
+	defer c.FuncIn("mergeFile", "%s", local.Filename()).out()
 
 	// For now, just take the newer file
-	if remote.ModificationTime() > localCopy.ModificationTime() {
-		var dummyParent Directory
-		dummyParent.treeLock_ = fi.treeLock_
-		remoteInode, _ := recordToInode(c, fi.inodeNum(), remote,
-			&dummyParent)
-		remoteFile := remoteInode.(*File)
-		fi.accessor = remoteFile.accessor
-		c.vlog("taking remote copy of %s", fi.name_)
-
-		inodeNotify(c, fi.id)
-	} else {
-		c.vlog("keeping local copy of %s", fi.name_)
+	if remote.ModificationTime() > local.ModificationTime() {
+		c.vlog("taking remote copy of %s", remote.Filename())
+		return remote.ID()
 	}
+
+	c.vlog("keeping local copy of %s", local.Filename())
+	return local.ID()
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,

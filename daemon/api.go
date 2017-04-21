@@ -277,12 +277,6 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func (api *ApiInode) Merge(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord) {
-
-	c.elog("Invalid Merge against ApiHandle")
-}
-
 func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
 	defer c.funcIn("newApiHandle").out()
 
@@ -517,16 +511,16 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
 	}
 
-	remote := strings.Split(cmd.Remote, "/")
 	local := strings.Split(cmd.Local, "/")
-
-	workspace, ok := c.qfs.getWorkspaceRoot(c, local[0], local[1], local[2])
-	if !ok {
+	localRootId, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
+		local[2])
+	if err != nil {
 		c.vlog("Workspace not found: %s", local)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", local)
 	}
 
+	remote := strings.Split(cmd.Remote, "/")
 	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
 	if err != nil {
@@ -535,11 +529,15 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			"WorkspaceRoot %s does not exist or is not active", remote)
 	}
 
-	baseRecord := quantumfs.NewDirectoryRecord()
-	baseRecord.SetID(workspace.rootId)
-	remoteRecord := quantumfs.NewDirectoryRecord()
-	remoteRecord.SetID(remoteRootId)
-	workspace.Merge(c, baseRecord, remoteRecord)
+	newRootId := mergeWorkspaceRoot(c, remoteRootId, remoteRootId, localRootId)
+	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
+		local[2], localRootId, newRootId)
+	if err != nil {
+		c.vlog("Workspace rootId advanced after merge began, try again.")
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Workspace rootId advanced after merge began, try again.")
+	}
+
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
 }
