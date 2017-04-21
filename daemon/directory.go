@@ -60,7 +60,8 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 	var uninstantiated []InodeId
-	children, uninstantiated := dir.newChildMap(c, baseLayerId)
+	c.vlog("Loading child map for %d", inodeNum)
+	children, uninstantiated := loadChildMap(c, wsr, baseLayerId)
 	dir.children = children
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
@@ -68,7 +69,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	return uninstantiated
 }
 
-func (dir *Directory) newChildMap(c *ctx,
+func loadChildMap(c *ctx, wsr *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
 
 	var rtnMap *ChildMap
@@ -85,14 +86,13 @@ func (dir *Directory) newChildMap(c *ctx,
 		baseLayer := buffer.AsDirectoryEntry()
 
 		if rtnMap == nil {
-			rtnMap = newChildMap(baseLayer.NumEntries(), dir.wsr, dir)
+			rtnMap = newChildMap(baseLayer.NumEntries(), wsr)
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			childInodeNum := rtnMap.loadChild(c,
 				baseLayer.Entry(i), quantumfs.InodeIdInvalid)
-			c.vlog("newChildMap %d getting child %d", dir.inodeNum(),
-				childInodeNum)
+			c.vlog("loadChildMap getting child %d", childInodeNum)
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
 
@@ -1711,61 +1711,6 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	return dir.baseLayerId
 }
 
-func (dir *Directory) mergeRecord(c *ctx, name string,
-	base quantumfs.DirectoryRecord, remote quantumfs.DirectoryRecord) {
-
-	defer c.FuncIn("Directory::mergeRecord", "%s", name).out()
-
-	inodeNum, localCopy := func () (InodeId, quantumfs.DirectoryRecord) {
-		defer dir.childRecordLock.Lock().Unlock()
-
-		num := dir.children.inodeNum(name)
-		local := dir.children.record(num).ShallowCopy()
-
-		return num, local
-	} ()
-
-	// We want the last thing we do to be updating / modifying the local record
-	defer func () {
-		defer dir.childRecordLock.Lock().Unlock()
-
-		if remote.ModificationTime() > localCopy.ModificationTime() {
-			dir.children.loadChild(c, remote, inodeNum)
-			inodeNotify(c, inodeNum)
-			c.vlog("taking remote record for %s", name)
-		} else {
-			c.vlog("keeping local record for %s", name)
-		}
-	} ()
-
-	// Don't merge if remote indicates no changes
-	if remote.ID().IsEqualTo(localCopy.ID()) ||
-		remote.ID().IsEqualTo(base.ID()) {
-
-		return
-	}
-
-	// Merge differently depending on if the type is preserved
-	if typesMatch(localCopy.Type(), remote.Type()) &&
-		typesMatch(localCopy.Type(), base.Type()) {
-
-		// if all types match, great, we can defer Merging to the type's
-		// implementation
-		child := c.qfs.inode(c, inodeNum)
-		child.Merge(c, base, remote)
-	} else if remote.ModificationTime() > localCopy.ModificationTime() {
-		// The type changed in some way, so we have to do a full replacement
-		// based on modification time. If the local is newer than the remote,
-		// we just keep the local
-		dir.internalRmRf(c, name)
-		inodeNum := dir.children.loadChild(c, remote,
-			quantumfs.InodeIdInvalid)
-		c.qfs.addUninstantiated(c, []InodeId{inodeNum},
-			dir.inodeNum())
-		inodeNotify(c, inodeNum)
-	}
-}
-
 func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
 	// consolidate file types into one
 	if a == quantumfs.ObjectTypeSmallFile ||
@@ -1782,69 +1727,100 @@ func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
 	return a == b
 }
 
-func (dir *Directory) Merge(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord) {
+func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
+	localWsr *WorkspaceRoot, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	defer c.funcIn("Directory::Merge").out()
+	defer c.FuncIn("mergeRecord %s", local.Filename()).out()
 
-	baseChildMap, _ := dir.newChildMap(c, base.ID())
-	remoteChildMap, _ := dir.newChildMap(c, remote.ID())
+	// Don't merge if remote indicates no changes
+	if remote.ID().IsEqualTo(local.ID()) || remote.ID().IsEqualTo(base.ID()) {
+		return local
+	}
 
-	toRemove, toMerge := func () ([]string, []string) {
-		defer dir.Lock().Unlock()
+	// Merge differently depending on if the type is preserved
+	localChanged := !typesMatch(local.Type(), base.Type())
+	remoteChanged := !typesMatch(remote.Type(), base.Type())
+	localRemoteSame := typesMatch(local.Type(), remote.Type())
 
-		toRemove := make([]string, 0)
-		toMerge := make([]string, 0)
-		baseChildren := baseChildMap.records()
-		for _, v := range baseChildren {
-			remoteChild := remoteChildMap.recordByName(c, v.Filename())
-			localChild := func () quantumfs.DirectoryRecord {
-				defer dir.childRecordLock.Lock().Unlock()
-				record := dir.children.recordByName(c, v.Filename())
-				if record == nil {
-					return nil
-				}
-
-				return record.ShallowCopy()
-			}
-
-			if remoteChild != nil && localChild != nil {
-				// changed
-				toMerge = append(toMerge, v.Filename())
-			} else if remoteChild == nil && localChild != nil {
-				// removed
-				toRemove = append(toRemove, v.Filename())
-			}
+	var mergedKey *quantumfs.ObjectKey
+	switch local.Type() {
+	case quantumfs.ObjectTypeDirectoryEntry:
+		if !localChanged && !remoteChanged {
+			*mergedKey = mergeDirectory(c, baseWsr, remoteWsr, localWsr,
+				base.ID(), remote.ID(), local.ID())
 		}
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeMediumFile:
+		fallthrough
+	case quantumfs.ObjectTypeLargeFile:
+		fallthrough
+	case quantumfs.ObjectTypeVeryLargeFile:
+		if localRemoteSame {
+			*mergedKey = mergeFile(c, remote, local)
+		}
+	case quantumfs.ObjectTypeHardlink:
+		// Do nothing, hardlinks don't get merged
+	case quantumfs.ObjectTypeSymlink:
+		if localRemoteSame {
+			*mergedKey = mergeSymlink(c, remote, local)
+		}
+	case quantumfs.ObjectTypeSpecial:
+		if localRemoteSame {
+			*mergedKey = mergeSpecial(c, remote, local)
+		}
+	default:
+		panic(fmt.Sprintf("Unsupported file type in merge: %s",
+			quantumfs.ObjectType2String(local.Type())))
+	}
 
-		remoteChildren := remoteChildMap.records()
-		defer dir.childRecordLock.Lock().Unlock()
-		for _, v := range remoteChildren {
-			baseChild := baseChildMap.recordByName(c, v.Filename())
-			if baseChild != nil {
-				continue
-			}
+	rtnRecord := local
+	// now decide which set of metadata we take (local or remote)
+	if remote.ModificationTime() > local.ModificationTime() {
+		rtnRecord = remote
+	}
 
-			// added
-			inodeNum := dir.children.loadChild(c, v,
+	if mergedKey != nil {
+		rtnRecord.SetID(*mergedKey)
+	}
+
+	return rtnRecord
+}
+
+func mergeDirectory(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
+	localWsr *WorkspaceRoot, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) quantumfs.ObjectKey {
+
+	defer c.funcIn("mergeDirectory").out()
+
+	baseChildMap, _ := loadChildMap(c, baseWsr, base)
+	remoteChildMap, _ := loadChildMap(c, remoteWsr, remote)
+	localChildMap, _ := loadChildMap(c, localWsr, local)
+
+	for _, v := range remoteChildMap.records() {
+		baseChild := baseChildMap.recordByName(c, v.Filename())
+		localChild := localChildMap.recordByName(c, v.Filename())
+
+		if localChild != nil {
+			localChildMap.loadChild(c, mergeRecord(c, baseWsr, remoteWsr,
+				localWsr, baseChild, v, localChild),
 				quantumfs.InodeIdInvalid)
-			c.qfs.addUninstantiated(c, []InodeId{inodeNum},
-				dir.inodeNum())
+		} else if baseChild == nil {
+			localChildMap.loadChild(c, v, quantumfs.InodeIdInvalid)
 		}
-
-		return toRemove, toMerge
-	} ()
-
-	// Do all Merging and Removing outside of the parent being locked
-	for _, v := range toMerge {
-		baseChild := baseChildMap.recordByName(c, v)
-		remoteChild := remoteChildMap.recordByName(c, v)
-		dir.mergeRecord(c, v, baseChild, remoteChild)
 	}
 
-	for _, v := range toRemove {
-		dir.internalRmRf(c, v)
+	for _, v := range baseChildMap.records() {
+		remoteChild := remoteChildMap.recordByName(c, v.Filename())
+
+		if remoteChild == nil {
+			localChildMap.deleteChild(c, v.Filename())
+		}
 	}
+
+	return publishDirectoryRecords(c, localChildMap.records())
 }
 
 type directoryContents struct {

@@ -169,9 +169,6 @@ type Inode interface {
 	RLockTree() *sync.RWMutex
 
 	isWorkspaceRoot() bool
-
-	Merge(c *ctx, base quantumfs.DirectoryRecord,
-		remote quantumfs.DirectoryRecord)
 }
 
 type inodeHolder interface {

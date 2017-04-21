@@ -28,7 +28,9 @@ type WorkspaceRoot struct {
 	// tree.
 	realTreeLock sync.RWMutex
 
-	// Hardlink support structures
+	// TODO: Refactor hardlink management into a child class that workspaceroot
+	// passes functions through to. This is to ensure that wsr is usable for
+	// hardlink management even if it's only a "thin" one used in Merging
 	linkLock       utils.DeferableRwMutex
 	hardlinks      map[HardlinkId]linkEntry
 	nextHardlinkId HardlinkId
@@ -68,23 +70,33 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s/%s/%s", typespace,
 		namespace, workspace).out()
 
-	var wsr WorkspaceRoot
-
 	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
 		typespace, namespace, workspace)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 	c.vlog("Workspace Loading %s/%s/%s %s",
 		typespace, namespace, workspace, rootId.String())
 
+	rtn, uninstantiated := instantiateWorkspaceRoot(c, rootId, parent.inodeNum(),
+		inodeNum, workspace)
+	rtn.typespace = typespace
+	rtn.namespace = namespace
+	rtn.workspace = workspace
+
+	return rtn, uninstantiated
+}
+
+func instantiateWorkspaceRoot(c *ctx, rootId quantumfs.ObjectKey, parent InodeId,
+	inodeNum InodeId, name string) (*WorkspaceRoot, []InodeId) {
+
+	defer c.funcIn("instantiateWorkspaceRoot").out()
+
+	var wsr WorkspaceRoot
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
 	defer wsr.Lock().Unlock()
 
 	wsr.self = &wsr
-	wsr.typespace = typespace
-	wsr.namespace = namespace
-	wsr.workspace = workspace
 	wsr.rootId = rootId
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
@@ -95,8 +107,8 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]HardlinkId)
 	} ()
-	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
-		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
+	uninstantiated := initDirectory(c, name, &wsr.Directory, &wsr,
+		workspaceRoot.BaseLayer(), inodeNum, parent,
 		&wsr.realTreeLock)
 
 	return &wsr, uninstantiated
@@ -443,15 +455,12 @@ func publishHardlinkMap(c *ctx,
 	return baseLayer
 }
 
-func (wsr *WorkspaceRoot) publishBuffer(c *ctx) quantumfs.ObjectKey {
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
-	defer wsr.linkLock.RLock().RUnlock()
+func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
+	hardlinks map[HardlinkId]linkEntry) quantumfs.ObjectKey {
 
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
-	workspaceRoot.SetBaseLayer(wsr.baseLayerId)
-	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
-	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, wsr.hardlinks))
+	workspaceRoot.SetBaseLayer(baseLayer)
+	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, hardlinks))
 
 	bytes := workspaceRoot.Bytes()
 
@@ -464,62 +473,44 @@ func (wsr *WorkspaceRoot) publishBuffer(c *ctx) quantumfs.ObjectKey {
 	return newRootId
 }
 
-// Treelock must be locked for writing
 func (wsr *WorkspaceRoot) publish(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::publish").out()
 
-	// Upload the workspaceroot object
-	newRootId := wsr.publishBuffer(c)
-	origRootId := wsr.rootId
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
+	defer wsr.linkLock.RLock().RUnlock()
 
-	lastRootId := quantumfs.EmptyBlockKey
-	for {
-		currentRootId, err := c.workspaceDB.Workspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace)
+	// Upload the workspaceroot object
+	newRootId := publishWorkspaceRoot(c, wsr.rootId, wsr.hardlinks)
+
+	// Update workspace rootId
+	if newRootId != wsr.rootId {
+		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
 
 		if err != nil {
-			panic("Unable to get current rootId for workspace")
-		}
+			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
+				wsr.workspace
 
-		if !currentRootId.IsEqualTo(wsr.rootId) {
-			// We need to pull in the new rootId changes
-			baseRecord := quantumfs.NewDirectoryRecord()
-			baseRecord.SetID(wsr.rootId)
-			remoteRecord := quantumfs.NewDirectoryRecord()
-			remoteRecord.SetID(currentRootId)
-			wsr.Merge(c, baseRecord, remoteRecord)
-			// Recalculate the new rootId after re-flushing
-			wsr.Directory.flush(c)
-			newRootId = wsr.publishBuffer(c)
-			wsr.rootId = currentRootId
-		}
+			c.elog("Unable to update: wsdb %s, new %s, wsr %s: %s.",
+				rootId.String(), newRootId.String(),
+				wsr.rootId.String(), err.Error())
+			c.elog("Another quantumfs instance is writing to %s.",
+				workspacePath)
+			c.elog("Save your work elsewhere or it will be lost.")
 
-		if !newRootId.IsEqualTo(wsr.rootId) {
-			// Try to advance
-			rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx,
-				wsr.typespace, wsr.namespace, wsr.workspace,
-				wsr.rootId, newRootId)
+			// Lock the user out of the workspace
+			defer c.qfs.mutabilityLock.Lock().Unlock()
+			c.qfs.workspaceMutability[workspacePath] = 0 +
+				workspaceImmutableUntilRestart
 
-			if err == nil {
-				// Great, we're all done
-				c.dlog("Advanced rootId %s -> %s",
-					origRootId.String(), rootId.String())
-				wsr.rootId = rootId
-				return
-			}
-
-			// if there was an error, then check to see if this is the
-			// second time that we've tried to advance given this rootId
-			if currentRootId.IsEqualTo(lastRootId) {
-				panic(fmt.Sprintf("Failed to advance twice for "+
-					"rootId: %s", err))
-			}
-		} else {
-			// nothing to do
 			return
 		}
 
-		lastRootId = currentRootId
+		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
+			rootId.String())
+		wsr.rootId = rootId
 	}
 }
 
@@ -673,102 +664,70 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	return directChildren
 }
 
-func (wsr *WorkspaceRoot) mergeLink(c *ctx, link HardlinkId, remote linkEntry) {
-	inodeId, reinstantiate := func () (InodeId, bool) {
-		defer wsr.linkLock.Lock().Unlock()
-		entry := wsr.hardlinks[link]
+func mergeLink(c *ctx, remote linkEntry, local linkEntry) (rtn linkEntry) {
 
-		// This counter should be replaced with a set of hashes
-		if remote.nlink > entry.nlink {
-			entry.nlink = remote.nlink
-			wsr.hardlinks[link] = entry
-		}
+	rtn = local
 
-		localModTime := entry.record.ModificationTime()
-		if remote.record.ModificationTime() > localModTime {
-			keySame := remote.record.ID().IsEqualTo(entry.record.ID())
-			entry.record = remote.record
-			wsr.hardlinks[link] = entry
-
-			// if object key has changed, we must reinstantiate
-			return entry.inodeId, !keySame
-		}
-
-		return entry.inodeId, false
-	} ()
-
-	if reinstantiate {
-		inode := c.qfs.inodeNoInstantiate(c, inodeId)
-		// if it has been instantiated, we need to reinstantiate it
-		if inode != nil {
-			c.qfs.setInode(c, inodeId, nil)
-			c.qfs.inode(c, inodeId)
-		}
+	// TODO: Replace with a set of hashes to fix duplicates and miscounts
+	if remote.nlink > local.nlink {
+		rtn.nlink = remote.nlink
 	}
+
+	localModTime := local.record.ModificationTime()
+	if remote.record.ModificationTime() > localModTime {
+		rtn.record = remote.record
+		c.vlog("taking remote record for %s", local.record.Filename())
+	} else {
+		c.vlog("keeping local record for %s", local.record.Filename())
+	}
+
+	return rtn
 }
 
-func (wsr *WorkspaceRoot) Merge(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord) {
+func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
+	local quantumfs.ObjectKey) quantumfs.ObjectKey {
 
-	defer c.funcIn("WorkspaceRoot::Merge").out()
+	defer c.funcIn("mergeWorkspaceRoot").out()
 
-	buffer := c.dataStore.Get(&c.Ctx, base.ID())
-	baseWsr := buffer.AsWorkspaceRoot()
-	baseHardlinks, _ := loadHardlinks(c, baseWsr.HardlinkEntry())
-	buffer = c.dataStore.Get(&c.Ctx, remote.ID())
-	remoteWsr := buffer.AsWorkspaceRoot()
-	remoteHardlinks, _ := loadHardlinks(c, remoteWsr.HardlinkEntry())
-	buffer = c.dataStore.Get(&c.Ctx, wsr.rootId)
-	localWsr := buffer.AsWorkspaceRoot()
+	baseWsr, _ := instantiateWorkspaceRoot(c, base, quantumfs.InodeIdInvalid,
+		quantumfs.InodeIdInvalid, "base")
+	remoteWsr, _ := instantiateWorkspaceRoot(c, remote,
+		quantumfs.InodeIdInvalid, quantumfs.InodeIdInvalid, "remote")
+	localWsr, _ := instantiateWorkspaceRoot(c, local, quantumfs.InodeIdInvalid,
+		quantumfs.InodeIdInvalid, "local")
 
-	func () {
-		wsr.lock.RLock()
-		defer wsr.lock.RUnlock()
-		defer wsr.linkLock.RLock().RUnlock()
+	// We assume that local is a newer version of base
+	for k, v := range remoteWsr.hardlinks {
+		_, baseExists := baseWsr.hardlinks[k]
+		localLink, localExists := localWsr.hardlinks[k]
 
-		// There are only three states we need to check: added, removed,
-		// changed
-		toRemove := make([]HardlinkId, 0)
-		for k, _ := range baseHardlinks {
-			remoteLink, remoteExists := remoteHardlinks[k]
-			_, localExists := wsr.hardlinks[k]
-
-			if remoteExists && localExists {
-				// changed
-				wsr.mergeLink(c, k, remoteLink)
-			} else if !remoteExists && localExists {
-				// removed
-				toRemove = append(toRemove, k)
-			}
+		if localExists {
+			localWsr.hardlinks[k] = mergeLink(c, v, localLink)
+		} else if !baseExists {
+			localWsr.hardlinks[k] = v
 		}
-
-		// Now handle new entries in remote map
-		for k, v := range remoteHardlinks {
-			_, baseExists := baseHardlinks[k]
-			if baseExists {
-				continue
-			}
-
-			// added
-			wsr.hardlinks[k] = v
-		}
-
-		for _, v := range toRemove {
-			delete(wsr.hardlinks, v)
-		}
-	} ()
-
-	if !remote.ID().IsEqualTo(localWsr.BaseLayer()) &&
-		!remote.ID().IsEqualTo(base.ID()) {
-
-		// make some placeholder directory records for the wsr
-		baseRecord := quantumfs.NewDirectoryRecord()
-		baseRecord.SetID(baseWsr.BaseLayer())
-		remoteRecord := quantumfs.NewDirectoryRecord()
-		remoteRecord.SetID(remoteWsr.BaseLayer())
-
-		wsr.Directory.Merge(c, baseRecord, remoteRecord)
 	}
 
-	wsr.self.dirty(c)
+	for k, _ := range baseWsr.hardlinks {
+		_, remoteExists := remoteWsr.hardlinks[k]
+
+		// We assume that removal takes precedence over modification
+		if !remoteExists {
+			delete(localWsr.hardlinks, k)
+		}
+	}
+
+	if !remoteWsr.rootId.IsEqualTo(baseWsr.rootId) {
+		if localWsr.rootId.IsEqualTo(baseWsr.rootId) {
+			// No conflict, just take remote
+			localWsr.rootId = remoteWsr.rootId
+		} else {
+			// three way merge
+			localWsr.rootId = mergeDirectory(c, baseWsr, remoteWsr,
+				localWsr, baseWsr.rootId, remoteWsr.rootId,
+				localWsr.rootId)
+		}
+	}
+
+	return publishWorkspaceRoot(c, localWsr.rootId, localWsr.hardlinks)
 }

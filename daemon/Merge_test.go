@@ -41,6 +41,15 @@ func TestBasicMerge(t *testing.T) {
 		err = api.Merge(test.RelPath(workspaceB), test.RelPath(workspaceA))
 		test.AssertNoErr(err)
 
+		newBranch := test.absPath("branch/basic/test")
+		err = api.Branch(test.RelPath(workspaceA), test.RelPath(newBranch))
+		test.AssertNoErr(err)
+
+		fileA = newBranch + "/fileA"
+		fileB = newBranch + "/fileB"
+		fileC = newBranch + "/subdir/fileC"
+		fileD = newBranch + "/subdir/fileD"
+
 		test.CheckData(fileA, dataA)
 		test.CheckData(workspaceA + "/fileB", dataB)
 		// ensure we took remote
@@ -91,11 +100,24 @@ func TestSpecialsMerge(t *testing.T) {
 		api := test.getApi()
 		err = api.Merge(test.RelPath(workspaceB), test.RelPath(workspaceA))
 		test.AssertNoErr(err)
+if false {
+		// to reload the workspaceA rootID, branch it
+		newBranch := test.absPath("branch/specials/test")
+		err = api.Branch(test.RelPath(workspaceA), test.RelPath(newBranch))
+		test.AssertNoErr(err)
+
+		fileA = newBranch + "/fileA"
+		fileB = newBranch + "/fileB"
+		symlinkA = newBranch + "/symlink"
+		symlinkA2 = newBranch + "/symlink2"
+		specialB = newBranch + "/special"
+}
+		test.remountFilesystem()
 
 		test.CheckData(fileA, dataA)
 		// symlink should be overwritten and pointing to fileB
 		test.CheckData(symlinkA, dataB)
-		test.CheckData(workspaceA + "/fileB", dataB)
+		test.CheckData(fileB, dataB)
 		// remote should have been overwritten this time
 		test.CheckData(symlinkA2, dataA)
 
