@@ -41,10 +41,9 @@ func SetupTestspace(testName string) string {
 		if err = os.Chmod(testRunDir, 0777); err != nil {
 			continue
 		}
-		goto end
+		return testRunDir
 	}
 
 	panic(fmt.Sprintf("Unable to create test directory: %v", err))
-end:
 	return testRunDir
 }
