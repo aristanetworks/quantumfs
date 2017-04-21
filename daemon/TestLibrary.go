@@ -39,18 +39,6 @@ type TestHelper struct {
 	api            *quantumfs.Api
 }
 
-// CreateTestDirs makes the required directories for the test.
-// These directories are inside TestRunDir
-func (th *TestHelper) CreateTestDirs() {
-	th.TempDir = TestRunDir + "/" + th.TestName
-
-	mountPath := th.TempDir + "/mnt"
-	utils.MkdirAll(mountPath, 0777)
-	th.Log("Using mountpath %s", mountPath)
-
-	utils.MkdirAll(th.TempDir+"/ether", 0777)
-}
-
 func abortFuse(th *TestHelper) {
 	if th.fuseConnection == 0 {
 		// Nothing to abort
