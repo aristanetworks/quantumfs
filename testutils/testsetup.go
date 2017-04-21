@@ -1,12 +1,14 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package utils
+package testutils
 
 import "fmt"
 import "io/ioutil"
 import "os"
 import "strings"
+
+import "github.com/aristanetworks/quantumfs/utils"
 
 var rootDir string
 
@@ -18,7 +20,7 @@ func init() {
 			rootDir))
 	}
 
-	err := os.MkdirAll(rootDir, 0777)
+	err := utils.MkdirAll(rootDir, 0777)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to create temporary directories in"+
 			" /dev/shm: %s", err.Error()))
@@ -26,7 +28,7 @@ func init() {
 }
 
 // Leave a record of the temporary directory's name
-func SetupTestspace(testName string) (string, error) {
+func SetupTestspace(testName string) string {
 	var err error = nil
 	var testRunDir string = ""
 
@@ -39,8 +41,10 @@ func SetupTestspace(testName string) (string, error) {
 		if err = os.Chmod(testRunDir, 0777); err != nil {
 			continue
 		}
-		return testRunDir, nil
+		goto end
 	}
 
-	return testRunDir, err
+	panic(fmt.Sprintf("Unable to create test directory: %v", err))
+end:
+	return testRunDir
 }

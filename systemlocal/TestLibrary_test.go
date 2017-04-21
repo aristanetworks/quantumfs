@@ -5,13 +5,11 @@ package systemlocal
 
 import "flag"
 import "os"
-import "fmt"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
 
 func runTest(t *testing.T, test systemlocalTest) {
 	t.Parallel()
@@ -21,10 +19,7 @@ func runTest(t *testing.T, test systemlocalTest) {
 	// 1 <testname>
 	// 0 runTest
 	testName := testutils.TestName(1)
-	testDir, err := utils.SetupTestspace("systemlocalTest")
-	if err != nil {
-		panic(fmt.Sprintf("Unable to create test directory: %v", err))
-	}
+	testDir := testutils.SetupTestspace("systemlocalTest")
 
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
