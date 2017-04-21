@@ -104,8 +104,6 @@ func main() {
 	c := newCtx()
 	start := time.Now()
 
-	// TODO: build a progress bar to indicate tool progress
-	// With option only
 	switch walkFlags.Arg(0) {
 	case "du":
 		err = handleDiskUsage(c, *progress, qfsds, qfsdb)
@@ -129,11 +127,11 @@ func main() {
 
 	walkTime := time.Since(start)
 	if err != nil {
-		fmt.Printf("Walk failed after %v with error: %v\n", walkTime, err.Error())
+		fmt.Printf("Error: %v\n", err.Error())
 		os.Exit(exitBadCmd)
 	}
 
-	fmt.Printf("Walk completed successfully after %v\n", walkTime)
+	fmt.Printf("Finished: %v\n", walkTime)
 }
 
 func handleDiskUsage(c *quantumfs.Ctx, progress bool,
@@ -325,12 +323,12 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return err
+			return fmt.Errorf("path: %v key %v: %v", path, ks, err)
 		}
 
 		err = refreshTTL(cqlds, ks, metadata)
 		if err != nil {
-			return err
+			return fmt.Errorf("path: %v key %v: %v", path, ks, err)
 		}
 
 		//  TODO if isDir() and TTL is good, return walker.SkipDir
@@ -339,8 +337,7 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
-		fmt.Println("Walk failed for ttl with rootID: ", rootID)
-		return err
+		return fmt.Errorf("rootID: %s err: %v", rootID, err)
 	}
 	return nil
 }
@@ -391,12 +388,12 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return err
+			return fmt.Errorf("key %v: %v", ks, err)
 		}
 
 		err = refreshTTL(cqlds, ks, metadata)
 		if err != nil {
-			return err
+			return fmt.Errorf("path: %v key %v: %v", path, ks, err)
 		}
 
 		//  TODO if isDir() and TTL is good, return walker.SkipDir
@@ -474,7 +471,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return err
+			return fmt.Errorf("key %v: %v", ks, err)
 		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
