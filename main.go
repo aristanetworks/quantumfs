@@ -10,9 +10,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )
 
 // Various exit reasons, will be returned to the shell as an exit code
@@ -30,37 +28,28 @@ const (
 
 var walkFlags *flag.FlagSet
 
-func Log(c *quantumfs.Ctx, code int, format string, args ...interface{}) {
-	format = format + "\n"
-
-	switch code {
-	case logErr:
-		c.Elog(qlog.LogTool, format, args...)
-		fmt.Printf("ERROR:"+format, args...)
-
-	case logWarn:
-		c.Wlog(qlog.LogTool, format, args...)
-		fmt.Printf("WARN:"+format, args...)
-	case logDebug:
-		c.Dlog(qlog.LogTool, format, args...)
-		fmt.Printf("DEBUG:"+format, args...)
-	case logInfo:
-		fallthrough
-	default:
-		c.Vlog(qlog.LogTool, format, args...)
-		fmt.Printf("INFO:"+format, args...)
-	}
-
+func (c *Ctx) vlog(format string, args ...interface{}) {
+	c.qctx.Vlog(qlog.LogTool, format, args...)
+}
+func (c *Ctx) dlog(format string, args ...interface{}) {
+	c.qctx.Dlog(qlog.LogTool, format, args...)
+}
+func (c *Ctx) wlog(format string, args ...interface{}) {
+	c.qctx.Wlog(qlog.LogTool, format, args...)
 }
 
-var confFile string
+func (c *Ctx) elog(format string, args ...interface{}) {
+	c.qctx.Elog(qlog.LogTool, format, args...)
+}
+
 var walkRerunPeriod = 4 * time.Hour
 
 func main() {
 
 	walkFlags = flag.NewFlagSet("Walker daemon", flag.ExitOnError)
 
-	config := walkFlags.String("cfg", "", "datastore and workspaceDB config file")
+	config := walkFlags.String("cfg", "",
+		"datastore and workspaceDB config file")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
 
 	walkFlags.Usage = func() {
@@ -77,14 +66,8 @@ func main() {
 		walkFlags.Usage()
 		os.Exit(exitBadConfig)
 	}
-	confFile = *config
 
-	c := newCtx(*logdir)
-	db, err := thirdparty_backends.ConnectWorkspaceDB("ether.cql", *config)
-	if err != nil {
-		Log(c, logErr, "Connection to workspaceDB failed\n")
-		os.Exit(exitBadConfig)
-	}
+	c := getWalkerDaemonContext("test", *config, *logdir)
 
 	var lastWalkStart time.Time
 	var lastWalkDuration time.Duration
@@ -93,81 +76,66 @@ func main() {
 		lastWalkDuration = time.Since(lastWalkStart)
 		if lastWalkDuration < walkRerunPeriod {
 
-			Log(c, logInfo, "Not enough time has passed since last walk\n")
+			c.vlog("Not enough time has passed since last walk")
 			sleepDur := time.Until(lastWalkStart.Add(walkRerunPeriod))
-			Log(c, logInfo, "Sleeping for %v\n", sleepDur)
+			c.vlog("Sleeping for %v", sleepDur)
 			time.Sleep(sleepDur)
 
 		}
 		lastWalkStart = time.Now()
-		Log(c, logInfo, "Walk started at %v\n", lastWalkStart)
-		walkFullWSDB(c, db)
+		c.vlog("Walk started at %v", lastWalkStart)
+		walkFullWSDB(c)
 		lastWalkDuration = time.Since(lastWalkStart)
-		Log(c, logInfo, "Walk ended at %v took %v\n", time.Now(), lastWalkDuration)
+		c.vlog("Walk ended at %v took %v", time.Now(),
+			lastWalkDuration)
 
 	}
 }
 
-func walkFullWSDB(c *quantumfs.Ctx, db quantumfs.WorkspaceDB) {
+// walkFullWSDB will iterate through all the TS/NS/WS once.
+func walkFullWSDB(c *Ctx) {
 
-	tsl, err := db.TypespaceList(c)
+	tsl, err := c.wsdb.TypespaceList(c.qctx)
 	if err != nil {
-		Log(c, logErr, "Error in geting List of Typespaces")
+		c.elog("Error in geting List of Typespaces")
 	}
 	for _, ts := range tsl {
-		nsl, err := db.NamespaceList(c, ts)
+		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
-			Log(c, logErr, "Error in geting List of Namespaces for TS:%s", ts)
+			c.elog("Error in geting List of Namespaces for TS:%s", ts)
 		}
 		for _, ns := range nsl {
-			wsl, err := db.WorkspaceList(c, ts, ns)
+			wsl, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
-				Log(c, logErr, "Error in geting List of Workspaces "+
+				c.elog("Error in geting List of Workspaces "+
 					"for TS:%s NS:%s", ts, ns)
 			}
 			for _, ws := range wsl {
-
-				Log(c, logInfo, "Starting walk of %s/%s/%s\n",
-					ts, ns, ws)
-				stdStr, errStr, err := runCommand(c, ts, ns, ws)
-				if err != nil || errStr != "" {
-					Log(c, logErr, "Updating TTL for %s/%s/%s failed\n"+
-						"STDOUT: %s"+"STDERR: %s",
-						ts, ns, ws, stdStr, errStr)
-				}
-				Log(c, logInfo, "Finished walk of %s/%s/%s\n"+
-					"STDOUT: %s", ts, ns, ws, stdStr)
-
+				c.vlog("Starting walk of %s/%s/%s", ts, ns, ws)
+				runCommand(c, ts, ns, ws)
 			}
 		}
 	}
 }
 
-func runCommand(c *quantumfs.Ctx, ts string, ns string,
-	ws string) (string, string, error) {
+func runCommand(c *Ctx, ts string, ns string, ws string) {
 
 	fullWsName := ts + "/" + ns + "/" + ws
 
-	cmd := exec.Command("/usr/sbin/qubit-walkercmd", "-cfg", confFile, "ttl", fullWsName)
+	cmd := exec.Command("/usr/sbin/qubit-walkercmd", "-cfg", c.confFile,
+		"ttl", fullWsName)
 	var stdOut bytes.Buffer
 	var errOut bytes.Buffer
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &errOut
 	err := cmd.Run()
 
-	fmt.Printf("")
-	return stdOut.String(), errOut.String(), err
-}
-
-func newCtx(logdir string) *quantumfs.Ctx {
-	log := qlog.NewQlogTiny()
-	if logdir != "" {
-		log = qlog.NewQlog(logdir)
+	if err != nil || errOut.String() != "" {
+		c.elog("Updating TTL for %s/%s/%s failed", ts, ns, ws)
+		c.elog("STDOUT: %s", stdOut.String())
+		c.elog("STDERR: %s", errOut.String())
+	} else {
+		c.vlog("Updating TTL for %s/%s/%s successful", ts, ns, ws)
+		c.vlog("STDOUT: %s", stdOut.String())
 	}
-
-	c := &quantumfs.Ctx{
-		Qlog:      log,
-		RequestId: 1,
-	}
-	return c
 }
