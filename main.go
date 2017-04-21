@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -42,7 +43,7 @@ func (c *Ctx) elog(format string, args ...interface{}) {
 	c.qctx.Elog(qlog.LogTool, format, args...)
 }
 
-var walkRerunPeriod = 4 * time.Hour
+var walkRerunPeriod = 1 * time.Hour
 
 func main() {
 
@@ -51,6 +52,7 @@ func main() {
 	config := walkFlags.String("cfg", "",
 		"datastore and workspaceDB config file")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
+	serverIP := walkFlags.String("influx", "", "influxdb server's IP:port")
 
 	walkFlags.Usage = func() {
 		fmt.Println("This daemon periodically walks all the workspaces ")
@@ -67,7 +69,7 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	c := getWalkerDaemonContext("test", *config, *logdir)
+	c := getWalkerDaemonContext(*serverIP, *config, *logdir)
 
 	var lastWalkStart time.Time
 	var lastWalkDuration time.Duration
@@ -95,10 +97,13 @@ func main() {
 // walkFullWSDB will iterate through all the TS/NS/WS once.
 func walkFullWSDB(c *Ctx) {
 
+	var numSuccess uint
+	var numError uint
 	tsl, err := c.wsdb.TypespaceList(c.qctx)
 	if err != nil {
 		c.elog("Error in geting List of Typespaces")
 	}
+	startTimeOuter := time.Now()
 	for _, ts := range tsl {
 		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
@@ -111,31 +116,42 @@ func walkFullWSDB(c *Ctx) {
 					"for TS:%s NS:%s", ts, ns)
 			}
 			for _, ws := range wsl {
-				c.vlog("Starting walk of %s/%s/%s", ts, ns, ws)
-				runCommand(c, ts, ns, ws)
+				startTime := time.Now()
+				err := runCommand(c, ts, ns, ws)
+				if err != nil {
+					numError++
+					WriteWorkspaceWalkDuration(c, ts, ns, false, ws, time.Since(startTime))
+				} else {
+					numSuccess++
+					WriteWorkspaceWalkDuration(c, ts, ns, true, ws, time.Since(startTime))
+				}
+				c.qctx.RequestId++
 			}
 		}
 	}
+	WriteWalkerStride(c, time.Since(startTimeOuter), numSuccess, numError)
 }
 
-func runCommand(c *Ctx, ts string, ns string, ws string) {
+func runCommand(c *Ctx, ts string, ns string, ws string) error {
 
+	c.vlog("Updating TTL for %s/%s/%s started", ts, ns, ws)
+	var cmdPath string
+	cmdPath = "/usr/sbin/qubit-walkercmd"
 	fullWsName := ts + "/" + ns + "/" + ws
-
-	cmd := exec.Command("/usr/sbin/qubit-walkercmd", "-cfg", c.confFile,
+	cmd := exec.Command(cmdPath, "-cfg", c.confFile,
 		"ttl", fullWsName)
+
 	var stdOut bytes.Buffer
-	var errOut bytes.Buffer
 	cmd.Stdout = &stdOut
-	cmd.Stderr = &errOut
 	err := cmd.Run()
 
-	if err != nil || errOut.String() != "" {
+	outStr := strings.Replace(stdOut.String(), "\n", " ", -1)
+	if err != nil {
 		c.elog("Updating TTL for %s/%s/%s failed", ts, ns, ws)
-		c.elog("STDOUT: %s", stdOut.String())
-		c.elog("STDERR: %s", errOut.String())
-	} else {
-		c.vlog("Updating TTL for %s/%s/%s successful", ts, ns, ws)
-		c.vlog("STDOUT: %s", stdOut.String())
+		c.elog("%s", outStr)
+		return err
 	}
+	c.vlog("Updating TTL for %s/%s/%s finished", ts, ns, ws)
+	c.vlog("%s", outStr)
+	return nil
 }
