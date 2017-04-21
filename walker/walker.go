@@ -13,6 +13,7 @@ import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
+import "github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
 
 // SkipDir is used as a return value from WalkFunc to indicate that
 // the directory named in the call is to be skipped. It is not returned
@@ -33,6 +34,7 @@ var SkipDir = errors.New("skip this directory")
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, isDir bool) error
 
+// Ctx maintains context for the walker library.
 type Ctx struct {
 	context.Context
 	qctx *quantumfs.Ctx
@@ -48,18 +50,12 @@ type workerData struct {
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
-	if rootID.IsEqualTo(quantumfs.EmptyWorkspaceKey) {
-		return nil
-	}
-
-	if rootID.Type() != quantumfs.KeyTypeMetadata {
-		return fmt.Errorf(
-			"Type of rootID %s is %s instead of KeyTypeMetadata",
-			rootID.String(), key2String(rootID))
-	}
+	// encompass the provided datastore in an
+	// AggregateDataStore
+	ads := aggregatedatastore.New(ds)
 
 	buf := simplebuffer.New(nil, rootID)
-	if err := ds.Get(cq, rootID, buf); err != nil {
+	if err := ads.Get(cq, rootID, buf); err != nil {
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
@@ -93,13 +89,13 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	group.Go(func() error {
 		defer close(keyChan)
-		if err := handleHardLinks(c, ds, wsr.HardlinkEntry(), wf,
+		if err := handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
 			return err
 		}
 
 		// Skip WSR
-		if err := handleDirectoryEntry(c, "/", ds, wsr.BaseLayer(), wf,
+		if err := handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
 			if err == SkipDir {
 				return nil
@@ -288,10 +284,8 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		return handleVeryLargeFile(c, fpath,
 			ds, dr.ID(), wf, keyChan)
 	case quantumfs.ObjectTypeDirectoryEntry:
-		if !dr.ID().IsEqualTo(quantumfs.EmptyDirKey) {
-			return handleDirectoryEntry(c, fpath,
-				ds, dr.ID(), wf, keyChan)
-		}
+		return handleDirectoryEntry(c, fpath,
+			ds, dr.ID(), wf, keyChan)
 	default:
 	}
 
@@ -327,4 +321,22 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 	case keyChan <- &workerData{path: p, key: k, size: s}:
 	}
 	return nil
+}
+
+// SkipKey returns nil:
+// If the Key is in Constant DataStore, or
+// If the Key is of Type Embedded,
+func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
+
+	if key.Type() == quantumfs.KeyTypeEmbedded {
+		return true
+	}
+
+	cds := quantumfs.ConstantStore
+	buf := simplebuffer.New(nil, key)
+
+	if err := cds.Get(nil, key, buf); err != nil {
+		return false // Not a ConstKey, so do not Skip.
+	}
+	return true
 }
