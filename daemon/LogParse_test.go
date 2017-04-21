@@ -105,7 +105,7 @@ func TestQParse(t *testing.T) {
 
 		// Now grab the log file and compare against std out. Since logOut
 		// started being appended to a bit late, and we sample it first, it
-		// should be a subset of the qarsed logs
+		// should be a subset of the qparsed logs
 		testMutex.Lock()
 		logOutCopy := string(logOut.Bytes())
 		testMutex.Unlock()
