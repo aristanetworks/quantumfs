@@ -5,6 +5,13 @@
 # instead of '.' to reference any sources or other files that
 # we expect in the same directory as this makefile
 d           := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+ppid        := $(shell ps -o ppid= $$$$)
+DIRNAME     := $(shell if [ -z $(ROOTDIRNAME) ]; then echo \
+            "$(USER)-RootContainer-$(ppid)" | tr -d '[:space:]'; fi)
+ifndef ROOTDIRNAME
+        ROOTDIRNAME := $(DIRNAME)
+        export ROOTDIRNAME=$(DIRNAME)
+endif
 
 TARGET      := $(d)/libqfsclient.so
 TEST_TARGET := $(d)/qfsclient_test
@@ -39,10 +46,15 @@ $(OBJS): $(DEPS)
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^
 
-test: $(TEST_TARGET)
+test: cleanuplocal $(TEST_TARGET)
 	LD_LIBRARY_PATH=$(d) $(TEST_TARGET)
 
 $(TEST_TARGET): $(TEST_OBJS) $(TARGET)
 	$(CXX) $(TEST_LD_FLAGS) -o $@ $(TEST_OBJS)
 
-.PHONY: all test
+cleanuplocal:
+	if [[ "$(ROOTDIRNAME)" == "$(DIRNAME)" ]]; then \
+		../cleanup.sh $(ppid) & \
+	fi
+
+.PHONY: all test cleanuplocal
