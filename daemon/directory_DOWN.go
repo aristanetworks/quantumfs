@@ -148,6 +148,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 		if err != nil {
 			return child, err
 		}
+		// defer c.qfs.Forget(uint64(child.inodeNum()), 1)
 		currDir = child.(*Directory)
 	}
 
