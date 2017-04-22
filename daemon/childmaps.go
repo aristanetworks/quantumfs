@@ -45,7 +45,7 @@ func (cmap *ChildMap) firstRecord(c *ctx,
 	// fine a name that matches the inodeId
 	for k, v := range cmap.children {
 		if v == inodeId {
-			return cmap.childrenRecords.record(c, k)
+			return cmap.childrenRecords.recordCopy(c, k)
 		}
 	}
 
@@ -129,7 +129,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 		return nil
 	}
 
-	record := cmap.childrenRecords.record(c, name)
+	record := cmap.childrenRecords.recordCopy(c, name)
 	if record == nil {
 		c.vlog("record does not exist")
 		return nil
@@ -179,7 +179,7 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 		return quantumfs.InodeIdInvalid
 	}
 
-	record := cmap.childrenRecords.record(c, oldName)
+	record := cmap.childrenRecords.recordCopy(c, oldName)
 	if record == nil {
 		c.vlog("oldName record doesn't exist")
 		panic("inode set without record")
@@ -195,8 +195,11 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	}
 
 	delete(cmap.children, oldName)
+	cmap.childrenRecords.delRecord(c, oldName)
+
 	cmap.children[newName] = inodeId
 	record.SetFilename(newName)
+	cmap.childrenRecords.setRecord(record)
 
 	if needCleanup {
 		c.vlog("cleanupInodeId %d", cleanupInodeId)
@@ -242,7 +245,7 @@ func (cmap *ChildMap) recordCopy(c *ctx,
 func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecord {
 	defer c.FuncIn("ChildMap::recordByName", "name %s", name).out()
 
-	return cmap.childrenRecords.record(c, name)
+	return cmap.childrenRecords.recordCopy(c, name)
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx,
@@ -358,7 +361,7 @@ func (th *thinChildren) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 	return rtn
 }
 
-func (th *thinChildren) record(c *ctx, name string) quantumfs.DirectoryRecord {
+func (th *thinChildren) recordCopy(c *ctx, name string) quantumfs.DirectoryRecord {
 	defer c.FuncIn("thinChildren::record", "%s", name).out()
 	if record, exists := th.changes[name]; exists {
 		c.vlog("changed record %s", name)
@@ -396,7 +399,7 @@ func (th *thinChildren) setRecord(record quantumfs.DirectoryRecord) {
 }
 
 func (th *thinChildren) delRecord(c *ctx, name string) quantumfs.DirectoryRecord {
-	record := th.record(c, name)
+	record := th.recordCopy(c, name)
 
 	// mark as deleted
 	if record != nil {
