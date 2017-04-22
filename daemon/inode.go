@@ -172,7 +172,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	directChildInodes() []InodeId
+	directChildInodes(c *ctx) []InodeId
 }
 
 type InodeCommon struct {
@@ -358,7 +358,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.record(inode.id)
+	record := parent.children.recordCopy(c, inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return
