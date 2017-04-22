@@ -832,7 +832,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
-			children := dir.directChildInodes()
+			children := dir.directChildInodes(c)
 
 			for _, i := range children {
 				// To be fully unloaded, the child must have lookup
