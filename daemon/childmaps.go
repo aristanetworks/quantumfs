@@ -27,29 +27,18 @@ func newChildMap(c *ctx, key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) (*ChildMa
 		childrenRecords:	newThinChildren(key, wsr_),
 	}
 
-	records := rtn.childrenRecords.recordCopies(c)
-
 	// allocate inode ids
-	uninstantiated := make([]InodeId, 0, len(records))
-	for _, v := range records {
-		inodeId := rtn.loadInodeId(c, v, quantumfs.InodeIdInvalid)
-		rtn.children[v.Filename()] = inodeId
+	uninstantiated := make([]InodeId, 0)
+	rtn.childrenRecords.iterateOverRecords(c,
+		func (record quantumfs.DirectoryRecord) bool {
+
+		inodeId := rtn.loadInodeId(c, record, quantumfs.InodeIdInvalid)
+		rtn.children[record.Filename()] = inodeId
 		uninstantiated = append(uninstantiated, inodeId)
-	}
+		return false
+	})
 
 	return &rtn, uninstantiated
-}
-
-func (cmap *ChildMap) firstRecord(c *ctx,
-	inodeId InodeId) quantumfs.DirectoryRecord {
-	// fine a name that matches the inodeId
-	for k, v := range cmap.children {
-		if v == inodeId {
-			return cmap.childrenRecords.recordCopy(c, k)
-		}
-	}
-
-	return nil
 }
 
 // Whenever a record passes through this class, we must ensure it's converted if
@@ -218,22 +207,31 @@ func (cmap *ChildMap) inodeNum(name string) InodeId {
 }
 
 func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
-	records := cmap.childrenRecords.recordCopies(c)
-	rtn := make([]InodeId, 0, len(records))
+	rtn := make([]InodeId, 0)
 
-	for _, record := range records {
-		if _, isHardlink := record.(*Hardlink); isHardlink {
-			continue
+	cmap.childrenRecords.iterateOverRecords(c,
+		func (record quantumfs.DirectoryRecord) bool {
+
+		if _, isHardlink := record.(*Hardlink); !isHardlink {
+			rtn = append(rtn, cmap.children[record.Filename()])
 		}
-
-		rtn = append(rtn, cmap.children[record.Filename()])
-	}
+		return false
+	})
 
 	return rtn
 }
 
 func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
-	return cmap.childrenRecords.recordCopies(c)
+	rtn := make([]quantumfs.DirectoryRecord, 0)
+
+	cmap.childrenRecords.iterateOverRecords(c,
+		func (record quantumfs.DirectoryRecord) bool {
+
+		rtn = append(rtn, record)
+		return false
+	})
+
+	return rtn
 }
 
 func (cmap *ChildMap) recordCopy(c *ctx,
@@ -246,6 +244,26 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 	defer c.FuncIn("ChildMap::recordByName", "name %s", name).out()
 
 	return cmap.childrenRecords.recordCopy(c, name)
+}
+
+func (cmap *ChildMap) firstRecord(c *ctx,
+	inodeId InodeId) quantumfs.DirectoryRecord {
+
+	var rtn quantumfs.DirectoryRecord
+
+	cmap.childrenRecords.iterateOverRecords(c,
+		func (record quantumfs.DirectoryRecord) bool {
+
+		inodeNum, exists := cmap.children[record.Filename()]
+		if exists && inodeNum == inodeId {
+			rtn = record
+			return true
+		}
+
+		return false
+	})
+
+	return rtn
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx,
@@ -310,8 +328,9 @@ func newThinChildren (key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) thinChildren
 	}
 }
 
-func (th *thinChildren) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
-	rtn := make([]quantumfs.DirectoryRecord, 0)
+func (th *thinChildren) iterateOverRecords(c *ctx,
+	fxn func (quantumfs.DirectoryRecord) bool) {
+
 	existingEntries := make(map[string]bool, 0)
 
 	key := th.base
@@ -324,17 +343,24 @@ func (th *thinChildren) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 		baseLayer := buffer.AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			// ensure we overwrite changes from the base
-			entry := convertRecord(th.wsr, baseLayer.Entry(i))
+			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
 
+			// ensure we overwrite changes from the base
 			record, exists := th.changes[entry.Filename()]
 			if exists {
 				// if the record is nil, that means it was deleted
 				if record != nil {
-					rtn = append(rtn, record)
+					escape := fxn(record)
+					if escape {
+						return
+					}
 				}
 			} else {
-				rtn = append(rtn, entry)
+				entry = convertRecord(th.wsr, baseLayer.Entry(i))
+				escape := fxn(entry)
+				if escape {
+					return
+				}
 			}
 
 			existingEntries[entry.Filename()] = true
@@ -354,11 +380,12 @@ func (th *thinChildren) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 		}
 
 		if _, exists := existingEntries[name]; !exists {
-			rtn = append(rtn, record)
+			escape := fxn(record)
+			if escape {
+				return
+			}
 		}
 	}
-
-	return rtn
 }
 
 func (th *thinChildren) recordCopy(c *ctx, name string) quantumfs.DirectoryRecord {
@@ -427,8 +454,7 @@ func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
 	// metadata block
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
-	records := th.recordCopies(c)
-	for _, child := range records {
+	th.iterateOverRecords(c, func (record quantumfs.DirectoryRecord) bool {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			c.vlog("Block full with %d entries", entryIdx)
@@ -439,11 +465,12 @@ func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
 			entryIdx = 0
 		}
 
-		recordCopy := child.Record()
+		recordCopy := record.Record()
 		baseLayer.SetEntry(entryIdx, &recordCopy)
 
 		entryIdx++
-	}
+		return false
+	})
 
 	baseLayer.SetNumEntries(entryIdx)
 	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
