@@ -379,7 +379,13 @@ func (th *thinChildren) recordCopy(c *ctx, name string) quantumfs.DirectoryRecor
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			if baseLayer.Entry(i).Filename() == name {
-				return convertRecord(th.wsr, baseLayer.Entry(i))
+				record := convertRecord(th.wsr, baseLayer.Entry(i))
+				// if someone requested this record individually,
+				// there's a good chance they'll ask for it a number
+				// of times soon. Performance it hit too hard if we
+				// don't cache this until the next publish.
+				th.changes[name] = record
+				return record
 			}
 		}
 
