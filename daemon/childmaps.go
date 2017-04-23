@@ -62,7 +62,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 		return nil
 	}
 
-	if record, exists := cmap.childrenRecords.changes[name]; exists {
+	if record, exists := cmap.childrenRecords.cache[name]; exists {
 		return record
 	}
 
@@ -125,7 +125,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
-	cmap.childrenRecords.setRecord(entry)
+	cmap.childrenRecords.setRecord(entry, inodeId)
 
 	return inodeId
 }
@@ -166,7 +166,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	}
 	delete(cmap.children, name)
 	result := cmap.recordByName(c, name)
-	cmap.childrenRecords.delRecord(name)
+	cmap.childrenRecords.delRecord(name, inodeId)
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
 		if cmap.wsr.hardlinkDec(link.linkId) {
@@ -207,16 +207,16 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	if needCleanup {
 		// we have to cleanup before we move, to allow the case where we
 		// rename a hardlink to an existing one with the same inode
-		cmap.childrenRecords.delRecord(newName)
+		cmap.childrenRecords.delRecord(newName, cleanupInodeId)
 		delete(cmap.children, newName)
 	}
 
 	delete(cmap.children, oldName)
-	cmap.childrenRecords.delRecord(oldName)
+	cmap.childrenRecords.delRecord(oldName, inodeId)
 
 	cmap.children[newName] = inodeId
 	record.SetFilename(newName)
-	cmap.childrenRecords.setRecord(record)
+	cmap.childrenRecords.setRecord(record, inodeId)
 
 	if needCleanup {
 		c.vlog("cleanupInodeId %d", cleanupInodeId)
@@ -264,6 +264,12 @@ func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 
 func (cmap *ChildMap) recordCopy(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
+
+	// Check if the dirty cache already has an entry
+	if recordName, exists := cmap.childrenRecords.cacheId[inodeId]; exists {
+		// if there's a cacheId entry, there must be a cache entry
+		return cmap.childrenRecords.cache[recordName]
+	}
 
 	// Just return the first matching inode id entry
 	var rtn quantumfs.DirectoryRecord
@@ -322,7 +328,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	c.vlog("Converting into a hardlink")
 	newLink := cmap.wsr.newHardlink(c, childId, child)
 
-	cmap.childrenRecords.setRecord(newLink)
+	cmap.childrenRecords.setRecord(newLink, childId)
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
 }
@@ -334,14 +340,16 @@ func (cmap *ChildMap) publish(c *ctx) quantumfs.ObjectKey {
 type thinChildren struct {
 	wsr	*WorkspaceRoot
 	base	quantumfs.ObjectKey
-	changes	map[string]quantumfs.DirectoryRecord
+	cache	map[string]quantumfs.DirectoryRecord
+	cacheId	map[InodeId]string
 }
 
 func newThinChildren (key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) thinChildren {
 	return thinChildren {
 		wsr:		wsr_,
 		base:		key,
-		changes:	make(map[string]quantumfs.DirectoryRecord),
+		cache:		make(map[string]quantumfs.DirectoryRecord),
+		cacheId:	make(map[InodeId]string),
 	}
 }
 
@@ -363,7 +371,7 @@ func (th *thinChildren) iterateOverRecords(c *ctx,
 			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
 
 			// ensure we overwrite changes from the base
-			record, exists := th.changes[entry.Filename()]
+			record, exists := th.cache[entry.Filename()]
 			if exists {
 				// if the record is nil, that means it was deleted
 				if record != nil {
@@ -374,9 +382,6 @@ func (th *thinChildren) iterateOverRecords(c *ctx,
 				}
 			} else {
 				entry = convertRecord(th.wsr, baseLayer.Entry(i))
-
-				// cache the vanilla entry to improve performance
-				th.changes[entry.Filename()] = entry
 
 				escape := fxn(entry)
 				if escape {
@@ -395,7 +400,7 @@ func (th *thinChildren) iterateOverRecords(c *ctx,
 	}
 
 	// don't forget added entries
-	for name, record := range th.changes {
+	for name, record := range th.cache {
 		if record == nil {
 			continue
 		}
@@ -409,12 +414,16 @@ func (th *thinChildren) iterateOverRecords(c *ctx,
 	}
 }
 
-func (th *thinChildren) setRecord(record quantumfs.DirectoryRecord) {
-	th.changes[record.Filename()] = record
+func (th *thinChildren) setRecord(record quantumfs.DirectoryRecord,
+	inodeId InodeId) {
+
+	th.cache[record.Filename()] = record
+	th.cacheId[inodeId] = record.Filename()
 }
 
-func (th *thinChildren) delRecord(name string) {
-	th.changes[name] = nil
+func (th *thinChildren) delRecord(name string, inodeId InodeId) {
+	th.cache[name] = nil
+	delete(th.cacheId, inodeId)
 }
 
 func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
@@ -452,7 +461,8 @@ func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
 
 	// update our state
 	th.base = newBaseLayerId
-	th.changes = make(map[string]quantumfs.DirectoryRecord)
+	th.cache = make(map[string]quantumfs.DirectoryRecord)
+	th.cacheId = make(map[InodeId]string)
 
 	return newBaseLayerId
 }
