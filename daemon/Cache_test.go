@@ -206,6 +206,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 		createBuffer(c, test, backingStore, datastore, keys, 13, 6)
 		createBuffer(c, test, backingStore, datastore, keys, 71, 30)
 		createBuffer(c, test, backingStore, datastore, keys, 257, 120)
+		createBuffer(c, test, backingStore, datastore, keys, 298, 72)
 		fillDatastore(c, test, backingStore, datastore, entryNum, keys)
 
 		test.Log("Priming LRU")
@@ -213,7 +214,9 @@ func TestCacheLruDiffSize(t *testing.T) {
 			buf := datastore.Get(c, keys[i])
 			test.Assert(buf != nil, "Failed retrieving block %d", i)
 		}
-		// Update keys[257] whose size is greater than cacheSize
+		// Update keys[257] whose size is greater than cacheSize, but it
+		// should not have an impact on the final result of lru list because
+		// it is too large
 		buf := datastore.Get(c, keys[257])
 		test.Assert(buf != nil, "Failed retrieving block 257")
 
@@ -244,5 +247,20 @@ func TestCacheLruDiffSize(t *testing.T) {
 			test.Assert(i == num, "Out of order block %d not %d", i, num)
 			num++
 		}
+
+		// Cause a block to be refreshed to the beginning
+		buf = datastore.Get(c, keys[298])
+		test.Assert(buf != nil, "Block not found")
+
+		data := datastore.lru.Back().Value.(buffer)
+		i := int(data.data[1]) + int(data.data[2])*256
+		test.Assert(i == 298, "Incorrect most recent block %d != 298", i)
+
+		// The front element is supposed to be keys[13], but its size is too
+		// large, so it has to be removed from the cache
+		data = datastore.lru.Front().Value.(buffer)
+		i = int(data.data[1]) + int(data.data[2])*256
+		test.Assert(i == 12, "Wrong least recent block %d != 13", i)
+
 	})
 }
