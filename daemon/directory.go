@@ -681,7 +681,7 @@ func (dir *Directory) modifyRecordChildCall_(c *ctx,
 	modifyFxn func (inout quantumfs.DirectoryRecord), 
 	inodeNum InodeId) (copy quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("DirectoryRecord::modifyRecordChildCall_", "inode %d",
+	defer c.FuncIn("Directory::modifyRecordChildCall_", "inode %d",
 		inodeNum).out()
 
 	record := dir.children.recordCopy(c, inodeNum)
@@ -1229,15 +1229,23 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	dir.self.dirty(c)
 	defer dir.childRecordLock.Lock().Unlock()
 
-	entry := dir.modifyRecordChildCall_(c,
-		func (inout quantumfs.DirectoryRecord) {
-			inout.SetID(newKey)
-		}, inodeNum)
-	if entry == nil {
-		c.wlog("Directory::syncChild inode %d not a valid child",
-			inodeNum)
+	err := dir.children.setKey(inodeNum, newKey)
+	if err != fuse.OK && err != fuse.ENOENT {
+		c.wlog("Directory::syncChild inode %d error: %s", inodeNum, err)
 		return
 	}
+
+	if err == fuse.ENOENT && dir.isWorkspaceRoot() {
+		// maybe we're wsr and it's a hardlink
+		valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+		if valid {
+			// hardlink records aren't copies, so we can just modify
+			linkRecord.SetID(newKey)
+			return
+		}
+	}
+
+	c.vlog("syncChild called on missing child %d", inodeNum)
 }
 
 // Get the extended attributes object. The status is EIO on error or ENOENT if there
