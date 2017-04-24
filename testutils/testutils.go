@@ -9,7 +9,6 @@ import "bytes"
 import "errors"
 import "fmt"
 import "io"
-import "io/ioutil"
 import "os"
 import "runtime"
 import "runtime/debug"
@@ -82,6 +81,18 @@ func NewTestHelper(testName string, testRunDir string,
 		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
 			60*10000*24, NoStdOut),
 	}
+}
+
+// CreateTestDirs makes the required directories for the test.
+// These directories are inside TestRunDir
+func (th *TestHelper) CreateTestDirs() {
+	th.TempDir = TestRunDir + "/" + th.TestName
+
+	mountPath := th.TempDir + "/mnt"
+	utils.MkdirAll(mountPath, 0777)
+	th.Log("Using mountpath %s", mountPath)
+
+	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 func (th *TestHelper) RunTestCommonEpilog(testName string,
@@ -198,18 +209,7 @@ var TestRunDir string
 
 func init() {
 	syscall.Umask(0)
-	var err error
-	for i := 0; i < 100; i++ {
-		TestRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
-		if err != nil {
-			continue
-		}
-		if err := os.Chmod(TestRunDir, 0777); err != nil {
-			continue
-		}
-		return
-	}
-	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
+	TestRunDir = SetupTestspace("quantumfsTest")
 }
 
 type TLA struct {
