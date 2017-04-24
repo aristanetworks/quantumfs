@@ -7,7 +7,6 @@ import "bytes"
 import "flag"
 import "fmt"
 import "io"
-import "io/ioutil"
 import "os"
 import "reflect"
 import "strings"
@@ -233,20 +232,7 @@ var testRunDir string
 
 func init() {
 	syscall.Umask(0)
-
-	var err error
-	for i := 0; i < 10; i++ {
-		// We must use a ramfs or else we get IO lag spikes of > 1 second
-		testRunDir, err = ioutil.TempDir("/dev/shm", "quantumfsTest")
-		if err != nil {
-			continue
-		}
-		if err := os.Chmod(testRunDir, 777); err != nil {
-			continue
-		}
-		return
-	}
-	panic(fmt.Sprintf("Unable to create temporary test directory: %v", err))
+	testRunDir = testutils.SetupTestspace("daemonQuantumfsTest")
 }
 
 // Produce a request specific ctx variable to use for quantumfs internal calls
