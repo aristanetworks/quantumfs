@@ -9,7 +9,6 @@ import "fmt"
 import "io"
 import "os"
 import "reflect"
-import "runtime"
 import "strings"
 import "sync/atomic"
 import "syscall"
@@ -371,9 +370,10 @@ func (th *testHelper) checkZeroSparse(fileA string, offset int) {
 // Temporarily set the groups for this test. Use like:
 //
 // defer setGroups(newGroups)()
+//
+// Be sure the test has been locked to the OS thread before calling this method or
+// hard to debug behaviour may occur.
 func (th *testHelper) setGroups(newGroups []int) func() {
-	runtime.LockOSThread()
-
 	oldGroups, err := syscall.Getgroups()
 	th.AssertNoErr(err)
 
@@ -382,6 +382,5 @@ func (th *testHelper) setGroups(newGroups []int) func() {
 
 	return func() {
 		syscall.Setgroups(oldGroups)
-		runtime.UnlockOSThread()
 	}
 }
