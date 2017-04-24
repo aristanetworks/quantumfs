@@ -134,25 +134,29 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 
 // go along the given path to the destination
 // The path is stored in a string slice, each cell index contains an inode
-func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
+func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode,
+	[]uint64, error) {
+
 	defer c.funcIn("Directory::followPath_DOWN").out()
 
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
+	// Store all of the inode is looked up internally
+	ancestors := make([]uint64, length-3)
 	// skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, err := currDir.lookupInternal(c, path[num],
 			quantumfs.ObjectTypeDirectoryEntry)
 		if err != nil {
-			return child, err
+			return child, ancestors, err
 		}
-		// defer c.qfs.Forget(uint64(child.inodeNum()), 1)
+		ancestors[num-3] = uint64(child.inodeNum())
 		currDir = child.(*Directory)
 	}
 
-	return currDir, nil
+	return currDir, ancestors, nil
 }
 
 // the toLink parentLock must be locked
