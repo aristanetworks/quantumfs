@@ -21,10 +21,16 @@ func init() {
 			strconv.Itoa(os.Getppid())
 	}
 
-	err := utils.MkdirAll(rootDir, 0777)
-	if err != nil {
+	if err := utils.MkdirAll(rootDir, 0777); err != nil {
 		panic(fmt.Sprintf("Unable to create temporary directories in"+
 			" /dev/shm: %s", err.Error()))
+	}
+
+	// The newly created directory's perm is (mode & ~umask & 0777)
+	// Make sure it is 0777 no matter what umask is
+	if err := os.Chmod(rootDir, 0777); err != nil {
+		panic(fmt.Sprintf("Unable to chmod rootDir "+
+			" %s: %s", rootDir, err.Error()))
 	}
 }
 
