@@ -63,8 +63,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"WorkspaceRoot buffer %s",
-		key2String(rootID))
+		"WorkspaceRoot buffer %s", key.String())
 
 	wsr := buf.AsWorkspaceRoot()
 	//===============================================
@@ -160,8 +159,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		}
 
 		simplebuffer.AssertNonZeroBuf(buf,
-			"WorkspaceRoot buffer %s",
-			key2String(key))
+			"WorkspaceRoot buffer %s", key.String())
 
 		if err := writeToChan(c, keyChan, "", key,
 			uint64(buf.Size())); err != nil {
@@ -184,7 +182,6 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 
 	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s",
-		key2String(key))
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -218,8 +215,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"VeryLargeFile buffer %s",
-		key2String(key))
+		"VeryLargeFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -247,7 +243,6 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 	simplebuffer.AssertNonZeroBuf(buf,
 		"DirectoryEntry buffer %s",
-		key2String(key))
 
 	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
 	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
@@ -258,13 +253,36 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	de := buf.AsDirectoryEntry()
-	for i := 0; i < de.NumEntries(); i++ {
-		if err := handleDirectoryRecord(c, path, ds,
-			de.Entry(i), wf, keyChan); err != nil {
+	for {
+		for i := 0; i < de.NumEntries(); i++ {
+			if err := handleDirectoryRecord(c, path, ds,
+				de.Entry(i), wf, keyChan); err != nil {
+				return err
+			}
+		}
+		if !de.HasNext() {
+			break
+		}
+
+		key := de.Next()
+		buf := simplebuffer.New(nil, key)
+		if err := ds.Get(c.qctx, key, buf); err != nil {
 			return err
 		}
-	}
 
+		simplebuffer.AssertNonZeroBuf(buf,
+			"WorkspaceRoot buffer %s", key.String())
+
+		// When wf returns SkipDir for a DE, we can skip all
+		// the DR in that DE.
+		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
+			if err == SkipDir {
+				return nil
+			}
+			return err
+		}
+		de = buf.AsDirectoryEntry()
+	}
 	return nil
 }
 
