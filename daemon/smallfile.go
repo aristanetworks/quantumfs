@@ -10,18 +10,36 @@ import "errors"
 import "math"
 
 type SmallFile struct {
-	buf quantumfs.Buffer
+	key  quantumfs.ObjectKey
+	size int
+	buf  quantumfs.Buffer
 }
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
 	defer c.FuncIn("newSmallAccessor", "size %d", size).out()
-	var rtn SmallFile
-	rtn.buf = c.dataStore.Get(&c.Ctx, key)
-	if rtn.buf != nil {
-		rtn.buf.SetSize(int(size))
+
+	return &SmallFile{
+		key:  key,
+		size: int(size),
+		buf:  nil,
+	}
+}
+
+func (fi *SmallFile) getBuffer(c *ctx) quantumfs.Buffer {
+	if fi.buf != nil {
+		return fi.buf
 	}
 
-	return &rtn
+	buf := c.dataStore.Get(&c.Ctx, fi.key)
+	if buf != nil {
+		buf.SetSize(fi.size)
+	}
+	return buf
+}
+
+func (fi *SmallFile) getBufferToDirty(c *ctx) quantumfs.Buffer {
+	fi.buf = fi.getBuffer(c)
+	return fi.buf
 }
 
 func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -35,12 +53,14 @@ func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 		return 0, errors.New("Attempt to read past end of block")
 	}
 
+	backingData := fi.getBuffer(c)
+
 	// If we try to read too far, there's nothing to read here
-	if blockIdx > 0 || offset > uint64(fi.buf.Size()) {
+	if blockIdx > 0 || offset > uint64(backingData.Size()) {
 		return 0, nil
 	}
 
-	copied := fi.buf.Read(buf, uint32(offset))
+	copied := backingData.Read(buf, uint32(offset))
 	return copied, nil
 }
 
@@ -59,7 +79,7 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, errors.New("Offset exceeds small file")
 	}
 
-	copied := fi.buf.Write(&c.Ctx, buf, uint32(offset))
+	copied := fi.getBufferToDirty(c).Write(&c.Ctx, buf, uint32(offset))
 	if copied > 0 {
 		return int(copied), nil
 	}
@@ -68,8 +88,8 @@ func (fi *SmallFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	return 0, errors.New("writeBlock attempt with zero data")
 }
 
-func (fi *SmallFile) fileLength() uint64 {
-	return uint64(fi.buf.Size())
+func (fi *SmallFile) fileLength(c *ctx) uint64 {
+	return uint64(fi.getBuffer(c).Size())
 }
 
 func (fi *SmallFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
@@ -85,10 +105,17 @@ func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("SmallFile::sync").out()
 
 	// No metadata to marshal for small files
-	key, err := fi.buf.Key(&c.Ctx)
+	buf := fi.getBuffer(c)
+	key, err := buf.Key(&c.Ctx)
 	if err != nil {
 		panic(err.Error())
 	}
+
+	// Now that we've flushed our data to the datastore, drop our local buffer
+	fi.key = key
+	fi.size = buf.Size()
+	fi.buf = nil
+
 	return key
 }
 
@@ -103,18 +130,18 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 
 	input.metadata.BlockSize = uint32(quantumfs.MaxBlockSize)
 
-	numBlocks := int(math.Ceil(float64(fi.buf.Size()) /
+	numBlocks := int(math.Ceil(float64(fi.getBuffer(c).Size()) /
 		float64(input.metadata.BlockSize)))
 	input.expandTo(numBlocks)
 	dataInPrevBlocks := 0
 	if numBlocks > 0 {
 		c.dlog("Syncing smallFile dataBlock")
-		input.toSync[0] = fi.buf
+		input.toSync[0] = fi.getBuffer(c)
 		dataInPrevBlocks = (numBlocks - 1) * int(input.metadata.BlockSize)
 	}
 	// last block (could be the only block) may be full or partial
 	input.metadata.LastBlockBytes =
-		uint32(fi.buf.Size() - dataInPrevBlocks)
+		uint32(fi.getBuffer(c).Size() - dataInPrevBlocks)
 
 	return input
 }
@@ -151,6 +178,6 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 
 func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
 	defer c.FuncIn("SmallFile::truncate", "new size %d", newLengthBytes).out()
-	fi.buf.SetSize(int(newLengthBytes))
+	fi.getBufferToDirty(c).SetSize(int(newLengthBytes))
 	return nil
 }

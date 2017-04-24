@@ -12,7 +12,7 @@ import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 
 // SkipDir is used as a return value from WalkFunc to indicate that
 // the directory named in the call is to be skipped. It is not returned
@@ -48,17 +48,21 @@ type workerData struct {
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
+	if rootID.IsEqualTo(quantumfs.EmptyWorkspaceKey) {
+		return nil
+	}
+
 	if rootID.Type() != quantumfs.KeyTypeMetadata {
 		return fmt.Errorf(
 			"Type of rootID %s is %s instead of KeyTypeMetadata",
 			rootID.String(), key2String(rootID))
 	}
 
-	buf := utils.NewSimpleBuffer(nil, rootID)
+	buf := simplebuffer.New(nil, rootID)
 	if err := ds.Get(cq, rootID, buf); err != nil {
 		return err
 	}
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"WorkspaceRoot buffer %s",
 		key2String(rootID))
 
@@ -134,7 +138,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 	keyChan chan<- *workerData) error {
 
 	for {
-		//  Go through all records in this entry.
+		// Go through all records in this entry.
 		for idx := 0; idx < hle.NumEntries(); idx++ {
 
 			hlr := hle.Entry(idx)
@@ -145,19 +149,17 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 				return err
 			}
 		}
-		// Go to next Entry
-		if hle.Next().IsEqualTo(quantumfs.EmptyDirKey) ||
-			hle.NumEntries() == 0 {
+		if !hle.HasNext() {
 			break
 		}
 
 		key := hle.Next()
-		buf := utils.NewSimpleBuffer(nil, key)
+		buf := simplebuffer.New(nil, key)
 		if err := ds.Get(c.qctx, key, buf); err != nil {
 			return err
 		}
 
-		utils.AssertNonZeroBuf(buf,
+		simplebuffer.AssertNonZeroBuf(buf,
 			"WorkspaceRoot buffer %s",
 			key2String(key))
 
@@ -175,12 +177,12 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s",
 		key2String(key))
 
@@ -210,12 +212,12 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"VeryLargeFile buffer %s",
 		key2String(key))
 
@@ -234,18 +236,16 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-var totalFilesWalked uint64
-
 func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := utils.NewSimpleBuffer(nil, key)
+	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.qctx, key, buf); err != nil {
 		return err
 	}
 
-	utils.AssertNonZeroBuf(buf,
+	simplebuffer.AssertNonZeroBuf(buf,
 		"DirectoryEntry buffer %s",
 		key2String(key))
 
@@ -303,13 +303,12 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 	for {
 		select {
 		case <-c.Done():
-			return fmt.Errorf("Quiting in worker because at least one " +
+			return fmt.Errorf("Quitting worker because at least one " +
 				"goroutine failed with an error")
 		case keyItem = <-keyChan:
 			if keyItem == nil {
 				return nil
 			}
-
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
 			keyItem.size, false); err != nil {
@@ -323,7 +322,7 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 
 	select {
 	case <-c.Done():
-		return fmt.Errorf("Quiting in writeToChan because at least one " +
+		return fmt.Errorf("Quitting writeToChan because at least one " +
 			"goroutine failed with an error")
 	case keyChan <- &workerData{path: p, key: k, size: s}:
 	}
