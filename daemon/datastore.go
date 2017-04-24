@@ -19,9 +19,10 @@ func init() {
 }
 
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
+	entryNum := cacheSize / 102400
 	return &dataStore{
 		durableStore: durableStore,
-		cache:        make(map[quantumfs.ObjectKey]*buffer),
+		cache:        make(map[quantumfs.ObjectKey]*buffer, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
 	}
@@ -73,7 +74,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
-		size := len(buf.data)
+		size := buf.Size()
 
 		// Store in cache
 		defer store.cacheLock.Lock().Unlock()
@@ -86,9 +87,9 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 		store.freeSpace -= size
 		for store.freeSpace < 0 {
-			evictedBuf := store.lru.Remove(store.lru.Front())
-			store.freeSpace += len(evictedBuf.(buffer).data)
-			delete(store.cache, evictedBuf.(buffer).key)
+			evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
+			store.freeSpace += evictedBuf.Size()
+			delete(store.cache, evictedBuf.key)
 		}
 		store.cache[buf.key] = &buf
 		buf.lruElement = store.lru.PushBack(buf)
