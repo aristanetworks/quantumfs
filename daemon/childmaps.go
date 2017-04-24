@@ -63,19 +63,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 		return record
 	}
 
-	var rtn quantumfs.DirectoryRecord
-	cmap.childrenRecords.iterateOverRecords(c,
-		func (record quantumfs.DirectoryRecord) bool {
-
-		if record.Filename() == name {
-			rtn = record
-			return true
-		}
-
-		return false
-	})
-
-	return rtn
+	return cmap.childrenRecords.fetchFromBase(c, name)
 }
 
 // Returns the inodeId used for the child
@@ -275,27 +263,7 @@ func (cmap *ChildMap) recordCopy(c *ctx,
 		return record
 	}
 
-	// Just return the first matching inode id entry
-	var rtn quantumfs.DirectoryRecord
-
-	cmap.childrenRecords.iterateOverRecords(c,
-		func (record quantumfs.DirectoryRecord) bool {
-
-		inodeNum, exists := cmap.childrenRecords.inodeId(record.Filename())
-		if exists && inodeNum == inodeId {
-			newerKey, useNewer := cmap.childrenRecords.cacheKey[inodeNum]
-			if useNewer {
-				record.SetID(newerKey)
-			}
-
-			rtn = record
-			return true
-		}
-
-		return false
-	})
-
-	return rtn
+	return cmap.childrenRecords.fetchFromBase(c, recordName)
 }
 
 func (cmap *ChildMap) setKey(inodeNum InodeId, key quantumfs.ObjectKey) fuse.Status {
@@ -358,6 +326,8 @@ type thinChildren struct {
 	nameToInode	map[string]InodeId
 	inodeToName	map[InodeId][]string
 
+	nameToEntryIdx	map[string]uint32
+
 	cache		map[string]quantumfs.DirectoryRecord
 	// One of the most common and expensive operations is updating the ID.
 	// Separate this into it's own cache to optimize syncChild
@@ -370,6 +340,7 @@ func newThinChildren (key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) thinChildren
 		base:		key,
 		nameToInode: 	make(map[string]InodeId),
 		inodeToName:	make(map[InodeId][]string),
+		nameToEntryIdx:	make(map[string]uint32),
 		cache:		make(map[string]quantumfs.DirectoryRecord),
 		cacheKey:	make(map[InodeId]quantumfs.ObjectKey),
 	}
@@ -409,10 +380,14 @@ func (th *thinChildren) mapInodeId(name string, inodeId InodeId) {
 	th.inodeToName[inodeId] = list
 }
 
-func (th *thinChildren) iterateOverRecords(c *ctx,
-	fxn func (quantumfs.DirectoryRecord) bool) {
+func (th *thinChildren) fetchFromBase(c *ctx,
+	name string) quantumfs.DirectoryRecord {
 
-	existingEntries := make(map[string]bool, 0)
+	nameOffset, exists := th.nameToEntryIdx[name]
+	if !exists {
+		return nil
+	}
+	offset := int(nameOffset)
 
 	key := th.base
 	for {
@@ -423,8 +398,59 @@ func (th *thinChildren) iterateOverRecords(c *ctx,
 
 		baseLayer := buffer.AsDirectoryEntry()
 
+		if int(baseLayer.NumEntries()) > offset {
+			// the record should be in this DirectoryEntry
+			entry := convertRecord(th.wsr,
+				quantumfs.DirectoryRecord(baseLayer.Entry(offset)))
+
+			if entry.Filename() != name {
+				c.elog("Name map mismatch: %s vs %s", name,
+					entry.Filename())
+			}
+
+			// ensure we use the newest key
+			entryInodeId := th.nameToInode[entry.Filename()]
+			newerKey, useNewer := th.cacheKey[entryInodeId]
+			if useNewer {
+				entry.SetID(newerKey)
+			}
+
+			return entry
+		} else {
+			offset -= baseLayer.NumEntries()
+
+			// go to the next page
+			if baseLayer.HasNext() {
+				key = baseLayer.Next()
+			} else {
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func (th *thinChildren) iterateOverRecords(c *ctx,
+	fxn func (quantumfs.DirectoryRecord) bool) {
+
+	existingEntries := make(map[string]bool, 0)
+	entryIdx := uint32(0)
+
+	key := th.base
+	for {
+		buffer := c.dataStore.Get(&c.Ctx, key)
+		if buffer == nil {
+			panic(fmt.Sprintf("No baseLayer object for %s",
+				key.String()))
+		}
+
+		baseLayer := buffer.AsDirectoryEntry()
+
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
+			// remember the index for fast access later
+			th.nameToEntryIdx[entry.Filename()] = entryIdx
 
 			// ensure we overwrite changes from the base
 			record, exists := th.getCached(entry.Filename())
@@ -453,6 +479,7 @@ func (th *thinChildren) iterateOverRecords(c *ctx,
 			}
 
 			existingEntries[entry.Filename()] = true
+			entryIdx++
 		}
 
 		if baseLayer.HasNext() {
@@ -581,6 +608,13 @@ func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
 	th.base = newBaseLayerId
 	th.cache = make(map[string]quantumfs.DirectoryRecord)
 	th.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
+
+	// re-set our map of indices into directory entries
+	th.nameToEntryIdx = make(map[string]uint32)
+	th.iterateOverRecords(c, func (record quantumfs.DirectoryRecord) bool {
+		// don't need to do anything while we iterate
+		return false
+	})
 
 	return newBaseLayerId
 }
