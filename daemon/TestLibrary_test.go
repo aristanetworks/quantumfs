@@ -9,6 +9,7 @@ import "fmt"
 import "io"
 import "os"
 import "reflect"
+import "runtime"
 import "strings"
 import "sync/atomic"
 import "syscall"
@@ -364,5 +365,23 @@ func (th *testHelper) checkZeroSparse(fileA string, offset int) {
 
 		th.Assert(bytes.Equal(rtnA, []byte{0}), "file %s not zeroed",
 			fileA)
+	}
+}
+
+// Temporarily set the groups for this test. Use like:
+//
+// defer setGroups(newGroups)()
+func (th *testHelper) setGroups(newGroups []int) func() {
+	runtime.LockOSThread()
+
+	oldGroups, err := syscall.Getgroups()
+	th.AssertNoErr(err)
+
+	err = syscall.Setgroups(newGroups)
+	th.AssertNoErr(err)
+
+	return func() {
+		syscall.Setgroups(oldGroups)
+		runtime.UnlockOSThread()
 	}
 }
