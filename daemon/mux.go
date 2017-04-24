@@ -21,7 +21,7 @@ import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
-const defaultCacheSize = 4096
+const defaultCacheSize = 32768
 const flushSanityTimeout = time.Minute
 
 type dirtyInode struct {
@@ -201,7 +201,8 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 		if sleepTime > flushSanityTimeout {
 			c.elog("Overlong flusher sleepTime %s!", sleepTime)
 			sleepTime = flushSanityTimeout
-		} else if sleepTime > 0 {
+		}
+		if sleepTime > 0 {
 			c.vlog("Waiting until %s (%s)...",
 				nextExpiringInode.String(), sleepTime.String())
 

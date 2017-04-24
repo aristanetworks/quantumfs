@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -25,9 +26,22 @@
 namespace qfsclient {
 
 void QfsClientTest::CreateTempDirTree(const std::vector<std::string> &path) {
-	char temp_directory_template[128] = "/tmp/qfs-client-test-XXXXXX";
-	char *temp_directory_name = mkdtemp(temp_directory_template);
+	char* temp_rootDir = getenv("ROOTDIRNAME");
+	char temp_directory_template[128];
+	struct stat info;
+	snprintf(temp_directory_template, sizeof(temp_directory_template),
+			"/dev/shm/%s", temp_rootDir);
+	if (stat(temp_directory_template,  &info) != 0 &&
+		mkdir(temp_directory_template, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
+			util::fperror(__func__, "mkdir()");
+			this->tree.clear();
+			return;
+	}
 
+	memset(temp_directory_template, 0x00, sizeof(temp_directory_template));
+	snprintf(temp_directory_template, sizeof(temp_directory_template),
+			"/dev/shm/%s/qfs-client-test-XXXXXX", temp_rootDir);
+	char *temp_directory_name = mkdtemp(temp_directory_template);
 	if (!temp_directory_name) {
 		util::fperror(__func__, "mkdtemp()");
 		this->tree.clear();
