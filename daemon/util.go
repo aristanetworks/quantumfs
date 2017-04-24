@@ -214,7 +214,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 	// The primary group doesn't match. We now need to check the supplementary
 	// groups. Unfortunately FUSE doesn't give us these so we need to parse them
 	// ourselves out of /proc.
-	file, err := os.Open(fmt.Sprintf("/proc/%d/task/%d", pid, pid))
+	file, err := os.Open(fmt.Sprintf("/proc/%d/task/%d/status", pid, pid))
 	if err != nil {
 		c.dlog("Unable to open /proc/status for %d: %s", pid, err.Error())
 		return false
@@ -236,14 +236,22 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 			continue
 		}
 
-		// We now have something like "Groups: 10 10545", get all the GIDs
+		// We now have something like "Groups:\t10 10545 ", get all the GIDs
 		// and skip the prefix
-		groups := strings.Split(line, " ")[1:]
+		groups := strings.Split(line, "\t")[1:]
+
+		// Now we need to split the groups themselves up
+		groups = strings.Split(groups[0], " ")
 
 		for _, sgid := range groups {
+			if sgid == "" {
+				continue
+			}
+
 			gid, err := strconv.Atoi(sgid)
 			if err != nil {
-				c.elog("Failed to parse gid from %s", sgid)
+				c.elog("Failed to parse gid from '%s' out of '%s'",
+					sgid, line)
 				continue
 			}
 			if uint32(gid) == inodeGid {
