@@ -6,6 +6,7 @@ package testutils
 import "fmt"
 import "io/ioutil"
 import "os"
+import "strconv"
 import "strings"
 
 import "github.com/aristanetworks/quantumfs/utils"
@@ -16,8 +17,8 @@ func init() {
 	// We must use a ramfs or else we get IO lag spikes of > 1 second
 	rootDir = "/dev/shm/" + os.Getenv("ROOTDIRNAME")
 	if !strings.Contains(rootDir, "-RootContainer-") {
-		panic(fmt.Sprintf("Environmental variable ROOTDIRNAME is wrong: %s",
-			rootDir))
+		rootDir = "/dev/shm/" + os.Getenv("USER") + "-RootContainer-" +
+			strconv.Itoa(os.Getppid())
 	}
 
 	err := utils.MkdirAll(rootDir, 0777)
