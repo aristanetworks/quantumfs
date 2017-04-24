@@ -21,7 +21,7 @@ import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
-const defaultCacheSize = 32768
+const defaultCacheSize = 8388608
 const flushSanityTimeout = time.Minute
 
 type dirtyInode struct {
