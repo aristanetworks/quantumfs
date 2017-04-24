@@ -380,21 +380,23 @@ func init() {
 // Produce a test infrastructure ctx variable for use with QuantumFS utility
 // functions.
 func (th *TestHelper) TestCtx() *ctx {
-	return th.qfs.c.dummyReq(qlog.TestReqId)
+	return th.dummyReq(qlog.TestReqId)
 }
 
 //only to be used for some testing - not all functions will work with this
-func (c *ctx) dummyReq(request uint64) *ctx {
+func (th *TestHelper) dummyReq(request uint64) *ctx {
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
-			Qlog:      c.Qlog,
+			Qlog:      th.Logger,
 			RequestId: request,
 		},
-		qfs:         c.qfs,
-		config:      c.config,
-		workspaceDB: c.workspaceDB,
-		dataStore:   c.dataStore,
-		fuseCtx:     nil,
+	}
+
+	if th.qfs != nil {
+		requestCtx.qfs = th.qfs
+		requestCtx.config = th.qfs.c.config
+		requestCtx.workspaceDB = th.qfs.c.workspaceDB
+		requestCtx.dataStore = th.qfs.c.dataStore
 	}
 	return requestCtx
 }
