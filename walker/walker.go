@@ -63,7 +63,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"WorkspaceRoot buffer %s", key.String())
+		"WorkspaceRoot buffer %s", rootID.String())
 
 	wsr := buf.AsWorkspaceRoot()
 	//===============================================
@@ -181,7 +181,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"MultiBlockFile buffer %s",
+		"MultiBlockFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -242,7 +242,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"DirectoryEntry buffer %s",
+		"DirectoryEntry buffer %s", key.String())
 
 	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
 	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
