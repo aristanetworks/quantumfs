@@ -238,7 +238,7 @@ func init() {
 // Produce a request specific ctx variable to use for quantumfs internal calls
 func (th *testHelper) newCtx() *ctx {
 	reqId := atomic.AddUint64(&requestId, 1)
-	c := th.qfs.c.dummyReq(reqId)
+	c := th.dummyReq(reqId)
 	c.Ctx.Vlog(qlog.LogTest, "Allocating request %d to test %s", reqId,
 		th.TestName)
 	return c
