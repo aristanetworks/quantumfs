@@ -153,7 +153,8 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 		checkFlags |= quantumfs.PermExecAll
 	}
 
-	return hasPermissionIds(c, inode, uid, gid, checkFlags, -1)
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, uid, gid, pid, checkFlags, -1)
 }
 
 func hasDirectoryWritePermSticky(c *ctx, inode Inode,
@@ -161,7 +162,8 @@ func hasDirectoryWritePermSticky(c *ctx, inode Inode,
 
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags,
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags,
 		int32(childOwner))
 }
 
@@ -171,7 +173,8 @@ func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
 
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
 }
 
 func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
@@ -193,14 +196,76 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	}
 
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
+}
+
+// Determine if the process has a matching group. Normally the primary group is all
+// we need to check, but sometimes we also much check the supplementary groups.
+func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
+	defer c.FuncIn("hasMatchingGid", "%d %d %d", userGid, pid, inodeGid).out()
+
+	// First check the common case where we do the least work
+	if userGid == inodeGid {
+		c.vlog("user GID matches inode")
+		return true
+	}
+
+	// The primary group doesn't match. We now need to check the supplementary
+	// groups. Unfortunately FUSE doesn't give us these so we need to parse them
+	// ourselves out of /proc.
+	file, err := os.Open(fmt.Sprintf("/proc/%d/task/%d", pid, pid))
+	if err != nil {
+		c.dlog("Unable to open /proc/status for %d: %s", pid, err.Error())
+		return false
+	}
+	defer file.Close()
+	procStatus := bufio.NewReader(file)
+
+	// Find "Groups:" line
+	for {
+		bline, _, err := procStatus.ReadLine()
+		if err != nil {
+			c.dlog("Error reading proc status line: %s", err.Error())
+			return false
+		}
+
+		line := string(bline)
+
+		if !strings.HasPrefix(line, "Groups:") {
+			continue
+		}
+
+		// We now have something like "Groups: 10 10545", get all the GIDs
+		// and skip the prefix
+		groups := strings.Split(line, " ")[1:]
+
+		for _, sgid := range groups {
+			gid, err := strconv.Atoi(sgid)
+			if err != nil {
+				c.elog("Failed to parse gid from %s", sgid)
+				continue
+			}
+			if uint32(gid) == inodeGid {
+				return true
+			}
+		}
+
+		// We've processed the only line which matters. Since we didn't find
+		// a matching group we are done. However, to protect against the
+		// possibility that the Groups line is empty we do not return here.
+		break
+	}
+
+	return false
 }
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
-	checkGid uint32, checkFlags uint32, stickyAltOwner int32) fuse.Status {
+	checkGid uint32, pid uint32, checkFlags uint32,
+	stickyAltOwner int32) fuse.Status {
 
-	defer c.FuncIn("hasPermissionIds", "%d %d %d %o", checkUid, checkGid,
-		stickyAltOwner, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%d %d %d %d %o", checkUid, checkGid,
+		pid, stickyAltOwner, checkFlags).out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
