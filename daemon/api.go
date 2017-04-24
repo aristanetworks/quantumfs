@@ -596,7 +596,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	// get immediate parent of the target node
-	p, err := func() (Inode, error) {
+	p, ancestors, err := func() (Inode, error) {
 		// The ApiInode uses tree lock of NamespaceList and not any
 		// particular workspace. Thus at this point in the code, we don't
 		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
@@ -605,6 +605,12 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		defer (&workspace.Directory).LockTree().Unlock()
 		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()
+
+	// Decrease the inode looked up internally
+	for _, ancestorId := range ancestors {
+		defer c.qfs.Forget(ancestorId, 1)
+	}
+
 	if err != nil {
 		c.vlog("Path does not exist: %s", cmd.DstPath)
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
