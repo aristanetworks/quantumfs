@@ -1,9 +1,12 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
+// The QuantumFS internals are implemented here. This is not the package you want,
+// try quantumfs.
+package daemon
+
 // go-fuse creates a goroutine for every request. The code here simply takes these
 // requests and forwards them to the correct Inode.
-package daemon
 
 import "reflect"
 import "container/list"

@@ -1,8 +1,9 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Various constants used throughout quantumfsd
 package daemon
+
+// Various constants used throughout quantumfsd
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
