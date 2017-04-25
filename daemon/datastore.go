@@ -196,6 +196,11 @@ func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 	newLen := len(arrA) + len(arrB)
 	oldCap := cap(arrA)
 	newCap := oldCap
+
+	if newCap == 0 {
+		newCap = 1
+	}
+
 	for ; newLen > newCap; newCap += newCap {
 		// double the capacity until everything fits
 	}

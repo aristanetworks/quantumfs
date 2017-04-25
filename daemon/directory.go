@@ -96,12 +96,10 @@ func loadChildMap(c *ctx, wsr *WorkspaceRoot,
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
 
-		if baseLayer.Next() == quantumfs.EmptyDirKey ||
-			baseLayer.NumEntries() == 0 {
-
-			break
-		} else {
+		if baseLayer.HasNext() {
 			key = baseLayer.Next()
+		} else {
+			break
 		}
 	}
 

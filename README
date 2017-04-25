@@ -13,7 +13,7 @@ README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 
 2) Clone the dependent go libraries:
 
-	cd $GOPATH/src/github.com/aristanetworks
+	cd $GOPATH/src/github.com/aristanetworks/quantumfs
         make fetch
 
 3) Compile and install the Google CityHash library:
