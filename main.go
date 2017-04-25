@@ -52,13 +52,16 @@ func main() {
 	config := walkFlags.String("cfg", "",
 		"datastore and workspaceDB config file")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
-	serverIP := walkFlags.String("influx", "", "influxdb server's IP:port")
+	influxServer := walkFlags.String("influxServer", "", "influxdb server's IP:port")
+	influxDB := walkFlags.String("influxDB", "", "database to use in influxdb")
 
 	walkFlags.Usage = func() {
-		fmt.Println("This daemon periodically walks all the workspaces ")
-		fmt.Println("and updates the TTL of each block as per the config file")
+		fmt.Println("This daemon periodically walks all the workspaces,")
+		fmt.Println("updates the TTL of each block as per the config file and")
+		fmt.Println("uploads the statistics to influx")
 
-		fmt.Println("usage: qwalkerd [config]")
+		fmt.Println("usage: qwalkerd -cfg <config> [-logdir dir] [-progress ] " +
+			" [-influxServer serverIP:port -influxDB dbname]")
 		walkFlags.PrintDefaults()
 	}
 
@@ -69,7 +72,15 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	c := getWalkerDaemonContext(*serverIP, *config, *logdir)
+	// If influxServer is specified ensure than
+	// ensure than influxDB is also specified.
+	if *influxServer != "" && influxDB == "" {
+		fmt.Println("When providing influxServer, influxDB needs to be provided")
+		walkFlags.Usage()
+		os.Exit(exitBadConfig)
+	}
+
+	c := getWalkerDaemonContext(*influxServer, *config, *logdir, *influxDB)
 
 	var lastWalkStart time.Time
 	var lastWalkDuration time.Duration

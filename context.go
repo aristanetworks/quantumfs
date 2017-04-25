@@ -20,25 +20,26 @@ type Ctx struct {
 	confFile string
 }
 
-func getWalkerDaemonContext(serverIP string, config string,
-	logdir string) *Ctx {
+func getWalkerDaemonContext(server string, config string,
+	logdir string, influxDB string) *Ctx {
 
 	// Connect to InfluxDB
 	var influx *influxlib.InfluxDBConnection
 	var err error
-	if serverIP == "" {
+	if server == "" {
 		influx, err = influxlib.Connect()
 		if err != nil {
 			fmt.Printf("Unable to connect to influxDB err:%v\n", err)
 			os.Exit(1)
 		}
+		// Uses "qubit" database by default
 	} else {
-		influx, err = influxlib.ConnectToHost(serverIP)
+		influx, err = influxlib.ConnectToHost(server)
 		if err != nil {
-			fmt.Printf("Unable to connect to influxDB at IP:%v err:%v\n", serverIP, err)
+			fmt.Printf("Unable to connect to influxDB at IP:%v err:%v\n", server, err)
 			os.Exit(1)
 		}
-		influx.UseDatabase("mydb")
+		influx.UseDatabase(influxDB)
 	}
 
 	// Connect to ether.cql WorkSpaceDB
