@@ -249,6 +249,11 @@ func TestCacheLruDiffSize(t *testing.T) {
 		}
 
 		// Cause a block to be refreshed to the beginning
+
+		// The size of keys[298] is 72 units of quantumfs.ObjectKeyLength, so
+		// it will take off the space up to keys[14] and part of keys[13].
+		// Due to the mechanism of cache, all keys from keys[70] downto
+		// keys[13] should be evicted.
 		buf = datastore.Get(c, keys[298])
 		test.Assert(buf != nil, "Block not found")
 
