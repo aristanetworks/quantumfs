@@ -177,7 +177,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		c.vlog("Got file lock")
 
 		if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
-			if attr.Size != fi.accessor.fileLength() {
+			if attr.Size != fi.accessor.fileLength(c) {
 				updateMtime = true
 			}
 
@@ -593,7 +593,7 @@ type blockAccessor interface {
 	writeBlock(*ctx, int, uint64, []byte) (int, error)
 
 	// Get the file's length in bytes
-	fileLength() uint64
+	fileLength(c *ctx) uint64
 
 	// Extract block and remaining offset from absolute offset
 	blockIdxInfo(c *ctx, absOffset uint64) (int, uint64)
@@ -721,7 +721,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	// Update the size with what we were able to write
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
-	attr.Size = uint64(fi.accessor.fileLength())
+	attr.Size = uint64(fi.accessor.fileLength(c))
 	fi.parentSetChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
 
