@@ -12,6 +12,8 @@ package blobstore
 
 import (
 	"fmt"
+
+	"github.com/aristanetworks/ether"
 )
 
 // BSErrorCode are integer codes for error responses from ether/blobstore package
@@ -48,7 +50,7 @@ type BlobStore interface {
 
 	// Get returns both the value and metadata for the given key or
 	// an error
-	Get(key string) ([]byte, map[string]string, error)
+	Get(c ether.Ctx, key string) ([]byte, map[string]string, error)
 
 	// Insert stores the given value and metadata for the key
 	// Calling Insert with a pre-existing key will overwrite the
@@ -58,17 +60,18 @@ type BlobStore interface {
 	// specific metadata which represents the seconds after which
 	// the blob should be cleaned up by the system. Refer to store
 	// specific documentation to see the store specific metadata items.
-	Insert(key string, value []byte, metadata map[string]string) error
+	Insert(c ether.Ctx, key string, value []byte,
+		metadata map[string]string) error
 
 	// Delete removes both the value and metadata for a given key from the
 	// blobstore.
-	Delete(key string) error
+	Delete(c ether.Ctx, key string) error
 
 	// Metadata returns the metadata for the given key or an error
-	Metadata(key string) (map[string]string, error)
+	Metadata(c ether.Ctx, ey string) (map[string]string, error)
 
 	// Update updates the metadata for a given key irrespective of its prior
 	// existence. If the key does not exist the value associated with it will
 	// be an empty blob or string.
-	Update(key string, metadata map[string]string) error
+	Update(c ether.Ctx, key string, metadata map[string]string) error
 }
