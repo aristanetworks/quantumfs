@@ -15,6 +15,7 @@ import "os"
 import "strconv"
 import "time"
 
+import "github.com/aristanetworks/ether"
 import "github.com/aristanetworks/ether/blobstore"
 import "github.com/aristanetworks/ether/cql"
 import "github.com/aristanetworks/ether/filesystem"
@@ -49,7 +50,8 @@ func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := EtherBlobStoreTranslator{Blobstore: blobstore}
+	translator := EtherBlobStoreTranslator{Blobstore: blobstore,
+		logger: &dsLogger{}}
 	return &translator
 }
 
@@ -135,6 +137,24 @@ func loadCqlAdapterConfig(path string) error {
 	return nil
 }
 
+type dsLogger struct{}
+
+func (el *dsLogger) Vlog(ac interface{}, fmtStr string,
+	args ...interface{}) {
+	if qc, ok := ac.(*quantumfs.Ctx); ok {
+		qc.Vlog(qlog.LogDatastore, fmtStr, args...)
+	}
+}
+
+type wsdbLogger struct{}
+
+func (el *wsdbLogger) Vlog(ac interface{}, fmtStr string,
+	args ...interface{}) {
+	if qc, ok := ac.(*quantumfs.Ctx); ok {
+		qc.Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
+	}
+}
+
 func NewEtherCqlStore(path string) quantumfs.DataStore {
 
 	cerr := loadCqlAdapterConfig(path)
@@ -149,9 +169,11 @@ func NewEtherCqlStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
+
 	translator := EtherBlobStoreTranslator{
 		Blobstore:      blobstore,
 		ApplyTTLPolicy: true,
+		logger:         &dsLogger{},
 	}
 	return &translator
 }
@@ -159,6 +181,7 @@ func NewEtherCqlStore(path string) quantumfs.DataStore {
 type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
+	logger         ether.Logger
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
@@ -213,7 +236,8 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
 
 	ks := key.String()
-	data, metadata, err := ebt.Blobstore.Get(ks)
+	ec := &ether.Ctx{Logger: ebt.logger, Request: c}
+	data, metadata, err := ebt.Blobstore.Get(ec, ks)
 	if err != nil {
 		return err
 	}
