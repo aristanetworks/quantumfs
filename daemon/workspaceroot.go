@@ -482,7 +482,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	defer wsr.linkLock.RLock().RUnlock()
 
 	// Upload the workspaceroot object
-	newRootId := publishWorkspaceRoot(c, wsr.rootId, wsr.hardlinks)
+	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
 
 	// Update workspace rootId
 	if newRootId != wsr.rootId {
