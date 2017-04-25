@@ -14,14 +14,11 @@ import "time"
 import "github.com/aristanetworks/quantumfs/encoding"
 import capn "github.com/glycerine/go-capnproto"
 
-// 160 bit hash
-const HashSize = 20 // must match in hash/hash.go
+// 160 bit hash, must match hash.HashSize
+const HashSize = 20
 
 // Maximum size of a block which can be stored in a datastore
 const MaxBlockSize = int(encoding.MaxBlockSize)
-
-// This number empirically derived by looking at file sizes
-const InitBlockSize = 8192
 
 // The size of the ObjectKey: 21 + 1 + 8
 // The length decides the length in datastore.go: quantumfs.ExtendedKeyLength

@@ -108,7 +108,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 
 func newEmptyBuffer() buffer {
 	return buffer{
-		data: make([]byte, 0, quantumfs.InitBlockSize),
+		data: make([]byte, 0, initBlockSize),
 	}
 }
 
@@ -134,8 +134,8 @@ func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffe
 
 	var newData []byte
 	// ensure our buffer meets min capacity
-	if inSize < quantumfs.InitBlockSize {
-		newData = make([]byte, inSize, quantumfs.InitBlockSize)
+	if inSize < initBlockSize {
+		newData = make([]byte, inSize, initBlockSize)
 	} else {
 		newData = make([]byte, inSize)
 	}
@@ -277,8 +277,8 @@ func (buf *buffer) Get() []byte {
 
 func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
 	// ensure our buffer meets min size
-	if cap(data) < quantumfs.InitBlockSize {
-		newData := make([]byte, len(data), quantumfs.InitBlockSize)
+	if cap(data) < initBlockSize {
+		newData := make([]byte, len(data), initBlockSize)
 		copy(newData, data)
 		data = newData
 	}

@@ -50,3 +50,6 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 // The block size of the filesystem in bytes
 const qfsBlockSize = uint64(quantumfs.MaxBlockSize)
 const statBlockSize = uint64(512)
+
+// This number empirically derived by looking at file sizes
+const initBlockSize = 8192
