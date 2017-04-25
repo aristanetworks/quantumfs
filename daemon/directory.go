@@ -319,7 +319,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		defer dir.childRecordLock.Lock().Unlock()
 
 		entry := dir.modifyRecordChildCall_(c,
-			func (inout quantumfs.DirectoryRecord) {
+			func(inout quantumfs.DirectoryRecord) {
 				modifyEntryWithAttr(c, newType, attr, inout,
 					updateMtime)
 			}, inodeNum)
@@ -678,7 +678,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 }
 
 func (dir *Directory) modifyRecordChildCall_(c *ctx,
-	modifyFxn func (inout quantumfs.DirectoryRecord), 
+	modifyFxn func(inout quantumfs.DirectoryRecord),
 	inodeNum InodeId) (copy quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("Directory::modifyRecordChildCall_", "inode %d",
@@ -1439,7 +1439,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.modifyRecordChildCall_(c,
-			func (inout quantumfs.DirectoryRecord) {
+			func(inout quantumfs.DirectoryRecord) {
 				inout.SetExtendedAttributes(key)
 			}, inodeNum)
 	}()
@@ -1503,7 +1503,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.modifyRecordChildCall_(c,
-			func (inout quantumfs.DirectoryRecord) {
+			func(inout quantumfs.DirectoryRecord) {
 				inout.SetExtendedAttributes(key)
 			}, inodeNum)
 	}()
