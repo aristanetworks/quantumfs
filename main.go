@@ -43,7 +43,7 @@ func (c *Ctx) elog(format string, args ...interface{}) {
 	c.qctx.Elog(qlog.LogTool, format, args...)
 }
 
-var walkRerunPeriod = 1 * time.Hour
+var walkRerunPeriod = 4 * time.Hour
 
 func main() {
 
