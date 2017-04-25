@@ -458,7 +458,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	}
 
 	// Update workspace rootId
-	if newRootId != wsr.rootId {
+	if newRootId.IsEqualTo(wsr.rootId) {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
 			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
 
