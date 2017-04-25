@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
@@ -28,6 +29,8 @@ func checkSetupIntg(s *storeIntegrationTests) {
 		s.T().Skip("Blobstore was not setup")
 	}
 }
+
+var integTestEtherCtx = ether.DefaultCtx
 
 func (s *storeIntegrationTests) SetupSuite() {
 	confFile, err := EtherConfFile()
@@ -47,7 +50,7 @@ func (s *storeIntegrationTests) SetupTest() {
 }
 
 func (s *storeIntegrationTests) TestInsert() {
-	err := s.bls.Insert(testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().NoError(err, "Insert returned an error")
 }
@@ -60,7 +63,8 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 		countl := count
 		Wg.Go(func() error {
 
-			return s.bls.Insert(testKey+strconv.Itoa(countl), []byte(testValue),
+			return s.bls.Insert(integTestEtherCtx,
+				testKey+strconv.Itoa(countl), []byte(testValue),
 				map[string]string{TimeToLive: "0"})
 		})
 	}
@@ -69,18 +73,19 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 
 	// Check
 	for count := 0; count < 2; count++ {
-		value, _, err := s.bls.Get(testKey + strconv.Itoa(count))
+		value, _, err := s.bls.Get(integTestEtherCtx,
+			testKey+strconv.Itoa(count))
 		s.Require().NoError(err, "Insert returned an error")
 		s.Require().Equal(testValue, string(value), "Get returned in correct value")
 	}
 }
 
 func (s *storeIntegrationTests) TestGet() {
-	err := s.bls.Insert(testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	value, metadata, err := s.bls.Get(testKey)
+	value, metadata, err := s.bls.Get(integTestEtherCtx, testKey)
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
@@ -91,7 +96,7 @@ func (s *storeIntegrationTests) TestGet() {
 }
 
 func (s *storeIntegrationTests) TestGetUnknownKey() {
-	value, metadata, err := s.bls.Get(unknownKey)
+	value, metadata, err := s.bls.Get(integTestEtherCtx, unknownKey)
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 	s.Require().Error(err, "Get returned incorrect error")
@@ -101,11 +106,11 @@ func (s *storeIntegrationTests) TestGetUnknownKey() {
 }
 
 func (s *storeIntegrationTests) TestGetNonZeroTTL() {
-	err := s.bls.Insert(testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
 		map[string]string{TimeToLive: "1234"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	value, metadata, err := s.bls.Get(testKey)
+	value, metadata, err := s.bls.Get(integTestEtherCtx, testKey)
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
@@ -123,11 +128,11 @@ func (s *storeIntegrationTests) TestGetNonZeroTTL() {
 }
 
 func (s *storeIntegrationTests) TestMetadataOK() {
-	err := s.bls.Insert(testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
 		map[string]string{TimeToLive: "1234"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	metadata, err := s.bls.Metadata(testKey)
+	metadata, err := s.bls.Metadata(integTestEtherCtx, testKey)
 	s.Require().NoError(err, "Metadata returned an error")
 	s.Require().NotNil(metadata, "Metadata returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -144,7 +149,7 @@ func (s *storeIntegrationTests) TestMetadataOK() {
 }
 
 func (s *storeIntegrationTests) TestMetadataUnknownKey() {
-	metadata, err := s.bls.Metadata(unknownKey)
+	metadata, err := s.bls.Metadata(integTestEtherCtx, unknownKey)
 	s.Require().Error(err, "Metadata didn't return error")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 	verr, ok := err.(*blobstore.Error)

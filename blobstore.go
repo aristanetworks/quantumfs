@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/aristanetworks/ether/utils/stats"
 	"github.com/aristanetworks/ether/utils/stats/inmem"
@@ -60,7 +61,7 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 }
 
 // Insert is the CQL implementation of blobstore.Insert()
-func (b *cqlBlobStore) Insert(key string, value []byte,
+func (b *cqlBlobStore) Insert(c ether.Ctx, key string, value []byte,
 	metadata map[string]string) error {
 
 	if metadata == nil {
@@ -75,6 +76,7 @@ func (b *cqlBlobStore) Insert(key string, value []byte,
 			TimeToLive, metadata)
 	}
 
+	defer c.FuncIn("cql::Insert", "key: %s TTL:%d", key, ttl).Out()
 	queryStr := fmt.Sprintf(`INSERT
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
@@ -95,7 +97,8 @@ USING TTL %s`, b.keyspace, ttl)
 }
 
 // Get is the CQL implementation of blobstore.Get()
-func (b *cqlBlobStore) Get(key string) ([]byte, map[string]string, error) {
+func (b *cqlBlobStore) Get(c ether.Ctx, key string) ([]byte, map[string]string, error) {
+	defer c.FuncIn("cql::Get", "key: %s", key).Out()
 
 	// Session.Query() does not return error
 	var value []byte
@@ -124,13 +127,15 @@ WHERE key = ?`, b.keyspace)
 }
 
 // Delete is the CQL implementation of blobstore.Delete()
-func (b *cqlBlobStore) Delete(key string) error {
+func (b *cqlBlobStore) Delete(c ether.Ctx, key string) error {
+	defer c.FuncIn("cql::Delete", "key: %s", key).Out()
 	return blobstore.NewError(blobstore.ErrOperationFailed,
 		"Delete operation is not implemented")
 }
 
 // Metadata is the CQL implementation of blobstore.Metadata()
-func (b *cqlBlobStore) Metadata(key string) (map[string]string, error) {
+func (b *cqlBlobStore) Metadata(c ether.Ctx, key string) (map[string]string, error) {
+	defer c.FuncIn("cql::Metadata", "key: %s", key).Out()
 	var ttl int
 	queryStr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
@@ -159,7 +164,8 @@ WHERE key = ?`, b.keyspace)
 }
 
 // Update is the CQL implementation of blobstore.Update()
-func (b *cqlBlobStore) Update(key string, metadata map[string]string) error {
+func (b *cqlBlobStore) Update(c ether.Ctx, key string, metadata map[string]string) error {
+	defer c.FuncIn("cql::Update", "key: %s", key).Out()
 	return blobstore.NewError(blobstore.ErrOperationFailed,
 		"Update operation is not implemented")
 }

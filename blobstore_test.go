@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/aristanetworks/ether/utils/stats/inmem"
 	"github.com/gocql/gocql"
@@ -22,6 +23,8 @@ type storeTests struct {
 	suite.Suite
 	bls *cqlBlobStore
 }
+
+var unitTestEtherCtx = ether.DefaultCtx
 
 func (s *storeTests) SetupSuite() {
 }
@@ -75,7 +78,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 
 	mockquery.On("Exec").Return(nil)
 	mocksession.On("Close").Return()
-	err := s.bls.Insert(testKey, []byte(testValue),
+	err := s.bls.Insert(unitTestEtherCtx, testKey, []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 
 	s.Require().NoError(err, "Insert returned an error")
@@ -95,7 +98,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 	errVal := errors.New("Some random error")
 	mockquery.On("Exec").Return(errVal)
 
-	err := s.bls.Insert(testKey, []byte(testValue),
+	err := s.bls.Insert(unitTestEtherCtx, testKey, []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().Error(err, "Insert returned incorrect ErrorCode")
 
@@ -117,7 +120,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(nil)
 
-	_, metadata, err := s.bls.Get(testKey)
+	_, metadata, err := s.bls.Get(unitTestEtherCtx, testKey)
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -137,7 +140,7 @@ WHERE key = ?`, s.bls.keyspace)
 		mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
-	value, metadata, err := s.bls.Get(unknownKey)
+	value, metadata, err := s.bls.Get(unitTestEtherCtx, unknownKey)
 	s.Require().Error(err, "Get returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -159,7 +162,7 @@ WHERE key = ?`, s.bls.keyspace)
 		mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
 
 	// Verify return value for a non existent key
-	value, metadata, err := s.bls.Get(unknownKey)
+	value, metadata, err := s.bls.Get(unitTestEtherCtx, unknownKey)
 	s.Require().Error(err, "Get returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -187,7 +190,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(readMockTTL)
 
-	_, metadata, err := s.bls.Get(testKey)
+	_, metadata, err := s.bls.Get(unitTestEtherCtx, testKey)
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -213,7 +216,7 @@ WHERE key = ?`, s.bls.keyspace)
 	}
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(readMockTTL)
 
-	metadata, err := s.bls.Metadata(testKey)
+	metadata, err := s.bls.Metadata(unitTestEtherCtx, testKey)
 	s.Require().NoError(err, "Metadata returned an error")
 	s.Require().NotNil(metadata, "Metadata returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -234,7 +237,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
-	metadata, err := s.bls.Metadata(unknownKey)
+	metadata, err := s.bls.Metadata(unitTestEtherCtx, unknownKey)
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
@@ -254,7 +257,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
 
-	metadata, err := s.bls.Metadata(unknownKey)
+	metadata, err := s.bls.Metadata(unitTestEtherCtx, unknownKey)
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
