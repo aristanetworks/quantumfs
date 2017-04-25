@@ -29,13 +29,13 @@ func getWalkerDaemonContext(serverIP string, config string,
 	if serverIP == "" {
 		influx, err = influxlib.Connect()
 		if err != nil {
-			fmt.Printf("Unable to connect to influxDB\n")
+			fmt.Printf("Unable to connect to influxDB err:%v\n", err)
 			os.Exit(1)
 		}
 	} else {
 		influx, err = influxlib.ConnectToHost(serverIP)
 		if err != nil {
-			fmt.Printf("Unable to connect to influxDB at IP:%v\n", serverIP)
+			fmt.Printf("Unable to connect to influxDB at IP:%v err:%v\n", serverIP, err)
 			os.Exit(1)
 		}
 		influx.UseDatabase("mydb")
@@ -44,7 +44,7 @@ func getWalkerDaemonContext(serverIP string, config string,
 	// Connect to ether.cql WorkSpaceDB
 	db, err := thirdparty_backends.ConnectWorkspaceDB("ether.cql", config)
 	if err != nil {
-		fmt.Printf("Connection to workspaceDB failed\n")
+		fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 		os.Exit(exitBadConfig)
 	}
 
@@ -66,5 +66,6 @@ func newCtx(logdir string) *quantumfs.Ctx {
 		Qlog:      log,
 		RequestId: 1,
 	}
+	log.SetLogLevels("Tool/*")
 	return c
 }
