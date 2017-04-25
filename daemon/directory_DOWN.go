@@ -90,7 +90,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
-	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum())
+	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).out()
 
 	children := dir.directChildInodes(c)
 	for _, child := range children {
