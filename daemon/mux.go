@@ -307,13 +307,7 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
 		inodeNum, dirtyInode.shouldUninstantiate).out()
 
-	// The workspaceroot needs the tree locked for writing since, when we flush
-	// it, it may need to update the rest of the tree
-	if dirtyInode.inode.isWorkspaceRoot() {
-		defer dirtyInode.inode.LockTree().Unlock()
-	} else {
-		defer dirtyInode.inode.RLockTree().RUnlock()
-	}
+	defer dirtyInode.inode.RLockTree().RUnlock()
 
 	if !dirtyInode.inode.isOrphaned() {
 		dirtyInode.inode.flush(c)

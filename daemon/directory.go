@@ -853,35 +853,6 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	return result
 }
 
-func (dir *Directory) internalRmRf(c *ctx, name string) {
-	defer c.FuncIn("Directory::internalRmRf", "%s", name).out()
-
-	childId := func() InodeId {
-		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.inodeNum(name)
-	}()
-	child := c.qfs.inode(c, childId)
-
-	if childDir, isDir := child.(*Directory); isDir {
-		// clear the children first
-		for _, v := range dir.children.records() {
-			childDir.internalRmRf(c, v.Filename())
-		}
-
-		err := dir.Rmdir(c, name)
-		if err != fuse.OK {
-			panic(fmt.Sprintf("Unable to Rmdir %s", name))
-		}
-	} else {
-		err := dir.Unlink(c, name)
-		if err != fuse.OK {
-			panic(fmt.Sprintf("Unable to Unlink %s", name))
-		}
-	}
-
-	inodeNotify(c, dir.id)
-}
-
 func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Rmdir", "%s", name).out()
 
