@@ -906,52 +906,58 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
+// In order to call this function, a qfs.uninstantiateInternalInode(nLookup, list of
+// inodeId's) should be deferred right after. The list of inodeId's are provide by
+// this function.
+//
+// Here nLookup should have the value of 1. If the function is called internally, it
+// needs to reduce the increased lookupCount, so set nLookup to 1. Only if it is
+// triggered by kernel, should lookupCount be increased by one, and nLookup should be
+// 0. Therefore, lookupCount's in QuantumFS and kernel can match.
+//
+// For now, all getWorkspaceRoot() are called from internal functions and it calles
+// lookupCommon which inceases the lookupCount by 1, so nLookup is always 1.
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
-	workspace string) (*WorkspaceRoot, bool) {
+	workspace string) (*WorkspaceRoot, []uint64, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
 
-	// In order to run getWorkspaceRoot, we must set a proper value for the
-	// variable nLookup. If the function is called internally, it needs to reduce
-	// the increased lookupCount, so set nLookup to 1. Only if it is triggered by
-	// kernel, should lookupCount be increased by one, and nLookup should be 0.
-	// Therefore, lookupCount's in QuantumFS and kernel can match.
-	//
-	// For now, all getWorkspaceRoot() are called from internal functions, so
-	// nLookup is always 1.
-	var nLookup uint64 = 1
-
+	lookedUp := make([]uint64, 4)
+	lookedUp[0] = 1
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, lookedUp, false
 	}
-	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
+	lookedUp[lookedUp[0]] = typespaceAttr.NodeId
+	lookedUp[0]++
 
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, lookedUp, false
 	}
-	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
+	lookedUp[lookedUp[0]] = namespaceAttr.NodeId
+	lookedUp[0]++
 
 	// Get the WorkspaceRoot Inode number
 	var workspaceRootAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, lookedUp, false
 	}
-	defer qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+	lookedUp[lookedUp[0]] = workspaceRootAttr.NodeId
+	lookedUp[0]++
 
 	// Fetch the WorkspaceRoot object itelf
 	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
 
-	return wsr.(*WorkspaceRoot), wsr != nil
+	return wsr.(*WorkspaceRoot), lookedUp, wsr != nil
 }
 
 func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
@@ -1729,5 +1735,14 @@ func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
 		c.elog("ERROR: PANIC Global variable %d should"+
 			" be greater than zero", result)
 		atomic.StoreInt64(&qfs.apiFileSize, 0)
+	}
+}
+
+// Uninstantiate the list of inodes which were instantiated internally. Depending on
+// whether the lookupCount of inodes are increased, nlookup will will be determined
+// accordingly
+func (qfs *QuantumFs) uninstantiateInternalInode(nlookup uint64, lookedUp []uint64) {
+	for indx := int(lookedUp[0]) - 1; indx >= 1; indx-- {
+		qfs.Forget(lookedUp[indx], nlookup)
 	}
 }

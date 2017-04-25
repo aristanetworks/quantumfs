@@ -509,8 +509,9 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	dst := strings.Split(wsr, "/")
+	workspace, lookedUp, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	defer c.qfs.uninstantiateInternalInode(1, lookedUp)
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -531,8 +532,9 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	dst := strings.Split(wsr, "/")
+	workspace, lookedUp, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	defer c.qfs.uninstantiateInternalInode(1, lookedUp)
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -573,7 +575,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, lookedUp, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	defer c.qfs.uninstantiateInternalInode(1, lookedUp)
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -605,10 +608,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		defer (&workspace.Directory).LockTree().Unlock()
 		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()
-
-	for _, ancestralId := range uninstantiated {
-		defer c.qfs.Forget(ancestralId, 0)
-	}
+	defer c.qfs.uninstantiateInternalInode(0, uninstantiated)
 
 	if err != nil {
 		c.vlog("Path does not exist: %s", cmd.DstPath)
