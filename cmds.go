@@ -133,7 +133,7 @@ func findApiPathUpwards() (string, error) {
 		if err != nil {
 			if len(directories) == 1 {
 				// We didn't find anything and hit the root, give up
-				panic("Couldn't find api file")
+				return "", fmt.Errorf("Couldn't find api file")
 			}
 			directories = directories[:len(directories)-1]
 			continue
