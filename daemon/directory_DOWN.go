@@ -142,21 +142,25 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode,
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	// Store all of the inode is looked up internally
-	ancestors := make([]uint64, length-3)
+	instantiatedInodes := make([]uint64, 0, length-3)
+	size := 0
 	// skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
 		// all preceding nodes have to be directories
-		child, err := currDir.lookupInternal(c, path[num],
+		child, instantiated, err := currDir.lookupInternal(c, path[num],
 			quantumfs.ObjectTypeDirectoryEntry)
 		if err != nil {
-			return child, ancestors, err
+			return child, instantiatedInodes, err
 		}
-		ancestors[num-3] = uint64(child.inodeNum())
+
+		if !instantiated {
+			instantiatedInodes[size] = uint64(child.inodeNum())
+			size++
+		}
 		currDir = child.(*Directory)
 	}
 
-	return currDir, ancestors, nil
+	return currDir, instantiatedInodes, nil
 }
 
 // the toLink parentLock must be locked
