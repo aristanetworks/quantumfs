@@ -318,11 +318,3 @@ func recordToInode(c *ctx, inodeNum InodeId, entry quantumfs.DirectoryRecord,
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		parent, 0, 0, nil)
 }
-
-func inodeNotify(c *ctx, inodeNum InodeId) {
-	// Invalidate all of the metadata and file contents in the kernel cache
-	err := c.qfs.server.InodeNotify(uint64(inodeNum), 0, 0)
-	if err != fuse.OK {
-		panic(fmt.Sprintf("Unable to notify inode invalid: %s", err))
-	}
-}
