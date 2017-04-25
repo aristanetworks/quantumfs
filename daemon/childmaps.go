@@ -19,20 +19,21 @@ func newChildMap(c *ctx, key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) (*ChildMa
 	[]InodeId) {
 
 	rtn := ChildMap{
-		wsr:      		wsr_,
-		childrenRecords:	newThinChildren(key, wsr_),
+		wsr:             wsr_,
+		childrenRecords: newThinChildren(key, wsr_),
 	}
 
 	// allocate inode ids
 	uninstantiated := make([]InodeId, 0)
 	rtn.childrenRecords.iterateOverRecords(c,
-		func (record quantumfs.DirectoryRecord) bool {
+		func(record quantumfs.DirectoryRecord) bool {
 
-		inodeId := rtn.loadInodeId(c, record, quantumfs.InodeIdInvalid)
-		rtn.childrenRecords.mapInodeId(record.Filename(), inodeId)
-		uninstantiated = append(uninstantiated, inodeId)
-		return false
-	})
+			inodeId := rtn.loadInodeId(c, record,
+				quantumfs.InodeIdInvalid)
+			rtn.childrenRecords.mapInodeId(record.Filename(), inodeId)
+			uninstantiated = append(uninstantiated, inodeId)
+			return false
+		})
 
 	return &rtn, uninstantiated
 }
@@ -217,20 +218,21 @@ func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
 	rtn := make([]InodeId, 0)
 
 	cmap.childrenRecords.iterateOverRecords(c,
-		func (record quantumfs.DirectoryRecord) bool {
+		func(record quantumfs.DirectoryRecord) bool {
 
-		if _, isHardlink := record.(*Hardlink); isHardlink {
+			if _, isHardlink := record.(*Hardlink); isHardlink {
+				return false
+			}
+
+			getName := record.Filename()
+			inodeId, exists := cmap.childrenRecords.inodeId(getName)
+			if exists {
+				rtn = append(rtn, inodeId)
+			} else {
+				c.elog("Mismapped inode and name: %s", getName)
+			}
 			return false
-		}
-
-		inodeId, exists := cmap.childrenRecords.inodeId(record.Filename())
-		if exists {
-			rtn = append(rtn, inodeId)
-		} else {
-			c.elog("Mismapped inode and name: %s", record.Filename())
-		}
-		return false
-	})
+		})
 
 	return rtn
 }
@@ -239,11 +241,11 @@ func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 	rtn := make([]quantumfs.DirectoryRecord, 0)
 
 	cmap.childrenRecords.iterateOverRecords(c,
-		func (record quantumfs.DirectoryRecord) bool {
+		func(record quantumfs.DirectoryRecord) bool {
 
-		rtn = append(rtn, record)
-		return false
-	})
+			rtn = append(rtn, record)
+			return false
+		})
 
 	return rtn
 }
@@ -319,30 +321,30 @@ func (cmap *ChildMap) publish(c *ctx) quantumfs.ObjectKey {
 }
 
 type thinChildren struct {
-	wsr		*WorkspaceRoot
-	base		quantumfs.ObjectKey
+	wsr  *WorkspaceRoot
+	base quantumfs.ObjectKey
 
 	// can be many to one
-	nameToInode	map[string]InodeId
-	inodeToName	map[InodeId][]string
+	nameToInode map[string]InodeId
+	inodeToName map[InodeId][]string
 
-	nameToEntryIdx	map[string]uint32
+	nameToEntryIdx map[string]uint32
 
-	cache		map[string]quantumfs.DirectoryRecord
+	cache map[string]quantumfs.DirectoryRecord
 	// One of the most common and expensive operations is updating the ID.
 	// Separate this into it's own cache to optimize syncChild
-	cacheKey	map[InodeId]quantumfs.ObjectKey
+	cacheKey map[InodeId]quantumfs.ObjectKey
 }
 
-func newThinChildren (key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) thinChildren {
-	return thinChildren {
-		wsr:		wsr_,
-		base:		key,
-		nameToInode: 	make(map[string]InodeId),
-		inodeToName:	make(map[InodeId][]string),
-		nameToEntryIdx:	make(map[string]uint32),
-		cache:		make(map[string]quantumfs.DirectoryRecord),
-		cacheKey:	make(map[InodeId]quantumfs.ObjectKey),
+func newThinChildren(key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) thinChildren {
+	return thinChildren{
+		wsr:            wsr_,
+		base:           key,
+		nameToInode:    make(map[string]InodeId),
+		inodeToName:    make(map[InodeId][]string),
+		nameToEntryIdx: make(map[string]uint32),
+		cache:          make(map[string]quantumfs.DirectoryRecord),
+		cacheKey:       make(map[InodeId]quantumfs.ObjectKey),
 	}
 }
 
@@ -362,7 +364,7 @@ func (th *thinChildren) firstName(inodeId InodeId) (string, bool) {
 
 func (th *thinChildren) mapInodeId(name string, inodeId InodeId) {
 	th.nameToInode[name] = inodeId
-	
+
 	list, exists := th.inodeToName[inodeId]
 	if exists {
 		// only add if it doesn't exist already
@@ -433,7 +435,7 @@ func (th *thinChildren) fetchFromBase(c *ctx,
 }
 
 func (th *thinChildren) iterateOverRecords(c *ctx,
-	fxn func (quantumfs.DirectoryRecord) bool) {
+	fxn func(quantumfs.DirectoryRecord) bool) {
 
 	existingEntries := make(map[string]bool, 0)
 	entryIdx := uint32(0)
@@ -585,7 +587,7 @@ func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
 	// metadata block
 	baseLayer := quantumfs.NewDirectoryEntry()
 	entryIdx := 0
-	th.iterateOverRecords(c, func (record quantumfs.DirectoryRecord) bool {
+	th.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) bool {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			c.vlog("Block full with %d entries", entryIdx)
@@ -613,7 +615,7 @@ func (th *thinChildren) publish(c *ctx) quantumfs.ObjectKey {
 
 	// re-set our map of indices into directory entries
 	th.nameToEntryIdx = make(map[string]uint32)
-	th.iterateOverRecords(c, func (record quantumfs.DirectoryRecord) bool {
+	th.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) bool {
 		// don't need to do anything while we iterate
 		return false
 	})
