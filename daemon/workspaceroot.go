@@ -485,7 +485,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
 
 	// Update workspace rootId
-	if newRootId != wsr.rootId {
+	if !newRootId.IsEqualTo(wsr.rootId) {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
 			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
 
@@ -717,17 +717,20 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		}
 	}
 
-	if !remoteWsr.rootId.IsEqualTo(baseWsr.rootId) {
-		if localWsr.rootId.IsEqualTo(baseWsr.rootId) {
+	baseBaseLayer := baseWsr.Directory.baseLayerId
+	remoteBaseLayer := remoteWsr.Directory.baseLayerId
+	localBaseLayer := localWsr.Directory.baseLayerId
+	if !remoteBaseLayer.IsEqualTo(baseBaseLayer) {
+		if localBaseLayer.IsEqualTo(baseBaseLayer) {
 			// No conflict, just take remote
-			localWsr.rootId = remoteWsr.rootId
+			localBaseLayer = remoteBaseLayer
 		} else {
 			// three way merge
-			localWsr.rootId = mergeDirectory(c, baseWsr, remoteWsr,
-				localWsr, baseWsr.rootId, remoteWsr.rootId,
-				localWsr.rootId)
+			localBaseLayer = mergeDirectory(c, baseWsr, remoteWsr,
+				localWsr, baseBaseLayer, remoteBaseLayer,
+				localBaseLayer)
 		}
 	}
 
-	return publishWorkspaceRoot(c, localWsr.rootId, localWsr.hardlinks)
+	return publishWorkspaceRoot(c, localBaseLayer, localWsr.hardlinks)
 }

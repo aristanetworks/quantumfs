@@ -489,6 +489,9 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
+	c.vlog("Branching %s/%s/%s to %s/%s/%s", src[0], src[1], src[2], dst[0],
+		dst[1], dst[2])
+
 	c.qfs.syncAll(c)
 
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
@@ -503,7 +506,7 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 }
 
 func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
-	defer c.funcIn("ApiHandle::branchWorkspace").out()
+	defer c.funcIn("ApiHandle::mergeWorkspace").out()
 
 	var cmd quantumfs.MergeRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
@@ -528,6 +531,9 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", remote)
 	}
+
+	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
+		local[0], local[1], local[2])
 
 	newRootId := mergeWorkspaceRoot(c, remoteRootId, remoteRootId, localRootId)
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],

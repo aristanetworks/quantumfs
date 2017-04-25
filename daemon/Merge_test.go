@@ -51,7 +51,7 @@ func TestBasicMerge(t *testing.T) {
 		fileD = newBranch + "/subdir/fileD"
 
 		test.CheckData(fileA, dataA)
-		test.CheckData(workspaceA + "/fileB", dataB)
+		test.CheckData(fileB, dataB)
 		// ensure we took remote
 		test.CheckData(fileC, dataC2)
 		// ensure we took local
