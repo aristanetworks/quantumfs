@@ -73,9 +73,12 @@ func MaxVeryLargeFileSize() uint64 {
 	return uint64(MaxPartsVeryLargeFile()) * MaxLargeFileSize()
 }
 
-// Special reserved typespace/namespace/workspace names
+// Special reserved file paths
 const (
-	ApiPath       = "api" // File used for the qfs api
+	ApiPath = "api" // File used for the qfs api
+
+	// The reserved typespace/namespace/workspace name for the empty workspace,
+	// ie. _/_/_.
 	NullSpaceName = "_"
 )
 
@@ -84,9 +87,9 @@ const (
 	InodeIdInvalid     = 0 // Invalid
 	InodeIdRoot        = 1 // Same as fuse.FUSE_ROOT_ID
 	InodeIdApi         = 2 // /api file
-	InodeId_nullType   = 3 // /_null typespace
-	InodeId_nullName   = 4 // /_null/_null namespace
-	InodeId_nullWork   = 5 // /_null/_null/null workspace
+	InodeId_nullType   = 3 // /_typespace
+	InodeId_nullName   = 4 // /_/_namespace
+	InodeId_nullWork   = 5 // /_/_/_ workspace
 	InodeIdReservedEnd = 6 // End of the reserved range
 )
 
@@ -439,7 +442,9 @@ func (v UID) Primitive() interface{} {
 	return uint8(v)
 }
 
-// Similar to the UIDs above, group ownership is divided into special classes.
+// Quantumfs doesn't keep precise ownership values. Instead files and directories may
+// be owned by some special system accounts or the current user. The translation to
+// GID is done at access time.
 const GIDUser = 1001 // The currently accessing user
 
 // GID to use if a system user (ie. root) views the attributes of a file owned by the
@@ -516,8 +521,8 @@ func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
 
 // Take constant hashes produced by the emptykeys tool and convert them into a byte
 // string as if we have computed the hash ourselves. This is necessary to allow
-// clients to import the quantumfs package without requiring that CityHash is built
-// and available.
+// clients to import the quantumfs package without requiring that the specific
+// QuantumFS hash is built and available.
 func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 	var out [ObjectKeyLength - 1]byte
 
@@ -532,6 +537,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 	return out
 }
 
+// The key of the directory with no entries
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
@@ -545,6 +551,7 @@ func createEmptyDirectory() ObjectKey {
 	return emptyDirKey
 }
 
+// The key of the datablock with zero length
 var EmptyBlockKey ObjectKey
 
 func createEmptyBlock() ObjectKey {
@@ -721,6 +728,7 @@ func (wsr *WorkspaceRoot) SetUserLayer(key ObjectKey) {
 	wsr.wsr.SetUserLayer(key.key)
 }
 
+// The key of the workspace with no contents
 var EmptyWorkspaceKey ObjectKey
 
 func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
@@ -1133,6 +1141,7 @@ func (ea *ExtendedAttributes) Bytes() []byte {
 	return ea.ea.Segment.Data
 }
 
+// Buffer represents a bundle of data from a datastore.
 type Buffer interface {
 	Write(c *Ctx, in []byte, offset uint32) uint32
 	Read(out []byte, offset uint32) int
