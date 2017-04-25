@@ -5,6 +5,7 @@ package utils
 
 import "sync"
 
+// Mutex type which can have unlocking deferred. ie: defer df.Lock().Unlock()
 type DeferableMutex struct {
 	lock sync.Mutex
 }
@@ -27,6 +28,8 @@ type NeedWriteUnlock interface {
 	Unlock()
 }
 
+// RWMutex type which can have the unlocking deferred. ie: defer drm.Lock().Unlock()
+// or defer drm.RLock().RUnlock().
 type DeferableRwMutex struct {
 	lock sync.RWMutex
 }
