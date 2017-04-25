@@ -466,10 +466,10 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
 				wsr.workspace
 
-			c.elog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
+			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
 				rootId.String(), newRootId.String(),
 				wsr.rootId.String(), err.Error())
-			c.elog("Another quantumfs instance is writing to %s, %s",
+			c.wlog("Another quantumfs instance is writing to %s, %s",
 				workspacePath,
 				"your changes will be lost. "+
 					"Unable to sync to datastore - save your"+
