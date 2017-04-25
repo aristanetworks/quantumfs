@@ -17,7 +17,8 @@ func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 	mountPath := th.TempDir + "/mnt"
 
 	datastorePath := th.TempDir + "/ether"
-	datastore := thirdparty_backends.NewEtherFilesystemStore(datastorePath)
+	datastore, err := thirdparty_backends.ConnectDatastore("ether.filesystem", datastorePath)
+	th.AssertNoErr(err)
 
 	config := QuantumFsConfig{
 		CachePath:        th.TempDir + "/ramfs",
