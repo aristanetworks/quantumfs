@@ -136,6 +136,7 @@ func KeyTypeToString(keyType KeyType) string {
 // One of the KeyType* values above
 type KeyType uint8
 
+// Convert to primitive type for qlog
 func (v KeyType) Primitive() interface{} {
 	return uint8(v)
 }
@@ -389,6 +390,7 @@ func ObjectType2String(typ ObjectType) string {
 // One of the ObjectType* values
 type ObjectType uint8
 
+// Convert to primitive type for qlog
 func (v ObjectType) Primitive() interface{} {
 	return uint8(v)
 }
@@ -435,6 +437,7 @@ func ObjectUid(uid uint32, userId uint32) UID {
 // One of the UID* values
 type UID uint16
 
+// Convert to primitive type for qlog
 func (v UID) Primitive() interface{} {
 	return uint8(v)
 }
@@ -479,6 +482,7 @@ func ObjectGid(gid uint32, groupId uint32) GID {
 // One of the GID* values
 type GID uint16
 
+// Convert to primitive type for qlog
 func (v GID) Primitive() interface{} {
 	return uint8(v)
 }
@@ -486,6 +490,7 @@ func (v GID) Primitive() interface{} {
 // Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
 
+// Convert to primitive type for qlog
 func (t Time) Primitive() interface{} {
 	return uint64(t)
 }
