@@ -402,7 +402,7 @@ func (th *thinChildren) fetchFromBase(c *ctx,
 			// the record should be in this DirectoryEntry
 			entry := quantumfs.DirectoryRecord(baseLayer.Entry(offset))
 			// Clone to ensure that golang frees the rest of the memory
-			entry := convertRecord(th.wsr, entry).Clone()
+			entry = convertRecord(th.wsr, entry).Clone()
 
 			if entry.Filename() != name {
 				c.elog("Name map mismatch: %s vs %s", name,
