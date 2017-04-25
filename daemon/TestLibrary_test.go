@@ -275,8 +275,9 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 // Convert an absolute workspace path to the matching WorkspaceRoot object
 func (th *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
 	parts := strings.Split(th.RelPath(workspace), "/")
-	wsr, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
+	wsr, lookedUp, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
 		parts[0], parts[1], parts[2])
+	defer th.qfs.uninstantiateInternalInode(1, lookedUp)
 	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
 
 	return wsr

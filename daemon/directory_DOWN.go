@@ -132,8 +132,17 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	return typeKey, fuse.OK
 }
 
-// go along the given path to the destination
-// The path is stored in a string slice, each cell index contains an inode
+// In order to call this function, a qfs.uninstantiateInternalInode(nLookup, list of
+// inodeId's) should be deferred right after. The list of inodeId's are provide by
+// this function.
+//
+// Here nLookup should have the value of 0. If the function is called internally, it
+// needs to reduce the increased lookupCount, so set nLookup to 1. Only if it is
+// triggered by kernel, should lookupCount be increased by one, and nLookup should be
+// 0. Therefore, lookupCount's in QuantumFS and kernel can match.
+//
+// For now, all followPath_DOWN() only calls lookupInternal() which instantiates the
+// inodes but doesn't increase their lookupCount, so nLookup is always 0.
 func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode,
 	[]uint64, error) {
 
@@ -142,9 +151,13 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode,
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	instantiatedInodes := make([]uint64, 0, length-3)
-	size := 0
-	// skip the first three Inodes: typespace / namespace / workspace
+	// The slice has 1st cell for the used length, and the rest for the
+	// instantiated inodeId's.
+	instantiatedInodes := make([]uint64, length-2)
+	size := 1
+	// Go along the given path to the destination. The path is stored in a string
+	// slice, each cell index contains an inode.
+	// Skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, instantiated, err := currDir.lookupInternal(c, path[num],
@@ -153,6 +166,11 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode,
 			return child, instantiatedInodes, err
 		}
 
+		// If the inode wasn't instantiated before, it is instantiated
+		// internally by this function, so it needs to be added in the list.
+		// The function is protected by treeLock from the root Write()
+		// function, so it can guarantee that children will never be
+		// instantiated by other processes ahead of their parents.
 		if !instantiated {
 			instantiatedInodes[size] = uint64(child.inodeNum())
 			size++
@@ -160,6 +178,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode,
 		currDir = child.(*Directory)
 	}
 
+	instantiatedInodes[0] = uint64(size)
 	return currDir, instantiatedInodes, nil
 }
 

@@ -1609,7 +1609,8 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 }
 
 // Do a similar work like  Lookup(), but it does not interact with fuse, and return
-// the child node to the caller
+// the child node to the caller. Also, because the function probably instantiates the
+// inode, it should return the boolean indicating whether this inode is instantiated
 func (dir *Directory) lookupInternal(c *ctx, name string,
 	entryType quantumfs.ObjectType) (Inode, bool, error) {
 
@@ -1627,7 +1628,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	child.markSelfAccessed(c, false)
 
 	if record.Type() != entryType {
-		return nil, false, errors.New("Not Required Type")
+		return nil, exists, errors.New("Not Required Type")
 	}
 	return child, exists, nil
 }
