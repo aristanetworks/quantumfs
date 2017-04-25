@@ -345,7 +345,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		return rootId, e
 	}
 
-	if currentRootId != rootId {
+	if !currentRootId.IsEqualTo(rootId) {
 		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
 			"%s vs %s Advance failed.", currentRootId.String(),
 			rootId.String())
