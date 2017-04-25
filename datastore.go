@@ -1170,17 +1170,17 @@ type DataStore interface {
 var constStore = newConstantStore()
 var ConstantStore = DataStore(constStore)
 
-func newConstantStore() *ConstDataStore {
-	return &ConstDataStore{
+func newConstantStore() *constDataStore {
+	return &constDataStore{
 		store: make(map[string][]byte),
 	}
 }
 
-type ConstDataStore struct {
+type constDataStore struct {
 	store map[string][]byte
 }
 
-func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
+func (store *constDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	if data, ok := store.store[key.String()]; ok {
 		newData := make([]byte, len(data))
 		copy(newData, data)
@@ -1190,7 +1190,7 @@ func (store *ConstDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Object not found")
 }
 
-func (store *ConstDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
+func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
 }
 
