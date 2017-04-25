@@ -236,24 +236,26 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.qctx, key, buf); err != nil {
-		return err
-	}
-
-	simplebuffer.AssertNonZeroBuf(buf,
-		"DirectoryEntry buffer %s", key.String())
-
-	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
-	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
-		if err == SkipDir {
-			return nil
-		}
-		return err
-	}
-
-	de := buf.AsDirectoryEntry()
 	for {
+		buf := simplebuffer.New(nil, key)
+		if err := ds.Get(c.qctx, key, buf); err != nil {
+			return err
+		}
+
+		simplebuffer.AssertNonZeroBuf(buf,
+			"DirectoryEntry buffer %s", key.String())
+
+		// When wf returns SkipDir for a DirectoryEntry, we can skip all the
+		// DirectoryRecord in that DirectoryEntry
+		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
+			// TODO(sid): See how this works with ChainedDirEntries
+			if err == SkipDir {
+				return nil
+			}
+			return err
+		}
+
+		de := buf.AsDirectoryEntry()
 		for i := 0; i < de.NumEntries(); i++ {
 			if err := handleDirectoryRecord(c, path, ds,
 				de.Entry(i), wf, keyChan); err != nil {
@@ -264,24 +266,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 			break
 		}
 
-		key := de.Next()
-		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.qctx, key, buf); err != nil {
-			return err
-		}
-
-		simplebuffer.AssertNonZeroBuf(buf,
-			"WorkspaceRoot buffer %s", key.String())
-
-		// When wf returns SkipDir for a DE, we can skip all
-		// the DR in that DE.
-		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
-			if err == SkipDir {
-				return nil
-			}
-			return err
-		}
-		de = buf.AsDirectoryEntry()
+		key = de.Next()
 	}
 	return nil
 }
