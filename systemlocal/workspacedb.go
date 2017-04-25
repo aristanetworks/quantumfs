@@ -54,7 +54,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 		db.NoSync = true
 	}
 
-	wsdb := &WorkspaceDB{
+	wsdb := &workspaceDB{
 		db: db,
 	}
 
@@ -93,13 +93,13 @@ func insertMap(tx *bolt.Tx, bucketKey []byte) {
 	}
 }
 
-// WorkspaceDB is a persistent, system local quantumfs.WorkspaceDB. It only supports
+// workspaceDB is a persistent, system local quantumfs.WorkspaceDB. It only supports
 // one Quantumfs instance at a time however.
-type WorkspaceDB struct {
+type workspaceDB struct {
 	db *bolt.DB
 }
 
-func (wsdb *WorkspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
+func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	var num int
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NumTypespaces")
@@ -119,7 +119,7 @@ func (wsdb *WorkspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	return num, nil
 }
 
-func (wsdb *WorkspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
+func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	typespaceList := make([]string, 0, 100)
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::TypespaceList")
@@ -138,7 +138,7 @@ func (wsdb *WorkspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	return typespaceList, nil
 }
 
-func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
+func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NumNamespaces")
@@ -160,7 +160,7 @@ func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	return num, nil
 }
 
-func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
+func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NamespaceList")
@@ -182,7 +182,7 @@ func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	return namespaceList, nil
 }
 
-func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NumWorkspaces")
@@ -205,7 +205,7 @@ func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	return num, nil
 }
 
-func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) ([]string, error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::WorkspaceList")
@@ -228,7 +228,7 @@ func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	return workspaceList, nil
 }
 
-func (wsdb *WorkspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bool,
+func (wsdb *workspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bool,
 	error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::TypespaceExists")
@@ -249,7 +249,7 @@ func (wsdb *WorkspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bo
 	return exists, nil
 }
 
-func (wsdb *WorkspaceDB) NamespaceExists(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) NamespaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string) (bool, error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NamespaceExists")
@@ -296,7 +296,7 @@ func getWorkspaceContent_(tx *bolt.Tx, root []byte, typespace string,
 	return workspaces.Get([]byte(workspace))
 }
 
-func (wsdb *WorkspaceDB) WorkspaceExists(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) WorkspaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::WorkspaceExists")
@@ -317,7 +317,7 @@ func (wsdb *WorkspaceDB) WorkspaceExists(c *quantumfs.Ctx, typespace string,
 	return exists, nil
 }
 
-func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
+func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
@@ -418,7 +418,7 @@ func deleteWorkspace_(tx *bolt.Tx, root []byte, typespace string,
 	return nil
 }
 
-func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::DeleteWorkspace")
@@ -437,7 +437,7 @@ func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	})
 }
 
-func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
 	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::Workspace")
@@ -463,7 +463,7 @@ func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	return rootid, err
 }
 
-func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
@@ -511,7 +511,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	return dbRootId, err
 }
 
-func (wsdb *WorkspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
 	var exists bool
@@ -542,7 +542,7 @@ func getWorkspaces(typespaces *bolt.Bucket, typespace string,
 	return workspaces, nil
 }
 
-func (wsdb *WorkspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
+func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
