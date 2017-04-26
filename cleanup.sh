@@ -7,7 +7,16 @@ rootContainer=$ROOTDIRNAME
 mountPath=/sys/fs/fuse/connections
 
 # The go-test should be no longer than 3 min; otherwise, it is hanging
-sleep 180
+sleepTime=180
+while  [ $sleepTime -gt 0 ]; do
+	# Escape from the sleep loop when the process is finished
+	if ps -p $ppid > /dev/null; then
+		let "sleepTime-=1"
+		sleep 1
+	else
+		sleepTime=0
+	fi
+done
 
 # Force to kill the parent process "make all" because it has hung too long
 for pid in `ps ux | grep --color=never 'make' | awk '{print $2}'`; do
