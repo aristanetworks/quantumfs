@@ -49,7 +49,7 @@ func insertMap_(cache workspaceMap, typespace string,
 
 }
 
-// WorkspaceDB is a process local quantumfs.WorkspaceDB
+// workspaceDB is a process local quantumfs.WorkspaceDB
 type workspaceDB struct {
 	cacheMutex sync.RWMutex
 	cache      workspaceMap
