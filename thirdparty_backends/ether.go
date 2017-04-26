@@ -156,6 +156,13 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 	return &translator
 }
 
+// EtherBlobStoreTranslator translates quantumfs.Datastore APIs
+// to ether.Blobstore APIs
+//
+// NOTE: This is an exported type since some clients currently
+// alter the ApplyTTLPolicy attribute. Eventually TTL handling
+// will move outside of the adapter into Ether and then this type
+// can be turned back into an exported type
 type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
@@ -206,6 +213,7 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	return b.Insert(key, buf, newmetadata)
 }
 
+// Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
@@ -231,6 +239,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	return nil
 }
 
+// Set adpats quantumfs.DataStore's Set API to ether.BlobStore.Insert
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
