@@ -455,7 +455,12 @@ func printList(c *quantumfs.Ctx, progress bool, qfsds quantumfs.DataStore,
 				continue
 			}
 			for _, ws := range wsl {
-				fmt.Printf("%s/%s/%s\n", ts, ns, ws)
+				var rootID quantumfs.ObjectKey
+				wsname := ts + "/" + ns + "/" + ws
+				if rootID, err = getWorkspaceRootID(c, wsdb, wsname); err != nil {
+					return fmt.Errorf("RootId not found for %v err: %v", wsname, err)
+				}
+				fmt.Printf("%v : %s\n", rootID, wsname)
 			}
 		}
 	}
