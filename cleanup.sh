@@ -9,7 +9,7 @@ mountPath=/sys/fs/fuse/connections
 # The go-test should be no longer than 3 min; otherwise, it is hanging
 sleepTime=180
 while  [ $sleepTime -gt 0 ]; do
-	# Escape from the sleep loop when the process is finished
+	# Escape from the sleep loop when the make process is finished
 	if ps -p $ppid > /dev/null; then
 		let "sleepTime-=1"
 		sleep 1
