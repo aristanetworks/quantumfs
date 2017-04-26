@@ -100,7 +100,7 @@ func TestDirFilesWalk(t *testing.T) {
 
 		// Write File 2, empty File
 		filename = dirname + "/file2"
-		f, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
+		f, err := os.Create(filename)
 		test.Assert(err == nil, "File create failed (%s): %s",
 			filename, err)
 		test.Assert(f != nil, "File create failed (%s): %s",

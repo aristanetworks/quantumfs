@@ -323,7 +323,7 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 	return nil
 }
 
-// SkipKey returns nil:
+// SkipKey returns true:
 // If the Key is in Constant DataStore, or
 // If the Key is of Type Embedded,
 func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
@@ -335,7 +335,7 @@ func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
 	cds := quantumfs.ConstantStore
 	buf := simplebuffer.New(nil, key)
 
-	if err := cds.Get(nil, key, buf); err != nil {
+	if err := cds.Get(c.qctx, key, buf); err != nil {
 		return false // Not a ConstKey, so do not Skip.
 	}
 	return true
