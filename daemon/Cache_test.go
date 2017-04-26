@@ -146,53 +146,6 @@ func TestCacheLru(t *testing.T) {
 	})
 }
 
-func TestCacheCaching(t *testing.T) {
-	runTestNoQfs(t, func(test *testHelper) {
-		entryNum := 256
-		c, backingStore, datastore, keys := createDatastore(test,
-			entryNum, 100*quantumfs.ObjectKeyLength)
-		// Add a content with size greater than datastore.cacheSize, and
-		// double the size of keys[1] in advance.
-		createBuffer(c, test, backingStore, datastore, keys, 257, 101)
-		createBuffer(c, test, backingStore, datastore, keys, 1, 2)
-		fillDatastore(c, test, backingStore, datastore, entryNum, keys)
-
-		// Prime the cache
-		for i := 1; i <= 100; i++ {
-			buf := datastore.Get(c, keys[i])
-			test.Assert(buf != nil, "Failed to get block %d", i)
-		}
-		buf := datastore.Get(c, keys[257])
-		test.Assert(buf != nil, "Failed to get block 257")
-		test.Assert(buf.Size() == 101*quantumfs.ObjectKeyLength,
-			"Incorrect length of block 257: %d != %d", buf.Size(),
-			101*quantumfs.ObjectKeyLength)
-
-		// Since the size of keys[1] is doubled, so it is removed from the
-		// cache, so the usage of space is 99*quantumfs.ObjectKeyLength
-		test.Assert(datastore.freeSpace == quantumfs.ObjectKeyLength,
-			"Failed memory management: %d != %d", datastore.freeSpace,
-			quantumfs.ObjectKeyLength)
-
-		backingStore.shouldRead = false
-
-		// Because of the size constraint, the least recent used entry
-		// keys[1] should be deleted from cache
-		_, exists := datastore.cache[keys[1]]
-		test.Assert(!exists, "Failed to forget block 1")
-		// The content is oversized, so it should be stored in the cache
-		_, exists = datastore.cache[keys[257]]
-		test.Assert(!exists, "Failed to forget block 257")
-
-		// Reading again should come entirely from the cache. If not
-		// testDataStore will assert.
-		for i := 2; i <= 100; i++ {
-			buf := datastore.Get(c, keys[i])
-			test.Assert(buf != nil, "Failed to get block %d", i)
-		}
-	})
-}
-
 func TestCacheLruDiffSize(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		entryNum := 280
@@ -267,5 +220,52 @@ func TestCacheLruDiffSize(t *testing.T) {
 		i = int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 12, "Wrong least recent block %d != 12", i)
 
+	})
+}
+
+func TestCacheCaching(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		entryNum := 256
+		c, backingStore, datastore, keys := createDatastore(test,
+			entryNum, 100*quantumfs.ObjectKeyLength)
+		// Add a content with size greater than datastore.cacheSize, and
+		// double the size of keys[1] in advance.
+		createBuffer(c, test, backingStore, datastore, keys, 257, 101)
+		createBuffer(c, test, backingStore, datastore, keys, 1, 2)
+		fillDatastore(c, test, backingStore, datastore, entryNum, keys)
+
+		// Prime the cache
+		for i := 1; i <= 100; i++ {
+			buf := datastore.Get(c, keys[i])
+			test.Assert(buf != nil, "Failed to get block %d", i)
+		}
+		buf := datastore.Get(c, keys[257])
+		test.Assert(buf != nil, "Failed to get block 257")
+		test.Assert(buf.Size() == 101*quantumfs.ObjectKeyLength,
+			"Incorrect length of block 257: %d != %d", buf.Size(),
+			101*quantumfs.ObjectKeyLength)
+
+		// Since the size of keys[1] is doubled, so it is removed from the
+		// cache, so the usage of space is 99*quantumfs.ObjectKeyLength
+		test.Assert(datastore.freeSpace == quantumfs.ObjectKeyLength,
+			"Failed memory management: %d != %d", datastore.freeSpace,
+			quantumfs.ObjectKeyLength)
+
+		backingStore.shouldRead = false
+
+		// Because of the size constraint, the least recent used entry
+		// keys[1] should be deleted from cache
+		_, exists := datastore.cache[keys[1]]
+		test.Assert(!exists, "Failed to forget block 1")
+		// The content is oversized, so it should be stored in the cache
+		_, exists = datastore.cache[keys[257]]
+		test.Assert(!exists, "Failed to forget block 257")
+
+		// Reading again should come entirely from the cache. If not
+		// testDataStore will assert.
+		for i := 2; i <= 100; i++ {
+			buf := datastore.Get(c, keys[i])
+			test.Assert(buf != nil, "Failed to get block %d", i)
+		}
 	})
 }
