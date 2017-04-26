@@ -906,23 +906,21 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-// In order to call this function, a qfs.uninstantiateInternalInode(nLookup, list of
-// inodeId's) should be deferred right after. The list of inodeId's are provide by
-// this function.
-//
-// Here nLookup should have the value of 1. If the function is called internally, it
-// needs to reduce the increased lookupCount, so set nLookup to 1. Only if it is
-// triggered by kernel, should lookupCount be increased by one, and nLookup should be
-// 0. Therefore, lookupCount's in QuantumFS and kernel can match.
-//
-// For now, all getWorkspaceRoot() are called from internal functions and it calles
-// lookupCommon which inceases the lookupCount by 1, so nLookup is always 1.
+// The returned inode of workspaceroot should be forgotten in the end of the caller
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
 
+	// In order to run getWorkspaceRoot, we must set a proper value for the
+	// variable nLookup. If the function is called internally, it needs to reduce
+	// the increased lookupCount, so set nLookup to 1. Only if it is triggered by
+	// kernel, should lookupCount be increased by one, and nLookup should be 0.
+	// Therefore, lookupCount's in QuantumFS and kernel can match.
+	//
+	// For now, all getWorkspaceRoot() are called from internal functions, so
+	// nLookup is always 1.
 	var nLookup uint64 = 1
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
@@ -1730,14 +1728,5 @@ func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
 		c.elog("ERROR: PANIC Global variable %d should"+
 			" be greater than zero", result)
 		atomic.StoreInt64(&qfs.apiFileSize, 0)
-	}
-}
-
-// Uninstantiate the list of inodes which were instantiated internally. Depending on
-// whether the lookupCount of inodes are increased, nlookup will will be determined
-// accordingly
-func (qfs *QuantumFs) uninstantiateInternalInode(nlookup uint64, lookedUp []uint64) {
-	for indx := int(lookedUp[0]) - 1; indx >= 1; indx-- {
-		qfs.Forget(lookedUp[indx], nlookup)
 	}
 }

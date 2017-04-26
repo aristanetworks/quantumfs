@@ -1608,11 +1608,11 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 		dir.self, 0, 0, nil)
 }
 
-// Do a similar work like  Lookup(), but it does not interact with fuse, and return
+// Do a similar work like Lookup(), but it does not interact with fuse, and returns
 // the child node to the caller. Also, because the function probably instantiates the
 // inode, it should return the boolean indicating whether this inode is instantiated
 func (dir *Directory) lookupInternal(c *ctx, name string,
-	entryType quantumfs.ObjectType) (Inode, bool, error) {
+	entryType quantumfs.ObjectType) (child Inode, instantiated bool, err error) {
 
 	defer c.FuncIn("Directory::LookupInternal", "name %s", name).out()
 
@@ -1623,14 +1623,14 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	}
 
 	c.vlog("Directory::LookupInternal found inode %d Name %s", inodeNum, name)
-	_, exists := c.qfs.lookupCount(inodeNum)
-	child := c.qfs.inode(c, inodeNum)
+	_, instantiated = c.qfs.lookupCount(inodeNum)
+	child = c.qfs.inode(c, inodeNum)
 	child.markSelfAccessed(c, false)
 
 	if record.Type() != entryType {
-		return nil, exists, errors.New("Not Required Type")
+		return nil, instantiated, errors.New("Not Required Type")
 	}
-	return child, exists, nil
+	return child, instantiated, nil
 }
 
 // Require an Inode locked for read
