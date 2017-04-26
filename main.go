@@ -68,6 +68,9 @@ func main() {
 		fmt.Println("  ttlHistogram <workspace>")
 		fmt.Println("           - bucket all the blocks in the workspace")
 		fmt.Println("             into different TTL values.")
+		fmt.Println("  path2key <workspace> <path>")
+		fmt.Println("           - Given a path in a workspace")
+		fmt.Println("             print all the keys associated with that path")
 		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
@@ -121,6 +124,8 @@ func main() {
 		err = printList(c, *progress, qfsds, cqlds, qfsdb)
 	case "ttlHistogram":
 		err = printTTLHistogram(c, *progress, qfsds, cqlds, qfsdb)
+	case "path2key":
+		err = printPath2Key(c, *progress, qfsds, qfsdb)
 	default:
 		fmt.Println("Unsupported walk sub-command: ", walkFlags.Arg(0))
 		walkFlags.Usage()
@@ -516,5 +521,65 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 	}
 
 	hist.Print()
+	return nil
+}
+
+// path2key command walks the entire workspace even after it
+// has found the path. In essence this is like the "du" command
+// When we will fix du, we can visit this command as well.
+// It is inefficient, not wrong.
+// One way to fix it would be to not pursure paths where we know
+// there is no possibility of finding the searchPath.
+func printPath2Key(c *quantumfs.Ctx, progress bool,
+	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
+
+	// Cleanup Args
+	if walkFlags.NArg() != 3 {
+		fmt.Println("path2key subcommand takes 2 args: wsname path")
+		walkFlags.Usage()
+		os.Exit(exitBadCmd)
+	}
+
+	wsname := walkFlags.Arg(1)
+	searchPath := walkFlags.Arg(2)
+	searchPath = filepath.Clean("/" + searchPath)
+
+	// Get RootID
+	var err error
+	var rootID quantumfs.ObjectKey
+	if rootID, err = getWorkspaceRootID(c, qfsdb, wsname); err != nil {
+		return err
+	}
+
+	start := time.Now()
+	var listLock utils.DeferableMutex
+	keyList := make([]quantumfs.ObjectKey, 0, 10)
+	var totalKeys uint64
+	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		atomic.AddUint64(&totalKeys, 1)
+		defer showProgress(progress, start, totalKeys)
+		if strings.Compare(path, searchPath) == 0 {
+			defer listLock.Lock().Unlock()
+			keyList = append(keyList, key)
+		}
+		return nil
+	}
+
+	// Walk
+	if err = walker.Walk(c, qfsds, rootID, finder); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	if len(keyList) == 0 {
+		return fmt.Errorf("Key not found for path %v", searchPath)
+	}
+
+	fmt.Printf("Search path: %v\n", searchPath)
+	for _, key := range keyList {
+		fmt.Println(key)
+	}
 	return nil
 }
