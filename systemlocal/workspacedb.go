@@ -21,7 +21,7 @@ func init() {
 	stateTypespacesBucket = []byte("StateTypespaces")
 }
 
-// The database underlying the system local WorkspaceDB has three levels of buckets.
+// The database underlying the system local workspaceDB has three levels of buckets.
 //
 // The first level bucket are all the typespaces. Keys into this bucket are typespace
 // names and are mapped to the second level bucket.
