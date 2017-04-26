@@ -265,7 +265,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 		// large, so it has to be removed from the cache
 		data = datastore.lru.Front().Value.(buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
-		test.Assert(i == 12, "Wrong least recent block %d != 13", i)
+		test.Assert(i == 12, "Wrong least recent block %d != 12", i)
 
 	})
 }
