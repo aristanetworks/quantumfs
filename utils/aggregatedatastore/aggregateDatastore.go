@@ -1,22 +1,22 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
+// Package aggregateDataStore combines 2 types of DataStore
+// 1. Constant DataStore
+// 2. Durable DataStore
 package aggregatedatastore
 
 import "github.com/aristanetworks/quantumfs"
 
-// AggregateDataStore combines 2 types of DataStore
-// 1. Constant DataStore
-// 2. Durable DataStore
-type AggregateDataStore struct {
+type aggregateDataStore struct {
 	durableDS  quantumfs.DataStore
 	constantDS quantumfs.DataStore
 }
 
-// New returns a new instance of AggregateDataStore
+// New returns a new instance of aggregateDataStore
 func New(ds quantumfs.DataStore) quantumfs.DataStore {
 
-	return &AggregateDataStore{
+	return &aggregateDataStore{
 		durableDS:  ds,
 		constantDS: quantumfs.ConstantStore,
 	}
@@ -26,7 +26,7 @@ func New(ds quantumfs.DataStore) quantumfs.DataStore {
 // starting from the top:
 // 1. Constant DataStore
 // 2. Durable DataStore
-func (store *AggregateDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+func (store *aggregateDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	var err error
@@ -41,7 +41,7 @@ func (store *AggregateDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 }
 
 // Set for aggredateDataStore will always put the data in Durable DataStore
-func (store *AggregateDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+func (store *aggregateDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	return store.durableDS.Set(c, key, buf)
