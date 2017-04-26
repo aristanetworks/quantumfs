@@ -80,19 +80,8 @@ func NewTestHelper(testName string, testRunDir string,
 		CachePath:  cachePath,
 		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
 			60*10000*24, NoStdOut),
+		TempDir: TestRunDir + "/" + testName,
 	}
-}
-
-// CreateTestDirs makes the required directories for the test.
-// These directories are inside TestRunDir
-func (th *TestHelper) CreateTestDirs() {
-	th.TempDir = TestRunDir + "/" + th.TestName
-
-	mountPath := th.TempDir + "/mnt"
-	utils.MkdirAll(mountPath, 0777)
-	th.Log("Using mountpath %s", mountPath)
-
-	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
 func (th *TestHelper) RunTestCommonEpilog(testName string,
