@@ -98,21 +98,21 @@ func TestSpecialsMerge(t *testing.T) {
 		err = syscall.Mknod(specialB, syscall.S_IFBLK, 0x11111111)
 		test.AssertNoErr(err)
 
-		statA := test.SysStat(fileA)
-		statB := test.SysStat(fileB)
-		statLinkB := test.SysLstat(symlinkB)
-		statLinkA2 := test.SysLstat(symlinkA2)
 		statSpecB := test.SysStat(specialB)
 
 		test.SyncAllWorkspaces()
-
 		api := test.getApi()
-		err = api.Merge(test.RelPath(workspaceB), test.RelPath(workspaceA))
+
+		tempBranch := test.absPath("branch/basic/temp")
+		err = api.Branch(test.RelPath(workspaceA), test.RelPath(tempBranch))
 		test.AssertNoErr(err)
-if false {
-		// to reload the workspaceA rootID, branch it
+
+		err = api.Merge(test.RelPath(workspaceB), test.RelPath(tempBranch))
+		test.AssertNoErr(err)
+
+		// to reload the workspace rootID, branch it
 		newBranch := test.absPath("branch/specials/test")
-		err = api.Branch(test.RelPath(workspaceA), test.RelPath(newBranch))
+		err = api.Branch(test.RelPath(tempBranch), test.RelPath(newBranch))
 		test.AssertNoErr(err)
 
 		fileA = newBranch + "/fileA"
@@ -120,8 +120,6 @@ if false {
 		symlinkA = newBranch + "/symlink"
 		symlinkA2 = newBranch + "/symlink2"
 		specialB = newBranch + "/special"
-}
-		test.remountFilesystem()
 
 		test.CheckData(fileA, dataA)
 		// symlink should be overwritten and pointing to fileB
@@ -131,14 +129,12 @@ if false {
 		test.CheckData(symlinkA2, dataA)
 
 		// Check the stats
-		test.Assert(test.SysStat(fileA) == statA, "fileA changed")
-		test.Assert(test.SysStat(fileB) == statB, "fileB changed")
-		test.Assert(test.SysLstat(symlinkA) == statLinkB,
-			"symlink not changed")
-		test.Assert(test.SysLstat(symlinkA2) == statLinkA2,
-			"symlink not preserved")
-		test.Assert(test.SysStat(specialB) == statSpecB,
-			"special not changed")
-
+		specialStats := test.SysStat(specialB)
+		test.Assert(specialStats.Rdev == statSpecB.Rdev,
+			"special Rdev changed %x vs %x", specialStats.Rdev,
+			statSpecB.Rdev)
+		test.Assert(specialStats.Mode == statSpecB.Mode,
+			"special Mode changed %x vs %x", specialStats.Mode,
+			statSpecB.Mode)
 	})
 }
