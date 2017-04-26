@@ -65,7 +65,7 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 }
 
 func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent InodeId, inodeNum InodeId) (Inode, []InodeId) {
 
 	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s/%s/%s", typespace,
 		namespace, workspace).out()
@@ -76,7 +76,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	c.vlog("Workspace Loading %s/%s/%s %s",
 		typespace, namespace, workspace, rootId.String())
 
-	rtn, uninstantiated := instantiateWorkspaceRoot(c, rootId, parent.inodeNum(),
+	rtn, uninstantiated := instantiateWorkspaceRoot(c, rootId, parent,
 		inodeNum, workspace)
 	rtn.typespace = typespace
 	rtn.namespace = namespace
@@ -728,7 +728,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 			// three way merge
 			localBaseLayer = mergeDirectory(c, baseWsr, remoteWsr,
 				localWsr, baseBaseLayer, remoteBaseLayer,
-				localBaseLayer)
+				localBaseLayer, true)
 		}
 	}
 

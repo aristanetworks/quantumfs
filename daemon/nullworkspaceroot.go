@@ -14,11 +14,11 @@ type NullWorkspaceRoot struct {
 	WorkspaceRoot
 }
 
-func newNullWorkspaceRoot(c *ctx, typespace string, namespace string,
-	workspace string, parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+func newNullWorkspaceRoot(c *ctx, parent InodeId, inodeNum InodeId) (Inode,
+	[]InodeId) {
 
-	inode, uninstantiated := newWorkspaceRoot(c, typespace, namespace, workspace,
-		parent, inodeNum)
+	inode, uninstantiated := newWorkspaceRoot(c, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, parent, inodeNum)
 	wsr := *(inode.(*WorkspaceRoot))
 	nwsr := NullWorkspaceRoot{
 		WorkspaceRoot: wsr,

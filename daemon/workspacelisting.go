@@ -1132,7 +1132,7 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 	}
 
 	return newWorkspaceRoot(c, wsl.typespaceName, wsl.namespaceName,
-		wsl.workspacesById[inodeNum], wsl, inodeNum)
+		wsl.workspacesById[inodeNum], wsl.inodeNum(), inodeNum)
 }
 
 func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {

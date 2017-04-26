@@ -1701,24 +1701,34 @@ func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("mergeRecord %s", local.Filename()).out()
+	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
 
 	// Don't merge if remote indicates no changes
-	if remote.ID().IsEqualTo(local.ID()) || remote.ID().IsEqualTo(base.ID()) {
+	if remote.ID().IsEqualTo(local.ID()) || 
+		(base != nil && remote.ID().IsEqualTo(base.ID())) {
+
 		return local
 	}
 
 	// Merge differently depending on if the type is preserved
-	localChanged := !typesMatch(local.Type(), base.Type())
-	remoteChanged := !typesMatch(remote.Type(), base.Type())
+	localChanged := base == nil || !typesMatch(local.Type(), base.Type())
+	remoteChanged := base == nil || !typesMatch(remote.Type(), base.Type())
 	localRemoteSame := typesMatch(local.Type(), remote.Type())
 
-	var mergedKey *quantumfs.ObjectKey
+	var mergedKey quantumfs.ObjectKey
+	updatedKey := true
 	switch local.Type() {
 	case quantumfs.ObjectTypeDirectoryEntry:
-		if !localChanged && !remoteChanged {
-			*mergedKey = mergeDirectory(c, baseWsr, remoteWsr, localWsr,
-				base.ID(), remote.ID(), local.ID())
+		if (!localChanged && !remoteChanged) ||
+			(base == nil && localRemoteSame) {
+
+			var baseId quantumfs.ObjectKey
+			if base != nil {
+				baseId = base.ID()
+			}
+
+			mergedKey = mergeDirectory(c, baseWsr, remoteWsr, localWsr,
+				baseId, remote.ID(), local.ID(), (base != nil))
 		}
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
@@ -1728,17 +1738,18 @@ func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 		fallthrough
 	case quantumfs.ObjectTypeVeryLargeFile:
 		if localRemoteSame {
-			*mergedKey = mergeFile(c, remote, local)
+			mergedKey = mergeFile(c, remote, local)
 		}
 	case quantumfs.ObjectTypeHardlink:
 		// Do nothing, hardlinks don't get merged
+		updatedKey = false
 	case quantumfs.ObjectTypeSymlink:
 		if localRemoteSame {
-			*mergedKey = mergeSymlink(c, remote, local)
+			mergedKey = mergeSymlink(c, remote, local)
 		}
 	case quantumfs.ObjectTypeSpecial:
 		if localRemoteSame {
-			*mergedKey = mergeSpecial(c, remote, local)
+			mergedKey = mergeSpecial(c, remote, local)
 		}
 	default:
 		panic(fmt.Sprintf("Unsupported file type in merge: %s",
@@ -1751,8 +1762,8 @@ func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 		rtnRecord = remote
 	}
 
-	if mergedKey != nil {
-		rtnRecord.SetID(*mergedKey)
+	if updatedKey {
+		rtnRecord.SetID(mergedKey)
 	}
 
 	return rtnRecord
@@ -1760,16 +1771,23 @@ func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 
 func mergeDirectory(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 	localWsr *WorkspaceRoot, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) quantumfs.ObjectKey {
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
+	validBase bool) quantumfs.ObjectKey {
 
 	defer c.funcIn("mergeDirectory").out()
 
-	baseChildMap, _ := loadChildMap(c, baseWsr, base)
+	var baseChildMap *ChildMap
+	if validBase {
+		baseChildMap, _ = loadChildMap(c, baseWsr, base)
+	}
 	remoteChildMap, _ := loadChildMap(c, remoteWsr, remote)
 	localChildMap, _ := loadChildMap(c, localWsr, local)
 
 	for _, v := range remoteChildMap.records() {
-		baseChild := baseChildMap.recordByName(c, v.Filename())
+		var baseChild quantumfs.DirectoryRecord
+		if validBase {
+			baseChild = baseChildMap.recordByName(c, v.Filename())
+		}
 		localChild := localChildMap.recordByName(c, v.Filename())
 
 		if localChild != nil {
@@ -1781,11 +1799,13 @@ func mergeDirectory(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 		}
 	}
 
-	for _, v := range baseChildMap.records() {
-		remoteChild := remoteChildMap.recordByName(c, v.Filename())
+	if validBase {
+		for _, v := range baseChildMap.records() {
+			remoteChild := remoteChildMap.recordByName(c, v.Filename())
 
-		if remoteChild == nil {
-			localChildMap.deleteChild(c, v.Filename())
+			if remoteChild == nil {
+				localChildMap.deleteChild(c, v.Filename())
+			}
 		}
 	}
 
