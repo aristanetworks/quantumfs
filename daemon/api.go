@@ -510,13 +510,13 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 
 	wsr := cmd.WorkspaceRoot
 	dst := strings.Split(wsr, "/")
-	workspace, lookedUp, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
-	defer c.qfs.uninstantiateInternalInode(1, lookedUp)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
+	defer c.qfs.Forget(uint64(workspace.inodeNum()), 1)
 
 	accessList := workspace.getList()
 	return api.queueAccesslistResponse(accessList)
@@ -533,13 +533,13 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 
 	wsr := cmd.WorkspaceRoot
 	dst := strings.Split(wsr, "/")
-	workspace, lookedUp, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
-	defer c.qfs.uninstantiateInternalInode(1, lookedUp)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
+	defer c.qfs.Forget(uint64(workspace.inodeNum()), 1)
 
 	workspace.clearList()
 	return api.queueErrorResponse(quantumfs.ErrorOK,
@@ -575,13 +575,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, lookedUp, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
-	defer c.qfs.uninstantiateInternalInode(1, lookedUp)
+	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
+	defer c.qfs.Forget(uint64(workspace.inodeNum()), 1)
 
 	if len(dst) == 3 { // only have typespace/namespace/workspace
 		// duplicate the entire workspace root is illegal
