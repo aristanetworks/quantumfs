@@ -28,7 +28,6 @@ func runTest(t *testing.T, test systemlocalTest) {
 		db:   NewWorkspaceDB(testDir + "/db"),
 	}
 
-	th.CreateTestDirs()
 	defer th.EndTest()
 
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))

@@ -27,7 +27,6 @@ func runTest(t *testing.T, test systemlocalTest) {
 		ctx:  newCtx(),
 	}
 
-	th.CreateTestDirs()
 	defer th.EndTest()
 
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
