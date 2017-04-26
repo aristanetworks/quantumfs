@@ -340,14 +340,12 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	defer wsdb.cacheMutex.Unlock()
 	rootId, exists := wsdb.workspace(c, typespace, namespace, workspace)
 	if !exists {
-		wsdb.cacheMutex.Unlock()
 		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 			"Advance failed")
 		return rootId, e
 	}
 
 	if currentRootId != rootId {
-		wsdb.cacheMutex.Unlock()
 		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
 			"%s vs %s Advance failed.", currentRootId.String(),
 			rootId.String())
