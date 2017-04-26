@@ -50,7 +50,7 @@ func newEtherFilesystemStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := etherBlobStoreTranslator{Blobstore: blobstore}
+	translator := EtherBlobStoreTranslator{Blobstore: blobstore}
 	return &translator
 }
 
@@ -149,14 +149,14 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := etherBlobStoreTranslator{
+	translator := EtherBlobStoreTranslator{
 		Blobstore:      blobstore,
 		ApplyTTLPolicy: true,
 	}
 	return &translator
 }
 
-type etherBlobStoreTranslator struct {
+type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
 }
@@ -206,7 +206,7 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	return b.Insert(key, buf, newmetadata)
 }
 
-func (ebt *etherBlobStoreTranslator) Get(c *quantumfs.Ctx,
+func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
 	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Get")
@@ -231,7 +231,7 @@ func (ebt *etherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	return nil
 }
 
-func (ebt *etherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Set")
