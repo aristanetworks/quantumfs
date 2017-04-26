@@ -3,7 +3,7 @@
 
 package systemlocal
 
-// Test the systemlocal WorkspaceDB
+// Test the systemlocal workspaceDB
 
 import "testing"
 
@@ -317,7 +317,7 @@ func TestDbRestart(t *testing.T) {
 			"test", "a")
 		utils.Assert(err == nil, "Error branching workspace: %v", err)
 
-		systemdb := db.(*WorkspaceDB)
+		systemdb := db.(*workspaceDB)
 		err = systemdb.db.Close()
 		utils.Assert(err == nil, "Error closing database: %v", err)
 

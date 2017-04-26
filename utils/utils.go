@@ -68,8 +68,7 @@ func BlocksRoundUp(len uint64, blockSize uint64) uint64 {
 	return blocks
 }
 
-// Assert the condition is true. If it is not true then fail the test with the given
-// message.
+// Assert the condition is true. If it is not true then panic with the given message.
 func Assert(condition bool, format string, args ...interface{}) {
 	if !condition {
 		msg := fmt.Sprintf(format, args...)
