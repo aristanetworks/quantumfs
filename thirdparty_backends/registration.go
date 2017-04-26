@@ -8,35 +8,35 @@ package thirdparty_backends
 import "github.com/aristanetworks/quantumfs"
 
 type DatastoreConstructor func(conf string) quantumfs.DataStore
-type Datastore struct {
+type datastore struct {
 	Name        string
 	Constructor DatastoreConstructor
 }
 
-var Datastores []Datastore
+var datastores []datastore
 
 func registerDatastore(name string, constructor DatastoreConstructor) {
-	store := Datastore{
+	store := datastore{
 		Name:        name,
 		Constructor: constructor,
 	}
 
-	Datastores = append(Datastores, store)
+	datastores = append(datastores, store)
 }
 
 type WorkspaceDBConstructor func(conf string) quantumfs.WorkspaceDB
-type WorkspaceDB struct {
+type workspaceDB struct {
 	Name        string
 	Constructor WorkspaceDBConstructor
 }
 
-var WorkspaceDBs []WorkspaceDB
+var workspaceDBs []workspaceDB
 
 func registerWorkspaceDB(name string, constructor WorkspaceDBConstructor) {
-	db := WorkspaceDB{
+	db := workspaceDB{
 		Name:        name,
 		Constructor: constructor,
 	}
 
-	WorkspaceDBs = append(WorkspaceDBs, db)
+	workspaceDBs = append(workspaceDBs, db)
 }
