@@ -8,8 +8,6 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 type testHelper struct {
@@ -29,7 +27,6 @@ func runTest(t *testing.T, test adsTest) {
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
 	}
-	th.CreateTestDirs()
 	defer th.EndTest()
 
 	th.ds = processlocal.NewDataStore("")
@@ -44,14 +41,8 @@ func (th *testHelper) testHelperUpcast(
 	}
 }
 
-func (th *testHelper) CreateTestDirs() {
-	th.TempDir = testutils.TestRunDir + "/" + th.TestName
-	utils.MkdirAll(th.TempDir, 0777)
-	th.Log("Using TestDir %s", th.TempDir)
-}
-
 func (th *testHelper) testCtx() *quantumfs.Ctx {
-	log := qlog.NewQlogTiny()
+	log := th.Logger
 	reqId := atomic.AddUint64(&requestId, 1)
 	c := &quantumfs.Ctx{
 		Qlog:      log,
