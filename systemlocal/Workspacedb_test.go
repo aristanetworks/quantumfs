@@ -3,7 +3,7 @@
 
 package systemlocal
 
-// Test the systemlocal WorkspaceDB
+// Test the systemlocal workspaceDB
 
 import "testing"
 
