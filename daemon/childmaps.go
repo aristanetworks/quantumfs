@@ -217,22 +217,11 @@ func (cmap *ChildMap) inodeNum(name string) InodeId {
 func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
 	rtn := make([]InodeId, 0)
 
-	cmap.childrenRecords.iterateOverRecords(c,
-		func(record quantumfs.DirectoryRecord) bool {
-
-			if _, isHardlink := record.(*Hardlink); isHardlink {
-				return false
-			}
-
-			getName := record.Filename()
-			inodeId, exists := cmap.childrenRecords.inodeId(getName)
-			if exists {
-				rtn = append(rtn, inodeId)
-			} else {
-				c.elog("Mismapped inode and name: %s", getName)
-			}
-			return false
-		})
+	for k, _ := range cmap.childrenRecords.inodeToName {
+		if isHardlink, _ := cmap.wsr.checkHardlink(k); !isHardlink {
+			rtn = append(rtn, k)
+		}
+	}
 
 	return rtn
 }
