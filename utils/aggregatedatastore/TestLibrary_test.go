@@ -8,7 +8,6 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/testutils"
 
 type testHelper struct {
@@ -43,7 +42,7 @@ func (th *testHelper) testHelperUpcast(
 }
 
 func (th *testHelper) testCtx() *quantumfs.Ctx {
-	log := qlog.NewQlogTiny()
+	log := th.Logger
 	reqId := atomic.AddUint64(&requestId, 1)
 	c := &quantumfs.Ctx{
 		Qlog:      log,
