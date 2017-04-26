@@ -918,46 +918,41 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 // For now, all getWorkspaceRoot() are called from internal functions and it calles
 // lookupCommon which inceases the lookupCount by 1, so nLookup is always 1.
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
-	workspace string) (*WorkspaceRoot, []uint64, bool) {
+	workspace string) (*WorkspaceRoot, bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).out()
 
-	lookedUp := make([]uint64, 4)
-	lookedUp[0] = 1
+	var nLookup uint64 = 1
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
 	if result != fuse.OK {
-		return nil, lookedUp, false
+		return nil, false
 	}
-	lookedUp[lookedUp[0]] = typespaceAttr.NodeId
-	lookedUp[0]++
+	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
 
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
 	if result != fuse.OK {
-		return nil, lookedUp, false
+		return nil, false
 	}
-	lookedUp[lookedUp[0]] = namespaceAttr.NodeId
-	lookedUp[0]++
+	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
 
 	// Get the WorkspaceRoot Inode number
 	var workspaceRootAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
 	if result != fuse.OK {
-		return nil, lookedUp, false
+		return nil, false
 	}
-	lookedUp[lookedUp[0]] = workspaceRootAttr.NodeId
-	lookedUp[0]++
 
 	// Fetch the WorkspaceRoot object itelf
 	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
 
-	return wsr.(*WorkspaceRoot), lookedUp, wsr != nil
+	return wsr.(*WorkspaceRoot), wsr != nil
 }
 
 func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
