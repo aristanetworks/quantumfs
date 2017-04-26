@@ -99,7 +99,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
 	defer c.FuncIn("ChildMap::loadChild", "%s %s", entry.Filename(),
-		entry.ID().String())
+		entry.ID().String()).out()
 
 	entry = convertRecord(cmap.wsr, entry)
 	inodeId = cmap.loadInodeId(c, entry, inodeId)
@@ -138,14 +138,14 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	// This may be a hardlink that is due to be converted.
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
 		var newRecord quantumfs.DirectoryRecord
-		newRecord, inodeId = cmap.wsr.removeHardlink(c,
+		newRecord, removeId := cmap.wsr.removeHardlink(c,
 			hardlink.linkId)
 
 		// Wsr says we're about to orphan the last hardlink copy
-		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
+		if newRecord != nil || removeId != quantumfs.InodeIdInvalid {
 			newRecord.SetFilename(hardlink.Filename())
 			record = newRecord
-			cmap.loadChild(c, newRecord, inodeId)
+			cmap.loadChild(c, newRecord, removeId)
 		}
 	}
 	result := cmap.recordByName(c, name)
@@ -549,15 +549,16 @@ func (th *thinChildren) delRecord(name string, inodeId InodeId) {
 		for i := 0; i < len(list); i++ {
 			if list[i] == name {
 				list = append(list[:i], list[i+1:]...)
+
+				if len(list) > 0 {
+					th.inodeToName[inodeId] = list
+				} else {
+					delete(th.inodeToName, inodeId)
+				}
 				break
 			}
 		}
 
-		if len(list) == 0 {
-			delete(th.inodeToName, inodeId)
-		} else {
-			th.inodeToName[inodeId] = list
-		}
 	}
 
 	th.cache[name] = nil
