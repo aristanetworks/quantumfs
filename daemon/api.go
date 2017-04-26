@@ -535,7 +535,12 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
 		local[0], local[1], local[2])
 
-	newRootId := mergeWorkspaceRoot(c, remoteRootId, remoteRootId, localRootId)
+	nullWsrInode, _ := newNullWorkspaceRoot(c, quantumfs.InodeIdInvalid,
+		quantumfs.InodeIdInvalid)
+	nullWsr := nullWsrInode.(*NullWorkspaceRoot).WorkspaceRoot
+	nullRootId := publishWorkspaceRoot(c, nullWsr.baseLayerId, nullWsr.hardlinks)
+
+	newRootId := mergeWorkspaceRoot(c, nullRootId, remoteRootId, localRootId)
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
 		local[2], localRootId, newRootId)
 	if err != nil {

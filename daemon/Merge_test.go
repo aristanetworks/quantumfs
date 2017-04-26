@@ -36,13 +36,22 @@ func TestBasicMerge(t *testing.T) {
 		dataD := test.MakeFile(fileD)
 
 		test.SyncAllWorkspaces()
-
 		api := test.getApi()
-		err = api.Merge(test.RelPath(workspaceB), test.RelPath(workspaceA))
+
+		// Because of the buggy state of DeleteWorkspace and the fact that
+		// we can't rely on workspace inodes to update when the rootId
+		// changes, we have to Branch first into a workspace we never touch
+		tempBranch := test.absPath("branch/basic/temp")
+		err = api.Branch(test.RelPath(workspaceA), test.RelPath(tempBranch))
 		test.AssertNoErr(err)
 
+		err = api.Merge(test.RelPath(workspaceB), test.RelPath(tempBranch))
+		test.AssertNoErr(err)
+
+		// Now we have to branch again so that the rootId change is
+		// actually reflected in our local workspace instance
 		newBranch := test.absPath("branch/basic/test")
-		err = api.Branch(test.RelPath(workspaceA), test.RelPath(newBranch))
+		err = api.Branch(test.RelPath(tempBranch), test.RelPath(newBranch))
 		test.AssertNoErr(err)
 
 		fileA = newBranch + "/fileA"
