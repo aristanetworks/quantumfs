@@ -366,21 +366,3 @@ func (th *testHelper) checkZeroSparse(fileA string, offset int) {
 			fileA)
 	}
 }
-
-// Temporarily set the groups for this test. Use like:
-//
-// defer setGroups(newGroups)()
-//
-// Be sure the test has been locked to the OS thread before calling this method or
-// hard to debug behaviour may occur.
-func (th *testHelper) setGroups(newGroups []int) func() {
-	oldGroups, err := syscall.Getgroups()
-	th.AssertNoErr(err)
-
-	err = syscall.Setgroups(newGroups)
-	th.AssertNoErr(err)
-
-	return func() {
-		syscall.Setgroups(oldGroups)
-	}
-}

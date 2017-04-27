@@ -272,8 +272,7 @@ func testPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	}
 
 	if !asRoot {
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{})()
 	}
 
 	// first check if we can rename
@@ -473,8 +472,7 @@ func TestPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		err := syscall.Unlink(workspace + "/file")
 		test.Assert(err == syscall.ENOENT, "Wrong error when unlinking: %v",
@@ -1157,8 +1155,7 @@ func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{})()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1171,8 +1168,7 @@ func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{})()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1185,8 +1181,7 @@ func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{})()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1199,8 +1194,7 @@ func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{})()
 
 		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root with ownership")
@@ -1213,8 +1207,7 @@ func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1227,8 +1220,7 @@ func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1242,8 +1234,7 @@ func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		testInodeCreatePermissions(test, testDir, true,
 			"Fail creating directory as group member")
@@ -1256,8 +1247,7 @@ func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1269,8 +1259,7 @@ func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1285,8 +1274,7 @@ func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1301,8 +1289,7 @@ func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1317,8 +1304,7 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, []int{})()
 
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1374,8 +1360,7 @@ func TestStickyDirPerms(t *testing.T) {
 		err = os.Chown(testFile, 99, 99)
 		test.AssertNoErr(err)
 
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{})()
 
 		// we should be able to remove it, even though sticky bit is set
 		err = os.Remove(testFile)
