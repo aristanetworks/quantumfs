@@ -17,7 +17,7 @@ func TestNullWorkspaceDirectoryCreation(t *testing.T) {
 		testFilename := workspace + "/" + "test"
 
 		err := syscall.Mkdir(testFilename, 0124)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Unexpected success creating directory in null")
 	})
 }
@@ -28,7 +28,7 @@ func TestNullWorkspaceFileCreation(t *testing.T) {
 		testFilename := workspace + "/" + "test"
 
 		fd, err := syscall.Creat(testFilename, 0124)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Unexpected success creating file in null")
 		test.Assert(fd == -1,
 			"Unexpected valid filedescriptor in null")
@@ -42,7 +42,7 @@ func NullWorkspaceSpecialFile(test *testHelper, filetype uint32) {
 	testFilename := workspace + "/" + "test"
 	err := syscall.Mknod(testFilename, filetype|syscall.S_IRWXU,
 		0x12345678)
-	test.Assert(err == syscall.EPERM,
+	test.Assert(err == syscall.EROFS,
 		"Unexpected success creating special file in null")
 }
 
@@ -75,7 +75,7 @@ func TestNullWorkspaceFileSymlinkCreation(t *testing.T) {
 		workspace := test.nullWorkspace()
 		link := workspace + "/symlink"
 		err := syscall.Symlink("/usr/bin/arch", link)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Unexpected success creating symlink in null")
 	})
 }
@@ -91,7 +91,7 @@ func TestNullWorkspaceHardlinkCreation(t *testing.T) {
 		nullworkspace := test.nullWorkspace()
 		testLinkName := nullworkspace + "/testlink"
 		err = syscall.Link(testFileName, testLinkName)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Unexpected success creating hardlink in null")
 	})
 }
@@ -111,12 +111,12 @@ func TestNullWorkspaceRename(t *testing.T) {
 		nullworkspace := test.nullWorkspace()
 		nullTestFileName := nullworkspace + "/testfile"
 		err = syscall.Rename(testFileName, nullTestFileName)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Unexpected success moving file into null")
 
 		nullTestDirName := nullworkspace + "/testdir"
 		err = syscall.Rename(testDirName, nullTestDirName)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Unexpected success moving directory into null")
 	})
 }

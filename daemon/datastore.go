@@ -19,10 +19,12 @@ func init() {
 }
 
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
+	entryNum := cacheSize / 102400
 	return &dataStore{
 		durableStore: durableStore,
-		cache:        make(map[quantumfs.ObjectKey]*buffer, cacheSize),
+		cache:        make(map[quantumfs.ObjectKey]*buffer, entryNum),
 		cacheSize:    cacheSize,
+		freeSpace:    cacheSize,
 	}
 }
 
@@ -33,6 +35,7 @@ type dataStore struct {
 	lru       list.List // Back is most recently used
 	cache     map[quantumfs.ObjectKey]*buffer
 	cacheSize int
+	freeSpace int
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
@@ -71,12 +74,22 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
+		size := buf.Size()
+
 		// Store in cache
 		defer store.cacheLock.Lock().Unlock()
 
-		if store.lru.Len() >= store.cacheSize {
-			evictedBuf := store.lru.Remove(store.lru.Front())
-			delete(store.cache, evictedBuf.(buffer).key)
+		if size > store.cacheSize {
+			c.Vlog(qlog.LogDaemon, "The size of content is greater than"+
+				" total capacity of the cache")
+			return &buf
+		}
+
+		store.freeSpace -= size
+		for store.freeSpace < 0 {
+			evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
+			store.freeSpace += evictedBuf.Size()
+			delete(store.cache, evictedBuf.key)
 		}
 		store.cache[buf.key] = &buf
 		buf.lruElement = store.lru.PushBack(buf)
@@ -108,7 +121,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
 
 func newEmptyBuffer() buffer {
 	return buffer{
-		data: make([]byte, 0, quantumfs.InitBlockSize),
+		data: make([]byte, 0, initBlockSize),
 	}
 }
 
@@ -134,8 +147,8 @@ func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffe
 
 	var newData []byte
 	// ensure our buffer meets min capacity
-	if inSize < quantumfs.InitBlockSize {
-		newData = make([]byte, inSize, quantumfs.InitBlockSize)
+	if inSize < initBlockSize {
+		newData = make([]byte, inSize, initBlockSize)
 	} else {
 		newData = make([]byte, inSize)
 	}
@@ -277,8 +290,8 @@ func (buf *buffer) Get() []byte {
 
 func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
 	// ensure our buffer meets min size
-	if cap(data) < quantumfs.InitBlockSize {
-		newData := make([]byte, len(data), quantumfs.InitBlockSize)
+	if cap(data) < initBlockSize {
+		newData := make([]byte, len(data), initBlockSize)
 		copy(newData, data)
 		data = newData
 	}
