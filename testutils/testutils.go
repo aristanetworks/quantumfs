@@ -371,11 +371,32 @@ func (th *TestHelper) Logscan() (foundErrors bool) {
 	return true
 }
 
+type SetDefaultUidGids struct {
+	originalSupplementaryGroups []int
+	test                        *TestHelper
+}
+
+func (sdug SetDefaultUidGids) Revert() {
+	// Set the UID and GID back to the defaults
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+
+	sdug.test.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
+	sdug.test.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+
+	syscall.Setgroups(sdug.originalSupplementaryGroups)
+}
+
 // Change the UID/GID the test thread to the given values. Use -1 not to change
 // either the UID or GID. nil sets an empty supplementaryGid set.
 //
 // Use this like "defer test.SetUidGid(...)()".
-func (th *TestHelper) SetUidGid(uid int, gid int, supplementaryGids []int) func() {
+func (th *TestHelper) SetUidGid(uid int, gid int,
+	supplementaryGids []int) SetDefaultUidGids {
+
 	// The quantumfs tests are run as root because some tests require
 	// root privileges. However, root can read or write any file
 	// irrespective of the file permissions. Obviously if we want to
@@ -416,18 +437,9 @@ func (th *TestHelper) SetUidGid(uid int, gid int, supplementaryGids []int) func(
 		th.Assert(err == nil, "Failed to change test EUID: %v", err)
 	}
 
-	return func() {
-		// Set the UID and GID back to the defaults
-		defer runtime.UnlockOSThread()
-
-		// Test always runs as root, so its euid and egid is 0
-		err1 := syscall.Setreuid(-1, 0)
-		err2 := syscall.Setregid(-1, 0)
-
-		th.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
-		th.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
-
-		syscall.Setgroups(oldGroups)
+	return SetDefaultUidGids{
+		originalSupplementaryGroups: oldGroups,
+		test: th,
 	}
 }
 

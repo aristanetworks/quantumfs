@@ -11,7 +11,7 @@ import "testing"
 
 func TestGroupParsing(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
-		defer test.SetUidGid(-1, -1, []int{0, 30, 200})()
+		defer test.SetUidGid(-1, -1, []int{0, 30, 200}).Revert()
 
 		pid := uint32(syscall.Gettid())
 
@@ -51,7 +51,7 @@ func TestSupplementaryGroupFileAccess(t *testing.T) {
 		test.AssertNoErr(err)
 		file.Close()
 
-		defer test.SetUidGid(99, 99, []int{10, 200, 300})()
+		defer test.SetUidGid(99, 99, []int{10, 200, 300}).Revert()
 
 		test.AssertNoErr(syscall.Access(fileName, R_OK))
 	})
@@ -74,7 +74,7 @@ func TestSupplementaryGroupFileRead(t *testing.T) {
 		test.AssertNoErr(err)
 		file.Close()
 
-		defer test.SetUidGid(99, 99, []int{10, 200, 300})()
+		defer test.SetUidGid(99, 99, []int{10, 200, 300}).Revert()
 
 		file, err = os.Open(fileName)
 		test.AssertNoErr(err)
