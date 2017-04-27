@@ -6,15 +6,12 @@ package daemon
 // Test parsing supplementary groups
 
 import "os"
-import "runtime"
 import "syscall"
 import "testing"
 
 func TestGroupParsing(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		defer test.setGroups([]int{0, 30, 200})()
+		defer test.SetUidGid(-1, -1, []int{0, 30, 200})()
 
 		pid := uint32(syscall.Gettid())
 
@@ -54,10 +51,7 @@ func TestSupplementaryGroupFileAccess(t *testing.T) {
 		test.AssertNoErr(err)
 		file.Close()
 
-		defer test.setGroups([]int{10, 200, 300})()
-
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{10, 200, 300})()
 
 		test.AssertNoErr(syscall.Access(fileName, R_OK))
 	})
@@ -80,10 +74,7 @@ func TestSupplementaryGroupFileRead(t *testing.T) {
 		test.AssertNoErr(err)
 		file.Close()
 
-		defer test.setGroups([]int{10, 200, 300})()
-
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, []int{10, 200, 300})()
 
 		file, err = os.Open(fileName)
 		test.AssertNoErr(err)
