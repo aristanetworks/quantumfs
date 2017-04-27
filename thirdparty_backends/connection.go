@@ -1,17 +1,18 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Utility functions to connect to registered datastore and workspaceDB
 package thirdparty_backends
 
 import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
 
+// Select the datastore with the given name and construct it with the given
+// configuration string.
 func ConnectDatastore(name string,
 	config string) (quantumfs.DataStore, error) {
 
-	for _, datastore := range Datastores {
+	for _, datastore := range datastores {
 		if datastore.Name != name {
 			continue
 		}
@@ -27,10 +28,12 @@ func ConnectDatastore(name string,
 	return nil, fmt.Errorf("Failed to find datastore '%s'\n", name)
 }
 
+// Select the workspaceDB with the given name and construct it with the given
+// configuration string.
 func ConnectWorkspaceDB(name string,
 	config string) (quantumfs.WorkspaceDB, error) {
 
-	for _, db := range WorkspaceDBs {
+	for _, db := range workspaceDBs {
 		if db.Name != name {
 			continue
 		}
