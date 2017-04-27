@@ -74,7 +74,7 @@ func loadChildMap(c *ctx, wsr *WorkspaceRoot,
 
 	var rtnMap *ChildMap
 	uninstantiated := make([]InodeId, 0)
-	
+
 	key := baseLayerId
 	for {
 		c.vlog("Fetching baselayer %s", key.String())
@@ -1704,7 +1704,7 @@ func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
 
 	// Don't merge if remote indicates no changes
-	if remote.ID().IsEqualTo(local.ID()) || 
+	if remote.ID().IsEqualTo(local.ID()) ||
 		(base != nil && remote.ID().IsEqualTo(base.ID())) {
 
 		return local
