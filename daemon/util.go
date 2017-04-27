@@ -203,7 +203,8 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 // Determine if the process has a matching group. Normally the primary group is all
 // we need to check, but sometimes we also much check the supplementary groups.
 func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
-	defer c.FuncIn("hasMatchingGid", "%d %d %d", userGid, pid, inodeGid).out()
+	defer c.FuncIn("hasMatchingGid", "user gid %d pid %d inode gid %d", userGid,
+		pid, inodeGid).out()
 
 	// First check the common case where we do the least work
 	if userGid == inodeGid {
@@ -239,6 +240,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 		// We now have something like "Groups:\t10 10545 ", get all the GIDs
 		// and skip the prefix
 		groups := strings.Split(line, "\t")[1:]
+		c.vlog("Groups: %s", groups[0])
 
 		// Now we need to split the groups themselves up
 		groups = strings.Split(groups[0], " ")
@@ -255,6 +257,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 				continue
 			}
 			if uint32(gid) == inodeGid {
+				c.vlog("Supplementary group %d matches inode", gid)
 				return true
 			}
 		}
@@ -265,6 +268,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 		break
 	}
 
+	c.vlog("No matching user groups")
 	return false
 }
 
