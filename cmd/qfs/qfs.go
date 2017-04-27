@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// qfs is a command line tool used to interact with quantumfs and perform various
+// qfs is a command line tool used to interact with QuantumFS and perform various
 // special operations not available through normal POSIX interfaces.
 package main
 
