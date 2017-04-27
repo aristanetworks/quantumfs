@@ -79,65 +79,65 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 
 	dirName := workspace + subdirectory + "/dir1"
 	err := syscall.Mkdir(dirName, 0666)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	test.Assert(strings.Contains(err.Error(), "read-only file system"),
 		"Error creating directories: %s", err.Error())
 
 	fileName := workspace + subdirectory + "/file2"
 	fd, err := syscall.Creat(fileName, 0777)
 	syscall.Close(fd)
-	test.Assert(err == syscall.EPERM,
+	test.Assert(err == syscall.EROFS,
 		"Error creating a small file: %v", err)
 
 	fileName = workspace + subdirectory + "/dir" + "/file"
 	fd, err = syscall.Creat(fileName, 0777)
 	syscall.Close(fd)
-	test.Assert(err == syscall.EPERM,
+	test.Assert(err == syscall.EROFS,
 		"Error creating a small file: %v", err)
 
 	nodeName := workspace + subdirectory + "/node"
 	err = syscall.Mknod(nodeName,
 		syscall.S_IFBLK|syscall.S_IRWXU, 0x12345678)
-	test.Assert(err == syscall.EPERM, "Error creating node: %v", err)
+	test.Assert(err == syscall.EROFS, "Error creating node: %v", err)
 
 	targetFile := workspace + subdirectory + "/file"
 	linkName := workspace + subdirectory + "/link"
-	err = os.Symlink(targetFile, linkName)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	err = syscall.Symlink(targetFile, linkName)
+	test.Assert(err == syscall.EROFS,
 		"Error creating symlink: %v", err)
 
-	err = os.Link(targetFile, linkName)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	err = syscall.Link(targetFile, linkName)
+	test.Assert(err == syscall.EROFS,
 		"Error creating hardlink: %v", err)
 
 	err = os.RemoveAll(targetFile)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	test.Assert(strings.Contains(err.Error(), "read-only file system"),
 		"Error unlinking file: %v", err)
 
 	targetDir := workspace + subdirectory + "/dir"
 	err = os.RemoveAll(targetDir)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	test.Assert(strings.Contains(err.Error(), "read-only file system"),
 		"Error unlinking directory: %v", err)
 
-	file, err := os.OpenFile(targetFile, os.O_RDWR, 0)
-	file.Close()
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	file, err := syscall.Open(targetFile, syscall.O_RDWR, 0)
+	syscall.Close(file)
+	test.Assert(err == syscall.EROFS,
 		"Error opening the file: %v", err)
 
-	err = os.Rename(targetFile, workspace+"/newFile")
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	err = syscall.Rename(targetFile, workspace+"/newFile")
+	test.Assert(err == syscall.EROFS,
 		"Error renaming file: %v", err)
 
 	attrDataData = []byte("extendedattributedata")
 	err = syscall.Setxattr(targetFile, attrData, attrDataData, 0)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	test.Assert(err == syscall.EROFS,
 		"Error setting data XAttr: %v", err)
 
 	err = syscall.Removexattr(targetFile, attrData)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	test.Assert(err == syscall.EROFS,
 		"Error deleting data XAttr: %v", err)
 
 	err = syscall.Chmod(targetFile, 0123)
-	test.Assert(strings.Contains(err.Error(), "operation not permitted"),
+	test.Assert(err == syscall.EROFS,
 		"Error Set file permission attribute: %v", err)
 }
 
@@ -239,7 +239,7 @@ func TestWorkspaceDeleteAndRecreate(t *testing.T) {
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Error creating a small file: %v", err)
 	})
 }
@@ -261,7 +261,7 @@ func TestSetWorkspaceImmutable(t *testing.T) {
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Error creating a small file: %v", err)
 
 	})
@@ -280,7 +280,7 @@ func TestSetWorkspaceImmutableAfterDelete(t *testing.T) {
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Error creating a small file: %v", err)
 
 		err = api.DeleteWorkspace(workspaceName)
@@ -318,7 +318,7 @@ func TestSetRemoteWorkspaceImmutable(t *testing.T) {
 		fileName := workspace + "/file"
 		fd, err := syscall.Creat(fileName, 0777)
 		defer syscall.Close(fd)
-		test.Assert(err == syscall.EPERM,
+		test.Assert(err == syscall.EROFS,
 			"Error creating a small file: %v", err)
 	})
 }

@@ -96,7 +96,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func findFuseConnection(c *ctx, mountPath string) int {
-	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath)
+	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath).out()
 	c.dlog("Finding FUSE Connection ID...")
 	for i := 0; i < 100; i++ {
 		c.dlog("Waiting for mount try %d...", i)
