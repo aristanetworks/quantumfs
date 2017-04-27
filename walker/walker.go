@@ -102,13 +102,13 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			}
 			return err
 		}
+
+		if err := writeToChan(c, keyChan, "", rootID,
+			uint64(buf.Size())); err != nil {
+			return err
+		}
 		return nil
 	})
-
-	if err := writeToChan(c, keyChan, "", rootID,
-		uint64(buf.Size())); err != nil {
-		return err
-	}
 
 	return group.Wait()
 }
