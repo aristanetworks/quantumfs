@@ -347,6 +347,17 @@ func (th *TestHelper) GetDataStore() quantumfs.DataStore {
 	return th.qfs.c.dataStore.durableStore
 }
 
+// CreateTestDirs makes the required directories for the test.
+// These directories are inside TestRunDir
+
+func (th *TestHelper) CreateTestDirs() {
+	mountPath := th.TempDir + "/mnt"
+	utils.MkdirAll(mountPath, 0777)
+	th.Log("Using mountpath %s", mountPath)
+
+	utils.MkdirAll(th.TempDir+"/ether", 0777)
+}
+
 var genDataMutex utils.DeferableMutex
 var precompGenData []byte
 var genDataLast int
