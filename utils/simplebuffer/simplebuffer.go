@@ -16,13 +16,13 @@ import capn "github.com/glycerine/go-capnproto"
 // Get() in datastore. This can be used in tests and tools which need to
 // use datastore API and thus need an implementation of quantumfs.Buffer
 // interface
-type Buffer struct {
+type buffer struct {
 	key  quantumfs.ObjectKey
 	data []byte
 }
 
 func New(in []byte, q_key quantumfs.ObjectKey) quantumfs.Buffer {
-	return &Buffer{
+	return &buffer{
 		key:  q_key,
 		data: in,
 	}
@@ -39,69 +39,69 @@ func AssertNonZeroBuf(buf quantumfs.Buffer,
 // Implement the required interface functions. Only  Get() and Set() will be called,
 // so the others will be briefly implemented or be directly copied from
 // daemon/datastore.go
-func (buf *Buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
+func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset uint32) uint32 {
 	panic("Error: The Write function of Buffer is not implemented")
 }
 
-func (buf *Buffer) Read(out []byte, offset uint32) int {
+func (buf *buffer) Read(out []byte, offset uint32) int {
 	panic("Error: The Read function of Buffer is not implemented")
 }
 
-func (buf *Buffer) Get() []byte {
+func (buf *buffer) Get() []byte {
 	return buf.data
 }
 
-func (buf *Buffer) Set(data []byte, keyType quantumfs.KeyType) {
+func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
 	buf.data = data
 }
 
-func (buf *Buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
+func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 	return hash.Hash(buf.data)
 }
 
-func (buf *Buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
+func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 	return buf.key, nil
 }
 
-func (buf *Buffer) SetSize(size int) {
+func (buf *buffer) SetSize(size int) {
 	buf.data = buf.data[:size]
 }
 
-func (buf *Buffer) Size() int {
+func (buf *buffer) Size() int {
 	return len(buf.data)
 }
 
-func (buf *Buffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
+func (buf *buffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayDirectoryEntry(
 		encoding.ReadRootDirectoryEntry(segment))
 }
 
-func (buf *Buffer) AsWorkspaceRoot() quantumfs.WorkspaceRoot {
+func (buf *buffer) AsWorkspaceRoot() quantumfs.WorkspaceRoot {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayWorkspaceRoot(
 		encoding.ReadRootWorkspaceRoot(segment))
 }
 
-func (buf *Buffer) AsMultiBlockFile() quantumfs.MultiBlockFile {
+func (buf *buffer) AsMultiBlockFile() quantumfs.MultiBlockFile {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayMultiBlockFile(
 		encoding.ReadRootMultiBlockFile(segment))
 }
 
-func (buf *Buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
+func (buf *buffer) AsVeryLargeFile() quantumfs.VeryLargeFile {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayVeryLargeFile(
 		encoding.ReadRootVeryLargeFile(segment))
 }
 
-func (buf *Buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
+func (buf *buffer) AsExtendedAttributes() quantumfs.ExtendedAttributes {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayExtendedAttributes(
 		encoding.ReadRootExtendedAttributes(segment))
 }
 
-func (buf *Buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
+func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayHardlinkEntry(
 		encoding.ReadRootHardlinkEntry(segment))
