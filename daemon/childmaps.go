@@ -126,6 +126,11 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
 	}
 
+	// ensure we fully remove any existing record with the same name
+	if existingInodeId, exists := cmap.children[entry.Filename()]; exists {
+		cmap.delRecord(existingInodeId, entry.Filename())
+	}
+
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
