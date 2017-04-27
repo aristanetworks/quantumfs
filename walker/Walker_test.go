@@ -36,6 +36,17 @@ func TestFileWalk(t *testing.T) {
 	})
 }
 
+func TestEmptyWSR(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+
+		// Add nothing to workspace
+
+		test.readWalkCompare(workspace)
+	})
+}
+
 func TestDirWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -114,10 +125,15 @@ func TestDirFilesWalk(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
-		// Write File 2
+		// Write File 2, empty File
 		filename = dirname + "/file2"
-		err = ioutil.WriteFile(filename, []byte(data), os.ModePerm)
-		test.Assert(err == nil, "Write failed (%s): %s",
+		f, err := os.Create(filename)
+		test.Assert(err == nil, "File create failed (%s): %s",
+			filename, err)
+		test.Assert(f != nil, "File create failed (%s): %s",
+			filename, err)
+		err = f.Close()
+		test.Assert(err == nil, "File close failed (%s): %s",
 			filename, err)
 
 		test.readWalkCompare(workspace)
