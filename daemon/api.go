@@ -613,7 +613,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Path %s does not exist", cmd.DstPath)
 	}
-	c.qfs.Forget(uint64(p.inodeNum()), 0)
+	defer c.qfs.Forget(uint64(p.inodeNum()), 0)
 
 	parent := p.(*Directory)
 	target := dst[len(dst)-1]
