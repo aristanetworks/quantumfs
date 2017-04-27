@@ -320,7 +320,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	if checkUid == inodeOwner {
 		permMask = quantumfs.PermReadOwner | quantumfs.PermWriteOwner |
 			quantumfs.PermExecOwner
-	} else if checkGid == inodeGroup {
+	} else if hasMatchingGid(c, checkGid, pid, inodeGroup) {
 		permMask = quantumfs.PermReadGroup | quantumfs.PermWriteGroup |
 			quantumfs.PermExecGroup
 	} else { // all the other
