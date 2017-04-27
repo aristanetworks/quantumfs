@@ -32,7 +32,6 @@ func TestAggDSGetSet(t *testing.T) {
 		// Nothing is Set in the dataStore,
 		// Still this Get should succeed
 		// for a constant key.
-		key = quantumfs.EmptyDirKey
 		buf = simplebuffer.New(nil, key)
 		err = ads.Get(th.testCtx(), key, buf)
 		th.Assert(err == nil, "Get failed")
