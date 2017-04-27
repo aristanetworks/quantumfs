@@ -322,10 +322,10 @@ func TestHardlinkConversion(t *testing.T) {
 		test.Assert(bytes.Equal(output, data),
 			"File not working after conversion from hardlink")
 
-		wsr = test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
-		defer wsr.linkLock.Lock().Unlock()
-		_, exists := wsr.hardlinks[linkId]
+		wsrB := test.getWorkspaceRoot(workspace)
+		defer test.qfs.Forget(uint64(wsrB.inodeNum()), 1)
+		defer wsrB.linkLock.Lock().Unlock()
+		_, exists := wsrB.hardlinks[linkId]
 		test.Assert(!exists, "hardlink not converted back to file")
 	})
 }
