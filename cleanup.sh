@@ -6,15 +6,16 @@ ppid=$1
 rootContainer=$ROOTDIRNAME
 mountPath=/sys/fs/fuse/connections
 
-# The go-test should be no longer than 3 min; otherwise, it is hanging
-sleepTime=180
-while  [ $sleepTime -gt 0 ]; do
+# On an idle system, the go-test should take no longer than
+# 3 minutes. Otherwise, it is hanging.
+SLEEPTIME=${SLEEPTIME:-180}
+while  [ $SLEEPTIME -gt 0 ]; do
 	# Escape from the sleep loop when the make process is finished
 	if ps -p $ppid > /dev/null; then
-		let "sleepTime-=1"
+		let "SLEEPTIME-=1"
 		sleep 1
 	else
-		sleepTime=0
+		SLEEPTIME=0
 	fi
 done
 
