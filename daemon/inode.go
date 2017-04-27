@@ -1,8 +1,9 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// The basic Inode and FileHandle structures
 package daemon
+
+// The basic Inode and FileHandle structures
 
 import "container/list"
 import "fmt"
