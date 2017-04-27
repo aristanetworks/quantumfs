@@ -178,7 +178,7 @@ func TestFileDescriptorPermissions(t *testing.T) {
 		err := syscall.Mkdir(testDir, 0777)
 		test.Assert(err == nil, "Error creating directories: %v", err)
 
-		defer test.SetUidGid(99, -1, []int{})()
+		defer test.SetUidGid(99, -1, nil)()
 
 		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)
@@ -657,7 +657,7 @@ func TestFileOwnership(t *testing.T) {
 		err = syscall.Chmod(dirName, 0555)
 		test.AssertNoErr(err)
 
-		defer test.SetUidGid(99, 99, []int{})()
+		defer test.SetUidGid(99, 99, nil)()
 
 		// try to remove the file
 		err = os.Remove(testFileA)

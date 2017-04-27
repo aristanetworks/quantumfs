@@ -392,6 +392,10 @@ func (th *TestHelper) SetUidGid(uid int, gid int, supplementaryGids []int) func(
 	oldGroups, err := syscall.Getgroups()
 	th.AssertNoErr(err)
 
+	if supplementaryGids == nil {
+		supplementaryGids = []int{}
+	}
+
 	err = syscall.Setgroups(supplementaryGids)
 	th.AssertNoErr(err)
 
