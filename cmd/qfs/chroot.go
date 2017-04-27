@@ -1,9 +1,10 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
+package main
+
 // chroot runs a shell in the current workspace tree, in which
 // the current workspace root becomes the filesystem root
-package main
 
 import "fmt"
 import "io/ioutil"
