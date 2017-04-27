@@ -9,7 +9,6 @@ import "os"
 import "syscall"
 import "testing"
 
-
 func TestBasicMerge(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspaceA := test.NewWorkspace()
@@ -22,9 +21,9 @@ func TestBasicMerge(t *testing.T) {
 		fileD := workspaceA + "/subdir/fileD"
 		fileD2 := workspaceB + "/subdir/fileD"
 
-		err := os.MkdirAll(workspaceA + "/subdir", 0777)
+		err := os.MkdirAll(workspaceA+"/subdir", 0777)
 		test.AssertNoErr(err)
-		err = os.MkdirAll(workspaceB + "/subdir", 0777)
+		err = os.MkdirAll(workspaceB+"/subdir", 0777)
 		test.AssertNoErr(err)
 
 		dataA := test.MakeFile(fileA)

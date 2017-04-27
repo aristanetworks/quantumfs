@@ -101,12 +101,12 @@ func instantiateWorkspaceRoot(c *ctx, rootId quantumfs.ObjectKey, parent InodeId
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
-	func () {
+	func() {
 		defer wsr.linkLock.Lock().Unlock()
 		wsr.hardlinks, wsr.nextHardlinkId = loadHardlinks(c,
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]HardlinkId)
-	} ()
+	}()
 	uninstantiated := initDirectory(c, name, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent,
 		&wsr.realTreeLock)
@@ -392,7 +392,7 @@ func loadHardlinks(c *ctx,
 			id := HardlinkId(hardlink.HardlinkID())
 			hardlinks[id] = newLink
 
-			if id >= nextHardlinkId{
+			if id >= nextHardlinkId {
 				nextHardlinkId = id + 1
 			}
 		}

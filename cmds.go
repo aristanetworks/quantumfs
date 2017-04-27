@@ -279,7 +279,7 @@ type BranchRequest struct {
 type MergeRequest struct {
 	CommandCommon
 	Remote string
-	Local string
+	Local  string
 }
 
 type AccessedRequest struct {
@@ -403,8 +403,8 @@ func (api *Api) Merge(remote string, local string) error {
 
 	cmd := MergeRequest{
 		CommandCommon: CommandCommon{CommandId: CmdMergeRequest},
-		Remote:           remote,
-		Local:            local,
+		Remote:        remote,
+		Local:         local,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)

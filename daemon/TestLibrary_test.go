@@ -239,7 +239,7 @@ func (th *testHelper) MakeFile(filepath string) (data []byte) {
 	offset := charSum
 	length := offset
 
-	data = GenData(offset+length)[offset:]
+	data = GenData(offset + length)[offset:]
 	err := testutils.PrintToFile(filepath, string(data))
 	th.AssertNoErr(err)
 

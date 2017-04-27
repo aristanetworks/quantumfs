@@ -549,7 +549,6 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			"Workspace rootId advanced after merge began, try again.")
 	}
 
-
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
 }
 
