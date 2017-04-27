@@ -372,7 +372,7 @@ func (th *TestHelper) Logscan() (foundErrors bool) {
 }
 
 // Change the UID/GID the test thread to the given values. Use -1 not to change
-// either the UID or GID. []int{} sets an empty supplementaryGid set.
+// either the UID or GID. nil sets an empty supplementaryGid set.
 //
 // Use this like "defer test.SetUidGid(...)()".
 func (th *TestHelper) SetUidGid(uid int, gid int, supplementaryGids []int) func() {
