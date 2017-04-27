@@ -19,7 +19,7 @@ func newChildMap(c *ctx, key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) (*ChildMa
 	[]InodeId) {
 
 	rtn := ChildMap{
-		wsr:             wsr_,
+		wsr:     wsr_,
 		records: newRecordsOnDemand(key, wsr_),
 	}
 
