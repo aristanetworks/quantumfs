@@ -1,9 +1,10 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// The code which handles listing available workspaces as the first two levels of the
-// directory hierarchy.
 package daemon
+
+// The code which handles listing available workspaces as the first three levels of
+// the directory hierarchy.
 
 import "errors"
 import "sync"
