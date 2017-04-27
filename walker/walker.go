@@ -88,6 +88,12 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	group.Go(func() error {
 		defer close(keyChan)
+
+		if err := writeToChan(c, keyChan, "", rootID,
+			uint64(buf.Size())); err != nil {
+			return err
+		}
+
 		if err := handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
 			return err
@@ -103,12 +109,6 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		}
 		return nil
 	})
-
-	if err := writeToChan(c, keyChan, "", rootID,
-		uint64(buf.Size())); err != nil {
-		return err
-	}
-
 	return group.Wait()
 }
 
