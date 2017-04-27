@@ -403,6 +403,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 		accessList["/test4"] = true
 
 		wsr := test.getWorkspaceRoot(workspace)
+		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
 
 		eq := reflect.DeepEqual(accessList, wsr.accessList)
 		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
@@ -505,6 +506,7 @@ func TestAccessListClear(t *testing.T) {
 			"Error two maps different")
 
 		wsr := test.getWorkspaceRoot(workspace)
+		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
 		wsr.clearList()
 		accessList = make(map[string]bool)
 		wsrlist = test.getAccessList(workspace)

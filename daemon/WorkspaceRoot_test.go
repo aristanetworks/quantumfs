@@ -328,6 +328,8 @@ func TestWorkspaceRootChecker(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		wsr := test.getWorkspaceRoot(workspace)
+		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
+
 		var inode Inode
 		inode = wsr
 

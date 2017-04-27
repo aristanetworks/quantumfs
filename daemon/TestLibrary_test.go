@@ -272,18 +272,21 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 	return components[0], components[1], components[2]
 }
 
-// Convert an absolute workspace path to the matching WorkspaceRoot object
+// Convert an absolute workspace path to the matching WorkspaceRoot object. The same
+// as MUX::getWorkspaceRoot(), the caller of this function should Forget wsr at the
+// end.
 func (th *testHelper) getWorkspaceRoot(workspace string) *WorkspaceRoot {
 	parts := strings.Split(th.RelPath(workspace), "/")
 	wsr, ok := th.qfs.getWorkspaceRoot(&th.qfs.c, parts[0], parts[1], parts[2])
-	defer th.qfs.Forget(uint64(wsr.inodeNum()), 1)
 	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
 
 	return wsr
 }
 
 func (th *testHelper) getAccessList(workspace string) map[string]bool {
-	return th.getWorkspaceRoot(workspace).getList()
+	wsr := th.getWorkspaceRoot(workspace)
+	defer th.qfs.Forget(uint64(wsr.inodeNum()), 1)
+	return wsr.getList()
 }
 
 func (th *testHelper) assertAccessList(testlist map[string]bool,
