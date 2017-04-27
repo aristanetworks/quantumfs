@@ -140,6 +140,11 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
+		// Skip, since constant and embedded keys will not
+		// show up in regular walk.
+		if SkipKey(c, key) {
+			return nil
+		}
 		defer mapLock.Lock().Unlock()
 		walkerMap[key.String()] = 1
 		return nil
