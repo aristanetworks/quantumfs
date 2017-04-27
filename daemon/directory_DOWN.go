@@ -140,7 +140,8 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	// Traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	// Indicate the inode should starts to be forgotten
+	// Indicate we've started instantiating inodes and therefore need to start
+	// Forgetting them
 	startForgotten := false
 	// Go along the given path to the destination. The path is stored in a string
 	// slice, each cell index contains an inode.
@@ -154,7 +155,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 		// all preceding nodes have to be directories
 		child, instantiated, err := currDir.lookupInternal(c, path[num],
 			quantumfs.ObjectTypeDirectoryEntry)
-		startForgotten = instantiated
+		startForgotten = !instantiated
 		if err != nil {
 			return child, err
 		}
