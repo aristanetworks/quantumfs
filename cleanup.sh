@@ -21,6 +21,7 @@ done
 # Force to kill the parent process "make all" because it has hung too long
 for pid in `ps ux | grep --color=never 'make' | awk '{print $2}'`; do
 	if [ $ppid -eq $pid ]; then
+		echo "Sending SIGKILL to $pid"
 		kill -9 $pid
 	fi
 done
