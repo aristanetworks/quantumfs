@@ -201,6 +201,20 @@ func (key ObjectKey) String() string {
 	return hex
 }
 
+func (key ObjectKey) Text() string {
+	hex := fmt.Sprintf("(%s: %02x%016x%016x%08x)", KeyTypeToString(key.Type()),
+		key.Type(), key.key.Part2(), key.key.Part3(), key.key.Part4())
+
+	return hex
+}
+
+func (key ObjectKey) FromText() string {
+	hex := fmt.Sprintf("(%s: %016x%016x%08x)", KeyTypeToString(key.Type()),
+		key.key.Part2(), key.key.Part3(), key.key.Part4())
+
+	return hex
+}
+
 func (key ObjectKey) Bytes() []byte {
 	return key.key.Segment.Data
 }
