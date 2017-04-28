@@ -44,7 +44,7 @@ func vlFileWriter(qctx *quantumfs.Ctx, path string,
 		parts--
 	}
 
-	vlf := quantumfs.NewVeryLargeFile()
+	vlf := quantumfs.NewVeryLargeFile(len(mbfKeys))
 	vlf.SetNumberOfParts(len(mbfKeys))
 	for i := 0; i < len(mbfKeys); i++ {
 		vlf.SetLargeFileKey(i, mbfKeys[i])

@@ -7,7 +7,7 @@ import "testing"
 
 func TestDirectoryRecordSort(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		dirEntry := NewDirectoryEntry()
+		_, dirEntry := NewDirectoryEntry(MaxDirectoryRecords())
 		dirEntry.SetNumEntries(3)
 
 		dr1 := NewDirectoryRecord()
@@ -31,5 +31,7 @@ func TestDirectoryRecordSort(t *testing.T) {
 		test.Assert(dirEntry.Entry(2).Filename() == "name2",
 			"Wrong sort. Found %s expects \"name2\"",
 			dirEntry.Entry(2).Filename())
+
+		test.Assert(false, "The size of the block %d", BlockSize())
 	})
 }

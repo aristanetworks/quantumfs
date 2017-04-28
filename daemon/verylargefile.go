@@ -168,7 +168,7 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("VeryLargeFile::sync").out()
 
-	store := quantumfs.NewVeryLargeFile()
+	store := quantumfs.NewVeryLargeFile(len(fi.parts))
 	store.SetNumberOfParts(len(fi.parts))
 
 	for i := 0; i < len(fi.parts); i++ {
