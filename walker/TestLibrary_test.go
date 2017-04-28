@@ -10,6 +10,7 @@ import "path/filepath"
 import "reflect"
 import "strings"
 import "testing"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
@@ -38,6 +39,7 @@ func runTestCommon(t *testing.T, test walkerTest,
 		},
 	}
 
+	th.Timeout = 3000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
 
@@ -140,6 +142,11 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
+		// Skip, since constant and embedded keys will not
+		// show up in regular walk.
+		if SkipKey(c, key) {
+			return nil
+		}
 		defer mapLock.Lock().Unlock()
 		walkerMap[key.String()] = 1
 		return nil

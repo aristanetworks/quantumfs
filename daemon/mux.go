@@ -1,9 +1,12 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
+// The QuantumFS internals are implemented here. This is not the package you want,
+// try quantumfs.
+package daemon
+
 // go-fuse creates a goroutine for every request. The code here simply takes these
 // requests and forwards them to the correct Inode.
-package daemon
 
 import "reflect"
 import "container/list"
@@ -312,7 +315,10 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	if !dirtyInode.inode.isOrphaned() {
 		dirtyInode.inode.flush(c)
 	}
-	dirtyInode.inode.markClean()
+	func() {
+		defer qfs.dirtyQueueLock.Lock().Unlock()
+		dirtyInode.inode.markClean_()
+	}()
 
 	if dirtyInode.shouldUninstantiate {
 		defer qfs.instantiationLock.Lock().Unlock()
@@ -338,16 +344,15 @@ func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 
 // Don't use this method directly, use one of the semantically specific variants
 // instead.
-func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate bool,
-	shouldWait bool) *list.Element {
+// dirtyQueueLock must be locked when calling this function
+func (qfs *QuantumFs) _queueDirtyInode_(c *ctx, inode Inode,
+	shouldUninstantiate bool, shouldWait bool) *list.Element {
 
-	defer c.FuncIn("Mux::_queueDirtyInode", "inode %d uninstantiate %t wait %t",
+	defer c.FuncIn("Mux::_queueDirtyInode_", "inode %d uninstantiate %t wait %t",
 		inode.inodeNum(), shouldUninstantiate, shouldWait).out()
 
-	defer qfs.dirtyQueueLock.Lock().Unlock()
-
 	var dirtyNode *dirtyInode
-	dirtyElement := inode.dirtyElement()
+	dirtyElement := inode.dirtyElement_()
 	if dirtyElement == nil {
 		// This inode wasn't in the dirtyQueue so add it now
 		dirtyNode = &dirtyInode{
@@ -393,13 +398,15 @@ func (qfs *QuantumFs) _queueDirtyInode(c *ctx, inode Inode, shouldUninstantiate 
 }
 
 // Queue an Inode to be flushed because it is dirty
-func (qfs *QuantumFs) queueDirtyInode(c *ctx, inode Inode) *list.Element {
-	return qfs._queueDirtyInode(c, inode, false, true)
+// dirtyQueueLock must be locked when calling this function
+func (qfs *QuantumFs) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
+	return qfs._queueDirtyInode_(c, inode, false, true)
 }
 
 // Queue an Inode because the kernel has forgotten about it
-func (qfs *QuantumFs) queueInodeToForget(c *ctx, inode Inode) *list.Element {
-	return qfs._queueDirtyInode(c, inode, true, false)
+// dirtyQueueLock must be locked when calling this function
+func (qfs *QuantumFs) queueInodeToForget_(c *ctx, inode Inode) *list.Element {
+	return qfs._queueDirtyInode_(c, inode, true, false)
 }
 
 // There are several configuration knobs in the kernel which can affect FUSE
@@ -810,7 +817,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 			break
 		}
 
-		if dirtyElement := inode.dirtyElement(); dirtyElement != nil {
+		if dirtyElement := inode.dirtyElement_(); dirtyElement != nil {
 			c.vlog("Inode %d dirty, not uninstantiating yet",
 				inodeNum)
 			func() {
@@ -825,7 +832,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if !exists && !initial {
-			c.vlog("A inode %d with nil lookupCount "+
+			c.vlog("Inode %d with nil lookupCount "+
 				"is uninstantiated by its child", inodeNum)
 			break
 		}
