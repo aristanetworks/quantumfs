@@ -510,14 +510,13 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 
 	wsr := cmd.WorkspaceRoot
 	dst := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
-	defer c.qfs.Forget(uint64(workspace.inodeNum()), 1)
-
+	defer cleanup()
 	accessList := workspace.getList()
 	return api.queueAccesslistResponse(accessList)
 }
@@ -533,14 +532,13 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 
 	wsr := cmd.WorkspaceRoot
 	dst := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
-	defer c.qfs.Forget(uint64(workspace.inodeNum()), 1)
-
+	defer cleanup()
 	workspace.clearList()
 	return api.queueErrorResponse(quantumfs.ErrorOK,
 		"Clear AccessList Succeeded")
@@ -575,14 +573,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
-	defer c.qfs.Forget(uint64(workspace.inodeNum()), 1)
-
+	defer cleanup()
 	if len(dst) == 3 { // only have typespace/namespace/workspace
 		// duplicate the entire workspace root is illegal
 		c.vlog("Attempted to insert workspace root")
@@ -599,7 +596,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	// get immediate parent of the target node
-	p, err := func() (Inode, error) {
+	p, cleanup, err := func() (Inode, func(), error) {
 		// The ApiInode uses tree lock of NamespaceList and not any
 		// particular workspace. Thus at this point in the code, we don't
 		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
@@ -613,7 +610,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Path %s does not exist", cmd.DstPath)
 	}
-	defer c.qfs.Forget(uint64(p.inodeNum()), 0)
+	defer cleanup()
 
 	parent := p.(*Directory)
 	target := dst[len(dst)-1]

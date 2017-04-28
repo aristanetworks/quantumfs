@@ -34,8 +34,8 @@ func TestHardlinkReload(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// artificially insert some hardlinks into the map
-		wsr := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 
 		err = syscall.Link(testFileA, workspace+"/subdir/linkFileA")
 		test.AssertNoErr(err)
@@ -75,8 +75,8 @@ func TestHardlinkReload(t *testing.T) {
 		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.Assert(err == nil, "Unable to branch")
 
-		wsrB := test.getWorkspaceRoot(workspaceB)
-		defer test.qfs.Forget(uint64(wsrB.inodeNum()), 1)
+		wsrB, cleanup := test.getWorkspaceRoot(workspaceB)
+		defer cleanup()
 
 		// ensure that the hardlink was able to sync
 		wsrBFileA := test.absPath(workspaceB +
@@ -295,8 +295,8 @@ func TestHardlinkConversion(t *testing.T) {
 
 		linkInode := test.getInodeNum(linkFile)
 
-		wsr := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		linkId := func() HardlinkId {
 			defer wsr.linkLock.Lock().Unlock()
 			return wsr.inodeToLink[linkInode]
@@ -322,8 +322,8 @@ func TestHardlinkConversion(t *testing.T) {
 		test.Assert(bytes.Equal(output, data),
 			"File not working after conversion from hardlink")
 
-		wsrB := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsrB.inodeNum()), 1)
+		wsrB, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		defer wsrB.linkLock.Lock().Unlock()
 		_, exists := wsrB.hardlinks[linkId]
 		test.Assert(!exists, "hardlink not converted back to file")
@@ -493,8 +493,8 @@ func TestHardlinkExtraction(t *testing.T) {
 			"Error getting the file key: %v with a size of %d",
 			err, sz)
 
-		wsr := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsr.inodeNum()), 1)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		matchXAttrHardlinkExtendedKey(filename, dst, test,
 			quantumfs.ObjectTypeSmallFile, wsr)
 
