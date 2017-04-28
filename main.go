@@ -74,7 +74,7 @@ func main() {
 
 	// If influxServer is specified ensure than
 	// ensure than influxDB is also specified.
-	if *influxServer != "" && influxDB == "" {
+	if *influxServer != "" && *influxDB == "" {
 		fmt.Println("When providing influxServer, influxDB needs to be provided")
 		walkFlags.Usage()
 		os.Exit(exitBadConfig)
