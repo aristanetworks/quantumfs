@@ -144,7 +144,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
-		test.Assert(oldRootId != newRootId, "Workspace rootId didn't change")
+		test.Assert(!oldRootId.IsEqualTo(newRootId),
+			"Workspace rootId didn't change")
 
 		syscall.Close(fd)
 	})
