@@ -277,24 +277,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func mergeSpecial(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
-
-	defer c.FuncIn("mergeSpecial", "%s", local.Filename()).out()
-
-	// Take the newer file
-	if remote.ModificationTime() > local.ModificationTime() {
-		c.vlog("taking remote copy of %s", remote.Filename())
-		return remote.ID()
-	}
-
-	c.vlog("keeping local copy of %s", local.Filename())
-	return local.ID()
-}
-
-func specialOverrideAttr(c *ctx, entry quantumfs.DirectoryRecord,
-	attr *fuse.Attr) uint32 {
-
+func specialOverrideAttr(entry quantumfs.DirectoryRecord, attr *fuse.Attr) uint32 {
 	attr.Size = 0
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
@@ -305,8 +288,6 @@ func specialOverrideAttr(c *ctx, entry quantumfs.DirectoryRecord,
 			err))
 	}
 	attr.Rdev = dev
-
-	c.vlog("SpecialOverride %x %d", attr.Rdev, filetype)
 
 	return filetype
 }

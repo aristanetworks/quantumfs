@@ -741,21 +741,6 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func mergeFile(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
-
-	defer c.FuncIn("mergeFile", "%s", local.Filename()).out()
-
-	// For now, just take the newer file
-	if remote.ModificationTime() > local.ModificationTime() {
-		c.vlog("taking remote copy of %s", remote.Filename())
-		return remote.ID()
-	}
-
-	c.vlog("keeping local copy of %s", local.Filename())
-	return local.ID()
-}
-
 func newFileDescriptor(file *File, inodeNum InodeId,
 	fileHandleId FileHandleId, treeLock *sync.RWMutex) FileHandle {
 
