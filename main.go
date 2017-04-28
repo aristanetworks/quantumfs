@@ -19,6 +19,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
@@ -70,7 +71,9 @@ func main() {
 		fmt.Println("             into different TTL values.")
 		fmt.Println("  path2key <workspace> <path>")
 		fmt.Println("           - Given a path in a workspace")
-		fmt.Println("             print all the keys associated with that path")
+		fmt.Println("  findconstantkeys <workspace> <num_days>")
+		fmt.Println("           - List all keys and their paths, where key type is Constant")
+		fmt.Println("             but its not in constant datastore and ttl is more than num_days")
 		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
@@ -126,6 +129,8 @@ func main() {
 		err = printTTLHistogram(c, *progress, qfsds, cqlds, qfsdb)
 	case "path2key":
 		err = printPath2Key(c, *progress, qfsds, qfsdb)
+	case "findconstantkeys":
+		err = printConstantKeys(c, *progress, qfsds, cqlds, qfsdb)
 	default:
 		fmt.Println("Unsupported walk sub-command: ", walkFlags.Arg(0))
 		walkFlags.Usage()
@@ -587,4 +592,97 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 		fmt.Println(key)
 	}
 	return nil
+}
+
+const oneDaySecs = int64((24 * time.Hour) / time.Second)
+
+func printConstantKeys(c *quantumfs.Ctx, progress bool,
+	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
+	wsdb quantumfs.WorkspaceDB) error {
+
+	// Cleanup Args
+	if walkFlags.NArg() != 3 {
+		fmt.Println("findconstantkeys subcommand takes 2 args: wsname num_days")
+		walkFlags.Usage()
+		os.Exit(exitBadCmd)
+	}
+	wsname := walkFlags.Arg(1)
+	var numDays int64
+	var err error
+	if numDays, err = strconv.ParseInt(walkFlags.Arg(2), 10, 32); err != nil {
+		fmt.Println("num_days is not a valid integer")
+		walkFlags.Usage()
+		os.Exit(exitBadCmd)
+	}
+
+	// Get RootID
+	var rootID quantumfs.ObjectKey
+	if rootID, err = getWorkspaceRootID(c, wsdb, wsname); err != nil {
+		return err
+	}
+
+	cds := quantumfs.ConstantStore
+	start := time.Now()
+	var mapLock utils.DeferableMutex
+	matchKey := make(map[quantumfs.ObjectKey]struct {
+		p string
+		t int64
+	})
+	var totalKeys uint64
+	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		atomic.AddUint64(&totalKeys, 1)
+		defer showProgress(progress, start, totalKeys)
+
+		// Print the key if:
+		// - It is of type Constant,
+		// - It is not present in the Constant DataStore,
+		// - Its TTL value is more than numDays days.
+		if key.Type() == quantumfs.KeyTypeConstant {
+			buf := simplebuffer.New(nil, key)
+			if err := cds.Get(nil, key, buf); err != nil {
+
+				ks := key.String()
+				metadata, err := cqlds.Metadata(ks)
+				if err != nil {
+					return fmt.Errorf("path: %v key %v: %v", path, ks, err)
+				}
+
+				ttl, ok := metadata[cql.TimeToLive]
+				if !ok {
+					return fmt.Errorf("Store must return metadata with " +
+						"TimeToLive")
+				}
+				ttlVal, err := strconv.ParseInt(ttl, 10, 64)
+				if err != nil {
+					return fmt.Errorf("Invalid TTL value in metadata %s ",
+						ttl)
+				}
+
+				if ttlVal > (numDays * oneDaySecs) {
+					defer mapLock.Lock().Unlock()
+					matchKey[key] = struct {
+						p string
+						t int64
+					}{
+						p: path,
+						t: ttlVal / oneDaySecs,
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	// Walk
+	err = walker.Walk(c, qfsds, rootID, finder)
+
+	// Print all matches that we have collected so far
+	// even though we hit an error.
+	for k, v := range matchKey {
+		fmt.Println(k, ": ", v)
+	}
+
+	return err
 }
