@@ -263,18 +263,3 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 
 	return link.key
 }
-
-func mergeSymlink(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
-
-	defer c.FuncIn("mergeSymlink", "%s", local.Filename()).out()
-
-	// Take the newer file
-	if remote.ModificationTime() > local.ModificationTime() {
-		c.vlog("taking remote copy of %s", remote.Filename())
-		return remote.ID()
-	}
-
-	c.vlog("keeping local copy of %s", local.Filename())
-	return local.ID()
-}

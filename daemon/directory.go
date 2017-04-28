@@ -59,20 +59,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.treeLock_ = treeLock
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
-	var uninstantiated []InodeId
-	c.vlog("Loading child map for %d", inodeNum)
-	children, uninstantiated := loadChildMap(c, wsr, baseLayerId)
-	dir.children = children
 
-	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
-
-	return uninstantiated
-}
-
-func loadChildMap(c *ctx, wsr *WorkspaceRoot,
-	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
-
-	var rtnMap *ChildMap
 	uninstantiated := make([]InodeId, 0)
 
 	key := baseLayerId
@@ -85,14 +72,18 @@ func loadChildMap(c *ctx, wsr *WorkspaceRoot,
 
 		baseLayer := buffer.AsDirectoryEntry()
 
-		if rtnMap == nil {
-			rtnMap = newChildMap(baseLayer.NumEntries(), wsr)
+		if dir.children == nil {
+			dir.children = newChildMap(baseLayer.NumEntries(), wsr, dir)
 		}
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
-			childInodeNum := rtnMap.loadChild(c,
-				baseLayer.Entry(i), quantumfs.InodeIdInvalid)
-			c.vlog("loadChildMap getting child %d", childInodeNum)
+			childInodeNum := func() InodeId {
+				defer dir.childRecordLock.Lock().Unlock()
+				return dir.children.loadChild(c, baseLayer.Entry(i),
+					quantumfs.InodeIdInvalid)
+			}()
+			c.vlog("initDirectory %d getting child %d", inodeNum,
+				childInodeNum)
 			uninstantiated = append(uninstantiated, childInodeNum)
 		}
 
@@ -103,7 +94,9 @@ func loadChildMap(c *ctx, wsr *WorkspaceRoot,
 		}
 	}
 
-	return rtnMap, uninstantiated
+	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
+
+	return uninstantiated
 }
 
 func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
@@ -198,8 +191,7 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d, %s", inodeNum,
-		entry.Filename()).out()
+	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).out()
 
 	// Ensure we're working with a shallow copy for objectTypeToFileType
 	entry = entry.ShallowCopy()
@@ -218,7 +210,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 		attr.Nlink = uint32(entry.Size()) + 2
 	case fuse.S_IFIFO:
-		fileType = specialOverrideAttr(c, entry, attr)
+		fileType = specialOverrideAttr(entry, attr)
 	default:
 		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
 			fileType)
@@ -1574,7 +1566,40 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 			inodeNum, hardlink.linkId))
 	}
 
-	return recordToInode(c, inodeNum, entry, dir)
+	return dir.recordToChild(c, inodeNum, entry)
+}
+
+func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
+	entry quantumfs.DirectoryRecord) (Inode, []InodeId) {
+
+	defer c.FuncIn("DirectoryRecord::recordToChild", "name %s inode %d",
+		entry.Filename(), inodeNum).out()
+
+	var constructor InodeConstructor
+	switch entry.Type() {
+	default:
+		c.elog("Unknown InodeConstructor type: %d", entry.Type())
+		panic("Unknown InodeConstructor type")
+	case quantumfs.ObjectTypeDirectoryEntry:
+		constructor = newDirectory
+	case quantumfs.ObjectTypeSmallFile:
+		constructor = newSmallFile
+	case quantumfs.ObjectTypeMediumFile:
+		constructor = newMediumFile
+	case quantumfs.ObjectTypeLargeFile:
+		constructor = newLargeFile
+	case quantumfs.ObjectTypeVeryLargeFile:
+		constructor = newVeryLargeFile
+	case quantumfs.ObjectTypeSymlink:
+		constructor = newSymlink
+	case quantumfs.ObjectTypeSpecial:
+		constructor = newSpecial
+	}
+
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
+
+	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
+		dir.self, 0, 0, nil)
 }
 
 // Do a similar work like  Lookup(), but it does not interact with fuse, and return
@@ -1672,138 +1697,6 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	})
 
 	return dir.baseLayerId
-}
-
-func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
-	// consolidate file types into one
-	if a == quantumfs.ObjectTypeSmallFile ||
-		a == quantumfs.ObjectTypeMediumFile ||
-		a == quantumfs.ObjectTypeLargeFile ||
-		a == quantumfs.ObjectTypeVeryLargeFile {
-
-		return (b == quantumfs.ObjectTypeSmallFile ||
-			b == quantumfs.ObjectTypeMediumFile ||
-			b == quantumfs.ObjectTypeLargeFile ||
-			b == quantumfs.ObjectTypeVeryLargeFile)
-	}
-
-	return a == b
-}
-
-func mergeRecord(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
-	localWsr *WorkspaceRoot, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
-
-	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
-
-	// Don't merge if remote indicates no changes
-	if remote.ID().IsEqualTo(local.ID()) ||
-		(base != nil && remote.ID().IsEqualTo(base.ID())) {
-
-		return local
-	}
-
-	// Merge differently depending on if the type is preserved
-	localChanged := base == nil || !typesMatch(local.Type(), base.Type())
-	remoteChanged := base == nil || !typesMatch(remote.Type(), base.Type())
-	localRemoteSame := typesMatch(local.Type(), remote.Type())
-
-	var mergedKey quantumfs.ObjectKey
-	updatedKey := true
-	switch local.Type() {
-	case quantumfs.ObjectTypeDirectoryEntry:
-		if (!localChanged && !remoteChanged) ||
-			(base == nil && localRemoteSame) {
-
-			var baseId quantumfs.ObjectKey
-			if base != nil {
-				baseId = base.ID()
-			}
-
-			mergedKey = mergeDirectory(c, baseWsr, remoteWsr, localWsr,
-				baseId, remote.ID(), local.ID(), (base != nil))
-		}
-	case quantumfs.ObjectTypeSmallFile:
-		fallthrough
-	case quantumfs.ObjectTypeMediumFile:
-		fallthrough
-	case quantumfs.ObjectTypeLargeFile:
-		fallthrough
-	case quantumfs.ObjectTypeVeryLargeFile:
-		if localRemoteSame {
-			mergedKey = mergeFile(c, remote, local)
-		}
-	case quantumfs.ObjectTypeHardlink:
-		// Do nothing, hardlinks don't get merged
-		updatedKey = false
-	case quantumfs.ObjectTypeSymlink:
-		if localRemoteSame {
-			mergedKey = mergeSymlink(c, remote, local)
-		}
-	case quantumfs.ObjectTypeSpecial:
-		if localRemoteSame {
-			mergedKey = mergeSpecial(c, remote, local)
-		}
-	default:
-		panic(fmt.Sprintf("Unsupported file type in merge: %s",
-			quantumfs.ObjectType2String(local.Type())))
-	}
-
-	rtnRecord := local
-	// now decide which set of metadata we take (local or remote)
-	if remote.ModificationTime() > local.ModificationTime() {
-		rtnRecord = remote
-	}
-
-	if updatedKey {
-		rtnRecord.SetID(mergedKey)
-	}
-
-	return rtnRecord
-}
-
-func mergeDirectory(c *ctx, baseWsr *WorkspaceRoot, remoteWsr *WorkspaceRoot,
-	localWsr *WorkspaceRoot, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	validBase bool) quantumfs.ObjectKey {
-
-	defer c.funcIn("mergeDirectory").out()
-
-	var baseChildMap *ChildMap
-	if validBase {
-		baseChildMap, _ = loadChildMap(c, baseWsr, base)
-	}
-	remoteChildMap, _ := loadChildMap(c, remoteWsr, remote)
-	localChildMap, _ := loadChildMap(c, localWsr, local)
-
-	for _, v := range remoteChildMap.records() {
-		var baseChild quantumfs.DirectoryRecord
-		if validBase {
-			baseChild = baseChildMap.recordByName(c, v.Filename())
-		}
-		localChild := localChildMap.recordByName(c, v.Filename())
-
-		if localChild != nil {
-			localChildMap.loadChild(c, mergeRecord(c, baseWsr, remoteWsr,
-				localWsr, baseChild, v, localChild),
-				quantumfs.InodeIdInvalid)
-		} else if baseChild == nil {
-			localChildMap.loadChild(c, v, quantumfs.InodeIdInvalid)
-		}
-	}
-
-	if validBase {
-		for _, v := range baseChildMap.records() {
-			remoteChild := remoteChildMap.recordByName(c, v.Filename())
-
-			if remoteChild == nil {
-				localChildMap.deleteChild(c, v.Filename())
-			}
-		}
-	}
-
-	return publishDirectoryRecords(c, localChildMap.records())
 }
 
 type directoryContents struct {

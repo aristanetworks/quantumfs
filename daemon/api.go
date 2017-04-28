@@ -467,7 +467,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdSetWorkspaceImmutable:
 		c.vlog("Received SetWorkspaceImmutable request")
 		responseSize = api.setWorkspaceImmutable(c, buf)
-	case quantumfs.CmdMergeRequest:
+	case quantumfs.CmdMergeWorkspaces:
 		c.vlog("Received merge request")
 		responseSize = api.mergeWorkspace(c, buf)
 	}
@@ -509,38 +509,51 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	defer c.funcIn("ApiHandle::mergeWorkspace").out()
 
 	var cmd quantumfs.MergeRequest
+	var err error
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
 	}
 
-	local := strings.Split(cmd.Local, "/")
+	baseRootId := quantumfs.EmptyWorkspaceKey
+	if cmd.BaseWorkspace != "" {
+		base := strings.Split(cmd.BaseWorkspace, "/")
+		baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
+			base[2])
+		if err != nil {
+			c.vlog("Workspace not found: %s", base)
+			return api.queueErrorResponse(0+
+				quantumfs.ErrorWorkspaceNotFound,
+				"WorkspaceRoot %s does not exist or is not active",
+				cmd.BaseWorkspace)
+		}
+	}
+
+	local := strings.Split(cmd.LocalWorkspace, "/")
 	localRootId, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
 		local[2])
 	if err != nil {
 		c.vlog("Workspace not found: %s", local)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist or is not active", local)
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.LocalWorkspace)
 	}
 
-	remote := strings.Split(cmd.Remote, "/")
+	remote := strings.Split(cmd.RemoteWorkspace, "/")
 	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
 	if err != nil {
 		c.vlog("Workspace not found: %s", remote)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist or is not active", remote)
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.RemoteWorkspace)
 	}
 
 	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
 		local[0], local[1], local[2])
 
-	nullWsrInode, _ := newNullWorkspaceRoot(c, quantumfs.InodeIdInvalid,
-		quantumfs.InodeIdInvalid)
-	nullWsr := nullWsrInode.(*NullWorkspaceRoot).WorkspaceRoot
-	nullRootId := publishWorkspaceRoot(c, nullWsr.baseLayerId, nullWsr.hardlinks)
+	newRootId := mergeWorkspaceRoot(c, baseRootId, remoteRootId, localRootId)
 
-	newRootId := mergeWorkspaceRoot(c, nullRootId, remoteRootId, localRootId)
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
 		local[2], localRootId, newRootId)
 	if err != nil {

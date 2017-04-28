@@ -240,7 +240,7 @@ const (
 	CmdGetBlock              = 9
 	CmdEnableRootWrite       = 10
 	CmdSetWorkspaceImmutable = 11
-	CmdMergeRequest          = 12
+	CmdMergeWorkspaces       = 12
 )
 
 // The various error codes
@@ -278,8 +278,9 @@ type BranchRequest struct {
 
 type MergeRequest struct {
 	CommandCommon
-	Remote string
-	Local  string
+	BaseWorkspace   string
+	RemoteWorkspace string
+	LocalWorkspace  string
 }
 
 type AccessedRequest struct {
@@ -392,6 +393,20 @@ func (api *Api) Branch(src string, dst string) error {
 }
 
 func (api *Api) Merge(remote string, local string) error {
+	// A two way merge is equivalent to a three way merge where the base is
+	// the null (empty) workspace
+
+	return api.Merge3Way("", remote, local)
+}
+
+// Local takes precedence if remote and local have a conflict and matching
+// modification times. It is also the workspace who is Advanced to the resulting ID.
+func (api *Api) Merge3Way(base string, remote string, local string) error {
+	if base != "" && !isWorkspaceNameValid(base) {
+		return fmt.Errorf("\"%s\" (as base) must be an empty string or "+
+			"contain precisely two \"/\"\n", base)
+	}
+
 	if !isWorkspaceNameValid(remote) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
 			remote)
@@ -402,9 +417,10 @@ func (api *Api) Merge(remote string, local string) error {
 	}
 
 	cmd := MergeRequest{
-		CommandCommon: CommandCommon{CommandId: CmdMergeRequest},
-		Remote:        remote,
-		Local:         local,
+		CommandCommon:   CommandCommon{CommandId: CmdMergeWorkspaces},
+		BaseWorkspace:   base,
+		RemoteWorkspace: remote,
+		LocalWorkspace:  local,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)

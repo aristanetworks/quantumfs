@@ -229,6 +229,13 @@ func (th *testHelper) workspaceRootId(typespace string, namespace string,
 }
 
 func (th *testHelper) MakeFile(filepath string) (data []byte) {
+	// Make subdirectories needed
+	lastIndex := strings.LastIndex(filepath, "/")
+	if lastIndex > 0 {
+		err := os.MkdirAll(filepath[:lastIndex], 0777)
+		th.AssertNoErr(err)
+	}
+
 	// choose an offset and length based on the filepath so that it varies, but
 	// is consistent from run to run
 	charSum := 100
