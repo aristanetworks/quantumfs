@@ -132,9 +132,11 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	return typeKey, fuse.OK
 }
 
-// The returned inode of terminal directory should be forgotten in the end of the
-// caller
-func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
+// The returned Forget function of terminal directory should be triggered in the end
+// of the caller
+func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
+	cleanup func(), err error) {
+
 	defer c.funcIn("Directory::followPath_DOWN").out()
 
 	// Traverse through the workspace, reach the target inode
@@ -157,13 +159,16 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 			quantumfs.ObjectTypeDirectoryEntry)
 		startForgotten = !instantiated
 		if err != nil {
-			return child, err
+			return child, nil, err
 		}
 
 		currDir = child.(*Directory)
 	}
 
-	return currDir, nil
+	cleanup = func() {
+		c.qfs.Forget(uint64(currDir.inodeNum()), 0)
+	}
+	return currDir, cleanup, nil
 }
 
 // the toLink parentLock must be locked

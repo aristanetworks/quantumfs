@@ -34,8 +34,8 @@ func TestHardlink(t *testing.T) {
 		test.Assert(bytes.Equal(data, testData), "Data corrupt!")
 
 		// Take note of the nextHardlinkId
-		wsrA := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsrA.inodeNum()), 1)
+		wsrA, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		nextHardlinkId := wsrA.nextHardlinkId
 
 		// Branch and confirm the hardlink is still there
@@ -46,13 +46,13 @@ func TestHardlink(t *testing.T) {
 		test.Assert(err == nil, "Error reading linked file: %v", err)
 		test.Assert(bytes.Equal(data, testData), "Data corrupt!")
 
-		wsrB := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsrB.inodeNum()), 1)
+		wsrB, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		test.Assert(len(wsrB.hardlinks) == 1, "Wsr hardlink link len is %d",
 			len(wsrB.hardlinks))
 
-		wsrC := test.getWorkspaceRoot(workspace)
-		defer test.qfs.Forget(uint64(wsrC.inodeNum()), 1)
+		wsrC, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		nextHardlinkId_ := wsrC.nextHardlinkId
 		test.Assert(nextHardlinkId == nextHardlinkId_ && nextHardlinkId != 0,
 			"nextHardlinkId unset or not saved/loaded")
