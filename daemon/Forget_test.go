@@ -264,18 +264,17 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		err = testutils.PrintToFile(dir1+"/srcMarker", "testSomething")
 		test.AssertNoErr(err)
 
+		wsrId := test.getInodeNum(dstWorkspace)
+		fileId := test.getInodeNum(dstWorkspace + "/dir1")
+
+		test.qfs.Forget(uint64(fileId), 1)
+		test.qfs.Forget(uint64(wsrId), 1)
+
 		api := test.getApi()
 		key := getExtendedKeyHelper(test, dir1+"/srcMarker", "file")
 		err = api.InsertInode(dstWorkspaceName+"/dir1/dstMarker",
 			key, 0777, 0, 0)
-
-		wsrId := test.getInodeNum(dstWorkspace)
-		fileId := test.getInodeNum(dstWorkspace + "/dir1")
-
-		// Now force the kernel to drop all cached inodes
-		test.remountFilesystem()
-		test.AssertLogContains("Forget called",
-			"No inode forget triggered during dentry drop.")
+		test.Assert(err == nil, "Failed inserting inode: %v", err)
 		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated

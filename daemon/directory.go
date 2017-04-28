@@ -1626,6 +1626,9 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	_, instantiated = c.qfs.lookupCount(inodeNum)
 	child = c.qfs.inode(c, inodeNum)
 	child.markSelfAccessed(c, false)
+	if !instantiated {
+		c.qfs.increaseLookupCountWithNum(inodeNum, 0)
+	}
 
 	if record.Type() != entryType {
 		return nil, instantiated, errors.New("Not Required Type")
