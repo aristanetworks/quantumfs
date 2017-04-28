@@ -10,6 +10,7 @@ import "path/filepath"
 import "reflect"
 import "strings"
 import "testing"
+import "time"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/daemon"
@@ -38,6 +39,7 @@ func runTestCommon(t *testing.T, test walkerTest,
 		},
 	}
 
+	th.Timeout = 3000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
 
