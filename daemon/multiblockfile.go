@@ -188,7 +188,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 		delete(fi.toSync, i)
 	}
 
-	store := quantumfs.NewMultiBlockFile(fi.maxBlocks)
+	store := quantumfs.NewMultiBlockFile(len(fi.metadata.Blocks))
 	store.SetBlockSize(fi.metadata.BlockSize)
 	store.SetNumberOfBlocks(len(fi.metadata.Blocks))
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)

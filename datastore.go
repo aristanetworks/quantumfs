@@ -257,8 +257,15 @@ type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
 
-func NewDirectoryEntry() *DirectoryEntry {
-	return newDirectoryEntryRecords(MaxDirectoryRecords())
+func NewDirectoryEntry(entryNum int) (remain int, entry *DirectoryEntry) {
+	remain = 0
+	recs := entryNum
+	if entryNum > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryNum - recs
+	}
+
+	return remain, newDirectoryEntryRecords(recs)
 }
 
 func newDirectoryEntryRecords(recs int) *DirectoryEntry {
@@ -541,7 +548,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := NewDirectoryEntry()
+	_, emptyDir := NewDirectoryEntry(MaxDirectoryRecords())
 
 	bytes := emptyDir.Bytes()
 
@@ -631,18 +638,25 @@ type HardlinkEntry struct {
 	entry encoding.HardlinkEntry
 }
 
-func NewHardlinkEntry() *HardlinkEntry {
+func NewHardlinkEntry(entryNum int) (remain int, dirEntry *HardlinkEntry) {
+	remain = 0
+	recs := entryNum
+	if entryNum > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryNum - recs
+	}
+
 	segment := capn.NewBuffer(nil)
 
-	dirEntry := HardlinkEntry{
+	dirEntry = &HardlinkEntry{
 		entry: encoding.NewRootHardlinkEntry(segment),
 	}
 	dirEntry.entry.SetNumEntries(0)
 
-	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords())
+	recordList := encoding.NewHardlinkRecordList(segment, recs)
 	dirEntry.entry.SetEntries(recordList)
 
-	return &dirEntry
+	return remain, dirEntry
 }
 
 func OverlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
@@ -1047,13 +1061,16 @@ func (mb *MultiBlockFile) Bytes() []byte {
 	return mb.mb.Segment.Data
 }
 
-func NewVeryLargeFile() *VeryLargeFile {
+func NewVeryLargeFile(entryNum int) *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
-	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile())
+	if entryNum > MaxPartsVeryLargeFile() {
+		entryNum = MaxPartsVeryLargeFile()
+	}
+	largeFiles := encoding.NewObjectKeyList(segment, entryNum)
 	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
 }
