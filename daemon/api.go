@@ -573,13 +573,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, cleanupWSR, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
-	defer cleanupWSR()
+	defer cleanup()
 
 	if len(dst) == 3 { // only have typespace/namespace/workspace
 		// duplicate the entire workspace root is illegal
