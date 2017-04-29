@@ -1071,6 +1071,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	defer c.FuncIn("Directory::MvChild", "%s -> %s", oldName,
 		newName).out()
 
+	// moving any file into _null/null is not permitted
+	if _, ok := dstInode.(*NullWorkspaceRoot); ok {
+		c.vlog("Cannot move into null workspace")
+		return fuse.EPERM
+	}
+
 	// check write permission for both directories
 	err := hasDirectoryWritePerm(c, dstInode)
 	if err != fuse.OK {
@@ -1620,6 +1626,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	_, instantiated = c.qfs.lookupCount(inodeNum)
 	child = c.qfs.inode(c, inodeNum)
 	child.markSelfAccessed(c, false)
+	// Activate the lookupCount entry of currently instantiated inodes
 	if !instantiated {
 		c.qfs.increaseLookupCountWithNum(inodeNum, 0)
 	}
