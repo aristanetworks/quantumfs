@@ -268,8 +268,8 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		wsrId := test.getInodeNum(dstWorkspace)
 		fileId := test.getInodeNum(dstWorkspace + "/dir1")
 
-		// Uninstatiate the inodes instantiated by kernel, and then put them
-		// back at the end of the test
+		// Uninstatiate the inodes instantiated by kernel, and then restore
+		// them back at the end of the test
 		test.qfs.Forget(uint64(fileId), 1)
 		test.qfs.Forget(uint64(wsrId), 1)
 		defer test.qfs.increaseLookupCount(fileId)
