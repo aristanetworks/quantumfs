@@ -263,12 +263,18 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		// Create one marker file in srcWorkspace and dstWorkspace
 		err = testutils.PrintToFile(dir1+"/srcMarker", "testSomething")
 		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
 
 		wsrId := test.getInodeNum(dstWorkspace)
 		fileId := test.getInodeNum(dstWorkspace + "/dir1")
 
+		// Uninstatiate the inodes instantiated by kernel, and then put them
+		// back at the end of the test
 		test.qfs.Forget(uint64(fileId), 1)
 		test.qfs.Forget(uint64(wsrId), 1)
+		defer test.qfs.increaseLookupCount(fileId)
+		defer test.qfs.increaseLookupCount(wsrId)
+		test.SyncAllWorkspaces()
 
 		api := test.getApi()
 		key := getExtendedKeyHelper(test, dir1+"/srcMarker", "file")
@@ -285,6 +291,7 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
 		test.Assert(wsrInode == nil,
 			"Failed to forgot workspace inode")
+
 	})
 }
 
