@@ -56,12 +56,13 @@ func main() {
 	influxDB := walkFlags.String("influxDB", "", "database to use in influxdb")
 
 	walkFlags.Usage = func() {
+		fmt.Println("usage: qwalkerd -cfg <config> [-logdir dir] [-progress ] ")
+		fmt.Println("                [-influxServer serverIP:port -influxDB dbname]")
+		fmt.Println()
 		fmt.Println("This daemon periodically walks all the workspaces,")
 		fmt.Println("updates the TTL of each block as per the config file and")
-		fmt.Println("uploads the statistics to influx")
-
-		fmt.Println("usage: qwalkerd -cfg <config> [-logdir dir] [-progress ] " +
-			" [-influxServer serverIP:port -influxDB dbname]")
+		fmt.Println("uploads the statistics to influx.")
+		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
 
@@ -85,7 +86,6 @@ func main() {
 	var lastWalkStart time.Time
 	var lastWalkDuration time.Duration
 	for {
-
 		lastWalkDuration = time.Since(lastWalkStart)
 		if lastWalkDuration < walkRerunPeriod {
 
@@ -101,7 +101,6 @@ func main() {
 		lastWalkDuration = time.Since(lastWalkStart)
 		c.vlog("Walk ended at %v took %v", time.Now(),
 			lastWalkDuration)
-
 	}
 }
 
