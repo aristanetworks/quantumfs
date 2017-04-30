@@ -41,39 +41,41 @@ func main() {
 	progress := walkFlags.Bool("progress", false, "show progress")
 
 	walkFlags.Usage = func() {
-		fmt.Println("This tool walks all the keys within a workspace" +
-			"and executes a subcommand on selected objects")
-
-		fmt.Println("Available commands:")
-		fmt.Println("usage: walker -cfg <config> [-progress] <command> ARG1[,ARG2[,...]]")
+		fmt.Println("usage: walker -cfg <config> [-progress] <sub-command> ARG1[,ARG2[,...]]")
+		fmt.Println()
+		fmt.Println("This tool walks all the keys within a workspace")
+		fmt.Println("and invokes a sub-command on selected objects")
+		fmt.Println()
+		fmt.Println("Available sub-commands:")
+		fmt.Println("  du <workspace> <path>")
+		fmt.Println("           - calculate the size(approx) on disk for the given workspace.")
+		fmt.Println("           - path is from the root of workspace.")
+		fmt.Println("  findconstantkeys <workspace> <num_days>")
+		fmt.Println("           - list all keys and their paths, where key type is Constant")
+		fmt.Println("             but it is not in the constant datastore and its ttl is more")
+		fmt.Println("             than num_days.")
+		fmt.Println("  forceTTL <workspace> <new ttl(hrs)>")
+		fmt.Println("           - update ttl of all the blocks in the workspace")
+		fmt.Println("             in the given path to the given ttl value.")
+		fmt.Println("           - ttl is updated only if it is less than new ttl value.")
+		fmt.Println("             path is from the root of workspace.")
 		fmt.Println("  keycount <workspace> [dedupe]")
-		fmt.Println("           - count the number of keys in given workspace")
-		fmt.Println("           - optionally show the dedupe details within this workspace")
+		fmt.Println("           - count the number of keys in given workspace.")
+		fmt.Println("           - optionally show the dedupe details within this workspace.")
 		fmt.Println("  keydiffcount <workspace1> <workspace2> [keys]")
 		fmt.Println("           - count the diff in number of keys in between")
-		fmt.Println("	          the given workspaces")
-		fmt.Println("           - optionally show the unique keys")
-		fmt.Println("  du <workspace>  <path>")
-		fmt.Println("           - calculate the size on disk for the given workspace.")
-		fmt.Println("             path is from the root of workspace.")
-		fmt.Println("  ttl <workspace>")
-		fmt.Println("           - update TTL of all the blocks in the workspace as")
-		fmt.Println("             per the TTL values in the config file.")
-		fmt.Println("  forceTTL <workspace> <new ttl(hrs)>")
-		fmt.Println("           - update TTL of all the blocks in the workspace")
-		fmt.Println("             in the given path to the given TTL value.")
-		fmt.Println("             TTL is updated only if it is less than new TTL value.")
-		fmt.Println("             path is from the root of workspace.")
+		fmt.Println("             the given workspaces.")
+		fmt.Println("           - optionally show the unique keys.")
 		fmt.Println("  list")
-		fmt.Println("           - list all workspaces")
+		fmt.Println("           - list all workspaces.")
+		fmt.Println("  path2key <workspace> <path>")
+		fmt.Println("           - given a path in a workspace, print its key.")
+		fmt.Println("  ttl <workspace>")
+		fmt.Println("           - update ttl of all the blocks in the workspace as")
+		fmt.Println("             per the ttl values in the config file.")
 		fmt.Println("  ttlHistogram <workspace>")
 		fmt.Println("           - bucket all the blocks in the workspace")
-		fmt.Println("             into different TTL values.")
-		fmt.Println("  path2key <workspace> <path>")
-		fmt.Println("           - Given a path in a workspace")
-		fmt.Println("  findconstantkeys <workspace> <num_days>")
-		fmt.Println("           - List all keys and their paths, where key type is Constant")
-		fmt.Println("             but its not in constant datastore and ttl is more than num_days")
+		fmt.Println("             into different ttl values.")
 		fmt.Println()
 		walkFlags.PrintDefaults()
 	}
@@ -151,7 +153,7 @@ func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 3 {
-		fmt.Println("du subcommand takes 2 args: wsname path")
+		fmt.Println("du sub-command takes 2 args: wsname path")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
@@ -200,7 +202,7 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() < 2 || walkFlags.NArg() > 3 {
-		fmt.Println("keycount subcommand args: wsname [dedupe]")
+		fmt.Println("keycount sub-command args: wsname [dedupe]")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
@@ -251,7 +253,7 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() < 3 || walkFlags.NArg() > 4 {
-		fmt.Println("keydiffcount subcommand args: wsname1 wsname2 [keys]")
+		fmt.Println("keydiffcount sub-command args: wsname1 wsname2 [keys]")
 		fmt.Println()
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
@@ -320,7 +322,7 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 2 {
-		fmt.Println("ttl subcommand takes 1 arg: wsname")
+		fmt.Println("ttl sub-command takes 1 arg: wsname")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
@@ -372,7 +374,7 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 3 {
-		fmt.Println("forceTTL subcommand takes 2 arg: wsname <new TTL(hrs)>")
+		fmt.Println("forceTTL sub-command takes 2 arg: wsname <new TTL(hrs)>")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
@@ -478,7 +480,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 2 {
-		fmt.Println("ttlHistogram subcommand takes 1 args: wsname ")
+		fmt.Println("ttlHistogram sub-command takes 1 args: wsname ")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
@@ -534,9 +536,9 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 	return nil
 }
 
-// path2key command walks the entire workspace even after it
-// has found the path. In essence this is like the "du" command
-// When we will fix du, we can visit this command as well.
+// path2key sub-command walks the entire workspace even after it
+// has found the path. In essence this is like the "du" sub-command
+// When we will fix du, we can visit this sub-command as well.
 // It is inefficient, not wrong.
 // One way to fix it would be to not pursure paths where we know
 // there is no possibility of finding the searchPath.
@@ -545,7 +547,7 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 3 {
-		fmt.Println("path2key subcommand takes 2 args: wsname path")
+		fmt.Println("path2key sub-command takes 2 args: wsname path")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
@@ -602,7 +604,7 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 
 	// Cleanup Args
 	if walkFlags.NArg() != 3 {
-		fmt.Println("findconstantkeys subcommand takes 2 args: wsname num_days")
+		fmt.Println("findconstantkeys sub-command takes 2 args: wsname num_days")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
