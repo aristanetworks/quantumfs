@@ -203,7 +203,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		}
 		expectedDirRecords := len(dirEnts)
 		if exInfo != nil {
-			expectedDirRecords = exInfo.RecordsExcluded(checkPath,
+			expectedDirRecords = exInfo.RecordCount(checkPath,
 				expectedDirRecords)
 		}
 		// Empty directory is like a file with no content
