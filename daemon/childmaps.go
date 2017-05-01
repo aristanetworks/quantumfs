@@ -104,7 +104,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	if entry == nil {
 		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
 	}
-	
+
 	inodeId = cmap.loadInodeId(c, entry, inodeId)
 
 	// child is not dirty by default
