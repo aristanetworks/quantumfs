@@ -80,6 +80,7 @@ const (
 	// The reserved typespace/namespace/workspace name for the empty workspace,
 	// ie. _/_/_.
 	NullSpaceName = "_"
+	NullWorkspaceName = "_/_/_"
 )
 
 // Special reserved inode numbers

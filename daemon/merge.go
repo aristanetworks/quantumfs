@@ -20,7 +20,7 @@ func loadWorkspaceRoot(c *ctx,
 }
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
-	local quantumfs.ObjectKey) quantumfs.ObjectKey {
+	local quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	defer c.funcIn("mergeWorkspaceRoot").out()
 
@@ -28,6 +28,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	remoteHardlinks, _, remoteDirectory := loadWorkspaceRoot(c, remote)
 	localHardlinks, nextHardlinkId, localDirectory := loadWorkspaceRoot(c, local)
 
+	var err error
 	// We assume that local and remote are newer versions of base
 	for k, v := range remoteHardlinks {
 		_, baseExists := baseHardlinks[k]
@@ -57,12 +58,15 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 			localDirectory = remoteDirectory
 		} else {
 			// three way merge
-			localDirectory = mergeDirectory(c, baseDirectory,
+			localDirectory, err = mergeDirectory(c, baseDirectory,
 				remoteDirectory, localDirectory, true)
+			if err != nil {
+				return local, err
+			}
 		}
 	}
 
-	return publishWorkspaceRoot(c, localDirectory, localHardlinks)
+	return publishWorkspaceRoot(c, localDirectory, localHardlinks), nil
 }
 
 func mergeLink(c *ctx, baseExists bool, remote linkEntry, local linkEntry,
@@ -116,14 +120,14 @@ func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
 }
 
 func loadRecords(c *ctx,
-	key quantumfs.ObjectKey) map[string]quantumfs.DirectoryRecord {
+	key quantumfs.ObjectKey) (map[string]quantumfs.DirectoryRecord, error) {
 
 	rtn := make(map[string]quantumfs.DirectoryRecord)
 
 	for {
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
-			panic(fmt.Sprintf("No object for key %s", key.String()))
+			return nil, fmt.Errorf("No object for key %s", key.String())
 		}
 
 		baseLayer := buffer.AsDirectoryEntry()
@@ -136,7 +140,7 @@ func loadRecords(c *ctx,
 		if baseLayer.HasNext() {
 			key = baseLayer.Next()
 		} else {
-			return rtn
+			return rtn, nil
 		}
 	}
 }
@@ -145,16 +149,26 @@ func loadRecords(c *ctx,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	validBase bool) quantumfs.ObjectKey {
+	validBase bool) (quantumfs.ObjectKey, error) {
 
 	defer c.funcIn("mergeDirectory").out()
 
+	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
 	if validBase {
-		baseRecords = loadRecords(c, base)
+		baseRecords, err = loadRecords(c, base)
+		if err != nil {
+			return local, err
+		}
 	}
-	remoteRecords := loadRecords(c, remote)
-	localRecords := loadRecords(c, local)
+	remoteRecords, err := loadRecords(c, remote)
+	if err != nil {
+		return local, err
+	}
+	localRecords, err := loadRecords(c, local)
+	if err != nil {
+		return local, err
+	}
 
 	for k, v := range remoteRecords {
 		baseChild, _ := baseRecords[k]
@@ -162,7 +176,11 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 		if inLocal {
 			// We have at least a local and remote, must merge
-			localRecords[k] = mergeRecord(c, baseChild, v, localChild)
+			localRecords[k], err = mergeRecord(c, baseChild, v,
+				localChild)
+			if err != nil {
+				return local, err
+			}
 		} else {
 			// just take remote since it's known newer than base
 			localRecords[k] = v
@@ -185,12 +203,12 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		localRecordsList = append(localRecordsList, v)
 	}
 
-	return publishDirectoryRecords(c, localRecordsList)
+	return publishDirectoryRecords(c, localRecordsList), nil
 }
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
+	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
 
@@ -198,7 +216,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	if remote.ID().IsEqualTo(local.ID()) ||
 		(base != nil && remote.ID().IsEqualTo(base.ID())) {
 
-		return local
+		return local, nil
 	}
 
 	// Merge differently depending on if the type is preserved
@@ -207,6 +225,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	bothSameType := typesMatch(local.Type(), remote.Type())
 
 	var mergedKey quantumfs.ObjectKey
+	var err error
 	updatedKey := true
 	switch local.Type() {
 	case quantumfs.ObjectTypeDirectoryEntry:
@@ -218,8 +237,11 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 				baseId = base.ID()
 			}
 
-			mergedKey = mergeDirectory(c, baseId, remote.ID(),
+			mergedKey, err = mergeDirectory(c, baseId, remote.ID(),
 				local.ID(), (base != nil))
+			if err != nil {
+				return local, err
+			}
 		}
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
@@ -243,8 +265,8 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 			mergedKey = takeNewest(c, remote, local)
 		}
 	default:
-		panic(fmt.Sprintf("Unsupported file type in merge: %s",
-			quantumfs.ObjectType2String(local.Type())))
+		return local, fmt.Errorf("Unsupported file type in merge: %s",
+			quantumfs.ObjectType2String(local.Type()))
 	}
 
 	rtnRecord := local
@@ -257,7 +279,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 		rtnRecord.SetID(mergedKey)
 	}
 
-	return rtnRecord
+	return rtnRecord, nil
 }
 
 func takeNewest(c *ctx, remote quantumfs.DirectoryRecord,
