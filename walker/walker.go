@@ -59,8 +59,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"WorkspaceRoot buffer %s",
-		key2String(rootID))
+		"WorkspaceRoot buffer %s", rootID.String())
 
 	wsr := buf.AsWorkspaceRoot()
 	//===============================================
@@ -89,6 +88,12 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	group.Go(func() error {
 		defer close(keyChan)
+
+		if err := writeToChan(c, keyChan, "", rootID,
+			uint64(buf.Size())); err != nil {
+			return err
+		}
+
 		if err := handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
 			return err
@@ -104,12 +109,6 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		}
 		return nil
 	})
-
-	if err := writeToChan(c, keyChan, "", rootID,
-		uint64(buf.Size())); err != nil {
-		return err
-	}
-
 	return group.Wait()
 }
 
@@ -156,8 +155,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		}
 
 		simplebuffer.AssertNonZeroBuf(buf,
-			"WorkspaceRoot buffer %s",
-			key2String(key))
+			"WorkspaceRoot buffer %s", key.String())
 
 		if err := writeToChan(c, keyChan, "", key,
 			uint64(buf.Size())); err != nil {
@@ -179,8 +177,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"MultiBlockFile buffer %s",
-		key2String(key))
+		"MultiBlockFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -214,8 +211,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"VeryLargeFile buffer %s",
-		key2String(key))
+		"VeryLargeFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -236,31 +232,40 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.qctx, key, buf); err != nil {
-		return err
-	}
-
-	simplebuffer.AssertNonZeroBuf(buf,
-		"DirectoryEntry buffer %s",
-		key2String(key))
-
-	// When wf returns SkipDir for a DE, we can skip all the DR in that DE.
-	if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
-		if err == SkipDir {
-			return nil
-		}
-		return err
-	}
-
-	de := buf.AsDirectoryEntry()
-	for i := 0; i < de.NumEntries(); i++ {
-		if err := handleDirectoryRecord(c, path, ds,
-			de.Entry(i), wf, keyChan); err != nil {
+	for {
+		buf := simplebuffer.New(nil, key)
+		if err := ds.Get(c.qctx, key, buf); err != nil {
 			return err
 		}
-	}
 
+		simplebuffer.AssertNonZeroBuf(buf,
+			"DirectoryEntry buffer %s", key.String())
+
+		// When wf returns SkipDir for a DirectoryEntry, we can skip all the
+		// DirectoryRecord in that DirectoryEntry
+		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
+			// TODO(sid): See how this works with chain DirectoryEntries.
+			//            Since we check only the first of the many
+			//            chained DiretoryEntries.
+			if err == SkipDir {
+				return nil
+			}
+			return err
+		}
+
+		de := buf.AsDirectoryEntry()
+		for i := 0; i < de.NumEntries(); i++ {
+			if err := handleDirectoryRecord(c, path, ds,
+				de.Entry(i), wf, keyChan); err != nil {
+				return err
+			}
+		}
+		if !de.HasNext() {
+			break
+		}
+
+		key = de.Next()
+	}
 	return nil
 }
 
