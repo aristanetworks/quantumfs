@@ -516,17 +516,15 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	baseRootId := quantumfs.EmptyWorkspaceKey
-	if cmd.BaseWorkspace != "" {
-		base := strings.Split(cmd.BaseWorkspace, "/")
-		baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
-			base[2])
-		if err != nil {
-			c.vlog("Workspace not found: %s", base)
-			return api.queueErrorResponse(0+
-				quantumfs.ErrorWorkspaceNotFound,
-				"WorkspaceRoot %s does not exist or is not active",
-				cmd.BaseWorkspace)
-		}
+	base := strings.Split(cmd.BaseWorkspace, "/")
+	baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
+		base[2])
+	if err != nil {
+		c.vlog("Workspace not found: %s", base)
+		return api.queueErrorResponse(0+
+			quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.BaseWorkspace)
 	}
 
 	local := strings.Split(cmd.LocalWorkspace, "/")
@@ -552,7 +550,13 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
 		local[0], local[1], local[2])
 
-	newRootId := mergeWorkspaceRoot(c, baseRootId, remoteRootId, localRootId)
+	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
+		localRootId)
+	if err != nil {
+		c.vlog("Merge failed: %s", err)
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Merge failed: %s", err)
+	}
 
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
 		local[2], localRootId, newRootId)

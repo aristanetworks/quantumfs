@@ -396,13 +396,13 @@ func (api *Api) Merge(remote string, local string) error {
 	// A two way merge is equivalent to a three way merge where the base is
 	// the null (empty) workspace
 
-	return api.Merge3Way("", remote, local)
+	return api.Merge3Way(NullWorkspaceName, remote, local)
 }
 
 // Local takes precedence if remote and local have a conflict and matching
 // modification times. It is also the workspace who is Advanced to the resulting ID.
 func (api *Api) Merge3Way(base string, remote string, local string) error {
-	if base != "" && !isWorkspaceNameValid(base) {
+	if !isWorkspaceNameValid(base) {
 		return fmt.Errorf("\"%s\" (as base) must be an empty string or "+
 			"contain precisely two \"/\"\n", base)
 	}
