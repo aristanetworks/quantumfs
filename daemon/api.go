@@ -589,7 +589,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	if key.Type() != quantumfs.KeyTypeEmbedded {
 		if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
-			c.vlog("Key not found: %s", key.String())
+			c.vlog("Key not found: %s", key.Text())
 			return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
 				"Key does not exist in the datastore")
 		}
