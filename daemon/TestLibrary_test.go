@@ -240,7 +240,12 @@ func (th *testHelper) MakeFile(filepath string) (data []byte) {
 	// is consistent from run to run
 	charSum := 100
 	for i := 0; i < len(filepath); i++ {
-		charSum += int(filepath[i] - 'a')
+		charSum += int(filepath[i] - ' ')
+	}
+
+	// Add a little protection in case somehow this is negative
+	if charSum < 0 {
+		charSum = -charSum
 	}
 
 	offset := charSum
