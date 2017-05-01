@@ -7,7 +7,7 @@ import "testing"
 
 func TestDirectoryRecordSort(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		_, dirEntry := NewDirectoryEntry(4)
+		_, dirEntry := NewDirectoryEntry(3)
 		dirEntry.SetNumEntries(3)
 
 		dr1 := NewDirectoryRecord()
