@@ -209,11 +209,13 @@ func (key ObjectKey) Text() string {
 	return hex
 }
 
-func (key ObjectKey) FromText() string {
-	hex := fmt.Sprintf("(%s: %016x%016x%08x)", KeyTypeToString(key.Type()),
-		key.key.Part2(), key.key.Part3(), key.key.Part4())
+func FromText(text string) ObjectKey {
+	bytes, err := hex.DecodeString(text)
+	if err != nil {
+		panic(fmt.Sprintf("hex decode error: %v", err.Error()))
+	}
 
-	return hex
+	return NewObjectKeyFromBytes(bytes)
 }
 
 func (key ObjectKey) Bytes() []byte {

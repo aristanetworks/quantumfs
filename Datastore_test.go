@@ -3,6 +3,8 @@
 
 package quantumfs
 
+import "encoding/hex"
+import "strings"
 import "testing"
 
 func TestDirectoryRecordSort(t *testing.T) {
@@ -31,5 +33,38 @@ func TestDirectoryRecordSort(t *testing.T) {
 		test.Assert(dirEntry.Entry(2).Filename() == "name2",
 			"Wrong sort. Found %s expects \"name2\"",
 			dirEntry.Entry(2).Filename())
+	})
+}
+
+func TestEmptyKeyToString(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		key := EmptyDirKey
+		parts := strings.Split(strings.Trim(key.Text(), "()"), " ")
+		text := parts[1]
+		test.Assert(key.IsEqualTo(FromText(text)),
+			"The key before and after are not the same")
+	})
+}
+func TestKeyToString(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		// With an arbirary key
+		bytes, err :=
+			hex.DecodeString("2ee5784d3bd45789521abcdebbc45437c890fce8")
+		if err != nil {
+			panic(err.Error())
+		}
+
+		var out [ObjectKeyLength - 1]byte
+		for i := range bytes {
+			out[i] = bytes[1]
+		}
+
+		key := NewObjectKey(KeyTypeMetadata, out)
+		parts := strings.Split(strings.Trim(key.Text(), "()"), " ")
+		text := parts[1]
+		test.Assert(key.IsEqualTo(FromText(text)),
+			"The key before and after are not the same")
 	})
 }
