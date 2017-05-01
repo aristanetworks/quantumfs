@@ -114,6 +114,7 @@ to the QFS workspace build/eos-trunk/11223344. All files and sub-directories
 are included since an exclude file is not specified.
 
 The exclude file specifies paths that must be excluded from upload.
+It is possible to selectively include certain paths from excluded directories.
 The exclude file should be formatted based on following rules:
 
 One path per line
@@ -121,6 +122,7 @@ Path must be relative to the base directory specified
 Absolute paths are not allowed
 To create a directory without it's contents, specify / at the end of path
 To skip directory completely, specify directory name without trailing /
+To include a path , prefix the path with "+"
 Comments and empty lines are allowed. A comment is any line that starts with #
 
 `, version)

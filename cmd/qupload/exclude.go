@@ -6,6 +6,7 @@ package main
 import "bufio"
 import "bytes"
 import "fmt"
+import "io/ioutil"
 import "os"
 import "path/filepath"
 import "regexp"
@@ -19,8 +20,10 @@ type ExcludeInfo struct {
 
 func (e *ExcludeInfo) PathExcluded(path string) bool {
 	excl := e.re.MatchString(path)
-	incl := e.override.MatchString(path)
-	return excl && !incl
+	if e.override != nil {
+		excl = excl && !e.override.MatchString(path)
+	}
+	return excl
 }
 
 // returns the count of directory records that path should
@@ -58,8 +61,18 @@ func parseExcludeLine(line string) (string, bool) {
 // if the path is an exclude path then setup the exclude regex appropriately
 // if the path is an include path (or exclude override) then setup
 //  override regexp accordingly
-func handlePath(exInfo *ExcludeInfo, exclude bytes.Buffer, include bytes.Buffer,
-	word string, isIncludePath bool) {
+func handlePath(exInfo *ExcludeInfo, exclude *bytes.Buffer, include *bytes.Buffer,
+	base string, word string, isIncludePath bool) error {
+
+	_, ok := exInfo.dirRecordCounts["/"]
+	if !ok {
+		dirEnts, dirErr := ioutil.ReadDir(base)
+		if dirErr != nil {
+			return fmt.Errorf("Loading exclude info error: %v",
+				dirErr)
+		}
+		exInfo.dirRecordCounts["/"] = len(dirEnts)
+	}
 
 	if !isIncludePath {
 		exclude.WriteString("^" + word + "|")
@@ -68,17 +81,31 @@ func handlePath(exInfo *ExcludeInfo, exclude bytes.Buffer, include bytes.Buffer,
 		case strings.HasSuffix(word, "/"):
 			exInfo.dirRecordCounts[strings.TrimSuffix(word, "/")] = 0
 		case filepath.Dir(word) == ".":
-			rootDirRecords--
+			exInfo.dirRecordCounts["/"]--
 		default:
 			_, ok := exInfo.dirRecordCounts[filepath.Dir(word)]
 			if !ok {
-
+				dirEnts, dirErr := ioutil.ReadDir(
+					filepath.Join(base, filepath.Dir(word)))
+				if dirErr != nil {
+					return fmt.Errorf("Loading exclude "+
+						"info error: %v", dirErr)
+				}
+				exInfo.dirRecordCounts[filepath.Dir(word)] =
+					len(dirEnts)
 			}
 			exInfo.dirRecordCounts[filepath.Dir(word)]--
 		}
-
+	} else {
+		include.WriteString("^" + word + "|")
+		if filepath.Dir(word) == "." {
+			exInfo.dirRecordCounts["/"]++
+		} else {
+			exInfo.dirRecordCounts[filepath.Dir(word)]++
+		}
 	}
 
+	return nil
 }
 
 func LoadExcludeInfo(base string, path string) (*ExcludeInfo, error) {
@@ -88,7 +115,6 @@ func LoadExcludeInfo(base string, path string) (*ExcludeInfo, error) {
 	var exInfo ExcludeInfo
 
 	exInfo.dirRecordCounts = make(map[string]int)
-	exInfo.includePaths = make(map[string]bool)
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -116,7 +142,6 @@ func LoadExcludeInfo(base string, path string) (*ExcludeInfo, error) {
 		if strings.HasPrefix(word, "+") {
 			isIncludePath = true
 			word = strings.TrimPrefix(word, "+")
-			exInfo.includePaths[word] = true
 		}
 
 		// check to ensure the path entry in exlcude file is valid
@@ -126,8 +151,11 @@ func LoadExcludeInfo(base string, path string) (*ExcludeInfo, error) {
 				lineno, serr)
 		}
 
-		handlePath(include, exclude, word, isIncludePath)
-
+		err = handlePath(&exInfo, &exclude, &include, base, word,
+			isIncludePath)
+		if err != nil {
+			return nil, err
+		}
 		lineno++
 	}
 
@@ -140,10 +168,13 @@ func LoadExcludeInfo(base string, path string) (*ExcludeInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	reExp = strings.TrimSuffix(include.String(), "|")
-	exInfo.override, err = regexp.Compile(reExp)
-	if err != nil {
-		return nil, err
+	if include.String() != "" {
+		reExp = strings.TrimSuffix(include.String(), "|")
+		exInfo.override, err = regexp.Compile(reExp)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return &exInfo, nil
 }
