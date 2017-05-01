@@ -446,6 +446,8 @@ func publishHardlinkMap(c *ctx,
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	hardlinks map[HardlinkId]linkEntry) quantumfs.ObjectKey {
 
+	defer c.funcIn("publishWorkspaceRoot").out()
+
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(baseLayer)
 	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, hardlinks))
