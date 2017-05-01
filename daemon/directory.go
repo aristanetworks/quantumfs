@@ -48,7 +48,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
 	defer c.FuncIn("initDirectory",
-		"baselayer from %s", baseLayerId.String()).out()
+		"baselayer from %s", baseLayerId.Text()).out()
 
 	// Set directory data before processing the children in case the children
 	// access the parent.
@@ -64,7 +64,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 
 	key := baseLayerId
 	for {
-		c.vlog("Fetching baselayer %s", key.String())
+		c.vlog("Fetching baselayer %s", key.Text())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			panic("No baseLayer object")
@@ -387,8 +387,8 @@ func (dir *Directory) publish_(c *ctx) {
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records())
 
-	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
-		dir.baseLayerId.String())
+	c.vlog("Directory key %s -> %s", oldBaseLayer.Text(),
+		dir.baseLayerId.Text())
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
@@ -935,7 +935,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	if result == fuse.OK {
 		dir.self.dirty(c)
-		c.vlog("Created new symlink with key: %s", key.String())
+		c.vlog("Created new symlink with key: %s", key.Text())
 	}
 
 	return result
@@ -1269,7 +1269,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
-		dir.inodeNum(), inodeNum, newKey.String()).out()
+		dir.inodeNum(), inodeNum, newKey.Text()).out()
 
 	defer dir.Lock().Unlock()
 	dir.self.dirty(c)
@@ -1337,7 +1337,7 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 			continue
 		}
 
-		c.vlog("Found attribute key: %s", key.String())
+		c.vlog("Found attribute key: %s", key.Text())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			c.elog("Failed to retrieve attribute datablock")
@@ -1596,7 +1596,7 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 		constructor = newSpecial
 	}
 
-	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().Text())
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
