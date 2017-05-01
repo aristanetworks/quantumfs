@@ -79,7 +79,7 @@ const (
 
 	// The reserved typespace/namespace/workspace name for the empty workspace,
 	// ie. _/_/_.
-	NullSpaceName = "_"
+	NullSpaceName     = "_"
 	NullWorkspaceName = "_/_/_"
 )
 
