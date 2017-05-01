@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package daemon
@@ -52,18 +52,10 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		}
 	}
 
-	if !remoteDirectory.IsEqualTo(baseDirectory) {
-		if localDirectory.IsEqualTo(baseDirectory) {
-			// No conflict, just take remote
-			localDirectory = remoteDirectory
-		} else {
-			// three way merge
-			localDirectory, err = mergeDirectory(c, baseDirectory,
-				remoteDirectory, localDirectory, true)
-			if err != nil {
-				return local, err
-			}
-		}
+	localDirectory, err = mergeDirectory(c, baseDirectory,
+		remoteDirectory, localDirectory, true)
+	if err != nil {
+		return local, err
 	}
 
 	return publishWorkspaceRoot(c, localDirectory, localHardlinks), nil
@@ -145,17 +137,42 @@ func loadRecords(c *ctx,
 	}
 }
 
+func mergeIds(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
+	local quantumfs.ObjectKey, baseExists bool) (newKey quantumfs.ObjectKey,
+	valid bool) {
+
+	defer c.FuncIn("mergeIds", "%s", local.String()).out()
+
+	if baseExists && remote.IsEqualTo(base) {
+		return local, true
+	} else {
+		if baseExists && local.IsEqualTo(base) {
+			// just take remote
+			return remote, true
+		}
+
+		// three way merge
+		return local, false
+	}
+}
+
 // sometimes, in theory, two workspaces could simultaneously create directories or
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	validBase bool) (quantumfs.ObjectKey, error) {
+	baseExists bool) (quantumfs.ObjectKey, error) {
 
 	defer c.funcIn("mergeDirectory").out()
 
+	if quickKey, useQuick := mergeIds(c, base, remote, local,
+		baseExists); useQuick {
+
+		return quickKey, nil
+	}
+
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
-	if validBase {
+	if baseExists {
 		baseRecords, err = loadRecords(c, base)
 		if err != nil {
 			return local, err
@@ -187,7 +204,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		}
 	}
 
-	if validBase {
+	if baseExists {
 		for k, _ := range baseRecords {
 			_, inRemote := remoteRecords[k]
 
@@ -212,61 +229,73 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
 
-	// Don't merge if remote indicates no changes
-	if remote.ID().IsEqualTo(local.ID()) ||
-		(base != nil && remote.ID().IsEqualTo(base.ID())) {
-
-		return local, nil
+	var baseId quantumfs.ObjectKey
+	if base != nil {
+		baseId = base.ID()
 	}
 
-	// Merge differently depending on if the type is preserved
-	localChanged := base == nil || !typesMatch(local.Type(), base.Type())
-	remoteChanged := base == nil || !typesMatch(remote.Type(), base.Type())
-	bothSameType := typesMatch(local.Type(), remote.Type())
-
 	var mergedKey quantumfs.ObjectKey
-	var err error
 	updatedKey := true
-	switch local.Type() {
-	case quantumfs.ObjectTypeDirectoryEntry:
-		if (!localChanged && !remoteChanged) ||
-			(base == nil && bothSameType) {
 
-			var baseId quantumfs.ObjectKey
-			if base != nil {
-				baseId = base.ID()
-			}
+	if quickKey, useQuick := mergeIds(c, baseId, remote.ID(), local.ID(),
+		base != nil); useQuick {
 
-			mergedKey, err = mergeDirectory(c, baseId, remote.ID(),
-				local.ID(), (base != nil))
-			if err != nil {
-				return local, err
+		mergedKey = quickKey
+	} else {
+		// Merge differently depending on if the type is preserved
+		localTypeChanged := base == nil || !typesMatch(local.Type(),
+			base.Type())
+		remoteTypeChanged := base == nil || !typesMatch(remote.Type(),
+			base.Type())
+		bothSameType := typesMatch(local.Type(), remote.Type())
+
+		var err error
+		switch local.Type() {
+		case quantumfs.ObjectTypeDirectoryEntry:
+			if (!localTypeChanged && !remoteTypeChanged) ||
+				(base == nil && bothSameType) {
+
+				var baseId quantumfs.ObjectKey
+				if base != nil {
+					baseId = base.ID()
+				}
+
+				mergedKey, err = mergeDirectory(c, baseId,
+					remote.ID(), local.ID(), (base != nil))
+				if err != nil {
+					return local, err
+				}
+			} else {
+				return nil, fmt.Errorf("Misuse of mergeDirectory: "+
+					"%s %s",
+					quantumfs.ObjectType2String(local.Type()),
+					quantumfs.ObjectType2String(remote.Type()))
 			}
+		case quantumfs.ObjectTypeSmallFile:
+			fallthrough
+		case quantumfs.ObjectTypeMediumFile:
+			fallthrough
+		case quantumfs.ObjectTypeLargeFile:
+			fallthrough
+		case quantumfs.ObjectTypeVeryLargeFile:
+			if bothSameType {
+				// When we support intra-file merges, we'll need to
+				// use a mergeFile function
+				mergedKey = takeNewest(c, remote, local)
+			}
+		case quantumfs.ObjectTypeHardlink:
+			// Do nothing, hardlinks don't get merged
+			updatedKey = false
+		case quantumfs.ObjectTypeSymlink:
+			fallthrough
+		case quantumfs.ObjectTypeSpecial:
+			if bothSameType {
+				mergedKey = takeNewest(c, remote, local)
+			}
+		default:
+			return local, fmt.Errorf("Unsupported object merge type: %s",
+				quantumfs.ObjectType2String(local.Type()))
 		}
-	case quantumfs.ObjectTypeSmallFile:
-		fallthrough
-	case quantumfs.ObjectTypeMediumFile:
-		fallthrough
-	case quantumfs.ObjectTypeLargeFile:
-		fallthrough
-	case quantumfs.ObjectTypeVeryLargeFile:
-		if bothSameType {
-			// When we support intra-file merges, we'll need to use a
-			// mergeFile function
-			mergedKey = takeNewest(c, remote, local)
-		}
-	case quantumfs.ObjectTypeHardlink:
-		// Do nothing, hardlinks don't get merged
-		updatedKey = false
-	case quantumfs.ObjectTypeSymlink:
-		fallthrough
-	case quantumfs.ObjectTypeSpecial:
-		if bothSameType {
-			mergedKey = takeNewest(c, remote, local)
-		}
-	default:
-		return local, fmt.Errorf("Unsupported file type in merge: %s",
-			quantumfs.ObjectType2String(local.Type()))
 	}
 
 	rtnRecord := local
