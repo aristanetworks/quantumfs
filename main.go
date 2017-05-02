@@ -349,12 +349,12 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, ks, err)
+			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 		}
 
 		err = refreshTTL(cqlds, ks, metadata)
 		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, ks, err)
+			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 		}
 
 		//  TODO if isDir() and TTL is good, return walker.SkipDir
@@ -363,7 +363,7 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID, err)
+		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
 	}
 	return nil
 }
@@ -413,12 +413,12 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return fmt.Errorf("key %v: %v", ks, err)
+			return fmt.Errorf("key %v: %v", key.Text(), err)
 		}
 
 		err = refreshTTL(cqlds, ks, metadata)
 		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, ks, err)
+			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 		}
 
 		//  TODO if isDir() and TTL is good, return walker.SkipDir
@@ -467,7 +467,7 @@ func printList(c *quantumfs.Ctx, progress bool, qfsds quantumfs.DataStore,
 				if rootID, err = getWorkspaceRootID(c, wsdb, wsname); err != nil {
 					return fmt.Errorf("RootId not found for %v err: %v", wsname, err)
 				}
-				fmt.Printf("%v : %s\n", rootID, wsname)
+				fmt.Printf("%v : %s\n", rootID.Text(), wsname)
 			}
 		}
 	}
@@ -501,7 +501,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return fmt.Errorf("key %v: %v", ks, err)
+			return fmt.Errorf("key %v: %v", key.Text(), err)
 		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
@@ -648,7 +648,7 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 				ks := key.String()
 				metadata, err := cqlds.Metadata(ks)
 				if err != nil {
-					return fmt.Errorf("path: %v key %v: %v", path, ks, err)
+					return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 				}
 
 				ttl, ok := metadata[cql.TimeToLive]
