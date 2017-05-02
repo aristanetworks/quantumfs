@@ -37,20 +37,20 @@ func TestDirectoryRecordSort(t *testing.T) {
 
 func TestCacheSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		// Measure the cache block size of directory entries
+		// Measure the block size of directory entries
 		remain, dirEntry := NewDirectoryEntry(4)
 		cacheNum := dirEntry.dir.Entries().Len()
 		test.Assert(remain == 0 && cacheNum == 4, "Incorrect size of the "+
 			"remain: %d != 0 and of the cache: %d != 4",
 			remain, cacheNum)
 
-		// Measure the cache block size of very large files
+		// Measure the block size of very large files
 		vlf := NewVeryLargeFile(5)
 		cacheNum = vlf.vlf.LargeFileKeys().Len()
 		test.Assert(cacheNum == 5, "Incorrect size of the cache: %d != 5",
 			cacheNum)
 
-		// Measure the cache block size of Extended Attributes
+		// Measure the block size of entries containing Extended Attributes
 		remain, hlEntry := NewHardlinkEntry(6)
 		cacheNum = hlEntry.entry.Entries().Len()
 		test.Assert(remain == 0 && cacheNum == 6, "Incorrect size of the "+
