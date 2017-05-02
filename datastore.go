@@ -202,7 +202,6 @@ func (key ObjectKey) String() string {
 	return hex
 }
 
-// Text()'s output is different from String()'s output.
 func (key ObjectKey) Text() string {
 	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
 		hex.EncodeToString(key.Value()))
