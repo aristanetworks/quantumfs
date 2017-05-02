@@ -670,8 +670,8 @@ func (qfs *QuantumFs) increaseLookupCount(inodeId InodeId) {
 }
 
 func (qfs *QuantumFs) increaseLookupCountWithNum(inodeId InodeId, num uint64) {
-	defer qfs.c.FuncIn("Mux::increaseLookupCount", "inode %d with value %d",
-		inodeId, num).out()
+	defer qfs.c.FuncIn("Mux::increaseLookupCountWithNum",
+		"inode %d with value %d", inodeId, num).out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
@@ -918,8 +918,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-// The returned Forget function of workspaceroot should be triggered in the end of
-// the caller
+// The returned cleanup function of workspaceroot should be called in the end of the
+// caller
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	workspace string) (wsr *WorkspaceRoot, cleanup func(), ok bool) {
 

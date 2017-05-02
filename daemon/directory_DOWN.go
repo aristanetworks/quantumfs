@@ -132,8 +132,8 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	return typeKey, fuse.OK
 }
 
-// The returned Forget function of terminal directory should be triggered in the end
-// of the caller
+// The returned cleanup function of terminal directory should be called in the end of
+// the caller
 func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 	cleanup func(), err error) {
 
