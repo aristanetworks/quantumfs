@@ -548,7 +548,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	_, emptyDir := NewDirectoryEntry(MaxDirectoryRecords())
+	_, emptyDir := NewDirectoryEntry(0)
 
 	bytes := emptyDir.Bytes()
 
