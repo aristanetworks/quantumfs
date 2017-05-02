@@ -129,11 +129,11 @@ func TestMergeDifferentTypes(t *testing.T) {
 		MergeTester(test, func(branchA string,
 			branchB string) mergeTestCheck {
 
-			err := os.MkdirAll(branchA + "/fileA/fileisadir", 0777)
+			err := os.MkdirAll(branchA+"/fileA/fileisadir", 0777)
 			test.AssertNoErr(err)
 			dataB := test.MakeFile(branchB + "/fileA")
 
-			err = os.MkdirAll(branchB + "/fileB/fileisadir", 0777)
+			err = os.MkdirAll(branchB+"/fileB/fileisadir", 0777)
 			test.AssertNoErr(err)
 			dataA2 := test.MakeFile(branchA + "/fileB")
 
