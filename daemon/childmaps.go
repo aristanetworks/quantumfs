@@ -319,7 +319,7 @@ type recordsOnDemand struct {
 
 	cache map[string]quantumfs.DirectoryRecord
 	// One of the most common and expensive operations is updating the ID.
-	// Separate this into it's own cache to optimize syncChild
+	// Separate this into its own cache to optimize syncChild
 	cacheKey map[InodeId]quantumfs.ObjectKey
 }
 
