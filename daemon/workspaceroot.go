@@ -74,7 +74,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		typespace, namespace, workspace)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 	c.vlog("Workspace Loading %s/%s/%s %s",
-		typespace, namespace, workspace, rootId.String())
+		typespace, namespace, workspace, rootId.Text())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -467,8 +467,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 				wsr.workspace
 
 			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.String(), newRootId.String(),
-				wsr.rootId.String(), err.Error())
+				rootId.Text(), newRootId.Text(),
+				wsr.rootId.Text(), err.Error())
 			c.wlog("Another quantumfs instance is writing to %s, %s",
 				workspacePath,
 				"your changes will be lost. "+
@@ -483,8 +483,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			return
 		}
 
-		c.dlog("Advanced rootId %s -> %s", wsr.rootId.String(),
-			rootId.String())
+		c.dlog("Advanced rootId %s -> %s", wsr.rootId.Text(),
+			rootId.Text())
 		wsr.rootId = rootId
 	}
 }
