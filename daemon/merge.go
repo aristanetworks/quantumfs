@@ -9,14 +9,18 @@ import "github.com/aristanetworks/quantumfs"
 
 func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[HardlinkId]linkEntry,
-	nextHardlinkId HardlinkId, directory quantumfs.ObjectKey) {
+	nextHardlinkId HardlinkId, directory quantumfs.ObjectKey, err error) {
 
 	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		return nil, HardlinkId(0), key,
+			fmt.Errorf("Unable to Get block for key: %s", key.String())
+	}
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
 	links, nextId := loadHardlinks(c, workspaceRoot.HardlinkEntry())
 
-	return links, nextId, workspaceRoot.BaseLayer()
+	return links, nextId, workspaceRoot.BaseLayer(), nil
 }
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
@@ -24,11 +28,20 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 
 	defer c.funcIn("mergeWorkspaceRoot").out()
 
-	baseHardlinks, _, baseDirectory := loadWorkspaceRoot(c, base)
-	remoteHardlinks, _, remoteDirectory := loadWorkspaceRoot(c, remote)
-	localHardlinks, nextHardlinkId, localDirectory := loadWorkspaceRoot(c, local)
+	baseHardlinks, _, baseDirectory, err := loadWorkspaceRoot(c, base)
+	if err != nil {
+		return local, err
+	}
+	remoteHardlinks, _, remoteDirectory, err := loadWorkspaceRoot(c, remote)
+	if err != nil {
+		return local, err
+	}
+	localHardlinks, nextHardlinkId, localDirectory, err := loadWorkspaceRoot(c,
+		local)
+	if err != nil {
+		return local, err
+	}
 
-	var err error
 	// We assume that local and remote are newer versions of base
 	for k, v := range remoteHardlinks {
 		_, baseExists := baseHardlinks[k]
@@ -235,12 +248,13 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	}
 
 	var mergedKey quantumfs.ObjectKey
-	updatedKey := true
+	updatedKey := false
 
 	if quickKey, useQuick := mergeIds(c, baseId, remote.ID(), local.ID(),
 		base != nil); useQuick {
 
 		mergedKey = quickKey
+		updatedKey = true
 	} else {
 		// Merge differently depending on if the type is preserved
 		localTypeChanged := base == nil || !typesMatch(local.Type(),
@@ -265,11 +279,8 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 				if err != nil {
 					return local, err
 				}
-			} else {
-				return nil, fmt.Errorf("Misuse of mergeDirectory: "+
-					"%s %s",
-					quantumfs.ObjectType2String(local.Type()),
-					quantumfs.ObjectType2String(remote.Type()))
+
+				updatedKey = true
 			}
 		case quantumfs.ObjectTypeSmallFile:
 			fallthrough
@@ -279,34 +290,25 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 			fallthrough
 		case quantumfs.ObjectTypeVeryLargeFile:
 			if bothSameType {
-				// When we support intra-file merges, we'll need to
-				// use a mergeFile function
-				mergedKey = takeNewest(c, remote, local)
+				mergedKey, err = mergeFile(c, remote, local)
+				if err != nil {
+					return nil, err
+				}
+
+				updatedKey = true
 			}
-		case quantumfs.ObjectTypeHardlink:
-			// Do nothing, hardlinks don't get merged
-			updatedKey = false
-		case quantumfs.ObjectTypeSymlink:
-			fallthrough
-		case quantumfs.ObjectTypeSpecial:
-			if bothSameType {
-				mergedKey = takeNewest(c, remote, local)
-			}
-		default:
-			return local, fmt.Errorf("Unsupported object merge type: %s",
-				quantumfs.ObjectType2String(local.Type()))
 		}
 	}
 
 	rtnRecord := local
-	// now decide which set of metadata we take (local or remote)
 	if remote.ModificationTime() > local.ModificationTime() {
 		rtnRecord = remote
 	}
 
-	if updatedKey {
-		rtnRecord.SetID(mergedKey)
+	if !updatedKey {
+		mergedKey = takeNewest(c, remote, local)
 	}
+	rtnRecord.SetID(mergedKey)
 
 	return rtnRecord, nil
 }
@@ -323,4 +325,11 @@ func takeNewest(c *ctx, remote quantumfs.DirectoryRecord,
 
 	c.vlog("keeping local copy of %s", local.Filename())
 	return local.ID()
+}
+
+func mergeFile(c *ctx, remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) (quantumfs.ObjectKey, error) {
+
+	// support intra-file merges here later
+	return takeNewest(c, remote, local), nil
 }

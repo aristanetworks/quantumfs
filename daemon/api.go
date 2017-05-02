@@ -520,7 +520,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
 		base[2])
 	if err != nil {
-		c.vlog("Workspace not found: %s", base)
+		c.vlog("Workspace not fetched (%s): %s", base, err.Error())
 		return api.queueErrorResponse(0+
 			quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active",
@@ -531,7 +531,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	localRootId, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
 		local[2])
 	if err != nil {
-		c.vlog("Workspace not found: %s", local)
+		c.vlog("Workspace not fetched (%s): %s", local, err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active",
 			cmd.LocalWorkspace)
@@ -541,7 +541,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
 	if err != nil {
-		c.vlog("Workspace not found: %s", remote)
+		c.vlog("Workspace not fetched (%s): %s", remote, err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"WorkspaceRoot %s does not exist or is not active",
 			cmd.RemoteWorkspace)
@@ -553,15 +553,16 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
 		localRootId)
 	if err != nil {
-		c.vlog("Merge failed: %s", err)
+		c.vlog("Merge failed: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"Merge failed: %s", err)
+			"Merge failed: %s", err.Error())
 	}
 
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
 		local[2], localRootId, newRootId)
 	if err != nil {
-		c.vlog("Workspace rootId advanced after merge began, try again.")
+		c.vlog("Workspace can't advance after merge began, try again: %s",
+			err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"Workspace rootId advanced after merge began, try again.")
 	}

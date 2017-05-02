@@ -5,6 +5,7 @@ package daemon
 
 // Test workspace merging
 
+import "os"
 import "syscall"
 import "testing"
 
@@ -118,6 +119,27 @@ func TestMergeSpecial(t *testing.T) {
 				test.Assert(specialStats.Mode == statSpecB.Mode,
 					"special Mode changed %x vs %x",
 					specialStats.Mode, statSpecB.Mode)
+			}
+		})
+	})
+}
+
+func TestMergeDifferentTypes(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			err := os.MkdirAll(branchA + "/fileA/fileisadir", 0777)
+			test.AssertNoErr(err)
+			dataB := test.MakeFile(branchB + "/fileA")
+
+			err = os.MkdirAll(branchB + "/fileB/fileisadir", 0777)
+			test.AssertNoErr(err)
+			dataA2 := test.MakeFile(branchA + "/fileB")
+
+			return func(merged string) {
+				test.CheckData(merged+"/fileA", dataB)
+				test.CheckData(merged+"/fileB", dataA2)
 			}
 		})
 	})
