@@ -156,6 +156,9 @@ func mergeIds(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 
 	defer c.FuncIn("mergeIds", "%s", local.String()).out()
 
+	// The assumption in merge is that remote and locall are derived from base.
+	// That is why we are able to completely disregard one branch if the other's
+	// key matches the base.
 	if baseExists && remote.IsEqualTo(base) {
 		return local, true
 	} else {
