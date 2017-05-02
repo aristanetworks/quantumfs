@@ -1225,7 +1225,10 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	err := dir.children.setKey(inodeNum, newKey)
 	if err != fuse.OK && err != fuse.ENOENT {
-		c.wlog("Directory::syncChild inode %d error: %s", inodeNum, err)
+		c.wlog("Directory::syncChild inode %d error: %s", inodeNum,
+			err.String())
+		return
+	} else if err == fuse.OK {
 		return
 	}
 
@@ -1239,7 +1242,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 		}
 	}
 
-	c.vlog("syncChild called on missing child %d", inodeNum)
+	c.elog("syncChild called on missing child %d", inodeNum)
 }
 
 // Get the extended attributes object. The status is EIO on error or ENOENT if there
