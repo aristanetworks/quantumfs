@@ -98,7 +98,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
 	defer c.FuncIn("ChildMap::loadChild", "%s %s", entry.Filename(),
-		entry.ID().String()).out()
+		entry.ID().Text()).out()
 
 	entry = convertRecord(cmap.wsr, entry)
 	if entry == nil {
@@ -433,8 +433,7 @@ func (rd *recordsOnDemand) iterateOverRecords(c *ctx,
 	for {
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
-			panic(fmt.Sprintf("No baseLayer object for %s",
-				key.String()))
+			panic(fmt.Sprintf("No baseLayer object for %s", key.Text()))
 		}
 
 		baseLayer := buffer.AsDirectoryEntry()
