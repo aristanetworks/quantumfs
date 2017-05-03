@@ -196,9 +196,9 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	stop := false
-	flushAll := false
 
 	for {
+		flushAll := false
 		sleepTime := nextExpiringInode.Sub(time.Now())
 
 		if sleepTime > flushSanityTimeout {
@@ -839,7 +839,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
-			children := dir.directChildInodes()
+			children := dir.directChildInodes(c)
 
 			for _, i := range children {
 				// To be fully unloaded, the child must have lookup

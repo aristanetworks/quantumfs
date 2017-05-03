@@ -41,7 +41,7 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
-	c.Vlog(qlog.LogDaemon, "---In dataStore::Get key %s", key.String())
+	c.Vlog(qlog.LogDaemon, "---In dataStore::Get key %s", key.Text())
 	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Get")
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
@@ -98,7 +98,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return &buf
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
-		err.Error(), key.String())
+		err.Error(), key.Text())
 
 	return nil
 }
@@ -316,7 +316,7 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
+	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.Text())
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
 }
