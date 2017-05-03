@@ -202,6 +202,20 @@ func (key ObjectKey) String() string {
 	return hex
 }
 
+func (key ObjectKey) Text() string {
+	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
+		hex.EncodeToString(key.Value()))
+}
+
+func FromText(text string) (ObjectKey, error) {
+	bytes, err := hex.DecodeString(text)
+	if err != nil {
+		return ZeroKey,
+			fmt.Errorf("text is not valid ObjectKey err: %v", err)
+	}
+	return NewObjectKeyFromBytes(bytes), nil
+}
+
 func (key ObjectKey) Bytes() []byte {
 	return key.key.Segment.Data
 }
