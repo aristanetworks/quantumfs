@@ -37,7 +37,6 @@ func (e *ExcludeInfo) PathExcluded(path string) bool {
 		incl = e.includeRE.MatchString(path)
 		excl = excl && !incl
 	}
-	fmt.Printf("PathExcluded(%s) excl:%v incl:%v\n", path, excl, incl)
 	return excl
 }
 
@@ -51,7 +50,11 @@ func (e *ExcludeInfo) RecordCount(path string, recs int) int {
 	return exrecs
 }
 
-func parseExcludeLine(line string) (string, error) {
+func isIncludePath(word string) bool {
+	return strings.HasPrefix(word, "+")
+}
+
+func parseExcludeLine(base string, line string) (string, error) {
 	parts := strings.Split(line, " ")
 	// rules
 	switch {
@@ -61,13 +64,27 @@ func parseExcludeLine(line string) (string, error) {
 		return "", fmt.Errorf("path has / prefix")
 	case strings.HasPrefix(line, "."):
 		return "", fmt.Errorf("path has . prefix")
-	case !strings.HasPrefix(line, "+") && strings.HasSuffix(line, "/"):
+	case !isIncludePath(line) && strings.HasSuffix(line, "/"):
 		return "", fmt.Errorf("exclude path has / suffix")
+	}
+	// check to ensure the path entry in exclude file is valid
+	_, serr := os.Lstat(filepath.Join(base, strings.TrimPrefix(line, "+")))
+	if serr != nil {
+		return "", serr
 	}
 	return parts[0], nil
 }
 
 func checkExcludeRules(exInfo *ExcludeInfo, word string) error {
+	if isIncludePath(word) {
+		word = strings.TrimSuffix(word, "/")
+		for d := filepath.Dir(word); d != "."; d = filepath.Dir(d) {
+			d = strings.TrimPrefix(d, "+")
+			if _, ok := exInfo.includes[d]; !ok {
+				return fmt.Errorf("parent path is not included")
+			}
+		}
+	}
 	return nil
 }
 
@@ -84,15 +101,24 @@ func initRecordCount(exInfo *ExcludeInfo, dir string, path string) error {
 	return nil
 }
 
-func addWord(exInfo *ExcludeInfo, word string, isIncludePath bool) {
-	if !isIncludePath {
+func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
+	if !includePath {
 		exInfo.excludes[word] = true
+		// if an exclude overrides includes
+		// clean up includes that are redundant now
+		for inc, _ := range exInfo.includes {
+			if strings.Contains(inc, word) {
+				delete(exInfo.includes, inc)
+				// record counts aren't setup yet
+				// so no need to clean them up
+			}
+		}
 	} else {
 		exInfo.includes[word] = true
 	}
 }
 
-func decRecordCount(exInfo *ExcludeInfo, base string, path string) error {
+func excludeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	if path == "." {
 		path = excludeTopDir
 	}
@@ -101,13 +127,10 @@ func decRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 		return err
 	}
 	exInfo.dirRecordCounts[path]--
-	fmt.Printf("decRecordCount(%s) = %d\n",
-		path,
-		exInfo.dirRecordCounts[path])
 	return nil
 }
 
-func incRecordCount(exInfo *ExcludeInfo, base string, path string) error {
+func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	if path == "." {
 		path = excludeTopDir
 	}
@@ -115,11 +138,9 @@ func incRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	// for dirs in include path is completely based on
 	// includeMap and is independent of the record count
 	// in the source directory (base + path).
-	// TODO: add comment about excludeTopDir record count
+	// include paths follow exclude paths and so the excludeTopDir
+	// record count would already be setup correctly
 	exInfo.dirRecordCounts[path]++
-	fmt.Printf("incRecordCount(%s) = %d\n",
-		path,
-		exInfo.dirRecordCounts[path])
 	return nil
 }
 
@@ -137,10 +158,9 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		// an exclude path only says that the last path-component
 		// is excluded and hence only its parent's record count is
 		// impacted, grand-parents remain unaffected by this path
-		decRecordCount(exInfo, base, filepath.Dir(word))
+		excludeSetRecordCount(exInfo, base, filepath.Dir(word))
 	}
 	re := strings.TrimSuffix(exRE.String(), "|")
-	fmt.Println("ExcludeRE = ", re)
 	exInfo.excludeRE, err = regexp.Compile(re)
 	if err != nil {
 		return err
@@ -155,19 +175,16 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		//
 		// since we allow suffix of "/" in include paths
 		// trim it for record counting purposes
-		incRecordCount(exInfo, base,
+		includeSetRecordCount(exInfo, base,
 			filepath.Dir(strings.TrimSuffix(word, "/")))
 	}
 	re = strings.TrimSuffix(inRE.String(), "|")
 	if re != "" {
-		fmt.Println("IncludeRE = ", re)
 		exInfo.includeRE, err = regexp.Compile(re)
 		if err != nil {
 			return err
 		}
 	}
-
-	fmt.Printf("RecordCounts: %v\n", exInfo.dirRecordCounts)
 	return nil
 }
 
@@ -186,16 +203,17 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 	defer file.Close()
 
 	s := bufio.NewScanner(file)
-	lineno := 1
+	lineno := 0
 	word := ""
 	for s.Scan() {
 		line := s.Text()
 		line = strings.TrimSpace(line)
+		lineno++
 		// ignore comments and empty lines
 		if len(line) == 0 || strings.HasPrefix(line, "#") {
 			continue
 		}
-		word, err = parseExcludeLine(line)
+		word, err = parseExcludeLine(base, line)
 		if err != nil {
 			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
 				filename, lineno, err)
@@ -207,20 +225,13 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 				filename, lineno, err)
 		}
 
-		isIncludePath := false
-		if strings.HasPrefix(word, "+") {
-			isIncludePath = true
+		includePath := false
+		if isIncludePath(word) {
+			includePath = true
 			word = strings.TrimPrefix(word, "+")
 		}
-		// check to ensure the path entry in exlcude file is valid
-		_, serr := os.Lstat(filepath.Join(base, word))
-		if serr != nil {
-			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
-				filename, lineno, serr)
-		}
 
-		addWord(&exInfo, word, isIncludePath)
-		lineno++
+		addWord(&exInfo, word, includePath)
 	}
 
 	if err = s.Err(); err != nil {
