@@ -47,6 +47,7 @@ type params struct {
 var dataStore quantumfs.DataStore
 var wsDB quantumfs.WorkspaceDB
 var version string
+var exInfo *ExcludeInfo
 
 type Ctx struct {
 	Qctx *quantumfs.Ctx
@@ -286,7 +287,6 @@ func main() {
 
 	// setup exclude information
 	relpath := ""
-	var exInfo *ExcludeInfo
 	if cliParams.excludeFile != "" {
 		exInfo, err = LoadExcludeInfo(cliParams.baseDir,
 			cliParams.excludeFile)
@@ -328,8 +328,7 @@ func main() {
 	// upload
 	start := time.Now()
 	upErr := upload(c, cliParams.ws, cliParams.advance,
-		filepath.Join(cliParams.baseDir, relpath), exInfo,
-		cliParams.conc)
+		filepath.Join(cliParams.baseDir, relpath), cliParams.conc)
 	if upErr != nil {
 		c.Elog("Upload failed: ", upErr)
 		os.Exit(exitErrUpload)

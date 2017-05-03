@@ -71,6 +71,24 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 	rootTracker = false
 }
 
+func dumpUploadState() {
+	// exclude info
+	exInfo.DumpState()
+	// dump paths which have pending writes
+	for path, tracker := range dirEntryTrackers {
+		if len(tracker.records) != cap(tracker.records) {
+			fmt.Printf("%q (root: %v) is pending writes\n",
+				path, tracker.root)
+			fmt.Printf("  len: %d cap: %d\n",
+				len(tracker.records),
+				cap(tracker.records))
+			for _, rec := range tracker.records {
+				fmt.Printf("   %s\n", rec.Filename())
+			}
+		}
+	}
+}
+
 func handleDirRecord(qctx *quantumfs.Ctx,
 	record quantumfs.DirectoryRecord, path string) error {
 
@@ -80,6 +98,7 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 	for {
 		tracker, ok := dirEntryTrackers[path]
 		if !ok {
+			dumpUploadState()
 			panic(fmt.Sprintf("BUG: Directory state tracker must "+
 				"exist for %q", path))
 		}
@@ -169,8 +188,7 @@ func relativePath(path string, base string) (string, error) {
 }
 
 func pathWalker(c *Ctx, piChan chan<- *pathInfo,
-	path string, root string, info os.FileInfo, err error,
-	exInfo *ExcludeInfo) error {
+	path string, root string, info os.FileInfo, err error) error {
 
 	// when basedir is "./somebase" or "/somebase" or "somebase" then
 	// pathWalker is called with path as "somebase" then path as
@@ -249,7 +267,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 }
 
 func upload(c *Ctx, ws string, advance string, root string,
-	exInfo *ExcludeInfo, conc uint) error {
+	conc uint) error {
 
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
@@ -268,7 +286,7 @@ func upload(c *Ctx, ws string, advance string, root string,
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
 				return pathWalker(c, piChan, path,
-					root, info, err, exInfo)
+					root, info, err)
 			})
 		close(piChan)
 		return err
@@ -276,6 +294,13 @@ func upload(c *Ctx, ws string, advance string, root string,
 
 	err := group.Wait()
 	if err != nil {
+		return err
+	}
+
+	if topDirRecord == nil {
+		err = errors.New("BUG: workspace root dir not written yet but all " +
+			"writes to workspace completed.")
+		dumpUploadState()
 		return err
 	}
 

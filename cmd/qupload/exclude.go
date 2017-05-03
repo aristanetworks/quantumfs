@@ -4,7 +4,6 @@
 package main
 
 import "bufio"
-import "bytes"
 import "fmt"
 import "io/ioutil"
 import "os"
@@ -16,6 +15,7 @@ const excludeTopDir = "/"
 
 type ExcludeInfo struct {
 	// temporary maps to collect exclude and include paths
+	// boolean value indicates if regex must use dollar or not
 	excludes map[string]bool
 	includes map[string]bool
 
@@ -113,72 +113,85 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 				// so no need to clean them up
 			}
 		}
-	} else {
-		exInfo.includes[word] = true
+		return
 	}
+	if !strings.HasSuffix(word, "/") {
+		exInfo.includes[word] = true
+		return
+	}
+
+	// including a hierarchy implies that
+	// the regex for this word must not include $
+	exInfo.includes[strings.TrimSuffix(word, "/")] = false
 }
 
 func excludeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
-	if path == "." {
-		path = excludeTopDir
+	exInfo.dirRecordCounts[path] = 0
+	// an exclude path only says that the last path-component
+	// is excluded and hence only its parent's record count is
+	// impacted, grand-parents remain unaffected by this path
+	// update the parent's record count
+	parent := filepath.Dir(path)
+	if parent == "." {
+		parent = excludeTopDir
 	}
-	err := initRecordCount(exInfo, base, path)
+	err := initRecordCount(exInfo, base, parent)
 	if err != nil {
 		return err
 	}
-	exInfo.dirRecordCounts[path]--
+	exInfo.dirRecordCounts[parent]--
 	return nil
 }
 
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
-	if path == "." {
-		path = excludeTopDir
+	if exInfo.includes[path] {
+		// if only the directory name is being included then setup the
+		// record count
+		exInfo.dirRecordCounts[path] = 0
 	}
-	// no need to initRecordCount since the record count
-	// for dirs in include path is completely based on
-	// includeMap and is independent of the record count
-	// in the source directory (base + path).
-	// include paths follow exclude paths and so the excludeTopDir
+	parent := filepath.Dir(path)
+	if parent == "." {
+		parent = excludeTopDir
+	}
+	// an include parent will have all its parents in the
+	// includes so again we only need to setup the
+	// parent of last parent compoment
+	// include parents follow exclude parents and so the excludeTopDir
 	// record count would already be setup correctly
-	exInfo.dirRecordCounts[path]++
+	exInfo.dirRecordCounts[parent]++
 	return nil
 }
 
 // processing the words involves:
 //  a) setup the exclude and include RE based on the maps
 //  b) setup the record counts based on the maps
+//
+// generating the regex at the end of adding all words
+// helps in avoiding to edit the regex
 func processWords(exInfo *ExcludeInfo, base string) error {
-	var exRE bytes.Buffer
-	var inRE bytes.Buffer
 	var err error
+	exRE := make([]string, 0)
+	inRE := make([]string, 0)
 
 	for word, _ := range exInfo.excludes {
-		exRE.WriteString("^" + word + "|")
-
-		// an exclude path only says that the last path-component
-		// is excluded and hence only its parent's record count is
-		// impacted, grand-parents remain unaffected by this path
-		excludeSetRecordCount(exInfo, base, filepath.Dir(word))
+		exRE = append(exRE, "^"+regexp.QuoteMeta(word))
+		excludeSetRecordCount(exInfo, base, word)
 	}
-	re := strings.TrimSuffix(exRE.String(), "|")
+	re := strings.Join(exRE, "|")
 	exInfo.excludeRE, err = regexp.Compile(re)
 	if err != nil {
 		return err
 	}
 
-	for word, _ := range exInfo.includes {
-		inRE.WriteString("^" + word + "$|")
-
-		// an include path will have all its parents in the
-		// includes so again we only need to setup the
-		// parent of last path compoment
-		//
-		// since we allow suffix of "/" in include paths
-		// trim it for record counting purposes
-		includeSetRecordCount(exInfo, base,
-			filepath.Dir(strings.TrimSuffix(word, "/")))
+	for word, useDollar := range exInfo.includes {
+		includeSetRecordCount(exInfo, base, word)
+		if !useDollar {
+			inRE = append(inRE, "^"+regexp.QuoteMeta(word))
+			continue
+		}
+		inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"$")
 	}
-	re = strings.TrimSuffix(inRE.String(), "|")
+	re = strings.Join(inRE, "|")
 	if re != "" {
 		exInfo.includeRE, err = regexp.Compile(re)
 		if err != nil {
@@ -245,4 +258,19 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 	}
 
 	return &exInfo, nil
+}
+
+func (exInfo *ExcludeInfo) DumpState() {
+	fmt.Println("Dump of exclude information")
+	fmt.Printf("%v\n", exInfo)
+	if exInfo.excludeRE != nil {
+		fmt.Printf("Exclude Regex: %s\n", exInfo.excludeRE.String())
+	} else {
+		fmt.Printf("Exclude Regex is nil\n")
+	}
+	if exInfo.includeRE != nil {
+		fmt.Printf("Include Regex: %s\n", exInfo.includeRE.String())
+	} else {
+		fmt.Printf("Include Regex is nil\n")
+	}
 }
