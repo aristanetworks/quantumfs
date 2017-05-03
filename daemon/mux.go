@@ -238,7 +238,8 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 			// but we want to skip timer based flushes
 			nextExpiringInode = time.Now().Add(flushSanityTimeout)
 
-			// allow stop to still work
+			// If we're skipping flushes and someone tries to stop the
+			// flusher, we can stop without ever flushing to save time
 			if stop {
 				finished <- true
 				return
