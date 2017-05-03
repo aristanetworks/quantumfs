@@ -298,9 +298,6 @@ func main() {
 		relpath = qFlags.Arg(0)
 	}
 
-	// TEMP
-	//os.Exit(0)
-
 	if cliParams.progress == true {
 		// setup progress indicator
 		go func() {
