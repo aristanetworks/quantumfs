@@ -41,7 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
-		skipFlush:		false,
+		skipFlush:              false,
 		dirtyQueue:             make(map[*sync.RWMutex]*list.List),
 		kickFlush:              make(chan struct{}, 1),
 		flushAll:               make(chan *ctx),
