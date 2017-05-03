@@ -150,28 +150,6 @@ func loadRecords(c *ctx,
 	}
 }
 
-func mergeIds(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
-	local quantumfs.ObjectKey, baseExists bool) (newKey quantumfs.ObjectKey,
-	valid bool) {
-
-	defer c.FuncIn("mergeIds", "%s", local.String()).out()
-
-	// The assumption in merge is that remote and locall are derived from base.
-	// That is why we are able to completely disregard one branch if the other's
-	// key matches the base.
-	if baseExists && remote.IsEqualTo(base) {
-		return local, true
-	} else {
-		if baseExists && local.IsEqualTo(base) {
-			// just take remote
-			return remote, true
-		}
-
-		// three way merge
-		return local, false
-	}
-}
-
 // sometimes, in theory, two workspaces could simultaneously create directories or
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
@@ -179,12 +157,6 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	baseExists bool) (quantumfs.ObjectKey, error) {
 
 	defer c.funcIn("mergeDirectory").out()
-
-	if quickKey, useQuick := mergeIds(c, base, remote, local,
-		baseExists); useQuick {
-
-		return quickKey, nil
-	}
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
@@ -236,7 +208,28 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		localRecordsList = append(localRecordsList, v)
 	}
 
-	return publishDirectoryRecords(c, localRecordsList), nil
+	// publish localRecordsList
+	newBaseLayerId := quantumfs.EmptyDirKey
+
+	baseLayer := quantumfs.NewDirectoryEntry()
+	entryIdx := 0
+	for _, record := range localRecordsList {
+		if entryIdx == quantumfs.MaxDirectoryRecords() {
+			baseLayer.SetNumEntries(entryIdx)
+			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
+				newBaseLayerId)
+			baseLayer = quantumfs.NewDirectoryEntry()
+			entryIdx = 0
+		}
+
+		recordCopy := record.Record()
+		baseLayer.SetEntry(entryIdx, &recordCopy)
+
+		entryIdx++
+	}
+
+	baseLayer.SetNumEntries(entryIdx)
+	return publishDirectoryEntry(c, baseLayer, newBaseLayerId), nil
 }
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
@@ -245,61 +238,49 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
 
-	var baseId quantumfs.ObjectKey
-	if base != nil {
-		baseId = base.ID()
-	}
+	// Merge differently depending on if the type is preserved
+	localTypeChanged := base == nil || !typesMatch(local.Type(),
+		base.Type())
+	remoteTypeChanged := base == nil || !typesMatch(remote.Type(),
+		base.Type())
+	bothSameType := typesMatch(local.Type(), remote.Type())
 
 	var mergedKey quantumfs.ObjectKey
 	updatedKey := false
 
-	if quickKey, useQuick := mergeIds(c, baseId, remote.ID(), local.ID(),
-		base != nil); useQuick {
+	var err error
+	switch local.Type() {
+	case quantumfs.ObjectTypeDirectoryEntry:
+		if (!localTypeChanged && !remoteTypeChanged) ||
+			(base == nil && bothSameType) {
 
-		mergedKey = quickKey
-		updatedKey = true
-	} else {
-		// Merge differently depending on if the type is preserved
-		localTypeChanged := base == nil || !typesMatch(local.Type(),
-			base.Type())
-		remoteTypeChanged := base == nil || !typesMatch(remote.Type(),
-			base.Type())
-		bothSameType := typesMatch(local.Type(), remote.Type())
-
-		var err error
-		switch local.Type() {
-		case quantumfs.ObjectTypeDirectoryEntry:
-			if (!localTypeChanged && !remoteTypeChanged) ||
-				(base == nil && bothSameType) {
-
-				var baseId quantumfs.ObjectKey
-				if base != nil {
-					baseId = base.ID()
-				}
-
-				mergedKey, err = mergeDirectory(c, baseId,
-					remote.ID(), local.ID(), (base != nil))
-				if err != nil {
-					return local, err
-				}
-
-				updatedKey = true
+			var baseId quantumfs.ObjectKey
+			if base != nil {
+				baseId = base.ID()
 			}
-		case quantumfs.ObjectTypeSmallFile:
-			fallthrough
-		case quantumfs.ObjectTypeMediumFile:
-			fallthrough
-		case quantumfs.ObjectTypeLargeFile:
-			fallthrough
-		case quantumfs.ObjectTypeVeryLargeFile:
-			if bothSameType {
-				mergedKey, err = mergeFile(c, remote, local)
-				if err != nil {
-					return nil, err
-				}
 
-				updatedKey = true
+			mergedKey, err = mergeDirectory(c, baseId,
+				remote.ID(), local.ID(), (base != nil))
+			if err != nil {
+				return local, err
 			}
+
+			updatedKey = true
+		}
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeMediumFile:
+		fallthrough
+	case quantumfs.ObjectTypeLargeFile:
+		fallthrough
+	case quantumfs.ObjectTypeVeryLargeFile:
+		if bothSameType {
+			mergedKey, err = mergeFile(c, remote, local)
+			if err != nil {
+				return nil, err
+			}
+
+			updatedKey = true
 		}
 	}
 
