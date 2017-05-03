@@ -209,6 +209,7 @@ func TestHardlinkForget(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		// Check that it's uninstantiated
 		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated",
@@ -253,6 +254,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		test.qfs.increaseLookupCount(linkInode)
 
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.
