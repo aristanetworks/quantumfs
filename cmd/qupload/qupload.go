@@ -118,12 +118,26 @@ It is possible to selectively include certain paths from excluded directories.
 The exclude file should be formatted based on following rules:
 
 One path per line
+Comments and empty lines are allowed. A comment is any line that starts with "#"
+Order of the paths in the file is important
 Path must be relative to the base directory specified
 Absolute paths are not allowed
-To create a directory without it's contents, specify / at the end of path
-To skip directory completely, specify directory name without trailing /
-To include a path , prefix the path with "+"
-Comments and empty lines are allowed. A comment is any line that starts with #
+Exclude paths must not be "/" suffixed
+Paths to be included are prefixed with "+"
+The parent and grand-parents of paths to be included must be included already
+
+Example:
+
+dir1
++dir1/subdir1
++dir1/subdir1/file1
++dir1/subdir3
++dir1/subdir4
++dir1/subdir3/subsubdir4/
+
+In the above example, anything under directory "dir1" are excluded except
+dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
+Note dir1/subdir4 contents are not included
 
 `, version)
 	qFlags.PrintDefaults()
@@ -283,6 +297,9 @@ func main() {
 	} else {
 		relpath = qFlags.Arg(0)
 	}
+
+	// TEMP
+	//os.Exit(0)
 
 	if cliParams.progress == true {
 		// setup progress indicator
