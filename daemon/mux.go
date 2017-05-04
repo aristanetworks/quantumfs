@@ -449,7 +449,7 @@ func adjustBdi(c *ctx, mountId int) {
 	// /sys/class/bdi/<mount>/read_ahead_kb indicates how much data, up to the
 	// end of the file, should be speculatively read by the kernel. Setting this
 	// to the block size should improve the correlation between the what the
-	// kernel reads and what QuantumFS can provide most effeciently. Since this
+	// kernel reads and what QuantumFS can provide most efficiently. Since this
 	// is the amount in addition to the original read the kernel will read the
 	// entire block containing the user's read and then some portion of the next
 	// block. Thus QuantumFS will have time to fetch the next block in advance of
