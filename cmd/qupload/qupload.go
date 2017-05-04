@@ -42,6 +42,7 @@ type params struct {
 	conc        uint
 	logdir      string
 	wsforce     bool
+	referenceWS string
 }
 
 var dataStore quantumfs.DataStore
@@ -89,17 +90,21 @@ func showUsage() {
 	fmt.Printf(`
 qupload - tool to upload a directory hierarchy to a QFS supported datastore
 version: %s
-usage: qupload -datastore <dsname> -datastoreconf <dsconf>
+usage: qupload -datastore   <dsname>   -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
-	       -workspace <wsname>
-	       [ -alias <wsname> -progress -logdir <logpath>
-	         -concurrency <count> -wsforce ]
-	       -basedir <path> [ -exclude <file> | <reldirpath> ]
+               -workspace   <wsname>
+                          -basedir <path> [ -exclude <file> | <reldirpath> ]
+                        | -referencews <wsname>
+               [ -concurrency <count> ] 
+               [ -logdir <logpath> ]
+               [ -alias <wsname> ]
+               [ -progress ] 
+               [ -wsforce ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
            -workspaceDB ether.cql -workspaceDBconf etherconf
-	   -workspace build/eos-trunk/11223344
-	   -basedir /var/Abuild/66778899 -exclude excludeFile
+           -workspace build/eos-trunk/11223344
+           -basedir /var/Abuild/66778899 -exclude excludeFile
 Above command will upload the contents of /var/Abuild/66778899 directory
 to the QFS workspace build/eos-trunk/11223344. The files and directories
 specified by excludeFile are excluded from upload. See below for details about
@@ -107,8 +112,8 @@ the exclude file format.
 
 2) qupload -datastore ether.cql -datastoreconf etherconf
            -workspaceDB ether.cql -workspaceDBconf etherconf
-	   -workspace build/eos-trunk/11223344
-	   -basedir /var/Abuild/66778899 src
+           -workspace build/eos-trunk/11223344
+           -basedir /var/Abuild/66778899 src
 Above command will upload the contents of /var/Abuild/66778899/src directory
 to the QFS workspace build/eos-trunk/11223344. All files and sub-directories
 are included since an exclude file is not specified.
@@ -123,6 +128,13 @@ To create a directory without it's contents, specify / at the end of path
 To skip directory completely, specify directory name without trailing /
 Comments and empty lines are allowed. A comment is any line that starts with #
 
+3) qupload -datastore ether.cql -datastoreconf etherconf
+           -workspaceDB ether.cql -workspaceDBconf etherconf
+           -workspace build/eos-trunk/11223344
+           -referencews build/eos-trunk/11223300
+Above command will create a new workspace build/eos-trunk/11223344
+with the same contents as build/eos-trunk/11223300
+
 `, version)
 	qFlags.PrintDefaults()
 }
@@ -131,9 +143,14 @@ func validateParams(p *params) error {
 	var err error
 
 	// check mandatory flags
-	if p.ws == "" || p.baseDir == "" || p.dsName == "" ||
-		p.dsConf == "" || p.wsdbName == "" || p.wsdbConf == "" {
+	if p.ws == "" || (p.baseDir == "" && p.referenceWS == "") ||
+		p.dsName == "" || p.dsConf == "" || p.wsdbName == "" ||
+		p.wsdbConf == "" {
 		return errors.New("One or more mandatory flags are missing")
+	}
+
+	if p.baseDir != "" && p.referenceWS != "" {
+		return errors.New("Provide one of basedir and referencews, not both")
 	}
 
 	if strings.Count(p.ws, "/") != 2 {
@@ -146,10 +163,9 @@ func validateParams(p *params) error {
 			"contain precisely two \"/\"")
 	}
 
-	if (p.excludeFile == "" && qFlags.NArg() == 0) ||
-		(p.excludeFile != "" && qFlags.NArg() > 0) {
-		return errors.New("One of exclude file or directory " +
-			"argument must be specified")
+	if p.referenceWS != "" && strings.Count(p.referenceWS, "/") != 2 {
+		return errors.New("Workspace to be referenced must " +
+			"contain precisely two \"/\"")
 	}
 
 	if qFlags.NArg() > 1 {
@@ -158,21 +174,30 @@ func validateParams(p *params) error {
 	}
 
 	root := p.baseDir
-	if qFlags.NArg() == 1 {
-		if strings.HasPrefix(qFlags.Arg(0), "/") {
-			return errors.New("Directory argument must be " +
-				"relative to the base directory. Do not " +
-				"use absolute path")
+	if p.baseDir != "" {
+		if (p.excludeFile == "" && qFlags.NArg() == 0) ||
+			(p.excludeFile != "" && qFlags.NArg() > 0) {
+			return errors.New("One of exclude file or directory " +
+				"argument must be specified")
 		}
-		root = filepath.Join(p.baseDir, qFlags.Arg(0))
-	}
+		if qFlags.NArg() == 1 {
+			if strings.HasPrefix(qFlags.Arg(0), "/") {
+				return errors.New("Directory argument must be " +
+					"relative to the base directory. Do not " +
+					"use absolute path")
+			}
+			root = filepath.Join(p.baseDir, qFlags.Arg(0))
+		}
 
-	info, err := os.Lstat(root)
-	if err != nil {
-		return fmt.Errorf("%s : %s\n", root, err)
-	}
-	if !info.Mode().IsRegular() && !info.IsDir() {
-		return fmt.Errorf("%s must be regular file or directory", root)
+		info, err := os.Lstat(root)
+		if err != nil {
+			return fmt.Errorf("%s : %s\n", root, err)
+		}
+
+		if !info.Mode().IsRegular() && !info.IsDir() {
+			return fmt.Errorf("%s must be regular file or directory",
+				root)
+		}
 	}
 
 	if p.conc == 0 {
@@ -208,7 +233,7 @@ func main() {
 		"Name of workspace which'll contain uploaded data")
 
 	qFlags.StringVar(&cliParams.alias, "alias", "",
-		"Name of workspace which'll be aliased to point"+
+		"Name of workspace which'll be aliased to point "+
 			"to uploaded workspace")
 	qFlags.BoolVar(&cliParams.progress, "progress", false,
 		"Show the data and metadata sizes uploaded")
@@ -229,6 +254,8 @@ func main() {
 		"All directory arguments are relative to this base directory")
 	qFlags.StringVar(&cliParams.excludeFile, "exclude", "",
 		"Exclude the files and directories specified in this file")
+	qFlags.StringVar(&cliParams.referenceWS, "referencews", "",
+		"Name of the reference workspace")
 
 	qFlags.Usage = showUsage
 	qFlags.Parse(os.Args[1:])
@@ -306,25 +333,19 @@ func main() {
 		}()
 	}
 
-	// upload
-	start := time.Now()
-	upErr := upload(c, cliParams.ws, cliParams.alias,
-		filepath.Join(cliParams.baseDir, relpath), exInfo,
-		cliParams.conc)
-	if upErr != nil {
-		c.Elog("Upload failed: ", upErr)
-		os.Exit(exitErrUpload)
+	if cliParams.baseDir != "" {
+		err = upload(c, &cliParams, relpath, exInfo)
+		if err != nil {
+			c.Elog("Upload failed: ", err)
+			os.Exit(exitErrUpload)
+		}
+		c.Vlog("Upload completed")
+	} else {
+		err = byPass(c, &cliParams)
+		if err != nil {
+			c.Elog("Bypass failed: ", err)
+			os.Exit(exitErrUpload)
+		}
+		c.Vlog("Bypass completed")
 	}
-
-	c.Vlog("Upload completed")
-	fmt.Printf("\nUpload completed. Total: %d bytes "+
-		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
-		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
-		qwr.DataBytesWritten,
-		(qwr.DataBytesWritten*100)/
-			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
-		qwr.MetadataBytesWritten,
-		(qwr.MetadataBytesWritten*100)/
-			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
-		time.Since(start).Seconds(), cliParams.ws)
 }

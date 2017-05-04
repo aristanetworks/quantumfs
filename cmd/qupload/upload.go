@@ -248,9 +248,15 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(c *Ctx, ws string, alias_ws string, root string,
-	exInfo *ExcludeInfo, conc uint) error {
+func upload(c *Ctx, cli *params, relpath string,
+	exInfo *ExcludeInfo) error {
 
+	ws := cli.ws
+	aliasWS := cli.alias
+	root := filepath.Join(cli.baseDir, relpath)
+	conc := cli.conc
+
+	start := time.Now()
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
 	var group *errgroup.Group
@@ -284,7 +290,22 @@ func upload(c *Ctx, ws string, alias_ws string, root string,
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return uploadCompleted(c.Qctx, wsDB, ws, alias_ws, wsrKey)
+	err = uploadCompleted(c.Qctx, wsDB, ws, aliasWS, wsrKey)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("\nUpload completed. Total: %d bytes "+
+		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
+		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
+		qwr.DataBytesWritten,
+		(qwr.DataBytesWritten*100)/
+			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		qwr.MetadataBytesWritten,
+		(qwr.MetadataBytesWritten*100)/
+			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		time.Since(start).Seconds(), ws)
+	return nil
 }
 
 // Uploads to existing workspaces should be supported.
@@ -332,19 +353,35 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 }
 
 func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
-	alias_ws string, newWsrKey quantumfs.ObjectKey) error {
+	aliasWS string, newWsrKey quantumfs.ObjectKey) error {
 
 	err := branchThenAdvance(qctx, wsdb, ws, newWsrKey)
 	if err != nil {
 		return err
 	}
 
-	if alias_ws != "" {
-		err := branchThenAdvance(qctx, wsdb, alias_ws, newWsrKey)
+	if aliasWS != "" {
+		err := branchThenAdvance(qctx, wsdb, aliasWS, newWsrKey)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func byPass(c *Ctx, cli *params) error {
+
+	ws := cli.ws
+	aliasWS := cli.alias
+	referenceWS := cli.referenceWS
+	refWSParts := strings.Split(referenceWS, "/")
+
+	key, err := wsDB.Workspace(c.Qctx,
+		refWSParts[0], refWSParts[1], refWSParts[2])
+	if err != nil {
+		return err
+	}
+
+	return uploadCompleted(c.Qctx, wsDB, ws, aliasWS, key)
 }
