@@ -298,10 +298,11 @@ func upload(c *Ctx, ws string, alias_ws string, root string,
 	}
 
 	if topDirRecord == nil {
-		err = errors.New("BUG: workspace root dir not written yet but all " +
-			"writes to workspace completed.")
+		err = errors.New("workspace root dir not written yet but all " +
+			"writes to workspace completed. This is unexpected. " +
+			"Use debug dump to diagnose.")
 		dumpUploadState()
-		return err
+		panic()
 	}
 
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, topDirRecord.ID(),
