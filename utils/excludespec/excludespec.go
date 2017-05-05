@@ -6,14 +6,14 @@ Package excludespec provides APIs for loading a specification file that
 describes which files or directories are excluded and/or included. The spec
 file must follow rules outlined below:
 
-One path per line
-Comments and empty lines are allowed. A comment is any line that starts with "#"
-Order of the paths in the file is important
-Path must be under the base directory specified
-Absolute paths are not allowed
-Exclude paths must not be "/" suffixed
-Paths to be included are prefixed with "+"
-The parent and grand-parents of paths to be included must be included already
+One path per line.
+Comments and empty lines are allowed. A comment is any line that starts with "#".
+Order of the paths in the file is important.
+Path must be under the base directory specified.
+Absolute paths are not allowed.
+Exclude paths must not be "/" suffixed.
+Paths to be included are prefixed with "+".
+The parent and grand-parents of paths to be included must be included already.
 
 Example:
 
@@ -24,11 +24,10 @@ dir1
 +dir1/subdir4
 +dir1/subdir3/subsubdir4/
 
-In the above example, anything under directory "dir1" are excluded except
+In the above example, anything under directory "dir1" is excluded except
 dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
-Note dir1/subdir3 and dir1/subdir4 contents are not included
+Note contents of dir1/subdir3 and dir1/subdir4 are not included.
 */
-
 package excludespec
 
 import "bufio"

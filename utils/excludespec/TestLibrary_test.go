@@ -25,15 +25,10 @@ type esTest func(*testHelper)
 
 func runTest(t *testing.T, test esTest) {
 	t.Parallel()
-	runTestCommon(t, test)
-}
-
-func runTestCommon(t *testing.T, test esTest) {
 	// call-stack until test should be
-	// 2 <testname>
-	// 1 runTest
+	// 1 <testname>
 	// 0 runTestCommon
-	testName := testutils.TestName(2)
+	testName := testutils.TestName(1)
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
@@ -106,6 +101,8 @@ func createHierarchy(base string, paths []string) error {
 		if err != nil {
 			return err
 		}
+		// test cases mark directory with trailing slash
+		// to differentiate files and directory paths
 		if strings.HasSuffix(path, "/") {
 			err = os.MkdirAll(filepath.Join(base, path),
 				os.ModePerm)
@@ -139,6 +136,15 @@ func testSpec(base string, filename string, expected pathInfo) error {
 	if err != nil {
 		return err
 	}
+	// walker walks the hierarchy anchored at base.
+	// It checks if a path is excluded as per the exclude file
+	// referred by filename.
+	// All non-excluded (ie included) paths are tracked for
+	// comparison with the expected paths.
+	// For included directories, the RecordCount API is used
+	// to know the number of directory records that should be
+	// present for the included directory. This record count is also
+	// checked against the expected path information.
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
