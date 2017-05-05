@@ -91,95 +91,39 @@ func TestPanicFilesystemAbort(t *testing.T) {
 }
 
 // This is the normal way to run tests in the most time efficient manner
-func runTest(t *testing.T, test quantumFsTest) {
+func runTest(t *testing.T, test QuantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test, true, nil)
+	RunTestCommon(t, test, true, nil)
 }
 
 // If you need to initialize the QuantumFS instance in some special way,
 // then use this variant.
-func runTestNoQfs(t *testing.T, test quantumFsTest) {
+func runTestNoQfs(t *testing.T, test QuantumFsTest) {
 	t.Parallel()
-	runTestCommon(t, test, false, nil)
+	RunTestCommon(t, test, false, nil)
 }
-
-// configModifier is a function which is given the default configuration
-// and should make whichever modifications the test requires in place.
-type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
 
 // If you need to initialize QuantumFS with a special configuration, but not poke
 // into its internals before the test proper begins, use this.
 func runTestCustomConfig(t *testing.T, configModifier configModifierFunc,
-	test quantumFsTest) {
+	test QuantumFsTest) {
 
 	t.Parallel()
-	runTestCommon(t, test, true, configModifier)
+	RunTestCommon(t, test, true, configModifier)
 }
 
 // If you need to initialize the QuantumFS instance in some special way and the test
 // is relatively expensive, then use this variant.
-func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, false, nil)
+func runTestNoQfsExpensiveTest(t *testing.T, test QuantumFsTest) {
+	RunTestCommon(t, test, false, nil)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
 // runExpensiveTest() which will not run it at the same time as other tests. This is
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
-func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, true, nil)
-}
-
-func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
-	configModifier configModifierFunc) {
-
-	// the stack depth of test name for all callers of runTestCommon
-	// is 2. Since the stack looks as follows:
-	// 2 <testname>
-	// 1 runTest
-	// 0 runTestCommon
-	testName := testutils.TestName(2)
-	th := &testHelper{
-		TestHelper: TestHelper{
-			TestHelper: testutils.NewTestHelper(testName,
-				TestRunDir, t),
-		},
-	}
-	th.CreateTestDirs()
-	defer th.EndTest()
-
-	// Allow tests to run for up to 1 seconds before considering them timed out.
-	// If we are going to start a standard QuantumFS instance we can start the
-	// timer before the test proper and therefore avoid false positive test
-	// failures due to timeouts caused by system slowness as we try to mount
-	// dozens of FUSE filesystems at once.
-	if startDefaultQfs {
-		config := th.defaultConfig()
-		if configModifier != nil {
-			configModifier(th, &config)
-		}
-
-		th.startQuantumFs(config)
-	}
-
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
-}
-
-type quantumFsTest func(test *testHelper)
-
-func (th *testHelper) testHelperUpcast(
-	testFn func(test *testHelper)) testutils.QuantumFsTest {
-
-	return func(test testutils.TestArg) {
-		testFn(th)
-	}
-}
-
-// testHelper holds the variables important to maintain the state of testing
-// in a package. This helper is more of a namespacing mechanism than a
-// coherent object.
-type testHelper struct {
-	TestHelper
+func runExpensiveTest(t *testing.T, test QuantumFsTest) {
+	RunTestCommon(t, test, true, nil)
 }
 
 // Retrieve a list of FileDescriptor from an Inode

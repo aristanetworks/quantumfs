@@ -3,40 +3,24 @@
 
 package qfsclientc
 
+import "flag"
+import "os"
 import "testing"
 
-import "github.com/aristanetworks/quantumfs/testutils"
+import "github.com/aristanetworks/quantumfs/daemon"
 
-type testHelper struct {
-	testutils.TestHelper
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	daemon.PreTestRuns()
+	result := m.Run()
+	daemon.PostTestRuns()
+
+	os.Exit(result)
 }
 
-type qfsTest func(*testHelper)
-
-func runTest(t *testing.T, test qfsTest) {
+func runTest(t *testing.T, test func(test *daemon.TestHelper)) {
 	t.Parallel()
-	runTestCommon(t, test)
-}
-
-func runTestCommon(t *testing.T, test qfsTest) {
-	// call-stack until test should be
-	// 2 <testname>
-	// 1 runTest
-	// 0 runTestCommon
-	testName := testutils.TestName(2)
-	th := &testHelper{
-		TestHelper: testutils.NewTestHelper(testName,
-			testutils.TestRunDir, t),
-	}
-	defer th.EndTest()
-
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
-}
-
-func (th *testHelper) testHelperUpcast(
-	testFn func(test *testHelper)) testutils.QuantumFsTest {
-
-	return func(test testutils.TestArg) {
-		testFn(th)
-	}
+	daemon.RunTestCommon(t, daemon.QuantumFsTestCast(test), true, nil)
 }
