@@ -78,7 +78,7 @@ extern "C" {
 		std::vector<uint8_t> inputData(data, data + len);
 
 		qfsclient::Error err = search->second->SetBlock(inputKey, inputData);
-		
+
 		const char *rtn = errStr(err);
 		return rtn;
 	}
@@ -97,7 +97,7 @@ extern "C" {
 
 		std::vector<uint8_t> data;
 		qfsclient::Error err = search->second->GetBlock(inputKey, &data);
-		
+
 		const char *rtn = errStr(err);
 		if (rtn != "") {
 			return rtn;
