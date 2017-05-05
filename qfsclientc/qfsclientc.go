@@ -26,9 +26,8 @@ import "unsafe"
 
 import "github.com/aristanetworks/quantumfs"
 
-
 type QfsClientApi struct {
-	handle	uint32
+	handle uint32
 }
 
 func GetApi() (api QfsClientApi, err error) {
@@ -38,7 +37,7 @@ func GetApi() (api QfsClientApi, err error) {
 		return QfsClientApi{}, errors.New(errStr)
 	}
 
-	return QfsClientApi {
+	return QfsClientApi{
 		handle: apiHandle,
 	}, nil
 }
@@ -51,14 +50,14 @@ func GetApiPath(path string) (api QfsClientApi, err error) {
 		return QfsClientApi{}, errors.New(errStr)
 	}
 
-	return QfsClientApi {
+	return QfsClientApi{
 		handle: apiHandle,
 	}, nil
 }
 
 func ReleaseApi(api QfsClientApi) error {
 	handle := C.uint32_t(api.handle)
-	err := C.cReleaseApi(handle);
+	err := C.cReleaseApi(handle)
 	errStr := C.GoString(err)
 
 	if errStr != "" {
@@ -68,7 +67,7 @@ func ReleaseApi(api QfsClientApi) error {
 	return nil
 }
 
-func (api * QfsClientApi) SetBlock(key string, data []byte) error {
+func (api *QfsClientApi) SetBlock(key string, data []byte) error {
 	errStr := C.GoString(C.cSetBlock(C.uint32_t(api.handle), C.CString(key),
 		(*C.uint8_t)(unsafe.Pointer(&data)),
 		C.uint32_t(len(data))))
@@ -80,7 +79,7 @@ func (api * QfsClientApi) SetBlock(key string, data []byte) error {
 	return nil
 }
 
-func (api * QfsClientApi) GetBlock(key string) ([]byte, error) {
+func (api *QfsClientApi) GetBlock(key string) ([]byte, error) {
 	data := make([]byte, quantumfs.MaxBlockSize)
 	var dataLen uint32
 
@@ -94,4 +93,3 @@ func (api * QfsClientApi) GetBlock(key string) ([]byte, error) {
 
 	return data[:dataLen], nil
 }
-
