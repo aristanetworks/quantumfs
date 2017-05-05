@@ -99,7 +99,7 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 		tracker, ok := dirEntryTrackers[path]
 		if !ok {
 			dumpUploadState()
-			panic(fmt.Sprintf("BUG: Directory state tracker must "+
+			panic(fmt.Sprintf("Directory state tracker must "+
 				"exist for %q", path))
 		}
 
@@ -298,11 +298,10 @@ func upload(c *Ctx, ws string, alias_ws string, root string,
 	}
 
 	if topDirRecord == nil {
-		err = errors.New("workspace root dir not written yet but all " +
+		dumpUploadState()
+		panic("workspace root dir not written yet but all " +
 			"writes to workspace completed. This is unexpected. " +
 			"Use debug dump to diagnose.")
-		dumpUploadState()
-		panic()
 	}
 
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, topDirRecord.ID(),
