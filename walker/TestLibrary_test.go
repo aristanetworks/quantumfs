@@ -39,7 +39,7 @@ func runTestCommon(t *testing.T, test walkerTest,
 		},
 	}
 
-	th.Timeout = 3000 * time.Millisecond
+	th.Timeout = 5000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
 
@@ -118,8 +118,15 @@ func (th *testHelper) readWalkCompare(workspace string) {
 			return nil
 		}
 
+		if path == workspace+"/api" {
+			return nil
+		}
+
 		if !info.IsDir() {
-			ioutil.ReadFile(path)
+			_, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -185,8 +192,15 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 			return filepath.SkipDir
 		}
 
+		if path == workspace+"/api" {
+			return nil
+		}
+
 		if !info.IsDir() {
-			ioutil.ReadFile(path)
+			_, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}
