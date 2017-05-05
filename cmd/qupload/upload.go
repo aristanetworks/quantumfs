@@ -73,7 +73,7 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 
 func dumpUploadState() {
 	// exclude info
-	exInfo.DumpState()
+	fmt.Println(exInfo)
 	// dump paths which have pending writes
 	for path, tracker := range dirEntryTrackers {
 		if len(tracker.records) != cap(tracker.records) {
