@@ -50,7 +50,7 @@ test: cleanuplocal $(TEST_TARGET) gotests
 	LD_LIBRARY_PATH=$(d) $(TEST_TARGET)
 
 gotests:
-	LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
+	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
 		go test github.com/aristanetworks/quantumfs/qfsclientc
 
 $(TEST_TARGET): $(TEST_OBJS) $(TARGET)
