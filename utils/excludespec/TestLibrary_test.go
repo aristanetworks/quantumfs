@@ -3,18 +3,53 @@
 
 package excludespec
 
-import (
-	"bytes"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"reflect"
-	"sort"
-	"strconv"
-	"strings"
-	"testing"
-)
+import "bytes"
+import "fmt"
+import "io/ioutil"
+import "os"
+import "path/filepath"
+import "reflect"
+import "sort"
+import "strconv"
+import "strings"
+import "testing"
+
+import "github.com/aristanetworks/quantumfs/testutils"
+
+type testHelper struct {
+	testutils.TestHelper
+}
+
+// exclude spec test
+type esTest func(*testHelper)
+
+func runTest(t *testing.T, test esTest) {
+	t.Parallel()
+	runTestCommon(t, test)
+}
+
+func runTestCommon(t *testing.T, test esTest) {
+	// call-stack until test should be
+	// 2 <testname>
+	// 1 runTest
+	// 0 runTestCommon
+	testName := testutils.TestName(2)
+	th := &testHelper{
+		TestHelper: testutils.NewTestHelper(testName,
+			testutils.TestRunDir, t),
+	}
+	defer th.EndTest()
+
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+}
+
+func (th *testHelper) testHelperUpcast(
+	testFn func(test *testHelper)) testutils.QuantumFsTest {
+
+	return func(test testutils.TestArg) {
+		testFn(th)
+	}
+}
 
 // prints the actual and expected maps side by side so they
 // are easy to visually compare
@@ -153,31 +188,9 @@ func testSpec(base string, filename string, expected pathInfo) error {
 	return nil
 }
 
-type testCleaner struct {
-	testdir string
-	t       *testing.T
-}
-
-func (c *testCleaner) cleanup() {
-	err := os.RemoveAll(c.testdir)
-	if err != nil {
-		c.t.Fatalf("Test %q cleanup failed: %v",
-			c.t.Name(), err)
-	}
-}
-
-func setup(t *testing.T) *testCleaner {
-	dir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatalf("Test %q setup failed: %v",
-			t.Name(), err)
-	}
-	return &testCleaner{testdir: dir}
-}
-
 const excludeFileName = "testExcludeFileName"
 
-func loadSpecTest(t *testing.T, testdir string, hierarchy []string,
+func loadSpecTest(testdir string, hierarchy []string,
 	content string) error {
 
 	filename := filepath.Join(testdir, excludeFileName)
@@ -185,65 +198,37 @@ func loadSpecTest(t *testing.T, testdir string, hierarchy []string,
 
 	err := createHierarchy(datadir, hierarchy)
 	if err != nil {
-		t.Fatalf("IO error during test data creation: %s",
+		return fmt.Errorf("IO error during test data creation: %s",
 			err)
 	}
 	err = writeExcludeSpec(filename, content)
 	if err != nil {
-		t.Fatalf("IO error during exclude file write: %s",
+		return fmt.Errorf("IO error during exclude file write: %s",
 			err)
 	}
 	_, err = LoadExcludeInfo(datadir, filename)
 	return err
 }
 
-func runSpecTest(t *testing.T, testdir string, hierarchy []string,
-	content string, expected pathInfo) {
+func runSpecTest(testdir string, hierarchy []string,
+	content string, expected pathInfo) error {
 
 	filename := filepath.Join(testdir, "testExcludeFileName")
 	datadir := filepath.Join(testdir, "data")
 
 	err := createHierarchy(datadir, hierarchy)
 	if err != nil {
-		t.Fatalf("IO error during test data creation: %s",
+		return fmt.Errorf("IO error during test data creation: %s",
 			err)
 	}
 	err = writeExcludeSpec(filename, content)
 	if err != nil {
-		t.Fatalf("IO error during exclude file write: %s",
+		return fmt.Errorf("IO error during exclude file write: %s",
 			err)
 	}
 	err = testSpec(datadir, filename, expected)
 	if err != nil {
-		t.Fatalf("Failed: %s\n", err)
+		return fmt.Errorf("Failed: %s\n", err)
 	}
-}
-
-type loadSpecTestCase struct {
-	descr   string // test description
-	content string // content of exclude file
-	err     bool   // true if error expected else false
-}
-
-func loadSpecTestRunner(testcases []loadSpecTestCase, hierarchy []string,
-	topTest *testing.T) {
-
-	for _, test := range testcases {
-		topTest.Run(test.descr, func(t *testing.T) {
-			// test.descr isn't suited as testdir name
-			// so we use topTest's name
-			tc := setup(topTest)
-			defer tc.cleanup()
-			err := loadSpecTest(t, tc.testdir, hierarchy,
-				test.content)
-			if !test.err && err != nil {
-				fmt.Println("Unexpected error: ", err)
-				t.Fatal()
-			}
-			if test.err && err == nil {
-				fmt.Println("Expected error but got nil")
-				t.Fatal()
-			}
-		})
-	}
+	return nil
 }
