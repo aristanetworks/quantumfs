@@ -58,30 +58,6 @@ type ExcludeInfo struct {
 	dirRecordCounts map[string]int
 }
 
-func (e *ExcludeInfo) PathExcluded(path string) bool {
-	// a path is excluded if theres a match in excludeRE
-	// and no match in includeRE
-	// if a path doesn't match excludeRE then no need to check
-	// includeRE
-	excl := e.excludeRE.MatchString(path)
-	incl := false
-	if excl && e.includeRE != nil {
-		incl = e.includeRE.MatchString(path)
-		excl = excl && !incl
-	}
-	return excl
-}
-
-// returns the count of directory records that path should
-// have
-func (e *ExcludeInfo) RecordCount(path string, recs int) int {
-	exrecs, exist := e.dirRecordCounts[path]
-	if !exist {
-		return recs
-	}
-	return exrecs
-}
-
 func isIncludePath(word string) bool {
 	return strings.HasPrefix(word, "+")
 }
@@ -92,6 +68,8 @@ func parseExcludeLine(base string, line string) (string, error) {
 	switch {
 	case len(parts) > 1:
 		return "", fmt.Errorf("whitespace in a line")
+	// the slash and dot-dot are mainly to make sure that all paths
+	// are relative and under the base directory
 	case strings.HasPrefix(line, "/"):
 		return "", fmt.Errorf("path has / prefix")
 	case strings.HasPrefix(line, ".."):
@@ -108,6 +86,8 @@ func parseExcludeLine(base string, line string) (string, error) {
 }
 
 func checkExcludeRules(exInfo *ExcludeInfo, word string) error {
+	// parent and all grand-parent paths should be included
+	// prioer to including a path
 	if isIncludePath(word) {
 		word = strings.TrimSuffix(word, "/")
 		for d := filepath.Dir(word); d != "."; d = filepath.Dir(d) {
@@ -130,6 +110,9 @@ func initRecordCount(exInfo *ExcludeInfo, dir string, path string) error {
 	return nil
 }
 
+// Keep track of words by adding them to include and exclude maps.
+// This helps in doing the regex generation and record count setup
+// after all words have been added.
 func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 	if !includePath {
 		exInfo.excludes[word] = empty
@@ -221,6 +204,15 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		return err
 	}
 
+	// Only include paths which refer to a file or directory-without content
+	// should have dollar in their regex. All other cases shouldn't have
+	// $.
+	// For include paths, to match a directory and all its content the
+	// regex must not include dollar suffix. Similarly, to exclude a
+	// directory and its content, it must not have $ in regex. Excluding only
+	// directory is not allowed using exclude syntax. One must use, include
+	// syntax to exclude all content within a directory while retaining the
+	// directory itself.
 	for word, useDollar := range exInfo.includes {
 		includeSetRecordCount(exInfo, base, word)
 		if !useDollar {
@@ -237,6 +229,30 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		}
 	}
 	return nil
+}
+
+func (e *ExcludeInfo) PathExcluded(path string) bool {
+	// a path is excluded if theres a match in excludeRE
+	// and no match in includeRE
+	// if a path doesn't match excludeRE then no need to check
+	// includeRE
+	excl := e.excludeRE.MatchString(path)
+	incl := false
+	if excl && e.includeRE != nil {
+		incl = e.includeRE.MatchString(path)
+		excl = excl && !incl
+	}
+	return excl
+}
+
+// returns the count of directory records that path should
+// have
+func (e *ExcludeInfo) RecordCount(path string, recs int) int {
+	exrecs, exist := e.dirRecordCounts[path]
+	if !exist {
+		return recs
+	}
+	return exrecs
 }
 
 func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
@@ -264,6 +280,9 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 		if len(line) == 0 || strings.HasPrefix(line, "#") {
 			continue
 		}
+		// Word is obtained when line in exclude file passes
+		// parsing (syntax checks). It retains special characters
+		// like "+". Hence its neither a path nor a line.
 		word, err = parseExcludeLine(base, line)
 		if err != nil {
 			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
