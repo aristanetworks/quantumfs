@@ -9,7 +9,6 @@ import "testing"
 
 import "github.com/aristanetworks/quantumfs/daemon"
 
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 
