@@ -19,8 +19,9 @@ import "golang.org/x/net/context"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/thirdparty_backends"
+import exs "github.com/aristanetworks/quantumfs/utils/excludespec"
 
 // Various exit reasons returned to the shell as exit code
 const (
@@ -47,7 +48,7 @@ type params struct {
 var dataStore quantumfs.DataStore
 var wsDB quantumfs.WorkspaceDB
 var version string
-var exInfo *ExcludeInfo
+var exInfo *exs.ExcludeInfo
 
 type Ctx struct {
 	Qctx *quantumfs.Ctx
@@ -138,7 +139,7 @@ dir1
 
 In the above example, anything under directory "dir1" are excluded except
 dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
-Note dir1/subdir4 contents are not included
+Note dir1/subdir3 and dir1/subdir4 contents are not included
 
 `, version)
 	qFlags.PrintDefaults()
@@ -288,7 +289,7 @@ func main() {
 	// setup exclude information
 	relpath := ""
 	if cliParams.excludeFile != "" {
-		exInfo, err = LoadExcludeInfo(cliParams.baseDir,
+		exInfo, err = exs.LoadExcludeInfo(cliParams.baseDir,
 			cliParams.excludeFile)
 		if err != nil {
 			fmt.Println("Exclude file processing failed: ", err)

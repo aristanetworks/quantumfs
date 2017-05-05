@@ -1,9 +1,38 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package main
+/*
+Package excludespec provides APIs for loading a specification file that
+describes which files or directories are excluded and/or included. The spec
+file must follow rules outlined below:
+
+One path per line
+Comments and empty lines are allowed. A comment is any line that starts with "#"
+Order of the paths in the file is important
+Path must be under the base directory specified
+Absolute paths are not allowed
+Exclude paths must not be "/" suffixed
+Paths to be included are prefixed with "+"
+The parent and grand-parents of paths to be included must be included already
+
+Example:
+
+dir1
++dir1/subdir1
++dir1/subdir1/file1
++dir1/subdir3
++dir1/subdir4
++dir1/subdir3/subsubdir4/
+
+In the above example, anything under directory "dir1" are excluded except
+dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
+Note dir1/subdir3 and dir1/subdir4 contents are not included
+*/
+
+package excludespec
 
 import "bufio"
+import "bytes"
 import "fmt"
 import "io/ioutil"
 import "os"
@@ -13,10 +42,13 @@ import "strings"
 
 const excludeTopDir = "/"
 
+var empty struct{}
+
 type ExcludeInfo struct {
 	// temporary maps to collect exclude and include paths
-	// boolean value indicates if regex must use dollar or not
-	excludes map[string]bool
+	excludes map[string]struct{}
+	// true if only the dir should be included
+	// false if the dir and all its content should be included
 	includes map[string]bool
 
 	excludeRE *regexp.Regexp // exclude path regexp
@@ -62,8 +94,8 @@ func parseExcludeLine(base string, line string) (string, error) {
 		return "", fmt.Errorf("whitespace in a line")
 	case strings.HasPrefix(line, "/"):
 		return "", fmt.Errorf("path has / prefix")
-	case strings.HasPrefix(line, "."):
-		return "", fmt.Errorf("path has . prefix")
+	case strings.HasPrefix(line, ".."):
+		return "", fmt.Errorf("path has .. prefix")
 	case !isIncludePath(line) && strings.HasSuffix(line, "/"):
 		return "", fmt.Errorf("exclude path has / suffix")
 	}
@@ -89,21 +121,18 @@ func checkExcludeRules(exInfo *ExcludeInfo, word string) error {
 }
 
 func initRecordCount(exInfo *ExcludeInfo, dir string, path string) error {
-	_, ok := exInfo.dirRecordCounts[path]
-	if !ok {
-		dirEnts, dirErr := ioutil.ReadDir(filepath.Join(dir, path))
-		if dirErr != nil {
-			return fmt.Errorf("ReadDir failed for %s error: %v",
-				dir, dirErr)
-		}
-		exInfo.dirRecordCounts[path] = len(dirEnts)
+	dirEnts, dirErr := ioutil.ReadDir(filepath.Join(dir, path))
+	if dirErr != nil {
+		return fmt.Errorf("ReadDir failed for %s error: %v",
+			dir, dirErr)
 	}
+	exInfo.dirRecordCounts[path] = len(dirEnts)
 	return nil
 }
 
 func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 	if !includePath {
-		exInfo.excludes[word] = true
+		exInfo.excludes[word] = empty
 		// if an exclude overrides includes
 		// clean up includes that are redundant now
 		for inc, _ := range exInfo.includes {
@@ -122,6 +151,7 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 
 	// including a hierarchy implies that
 	// the regex for this word must not include $
+	// ie dir and all its content must be included
 	exInfo.includes[strings.TrimSuffix(word, "/")] = false
 }
 
@@ -135,19 +165,27 @@ func excludeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	if parent == "." {
 		parent = excludeTopDir
 	}
-	err := initRecordCount(exInfo, base, parent)
-	if err != nil {
-		return err
+	// setup parent record count for the first time
+	_, exist := exInfo.dirRecordCounts[parent]
+	if !exist {
+		err := initRecordCount(exInfo, base, parent)
+		if err != nil {
+			return err
+		}
 	}
 	exInfo.dirRecordCounts[parent]--
 	return nil
 }
 
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
-	if exInfo.includes[path] {
-		// if only the directory name is being included then setup the
-		// record count
-		exInfo.dirRecordCounts[path] = 0
+	onlyDir, _ := exInfo.includes[path]
+	if !onlyDir {
+		// if directory with complete content is being included
+		// then its record count shouldn't be manipulated
+		err := initRecordCount(exInfo, base, path)
+		if err != nil {
+			return err
+		}
 	}
 	parent := filepath.Dir(path)
 	if parent == "." {
@@ -206,7 +244,7 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 	var exInfo ExcludeInfo
 
 	exInfo.dirRecordCounts = make(map[string]int)
-	exInfo.excludes = make(map[string]bool)
+	exInfo.excludes = make(map[string]struct{})
 	exInfo.includes = make(map[string]bool)
 
 	file, err := os.Open(filename)
@@ -260,17 +298,22 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 	return &exInfo, nil
 }
 
-func (exInfo *ExcludeInfo) DumpState() {
-	fmt.Println("Dump of exclude information")
-	fmt.Printf("%v\n", exInfo)
+func (exInfo *ExcludeInfo) String() string {
+	var dump bytes.Buffer
+
+	fmt.Fprintf(&dump, "Dump of exclude information\n")
+	fmt.Fprintf(&dump, "Include map: %v\n", exInfo.includes)
+	fmt.Fprintf(&dump, "Exclude map: %v\n", exInfo.excludes)
+	fmt.Fprintf(&dump, "Record counts: %v\n", exInfo.dirRecordCounts)
 	if exInfo.excludeRE != nil {
-		fmt.Printf("Exclude Regex: %s\n", exInfo.excludeRE.String())
+		fmt.Fprintf(&dump, "Exclude Regex: %s\n", exInfo.excludeRE.String())
 	} else {
-		fmt.Printf("Exclude Regex is nil\n")
+		fmt.Fprintf(&dump, "Exclude Regex is nil\n")
 	}
 	if exInfo.includeRE != nil {
-		fmt.Printf("Include Regex: %s\n", exInfo.includeRE.String())
+		fmt.Fprintf(&dump, "Include Regex: %s\n", exInfo.includeRE.String())
 	} else {
-		fmt.Printf("Include Regex is nil\n")
+		fmt.Fprintf(&dump, "Include Regex is nil\n")
 	}
+	return dump.String()
 }
