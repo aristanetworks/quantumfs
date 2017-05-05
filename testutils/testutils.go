@@ -228,6 +228,9 @@ func (th *TestHelper) AssertTestLog(logs []TLA) {
 }
 
 func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
+	err := th.Logger.Sync()
+	th.Assert(err == 0, "Sync failed with errno %d", err)
+
 	logFile := th.TempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
