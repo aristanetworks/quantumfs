@@ -41,6 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
+		skipFlush:              false,
 		dirtyQueue:             make(map[*sync.RWMutex]*list.List),
 		kickFlush:              make(chan struct{}, 1),
 		flushAll:               make(chan *ctx),
@@ -105,6 +106,9 @@ type QuantumFs struct {
 	mapMutex    utils.DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
+
+	// Set to true to disable timer based flushing. Use for tests only
+	skipFlush bool
 
 	// This is a map from the treeLock to a list of dirty inodes. We use the
 	// treelock because every Inode already has the treelock of its workspace so
@@ -227,6 +231,21 @@ func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
 			case <-time.After(sleepTime):
 				c.vlog("flusher woken up due to timer")
 			}
+		}
+
+		if !flushAll && qfs.skipFlush {
+			// We still want to allow someone to manually flush,
+			// but we want to skip timer based flushes
+			nextExpiringInode = time.Now().Add(flushSanityTimeout)
+
+			// If we're skipping flushes and someone tries to stop the
+			// flusher, we can stop without ever flushing to save time
+			if stop {
+				finished <- true
+				return
+			}
+
+			continue
 		}
 
 		nextExpiringInode = func() time.Time {
@@ -839,7 +858,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
-			children := dir.directChildInodes()
+			children := dir.directChildInodes(c)
 
 			for _, i := range children {
 				// To be fully unloaded, the child must have lookup
