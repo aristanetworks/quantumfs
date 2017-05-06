@@ -377,11 +377,16 @@ func byPass(c *Ctx, cli *params) error {
 	referenceWS := cli.referenceWS
 	refWSParts := strings.Split(referenceWS, "/")
 
-	key, err := wsDB.Workspace(c.Qctx,
+	refKey, err := wsDB.Workspace(c.Qctx,
 		refWSParts[0], refWSParts[1], refWSParts[2])
 	if err != nil {
 		return err
 	}
 
-	return uploadCompleted(c.Qctx, wsDB, ws, aliasWS, key)
+	err = uploadCompleted(c.Qctx, wsDB, ws, aliasWS, refKey)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("ByPass Completed: %v -> %v\n", ws, referenceWS)
+	return nil
 }

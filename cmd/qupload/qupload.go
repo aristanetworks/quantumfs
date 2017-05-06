@@ -150,7 +150,7 @@ func validateParams(p *params) error {
 	}
 
 	if p.baseDir != "" && p.referenceWS != "" {
-		return errors.New("Provide one of basedir and referencews, not both")
+		return errors.New("Provide only one of basedir and referencews, not both")
 	}
 
 	if strings.Count(p.ws, "/") != 2 {
