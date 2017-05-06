@@ -12,7 +12,6 @@
 #include <gtest/gtest_prod.h>
 #include <jansson.h>
 
-#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -110,7 +109,7 @@ class ApiImpl: public Api {
 	// indicate the path's validity.
 	Error CheckWorkspacePathValid(const char *workspace_path);
 
-	std::fstream file;
+	int fd;
 
 	// We use the presence of a value in this member variable to indicate that
 	// the API file's location is known (either because it was passed to the
