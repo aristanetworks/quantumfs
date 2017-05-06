@@ -17,7 +17,7 @@ func TestInterface(t *testing.T) {
 		test.AssertNoErr(err)
 
 		testKey := "ABABABABABABABABABAB"
-		testData := []byte("This is some data")
+		testData := daemon.GenData(2000)
 		err = api.SetBlock(testKey, testData)
 		test.AssertNoErr(err)
 
