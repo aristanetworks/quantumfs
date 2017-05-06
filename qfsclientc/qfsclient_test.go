@@ -15,16 +15,13 @@ func TestInterface(t *testing.T) {
 		api, err := GetApiPath(test.TempDir + "/mnt/api")
 		test.AssertNoErr(err)
 
-		/*
-			// TODO: Add DirectIO to QFSClient so this doesn't fail
-			testKey := "ABABABABABABABABABAB"
-			testData := []byte("This is some data")
-			err = api.SetBlock(testKey, testData)
-			test.AssertNoErr(err)
+		testKey := "ABABABABABABABABABAB"
+		testData := []byte("This is some data")
+		err = api.SetBlock(testKey, testData)
+		test.AssertNoErr(err)
 
-			_, err = api.GetBlock(testKey)
-			test.AssertNoErr(err)
-		*/
+		_, err = api.GetBlock(testKey)
+		test.AssertNoErr(err)
 
 		err = ReleaseApi(apiNoPath)
 		test.AssertNoErr(err)

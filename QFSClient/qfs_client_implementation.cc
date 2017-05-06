@@ -3,6 +3,7 @@
 
 #include "QFSClient/qfs_client_implementation.h"
 
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -120,13 +121,15 @@ void ReleaseApi(Api *api) {
 }
 
 ApiImpl::ApiImpl()
-	: path(""),
+	: fd(-1),
+	  path(""),
 	  api_inode_id(kInodeIdApi),
 	  test_hook(NULL) {
 }
 
 ApiImpl::ApiImpl(const char *path)
-	: path(path),
+	: fd(-1),
+	  path(path),
 	  api_inode_id(kInodeIdApi),
 	  test_hook(NULL) {
 }
@@ -144,11 +147,9 @@ Error ApiImpl::Open() {
 		}
 	}
 
-	if (!this->file.is_open()) {
-		this->file.open(this->path.c_str(),
-				std::ios::in | std::ios::out | std::ios::binary);
-
-		if (this->file.fail()) {
+	if (this->fd == -1) {
+		this->fd = open(this->path.c_str(), O_RDWR|O_DIRECT);
+		if (this->fd == -1) {
 			return util::getError(kCantOpenApiFile, this->path);
 		}
 	}
@@ -157,8 +158,8 @@ Error ApiImpl::Open() {
 }
 
 void ApiImpl::Close() {
-	if (this->file.is_open()) {
-		this->file.close();
+	if (this->fd != -1) {
+		close(this->fd);
 	}
 }
 
@@ -191,22 +192,27 @@ Error ApiImpl::SendCommand(const CommandBuffer &command, CommandBuffer *response
 }
 
 Error ApiImpl::WriteCommand(const CommandBuffer &command) {
-	if (!this->file.is_open()) {
+	if (this->fd == -1) {
 		return util::getError(kApiFileNotOpen);
 	}
 
-	this->file.seekp(0);
-	if (this->file.fail()) {
+	int err = lseek(this->fd, 0, SEEK_SET);
+	if (err == -1) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
-	this->file.write((const char *)command.Data(), command.Size());
-	if (this->file.fail()) {
-		return util::getError(kApiFileWriteFail, this->path);
+	for (int written = 0; written < command.Size(); written++) {
+		int num = write(this->fd, (const char *)command.Data(),
+			command.Size()-written);
+
+		if (num == -1) {
+			return util::getError(kApiFileWriteFail, this->path);
+		}
+		written += num;
 	}
 
-	this->file.flush();
-	if (this->file.fail()) {
+	err = fsync(this->fd);
+	if (err == -1) {
 		return util::getError(kApiFileFlushFail, this->path);
 	}
 
@@ -216,12 +222,12 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	ErrorCode err = kSuccess;
 
-	if (!this->file.is_open()) {
+	if (this->fd == -1) {
 		return util::getError(kApiFileNotOpen);
 	}
 
-	this->file.seekg(0);
-	if (this->file.fail()) {
+	int errCode = lseek(this->fd, 0, SEEK_SET);
+	if (errCode == -1) {
 		return util::getError(kApiFileSeekFail);
 	}
 
@@ -229,25 +235,25 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	command->Reset();
 
 	byte data[4096];
-	while(!this->file.eof()) {
-		this->file.read(reinterpret_cast<char *>(data), sizeof(data));
+	int readCount = 0;
+	while(true) {
+		int num = read(this->fd, reinterpret_cast<void*>(data),
+			sizeof(data));
+		if (num == 0) {
+			break;
+		}
 
-		if (this->file.fail() && !(this->file.eof())) {
+		if (num < 0) {
 			// any read failure *except* an EOF is a failure
 			return util::getError(kApiFileReadFail, this->path);
 		}
 
-		size_t size = this->file.gcount();
-		err = command->Append(data, size);
+		err = command->Append(data, num);
 
 		if (err != kSuccess) {
 			return util::getError(err);
 		}
 	}
-
-	// clear the file stream's state, because it will remain in an error state
-	// after hitting an EOF
-	this->file.clear();
 
 	return util::getError(err);
 }
