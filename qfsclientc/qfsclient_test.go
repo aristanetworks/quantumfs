@@ -3,6 +3,7 @@
 
 package qfsclientc
 
+import "bytes"
 import "testing"
 
 import "github.com/aristanetworks/quantumfs/daemon"
@@ -20,8 +21,10 @@ func TestInterface(t *testing.T) {
 		err = api.SetBlock(testKey, testData)
 		test.AssertNoErr(err)
 
-		_, err = api.GetBlock(testKey)
+		readBack, err := api.GetBlock(testKey)
 		test.AssertNoErr(err)
+		test.Assert(bytes.Equal(testData, readBack),
+			"Data changed between SetBlock and GetBlock")
 
 		err = ReleaseApi(apiNoPath)
 		test.AssertNoErr(err)
