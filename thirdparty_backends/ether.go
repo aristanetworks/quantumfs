@@ -50,8 +50,7 @@ func NewEtherFilesystemStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := EtherBlobStoreTranslator{Blobstore: blobstore,
-		logger: &dsLogger{}}
+	translator := EtherBlobStoreTranslator{Blobstore: blobstore}
 	return &translator
 }
 
@@ -137,22 +136,16 @@ func loadCqlAdapterConfig(path string) error {
 	return nil
 }
 
-type dsLogger struct{}
+type dsApiCtx *quantumfs.Ctx
 
-func (el *dsLogger) Vlog(ac interface{}, fmtStr string,
-	args ...interface{}) {
-	if qc, ok := ac.(*quantumfs.Ctx); ok {
-		qc.Vlog(qlog.LogDatastore, fmtStr, args...)
-	}
+func (dc *dsApiCtx) Vlog(fmtStr string, args ...interface{}) {
+	dc.Vlog(qlog.LogDatastore, fmtStr, args...)
 }
 
-type wsdbLogger struct{}
+type wsApiCtx *quantumfs.Ctx
 
-func (el *wsdbLogger) Vlog(ac interface{}, fmtStr string,
-	args ...interface{}) {
-	if qc, ok := ac.(*quantumfs.Ctx); ok {
-		qc.Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
-	}
+func (wc *wsApiCtx) Vlog(fmtStr string, args ...interface{}) {
+	wc.Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
 }
 
 func NewEtherCqlStore(path string) quantumfs.DataStore {
@@ -173,7 +166,6 @@ func NewEtherCqlStore(path string) quantumfs.DataStore {
 	translator := EtherBlobStoreTranslator{
 		Blobstore:      blobstore,
 		ApplyTTLPolicy: true,
-		logger:         &dsLogger{},
 	}
 	return &translator
 }
@@ -181,7 +173,6 @@ func NewEtherCqlStore(path string) quantumfs.DataStore {
 type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
-	logger         ether.Logger
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
@@ -236,8 +227,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
 
 	ks := key.String()
-	ec := &ether.Ctx{Logger: ebt.logger, Request: c}
-	data, metadata, err := ebt.Blobstore.Get(ec, ks)
+	data, metadata, err := ebt.Blobstore.Get(c, ks)
 	if err != nil {
 		return err
 	}
