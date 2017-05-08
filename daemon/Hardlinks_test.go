@@ -44,7 +44,7 @@ func TestHardlinkReload(t *testing.T) {
 		err = syscall.Link(testFileB, workspace+"/linkFileB")
 		test.AssertNoErr(err)
 
-		// Write data to the hardlink to ensure it's syncChild function works
+		// Write data to the hardlink to ensure its syncChild function works
 		err = testutils.PrintToFile(
 			workspace+"/subdir/grandchild/linkFileA2",
 			string(data[1000:]))

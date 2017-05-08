@@ -450,7 +450,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		responseSize = api.syncAll(c)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
-		c.vlog("Recieved InsertInode request")
+		c.vlog("Received InsertInode request")
 		responseSize = api.insertInode(c, buf)
 	case quantumfs.CmdDeleteWorkspace:
 		c.vlog("Received DeleteWorkspace request")
@@ -567,7 +567,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
 	if type_ == quantumfs.ObjectTypeDirectoryEntry {
-		c.vlog("Attemped to insert a directory")
+		c.vlog("Attemtped to insert a directory")
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"InsertInode with directories is not supporte")
 	}
