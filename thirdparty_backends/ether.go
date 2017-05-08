@@ -343,7 +343,7 @@ func (w *etherWsdbTranslator) TypespaceList(
 func (w *etherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 	typespace string) (int, error) {
 
-	defer c.Vlog(qlog.LogWorkspaceDb, "EtherWsdbTranslator::NumNamespaces").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, "EtherWsdbTranslator::NumNamespaces").Out()
 
 	count, err := w.wsdb.NumNamespaces(typespace)
 	if err != nil {
