@@ -549,7 +549,7 @@ func (e etherLogFuncExit) LogFuncOut() {
 }
 
 func (dc *dsApiCtx) LogFuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.ExitFunc {
+	args ...interface{}) ether.LogFuncExit {
 
 	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
 		fmtStr, args...)
@@ -575,7 +575,7 @@ func (wa *wsApiCtx) LogV(fmtStr string, args ...interface{}) {
 }
 
 func (dc *wsApiCtx) LogFuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.ExitFunc {
+	args ...interface{}) ether.LogFuncExit {
 
 	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogWorkspaceDb, funcName,
 		fmtStr, args...)
