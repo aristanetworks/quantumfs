@@ -3,13 +3,16 @@
 
 #include "../QFSClient/qfs_client.h"
 
+#include <atomic>
 #include <map>
 #include <stdint.h>
 #include <string.h>
 
 extern "C" {
+	// We need a unique identifier to give out for each Api instance.
+	// The map is from identifiers to Apis
 	static std::map<uint32_t, qfsclient::Api*> s_apiHandles;
-	static uint32_t s_freeHandle = 0;
+	static std::atomic<uint32_t> s_freeHandle;
 
 	const char * errStr(qfsclient::Error err) {
 		if (err.code !=  qfsclient::kSuccess) {
