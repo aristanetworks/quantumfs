@@ -203,8 +203,8 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 // Determine if the process has a matching group. Normally the primary group is all
 // we need to check, but sometimes we also much check the supplementary groups.
 func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
-	defer c.FuncIn("hasMatchingGid", "user gid %d pid %d inode gid %d", userGid,
-		pid, inodeGid).out()
+	defer c.FuncIn("hasMatchingGid",
+		"user gid %d pid %d inode gid %d", userGid, pid, inodeGid).Out()
 
 	// First check the common case where we do the least work
 	if userGid == inodeGid {

@@ -41,8 +41,7 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
-	c.Vlog(qlog.LogDaemon, "---In dataStore::Get key %s", key.Text())
-	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Get")
+	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get key %s", key.Text()).Out()
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
@@ -104,8 +103,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 }
 
 func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
-	c.Vlog(qlog.LogDaemon, "---In dataStore::Set")
-	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Set")
+	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
 	key, err := buffer.Key(c)
 	if err != nil {
@@ -242,9 +240,8 @@ func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 }
 
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset_ uint32) uint32 {
-	c.Vlog(qlog.LogDaemon, "---In buffer::Write size %d offset %d", len(in),
-		offset_)
-	defer c.Vlog(qlog.LogDaemon, "Out-- buffer::Write")
+	defer c.FuncIn(qlog.LogDaemon, "buffer::Write", "size %d offset %d",
+		len(in), offset_).Out()
 
 	offset := int(offset_)
 	// Sanity check offset and length
@@ -306,8 +303,7 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
-	c.Vlog(qlog.LogDaemon, "---In buffer::Key")
-	defer c.Vlog(qlog.LogDaemon, "Out-- buffer::Key")
+	defer c.FuncInName(qlog.LogDaemon, "buffer::Key").Out()
 
 	if !buf.dirty {
 		c.Vlog(qlog.LogDaemon, "Buffer not dirty")
