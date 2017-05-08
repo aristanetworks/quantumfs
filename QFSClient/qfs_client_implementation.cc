@@ -201,14 +201,12 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
-	for (int written = 0; written < command.Size();) {
-		int num = write(this->fd, (const char *)command.Data(),
-			command.Size()-written);
+	// We must write the whole command at once
+	int written = write(this->fd, (const char *)command.Data(),
+		command.Size());
 
-		if (num == -1) {
-			return util::getError(kApiFileWriteFail, this->path);
-		}
-		written += num;
+	if (written == -1 || written != command.Size()) {
+		return util::getError(kApiFileWriteFail, this->path);
 	}
 
 	err = fsync(this->fd);
