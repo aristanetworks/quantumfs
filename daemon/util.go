@@ -310,7 +310,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 		stickyUid := quantumfs.SystemUid(quantumfs.UID(stickyAltOwner),
 			checkUid)
 
-		if record.Type() == quantumfs.ObjectTypeDirectoryEntry &&
+		if record.Type() == quantumfs.ObjectTypeDirectory &&
 			utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) &&
 			checkUid != inodeOwner && checkUid != stickyUid {
 

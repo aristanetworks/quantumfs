@@ -33,6 +33,7 @@ func TestForgetOnDirectory(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -64,6 +65,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -95,9 +97,9 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
@@ -162,6 +164,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -203,6 +206,7 @@ func TestMultipleLookupCount(t *testing.T) {
 
 		// Forget Inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertTestLog([]testutils.TLA{
 			testutils.TLA{true, "Looked up 2 Times",
@@ -235,9 +239,9 @@ func TestLookupCountAfterCommand(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
@@ -274,9 +278,9 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
