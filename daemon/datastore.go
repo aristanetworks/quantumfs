@@ -115,7 +115,7 @@ func newEmptyBuffer() buffer {
 // Does not obey the initBlockSize capacity, so only for use with buffers that
 // are very unlikely to be written to
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	defer c.FuncIn("newBuffer", "keyType %d", keyType).out()
+	defer c.FuncIn("newBuffer", "keyType %d", keyType).Out()
 
 	return &buffer{
 		data:      in,
@@ -130,7 +130,7 @@ func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffe
 	inSize := len(in)
 
 	defer c.FuncIn("newBufferCopy", "keyType %d inSize %d", keyType,
-		len(in)).out()
+		len(in)).Out()
 
 	var newData []byte
 	// ensure our buffer meets min capacity
