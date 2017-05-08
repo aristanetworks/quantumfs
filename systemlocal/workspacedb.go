@@ -102,8 +102,7 @@ type workspaceDB struct {
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	var num int
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NumTypespaces")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::NumTypespaces")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::NumTypespaces").Out()
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
 		typespaces := tx.Bucket(typespacesBucket)
@@ -122,8 +121,7 @@ func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	typespaceList := make([]string, 0, 100)
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::TypespaceList")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::TypespaceList")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::TypespaceList").Out()
 
 	wsdb.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(typespacesBucket)
@@ -141,8 +139,7 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NumNamespaces")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::NumNamespaces")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::NumNamespaces").Out()
 
 	var num int
 
@@ -163,8 +160,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NamespaceList")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::NamespaceList")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::NamespaceList").Out()
 
 	namespaceList := make([]string, 0, 100)
 
@@ -185,8 +181,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NumWorkspaces")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::NumWorkspaces")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::NumWorkspaces").Out()
 
 	var num int
 
@@ -208,8 +203,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) ([]string, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::WorkspaceList")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::WorkspaceList")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::WorkspaceList").Out()
 
 	workspaceList := make([]string, 0, 100)
 
@@ -231,8 +225,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bool,
 	error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::TypespaceExists")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::TypespaceExists")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::TypespaceExists").Out()
 
 	var exists bool
 
@@ -252,8 +245,7 @@ func (wsdb *workspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bo
 func (wsdb *workspaceDB) NamespaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string) (bool, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::NamespaceExists")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::NamespaceExists")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::NamespaceExists").Out()
 
 	var exists bool
 
@@ -299,8 +291,7 @@ func getWorkspaceContent_(tx *bolt.Tx, root []byte, typespace string,
 func (wsdb *workspaceDB) WorkspaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::WorkspaceExists")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::WorkspaceExists")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::WorkspaceExists").Out()
 
 	var exists bool
 
@@ -321,8 +312,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::BranchWorkspace")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::BranchWorkspace")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::BranchWorkspace").Out()
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
 		// Get the source workspace rootID
@@ -421,8 +411,7 @@ func deleteWorkspace_(tx *bolt.Tx, root []byte, typespace string,
 func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::DeleteWorkspace")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::DeleteWorkspace")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::DeleteWorkspace").Out()
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
 		err := deleteWorkspace_(tx, typespacesBucket,
@@ -440,8 +429,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::Workspace")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::Workspace")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::Workspace").Out()
 
 	var rootid quantumfs.ObjectKey
 
@@ -467,8 +455,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In systemlocal::AdvanceWorkspace")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- systemlocal::AdvanceWorkspace")
+	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::AdvanceWorkspace").Out()
 
 	var dbRootId quantumfs.ObjectKey
 
