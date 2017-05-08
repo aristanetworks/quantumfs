@@ -144,7 +144,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	for num := 3; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, err := currDir.lookupInternal(c, path[num],
-			quantumfs.ObjectTypeDirectoryEntry)
+			quantumfs.ObjectTypeDirectory)
 		if err != nil {
 			return child, err
 		}

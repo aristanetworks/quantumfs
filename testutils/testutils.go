@@ -228,12 +228,17 @@ func (th *TestHelper) AssertTestLog(logs []TLA) {
 }
 
 func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
+	err := th.Logger.Sync()
+	th.Assert(err == 0, "Sync failed with errno %d", err)
+
 	logFile := th.TempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
+	nLines := 0
 	containChecker := make([]bool, len(logs))
 
 	for _, rawlog := range logLines {
+		nLines++
 		logOutput := rawlog.ToString()
 		for idx, tla := range logs {
 			exists := strings.Contains(logOutput, tla.Text)
@@ -242,6 +247,7 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
 			}
 		}
 	}
+	th.Log("Inspected %d log lines looking for patterns", nLines)
 
 	return containChecker
 }

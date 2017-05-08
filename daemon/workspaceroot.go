@@ -595,7 +595,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
 	for _, entry := range wsr.children.recordCopies(c) {
-		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
+		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
 		}
 	}

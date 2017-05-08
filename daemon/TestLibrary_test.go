@@ -45,7 +45,7 @@ func TestRandomNamespaceName(t *testing.T) {
 	})
 }
 
-// If a test never returns from some event, such as an inifinite loop, the test
+// If a test never returns from some event, such as an infinite loop, the test
 // should timeout and cleanup after itself.
 func TestTimeout(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -53,7 +53,7 @@ func TestTimeout(t *testing.T) {
 		time.Sleep(60 * time.Second)
 
 		// If we get here then the test library didn't time us out and we
-		// sould fail this test.
+		// should fail this test.
 		test.ShouldFail = false
 		test.Assert(false, "Test didn't fail due to timeout")
 	})

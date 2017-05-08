@@ -36,7 +36,7 @@ type params struct {
 	wsdbName    string
 	wsdbConf    string
 	ws          string
-	advance     string
+	alias       string
 	baseDir     string
 	excludeFile string
 	conc        uint
@@ -92,7 +92,7 @@ version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
-	       [ -advance <wsname> -progress -logdir <logpath>
+	       [ -alias <wsname> -progress -logdir <logpath>
 	         -concurrency <count> -wsforce ]
 	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
@@ -141,8 +141,8 @@ func validateParams(p *params) error {
 			"precisely two \"/\"")
 	}
 
-	if p.advance != "" && strings.Count(p.advance, "/") != 2 {
-		return errors.New("Workspace to be advanced must " +
+	if p.alias != "" && strings.Count(p.alias, "/") != 2 {
+		return errors.New("Workspace to be aliased must " +
 			"contain precisely two \"/\"")
 	}
 
@@ -207,8 +207,8 @@ func main() {
 	qFlags.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
 
-	qFlags.StringVar(&cliParams.advance, "advance", "",
-		"Name of workspace which'll be advanced to point"+
+	qFlags.StringVar(&cliParams.alias, "alias", "",
+		"Name of workspace which'll be aliased to point"+
 			"to uploaded workspace")
 	qFlags.BoolVar(&cliParams.progress, "progress", false,
 		"Show the data and metadata sizes uploaded")
@@ -308,7 +308,7 @@ func main() {
 
 	// upload
 	start := time.Now()
-	upErr := upload(c, cliParams.ws, cliParams.advance,
+	upErr := upload(c, cliParams.ws, cliParams.alias,
 		filepath.Join(cliParams.baseDir, relpath), exInfo,
 		cliParams.conc)
 	if upErr != nil {
