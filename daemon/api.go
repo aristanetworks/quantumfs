@@ -125,7 +125,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 
 	// Verify that O_DIRECT is actually set
 	if !utils.BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
-		c.dlog("FAIL setting O_DIRECT in File descriptor")
+		c.elog("FAIL setting O_DIRECT in File descriptor")
 		return fuse.EINVAL
 	}
 
@@ -450,7 +450,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		responseSize = api.syncAll(c)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
-		c.vlog("Recieved InsertInode request")
+		c.vlog("Received InsertInode request")
 		responseSize = api.insertInode(c, buf)
 	case quantumfs.CmdDeleteWorkspace:
 		c.vlog("Received DeleteWorkspace request")
@@ -566,8 +566,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
-	if type_ == quantumfs.ObjectTypeDirectoryEntry {
-		c.vlog("Attemped to insert a directory")
+	if type_ == quantumfs.ObjectTypeDirectory {
+		c.vlog("Attempted to insert a directory")
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"InsertInode with directories is not supporte")
 	}
