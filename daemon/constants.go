@@ -1,8 +1,9 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Various constants used throughout quantumfsd
 package daemon
+
+// Various constants used throughout quantumfsd
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/hanwen/go-fuse/fuse"
@@ -10,7 +11,7 @@ import "github.com/hanwen/go-fuse/fuse"
 // Mapping between datastore object types and the FUSE filetype
 // Returns 0 if there is no valid FUSE filetype
 func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
-	defer c.FuncIn("objectTypeToFileType", "type %d", objectType).out()
+	defer c.FuncIn("objectTypeToFileType", "type %d", objectType).Out()
 
 	switch objectType {
 	case quantumfs.ObjectTypeSmallFile,
@@ -50,3 +51,6 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 // The block size of the filesystem in bytes
 const qfsBlockSize = uint64(quantumfs.MaxBlockSize)
 const statBlockSize = uint64(512)
+
+// This number empirically derived by looking at file sizes
+const initBlockSize = 8192

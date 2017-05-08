@@ -14,23 +14,23 @@ import "github.com/aristanetworks/quantumfs/hash"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 func NewDataStore(conf string) quantumfs.DataStore {
-	store := &DataStore{
+	store := &dataStore{
 		data: make(map[string][]byte),
 	}
 
 	return store
 }
 
-type DataStore struct {
+type dataStore struct {
 	mutex sync.RWMutex
 	data  map[string][]byte
 }
 
-func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+func (store *dataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	c.Vlog(qlog.LogDatastore, "---In processlocal::Get key %s", key.String())
-	defer c.Vlog(qlog.LogDatastore, "Out-- processlocal::Get")
+	defer c.FuncIn(qlog.LogDatastore, "processlocal::Get",
+		"key %s", key.String()).Out()
 
 	var err error
 
@@ -46,11 +46,11 @@ func (store *DataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return err
 }
 
-func (store *DataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+func (store *dataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buffer quantumfs.Buffer) error {
 
-	c.Vlog(qlog.LogDatastore, "---In processlocal::Set key %s", key.String())
-	defer c.Vlog(qlog.LogDatastore, "Out-- processlocal::Set")
+	defer c.FuncIn(qlog.LogDatastore, "processlocal::Set",
+		"key %s", key.String()).Out()
 
 	if buffer.Size() > int(quantumfs.MaxBlockSize) {
 		panic("Attempted to store overlarge block")
