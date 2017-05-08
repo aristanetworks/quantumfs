@@ -233,7 +233,6 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	command->Reset();
 
 	byte data[4096];
-	int readCount = 0;
 	while(true) {
 		int num = read(this->fd, reinterpret_cast<void*>(data),
 			sizeof(data));
