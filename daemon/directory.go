@@ -644,7 +644,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 		}
 
 		dir.create_(c, name, input.Mode, input.Umask, 0, newDirectory,
-			quantumfs.ObjectTypeDirectoryEntry, quantumfs.EmptyDirKey,
+			quantumfs.ObjectTypeDirectory, quantumfs.EmptyDirKey,
 			out)
 		return fuse.OK
 	}()
@@ -1546,7 +1546,7 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 	default:
 		c.elog("Unknown InodeConstructor type: %d", entry.Type())
 		panic("Unknown InodeConstructor type")
-	case quantumfs.ObjectTypeDirectoryEntry:
+	case quantumfs.ObjectTypeDirectory:
 		constructor = newDirectory
 	case quantumfs.ObjectTypeSmallFile:
 		constructor = newSmallFile

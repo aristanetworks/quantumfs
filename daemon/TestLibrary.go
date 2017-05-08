@@ -180,6 +180,10 @@ func serveSafely(th *TestHelper) {
 	mountOptions.Options = append(mountOptions.Options, "suid")
 	mountOptions.Options = append(mountOptions.Options, "dev")
 
+	// Ensure that, since we're in a test, we only sync when syncAll is called.
+	// Otherwise, we shouldn't ever need to flush.
+	th.qfs.skipFlush = true
+
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
 	th.qfs.Serve(mountOptions)
