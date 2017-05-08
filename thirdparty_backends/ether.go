@@ -136,16 +136,68 @@ func loadCqlAdapterConfig(path string) error {
 	return nil
 }
 
-type dsApiCtx *quantumfs.Ctx
+type dsApiCtx quantumfs.Ctx
 
-func (dc *dsApiCtx) Vlog(fmtStr string, args ...interface{}) {
-	dc.Vlog(qlog.LogDatastore, fmtStr, args...)
+func (dc *dsApiCtx) LogE(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Elog(qlog.LogDatastore, fmtStr, args...)
 }
 
-type wsApiCtx *quantumfs.Ctx
+func (dc *dsApiCtx) LogW(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Wlog(qlog.LogDatastore, fmtStr, args...)
+}
 
-func (wc *wsApiCtx) Vlog(fmtStr string, args ...interface{}) {
-	wc.Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
+func (dc *dsApiCtx) LogD(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Dlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) LogV(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Vlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+type etherDsFuncExit quantumfs.ExitFuncLog
+
+func (e etherDsFuncExit) LogFuncOut() {
+	(quantumfs.ExitFuncLog)(e).Out()
+}
+
+func (dc *dsApiCtx) LogFuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.ExitFunc {
+
+	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
+		fmtStr, args...)
+	return (etherDsFuncExit)(el)
+}
+
+type wsApiCtx quantumfs.Ctx
+
+func (dc *wsApiCtx) LogE(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Elog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (dc *wsApiCtx) LogW(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Wlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (dc *wsApiCtx) LogD(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Dlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (dc *wsApiCtx) LogV(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+type etherWsFuncExit quantumfs.ExitFuncLog
+
+func (e etherWsFuncExit) LogFuncOut() {
+	(quantumfs.ExitFuncLog)(e).Out()
+}
+
+func (dc *wsApiCtx) LogFuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.ExitFunc {
+
+	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogWorkspaceDb, funcName,
+		fmtStr, args...)
+	return (etherWsFuncExit)(el)
 }
 
 func NewEtherCqlStore(path string) quantumfs.DataStore {
@@ -227,7 +279,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
 
 	ks := key.String()
-	data, metadata, err := ebt.Blobstore.Get(c, ks)
+	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), ks)
 	if err != nil {
 		return err
 	}
