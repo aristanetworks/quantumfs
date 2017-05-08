@@ -28,7 +28,7 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 	for i := 0; i < store.NumberOfParts(); i++ {
 		newPart := newLargeAccessor(c, store.LargeFileKey(i))
 		if newPart == nil {
-			c.elog("Recieved nil accessor, system state inconsistent")
+			c.elog("Received nil accessor, system state inconsistent")
 			panic("Nil Large accessor in very large file")
 		}
 		rtn.parts[i] = *newPart

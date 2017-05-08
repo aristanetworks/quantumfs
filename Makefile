@@ -38,10 +38,10 @@ $(COMMANDS): cleanup encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
-	sudo go test github.com/aristanetworks/quantumfs/cmd/$@
+	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST): cleanup encoding/metadata.capnp.go
-	sudo go test -gcflags '-e' github.com/aristanetworks/$@
+	sudo -E go test -gcflags '-e' github.com/aristanetworks/$@
 
 rpm: $(COMMANDS)
 	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
