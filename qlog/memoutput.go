@@ -45,6 +45,7 @@ type circBufHeader struct {
 
 type SharedMemory struct {
 	fd       *os.File
+	mapSize  int
 	circBuf  CircMemLogs
 	strIdMap IdStrMap
 	buffer   []byte
@@ -278,6 +279,7 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 
 	var rtn SharedMemory
 	rtn.fd = mapFile
+	rtn.mapSize = mmapTotalSize
 	rtn.buffer = mmap
 	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
 	header.Version = QlogVersion
@@ -531,6 +533,15 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	}
 
 	return buf
+}
+
+func (mem *SharedMemory) Sync() int {
+	_, _, err := syscall.Syscall(syscall.SYS_MSYNC,
+		uintptr(unsafe.Pointer(&mem.buffer[0])), // *addr
+		uintptr(mem.mapSize),                    // length
+		uintptr(syscall.MS_SYNC))                //flags
+
+	return int(err)
 }
 
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
