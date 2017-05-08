@@ -3,10 +3,11 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
+package thirdparty_backends
+
 // To avoid compiling in support for ether datastore
 // change "!skip_backends" in first line with "ignore"
 // You will need to do the same in daemon/Ether_test.go as well.
-package thirdparty_backends
 
 import "bytes"
 import "encoding/json"
@@ -24,9 +25,9 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 func init() {
-	registerDatastore("ether.filesystem", NewEtherFilesystemStore)
-	registerDatastore("ether.cql", NewEtherCqlStore)
-	registerWorkspaceDB("ether.cql", NewEtherWorkspaceDB)
+	registerDatastore("ether.filesystem", newEtherFilesystemStore)
+	registerDatastore("ether.cql", newEtherCqlStore)
+	registerWorkspaceDB("ether.cql", newEtherWorkspaceDB)
 }
 
 // TODO(krishna) TTL configuration is specific to CQL blobstore.
@@ -42,7 +43,7 @@ func init() {
 // datastore the TTL on the block doesn't count down and hence TTL is
 // actually never refreshed since TTL > refreshTTLTimeSecs (=0) always
 
-func NewEtherFilesystemStore(path string) quantumfs.DataStore {
+func newEtherFilesystemStore(path string) quantumfs.DataStore {
 
 	blobstore, err := filesystem.NewFilesystemStore(path)
 	if err != nil {
@@ -78,7 +79,7 @@ func (d *TTLDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type CqlAdapterConfig struct {
+type cqlAdapterConfig struct {
 	// CqlTTLRefreshTime controls when a block's TTL is refreshed
 	// A block's TTL is refreshed when its TTL is <= CqlTTLRefreshTime
 	// ttlrefreshtime is a string accepted by
@@ -107,7 +108,7 @@ var defaultTTLValueSecs int64
 
 func loadCqlAdapterConfig(path string) error {
 	var c struct {
-		A CqlAdapterConfig `json:"adapter"`
+		A cqlAdapterConfig `json:"adapter"`
 	}
 
 	f, err := os.Open(path)
@@ -136,72 +137,7 @@ func loadCqlAdapterConfig(path string) error {
 	return nil
 }
 
-type dsApiCtx quantumfs.Ctx
-
-func (dc *dsApiCtx) LogE(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Elog(qlog.LogDatastore, fmtStr, args...)
-}
-
-func (dc *dsApiCtx) LogW(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Wlog(qlog.LogDatastore, fmtStr, args...)
-}
-
-func (dc *dsApiCtx) LogD(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Dlog(qlog.LogDatastore, fmtStr, args...)
-}
-
-func (dc *dsApiCtx) LogV(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Vlog(qlog.LogDatastore, fmtStr, args...)
-}
-
-type etherDsFuncExit quantumfs.ExitFuncLog
-
-func (e etherDsFuncExit) LogFuncOut() {
-	(quantumfs.ExitFuncLog)(e).Out()
-}
-
-func (dc *dsApiCtx) LogFuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.ExitFunc {
-
-	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
-		fmtStr, args...)
-	return (etherDsFuncExit)(el)
-}
-
-type wsApiCtx quantumfs.Ctx
-
-func (dc *wsApiCtx) LogE(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Elog(qlog.LogWorkspaceDb, fmtStr, args...)
-}
-
-func (dc *wsApiCtx) LogW(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Wlog(qlog.LogWorkspaceDb, fmtStr, args...)
-}
-
-func (dc *wsApiCtx) LogD(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Dlog(qlog.LogWorkspaceDb, fmtStr, args...)
-}
-
-func (dc *wsApiCtx) LogV(fmtStr string, args ...interface{}) {
-	(*quantumfs.Ctx)(dc).Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
-}
-
-type etherWsFuncExit quantumfs.ExitFuncLog
-
-func (e etherWsFuncExit) LogFuncOut() {
-	(quantumfs.ExitFuncLog)(e).Out()
-}
-
-func (dc *wsApiCtx) LogFuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.ExitFunc {
-
-	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogWorkspaceDb, funcName,
-		fmtStr, args...)
-	return (etherWsFuncExit)(el)
-}
-
-func NewEtherCqlStore(path string) quantumfs.DataStore {
-
+func newEtherCqlStore(path string) quantumfs.DataStore {
 	cerr := loadCqlAdapterConfig(path)
 	if cerr != nil {
 		fmt.Printf("Error loading %q: %v\n", path, cerr)
@@ -222,6 +158,13 @@ func NewEtherCqlStore(path string) quantumfs.DataStore {
 	return &translator
 }
 
+// EtherBlobStoreTranslator translates quantumfs.Datastore APIs
+// to ether.Blobstore APIs
+//
+// NOTE: This is an exported type since some clients currently
+// alter the ApplyTTLPolicy attribute. Eventually TTL handling
+// will move outside of the adapter into Ether and then this type
+// can be turned back into an exported type
 type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
@@ -272,11 +215,12 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	return b.Insert(key, buf, newmetadata)
 }
 
+// Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
-	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Get")
-	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Get")
+	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Get",
+		"key %s", key.Text()).Out()
 
 	ks := key.String()
 	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), ks)
@@ -297,11 +241,12 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	return nil
 }
 
+// Set adpats quantumfs.DataStore's Set API to ether.BlobStore.Insert
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	c.Vlog(qlog.LogDatastore, "---In EtherBlobStoreTranslator::Set")
-	defer c.Vlog(qlog.LogDatastore, "Out-- EtherBlobStoreTranslator::Set")
+	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Set",
+		"key %s", key.Text()).Out()
 
 	ks := key.String()
 	metadata, err := ebt.Blobstore.Metadata(ks)
@@ -325,7 +270,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	panic(panicMsg)
 }
 
-type EtherWsdbTranslator struct {
+type etherWsdbTranslator struct {
 	wsdb wsdb.WorkspaceDB
 }
 
@@ -355,8 +300,8 @@ func convertWsdbError(e error) error {
 	return quantumfs.NewWorkspaceDbErr(errCode, wE.Msg)
 }
 
-func NewEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
-	eWsdb := &EtherWsdbTranslator{
+func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
+	eWsdb := &etherWsdbTranslator{
 		wsdb: cql.NewWorkspaceDB(path),
 	}
 
@@ -377,9 +322,9 @@ func NewEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	return eWsdb
 }
 
-func (w *EtherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NumTypespaces")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NumTypespaces")
+func (w *etherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::NumTypespaces").Out()
 
 	count, err := w.wsdb.NumTypespaces()
 	if err != nil {
@@ -388,11 +333,11 @@ func (w *EtherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	return count, nil
 }
 
-func (w *EtherWsdbTranslator) TypespaceList(
+func (w *etherWsdbTranslator) TypespaceList(
 	c *quantumfs.Ctx) ([]string, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::TypespaceList")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::TypespaceList")
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::TypespaceList").Out()
 
 	list, err := w.wsdb.TypespaceList()
 	if err != nil {
@@ -401,11 +346,12 @@ func (w *EtherWsdbTranslator) TypespaceList(
 	return list, nil
 }
 
-func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 	typespace string) (int, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NumNamespaces")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NumNamespaces")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::NumNamespaces",
+		"typespace: %s", typespace).Out()
 
 	count, err := w.wsdb.NumNamespaces(typespace)
 	if err != nil {
@@ -414,11 +360,12 @@ func (w *EtherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 	return count, nil
 }
 
-func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 	typespace string) ([]string, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NamespaceList")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NamespaceList")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::NamespaceList",
+		"typespace: %s", typespace).Out()
 
 	list, err := w.wsdb.NamespaceList(typespace)
 	if err != nil {
@@ -427,11 +374,12 @@ func (w *EtherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 	return list, nil
 }
 
-func (w *EtherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 	typespace string, namespace string) (int, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NumWorkspaces")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::NumWorkspaces")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::NumWorkspaces",
+		"%s/%s", typespace, namespace).Out()
 
 	count, err := w.wsdb.NumWorkspaces(typespace, namespace)
 	if err != nil {
@@ -440,11 +388,12 @@ func (w *EtherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 	return count, nil
 }
 
-func (w *EtherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	typespace string, namespace string) ([]string, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::WorkspaceList")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::WorkspaceList")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::WorkspaceList",
+		"%s/%s", typespace, namespace).Out()
 
 	list, err := w.wsdb.WorkspaceList(typespace, namespace)
 	if err != nil {
@@ -453,12 +402,12 @@ func (w *EtherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	return list, nil
 }
 
-func (w *EtherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
 	typespace string) (bool, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::TypespaceExists")
-	defer c.Vlog(qlog.LogWorkspaceDb,
-		"Out-- EtherWsdbTranslator::TypespaceExists")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::TypespaceExists",
+		"typespace: %s", typespace).Out()
 
 	exists, err := w.wsdb.TypespaceExists(typespace)
 	if err != nil {
@@ -467,12 +416,12 @@ func (w *EtherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
 	return exists, nil
 }
 
-func (w *EtherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
 	typespace string, namespace string) (bool, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::NamespaceExists")
-	defer c.Vlog(qlog.LogWorkspaceDb,
-		"Out-- EtherWsdbTranslator::NamespaceExists")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::NamespaceExists",
+		"%s/%s", typespace, namespace).Out()
 
 	exists, err := w.wsdb.NamespaceExists(typespace, namespace)
 	if err != nil {
@@ -481,12 +430,12 @@ func (w *EtherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
 	return exists, nil
 }
 
-func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string,
+func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::WorkspaceExists")
-	defer c.Vlog(qlog.LogWorkspaceDb,
-		"Out-- EtherWsdbTranslator::WorkspaceExists")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::WorkspaceExists",
+		"%s/%s/%s", typespace, namespace, workspace).Out()
 
 	exists, err := w.wsdb.WorkspaceExists(typespace, namespace, workspace)
 	if err != nil {
@@ -495,11 +444,12 @@ func (w *EtherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 	return exists, nil
 }
 
-func (w *EtherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
+func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::Workspace")
-	defer c.Vlog(qlog.LogWorkspaceDb, "Out-- EtherWsdbTranslator::Workspace")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::Workspace",
+		"%s/%s/%s", typespace, namespace, workspace).Out()
 
 	key, err := w.wsdb.Workspace(typespace, namespace, workspace)
 	if err != nil {
@@ -509,13 +459,15 @@ func (w *EtherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	return quantumfs.NewObjectKeyFromBytes(key), nil
 }
 
-func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
+func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::BranchWorkspace")
-	defer c.Vlog(qlog.LogWorkspaceDb,
-		"Out-- EtherWsdbTranslator::BranchWorkspace")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::BranchWorkspace",
+		"%s/%s/%s -> %s/%s/%s",
+		srcTypespace, srcNamespace, srcWorkspace,
+		dstTypespace, dstNamespace, dstWorkspace).Out()
 
 	err := w.wsdb.BranchWorkspace(srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace)
@@ -525,12 +477,12 @@ func (w *EtherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 	return nil
 }
 
-func (w *EtherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
+func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::DeleteWorkspace")
-	defer c.Vlog(qlog.LogWorkspaceDb,
-		"Out-- EtherWsdbTranslator::DeleteWorkspace")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::DeleteWorkspace",
+		"%s/%s/%s", typespace, namespace, workspace).Out()
 
 	err := w.wsdb.DeleteWorkspace(typespace, namespace, workspace)
 	if err != nil {
@@ -539,13 +491,16 @@ func (w *EtherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 	return nil
 }
 
-func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
+func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	c.Vlog(qlog.LogWorkspaceDb, "---In EtherWsdbTranslator::AdvanceWorkspace")
-	defer c.Vlog(qlog.LogWorkspaceDb,
-		"Out-- EtherWsdbTranslator::AdvanceWorkspace")
+	defer c.FuncIn(qlog.LogWorkspaceDb,
+		"EtherWsdbTranslator::AdvanceWorkspace",
+		"%s/%s/%s %s -> %s",
+		typespace, namespace, workspace,
+		currentRootId.Text(),
+		newRootId.Text()).Out()
 
 	key, err := w.wsdb.AdvanceWorkspace(typespace, namespace, workspace,
 		currentRootId.Value(), newRootId.Value())
@@ -556,14 +511,14 @@ func (w *EtherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 	return quantumfs.NewObjectKeyFromBytes(key), nil
 }
 
-func (w *EtherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) error {
 
 	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 		"Ether does not support setting workspaces immutable")
 }
 
-func (w *EtherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
+func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (bool, error) {
 
 	return false, nil

@@ -12,7 +12,7 @@ type VeryLargeFile struct {
 }
 
 func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
-	defer c.funcIn("newVeryLargeAccessor").out()
+	defer c.funcIn("newVeryLargeAccessor").Out()
 	var rtn VeryLargeFile
 
 	buffer := c.dataStore.Get(&c.Ctx, key)
@@ -49,7 +49,7 @@ func (fi *VeryLargeFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	defer c.FuncIn("VeryLargeFile::readBlock", "block %d offset %d", blockIdx,
-		offset).out()
+		offset).Out()
 
 	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile()
 	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile()
@@ -98,7 +98,7 @@ func (fi *VeryLargeFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	defer c.FuncIn("VeryLargeFile::writeBlock", "block %d offset %d", blockIdx,
-		offset).out()
+		offset).Out()
 
 	partIdx := blockIdx / quantumfs.MaxBlocksLargeFile()
 	blockIdxRem := blockIdx % quantumfs.MaxBlocksLargeFile()
@@ -128,7 +128,7 @@ func (fi *VeryLargeFile) fileLength(c *ctx) uint64 {
 
 func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	defer c.FuncIn("VeryLargeFile::blockIdxInfo", "absOffset %d",
-		absOffset).out()
+		absOffset).Out()
 
 	// Variable multiblock data block sizes makes this function harder
 
@@ -166,7 +166,7 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 }
 
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("VeryLargeFile::sync").out()
+	defer c.funcIn("VeryLargeFile::sync").Out()
 
 	store := quantumfs.NewVeryLargeFile()
 	store.SetNumberOfParts(len(fi.parts))
@@ -196,7 +196,7 @@ func (fi *VeryLargeFile) getType() quantumfs.ObjectType {
 func (fi *VeryLargeFile) convertTo(c *ctx,
 	newType quantumfs.ObjectType) blockAccessor {
 
-	defer c.FuncIn("VeryLargeFile::convertTo", "newType %d", newType).out()
+	defer c.FuncIn("VeryLargeFile::convertTo", "newType %d", newType).Out()
 
 	if newType <= quantumfs.ObjectTypeVeryLargeFile {
 		return fi
@@ -208,7 +208,7 @@ func (fi *VeryLargeFile) convertTo(c *ctx,
 
 func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
 	defer c.FuncIn("VeryLargeFile::truncate", "new size %d",
-		newLengthBytes).out()
+		newLengthBytes).Out()
 
 	if newLengthBytes == 0 {
 		fi.parts = nil
