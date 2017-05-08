@@ -277,6 +277,10 @@ func formatString(idx LogSubsystem, reqId uint64, t time.Time,
 	return front + format
 }
 
+func (q *Qlog) Sync() int {
+	return q.logBuffer.Sync()
+}
+
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
