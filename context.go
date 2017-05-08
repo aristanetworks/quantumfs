@@ -11,18 +11,22 @@ type Ctx struct {
 	RequestId uint64
 }
 
+// Log an Error message
 func (c Ctx) Elog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
 	c.Qlog.Log(subsystem, c.RequestId, 0, format, args...)
 }
 
+// Log a Warning message
 func (c Ctx) Wlog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
 	c.Qlog.Log(subsystem, c.RequestId, 1, format, args...)
 }
 
+// Log a Debug message
 func (c Ctx) Dlog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
 	c.Qlog.Log(subsystem, c.RequestId, 2, format, args...)
 }
 
+// Log a Verbose tracing message
 func (c Ctx) Vlog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
 	c.Qlog.Log(subsystem, c.RequestId, 3, format, args...)
 }

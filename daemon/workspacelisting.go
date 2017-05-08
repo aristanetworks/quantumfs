@@ -1,9 +1,10 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// The code which handles listing available workspaces as the first two levels of the
-// directory hierarchy.
 package daemon
+
+// The code which handles listing available workspaces as the first three levels of
+// the directory hierarchy.
 
 import "errors"
 import "sync"
@@ -264,7 +265,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) directChildInodes() []InodeId {
+func (tsl *TypespaceList) directChildInodes(c *ctx) []InodeId {
 	defer tsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(tsl.typespacesById))
@@ -586,7 +587,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) directChildInodes() []InodeId {
+func (nsl *NamespaceList) directChildInodes(c *ctx) []InodeId {
 	defer nsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(nsl.namespacesById))
@@ -906,7 +907,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) directChildInodes() []InodeId {
+func (wsl *WorkspaceList) directChildInodes(c *ctx) []InodeId {
 	defer wsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(wsl.workspacesById))
