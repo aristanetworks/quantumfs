@@ -566,8 +566,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
 
-	if type_ == quantumfs.ObjectTypeDirectoryEntry {
-		c.vlog("Attemtped to insert a directory")
+	if type_ == quantumfs.ObjectTypeDirectory {
+		c.vlog("Attempted to insert a directory")
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"InsertInode with directories is not supporte")
 	}

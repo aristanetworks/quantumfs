@@ -288,7 +288,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
 			ds, dr.ID(), wf, keyChan)
-	case quantumfs.ObjectTypeDirectoryEntry:
+	case quantumfs.ObjectTypeDirectory:
 		return handleDirectoryEntry(c, fpath,
 			ds, dr.ID(), wf, keyChan)
 	default:

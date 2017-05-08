@@ -357,7 +357,7 @@ func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 const (
 	ObjectTypeInvalid           = 0
 	ObjectTypeBuildProduct      = 1
-	ObjectTypeDirectoryEntry    = 2
+	ObjectTypeDirectory         = 2
 	ObjectTypeExtendedAttribute = 3
 	ObjectTypeHardlink          = 4
 	ObjectTypeSymlink           = 5
@@ -374,8 +374,8 @@ func ObjectType2String(typ ObjectType) string {
 	switch typ {
 	case ObjectTypeBuildProduct:
 		return "ObjectTypeBuildProduct"
-	case ObjectTypeDirectoryEntry:
-		return "ObjectTypeDirectoryEntry"
+	case ObjectTypeDirectory:
+		return "ObjectTypeDirectory"
 	case ObjectTypeExtendedAttribute:
 		return "ObjectTypeExtendedAttribute"
 	case ObjectTypeHardlink:
