@@ -523,3 +523,61 @@ func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 
 	return false, nil
 }
+
+type dsApiCtx quantumfs.Ctx
+
+func (dc *dsApiCtx) LogE(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Elog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) LogW(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Wlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) LogD(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Dlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) LogV(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Vlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+type etherLogFuncExit quantumfs.ExitFuncLog
+
+func (e etherLogFuncExit) LogFuncOut() {
+	(quantumfs.ExitFuncLog)(e).Out()
+}
+
+func (dc *dsApiCtx) LogFuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.ExitFunc {
+
+	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
+		fmtStr, args...)
+	return (etherLogFuncExit)(el)
+}
+
+type wsApiCtx quantumfs.Ctx
+
+func (wa *wsApiCtx) LogE(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wa).Elog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wa *wsApiCtx) LogW(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wa).Wlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wa *wsApiCtx) LogD(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wa).Dlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wa *wsApiCtx) LogV(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wa).Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (dc *wsApiCtx) LogFuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.ExitFunc {
+
+	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogWorkspaceDb, funcName,
+		fmtStr, args...)
+	return (etherLogFuncExit)(el)
+}
