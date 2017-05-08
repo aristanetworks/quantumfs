@@ -455,7 +455,8 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::AdvanceWorkspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"systemlocal::AdvanceWorkspace").Out()
 
 	var dbRootId quantumfs.ObjectKey
 

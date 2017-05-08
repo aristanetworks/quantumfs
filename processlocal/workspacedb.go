@@ -58,7 +58,8 @@ type workspaceDB struct {
 }
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::NumTypespaces").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::NumTypespaces").Out()
 
 	wsdb.cacheMutex.RLock()
 	num := len(wsdb.cache)
@@ -97,7 +98,8 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::NamespaceList").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::NamespaceList").Out()
 
 	wsdb.cacheMutex.RLock()
 	namespaces := make([]string, 0, len(wsdb.cache[typespace]))
@@ -114,7 +116,8 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::NumWorkspaces").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::NumWorkspaces").Out()
 
 	wsdb.cacheMutex.RLock()
 	num := len(wsdb.cache[typespace][namespace])
@@ -128,7 +131,8 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) ([]string, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::WorkspaceList").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::WorkspaceList").Out()
 
 	wsdb.cacheMutex.RLock()
 	workspaces := make([]string, 0, len(wsdb.cache[typespace][namespace]))
@@ -145,7 +149,8 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bool,
 	error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::TypespaceExists").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::TypespaceExists").Out()
 
 	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.cache[typespace]
@@ -157,7 +162,8 @@ func (wsdb *workspaceDB) TypespaceExists(c *quantumfs.Ctx, typespace string) (bo
 func (wsdb *workspaceDB) namespace(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]interface{}, bool) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::namespace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::namespace").Out()
 
 	var workspacelist map[string]interface{}
 	namespacelist, exists := wsdb.cache[typespace]
@@ -171,7 +177,8 @@ func (wsdb *workspaceDB) namespace(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, bool) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::workspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::workspace").Out()
 
 	var rootId quantumfs.ObjectKey
 	workspacelist, exists := wsdb.namespace(c, typespace, namespace)
@@ -191,7 +198,8 @@ func (wsdb *workspaceDB) workspace(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) NamespaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string) (bool, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::NamespaceExists").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::NamespaceExists").Out()
 
 	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.namespace(c, typespace, namespace)
@@ -203,7 +211,8 @@ func (wsdb *workspaceDB) NamespaceExists(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) WorkspaceExists(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::WorkspaceExists").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::WorkspaceExists").Out()
 
 	wsdb.cacheMutex.RLock()
 	_, exists := wsdb.workspace(c, typespace, namespace, workspace)
@@ -216,7 +225,8 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::BranchWorkspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::BranchWorkspace").Out()
 
 	wsdb.cacheMutex.Lock()
 	defer wsdb.cacheMutex.Unlock()
@@ -301,7 +311,8 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::Workspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::Workspace").Out()
 
 	wsdb.cacheMutex.RLock()
 	rootid, exists := wsdb.workspace(c, typespace, namespace, workspace)
@@ -318,7 +329,8 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::AdvanceWorkspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::AdvanceWorkspace").Out()
 
 	wsdb.cacheMutex.Lock()
 	defer wsdb.cacheMutex.Unlock()
