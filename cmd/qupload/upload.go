@@ -248,7 +248,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(c *Ctx, ws string, advance string, root string,
+func upload(c *Ctx, ws string, alias_ws string, root string,
 	exInfo *ExcludeInfo, conc uint) error {
 
 	// launch walker in same task group so that
@@ -284,7 +284,7 @@ func upload(c *Ctx, ws string, advance string, root string,
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return uploadCompleted(c.Qctx, wsDB, ws, advance, wsrKey)
+	return uploadCompleted(c.Qctx, wsDB, ws, alias_ws, wsrKey)
 }
 
 // Uploads to existing workspaces should be supported.
@@ -332,15 +332,15 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 }
 
 func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
-	advance string, newWsrKey quantumfs.ObjectKey) error {
+	alias_ws string, newWsrKey quantumfs.ObjectKey) error {
 
 	err := branchThenAdvance(qctx, wsdb, ws, newWsrKey)
 	if err != nil {
 		return err
 	}
 
-	if advance != "" {
-		err := branchThenAdvance(qctx, wsdb, advance, newWsrKey)
+	if alias_ws != "" {
+		err := branchThenAdvance(qctx, wsdb, alias_ws, newWsrKey)
 		if err != nil {
 			return err
 		}
