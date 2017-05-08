@@ -63,12 +63,12 @@ func (nwsr *NullWorkspaceRoot) publish(c *ctx) {
 func (nwsr *NullWorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.funcIn("NullWorkspaceRoot::syncChild").out()
+	defer c.funcIn("NullWorkspaceRoot::syncChild").Out()
 	nwsr.Directory.syncChild(c, inodeNum, newKey)
 }
 
 func (nwsr *NullWorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("NullWorkspaceRoot::flush").out()
+	defer c.funcIn("NullWorkspaceRoot::flush").Out()
 
 	nwsr.WorkspaceRoot.flush(c)
 	return nwsr.rootId

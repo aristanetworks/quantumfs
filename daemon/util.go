@@ -23,7 +23,7 @@ const F_OK = 0
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
-	defer c.funcIn("modifyEntryWithAttr").out()
+	defer c.funcIn("modifyEntryWithAttr").Out()
 
 	// Update the type if needed
 	if newType != nil {
@@ -96,7 +96,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func findFuseConnection(c *ctx, mountPath string) int {
-	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath).out()
+	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath).Out()
 	c.dlog("Finding FUSE Connection ID...")
 	for i := 0; i < 100; i++ {
 		c.dlog("Waiting for mount try %d...", i)
@@ -200,7 +200,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, checkFlags uint32, stickyAltOwner int32) fuse.Status {
 
 	defer c.FuncIn("hasPermissionIds", "%d %d %d %o", checkUid, checkGid,
-		stickyAltOwner, checkFlags).out()
+		stickyAltOwner, checkFlags).Out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid

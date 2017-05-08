@@ -25,7 +25,7 @@ type MultiBlockFile struct {
 func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 	maxBlocks int) *MultiBlockFile {
 
-	defer c.FuncIn("newMultiBlockAccessor", "maxBlocks %d", maxBlocks).out()
+	defer c.FuncIn("newMultiBlockAccessor", "maxBlocks %d", maxBlocks).Out()
 
 	var rtn MultiBlockFile
 	initMultiBlockAccessor(&rtn, maxBlocks)
@@ -65,7 +65,7 @@ func (fi *MultiBlockFile) expandTo(length int) {
 
 func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buffer {
 	defer c.FuncIn("MultiBlockFile::retrieveDataBlock", "block %d",
-		blockIdx).out()
+		blockIdx).Out()
 	block, exists := fi.toSync[blockIdx]
 	if !exists {
 		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
@@ -78,7 +78,7 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	defer c.FuncIn("MultiBlockFile::readBlock", "block %d offset %d", blockIdx,
-		offset).out()
+		offset).Out()
 
 	// Sanity checks
 	if offset >= uint64(fi.metadata.BlockSize) {
@@ -126,7 +126,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	buf []byte) (int, error) {
 
 	defer c.FuncIn("MultiBlockFile::writeBlock", "block %d offset %d", blockIdx,
-		offset).out()
+		offset).Out()
 
 	// Sanity checks
 	if blockIdx > fi.maxBlocks {
@@ -168,7 +168,7 @@ func (fi *MultiBlockFile) fileLength(c *ctx) uint64 {
 }
 
 func (fi *MultiBlockFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
-	defer c.FuncIn("MultiBlockFile::blockIdxInfo", "offset %d", absOffset).out()
+	defer c.FuncIn("MultiBlockFile::blockIdxInfo", "offset %d", absOffset).Out()
 	blkIdx := absOffset / uint64(fi.metadata.BlockSize)
 	remainingOffset := absOffset % uint64(fi.metadata.BlockSize)
 
@@ -176,7 +176,7 @@ func (fi *MultiBlockFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 }
 
 func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("MultiBlockFile::sync").out()
+	defer c.funcIn("MultiBlockFile::sync").Out()
 
 	for i, block := range fi.toSync {
 		c.vlog("Syncing block %d", i)
@@ -207,7 +207,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 
 func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	defer c.FuncIn("MultiBlockFile::truncate", "new length %d",
-		newLengthBytes).out()
+		newLengthBytes).Out()
 
 	newEndBlkIdx := (newLengthBytes - 1) / uint64(fi.metadata.BlockSize)
 	newNumBlocks := newEndBlkIdx + 1

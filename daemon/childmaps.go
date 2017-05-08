@@ -83,7 +83,7 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecord {
 func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 	name string) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).out()
+	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).Out()
 
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
@@ -103,7 +103,7 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
-	defer c.FuncIn("ChildMap::loadChild", "inode %d", inodeId).out()
+	defer c.FuncIn("ChildMap::loadChild", "inode %d", inodeId).Out()
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		linkId := decodeHardlinkKey(entry.ID())
@@ -143,7 +143,7 @@ func (cmap *ChildMap) count() uint64 {
 func (cmap *ChildMap) deleteChild(c *ctx,
 	name string) (needsReparent quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).out()
+	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
 
 	inodeId, exists := cmap.children[name]
 	if !exists {
@@ -188,7 +188,7 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	newName string) (oldInodeRemoved InodeId) {
 
 	defer c.FuncIn("ChildMap::renameChild", "oldName %s newName %s", oldName,
-		newName).out()
+		newName).Out()
 
 	if oldName == newName {
 		c.vlog("Names are identical")
@@ -262,7 +262,7 @@ func (cmap *ChildMap) record(inodeNum InodeId) quantumfs.DirectoryRecord {
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecord {
-	defer c.FuncIn("ChildMap::recordByName", "name %s", name).out()
+	defer c.FuncIn("ChildMap::recordByName", "name %s", name).Out()
 
 	inodeNum, exists := cmap.children[name]
 	if !exists {
@@ -282,7 +282,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 func (cmap *ChildMap) makeHardlink(c *ctx,
 	childId InodeId) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
-	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).out()
+	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
 
 	child := cmap.firstRecord(childId)
 	if child == nil {
