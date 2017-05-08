@@ -125,7 +125,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 
 	// Verify that O_DIRECT is actually set
 	if !utils.BitAnyFlagSet(uint(syscall.O_DIRECT), uint(flags)) {
-		c.dlog("FAIL setting O_DIRECT in File descriptor")
+		c.elog("FAIL setting O_DIRECT in File descriptor")
 		return fuse.EINVAL
 	}
 
@@ -589,7 +589,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	if key.Type() != quantumfs.KeyTypeEmbedded {
 		if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
-			c.vlog("Key not found: %s", key.String())
+			c.vlog("Key not found: %s", key.Text())
 			return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
 				"Key does not exist in the datastore")
 		}

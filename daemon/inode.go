@@ -1,8 +1,9 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// The basic Inode and FileHandle structures
 package daemon
+
+// The basic Inode and FileHandle structures
 
 import "container/list"
 import "fmt"
@@ -141,7 +142,7 @@ type Inode interface {
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx) // Mark this Inode dirty
-	markClean()   // Mark this Inode as cleaned
+	markClean_()  // Mark this Inode as cleaned
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child InodeId)
 
@@ -150,7 +151,7 @@ type Inode interface {
 	queueToForget(c *ctx)
 
 	// Returns this inode's place in the dirtyQueue
-	dirtyElement() *list.Element
+	dirtyElement_() *list.Element
 
 	// Compute a new object key, schedule the object data to be uploaded to the
 	// datastore and update the parent with the new key.
@@ -172,7 +173,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	directChildInodes() []InodeId
+	directChildInodes(c *ctx) []InodeId
 }
 
 type InodeCommon struct {
@@ -197,10 +198,8 @@ type InodeCommon struct {
 	// to ensure that all Inode locks are only acquired child to parent.
 	treeLock_ *sync.RWMutex
 
-	// This field is accessed using atomic instructions
-	dirty_           uint32 // 1 if this Inode or any children are dirty
-	dirtyElementLock utils.DeferableMutex
-	dirtyElement_    *list.Element
+	// This element is protected by the DirtyQueueLock
+	dirtyElement__ *list.Element
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -215,7 +214,8 @@ func (inode *InodeCommon) parent_(c *ctx) Inode {
 	defer c.funcIn("InodeCommon::parent_").Out()
 	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
-		c.elog("Parent was unloaded before child! %d", inode.parentId)
+		c.elog("Parent (%d) was unloaded before child (%d)!",
+			inode.parentId, inode.id)
 		parent = c.qfs.inode(c, inode.parentId)
 	}
 
@@ -358,7 +358,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.record(inode.id)
+	record := parent.children.recordCopy(c, inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return
@@ -424,23 +424,17 @@ func (inode *InodeCommon) dirty(c *ctx) {
 		return
 	}
 
-	de := inode.dirtyElement()
-
-	if de == nil {
+	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
-		de = c.qfs.queueDirtyInode(c, inode.self)
-
-		// queueDirtyInode requests the dirtyElement so we cannot hold the
-		// dirtyElementLock over that call.
-		defer inode.dirtyElementLock.Lock().Unlock()
-		inode.dirtyElement_ = de
+		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
 	}
 }
 
 // Mark this Inode as having been cleaned
-func (inode *InodeCommon) markClean() {
-	defer inode.dirtyElementLock.Lock().Unlock()
-	inode.dirtyElement_ = nil
+// dirtyQueueLock must be locked when calling this function
+func (inode *InodeCommon) markClean_() {
+	inode.dirtyElement__ = nil
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
@@ -451,15 +445,15 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 
 func (inode *InodeCommon) queueToForget(c *ctx) {
 	defer c.funcIn("InodeCommon::queueToForget").Out()
-	de := c.qfs.queueInodeToForget(c, inode.self)
 
-	defer inode.dirtyElementLock.Lock().Unlock()
-	inode.dirtyElement_ = de
+	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	de := c.qfs.queueInodeToForget_(c, inode.self)
+	inode.dirtyElement__ = de
 }
 
-func (inode *InodeCommon) dirtyElement() *list.Element {
-	defer inode.dirtyElementLock.Lock().Unlock()
-	return inode.dirtyElement_
+// dirtyQueueLock must be locked when calling this function
+func (inode *InodeCommon) dirtyElement_() *list.Element {
+	return inode.dirtyElement__
 }
 
 func (inode *InodeCommon) name() string {
