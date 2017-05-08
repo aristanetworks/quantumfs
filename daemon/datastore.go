@@ -41,7 +41,8 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
-	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get key %s", key.Text()).Out()
+	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get",
+		"key %s", key.Text()).Out()
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
