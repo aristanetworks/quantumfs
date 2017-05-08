@@ -37,12 +37,20 @@ type ExitFuncLog struct {
 	funcName  string
 }
 
+func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
+	c.Qlog.Log(subsystem, c.RequestId, 3, qlog.FnEnterStr+funcName)
+	return ExitFuncLog{
+		c:         &c,
+		subsystem: subsystem,
+		funcName:  funcName,
+	}
+}
+
 func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	extraFmtStr string, args ...interface{}) ExitFuncLog {
 
 	c.Qlog.Log(subsystem, c.RequestId, 3, qlog.FnEnterStr+
 		funcName+" "+extraFmtStr, args...)
-
 	return ExitFuncLog{
 		c:         &c,
 		subsystem: subsystem,
