@@ -22,7 +22,7 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 		quantumfs.ObjectTypeBuildProduct: // Do we need recursive evaluation?
 		return fuse.S_IFREG
 
-	case quantumfs.ObjectTypeDirectoryEntry:
+	case quantumfs.ObjectTypeDirectory:
 		return fuse.S_IFDIR
 
 	case quantumfs.ObjectTypeSymlink:
