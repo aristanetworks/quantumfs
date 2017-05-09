@@ -464,7 +464,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) {
-	defer c.funcIn("WorkspaceRoot::publish").out()
+	defer c.funcIn("WorkspaceRoot::publish").Out()
 
 	wsr.lock.RLock()
 	defer wsr.lock.RUnlock()
