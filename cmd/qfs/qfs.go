@@ -41,7 +41,7 @@ func main() {
 		fmt.Println("  clearAccessedFiles <workspace>")
 		fmt.Println("         - clear the access list of workspace")
 		fmt.Println("  insertInode <dstPath> <key> <uid> <gid> <permission>")
-		fmt.Println("         - copy an inode correponding to a extended" +
+		fmt.Println("         - copy an inode corresponding to an extended" +
 			" key under the location of dstPath with specifications of" +
 			" user <uid>, group <gid>, and RWX permission <permission>" +
 			" in octal format")
