@@ -26,7 +26,7 @@ func loadWorkspaceRoot(c *ctx,
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 	local quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	defer c.funcIn("mergeWorkspaceRoot").out()
+	defer c.funcIn("mergeWorkspaceRoot").Out()
 
 	baseHardlinks, _, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
@@ -156,7 +156,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
 	baseExists bool) (quantumfs.ObjectKey, error) {
 
-	defer c.funcIn("mergeDirectory").out()
+	defer c.funcIn("mergeDirectory").Out()
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
@@ -236,7 +236,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
-	defer c.FuncIn("mergeRecord", "%s", local.Filename()).out()
+	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
 
 	// Merge differently depending on if the type is preserved
 	localTypeChanged := base == nil || !typesMatch(local.Type(),
@@ -250,7 +250,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 	var err error
 	switch local.Type() {
-	case quantumfs.ObjectTypeDirectoryEntry:
+	case quantumfs.ObjectTypeDirectory:
 		if (!localTypeChanged && !remoteTypeChanged) ||
 			(base == nil && bothSameType) {
 
@@ -300,7 +300,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 func takeNewest(c *ctx, remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
 
-	defer c.FuncIn("mergeFile", "%s", local.Filename()).out()
+	defer c.FuncIn("mergeFile", "%s", local.Filename()).Out()
 
 	if remote.ModificationTime() > local.ModificationTime() {
 		c.vlog("taking remote copy of %s", remote.Filename())

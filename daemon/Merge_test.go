@@ -119,6 +119,9 @@ func TestMergeSpecial(t *testing.T) {
 				test.Assert(specialStats.Mode == statSpecB.Mode,
 					"special Mode changed %x vs %x",
 					specialStats.Mode, statSpecB.Mode)
+				test.Assert(specialStats.Mtim == statSpecB.Mtim,
+					"special Modtime changed %v vs %v",
+					specialStats.Mtim, statSpecB.Mtim)
 			}
 		})
 	})

@@ -506,7 +506,7 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 }
 
 func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
-	defer c.funcIn("ApiHandle::mergeWorkspace").out()
+	defer c.funcIn("ApiHandle::mergeWorkspace").Out()
 
 	var cmd quantumfs.MergeRequest
 	var err error
