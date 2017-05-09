@@ -457,6 +457,8 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 
 func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	hardlink *quantumfs.HardlinkRecord) {
+
+	defer c.funcIn("WorkspaceRoot::handleRemoteHardlink").out()
 	id := HardlinkId(hardlink.HardlinkID())
 	if entry, exists := wsr.hardlinks[id]; !exists {
 		c.vlog("Adding new hardlink entry with id %d", id)
