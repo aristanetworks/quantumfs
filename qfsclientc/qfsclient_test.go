@@ -58,7 +58,7 @@ func TestBranchInterface(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// Ensure that the branch was created
-		_, err = os.Stat(test.absPath("test/test/test"))
+		_, err = os.Stat(test.AbsPath("test/test/test"))
 		test.AssertNoErr(err)
 
 		err = ReleaseApi(api)
