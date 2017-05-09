@@ -213,11 +213,6 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 		return util::getError(kApiFileWriteFail, this->path);
 	}
 
-	err = fsync(this->fd);
-	if (err == -1) {
-		return util::getError(kApiFileFlushFail, this->path);
-	}
-
 	return util::getError(kSuccess);
 }
 
