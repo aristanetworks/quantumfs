@@ -159,7 +159,11 @@ Error ApiImpl::Open() {
 
 void ApiImpl::Close() {
 	if (this->fd != -1) {
-		close(this->fd);
+		int err = close(this->fd);
+		if (err != 0) {
+			printf("Error when closing api: %d", err);
+		}
+		this->fd = -1;
 	}
 }
 
