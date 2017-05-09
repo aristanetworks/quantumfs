@@ -240,6 +240,7 @@ const (
 	CmdGetBlock              = 9
 	CmdEnableRootWrite       = 10
 	CmdSetWorkspaceImmutable = 11
+	CmdMergeWorkspaces       = 12
 )
 
 // The various error codes
@@ -273,6 +274,13 @@ type BranchRequest struct {
 	CommandCommon
 	Src string
 	Dst string
+}
+
+type MergeRequest struct {
+	CommandCommon
+	BaseWorkspace   string
+	RemoteWorkspace string
+	LocalWorkspace  string
 }
 
 type AccessedRequest struct {
@@ -360,6 +368,59 @@ func (api *Api) Branch(src string, dst string) error {
 		CommandCommon: CommandCommon{CommandId: CmdBranchRequest},
 		Src:           src,
 		Dst:           dst,
+	}
+
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	var errorResponse ErrorResponse
+	err = json.Unmarshal(buf, &errorResponse)
+	if err != nil {
+		return err
+	}
+	if errorResponse.ErrorCode != ErrorOK {
+		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+	}
+
+	return nil
+}
+
+func (api *Api) Merge(remote string, local string) error {
+	// A two way merge is equivalent to a three way merge where the base is
+	// the null (empty) workspace
+
+	return api.Merge3Way(NullWorkspaceName, remote, local)
+}
+
+// Local takes precedence if remote and local have a conflict and matching
+// modification times. It is also the workspace who is Advanced to the resulting ID.
+func (api *Api) Merge3Way(base string, remote string, local string) error {
+	if !isWorkspaceNameValid(base) {
+		return fmt.Errorf("\"%s\" (as base) must be an empty string or "+
+			"contain precisely two \"/\"\n", base)
+	}
+
+	if !isWorkspaceNameValid(remote) {
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
+			remote)
+	}
+
+	if !isWorkspaceNameValid(local) {
+		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", local)
+	}
+
+	cmd := MergeRequest{
+		CommandCommon:   CommandCommon{CommandId: CmdMergeWorkspaces},
+		BaseWorkspace:   base,
+		RemoteWorkspace: remote,
+		LocalWorkspace:  local,
 	}
 
 	cmdBuf, err := json.Marshal(cmd)
