@@ -14,7 +14,7 @@ import "github.com/aristanetworks/quantumfs/testutils"
 
 func WaitForApi(test *daemon.TestHelper) {
 	test.WaitFor("Api inode to be seen by kernel", func() bool {
-		_, err := os.Stat(test.TempDir +"/mnt/api")
+		_, err := os.Stat(test.TempDir + "/mnt/api")
 		return (err == nil)
 	})
 }
@@ -89,7 +89,7 @@ func TestInsertInode(t *testing.T) {
 			0777, uint32(os.Getuid()), uint32(os.Getgid()))
 		test.AssertNoErr(err)
 
-		readBack, err := ioutil.ReadFile(workspace+"/fileCopy")
+		readBack, err := ioutil.ReadFile(workspace + "/fileCopy")
 		test.Assert(bytes.Equal(readBack, filedata),
 			"inserted inode data mismatch")
 
