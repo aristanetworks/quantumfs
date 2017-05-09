@@ -1644,10 +1644,14 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	entry := dir.createNewEntry(c, name, mode, umask, rdev, size,
 		uid, gid, type_, key)
 
-	defer dir.childRecordLock.Lock().Unlock()
-	inodeNum := dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
+	inodeNum := func() InodeId {
+		defer dir.childRecordLock.Lock().Unlock()
+		return dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
+	}()
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
+
+	dir.updateSize_(c)
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
