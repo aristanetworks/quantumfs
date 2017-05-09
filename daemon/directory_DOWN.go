@@ -11,7 +11,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	defer c.funcIn("Directory::link_DOWN").out()
+	defer c.funcIn("Directory::link_DOWN").Out()
 
 	// Make sure the file's flushed before we try to hardlink it. We can't do
 	// this with the inode parentLock locked since Sync locks the parent as well.
@@ -90,9 +90,9 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
-	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).out()
+	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).Out()
 
-	children := dir.directChildInodes()
+	children := dir.directChildInodes(c)
 	for _, child := range children {
 		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
 			inode.Sync_DOWN(c)
@@ -114,7 +114,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	fuse.Status) {
 
 	defer c.FuncIn("Directory::generateChildTypeKey_DOWN", "inode %d",
-		inodeNum).out()
+		inodeNum).Out()
 
 	// flush already acquired an Inode lock exclusively. In case of the dead
 	// lock, the Inode lock for reading should be required after releasing its
@@ -135,7 +135,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 // go along the given path to the destination
 // The path is stored in a string slice, each cell index contains an inode
 func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
-	defer c.funcIn("Directory::followPath_DOWN").out()
+	defer c.funcIn("Directory::followPath_DOWN").Out()
 
 	// traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
@@ -144,7 +144,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 	for num := 3; num < length; num++ {
 		// all preceding nodes have to be directories
 		child, err := currDir.lookupInternal(c, path[num],
-			quantumfs.ObjectTypeDirectoryEntry)
+			quantumfs.ObjectTypeDirectory)
 		if err != nil {
 			return child, err
 		}
@@ -158,7 +158,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
 func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	toLink Inode) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
-	defer c.funcIn("Directory::makeHardlink_DOWN").out()
+	defer c.funcIn("Directory::makeHardlink_DOWN").Out()
 
 	// If someone is trying to link a hardlink, we just need to return a copy
 	if isHardlink, id := dir.wsr.checkHardlink(toLink.inodeNum()); isHardlink {

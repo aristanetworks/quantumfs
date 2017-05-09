@@ -41,8 +41,8 @@ type dataStore struct {
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
-	c.Vlog(qlog.LogDaemon, "---In dataStore::Get key %s", key.String())
-	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Get")
+	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get",
+		"key %s", key.Text()).Out()
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
@@ -98,14 +98,13 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return &buf
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
-		err.Error(), key.String())
+		err.Error(), key.Text())
 
 	return nil
 }
 
 func (store *dataStore) Set(c *quantumfs.Ctx, buffer quantumfs.Buffer) error {
-	c.Vlog(qlog.LogDaemon, "---In dataStore::Set")
-	defer c.Vlog(qlog.LogDaemon, "Out-- dataStore::Set")
+	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
 	key, err := buffer.Key(c)
 	if err != nil {
@@ -128,7 +127,7 @@ func newEmptyBuffer() buffer {
 // Does not obey the initBlockSize capacity, so only for use with buffers that
 // are very unlikely to be written to
 func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	defer c.FuncIn("newBuffer", "keyType %d", keyType).out()
+	defer c.FuncIn("newBuffer", "keyType %d", keyType).Out()
 
 	return &buffer{
 		data:      in,
@@ -143,7 +142,7 @@ func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffe
 	inSize := len(in)
 
 	defer c.FuncIn("newBufferCopy", "keyType %d inSize %d", keyType,
-		len(in)).out()
+		len(in)).Out()
 
 	var newData []byte
 	// ensure our buffer meets min capacity
@@ -242,9 +241,8 @@ func appendAndExtendCap(arrA []byte, arrB []byte) []byte {
 }
 
 func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset_ uint32) uint32 {
-	c.Vlog(qlog.LogDaemon, "---In buffer::Write size %d offset %d", len(in),
-		offset_)
-	defer c.Vlog(qlog.LogDaemon, "Out-- buffer::Write")
+	defer c.FuncIn(qlog.LogDaemon, "buffer::Write", "size %d offset %d",
+		len(in), offset_).Out()
 
 	offset := int(offset_)
 	// Sanity check offset and length
@@ -306,8 +304,7 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
-	c.Vlog(qlog.LogDaemon, "---In buffer::Key")
-	defer c.Vlog(qlog.LogDaemon, "Out-- buffer::Key")
+	defer c.FuncInName(qlog.LogDaemon, "buffer::Key").Out()
 
 	if !buf.dirty {
 		c.Vlog(qlog.LogDaemon, "Buffer not dirty")
@@ -316,7 +313,7 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
+	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.Text())
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
 }

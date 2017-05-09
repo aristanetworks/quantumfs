@@ -59,7 +59,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"WorkspaceRoot buffer %s", rootID.String())
+		"WorkspaceRoot buffer %s", rootID.Text())
 
 	wsr := buf.AsWorkspaceRoot()
 	//===============================================
@@ -88,6 +88,12 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	group.Go(func() error {
 		defer close(keyChan)
+
+		if err := writeToChan(c, keyChan, "", rootID,
+			uint64(buf.Size())); err != nil {
+			return err
+		}
+
 		if err := handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
 			return err
@@ -103,29 +109,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		}
 		return nil
 	})
-
-	if err := writeToChan(c, keyChan, "", rootID,
-		uint64(buf.Size())); err != nil {
-		return err
-	}
-
 	return group.Wait()
-}
-
-func key2String(key quantumfs.ObjectKey) string {
-	switch {
-
-	case key.IsEqualTo(quantumfs.EmptyDirKey):
-		return "EmptyDirKey"
-	case key.IsEqualTo(quantumfs.EmptyBlockKey):
-		return "EmptyBlockKey"
-	case key.IsEqualTo(quantumfs.EmptyWorkspaceKey):
-		return "EmptyWorkspaceKey"
-	case key.IsEqualTo(quantumfs.ZeroKey):
-		return "ZeroKey"
-	default:
-		return key.String()
-	}
 }
 
 func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
@@ -155,7 +139,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		}
 
 		simplebuffer.AssertNonZeroBuf(buf,
-			"WorkspaceRoot buffer %s", key.String())
+			"WorkspaceRoot buffer %s", key.Text())
 
 		if err := writeToChan(c, keyChan, "", key,
 			uint64(buf.Size())); err != nil {
@@ -177,7 +161,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"MultiBlockFile buffer %s", key.String())
+		"MultiBlockFile buffer %s", key.Text())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -211,7 +195,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"VeryLargeFile buffer %s", key.String())
+		"VeryLargeFile buffer %s", key.Text())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -239,7 +223,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		}
 
 		simplebuffer.AssertNonZeroBuf(buf,
-			"DirectoryEntry buffer %s", key.String())
+			"DirectoryEntry buffer %s", key.Text())
 
 		// When wf returns SkipDir for a DirectoryEntry, we can skip all the
 		// DirectoryRecord in that DirectoryEntry
@@ -288,7 +272,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
 			ds, dr.ID(), wf, keyChan)
-	case quantumfs.ObjectTypeDirectoryEntry:
+	case quantumfs.ObjectTypeDirectory:
 		return handleDirectoryEntry(c, fpath,
 			ds, dr.ID(), wf, keyChan)
 	default:
