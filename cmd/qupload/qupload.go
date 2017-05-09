@@ -19,8 +19,9 @@ import "golang.org/x/net/context"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/thirdparty_backends"
+import exs "github.com/aristanetworks/quantumfs/utils/excludespec"
 
 // Various exit reasons returned to the shell as exit code
 const (
@@ -36,7 +37,7 @@ type params struct {
 	wsdbName    string
 	wsdbConf    string
 	ws          string
-	advance     string
+	alias       string
 	baseDir     string
 	excludeFile string
 	conc        uint
@@ -47,6 +48,7 @@ type params struct {
 var dataStore quantumfs.DataStore
 var wsDB quantumfs.WorkspaceDB
 var version string
+var exInfo *exs.ExcludeInfo
 
 type Ctx struct {
 	Qctx *quantumfs.Ctx
@@ -92,7 +94,7 @@ version: %s
 usage: qupload -datastore <dsname> -datastoreconf <dsconf>
                -workspaceDB <wsdbname> -workspaceDBconf <wsdbconf>
 	       -workspace <wsname>
-	       [ -advance <wsname> -progress -logdir <logpath>
+	       [ -alias <wsname> -progress -logdir <logpath>
 	         -concurrency <count> -wsforce ]
 	       -basedir <path> [ -exclude <file> | <reldirpath> ]
 Exmaples:
@@ -114,14 +116,30 @@ to the QFS workspace build/eos-trunk/11223344. All files and sub-directories
 are included since an exclude file is not specified.
 
 The exclude file specifies paths that must be excluded from upload.
+It is possible to selectively include certain paths from excluded directories.
 The exclude file should be formatted based on following rules:
 
 One path per line
+Comments and empty lines are allowed. A comment is any line that starts with "#"
+Order of the paths in the file is important
 Path must be relative to the base directory specified
 Absolute paths are not allowed
-To create a directory without it's contents, specify / at the end of path
-To skip directory completely, specify directory name without trailing /
-Comments and empty lines are allowed. A comment is any line that starts with #
+Exclude paths must not be "/" suffixed
+Paths to be included are prefixed with "+"
+The parent and grand-parents of paths to be included must be included already
+
+Example:
+
+dir1
++dir1/subdir1
++dir1/subdir1/file1
++dir1/subdir3
++dir1/subdir4
++dir1/subdir3/subsubdir4/
+
+In the above example, anything under directory "dir1" are excluded except
+dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
+Note dir1/subdir3 and dir1/subdir4 contents are not included
 
 `, version)
 	qFlags.PrintDefaults()
@@ -141,8 +159,8 @@ func validateParams(p *params) error {
 			"precisely two \"/\"")
 	}
 
-	if p.advance != "" && strings.Count(p.advance, "/") != 2 {
-		return errors.New("Workspace to be advanced must " +
+	if p.alias != "" && strings.Count(p.alias, "/") != 2 {
+		return errors.New("Workspace to be aliased must " +
 			"contain precisely two \"/\"")
 	}
 
@@ -207,8 +225,8 @@ func main() {
 	qFlags.StringVar(&cliParams.ws, "workspace", "",
 		"Name of workspace which'll contain uploaded data")
 
-	qFlags.StringVar(&cliParams.advance, "advance", "",
-		"Name of workspace which'll be advanced to point"+
+	qFlags.StringVar(&cliParams.alias, "alias", "",
+		"Name of workspace which'll be aliased to point"+
 			"to uploaded workspace")
 	qFlags.BoolVar(&cliParams.progress, "progress", false,
 		"Show the data and metadata sizes uploaded")
@@ -270,9 +288,8 @@ func main() {
 
 	// setup exclude information
 	relpath := ""
-	var exInfo *ExcludeInfo
 	if cliParams.excludeFile != "" {
-		exInfo, err = LoadExcludeInfo(cliParams.baseDir,
+		exInfo, err = exs.LoadExcludeInfo(cliParams.baseDir,
 			cliParams.excludeFile)
 		if err != nil {
 			fmt.Println("Exclude file processing failed: ", err)
@@ -308,8 +325,8 @@ func main() {
 
 	// upload
 	start := time.Now()
-	upErr := upload(c, cliParams.ws, cliParams.advance,
-		filepath.Join(cliParams.baseDir, relpath), exInfo,
+	upErr := upload(c, cliParams.ws, cliParams.alias,
+		filepath.Join(cliParams.baseDir, relpath),
 		cliParams.conc)
 	if upErr != nil {
 		c.Elog("Upload failed: ", upErr)
