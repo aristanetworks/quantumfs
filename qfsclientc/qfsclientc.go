@@ -13,10 +13,13 @@ package qfsclientc
 const char * cGetApi(uint32_t *apiHandleOut);
 const char * cGetApiPath(const char *path, uint32_t *apiHandleOut);
 const char * cReleaseApi(uint32_t apiHandle);
-const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
-	uint32_t *lenOut);
+const char * cInsertInode(uint32_t apiHandle, const char *dest, const char *key,
+	uint32_t permissions, uint32_t uid, uint32_t gid);
+const char * cBranch(uint32_t apiHandle, const char *source, const char *dest);
 const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 	uint32_t len);
+const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
+	uint32_t *lenOut);
 
 */
 import "C"
@@ -59,6 +62,31 @@ func ReleaseApi(api QfsClientApi) error {
 	handle := C.uint32_t(api.handle)
 	err := C.cReleaseApi(handle)
 	errStr := C.GoString(err)
+
+	if errStr != "" {
+		return errors.New(errStr)
+	}
+
+	return nil
+}
+
+func (api *QfsClientApi) InsertInode(dest string, key string, permissions uint32,
+	uid uint32, gid uint32) error {
+
+	errStr := C.GoString(C.cInsertInode(C.uint32_t(api.handle), C.CString(dest),
+		C.CString(key), C.uint32_t(permissions), C.uint32_t(uid),
+		C.uint32_t(gid)))
+
+	if errStr != "" {
+		return errors.New(errStr)
+	}
+
+	return nil
+}
+
+func (api *QfsClientApi) Branch(source string, dest string) error {
+	errStr := C.GoString(C.cBranch(C.uint32_t(api.handle), C.CString(source),
+		C.CString(dest)))
 
 	if errStr != "" {
 		return errors.New(errStr)
