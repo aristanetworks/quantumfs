@@ -14,12 +14,12 @@ import "github.com/aristanetworks/quantumfs"
 func TestTypespaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		var stat syscall.Stat_t
-		err := syscall.Stat(test.AbsPath(quantumfs.ApiPath), &stat)
+		err := syscall.Stat(test.absPath(quantumfs.ApiPath), &stat)
 		test.Assert(err == nil, "Error getting api stat data: %v", err)
 		test.Assert(stat.Ino == quantumfs.InodeIdApi,
 			"api file has incorrect inode number %d", stat.Ino)
 
-		entries, err := ioutil.ReadDir(test.AbsPath(""))
+		entries, err := ioutil.ReadDir(test.absPath(""))
 		test.Assert(err == nil, "Couldn't read root listing")
 		test.Assert(len(entries) == 2,
 			"Incorrect number of entries in empty root: %d",
@@ -30,7 +30,7 @@ func TestTypespaceListing(t *testing.T) {
 func TestNamespaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		entries, err :=
-			ioutil.ReadDir(test.AbsPath(quantumfs.NullSpaceName))
+			ioutil.ReadDir(test.absPath(quantumfs.NullSpaceName))
 		test.Assert(err == nil, "Couldn't read typespace listing")
 		test.Assert(len(entries) == 1,
 			"Incorrect number of entries in null typespace: %d",
@@ -41,7 +41,7 @@ func TestNamespaceListing(t *testing.T) {
 func TestWorkspaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		entries, err :=
-			ioutil.ReadDir(test.AbsPath(quantumfs.NullSpaceName))
+			ioutil.ReadDir(test.absPath(quantumfs.NullSpaceName))
 		test.Assert(err == nil, "Couldn't read namespace listing")
 		test.Assert(len(entries) == 1,
 			"Incorrect number of entries in null namespace: %d",
@@ -67,7 +67,7 @@ func checkNlink(test *testHelper, path string, expectedCountGetAttr uint64,
 
 	// Trigger the GetAttr code path for determining nlink
 	var stat syscall.Stat_t
-	err := syscall.Stat(test.AbsPath(path), &stat)
+	err := syscall.Stat(test.absPath(path), &stat)
 	test.AssertNoErr(err)
 
 	test.Assert(stat.Nlink == expectedCountGetAttr,
@@ -75,9 +75,9 @@ func checkNlink(test *testHelper, path string, expectedCountGetAttr uint64,
 		expectedCountGetAttr)
 
 	// Trigger the ReadDirPlus code path for determining nlink
-	_, err = ioutil.ReadDir(test.AbsPath(path))
+	_, err = ioutil.ReadDir(test.absPath(path))
 
-	err = syscall.Stat(test.AbsPath(path), &stat)
+	err = syscall.Stat(test.absPath(path), &stat)
 	test.AssertNoErr(err)
 
 	test.Assert(stat.Nlink == expectedCountReadDirPlus,

@@ -81,7 +81,7 @@ func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	err = api.Branch(test.RelPath(workspace), dst)
 	test.Assert(err == nil, "Unable to branch")
 
-	test.checkSparse(test.AbsPath(dst+"/test"), testFilename, newLen/100, 10)
+	test.checkSparse(test.absPath(dst+"/test"), testFilename, newLen/100, 10)
 }
 
 func TestSmallConvert(t *testing.T) {

@@ -40,7 +40,7 @@ func TestWorkspaceBranching(t *testing.T) {
 			"workspace: %v", err)
 
 		// Then create a file
-		testFilename := test.AbsPath(dst + "/" + "test")
+		testFilename := test.absPath(dst + "/" + "test")
 		fd, _ := os.Create(testFilename)
 		fd.Close()
 		var stat syscall.Stat_t
@@ -48,7 +48,7 @@ func TestWorkspaceBranching(t *testing.T) {
 		test.Assert(err == nil, "Error stat'ing test file: %v", err)
 
 		// Ensure the first branched workspace wasn't modified
-		testFilename = test.AbsPath(src + "/" + "test")
+		testFilename = test.absPath(src + "/" + "test")
 		err = syscall.Stat(testFilename, &stat)
 		test.Assert(err != nil, "Original workspace was modified")
 	})
@@ -318,7 +318,7 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	// get the key from a pipe
 	keyP := getExtendedKeyHelper(test, spFilename, "pipe")
 
-	dirNameD := test.AbsPath(dst + "/test/a")
+	dirNameD := test.absPath(dst + "/test/a")
 	err = utils.MkdirAll(dirNameD, os.FileMode(PermissionA))
 	test.Assert(err == nil, "Error creating target directories: %v", err)
 
@@ -415,7 +415,7 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 
 func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
+		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
 			syscall.O_DIRECT, 0)
 		test.Assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()
@@ -428,7 +428,7 @@ func TestApiNoRequestBlockingRead(t *testing.T) {
 
 func TestApiNoRequestNonBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
+		api, err := os.OpenFile(test.absPath(quantumfs.ApiPath),
 			syscall.O_DIRECT|syscall.O_NONBLOCK, 0)
 		test.Assert(err == nil, "Error opening api file: %v", err)
 		defer api.Close()

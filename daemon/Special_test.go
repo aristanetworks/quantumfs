@@ -49,7 +49,7 @@ func specialCreate(test *testHelper, filetype uint32) {
 	confirm(testLinkname, 2)
 
 	// Branch and confirm everything is still correct
-	workspace = test.AbsPath(test.branchWorkspace(workspace))
+	workspace = test.absPath(test.branchWorkspace(workspace))
 	confirm(workspace+"/test", 2)
 	confirm(workspace+"/test_link", 2)
 }
