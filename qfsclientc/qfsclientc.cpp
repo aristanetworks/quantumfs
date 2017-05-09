@@ -15,7 +15,7 @@ extern "C" {
 	static std::atomic<uint32_t> s_freeHandle;
 
 	const char * errStr(qfsclient::Error err) {
-		if (err.code !=  qfsclient::kSuccess) {
+		if (err.code != qfsclient::kSuccess) {
 			return err.message.c_str();
 		}
 
@@ -27,7 +27,7 @@ extern "C" {
 		qfsclient::Error err = qfsclient::GetApi(&api);
 
 		const char * rtn = errStr(err);
-		if (rtn != "") {
+		if (strcmp(rtn, "") != 0) {
 			return rtn;
 		}
 
@@ -43,7 +43,7 @@ extern "C" {
 		qfsclient::Error err = qfsclient::GetApi(path, &api);
 
 		const char * rtn = errStr(err);
-		if (rtn != "") {
+		if (strcmp(rtn, "") != 0) {
 			return rtn;
 		}
 
@@ -102,7 +102,7 @@ extern "C" {
 		qfsclient::Error err = search->second->GetBlock(inputKey, &data);
 
 		const char *rtn = errStr(err);
-		if (rtn != "") {
+		if (strcmp(rtn, "") != 0) {
 			return rtn;
 		}
 
