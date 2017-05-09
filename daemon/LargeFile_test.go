@@ -173,7 +173,7 @@ func TestLargeFileAttr(t *testing.T) {
 		err = api.Branch(test.RelPath(workspace), dst)
 		test.Assert(err == nil, "Unable to branch")
 
-		test.checkSparse(test.AbsPath(dst+"/test"), testFilename,
+		test.checkSparse(test.absPath(dst+"/test"), testFilename,
 			int(newSize)/100, 10)
 	})
 }

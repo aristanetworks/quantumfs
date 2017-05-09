@@ -140,7 +140,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// Now branch this workspace so we have a workspace full of
 		// uninstantiated Inodes
 		workspace = test.branchWorkspace(workspace)
-		dirName = test.AbsPath(workspace + "/dir")
+		dirName = test.absPath(workspace + "/dir")
 
 		// Get the listing from the directory to instantiate that directory
 		// and add its children to the uninstantiated inode list.
@@ -263,7 +263,7 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.AssertNoErr(err)
 
 		dstWorkspaceName := test.branchWorkspace(srcWorkspace)
-		dstWorkspace := test.AbsPath(dstWorkspaceName)
+		dstWorkspace := test.absPath(dstWorkspaceName)
 		// Create one marker file in srcWorkspace and dstWorkspace
 		err = testutils.PrintToFile(dir1+"/srcMarker", "testSomething")
 		test.AssertNoErr(err)

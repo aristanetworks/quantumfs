@@ -420,7 +420,7 @@ func TestFileAttrUpdate(t *testing.T) {
 		dst := "dst/attrupdate/test"
 
 		// First create a file
-		testFile := test.AbsPath(src + "/" + "test")
+		testFile := test.absPath(src + "/" + "test")
 		fd, err := os.Create(testFile)
 		fd.Close()
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -432,7 +432,7 @@ func TestFileAttrUpdate(t *testing.T) {
 		err = api.Branch(src, dst)
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
 
-		testFile = test.AbsPath(dst + "/" + "test")
+		testFile = test.absPath(dst + "/" + "test")
 		// Ensure the new workspace has the correct file attributes
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFile, &stat)
@@ -458,7 +458,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 		dst := "dst/attrwriteupdate/test"
 
 		// First create a file
-		testFile := test.AbsPath(src + "/" + "test")
+		testFile := test.absPath(src + "/" + "test")
 		fd, err := os.Create(testFile)
 		fd.Close()
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -474,7 +474,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 		err = api.Branch(src, dst)
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
 
-		testFile = test.AbsPath(dst + "/" + "test")
+		testFile = test.absPath(dst + "/" + "test")
 		// Ensure the new workspace has the correct file attributes
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFile, &stat)
