@@ -51,7 +51,7 @@ func convertRecord(wsr *WorkspaceRoot,
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecord {
-	defer c.FuncIn("ChildMap::recordByName", "%s", name).out()
+	defer c.FuncIn("ChildMap::recordByName", "%s", name).Out()
 
 	// Do everything we can to optimize this function and allow fast escape
 	if _, exists := cmap.records.inodeId(name); !exists {
@@ -70,7 +70,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 func (cmap *ChildMap) loadInodeId(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
-	defer c.FuncIn("ChildMap::loadInodeId", "inode %d", inodeId).out()
+	defer c.FuncIn("ChildMap::loadInodeId", "inode %d", inodeId).Out()
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		linkId := decodeHardlinkKey(entry.ID())
@@ -98,7 +98,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
 	defer c.FuncIn("ChildMap::loadChild", "%s %s", entry.Filename(),
-		entry.ID().Text()).out()
+		entry.ID().Text()).Out()
 
 	entry = convertRecord(cmap.wsr, entry)
 	if entry == nil {
@@ -120,7 +120,7 @@ func (cmap *ChildMap) count() uint64 {
 func (cmap *ChildMap) deleteChild(c *ctx,
 	name string) (needsReparent quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).out()
+	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
 
 	inodeId, exists := cmap.records.inodeId(name)
 	if !exists {
@@ -165,7 +165,7 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	newName string) (oldInodeRemoved InodeId) {
 
 	defer c.FuncIn("ChildMap::renameChild", "oldName %s newName %s", oldName,
-		newName).out()
+		newName).Out()
 
 	if oldName == newName {
 		c.vlog("Names are identical")
@@ -262,7 +262,7 @@ func (cmap *ChildMap) setKey(inodeNum InodeId, key quantumfs.ObjectKey) fuse.Sta
 func (cmap *ChildMap) makeHardlink(c *ctx,
 	childId InodeId) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
-	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).out()
+	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
 
 	child := cmap.recordCopy(c, childId)
 	if child == nil {
@@ -557,7 +557,7 @@ func (rd *recordsOnDemand) delRecord(name string, inodeId InodeId) {
 
 func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
-	defer c.funcIn("recordsOnDemand::publish").out()
+	defer c.funcIn("recordsOnDemand::publish").Out()
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
@@ -604,7 +604,7 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
 
-	defer c.funcIn("publishDirectoryEntry").out()
+	defer c.funcIn("publishDirectoryEntry").Out()
 
 	layer.SetNext(nextKey)
 	bytes := layer.Bytes()
