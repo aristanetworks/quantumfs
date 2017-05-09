@@ -7,6 +7,7 @@ import "bytes"
 import "flag"
 import "fmt"
 import "io"
+import "io/ioutil"
 import "os"
 import "reflect"
 import "strings"
@@ -225,6 +226,59 @@ func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	th.Assert(err == nil, "Error fetching key")
 
 	return key
+}
+
+func (th *testHelper) MakeFile(filepath string) (data []byte) {
+	// Make subdirectories needed
+	lastIndex := strings.LastIndex(filepath, "/")
+	if lastIndex > 0 {
+		err := os.MkdirAll(filepath[:lastIndex], 0777)
+		th.AssertNoErr(err)
+	}
+
+	// choose an offset and length based on the filepath so that it varies, but
+	// is consistent from run to run
+	charSum := 100
+	for i := 0; i < len(filepath); i++ {
+		charSum += int(filepath[i] - ' ')
+	}
+
+	// Add a little protection in case somehow this is negative
+	if charSum < 0 {
+		charSum = -charSum
+	}
+
+	offset := charSum
+	length := offset
+
+	data = GenData(offset + length)[offset:]
+	err := testutils.PrintToFile(filepath, string(data))
+	th.AssertNoErr(err)
+
+	return data
+
+}
+
+func (th *testHelper) CheckData(filepath string, data []byte) {
+	readData, err := ioutil.ReadFile(filepath)
+	th.AssertNoErr(err)
+	th.Assert(bytes.Equal(readData, data), "Data changed in CheckData")
+}
+
+func (th *testHelper) SysStat(filepath string) syscall.Stat_t {
+	var stat syscall.Stat_t
+	err := syscall.Stat(filepath, &stat)
+	th.AssertNoErr(err)
+
+	return stat
+}
+
+func (th *testHelper) SysLstat(filepath string) syscall.Stat_t {
+	var stat syscall.Stat_t
+	err := syscall.Lstat(filepath, &stat)
+	th.AssertNoErr(err)
+
+	return stat
 }
 
 // Temporary directory for this test run
