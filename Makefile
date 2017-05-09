@@ -3,6 +3,7 @@ PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
+PKGS_TO_TEST+=quantumfs/utils/excludespec
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 ppid:=$(shell ps -o ppid= $$$$)
