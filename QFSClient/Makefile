@@ -19,7 +19,7 @@ SRCS      := $(d)/qfs_client_implementation.cc $(d)/qfs_client_util.cc
 OBJS      := $(SRCS:.cc=.o)
 DEPS      := $(SRCS:.cc=.d)
 
-CXX_FLAGS      := -xc++ -I.. -fPIC -g -Werror -std=c++11
+CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -shared -Wl,-rpath,.
 
 all: $(TARGET) test
