@@ -467,6 +467,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdSetWorkspaceImmutable:
 		c.vlog("Received SetWorkspaceImmutable request")
 		responseSize = api.setWorkspaceImmutable(c, buf)
+	case quantumfs.CmdMergeWorkspaces:
+		c.vlog("Received merge request")
+		responseSize = api.mergeWorkspace(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -486,6 +489,9 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
+	c.vlog("Branching %s/%s/%s to %s/%s/%s", src[0], src[1], src[2], dst[0],
+		dst[1], dst[2])
+
 	c.qfs.syncAll(c)
 
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
@@ -497,6 +503,71 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	}
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
+}
+
+func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
+	defer c.funcIn("ApiHandle::mergeWorkspace").Out()
+
+	var cmd quantumfs.MergeRequest
+	var err error
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		c.vlog("Error unmarshaling JSON: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+	}
+
+	baseRootId := quantumfs.EmptyWorkspaceKey
+	base := strings.Split(cmd.BaseWorkspace, "/")
+	baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
+		base[2])
+	if err != nil {
+		c.vlog("Workspace not fetched (%s): %s", base, err.Error())
+		return api.queueErrorResponse(0+
+			quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.BaseWorkspace)
+	}
+
+	local := strings.Split(cmd.LocalWorkspace, "/")
+	localRootId, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
+		local[2])
+	if err != nil {
+		c.vlog("Workspace not fetched (%s): %s", local, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.LocalWorkspace)
+	}
+
+	remote := strings.Split(cmd.RemoteWorkspace, "/")
+	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
+		remote[2])
+	if err != nil {
+		c.vlog("Workspace not fetched (%s): %s", remote, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s does not exist or is not active",
+			cmd.RemoteWorkspace)
+	}
+
+	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
+		local[0], local[1], local[2])
+
+	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
+		localRootId)
+	if err != nil {
+		c.vlog("Merge failed: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Merge failed: %s", err.Error())
+	}
+
+	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
+		local[2], localRootId, newRootId)
+	if err != nil {
+		c.vlog("Workspace can't advance after merge began, try again: %s",
+			err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Workspace rootId advanced after merge began, try again.")
+	}
+
+	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
 }
 
 func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
