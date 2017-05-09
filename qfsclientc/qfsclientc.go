@@ -13,6 +13,7 @@ package qfsclientc
 const char * cGetApi(uint32_t *apiHandleOut);
 const char * cGetApiPath(const char *path, uint32_t *apiHandleOut);
 const char * cReleaseApi(uint32_t apiHandle);
+const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot);
 const char * cInsertInode(uint32_t apiHandle, const char *dest, const char *key,
 	uint32_t permissions, uint32_t uid, uint32_t gid);
 const char * cBranch(uint32_t apiHandle, const char *source, const char *dest);
@@ -62,6 +63,17 @@ func ReleaseApi(api QfsClientApi) error {
 	handle := C.uint32_t(api.handle)
 	err := C.cReleaseApi(handle)
 	errStr := C.GoString(err)
+
+	if errStr != "" {
+		return errors.New(errStr)
+	}
+
+	return nil
+}
+
+func (api *QfsClientApi) GetAccessed(workspaceRoot string) error {
+	errStr := C.GoString(C.cGetAccessed(C.uint32_t(api.handle),
+		C.CString(workspaceRoot)))
 
 	if errStr != "" {
 		return errors.New(errStr)
