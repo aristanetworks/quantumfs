@@ -179,6 +179,7 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	localRecord quantumfs.DirectoryRecord,
 	remoteRecord *quantumfs.DirectRecord) {
 
+	defer c.funcIn("Directory::handleDirectoryEntryUpdate_DOWN").out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
 
 	c.wlog("entry %s with inodeid %d goes %s -> %s",
@@ -195,7 +196,6 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 				subdir.refresh_DOWN(c, remoteRecord.ID())
 			c.qfs.addUninstantiated(c, uninstantiated, inodeId)
 			c.qfs.removeUninstantiated(c, removedUninstantiated)
-
 		} else {
 			c.wlog("nothing to do for uninstantiated inode %d", inodeId)
 		}
@@ -205,7 +205,8 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 	remoteRecord *quantumfs.DirectRecord) []InodeId {
 
-	defer c.funcIn("handleRemoteRecord_DOWN " + remoteRecord.Filename()).out()
+	defer c.FuncIn("Directory::handleRemoteRecord_DOWN", "%s",
+		remoteRecord.Filename()).out()
 	defer dir.childRecordLock.Lock().Unlock()
 
 	uninstantiated := make([]InodeId, 0)
@@ -230,7 +231,7 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 	childId InodeId) {
 
-	defer c.funcIn("Directory::handleDeletedInMemoryRecord_DOWN " +
+	defer c.FuncIn("Directory::handleDeletedInMemoryRecord_DOWN", "%s",
 		childname).out()
 
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
@@ -238,7 +239,6 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 	} else {
 		result := child.deleteSelf(c, child,
 			func() (quantumfs.DirectoryRecord, fuse.Status) {
-
 				delRecord := dir.children.deleteChild(c, childname)
 				return delRecord, fuse.OK
 			})
