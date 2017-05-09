@@ -157,7 +157,7 @@ func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 				stat.Mode, uint32(stat.Rdev), 0,
 				quantumfs.ObjectUid(stat.Uid, stat.Uid),
 				quantumfs.ObjectGid(stat.Gid, stat.Gid),
-				quantumfs.ObjectTypeDirectoryEntry,
+				quantumfs.ObjectTypeDirectory,
 				// retain time of the input directory
 				quantumfs.NewTime(time.Unix(stat.Mtim.Sec,
 					stat.Mtim.Nsec)),
