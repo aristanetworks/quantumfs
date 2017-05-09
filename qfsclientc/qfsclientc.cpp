@@ -66,6 +66,31 @@ extern "C" {
 		return "";
 	}
 
+	const char * cInsertInode(uint32_t apiHandle, const char *dest,
+		const char *key, uint32_t permissions, uint32_t uid, uint32_t gid) {
+
+		auto search = s_apiHandles.find(apiHandle);
+		if (search == s_apiHandles.end()) {
+			return "Api doesn't exist.";
+		}
+
+		qfsclient::Error err = search->second->InsertInode(dest, key,
+			permissions, uid, gid);
+		return errStr(err);
+	}
+
+	const char * cBranch(uint32_t apiHandle, const char *source,
+		const char *dest) {
+
+		auto search = s_apiHandles.find(apiHandle);
+		if (search == s_apiHandles.end()) {
+			return "Api doesn't exist.";
+		}
+
+		qfsclient::Error err = search->second->Branch(source, dest);
+		return errStr(err);
+	}
+
 	const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 		uint32_t len) {
 
@@ -82,8 +107,7 @@ extern "C" {
 
 		qfsclient::Error err = search->second->SetBlock(inputKey, inputData);
 
-		const char *rtn = errStr(err);
-		return rtn;
+		return errStr(err);
 	}
 
 	const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
