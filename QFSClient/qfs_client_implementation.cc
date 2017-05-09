@@ -159,7 +159,11 @@ Error ApiImpl::Open() {
 
 void ApiImpl::Close() {
 	if (this->fd != -1) {
-		close(this->fd);
+		int err = close(this->fd);
+		if (err != 0) {
+			printf("Error when closing api: %d", err);
+		}
+		this->fd = -1;
 	}
 }
 
@@ -207,11 +211,6 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 
 	if (written == -1 || written != command.Size()) {
 		return util::getError(kApiFileWriteFail, this->path);
-	}
-
-	err = fsync(this->fd);
-	if (err == -1) {
-		return util::getError(kApiFileFlushFail, this->path);
 	}
 
 	return util::getError(kSuccess);
