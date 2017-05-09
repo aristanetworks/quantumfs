@@ -20,7 +20,7 @@ func newLargeShell() LargeFile {
 }
 
 func newLargeAccessor(c *ctx, key quantumfs.ObjectKey) *LargeFile {
-	defer c.funcIn("newLargeAccessor").out()
+	defer c.funcIn("newLargeAccessor").Out()
 	var rtn LargeFile
 
 	multiFile := newMultiBlockAccessor(c, key, quantumfs.MaxBlocksLargeFile())
@@ -38,7 +38,7 @@ func (fi *LargeFile) getType() quantumfs.ObjectType {
 }
 
 func (fi *LargeFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccessor {
-	defer c.funcIn("LargeFile::convertTo").out()
+	defer c.funcIn("LargeFile::convertTo").Out()
 	if newType <= quantumfs.ObjectTypeLargeFile {
 		return fi
 	}
