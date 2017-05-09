@@ -4,7 +4,6 @@
 package qfsclientc
 
 import "bytes"
-import "fmt"
 import "io/ioutil"
 import "os"
 import "syscall"
@@ -13,13 +12,22 @@ import "testing"
 import "github.com/aristanetworks/quantumfs/daemon"
 import "github.com/aristanetworks/quantumfs/testutils"
 
+func WaitForApi(test *daemon.TestHelper) {
+	test.WaitFor("Api inode to be seen by kernel", func() bool {
+		_, err := os.Stat(test.TempDir +"/mnt/api")
+		return (err == nil)
+	})
+}
+
 func TestBasicInterface(t *testing.T) {
 	runTest(t, func(test *daemon.TestHelper) {
+		WaitForApi(test)
+
 		apiNoPath, err := GetApi()
 		test.AssertNoErr(err)
 
 		api, err := GetApiPath(test.TempDir + "/mnt/api")
-		test.Assert(err == nil, fmt.Sprintf("Wha %s", test.TempDir+"/mnt/api"))
+		test.AssertNoErr(err)
 
 		testKey := "ABABABABABABABABABAB"
 		testData := daemon.GenData(2000)
@@ -41,6 +49,8 @@ func TestBasicInterface(t *testing.T) {
 
 func TestBranchInterface(t *testing.T) {
 	runTest(t, func(test *daemon.TestHelper) {
+		WaitForApi(test)
+
 		api, err := GetApiPath(test.TempDir + "/mnt/api")
 		test.AssertNoErr(err)
 
@@ -58,6 +68,8 @@ func TestBranchInterface(t *testing.T) {
 
 func TestInsertInode(t *testing.T) {
 	runTest(t, func(test *daemon.TestHelper) {
+		WaitForApi(test)
+
 		workspace := test.NewWorkspace()
 
 		filedata := daemon.GenData(2000)

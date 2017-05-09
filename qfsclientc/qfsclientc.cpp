@@ -66,6 +66,16 @@ extern "C" {
 		return "";
 	}
 
+	const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot) {
+		auto search = s_apiHandles.find(apiHandle);
+		if (search == s_apiHandles.end()) {
+			return "Api doesn't exist.";
+		}
+
+		qfsclient::Error err = search->second->GetAccessed(workspaceRoot);
+		return errStr(err);
+	}
+
 	const char * cInsertInode(uint32_t apiHandle, const char *dest,
 		const char *key, uint32_t permissions, uint32_t uid, uint32_t gid) {
 
