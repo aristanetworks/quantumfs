@@ -79,7 +79,8 @@ const (
 
 	// The reserved typespace/namespace/workspace name for the empty workspace,
 	// ie. _/_/_.
-	NullSpaceName = "_"
+	NullSpaceName     = "_"
+	NullWorkspaceName = "_/_/_"
 )
 
 // Special reserved inode numbers
@@ -200,6 +201,20 @@ func (key ObjectKey) String() string {
 		key.key.Part2(), key.key.Part3(), key.key.Part4())
 
 	return hex
+}
+
+func (key ObjectKey) Text() string {
+	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
+		hex.EncodeToString(key.Value()))
+}
+
+func FromText(text string) (ObjectKey, error) {
+	bytes, err := hex.DecodeString(text)
+	if err != nil {
+		return ZeroKey,
+			fmt.Errorf("text is not valid ObjectKey err: %v", err)
+	}
+	return NewObjectKeyFromBytes(bytes), nil
 }
 
 func (key ObjectKey) Bytes() []byte {
@@ -350,7 +365,7 @@ func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 const (
 	ObjectTypeInvalid           = 0
 	ObjectTypeBuildProduct      = 1
-	ObjectTypeDirectoryEntry    = 2
+	ObjectTypeDirectory         = 2
 	ObjectTypeExtendedAttribute = 3
 	ObjectTypeHardlink          = 4
 	ObjectTypeSymlink           = 5
@@ -367,8 +382,8 @@ func ObjectType2String(typ ObjectType) string {
 	switch typ {
 	case ObjectTypeBuildProduct:
 		return "ObjectTypeBuildProduct"
-	case ObjectTypeDirectoryEntry:
-		return "ObjectTypeDirectoryEntry"
+	case ObjectTypeDirectory:
+		return "ObjectTypeDirectory"
 	case ObjectTypeExtendedAttribute:
 		return "ObjectTypeExtendedAttribute"
 	case ObjectTypeHardlink:

@@ -59,34 +59,12 @@ func (c *ctx) vlog(format string, args ...interface{}) {
 	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, format, args...)
 }
 
-type exitLog struct {
-	c        *ctx
-	funcName string
-}
-
-func (c *ctx) funcIn(funcName string) exitLog {
-
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+funcName)
-
-	return exitLog{
-		c:        c,
-		funcName: funcName,
-	}
+func (c *ctx) funcIn(funcName string) quantumfs.ExitFuncLog {
+	return c.Ctx.FuncIn(qlog.LogDaemon, funcName, "")
 }
 
 func (c *ctx) FuncIn(funcName string, extraFmtStr string,
-	args ...interface{}) exitLog {
+	args ...interface{}) quantumfs.ExitFuncLog {
 
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, qlog.FnEnterStr+
-		funcName+" "+extraFmtStr, args...)
-
-	return exitLog{
-		c:        c,
-		funcName: funcName,
-	}
-}
-
-func (e exitLog) out() {
-	e.c.Qlog.Log(qlog.LogDaemon, uint64(e.c.RequestId), 3, qlog.FnExitStr+
-		e.funcName)
+	return c.Ctx.FuncIn(qlog.LogDaemon, funcName, extraFmtStr, args...)
 }

@@ -3,6 +3,8 @@
 
 package quantumfs
 
+import "encoding/hex"
+import "strings"
 import "testing"
 
 func TestDirectoryRecordSort(t *testing.T) {
@@ -56,5 +58,35 @@ func TestDirectoryRecordsListSize(t *testing.T) {
 		test.Assert(remain == 0 && cacheNum == 6, "Incorrect size of the "+
 			"remain: %d != 0 and of the cache: %d != 4",
 			remain, cacheNum)
+	})
+}
+
+func TestEmptyKeyToString(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		key := EmptyDirKey
+		parts := strings.Split(strings.Trim(key.Text(), "()"), " ")
+		text := parts[1]
+		key2, err := FromText(text)
+		test.Assert(err == nil, "error in FromText() err: %v", err)
+		test.Assert(key.IsEqualTo(key2),
+			"The key before and after are not the same")
+	})
+}
+func TestKeyToString(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		// With an arbirary key
+		bytes, err := hex.DecodeString(
+			"032ee5784d3bd45789521abcdebbc45437c890fce8")
+		test.Assert(err == nil, "error in hex.DecodeString() err: %v", err)
+		key1 := NewObjectKeyFromBytes(bytes)
+
+		parts := strings.Split(strings.Trim(key1.Text(), "()"), " ")
+		text := parts[1]
+		key2, err := FromText(text)
+		test.Assert(err == nil, "error in FromText() err: %v", err)
+		test.Assert(key1.IsEqualTo(key2),
+			"The key before and after are not the same")
 	})
 }

@@ -63,7 +63,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 		uint32(stat.Rdev), 0,
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
-		quantumfs.ObjectTypeDirectoryEntry,
+		quantumfs.ObjectTypeDirectory,
 		// retain time of the input directory
 		quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
 		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),

@@ -179,6 +179,10 @@ func serveSafely(th *TestHelper) {
 	mountOptions.Options = append(mountOptions.Options, "suid")
 	mountOptions.Options = append(mountOptions.Options, "dev")
 
+	// Ensure that, since we're in a test, we only sync when syncAll is called.
+	// Otherwise, we shouldn't ever need to flush.
+	th.qfs.skipFlush = true
+
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
 	th.qfs.Serve(mountOptions)
@@ -228,6 +232,13 @@ func (th *TestHelper) getApi() *quantumfs.Api {
 	th.Assert(err == nil, "Error getting api: %v", err)
 	th.api = api
 	return th.api
+}
+
+func (th *TestHelper) putApi() {
+	if th.api != nil {
+		th.api.Close()
+	}
+	th.api = nil
 }
 
 func (th *TestHelper) getUniqueApi(fdPath string) *quantumfs.Api {
