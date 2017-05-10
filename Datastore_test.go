@@ -35,7 +35,7 @@ func TestDirectoryRecordSort(t *testing.T) {
 	})
 }
 
-func TestCacheSize(t *testing.T) {
+func TestDirectoryRecordsListSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		// Measure the block size of directory entries
 		remain, dirEntry := NewDirectoryEntry(4)
