@@ -273,6 +273,8 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		if _, exists := remoteEntries[childname]; !exists {
 			dir.handleDeletedInMemoryRecord_DOWN(c, childname, childId)
 			deletedInodeIds = append(deletedInodeIds, childId)
+		} else {
+			c.vlog("Child %s not deleted", childname)
 		}
 
 	})
