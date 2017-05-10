@@ -553,6 +553,38 @@ func (rd *recordsOnDemand) delRecord(name string, inodeId InodeId) {
 	delete(rd.cacheKey, inodeId)
 }
 
+func (rd *recordsOnDemand) countEntryCapacity(c *ctx) int {
+	entryCapacity := 0
+	key := rd.base
+	for {
+		baseLayer := getBaseLayer(c, key)
+
+		entryCapacity += baseLayer.NumEntries()
+		for i := 0; i < baseLayer.NumEntries(); i++ {
+			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
+			// If the inode is already modified locally, it shouldn't be
+			// added twice.
+			if _, exists := rd.cache[entry.Filename()]; exists {
+				entryCapacity -= 1
+			}
+		}
+		if baseLayer.HasNext() {
+			key = baseLayer.Next()
+		} else {
+			break
+		}
+	}
+
+	// Take into account of the local dirty inodes
+	for _, record := range rd.cache {
+		if record == nil {
+			continue
+		}
+		entryCapacity += 1
+	}
+	return entryCapacity
+}
+
 func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	defer c.funcIn("recordsOnDemand::publish").Out()
@@ -626,36 +658,4 @@ func getBaseLayer(c *ctx, key quantumfs.ObjectKey) quantumfs.DirectoryEntry {
 
 	baseLayer := buffer.AsDirectoryEntry()
 	return baseLayer
-}
-
-func (rd *recordsOnDemand) countEntryCapacity(c *ctx) int {
-	entryCapacity := 0
-	key := rd.base
-	for {
-		baseLayer := getBaseLayer(c, key)
-
-		entryCapacity += baseLayer.NumEntries()
-		for i := 0; i < baseLayer.NumEntries(); i++ {
-			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
-			// If the inode is already modified locally, it shouldn't be
-			// added twice.
-			if _, exists := rd.cache[entry.Filename()]; exists {
-				entryCapacity -= 1
-			}
-		}
-		if baseLayer.HasNext() {
-			key = baseLayer.Next()
-		} else {
-			break
-		}
-	}
-
-	// Take into account of the local dirty inodes
-	for _, record := range rd.cache {
-		if record == nil {
-			continue
-		}
-		entryCapacity += 1
-	}
-	return entryCapacity
 }
