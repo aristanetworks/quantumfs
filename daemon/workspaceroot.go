@@ -465,7 +465,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	hardlink *quantumfs.HardlinkRecord) {
 
-	defer c.funcIn("WorkspaceRoot::handleRemoteHardlink").out()
+	defer c.funcIn("WorkspaceRoot::handleRemoteHardlink").Out()
 	id := HardlinkId(hardlink.HardlinkID())
 	if entry, exists := wsr.hardlinks[id]; !exists {
 		c.vlog("Adding new hardlink entry with id %d", id)
@@ -485,7 +485,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 }
 
 func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
-	defer c.funcIn("WorkspaceRoot::refreshHardlinks").out()
+	defer c.funcIn("WorkspaceRoot::refreshHardlinks").Out()
 	defer wsr.linkLock.Lock().Unlock()
 
 	remoteEntries := make(map[HardlinkId]bool, 0)
@@ -505,7 +505,7 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 }
 
 func (wsr *WorkspaceRoot) refresh(c *ctx, rootId quantumfs.ObjectKey) {
-	defer c.funcIn("WorkspaceRoot::refresh").out()
+	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
 	if !rootId.IsEqualTo(wsr.rootId) {
 		c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",

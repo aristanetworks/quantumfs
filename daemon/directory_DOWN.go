@@ -179,7 +179,7 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	localRecord quantumfs.DirectoryRecord,
 	remoteRecord *quantumfs.DirectRecord) {
 
-	defer c.funcIn("Directory::handleDirectoryEntryUpdate_DOWN").out()
+	defer c.funcIn("Directory::handleDirectoryEntryUpdate_DOWN").Out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
 
 	c.wlog("entry %s with inodeid %d goes %s -> %s",
@@ -206,7 +206,7 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 	remoteRecord *quantumfs.DirectRecord) []InodeId {
 
 	defer c.FuncIn("Directory::handleRemoteRecord_DOWN", "%s",
-		remoteRecord.Filename()).out()
+		remoteRecord.Filename()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
 
 	uninstantiated := make([]InodeId, 0)
@@ -232,7 +232,7 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 	childId InodeId) {
 
 	defer c.FuncIn("Directory::handleDeletedInMemoryRecord_DOWN", "%s",
-		childname).out()
+		childname).Out()
 
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
 		dir.children.deleteChild(c, childname)
@@ -253,7 +253,7 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 func (dir *Directory) refresh_DOWN(c *ctx,
 	baseLayerId quantumfs.ObjectKey) ([]InodeId, []InodeId) {
 
-	defer c.funcIn("Directory::refresh_DOWN").out()
+	defer c.funcIn("Directory::refresh_DOWN").Out()
 	uninstantiated := make([]InodeId, 0)
 	deletedInodeIds := make([]InodeId, 0)
 
