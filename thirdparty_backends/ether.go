@@ -526,58 +526,58 @@ func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 
 type dsApiCtx quantumfs.Ctx
 
-func (dc *dsApiCtx) LogE(fmtStr string, args ...interface{}) {
+func (dc *dsApiCtx) Elog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(dc).Elog(qlog.LogDatastore, fmtStr, args...)
 }
 
-func (dc *dsApiCtx) LogW(fmtStr string, args ...interface{}) {
+func (dc *dsApiCtx) Wlog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(dc).Wlog(qlog.LogDatastore, fmtStr, args...)
 }
 
-func (dc *dsApiCtx) LogD(fmtStr string, args ...interface{}) {
+func (dc *dsApiCtx) Dlog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(dc).Dlog(qlog.LogDatastore, fmtStr, args...)
 }
 
-func (dc *dsApiCtx) LogV(fmtStr string, args ...interface{}) {
+func (dc *dsApiCtx) Vlog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(dc).Vlog(qlog.LogDatastore, fmtStr, args...)
 }
 
-type etherLogFuncExit quantumfs.ExitFuncLog
+type etherFuncOut quantumfs.ExitFuncLog
 
-func (e etherLogFuncExit) LogFuncOut() {
+func (e etherFuncOut) Out() {
 	(quantumfs.ExitFuncLog)(e).Out()
 }
 
-func (dc *dsApiCtx) LogFuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.LogFuncExit {
+func (dc *dsApiCtx) FuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.FuncOut {
 
 	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
 		fmtStr, args...)
-	return (etherLogFuncExit)(el)
+	return (etherFuncOut)(el)
 }
 
 type wsApiCtx quantumfs.Ctx
 
-func (wa *wsApiCtx) LogE(fmtStr string, args ...interface{}) {
+func (wa *wsApiCtx) Elog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(wa).Elog(qlog.LogWorkspaceDb, fmtStr, args...)
 }
 
-func (wa *wsApiCtx) LogW(fmtStr string, args ...interface{}) {
+func (wa *wsApiCtx) Wlog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(wa).Wlog(qlog.LogWorkspaceDb, fmtStr, args...)
 }
 
-func (wa *wsApiCtx) LogD(fmtStr string, args ...interface{}) {
+func (wa *wsApiCtx) Dlog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(wa).Dlog(qlog.LogWorkspaceDb, fmtStr, args...)
 }
 
-func (wa *wsApiCtx) LogV(fmtStr string, args ...interface{}) {
+func (wa *wsApiCtx) Vlog(fmtStr string, args ...interface{}) {
 	(*quantumfs.Ctx)(wa).Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
 }
 
-func (dc *wsApiCtx) LogFuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.LogFuncExit {
+func (dc *wsApiCtx) FuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.FuncOut {
 
 	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogWorkspaceDb, funcName,
 		fmtStr, args...)
-	return (etherLogFuncExit)(el)
+	return (etherFuncOut)(el)
 }
