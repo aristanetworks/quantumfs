@@ -257,12 +257,12 @@ type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
 
-func NewDirectoryEntry(entryNum int) (remain int, entry *DirectoryEntry) {
+func NewDirectoryEntry(entryCapacity int) (remain int, entry *DirectoryEntry) {
 	remain = 0
-	recs := entryNum
-	if entryNum > MaxDirectoryRecords() {
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
 		recs = MaxDirectoryRecords()
-		remain = entryNum - recs
+		remain = entryCapacity - recs
 	}
 
 	return remain, newDirectoryEntryRecords(recs)
@@ -638,12 +638,12 @@ type HardlinkEntry struct {
 	entry encoding.HardlinkEntry
 }
 
-func NewHardlinkEntry(entryNum int) (remain int, dirEntry *HardlinkEntry) {
+func NewHardlinkEntry(entryCapacity int) (remain int, dirEntry *HardlinkEntry) {
 	remain = 0
-	recs := entryNum
-	if entryNum > MaxDirectoryRecords() {
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
 		recs = MaxDirectoryRecords()
-		remain = entryNum - recs
+		remain = entryCapacity - recs
 	}
 
 	segment := capn.NewBuffer(nil)
@@ -1061,16 +1061,16 @@ func (mb *MultiBlockFile) Bytes() []byte {
 	return mb.mb.Segment.Data
 }
 
-func NewVeryLargeFile(entryNum int) *VeryLargeFile {
+func NewVeryLargeFile(entryCapacity int) *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
-	if entryNum > MaxPartsVeryLargeFile() {
-		entryNum = MaxPartsVeryLargeFile()
+	if entryCapacity > MaxPartsVeryLargeFile() {
+		entryCapacity = MaxPartsVeryLargeFile()
 	}
-	largeFiles := encoding.NewObjectKeyList(segment, entryNum)
+	largeFiles := encoding.NewObjectKeyList(segment, entryCapacity)
 	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
 }
