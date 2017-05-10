@@ -561,10 +561,10 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 	// in the datastore.
 	newBaseLayerId := quantumfs.EmptyDirKey
 
-	entryCapacity := calculateEntryCapacity(c, rd.base)
+	entryCapacity := rd.countEntryCapacity(c)
 	// childIdx indexes into dir.records, entryIdx indexes into the
 	// metadata block
-	_, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
+	entryCapacity, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
 	entryIdx := 0
 	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
@@ -573,7 +573,8 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
 				newBaseLayerId)
-			_, baseLayer = quantumfs.NewDirectoryEntry(entryCapacity)
+			entryCapacity, baseLayer = quantumfs.NewDirectoryEntry(
+				entryCapacity)
 			entryIdx = 0
 		}
 
@@ -627,12 +628,21 @@ func getBaseLayer(c *ctx, key quantumfs.ObjectKey) quantumfs.DirectoryEntry {
 	return baseLayer
 }
 
-func calculateEntryCapacity(c *ctx, key quantumfs.ObjectKey) int {
+func (rd *recordsOnDemand) countEntryCapacity(c *ctx) int {
 	entryCapacity := 0
+	key := rd.base
 	for {
 		baseLayer := getBaseLayer(c, key)
 
 		entryCapacity += baseLayer.NumEntries()
+		for i := 0; i < baseLayer.NumEntries(); i++ {
+			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
+			// If the inode is already modified locally, it shouldn't be
+			// added twice.
+			if _, exists := rd.cache[entry.Filename()]; exists {
+				entryCapacity -= 1
+			}
+		}
 		if baseLayer.HasNext() {
 			key = baseLayer.Next()
 		} else {
@@ -640,5 +650,12 @@ func calculateEntryCapacity(c *ctx, key quantumfs.ObjectKey) int {
 		}
 	}
 
+	// Take into account of the local dirty inodes
+	for _, record := range rd.cache {
+		if record == nil {
+			continue
+		}
+		entryCapacity += 1
+	}
 	return entryCapacity
 }
