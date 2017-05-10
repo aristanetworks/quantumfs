@@ -19,8 +19,9 @@ import "golang.org/x/net/context"
 
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/thirdparty_backends"
+import exs "github.com/aristanetworks/quantumfs/utils/excludespec"
 
 // Various exit reasons returned to the shell as exit code
 const (
@@ -48,6 +49,7 @@ type params struct {
 var dataStore quantumfs.DataStore
 var wsDB quantumfs.WorkspaceDB
 var version string
+var exInfo *exs.ExcludeInfo
 
 type Ctx struct {
 	Qctx *quantumfs.Ctx
@@ -95,10 +97,10 @@ usage: qupload -datastore   <dsname>   -datastoreconf <dsconf>
                -workspace   <wsname>
                           -basedir <path> [ -exclude <file> | <reldirpath> ]
                         | -referencews <wsname>
-               [ -concurrency <count> ] 
+               [ -concurrency <count> ]
                [ -logdir <logpath> ]
                [ -alias <wsname> ]
-               [ -progress ] 
+               [ -progress ]
                [ -wsforce ]
 Exmaples:
 1) qupload -datastore ether.cql -datastoreconf etherconf
@@ -119,21 +121,37 @@ to the QFS workspace build/eos-trunk/11223344. All files and sub-directories
 are included since an exclude file is not specified.
 
 The exclude file specifies paths that must be excluded from upload.
+It is possible to selectively include certain paths from excluded directories.
 The exclude file should be formatted based on following rules:
 
 One path per line
+Comments and empty lines are allowed. A comment is any line that starts with "#"
+Order of the paths in the file is important
 Path must be relative to the base directory specified
 Absolute paths are not allowed
-To create a directory without it's contents, specify / at the end of path
-To skip directory completely, specify directory name without trailing /
-Comments and empty lines are allowed. A comment is any line that starts with #
+Exclude paths must not be "/" suffixed
+Paths to be included are prefixed with "+"
+The parent and grand-parents of paths to be included must be included already
+
+Example:
+
+dir1
++dir1/subdir1
++dir1/subdir1/file1
++dir1/subdir3
++dir1/subdir4
++dir1/subdir3/subsubdir4/
+
+In the above example, anything under directory "dir1" are excluded except
+dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
+Note dir1/subdir3 and dir1/subdir4 contents are not included
 
 3) qupload -datastore ether.cql -datastoreconf etherconf
            -workspaceDB ether.cql -workspaceDBconf etherconf
            -workspace build/eos-trunk/11223344
            -referencews build/eos-trunk/11223300
 Above command will create a new workspace build/eos-trunk/11223344
-with the same contents as build/eos-trunk/11223300
+with the same contents as by cloning  build/eos-trunk/11223300.
 
 `, version)
 	qFlags.PrintDefaults()
@@ -150,7 +168,8 @@ func validateParams(p *params) error {
 	}
 
 	if p.baseDir != "" && p.referenceWS != "" {
-		return errors.New("Provide only one of basedir and referencews, not both")
+		return errors.New("Provide only one of basedir and referencews," +
+			" not both")
 	}
 
 	if strings.Count(p.ws, "/") != 2 {
@@ -164,7 +183,7 @@ func validateParams(p *params) error {
 	}
 
 	if p.referenceWS != "" && strings.Count(p.referenceWS, "/") != 2 {
-		return errors.New("Workspace to be referenced must " +
+		return errors.New("reference workspace must " +
 			"contain precisely two \"/\"")
 	}
 
@@ -297,9 +316,8 @@ func main() {
 
 	// setup exclude information
 	relpath := ""
-	var exInfo *ExcludeInfo
 	if cliParams.excludeFile != "" {
-		exInfo, err = LoadExcludeInfo(cliParams.baseDir,
+		exInfo, err = exs.LoadExcludeInfo(cliParams.baseDir,
 			cliParams.excludeFile)
 		if err != nil {
 			fmt.Println("Exclude file processing failed: ", err)
@@ -333,19 +351,19 @@ func main() {
 		}()
 	}
 
-	if cliParams.baseDir != "" {
-		err = upload(c, &cliParams, relpath, exInfo)
-		if err != nil {
-			c.Elog("Upload failed: ", err)
-			os.Exit(exitErrUpload)
-		}
-		c.Vlog("Upload completed")
-	} else {
+	if cliParams.referenceWS != "" {
 		err = byPass(c, &cliParams)
 		if err != nil {
 			c.Elog("Bypass failed: ", err)
 			os.Exit(exitErrUpload)
 		}
 		c.Vlog("Bypass completed")
+	} else {
+		err = upload(c, &cliParams, relpath, exInfo)
+		if err != nil {
+			c.Elog("Upload failed: ", err)
+			os.Exit(exitErrUpload)
+		}
+		c.Vlog("Upload completed")
 	}
 }
