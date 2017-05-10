@@ -212,14 +212,15 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	newBaseLayerId := quantumfs.EmptyDirKey
 
 	entryCapacity := len(localRecordsList)
-	_, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
+	entryCapacity, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
 	entryIdx := 0
 	for _, record := range localRecordsList {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
 				newBaseLayerId)
-			_, baseLayer = quantumfs.NewDirectoryEntry(entryCapacity)
+			entryCapacity, baseLayer = quantumfs.NewDirectoryEntry(
+				entryCapacity)
 			entryIdx = 0
 		}
 

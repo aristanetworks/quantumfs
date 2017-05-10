@@ -47,10 +47,10 @@ func TestDirectoryRecordsListSize(t *testing.T) {
 			remain, cacheNum)
 
 		// Measure the block size of very large files
-		vlf := NewVeryLargeFile(5)
+		remain, vlf := NewVeryLargeFile(5)
 		cacheNum = vlf.vlf.LargeFileKeys().Len()
-		test.Assert(cacheNum == 5, "Incorrect size of the cache: %d != 5",
-			cacheNum)
+		test.Assert(remain == 0 && cacheNum == 5, "Incorrect size of the i"+
+			"cache: %d != 5", cacheNum)
 
 		// Measure the block size of entries containing Extended Attributes
 		remain, hlEntry := NewHardlinkEntry(6)
