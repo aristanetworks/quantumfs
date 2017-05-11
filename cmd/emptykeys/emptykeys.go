@@ -28,7 +28,7 @@ func computeEmptyBlock() {
 }
 
 func computeEmptyDirectory() [hash.HashSize]byte {
-	emptyDir := quantumfs.NewDirectoryEntry()
+	_, emptyDir := quantumfs.NewDirectoryEntry(quantumfs.MaxDirectoryRecords())
 	data := emptyDir.Bytes()
 	hash := hash.Hash(data)
 
