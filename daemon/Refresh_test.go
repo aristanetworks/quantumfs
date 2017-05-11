@@ -6,6 +6,7 @@ package daemon
 import "testing"
 import "syscall"
 import "os"
+import "time"
 import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
@@ -110,6 +111,15 @@ func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectK
 	wsr := test.getWorkspaceRoot(workspace)
 	test.Assert(wsr != nil, "workspace root does not exist")
 	wsr.refresh(c, dst)
+}
+
+func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
+	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
+
+	markImmutable(ctx, workspace)
+	advanceWorkspace(ctx, test, workspace, src, dst)
+	refreshTo(ctx, test, workspace, dst)
+	markMutable(ctx, workspace)
 }
 
 func refreshTest(ctx *ctx, test *testHelper, workspace string,
@@ -290,5 +300,63 @@ func TestRefreshNlinkBump(t *testing.T) {
 			newRootId3 = removeTestFile(ctx, test, workspace, linkfile)
 		}
 		test.Assert(newRootId3.IsEqualTo(oldRootId), "Unexpected rootid")
+	})
+}
+
+func assertFileIsOfSize(test *testHelper, fullname string, size int64) {
+	var stat syscall.Stat_t
+
+	err := syscall.Stat(fullname, &stat)
+	test.AssertNoErr(err)
+	test.Assert(stat.Size == size,
+		"Incorrect file size. Expected: %d", stat.Size)
+}
+
+func assertOpenFileIsOfSize(test *testHelper, fd int, size int64) {
+	var stat syscall.Stat_t
+
+	err := syscall.Fstat(fd, &stat)
+	test.AssertNoErr(err)
+	test.Assert(stat.Size == size,
+		"Incorrect file size. Expected: %d", stat.Size)
+}
+
+// Changing mtime/atime of a file has the side-effect of invalidating
+// the inode cache in the VFS layer and forcing the inode to be
+// re-read from fuse
+func reloadFile(test *testHelper, fullname string) {
+	err := os.Chtimes(fullname, time.Now(), time.Now())
+	test.AssertNoErr(err)
+}
+
+func TestRefreshOpenFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+"/subdir", 0777)
+		name := "subdir/testFile"
+		fullname := workspace + "/" + name
+
+		ctx := test.TestCtx()
+		newRootId1 := createTestFile(ctx, test, workspace, name, 1000)
+		newRootId2 := createTestFile(ctx, test, workspace, name, 2000)
+
+		file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		assertFileIsOfSize(test, fullname, 3000)
+		assertOpenFileIsOfSize(test, int(file.Fd()), 3000)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		newRootId3 := getRootId(test, workspace)
+		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+
+		reloadFile(test, fullname)
+		assertOpenFileIsOfSize(test, int(file.Fd()), 1000)
+		assertFileIsOfSize(test, fullname, 1000)
+
+		err = file.Close()
+		test.AssertNoErr(err)
+
+		removeTestFile(ctx, test, workspace, name)
 	})
 }
