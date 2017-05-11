@@ -372,30 +372,16 @@ func loadHardlinks(c *ctx,
 	hardlinks := make(map[HardlinkId]linkEntry)
 	nextHardlinkId := HardlinkId(0)
 
-	for {
-		for i := 0; i < entry.NumEntries(); i++ {
-			hardlink := entry.Entry(i)
-			newLink := newLinkEntry(hardlink.Record())
-			newLink.nlink = hardlink.Nlinks()
-			id := HardlinkId(hardlink.HardlinkID())
-			hardlinks[id] = newLink
+	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
+		newLink := newLinkEntry(hardlink.Record())
+		newLink.nlink = hardlink.Nlinks()
+		id := HardlinkId(hardlink.HardlinkID())
+		hardlinks[id] = newLink
 
-			if id >= nextHardlinkId {
-				nextHardlinkId = id + 1
-			}
+		if id >= nextHardlinkId {
+			nextHardlinkId = id + 1
 		}
-
-		if !entry.HasNext() {
-			break
-		}
-
-		buffer := c.dataStore.Get(&c.Ctx, entry.Next())
-		if buffer == nil {
-			panic("Missing next HardlinkEntry object")
-		}
-
-		entry = buffer.AsHardlinkEntry()
-	}
+	})
 
 	return hardlinks, nextHardlinkId
 }
