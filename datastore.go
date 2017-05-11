@@ -79,7 +79,8 @@ const (
 
 	// The reserved typespace/namespace/workspace name for the empty workspace,
 	// ie. _/_/_.
-	NullSpaceName = "_"
+	NullSpaceName     = "_"
+	NullWorkspaceName = "_/_/_"
 )
 
 // Special reserved inode numbers
@@ -202,6 +203,20 @@ func (key ObjectKey) String() string {
 	return hex
 }
 
+func (key ObjectKey) Text() string {
+	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
+		hex.EncodeToString(key.Value()))
+}
+
+func FromText(text string) (ObjectKey, error) {
+	bytes, err := hex.DecodeString(text)
+	if err != nil {
+		return ZeroKey,
+			fmt.Errorf("text is not valid ObjectKey err: %v", err)
+	}
+	return NewObjectKeyFromBytes(bytes), nil
+}
+
 func (key ObjectKey) Bytes() []byte {
 	return key.key.Segment.Data
 }
@@ -257,8 +272,20 @@ type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
 
-func NewDirectoryEntry() *DirectoryEntry {
-	return newDirectoryEntryRecords(MaxDirectoryRecords())
+func newDirectoryEntry(entryCapacity int) *DirectoryEntry {
+	return newDirectoryEntryRecords(entryCapacity)
+}
+
+func NewDirectoryEntry(entryCapacity int) (remain int, dirEntry *DirectoryEntry) {
+	remain = 0
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryCapacity - recs
+	}
+	dirEntry = newDirectoryEntry(recs)
+
+	return remain, dirEntry
 }
 
 func newDirectoryEntryRecords(recs int) *DirectoryEntry {
@@ -343,7 +370,7 @@ func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 const (
 	ObjectTypeInvalid           = 0
 	ObjectTypeBuildProduct      = 1
-	ObjectTypeDirectoryEntry    = 2
+	ObjectTypeDirectory         = 2
 	ObjectTypeExtendedAttribute = 3
 	ObjectTypeHardlink          = 4
 	ObjectTypeSymlink           = 5
@@ -360,8 +387,8 @@ func ObjectType2String(typ ObjectType) string {
 	switch typ {
 	case ObjectTypeBuildProduct:
 		return "ObjectTypeBuildProduct"
-	case ObjectTypeDirectoryEntry:
-		return "ObjectTypeDirectoryEntry"
+	case ObjectTypeDirectory:
+		return "ObjectTypeDirectory"
 	case ObjectTypeExtendedAttribute:
 		return "ObjectTypeExtendedAttribute"
 	case ObjectTypeHardlink:
@@ -541,7 +568,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := NewDirectoryEntry()
+	_, emptyDir := NewDirectoryEntry(MaxDirectoryRecords())
 
 	bytes := emptyDir.Bytes()
 
@@ -631,7 +658,7 @@ type HardlinkEntry struct {
 	entry encoding.HardlinkEntry
 }
 
-func NewHardlinkEntry() *HardlinkEntry {
+func newHardlinkEntry(entryCapacity int) *HardlinkEntry {
 	segment := capn.NewBuffer(nil)
 
 	dirEntry := HardlinkEntry{
@@ -639,10 +666,22 @@ func NewHardlinkEntry() *HardlinkEntry {
 	}
 	dirEntry.entry.SetNumEntries(0)
 
-	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords())
+	recordList := encoding.NewHardlinkRecordList(segment, entryCapacity)
 	dirEntry.entry.SetEntries(recordList)
 
 	return &dirEntry
+}
+
+func NewHardlinkEntry(entryCapacity int) (remain int, hardlink *HardlinkEntry) {
+	remain = 0
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryCapacity - recs
+	}
+	hardlink = newHardlinkEntry(recs)
+
+	return remain, hardlink
 }
 
 func OverlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
@@ -1047,15 +1086,27 @@ func (mb *MultiBlockFile) Bytes() []byte {
 	return mb.mb.Segment.Data
 }
 
-func NewVeryLargeFile() *VeryLargeFile {
+func newVeryLargeFile(entryCapacity int) *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
-	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile())
+	largeFiles := encoding.NewObjectKeyList(segment, entryCapacity)
 	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
+}
+
+func NewVeryLargeFile(entryCapacity int) (remain int, vlf *VeryLargeFile) {
+	remain = 0
+	recs := entryCapacity
+	if recs > MaxPartsVeryLargeFile() {
+		recs = MaxPartsVeryLargeFile()
+		remain = entryCapacity - recs
+	}
+
+	vlf = newVeryLargeFile(recs)
+	return remain, vlf
 }
 
 func OverlayVeryLargeFile(evlf encoding.VeryLargeFile) VeryLargeFile {
