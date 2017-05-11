@@ -272,8 +272,20 @@ type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
 
-func NewDirectoryEntry() *DirectoryEntry {
-	return newDirectoryEntryRecords(MaxDirectoryRecords())
+func newDirectoryEntry(entryCapacity int) *DirectoryEntry {
+	return newDirectoryEntryRecords(entryCapacity)
+}
+
+func NewDirectoryEntry(entryCapacity int) (remain int, dirEntry *DirectoryEntry) {
+	remain = 0
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryCapacity - recs
+	}
+	dirEntry = newDirectoryEntry(recs)
+
+	return remain, dirEntry
 }
 
 func newDirectoryEntryRecords(recs int) *DirectoryEntry {
@@ -556,7 +568,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := NewDirectoryEntry()
+	_, emptyDir := NewDirectoryEntry(MaxDirectoryRecords())
 
 	bytes := emptyDir.Bytes()
 
@@ -646,7 +658,7 @@ type HardlinkEntry struct {
 	entry encoding.HardlinkEntry
 }
 
-func NewHardlinkEntry() *HardlinkEntry {
+func newHardlinkEntry(entryCapacity int) *HardlinkEntry {
 	segment := capn.NewBuffer(nil)
 
 	dirEntry := HardlinkEntry{
@@ -654,10 +666,22 @@ func NewHardlinkEntry() *HardlinkEntry {
 	}
 	dirEntry.entry.SetNumEntries(0)
 
-	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords())
+	recordList := encoding.NewHardlinkRecordList(segment, entryCapacity)
 	dirEntry.entry.SetEntries(recordList)
 
 	return &dirEntry
+}
+
+func NewHardlinkEntry(entryCapacity int) (remain int, hardlink *HardlinkEntry) {
+	remain = 0
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryCapacity - recs
+	}
+	hardlink = newHardlinkEntry(recs)
+
+	return remain, hardlink
 }
 
 func OverlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
@@ -1062,15 +1086,27 @@ func (mb *MultiBlockFile) Bytes() []byte {
 	return mb.mb.Segment.Data
 }
 
-func NewVeryLargeFile() *VeryLargeFile {
+func newVeryLargeFile(entryCapacity int) *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
-	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile())
+	largeFiles := encoding.NewObjectKeyList(segment, entryCapacity)
 	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
+}
+
+func NewVeryLargeFile(entryCapacity int) (remain int, vlf *VeryLargeFile) {
+	remain = 0
+	recs := entryCapacity
+	if recs > MaxPartsVeryLargeFile() {
+		recs = MaxPartsVeryLargeFile()
+		remain = entryCapacity - recs
+	}
+
+	vlf = newVeryLargeFile(recs)
+	return remain, vlf
 }
 
 func OverlayVeryLargeFile(evlf encoding.VeryLargeFile) VeryLargeFile {
