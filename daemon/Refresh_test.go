@@ -167,14 +167,11 @@ func TestRefreshFileRewrite(t *testing.T) {
 		createTestFile(ctx, test, workspace, "otherfile", 1000)
 		newRootId1 := createTestFile(ctx, test, workspace, name, 1000)
 		newRootId2 := createTestFile(ctx, test, workspace, name, 2000)
-		test.Assert(!newRootId1.IsEqualTo(newRootId2),
-			"We expect the file to change from newRootId1 to 2")
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
 
 		newRootId3 := getRootId(test, workspace)
-		test.Assert(!newRootId3.IsEqualTo(newRootId2),
-			"Refresh must have resulted in going back to newRootId2")
+		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
 
 		removeTestFile(ctx, test, workspace, name)
 	})
@@ -191,8 +188,6 @@ func TestRefreshFileRemove(t *testing.T) {
 		createTestFile(ctx, test, workspace, name, 1000)
 		newRootId1 := removeTestFile(ctx, test, workspace, name)
 		newRootId2 := createTestFile(ctx, test, workspace, name, 2000)
-		test.Assert(!newRootId1.IsEqualTo(newRootId2),
-			"We expect the file to change from newRootId1 to 2")
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
 
