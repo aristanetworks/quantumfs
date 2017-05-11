@@ -85,7 +85,6 @@ class ApiImpl: public Api {
 			       std::vector<byte> *data);
 
  private:
-
 	// Open an Api
 	Error OpenCommon(bool directIo);
 
