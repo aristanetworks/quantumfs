@@ -45,7 +45,7 @@ func TestHardlinkReload(t *testing.T) {
 		err = syscall.Link(testFileB, workspace+"/linkFileB")
 		test.AssertNoErr(err)
 
-		// Write data to the hardlink to ensure it's syncChild function works
+		// Write data to the hardlink to ensure its syncChild function works
 		err = testutils.PrintToFile(
 			workspace+"/subdir/grandchild/linkFileA2",
 			string(data[1000:]))
@@ -211,6 +211,7 @@ func TestHardlinkForget(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		// Check that it's uninstantiated
 		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated",
@@ -255,6 +256,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		test.qfs.increaseLookupCount(linkInode)
 
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.

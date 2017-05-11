@@ -16,7 +16,8 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,
 	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
 
-	dirEntry := quantumfs.NewDirectoryEntry()
+	entryNum := len(childRecords)
+	entryNum, dirEntry := quantumfs.NewDirectoryEntry(entryNum)
 	dirEntry.SetNext(quantumfs.EmptyDirKey)
 	entryIdx := 0
 	// To promote dedupe, sort the directory
@@ -39,7 +40,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 			}
 			atomic.AddUint64(&MetadataBytesWritten,
 				uint64(len(dirEntry.Bytes())))
-			dirEntry = quantumfs.NewDirectoryEntry()
+			entryNum, dirEntry = quantumfs.NewDirectoryEntry(entryNum)
 			dirEntry.SetNext(key)
 			entryIdx = 0
 		}
@@ -62,7 +63,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 		uint32(stat.Rdev), 0,
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
-		quantumfs.ObjectTypeDirectoryEntry,
+		quantumfs.ObjectTypeDirectory,
 		// retain time of the input directory
 		quantumfs.NewTime(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)),
 		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
