@@ -391,8 +391,9 @@ func publishHardlinkMap(c *ctx,
 
 	defer c.funcIn("publishHardlinkMap").Out()
 
+	entryNum := len(records)
 	// entryIdx indexes into the metadata block
-	baseLayer := quantumfs.NewHardlinkEntry()
+	entryNum, baseLayer := quantumfs.NewHardlinkEntry(entryNum)
 	nextBaseLayerId := quantumfs.EmptyDirKey
 	var err error
 	entryIdx := 0
@@ -411,7 +412,7 @@ func publishHardlinkMap(c *ctx,
 				panic("Failed to upload new baseLayer object")
 			}
 
-			baseLayer = quantumfs.NewHardlinkEntry()
+			entryNum, baseLayer = quantumfs.NewHardlinkEntry(entryNum)
 			entryIdx = 0
 		}
 
