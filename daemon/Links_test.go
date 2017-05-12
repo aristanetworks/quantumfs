@@ -37,7 +37,7 @@ func TestHardlink(t *testing.T) {
 		nextHardlinkId := test.getWorkspaceRoot(workspace).nextHardlinkId
 
 		// Branch and confirm the hardlink is still there
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		file1 = workspace + "/orig_file"
 		file2 = workspace + "/hardlink"
 		data, err = ioutil.ReadFile(file2)
@@ -102,7 +102,7 @@ func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 		test.Assert(err == nil, "Error creating symlink: %v", err)
 
 		workspace = test.branchWorkspace(workspace)
-		link = test.absPath(workspace + "/symlink")
+		link = test.AbsPath(workspace + "/symlink")
 
 		path, err := os.Readlink(link)
 		test.Assert(err == nil, "Error reading symlink: %v", err)
