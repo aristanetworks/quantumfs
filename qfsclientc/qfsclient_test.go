@@ -3,7 +3,10 @@
 
 package qfsclientc
 
+import "bytes"
 import "testing"
+
+import "github.com/aristanetworks/quantumfs/daemon"
 
 func TestInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -13,16 +16,15 @@ func TestInterface(t *testing.T) {
 		api, err := GetApiPath(test.TempDir + "/mnt/api")
 		test.AssertNoErr(err)
 
-		/*
-			// TODO: Add DirectIO to QFSClient so this doesn't fail
-			testKey := "ABABABABABABABABABAB"
-			testData := []byte("This is some data")
-			err = api.SetBlock(testKey, testData)
-			test.AssertNoErr(err)
+		testKey := "ABABABABABABABABABAB"
+		testData := daemon.GenData(2000)
+		err = api.SetBlock(testKey, testData)
+		test.AssertNoErr(err)
 
-			_, err = api.GetBlock(testKey)
-			test.AssertNoErr(err)
-		*/
+		readBack, err := api.GetBlock(testKey)
+		test.AssertNoErr(err)
+		test.Assert(bytes.Equal(testData, readBack),
+			"Data changed between SetBlock and GetBlock")
 
 		err = ReleaseApi(apiNoPath)
 		test.AssertNoErr(err)
