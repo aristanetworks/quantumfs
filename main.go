@@ -32,6 +32,7 @@ const (
 )
 
 var walkFlags *flag.FlagSet
+var version string
 
 func main() {
 
@@ -41,6 +42,7 @@ func main() {
 	progress := walkFlags.Bool("progress", false, "show progress")
 
 	walkFlags.Usage = func() {
+		fmt.Println("qubit-walkercmd version", version)
 		fmt.Println("usage: walker -cfg <config> [-progress] <sub-command> ARG1[,ARG2[,...]]")
 		fmt.Println()
 		fmt.Println("This tool walks all the keys within a workspace")
@@ -145,7 +147,7 @@ func main() {
 		os.Exit(exitBadCmd)
 	}
 
-	fmt.Printf("Finished: %v\n", walkTime)
+	fmt.Printf(" Duration: %v\n", walkTime)
 }
 
 func handleDiskUsage(c *quantumfs.Ctx, progress bool,
@@ -365,6 +367,8 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
 		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
 	}
+	fmt.Println()
+	fmt.Printf("Success: rootID: %s", rootID.Text())
 	return nil
 }
 
@@ -413,7 +417,7 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return fmt.Errorf("key %v: %v", key.Text(), err)
+			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 		}
 
 		err = refreshTTL(cqlds, ks, metadata)
@@ -425,8 +429,10 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 		return nil
 	}
 	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
-		return err
+		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
 	}
+	fmt.Println()
+	fmt.Printf("Success: rootID: %s", rootID.Text())
 	return nil
 }
 
@@ -467,6 +473,7 @@ func printList(c *quantumfs.Ctx, progress bool, qfsds quantumfs.DataStore,
 				if rootID, err = getWorkspaceRootID(c, wsdb, wsname); err != nil {
 					return fmt.Errorf("RootId not found for %v err: %v", wsname, err)
 				}
+				fmt.Println()
 				fmt.Printf("%v : %s\n", rootID.Text(), wsname)
 			}
 		}
@@ -501,7 +508,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		ks := key.String()
 		metadata, err := cqlds.Metadata(ks)
 		if err != nil {
-			return fmt.Errorf("key %v: %v", key.Text(), err)
+			return fmt.Errorf("path:%v key %v: %v", path, key.Text(), err)
 		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
@@ -529,8 +536,10 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID, bucketer); err != nil {
-		return err
+		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
 	}
+	fmt.Println()
+	fmt.Printf("Success: rootID: %s", rootID.Text())
 
 	hist.Print()
 	return nil
@@ -685,6 +694,5 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 	for k, v := range matchKey {
 		fmt.Println(k, ": ", v)
 	}
-
 	return err
 }
