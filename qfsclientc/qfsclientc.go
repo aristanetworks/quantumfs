@@ -13,10 +13,14 @@ package qfsclientc
 const char * cGetApi(uint32_t *apiHandleOut);
 const char * cGetApiPath(const char *path, uint32_t *apiHandleOut);
 const char * cReleaseApi(uint32_t apiHandle);
-const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
-	uint32_t *lenOut);
+const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot);
+const char * cInsertInode(uint32_t apiHandle, const char *dest, const char *key,
+	uint32_t permissions, uint32_t uid, uint32_t gid);
+const char * cBranch(uint32_t apiHandle, const char *source, const char *dest);
 const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 	uint32_t len);
+const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
+	uint32_t *lenOut);
 
 */
 import "C"
@@ -28,6 +32,14 @@ import "github.com/aristanetworks/quantumfs"
 
 type QfsClientApi struct {
 	handle uint32
+}
+
+func checkError(errStr string) error {
+	if errStr == "" {
+		return nil
+	}
+
+	return errors.New(errStr)
 }
 
 func GetApi() (api QfsClientApi, err error) {
@@ -57,38 +69,53 @@ func GetApiPath(path string) (api QfsClientApi, err error) {
 
 func ReleaseApi(api QfsClientApi) error {
 	handle := C.uint32_t(api.handle)
-	err := C.cReleaseApi(handle)
-	errStr := C.GoString(err)
+	err := C.GoString(C.cReleaseApi(handle))
 
-	if errStr != "" {
-		return errors.New(errStr)
-	}
+	return checkError(err)
+}
 
-	return nil
+func (api *QfsClientApi) GetAccessed(workspaceRoot string) error {
+	err := C.GoString(C.cGetAccessed(C.uint32_t(api.handle),
+		C.CString(workspaceRoot)))
+
+	return checkError(err)
+}
+
+func (api *QfsClientApi) InsertInode(dest string, key string, permissions uint32,
+	uid uint32, gid uint32) error {
+
+	err := C.GoString(C.cInsertInode(C.uint32_t(api.handle), C.CString(dest),
+		C.CString(key), C.uint32_t(permissions), C.uint32_t(uid),
+		C.uint32_t(gid)))
+
+	return checkError(err)
+}
+
+func (api *QfsClientApi) Branch(source string, dest string) error {
+	err := C.GoString(C.cBranch(C.uint32_t(api.handle), C.CString(source),
+		C.CString(dest)))
+
+	return checkError(err)
 }
 
 func (api *QfsClientApi) SetBlock(key string, data []byte) error {
-	errStr := C.GoString(C.cSetBlock(C.uint32_t(api.handle), C.CString(key),
+	err := C.GoString(C.cSetBlock(C.uint32_t(api.handle), C.CString(key),
 		(*C.uint8_t)(unsafe.Pointer(&data)),
 		C.uint32_t(len(data))))
 
-	if errStr != "" {
-		return errors.New(errStr)
-	}
-
-	return nil
+	return checkError(err)
 }
 
 func (api *QfsClientApi) GetBlock(key string) ([]byte, error) {
 	data := make([]byte, quantumfs.MaxBlockSize)
 	var dataLen uint32
 
-	errStr := C.GoString(C.cGetBlock(C.uint32_t(api.handle), C.CString(key),
+	err := C.GoString(C.cGetBlock(C.uint32_t(api.handle), C.CString(key),
 		(*C.char)(unsafe.Pointer(&data)),
 		(*C.uint32_t)(unsafe.Pointer(&dataLen))))
 
-	if errStr != "" {
-		return nil, errors.New(errStr)
+	if err != "" {
+		return nil, errors.New(err)
 	}
 
 	return data[:dataLen], nil
