@@ -25,7 +25,7 @@ func MergeTester(test *testHelper, setup mergeTestSetup) {
 	// Because of the buggy state of DeleteWorkspace and the fact that
 	// we can't rely on workspace inodes to update when the rootId
 	// changes, we have to Branch first into a workspace we never touch
-	tempBranch := test.absPath("branch/basic/temp")
+	tempBranch := test.AbsPath("branch/basic/temp")
 	err := api.Branch(test.RelPath(workspaceA), test.RelPath(tempBranch))
 	test.AssertNoErr(err)
 
@@ -34,7 +34,7 @@ func MergeTester(test *testHelper, setup mergeTestSetup) {
 
 	// Now we have to branch again so that the rootId change is
 	// actually reflected in our local workspace instance
-	newBranch := test.absPath("branch/basic/test")
+	newBranch := test.AbsPath("branch/basic/test")
 	err = api.Branch(test.RelPath(tempBranch), test.RelPath(newBranch))
 	test.AssertNoErr(err)
 
