@@ -28,6 +28,7 @@ const (
 )
 
 var walkFlags *flag.FlagSet
+var version string
 
 func (c *Ctx) vlog(format string, args ...interface{}) {
 	c.qctx.Vlog(qlog.LogTool, format, args...)
@@ -57,6 +58,7 @@ func main() {
 	influxDBName := walkFlags.String("influxDBName", "", "database to use in influxdb")
 
 	walkFlags.Usage = func() {
+		fmt.Println("qubit-walkerd version", version)
 		fmt.Println("usage: qwalkerd -cfg <config> [-logdir dir] [-progress ] ")
 		fmt.Println("                [-influxServer serverIP -influxPort port" +
 			" -influxDBName dbname]")
