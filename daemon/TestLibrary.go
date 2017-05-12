@@ -87,11 +87,10 @@ func (th *TestHelper) EndTest() {
 
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs "+
-					"instance after aborting: %s", err.Error())
+					"after aborting: %s", err.Error())
 			}
-			th.Log("ERROR: Failed to unmount quantumfs instance, "+
-				"are you leaking a file descriptor?: %s",
-				err.Error())
+			th.Log("ERROR: Failed to unmount quantumfs instance.")
+			th.Log("Are you leaking a file descriptor?: %s", err.Error())
 		}
 	}
 
