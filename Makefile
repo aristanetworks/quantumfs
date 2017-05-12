@@ -62,4 +62,14 @@ rpm: $(COMMANDS)
 		./qupload=/usr/bin/qupload \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
+quploadrpm: qupload
+	fpm -f -s dir -t rpm -m 'ether-dev@arista.com' -n qubit-upload --no-depends \
+		--license='Arista Proprietary' \
+		--vendor='Arista Networks' \
+		--url http://gut/repos/quantumfs \
+		--description='A tool to upload directory hierarchy into datastore' \
+		--version $(version) \
+		./qupload=/usr/bin/qupload
+
+
 include QFSClient/Makefile
