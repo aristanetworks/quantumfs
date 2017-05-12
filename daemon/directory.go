@@ -43,6 +43,29 @@ type Directory struct {
 	children        *ChildMap
 }
 
+func foreachDentry(c *ctx, key quantumfs.ObjectKey,
+	visitor func(*quantumfs.DirectRecord)) {
+
+	for {
+		c.vlog("Fetching baselayer %s", key.String())
+		buffer := c.dataStore.Get(&c.Ctx, key)
+		if buffer == nil {
+			panic("No baseLayer object")
+		}
+		baseLayer := buffer.AsDirectoryEntry()
+
+		for i := 0; i < baseLayer.NumEntries(); i++ {
+			visitor(baseLayer.Entry(i))
+		}
+
+		if baseLayer.HasNext() {
+			key = baseLayer.Next()
+		} else {
+			break
+		}
+	}
+}
+
 func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
