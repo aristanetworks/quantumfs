@@ -300,8 +300,21 @@ func (th *testHelper) newCtx() *ctx {
 
 func (th *testHelper) remountFilesystem() {
 	th.Log("Remounting filesystem")
+	th.putApi()
+	for i := 0; i < 100; i++ {
+		err := syscall.Mount("", th.TempDir+"/mnt", "",
+			syscall.MS_REMOUNT|syscall.MS_RDONLY, "")
+		if err != nil {
+			th.Log("Remount failed with " + err.Error() + " retrying...")
+			time.Sleep(time.Millisecond)
+		} else {
+			break
+		}
+		th.Assert(i < 99, "Cannot remount readonly %v", err)
+	}
+
 	err := syscall.Mount("", th.TempDir+"/mnt", "", syscall.MS_REMOUNT, "")
-	th.Assert(err == nil, "Unable to force vfs to drop dentry cache: %v", err)
+	th.Assert(err == nil, "Unable to remount %v", err)
 }
 
 // Modify the QuantumFS cache time to 100 milliseconds
