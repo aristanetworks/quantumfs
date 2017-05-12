@@ -6,6 +6,7 @@ package daemon
 // This is _DOWN counterpart to directory.go
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -184,18 +185,29 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 
 	c.wlog("entry %s with inodeid %d goes %s -> %s",
 		remoteRecord.Filename(), inodeId,
-		localRecord.ID().String(), remoteRecord.ID().String())
+		localRecord.ID().Text(), remoteRecord.ID().Text())
 
-	dir.children.loadChild(c, remoteRecord, inodeId)
+	newInodeId := dir.children.loadChild(c, remoteRecord, inodeId)
+	if newInodeId != inodeId {
+		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
+			"inode mismatch %d vs. %d", inodeId, newInodeId)
+		c.wlog("leaking inode %d", inodeId)
+	}
 
 	if remoteRecord.Type() == quantumfs.ObjectTypeDirectory {
 		c.wlog("%s is a directory", remoteRecord.Filename())
 		if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
-			subdir := inode.(*Directory)
-			uninstantiated, removedUninstantiated :=
-				subdir.refresh_DOWN(c, remoteRecord.ID())
-			c.qfs.addUninstantiated(c, uninstantiated, inodeId)
-			c.qfs.removeUninstantiated(c, removedUninstantiated)
+			if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+				subdir := inode.(*Directory)
+				uninstantiated, removedUninstantiated :=
+					subdir.refresh_DOWN(c, remoteRecord.ID())
+				c.qfs.addUninstantiated(c, uninstantiated, inodeId)
+				c.qfs.removeUninstantiated(c, removedUninstantiated)
+			} else {
+				c.wlog("type of inode %d changed %d->%d", inodeId,
+					localRecord.Type(), remoteRecord.Type())
+				c.wlog("inode %d is now orphaned", inodeId)
+			}
 		} else {
 			c.wlog("nothing to do for uninstantiated inode %d", inodeId)
 		}
