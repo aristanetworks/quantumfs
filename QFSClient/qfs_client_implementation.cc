@@ -139,6 +139,14 @@ ApiImpl::~ApiImpl() {
 }
 
 Error ApiImpl::Open() {
+	return this->OpenCommon(true);
+}
+
+Error ApiImpl::TestOpen() {
+	return this->OpenCommon(false);
+}
+
+Error ApiImpl::OpenCommon(bool directIo) {
 	if (this->path.length() == 0) {
 		// Path was not passed to constructor: determine path
 		Error err = this->DeterminePath();
@@ -148,7 +156,12 @@ Error ApiImpl::Open() {
 	}
 
 	if (this->fd == -1) {
-		this->fd = open(this->path.c_str(), O_RDWR|O_DIRECT);
+		int flags = O_RDWR;
+		if (directIo) {
+			flags |= O_DIRECT;
+		}
+
+		this->fd = open(this->path.c_str(), flags);
 		if (this->fd == -1) {
 			return util::getError(kCantOpenApiFile, this->path);
 		}

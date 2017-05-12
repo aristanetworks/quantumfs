@@ -61,6 +61,9 @@ class ApiImpl: public Api {
 	// indicate the outcome.
 	Error Open();
 
+	// Open the Api file without DIRECT_IO. Not for use with real quantumfs
+	Error TestOpen();
+
 	// Closes the api file if it's still open.
 	void Close();
 
@@ -82,6 +85,9 @@ class ApiImpl: public Api {
 			       std::vector<byte> *data);
 
  private:
+	// Open an Api
+	Error OpenCommon(bool directIo);
+
 	// Work out the location of the api file (which must be called 'api'
 	// and have an inode ID of 2) by looking in the current directory
 	// and walking up the directory tree towards the root until it's found.

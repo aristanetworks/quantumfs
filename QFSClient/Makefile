@@ -14,13 +14,17 @@ ifndef ROOTDIRNAME
 endif
 
 TARGET      := $(d)/libqfsclient.so
+TEST_TARGET := $(d)/qfsclient_test
 
 SRCS      := $(d)/qfs_client_implementation.cc $(d)/qfs_client_util.cc
 OBJS      := $(SRCS:.cc=.o)
 DEPS      := $(SRCS:.cc=.d)
+TEST_SRCS := $(d)/qfs_client_test.cc $(d)/qfs_client_util_test.cc
+TEST_OBJS := $(TEST_SRCS:.cc=.o)
 
 CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -shared -Wl,-rpath,.
+TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
 
 all: $(TARGET) test
 
@@ -29,7 +33,7 @@ qfsclient: $(TARGET) test
 clean: qfsc-clean
 
 qfsc-clean:
-	rm -f $(TARGET) $(OBJS) $(DEPS)
+	rm -f $(TARGET) $(OBJS) $(DEPS) $(TEST_TARGET) $(TEST_OBJS)
 
 $(OBJS): $(DEPS)
 
@@ -42,9 +46,15 @@ $(OBJS): $(DEPS)
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^
 
-test: cleanuplocal
+gotests:
 	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
 		go test github.com/aristanetworks/quantumfs/qfsclientc
+
+test: cleanuplocal $(TEST_TARGET) gotests
+	LD_LIBRARY_PATH=$(d) $(TEST_TARGET)
+
+$(TEST_TARGET): $(TEST_OBJS) $(TARGET)
+	$(CXX) $(TEST_LD_FLAGS) -o $@ $(TEST_OBJS)
 
 cleanuplocal:
 	if [[ "$(ROOTDIRNAME)" == "$(DIRNAME)" ]]; then \
