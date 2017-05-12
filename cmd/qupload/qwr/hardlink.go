@@ -98,7 +98,8 @@ func writeHardLinkInfo(qctx *quantumfs.Ctx,
 	ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error) {
 
 	// entryIdx indexes into the metadata block
-	hle := quantumfs.NewHardlinkEntry()
+	entryNum := len(hardLinkInfoMap)
+	entryNum, hle := quantumfs.NewHardlinkEntry(entryNum)
 	hleKey := quantumfs.EmptyDirKey
 	entryIdx := 0
 	var err error
@@ -116,7 +117,7 @@ func writeHardLinkInfo(qctx *quantumfs.Ctx,
 			atomic.AddUint64(&MetadataBytesWritten,
 				uint64(len(hle.Bytes())))
 
-			hle = quantumfs.NewHardlinkEntry()
+			entryNum, hle = quantumfs.NewHardlinkEntry(entryNum)
 			entryIdx = 0
 		}
 
