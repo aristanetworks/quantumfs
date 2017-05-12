@@ -161,7 +161,7 @@ void ApiImpl::Close() {
 	if (this->fd != -1) {
 		int err = close(this->fd);
 		if (err != 0) {
-			printf("Error when closing api: %d", err);
+			printf("Error when closing api: %d\n", errno);
 		}
 		this->fd = -1;
 	}
