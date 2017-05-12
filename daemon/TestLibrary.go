@@ -14,7 +14,6 @@ import "runtime/debug"
 import "strings"
 import "strconv"
 import "sync"
-import "testing"
 import "time"
 
 import "github.com/aristanetworks/quantumfs"
@@ -27,7 +26,7 @@ import "github.com/hanwen/go-fuse/fuse"
 
 const fusectlPath = "/sys/fs/fuse/"
 
-type QuantumFsTest func(test *testHelper)
+type QuantumFsTest func(test *TestHelper)
 
 // TestHelper holds the variables important to maintain the state of testing
 // in a package which intends to use a QFS instance. daemon.TestHelper will
@@ -463,64 +462,4 @@ func PostTestRuns() {
 	debug.SetGCPercent(origGC)
 
 	testutils.PostTestRuns()
-}
-
-// testHelper holds the variables important to maintain the state of testing
-// in a package. This helper is more of a namespacing mechanism than a
-// coherent object.
-type testHelper struct {
-	TestHelper
-}
-
-// configModifier is a function which is given the default configuration
-// and should make whichever modifications the test requires in place.
-type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
-
-func (th *testHelper) testHelperUpcast(
-	testFn func(test *testHelper)) testutils.QuantumFsTest {
-
-	return func(test testutils.TestArg) {
-		testFn(th)
-	}
-}
-
-func QuantumFsTestCast(testFn func(th *TestHelper)) QuantumFsTest {
-	return func(test *testHelper) {
-		testFn(&test.TestHelper)
-	}
-}
-
-func RunTestCommon(t *testing.T, test QuantumFsTest, startDefaultQfs bool,
-	configModifier configModifierFunc) {
-
-	// the stack depth of test name for all callers of RunTestCommon
-	// is 2. Since the stack looks as follows:
-	// 2 <testname>
-	// 1 runTest
-	// 0 RunTestCommon
-	testName := testutils.TestName(2)
-	th := &testHelper{
-		TestHelper: TestHelper{
-			TestHelper: testutils.NewTestHelper(testName,
-				TestRunDir, t),
-		},
-	}
-	th.CreateTestDirs()
-	defer th.EndTest()
-
-	// Allow tests to run for up to 1 seconds before considering them timed out.
-	// If we are going to start a standard QuantumFS instance we can start the
-	// timer before the test proper and therefore avoid false positive test
-	// failures due to timeouts caused by system slowness as we try to mount
-	// dozens of FUSE filesystems at once.
-	if startDefaultQfs {
-		config := th.defaultConfig()
-		if configModifier != nil {
-			configModifier(th, &config)
-		}
-
-		th.startQuantumFs(config)
-	}
-
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
