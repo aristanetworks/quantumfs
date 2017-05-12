@@ -6,10 +6,8 @@ package qfsclientc
 import "bytes"
 import "testing"
 
-import "github.com/aristanetworks/quantumfs/daemon"
-
 func TestInterface(t *testing.T) {
-	runTest(t, func(test *daemon.TestHelper) {
+	runTest(t, func(test *testHelper) {
 		apiNoPath, err := GetApi()
 		test.AssertNoErr(err)
 
