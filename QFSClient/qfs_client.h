@@ -4,6 +4,7 @@
 #ifndef QFSCLIENT_QFS_CLIENT_H_
 #define QFSCLIENT_QFS_CLIENT_H_
 
+#include <stdint.h>
 #include <string>
 #include <vector>
 
