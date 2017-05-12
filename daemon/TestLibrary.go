@@ -234,6 +234,13 @@ func (th *TestHelper) getApi() *quantumfs.Api {
 	return th.api
 }
 
+func (th *TestHelper) putApi() {
+	if th.api != nil {
+		th.api.Close()
+	}
+	th.api = nil
+}
+
 func (th *TestHelper) getUniqueApi(fdPath string) *quantumfs.Api {
 	api, err := quantumfs.NewApiWithPath(fdPath)
 	th.Assert(err == nil, "Error getting unique api: %v", err)
