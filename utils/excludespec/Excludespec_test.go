@@ -380,6 +380,30 @@ dir12
 	})
 }
 
+func TestExclude_PathnameOverlap(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir13/file1313a",
+			"dir13/file1313b",
+			"dir13b/file1313a",
+			"dir13bc/file1313a",
+		}
+		content := `
+
+dir13
+dir13bc
++dir13b/
+`
+		expected := pathInfo{
+			"dir13b":           1,
+			"dir13b/file1313a": 0,
+		}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
+
 // TestBasicExclude tests the advanced exclude file
 func TestAdvancedExclude(t *testing.T) {
 	runTest(t, func(test *testHelper) {
