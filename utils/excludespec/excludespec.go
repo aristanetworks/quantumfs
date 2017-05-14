@@ -110,8 +110,9 @@ func initRecordCount(exInfo *ExcludeInfo, dir string, path string) error {
 }
 
 // Keep track of words by adding them to include and exclude maps.
-// This helps in doing the regex generation and record count setup
-// after all words have been added.
+// Separating addition and processing of words, simplifies maintaining
+// regex. Otherwise, things like duplicate words need to be handled
+// in a special way.
 func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 	if !includePath {
 		exInfo.excludes[word] = empty
@@ -126,27 +127,21 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 		}
 		return
 	}
-	if !strings.HasSuffix(word, "/") {
-		exInfo.includes[word] = true
-		return
+	dirOnly := true
+	if strings.HasSuffix(word, "/") {
+		dirOnly = false
 	}
-
-	// including a hierarchy implies that
-	// the regex for this word must not include $
-	// ie dir and all its content must be included
-	exInfo.includes[strings.TrimSuffix(word, "/")] = false
+	word = strings.TrimSuffix(word, "/")
+	exInfo.includes[word] = dirOnly
 }
 
 func excludeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
+	// since path is excluded, its record count must be zero
 	exInfo.dirRecordCounts[path] = 0
-	// an exclude path only says that the last path-component
+	// An exclude path only says that the last path-component
 	// is excluded and hence only its parent's record count is
-	// impacted, grand-parents remain unaffected by this path
-	// update the parent's record count
-	parent := filepath.Dir(path)
-	if parent == "." {
-		parent = excludeTopDir
-	}
+	// affected, grand-parent's record count is unaffected.
+	parent := getParent(path)
 	// setup parent record count for the first time
 	_, exist := exInfo.dirRecordCounts[parent]
 	if !exist {
@@ -159,51 +154,62 @@ func excludeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	return nil
 }
 
+func getParent(path string) string {
+	parent := filepath.Dir(path)
+	if parent == "." {
+		parent = excludeTopDir
+	}
+	return parent
+}
+
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	onlyDir, _ := exInfo.includes[path]
 	if !onlyDir {
-		// if directory with complete content is being included
-		// then its record count shouldn't be manipulated
+		// If directory with its sub-dirs is being included
+		// then its record count needs to be setup.
 		err := initRecordCount(exInfo, base, path)
 		if err != nil {
 			return err
 		}
 	}
-	parent := filepath.Dir(path)
-	if parent == "." {
-		parent = excludeTopDir
-	}
-	// an include parent will have all its parents in the
-	// includes so again we only need to setup the
-	// parent of last parent compoment
-	// include parents follow exclude parents and so the excludeTopDir
-	// record count would already be setup correctly
+	// Only parent's record count is affected.
+	// Ancestor record count is not affected.
+	// Its gaurantee that parent exists in dirRecordCounts
+	// since all explicitly included paths are present.
+	parent := getParent(path)
 	exInfo.dirRecordCounts[parent]++
 	return nil
 }
 
-// processing the words involves:
-//  a) setup the exclude and include RE based on the maps
-//  b) setup the record counts based on the maps
-//
-// generating the regex at the end of adding all words
-// helps in avoiding to edit the regex
+func compileRE(s []string) (*regexp.Regexp, error) {
+	var re *regexp.Regexp
+	var err error
+	// empty s creates a nil Regexp
+	if len(s) != 0 {
+		res := strings.Join(s, "|")
+		re, err = regexp.Compile(res)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return re, nil
+}
+
+// Setup regex and record counts.
 func processWords(exInfo *ExcludeInfo, base string) error {
 	var err error
-	exRE := make([]string, 0)
-	inRE := make([]string, 0)
+	reWords := make([]string, 0)
 
 	for word, _ := range exInfo.excludes {
 		// Avoid dir10 regex to match dir103
 		// by adding ^dir10$ and ^dir10/
-		exRE = append(exRE, "^"+regexp.QuoteMeta(word)+"$")
+		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		// Adding trailing slash even for file excludes
 		// is ok since file excludes will match it.
-		exRE = append(exRE, "^"+regexp.QuoteMeta(word)+"/")
+		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
 		excludeSetRecordCount(exInfo, base, word)
 	}
-	re := strings.Join(exRE, "|")
-	exInfo.excludeRE, err = regexp.Compile(re)
+	exInfo.excludeRE, err = compileRE(reWords)
 	if err != nil {
 		return err
 	}
@@ -212,19 +218,17 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	// will have a dollar suffix in regex.
 	// Include paths which refer to directory and its nested content will
 	// have both dollar suffixed and slash suffixed entries in regex.
+	reWords = make([]string, 0)
 	for word, onlyDir := range exInfo.includes {
-		includeSetRecordCount(exInfo, base, word)
-		inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"$")
+		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		if !onlyDir {
-			inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"/")
+			reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
 		}
+		includeSetRecordCount(exInfo, base, word)
 	}
-	re = strings.Join(inRE, "|")
-	if re != "" {
-		exInfo.includeRE, err = regexp.Compile(re)
-		if err != nil {
-			return err
-		}
+	exInfo.includeRE, err = compileRE(reWords)
+	if err != nil {
+		return err
 	}
 	return nil
 }
