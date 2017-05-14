@@ -194,7 +194,12 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	inRE := make([]string, 0)
 
 	for word, _ := range exInfo.excludes {
-		exRE = append(exRE, "^"+regexp.QuoteMeta(word))
+		// Avoid dir10 regex to match dir103
+		// by adding ^dir10$ and ^dir10/
+		exRE = append(exRE, "^"+regexp.QuoteMeta(word)+"$")
+		// Adding trailing slash even for file excludes
+		// is ok since file excludes will match it.
+		exRE = append(exRE, "^"+regexp.QuoteMeta(word)+"/")
 		excludeSetRecordCount(exInfo, base, word)
 	}
 	re := strings.Join(exRE, "|")
@@ -203,22 +208,16 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		return err
 	}
 
-	// Only include paths which refer to a file or directory-without content
-	// should have dollar in their regex. All other cases shouldn't have
-	// $.
-	// For include paths, to match a directory and all its content the
-	// regex must not include dollar suffix. Similarly, to exclude a
-	// directory and its content, it must not have $ in regex. Excluding only
-	// directory is not allowed using exclude syntax. One must use, include
-	// syntax to exclude all content within a directory while retaining the
-	// directory itself.
-	for word, useDollar := range exInfo.includes {
+	// Include paths which refer to a file or directory-without content
+	// will have a dollar suffix in regex.
+	// Include paths which refer to directory and its nested content will
+	// have both dollar suffixed and slash suffixed entries in regex.
+	for word, onlyDir := range exInfo.includes {
 		includeSetRecordCount(exInfo, base, word)
-		if !useDollar {
-			inRE = append(inRE, "^"+regexp.QuoteMeta(word))
-			continue
-		}
 		inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"$")
+		if !onlyDir {
+			inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"/")
+		}
 	}
 	re = strings.Join(inRE, "|")
 	if re != "" {
