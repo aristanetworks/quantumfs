@@ -411,7 +411,11 @@ func TestExclude_EmptySpec(t *testing.T) {
 			"dir14/subdir1414/file141414a",
 		}
 		content := ""
-		expected := pathInfo{}
+		expected := pathInfo{
+			"dir14":                        1,
+			"dir14/subdir1414":             1,
+			"dir14/subdir1414/file141414a": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
 	})
