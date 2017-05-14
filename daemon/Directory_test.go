@@ -165,7 +165,7 @@ func TestDirectoryUpdate(t *testing.T) {
 		dst := "branch/dirupdate/test"
 
 		// First create a file
-		testFilename := test.absPath(src + "/" + "test")
+		testFilename := test.AbsPath(src + "/" + "test")
 		fd, err := os.Create(testFilename)
 		fd.Close()
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -175,7 +175,7 @@ func TestDirectoryUpdate(t *testing.T) {
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
 
 		// Ensure the new workspace has the correct file
-		testFilename = test.absPath(dst + "/" + "test")
+		testFilename = test.AbsPath(dst + "/" + "test")
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
 		test.Assert(err == nil, "Workspace copy doesn't match: %v", err)
@@ -199,7 +199,7 @@ func TestDirectoryFileDeletion(t *testing.T) {
 		test.Assert(err != nil, "Error test file not deleted: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFilename = workspace + "/" + "test"
 		err = syscall.Stat(testFilename, &stat)
 		test.Assert(err != nil, "Error test file not deleted: %v", err)
@@ -584,7 +584,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 		test.Assert(err == nil, "Error writing to file: %v", err)
 		fd.Close()
 
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFile = workspace + "/testdir/testfile"
 
 		data, err := ioutil.ReadFile(testFile)
@@ -633,7 +633,7 @@ func TestLargeDirectory(t *testing.T) {
 
 		// Confirm all the children are accounted for in a branched
 		// workspace
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testdir = workspace + "/testlargedir"
 		files, err = ioutil.ReadDir(testdir)
 		test.Assert(err == nil, "Error reading directory %v", err)
@@ -694,7 +694,7 @@ func TestIntraDirectoryRename(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFilename2 = workspace + "/test2"
 		err = syscall.Stat(testFilename2, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -731,7 +731,7 @@ func interDirectoryRename(test *testHelper) {
 	test.Assert(err == nil, "Rename failed: %v", err)
 
 	// Confirm after branch
-	workspace = test.absPath(test.branchWorkspace(workspace))
+	workspace = test.AbsPath(test.branchWorkspace(workspace))
 	testFilename2 = workspace + "/dir2/test2"
 	err = syscall.Stat(testFilename2, &stat)
 	test.Assert(err == nil, "Rename failed: %v", err)
@@ -762,7 +762,7 @@ func TestRenameIntoParent(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		parentFile = workspace + "/parent/test2"
 		err = syscall.Stat(parentFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -794,7 +794,7 @@ func TestRenameIntoChild(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		childFile = workspace + "/parent/child/test2"
 		err = syscall.Stat(childFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -826,7 +826,7 @@ func TestRenameIntoIndirectParent(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		parentFile = workspace + "/parent/test2"
 		err = syscall.Stat(parentFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -858,7 +858,7 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		childFile = workspace + "/parent/indirect/child/test2"
 		err = syscall.Stat(childFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -884,7 +884,7 @@ func TestSUIDPerms(t *testing.T) {
 			"Changed permissions incorrect %d", info.Mode())
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFilename = workspace + "/test"
 		info, err = os.Stat(testFilename)
 		test.Assert(err == nil, "Failed getting dir info: %v", err)
@@ -916,7 +916,7 @@ func TestLoadOnDemand(t *testing.T) {
 		err = testutils.PrintToFile(workspace+fileC, string(dataC))
 		test.Assert(err == nil, "Error creating file: %v", err)
 
-		newspace := test.absPath(test.branchWorkspace(workspace))
+		newspace := test.AbsPath(test.branchWorkspace(workspace))
 		fileA = newspace + "/layerA/fileA"
 		dirB := newspace + "/layerA/layerB"
 		fileB = dirB + "/fileB"
