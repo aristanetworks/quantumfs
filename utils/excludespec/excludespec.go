@@ -233,15 +233,21 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	return nil
 }
 
+// PathExcluded returns true if path is excluded as per exclude
+// file spec.
 func (e *ExcludeInfo) PathExcluded(path string) bool {
-	// a path is excluded if theres a match in excludeRE
-	// and no match in includeRE
-	// if a path doesn't match excludeRE then no need to check
-	// includeRE
-	excl := e.excludeRE.MatchString(path)
-	incl := false
+	// A path is excluded if theres a match in excludeRE
+	// and no match in includeRE.
+	// If a path doesn't match excludeRE then no need to check
+	// includeRE.
+
+	// by default everything is included
+	excl := false
+	if e.excludeRE != nil {
+		excl = e.excludeRE.MatchString(path)
+	}
 	if excl && e.includeRE != nil {
-		incl = e.includeRE.MatchString(path)
+		incl := e.includeRE.MatchString(path)
 		excl = excl && !incl
 	}
 	return excl
