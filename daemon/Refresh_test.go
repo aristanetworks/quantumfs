@@ -6,7 +6,6 @@ package daemon
 import "testing"
 import "syscall"
 import "os"
-import "time"
 import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
@@ -325,14 +324,6 @@ func assertOpenFileIsOfSize(test *testHelper, fd int, size int64) {
 		"Incorrect file size. Expected: %d", stat.Size)
 }
 
-// Changing mtime/atime of a file has the side-effect of invalidating
-// the inode cache in the VFS layer and forcing the inode to be
-// re-read from fuse
-func reloadFile(test *testHelper, fullname string) {
-	err := os.Chtimes(fullname, time.Now(), time.Now())
-	test.AssertNoErr(err)
-}
-
 func TestRefreshOpenFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -354,7 +345,6 @@ func TestRefreshOpenFile(t *testing.T) {
 		newRootId3 := getRootId(test, workspace)
 		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
 
-		reloadFile(test, fullname)
 		assertOpenFileIsOfSize(test, int(file.Fd()), 1000)
 		assertFileIsOfSize(test, fullname, 1000)
 
