@@ -441,6 +441,7 @@ func (qfs *QuantumFs) adjustKernelKnobs() {
 	}
 
 	adjustBdi(&qfs.c, mountId)
+	adjustVmDirtyBackgroundBytes(&qfs.c)
 }
 
 func adjustBdi(c *ctx, mountId int) {
@@ -448,12 +449,12 @@ func adjustBdi(c *ctx, mountId int) {
 
 	// /sys/class/bdi/<mount>/read_ahead_kb indicates how much data, up to the
 	// end of the file, should be speculatively read by the kernel. Setting this
-	// to the block size should improve the correlation between the what the
-	// kernel reads and what QuantumFS can provide most efficiently. Since this
-	// is the amount in addition to the original read the kernel will read the
-	// entire block containing the user's read and then some portion of the next
-	// block. Thus QuantumFS will have time to fetch the next block in advance of
-	// it being required.
+	// to the block size should improve the correlation between what the kernel
+	// reads and what QuantumFS can provide most efficiently. Since this is the
+	// amount in addition to the original read the kernel will read the entire
+	// block containing the user's read and then some portion of the next block.
+	// Thus QuantumFS will have time to fetch the next block in advance of it
+	// being required.
 	filename := fmt.Sprintf("/sys/class/bdi/0:%d/read_ahead_kb", mountId)
 	value := fmt.Sprintf("%d", quantumfs.MaxBlockSize/1024)
 	err := ioutil.WriteFile(filename, []byte(value), 000)
@@ -472,6 +473,23 @@ func adjustBdi(c *ctx, mountId int) {
 	err = ioutil.WriteFile(filename, []byte("100"), 000)
 	if err != nil {
 		c.wlog("Unable to set bdi max_ratio: %s", err.Error())
+	}
+}
+
+func adjustVmDirtyBackgroundBytes(c *ctx) {
+	defer c.funcIn("adjustVmDirtyBackgroundBytes").Out()
+
+	// Sometimes, for reasons which have not been root caused yet, the kernel
+	// will start delaying FUSE requests for about 200ms. This appears related to
+	// some IO throughput control mechanism erroneously trending to zero for
+	// QuantumFS.
+	//
+	// Work around this for now by setting vm.dirty_background_bytes to a low
+	// number, which prevents FUSE from getting stuck in this manner.
+	err := ioutil.WriteFile("/proc/sys/vm/dirty_background_bytes",
+		[]byte("100000"), 000)
+	if err != nil {
+		c.wlog("Unable to set vm.dirty_background_bytes: %s", err.Error())
 	}
 }
 
