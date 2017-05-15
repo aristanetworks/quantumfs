@@ -112,7 +112,8 @@ func markMutable(ctx *ctx, workspace string) {
 }
 
 func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectKey) {
-	wsr := test.getWorkspaceRoot(workspace)
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
 	test.Assert(wsr != nil, "workspace root does not exist")
 	wsr.refresh(c, dst)
 }
@@ -368,7 +369,7 @@ func TestRefreshOpenFile(t *testing.T) {
 func TestRefreshUninstantiated(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		const (
-			nfiles = 100
+			nfiles = 30
 			ndirs  = 10
 			pardir = "/pardir"
 		)
@@ -398,10 +399,12 @@ func TestRefreshUninstantiated(t *testing.T) {
 			"no changes to the rootId")
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		test.AssertLogContains("Adding uninstantiated",
+			"There are no uninstantiated inodes")
 
 		for i := 0; i < nfiles; i++ {
 			name := fmt.Sprintf("%s/%d/%d", pardir, i%ndirs, i)
-			newRootId2 = removeTestFile(ctx, test, workspace, name)
+			removeTestFile(ctx, test, workspace, name)
 		}
 	})
 }
