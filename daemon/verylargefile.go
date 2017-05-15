@@ -165,6 +165,26 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	}
 }
 
+func (fi *VeryLargeFile) reload(c *ctx, key quantumfs.ObjectKey) {
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		panic("Unable to fetch metadata for reload")
+	}
+
+	store := buffer.AsVeryLargeFile()
+
+	c.vlog("Reloading VeryLargeFile of %d parts", store.NumberOfParts())
+	fi.parts = make([]LargeFile, store.NumberOfParts())
+	for i := 0; i < store.NumberOfParts(); i++ {
+		newPart := newLargeAccessor(c, store.LargeFileKey(i))
+		if newPart == nil {
+			c.elog("Received nil accessor, system state inconsistent")
+			panic("Nil Large accessor in very large file")
+		}
+		fi.parts[i] = *newPart
+	}
+}
+
 func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("VeryLargeFile::sync").Out()
 
