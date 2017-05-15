@@ -57,6 +57,16 @@ type ExcludeInfo struct {
 	dirRecordCounts map[string]int
 }
 
+/*
+Overview of scheme:
+- Parse the exclude spec file to collect words into exclude and include maps.
+- Words are exclude and include directives.
+- Build exclude and include regexp based on words.
+- Build record count for paths in exclude spec.
+- PathExcluded uses exclude and include regexps.
+- RecordCount uses the record count info.
+*/
+
 func isIncludePath(word string) bool {
 	return strings.HasPrefix(word, "+")
 }
