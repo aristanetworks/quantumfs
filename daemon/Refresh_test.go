@@ -111,7 +111,8 @@ func markMutable(ctx *ctx, workspace string) {
 }
 
 func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectKey) {
-	wsr := test.getWorkspaceRoot(workspace)
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
 	test.Assert(wsr != nil, "workspace root does not exist")
 	wsr.refresh(c, dst)
 }
@@ -358,7 +359,7 @@ func TestRefreshOpenFile(t *testing.T) {
 func TestRefreshUninstantiated(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		const (
-			nfiles = 100
+			nfiles = 30
 			ndirs  = 10
 			pardir = "/pardir"
 		)
@@ -388,10 +389,59 @@ func TestRefreshUninstantiated(t *testing.T) {
 			"no changes to the rootId")
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		test.AssertLogContains("Adding uninstantiated",
+			"There are no uninstantiated inodes")
 
 		for i := 0; i < nfiles; i++ {
 			name := fmt.Sprintf("%s/%d/%d", pardir, i%ndirs, i)
 			removeTestFile(ctx, test, workspace, name)
 		}
+	})
+}
+
+func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		linkfile := "linkFile"
+
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId1 := linkTestFile(ctx, test, workspace, name, linkfile)
+		removeTestFileNoSync(test, workspace, name)
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		removeTestFile(ctx, test, workspace, name)
+		removeTestFile(ctx, test, workspace, linkfile)
+	})
+}
+
+func TestRefreshChangeTypeFileToDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+		removeTestFileNoSync(test, workspace, name)
+		newRootId2 := createTestFile(ctx, test, workspace, name, 1000)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		err := syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
 	})
 }
