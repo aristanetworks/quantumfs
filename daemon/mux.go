@@ -685,13 +685,18 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 // Increase an Inode's lookup count. This must be called whenever a fuse.EntryOut is
 // returned.
 func (qfs *QuantumFs) increaseLookupCount(inodeId InodeId) {
-	defer qfs.c.FuncIn("Mux::increaseLookupCount", "inode %d", inodeId).Out()
+	qfs.increaseLookupCountWithNum(inodeId, 1)
+}
+
+func (qfs *QuantumFs) increaseLookupCountWithNum(inodeId InodeId, num uint64) {
+	defer qfs.c.FuncIn("Mux::increaseLookupCountWithNum",
+		"inode %d with value %d", inodeId, num).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		qfs.lookupCounts[inodeId] = 1
+		qfs.lookupCounts[inodeId] = num
 	} else {
-		qfs.lookupCounts[inodeId] = prev + 1
+		qfs.lookupCounts[inodeId] = prev + num
 	}
 }
 
@@ -932,8 +937,10 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
+// The returned cleanup function of workspaceroot should be called at the end of the
+// caller
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
-	workspace string) (*WorkspaceRoot, bool) {
+	workspace string) (wsr *WorkspaceRoot, cleanup func(), ok bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
@@ -947,13 +954,15 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	// For now, all getWorkspaceRoot() are called from internal functions, so
 	// nLookup is always 1.
 	var nLookup uint64 = 1
-
+	// Before workspace root is successfully instantiated, there is no need to
+	// uninstantiated it, so cleanup() should be a no-op
+	cleanup = func() {}
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, cleanup, false
 	}
 	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
 
@@ -961,7 +970,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, cleanup, false
 	}
 	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
 
@@ -970,14 +979,16 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, cleanup, false
 	}
-	defer qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+	cleanup = func() {
+		qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+	}
 
 	// Fetch the WorkspaceRoot object itelf
-	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
+	wsr = qfs.inode(c, InodeId(workspaceRootAttr.NodeId)).(*WorkspaceRoot)
 
-	return wsr.(*WorkspaceRoot), wsr != nil
+	return wsr, cleanup, wsr != nil
 }
 
 func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
