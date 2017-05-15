@@ -79,7 +79,7 @@ func TestHardlinkReload(t *testing.T) {
 		defer cleanup()
 
 		// ensure that the hardlink was able to sync
-		wsrBFileA := test.absPath(workspaceB +
+		wsrBFileA := test.AbsPath(workspaceB +
 			"/subdir/grandchild/linkFileA2")
 		readData, err := ioutil.ReadFile(wsrBFileA)
 		test.AssertNoErr(err)
@@ -620,7 +620,7 @@ func TestHardlinkUninstantiated(t *testing.T) {
 		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.AssertNoErr(err)
 
-		readData, err := ioutil.ReadFile(test.absPath(workspaceB +
+		readData, err := ioutil.ReadFile(test.AbsPath(workspaceB +
 			"/subdir/grandchild/fileB"))
 		test.AssertNoErr(err)
 		test.Assert(bytes.Equal(readData, data),

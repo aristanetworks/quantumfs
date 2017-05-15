@@ -39,7 +39,7 @@ func TestAccessListFileOpen(t *testing.T) {
 
 		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + filename
 		file, err := os.Open(path)
 		test.Assert(err == nil, "Open file error:%v", err)
@@ -72,7 +72,7 @@ func TestAccessListFileDelete(t *testing.T) {
 
 		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + filename
 		err = os.Remove(path)
 		test.Assert(err == nil, "Remove file error:%v", err)
@@ -118,7 +118,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 
 		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + dirname
 		err = syscall.Rmdir(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
@@ -166,7 +166,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 
 		accessList := make(map[string]bool)
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + dir1
 		err = os.RemoveAll(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
@@ -213,7 +213,7 @@ func TestAccessListMvChild(t *testing.T) {
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		accessList := make(map[string]bool)
 		path1 := absbworkspace + dirname1 + filename1
 		path2 := absbworkspace + dirname2 + filename3
@@ -258,7 +258,7 @@ func TestAccessListRename(t *testing.T) {
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		accessList := make(map[string]bool)
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
@@ -301,7 +301,7 @@ func TestAccessListHardLink(t *testing.T) {
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		accessList := make(map[string]bool)
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
@@ -344,7 +344,7 @@ func TestAccessListSymlink(t *testing.T) {
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		accessList := make(map[string]bool)
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
@@ -431,7 +431,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 		test.Assert(err == nil, "Create symlink error:%v", err)
 
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		accessList := make(map[string]bool)
 		path2 = absbworkspace + dirname + filename2
 		path1, err = os.Readlink(path2)
@@ -466,7 +466,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		syscall.Close(fd)
 
 		bworkspace := test.branchWorkspace(workspace)
-		absbworkspace := test.absPath(bworkspace)
+		absbworkspace := test.AbsPath(bworkspace)
 		accessList := make(map[string]bool)
 		path = absbworkspace + filename
 		err = os.Remove(path)
