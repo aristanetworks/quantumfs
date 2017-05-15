@@ -121,6 +121,7 @@ func TestBasicExclude(t *testing.T) {
 dir1
 `
 		expected := pathInfo{
+			"/":            1,
 			"dir2":         1,
 			"dir2/subdir2": 0,
 		}
@@ -138,6 +139,7 @@ func TestExclude_EmptySubdir(t *testing.T) {
 		}
 		content := "dir1/subdir11a"
 		expected := pathInfo{
+			"/":    1,
 			"dir1": 0,
 		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
@@ -154,6 +156,7 @@ func TestExclude_NonEmptySubdirAllContent(t *testing.T) {
 		}
 		content := "dir2/subdir22a"
 		expected := pathInfo{
+			"/":    1,
 			"dir2": 0,
 		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
@@ -170,6 +173,7 @@ func TestExclude_NonEmptySubdirSelectiveContent(t *testing.T) {
 		}
 		content := "dir3/subdir33a/.file333a"
 		expected := pathInfo{
+			"/":                        1,
 			"dir3":                     1,
 			"dir3/subdir33a":           1,
 			"dir3/subdir33a/.file333b": 0,
@@ -190,6 +194,7 @@ dir4/subdir44a
 +dir4/subdir44a
 `
 		expected := pathInfo{
+			"/":              1,
 			"dir4":           1,
 			"dir4/subdir44a": 0,
 		}
@@ -210,6 +215,7 @@ dir5/subdir55a
 +dir5/subdir55a/
 `
 		expected := pathInfo{
+			"/":                          1,
 			"dir5":                       1,
 			"dir5/subdir55a":             2,
 			"dir5/subdir55a/content555a": 0,
@@ -233,6 +239,7 @@ dir6/subdir66a
 +dir6/subdir66a/content666b
 `
 		expected := pathInfo{
+			"/":                          1,
 			"dir6":                       1,
 			"dir6/subdir66a":             1,
 			"dir6/subdir66a/content666b": 0,
@@ -249,7 +256,9 @@ func TestExclude_EmptyDir(t *testing.T) {
 			"dir7/",
 		}
 		content := "dir7"
-		expected := pathInfo{}
+		expected := pathInfo{
+			"/": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
 	})
@@ -263,7 +272,9 @@ func TestExclude_NonEmptyDirAllContent(t *testing.T) {
 			"dir8/content88b",
 		}
 		content := "dir8"
-		expected := pathInfo{}
+		expected := pathInfo{
+			"/": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
 	})
@@ -278,6 +289,7 @@ func TestExclude_NonEmptyDirSelectiveContent(t *testing.T) {
 		}
 		content := "dir9/.file99a"
 		expected := pathInfo{
+			"/":             1,
 			"dir9":          1,
 			"dir9/Xfile99b": 0,
 		}
@@ -297,6 +309,7 @@ dir10
 +dir10
 `
 		expected := pathInfo{
+			"/":     1,
 			"dir10": 0,
 		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
@@ -316,6 +329,7 @@ dir11
 +dir11/
 `
 		expected := pathInfo{
+			"/":                  1,
 			"dir11":              2,
 			"dir11/content1111a": 0,
 			"dir11/content1111b": 0,
@@ -339,6 +353,7 @@ dir12
 +dir12/content1212b
 `
 		expected := pathInfo{
+			"/":                  1,
 			"dir12":              1,
 			"dir12/content1212b": 0,
 		}
@@ -364,6 +379,7 @@ dir13b
 +dir13b/
 `
 		expected := pathInfo{
+			"/":                1,
 			"dir13b":           1,
 			"dir13b/file1313a": 0,
 		}
@@ -380,6 +396,7 @@ func TestExclude_EmptySpec(t *testing.T) {
 		}
 		content := ""
 		expected := pathInfo{
+			"/":                            1,
 			"dir14":                        1,
 			"dir14/subdir1414":             1,
 			"dir14/subdir1414/file141414a": 0,
@@ -399,7 +416,9 @@ func TestExclude_ParentNotIncluded(t *testing.T) {
 dir15
 +dir15/subdir1515
 `
-		expected := pathInfo{}
+		expected := pathInfo{
+			"/": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.Assert(err != nil, "include of subdir passed even when parent "+
 			"not included")
@@ -485,6 +504,8 @@ dir12
 +dir12/content1212b
 `
 		expected := pathInfo{
+			"/": 10,
+
 			"dir1":                     0,
 			"dir2":                     0,
 			"dir3":                     1,
