@@ -132,7 +132,7 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	return typeKey, fuse.OK
 }
 
-// The returned cleanup function of terminal directory should be called in the end of
+// The returned cleanup function of terminal directory should be called at the end of
 // the caller
 func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 	cleanup func(), err error) {
@@ -158,7 +158,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 			quantumfs.ObjectTypeDirectory)
 		startForgotten = !instantiated
 		if err != nil {
-			return child, nil, err
+			return child, func() {}, err
 		}
 
 		currDir = child.(*Directory)
