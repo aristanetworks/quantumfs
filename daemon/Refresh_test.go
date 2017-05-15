@@ -408,3 +408,50 @@ func TestRefreshUninstantiated(t *testing.T) {
 		}
 	})
 }
+
+func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		linkfile := "linkFile"
+
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId1 := linkTestFile(ctx, test, workspace, name, linkfile)
+		removeTestFileNoSync(test, workspace, name)
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		removeTestFile(ctx, test, workspace, name)
+		removeTestFile(ctx, test, workspace, linkfile)
+	})
+}
+
+func TestRefreshChangeTypeFileToDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+		removeTestFileNoSync(test, workspace, name)
+		newRootId2 := createTestFile(ctx, test, workspace, name, 1000)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		err := syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+	})
+}
