@@ -6,27 +6,43 @@ Package excludespec provides APIs for loading a specification file that
 describes which files or directories are excluded and/or included. The spec
 file must follow rules outlined below:
 
-One path per line.
-Comments and empty lines are allowed. A comment is any line that starts with "#".
-Order of the paths in the file is important.
-Path must be under the base directory specified.
-Absolute paths are not allowed.
-Exclude paths must not be "/" suffixed.
-Paths to be included are prefixed with "+".
-The parent and grand-parents of paths to be included must be included already.
+ - One path per line.
+ - Comments and empty lines are allowed. A comment is any line that starts with "#".
+ - Path must be under the base directory specified.
+ - Absolute path is not allowed.
+ - Exclude path must not be "/" suffixed.
+ - Path to be included is prefixed with "+".
+ - The parent and grand-parents of path to be included must be included (explicitly
+   or implicitly) already.
+ - The order of exclude and include paths in the file does not matter.
+ - Use ordering that makes the file more readable.
+ - All excludes are processed first and then includes are processed.
+ - A path cannot be included more than once.
+
+A path is considered as included if it meets following criteria:
+ - if the path is not covered by any exclude directives (implict inclusion)
+ - if the path has been explicitly included
 
 Example:
 
-dir1
-+dir1/subdir1
-+dir1/subdir1/file1
-+dir1/subdir3
-+dir1/subdir4
-+dir1/subdir3/subsubdir4/
+ # exclude dir1 and all its contents
+ dir1
+ # create only dir1 (not its contents)
+ +dir1
+ # create dir1/subdir1 (not its contents)
+ +dir1/subdir1
+ # create dir1/subdir1/file1
+ +dir1/subdir1/file1
+ # create dir1/subdir4 (not its contents)
+ +dir1/subdir4
 
-In the above example, anything under directory "dir1" is excluded except
-dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
-Note contents of dir1/subdir3 and dir1/subdir4 are not included.
+ # exclude dir2/subdir2
+ # implicitly includes dir2 and all other content in dir2
+ dir2/subdir2
+ # include selective content dir2/subdir2/file2
+ # inside excluded content (dir2/subdir2)
+ +dir2/subdir2/file2
+
 */
 package excludespec
 
@@ -37,6 +53,7 @@ import "io/ioutil"
 import "os"
 import "path/filepath"
 import "regexp"
+import "sort"
 import "strings"
 
 const excludeTopDir = "/"
@@ -49,6 +66,13 @@ type ExcludeInfo struct {
 	// true if only the dir should be included
 	// false if the dir and all its content should be included
 	includes map[string]bool
+
+	// Sorting words ensures that a directory is listed
+	// before all its sub-directories. Checking if ancestor
+	// is included works reliably when parent path is listed before
+	// any of the child paths.
+	sortedExcWords []string
+	sortedIncWords []string
 
 	excludeRE *regexp.Regexp // exclude path regexp
 	includeRE *regexp.Regexp // include path regexp
@@ -74,6 +98,8 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 	exInfo.dirRecordCounts = make(map[string]int)
 	exInfo.excludes = make(map[string]struct{})
 	exInfo.includes = make(map[string]bool)
+	exInfo.sortedExcWords = make([]string, 0)
+	exInfo.sortedIncWords = make([]string, 0)
 
 	file, err := os.Open(filename)
 	if err != nil {
@@ -101,19 +127,17 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 				filename, lineno, err)
 		}
 
-		err = checkExcludeRules(&exInfo, word)
-		if err != nil {
-			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
-				filename, lineno, err)
-		}
-
 		includePath := false
 		if isIncludePath(word) {
 			includePath = true
 			word = strings.TrimPrefix(word, "+")
 		}
 
-		addWord(&exInfo, word, includePath)
+		err = addWord(&exInfo, word, includePath)
+		if err != nil {
+			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
+				filename, lineno, err)
+		}
 	}
 
 	if err = s.Err(); err != nil {
@@ -156,45 +180,34 @@ func parseExcludeLine(base string, line string) (string, error) {
 	return parts[0], nil
 }
 
-func checkExcludeRules(exInfo *ExcludeInfo, word string) error {
-	// parent and all grand-parent paths should be included
-	// prioer to including a path
-	if isIncludePath(word) {
-		word = strings.TrimSuffix(word, "/")
-		for d := filepath.Dir(word); d != "."; d = filepath.Dir(d) {
-			d = strings.TrimPrefix(d, "+")
-			if _, ok := exInfo.includes[d]; !ok {
-				return fmt.Errorf("parent path is not included")
-			}
-		}
-	}
-	return nil
-}
-
 // Keep track of words by adding them to include and exclude maps.
 // Separating addition and processing of words, simplifies maintaining
 // regex. Otherwise, things like duplicate words need to be handled
 // in a special way.
-func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
+func addWord(exInfo *ExcludeInfo, word string, includePath bool) error {
 	if !includePath {
-		exInfo.excludes[word] = empty
-		// if an exclude overrides includes
-		// clean up includes that are redundant now
-		for inc, _ := range exInfo.includes {
-			if strings.Contains(inc, word) {
-				delete(exInfo.includes, inc)
-				// record counts aren't setup yet
-				// so no need to clean them up
-			}
+		if _, exists := exInfo.excludes[word]; exists {
+			return fmt.Errorf("path %q already excluded", word)
 		}
-		return
+		exInfo.excludes[word] = empty
+		exInfo.sortedExcWords = append(exInfo.sortedExcWords,
+			word)
+		sort.Strings(exInfo.sortedExcWords)
+		return nil
 	}
 	dirOnly := true
 	if strings.HasSuffix(word, "/") {
 		dirOnly = false
 	}
 	word = strings.TrimSuffix(word, "/")
+	if _, exists := exInfo.includes[word]; exists {
+		return fmt.Errorf("path %q already included", word)
+	}
 	exInfo.includes[word] = dirOnly
+	exInfo.sortedIncWords = append(exInfo.sortedIncWords,
+		word)
+	sort.Strings(exInfo.sortedIncWords)
+	return nil
 }
 
 // Setup regex and record counts.
@@ -202,7 +215,7 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	var err error
 	reWords := make([]string, 0)
 
-	for word, _ := range exInfo.excludes {
+	for _, word := range exInfo.sortedExcWords {
 		// Avoid dir10 regex to match dir103
 		// by adding ^dir10$ and ^dir10/
 		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
@@ -221,11 +234,34 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	// Include paths which refer to directory and its nested content will
 	// have both dollar suffixed and slash suffixed entries in regex.
 	reWords = make([]string, 0)
-	for word, onlyDir := range exInfo.includes {
+	for _, word := range exInfo.sortedIncWords {
+		// Path shouldn't already be included (implicitly).
+		if !exInfo.PathExcluded(word) {
+			return fmt.Errorf("path %q already included", word)
+		}
+
+		// A path can be included only if all its ancestors
+		// are included.
+		parent := getParent(word)
+		if parent != excludeTopDir {
+			// root is never excluded
+			if exInfo.PathExcluded(parent) {
+				return fmt.Errorf("Ancestor(s) of %q not included. "+
+					"Add appropriate include paths.", word)
+			}
+		}
+		onlyDir := exInfo.includes[word]
 		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		if !onlyDir {
 			reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
 		}
+		// alter RE as we build regex so that PathExcluded check
+		// can be used while building RE
+		exInfo.includeRE, err = compileRE(reWords)
+		if err != nil {
+			return err
+		}
+
 		includeSetRecordCount(exInfo, base, word)
 	}
 	exInfo.includeRE, err = compileRE(reWords)
@@ -298,8 +334,9 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	}
 	// Only parent's record count is affected.
 	// Ancestor record count is not affected.
-	// Its gaurantee that parent exists in dirRecordCounts
-	// since all explicitly included paths are present.
+	// Its gauranteed that parent exists in dirRecordCounts
+	// since all explicitly included paths are present and
+	// re-includes aren't supported.
 	parent := getParent(path)
 	exInfo.dirRecordCounts[parent]++
 	return nil

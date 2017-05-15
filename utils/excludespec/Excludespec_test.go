@@ -8,7 +8,7 @@ import "testing"
 // --- exclude file syntax tests ---
 var syntaxTestHierarchy = []string{
 	".file1",
-	"dir1",
+	"dir1/",
 	"dir2/.file2",
 	"dir3/.file3a",
 	"dir3/file3b",
@@ -59,7 +59,7 @@ dir2
 func TestExcludeSyntax_IncludePathWithSlashSuffix(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		excludeFileContent := `
-dir1
+dir2
 +dir2/
 `
 		testSyntaxNoErr(test, excludeFileContent)
@@ -69,12 +69,12 @@ dir1
 func TestExcludeSyntax_AdvancedSyntax(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		excludeFileContent := `
-# some comment\
+# some comment
 dir1
-+dir2/
+
 .file1
-+dir3
-+dir3/.file3a
+dir3
++dir3/
 `
 		testSyntaxNoErr(test, excludeFileContent)
 	})
@@ -98,36 +98,6 @@ func TestExcludeSyntax_DotDotPrefix(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		excludeFileContent := "..dir1"
 		testSyntaxErr(test, excludeFileContent)
-	})
-}
-
-// --- exclude file rule tests ---
-var ruleTestHierarchy = []string{
-	"dir1/.file1",
-}
-
-func TestExcludeRule_NoError(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		excludeFileContent := `
-dir1
-+dir1
-+dir1/.file1
-`
-		err := loadSpecTest(test.TempDir, ruleTestHierarchy,
-			excludeFileContent)
-		test.AssertNoErr(err)
-	})
-}
-
-func TestExcludeRule_ParentNotIncluded(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		excludeFileContent := `
-dir1
-+dir1/.file1
-`
-		err := loadSpecTest(test.TempDir, ruleTestHierarchy,
-			excludeFileContent)
-		test.Assert(err != nil, "file included without parent include")
 	})
 }
 
@@ -217,7 +187,6 @@ func TestExclude_IncludeExcludedSubdirEmpty(t *testing.T) {
 		}
 		content := `
 dir4/subdir44a
-+dir4
 +dir4/subdir44a
 `
 		expected := pathInfo{
@@ -238,7 +207,6 @@ func TestExclude_IncludeExcludedSubdirAllContent(t *testing.T) {
 		}
 		content := `
 dir5/subdir55a
-+dir5
 +dir5/subdir55a/
 `
 		expected := pathInfo{
@@ -261,7 +229,6 @@ func TestExclude_IncludeExcludedSubdirSelectiveContent(t *testing.T) {
 		}
 		content := `
 dir6/subdir66a
-+dir6
 +dir6/subdir66a
 +dir6/subdir66a/content666b
 `
@@ -393,6 +360,7 @@ func TestExclude_PathnameOverlap(t *testing.T) {
 
 dir13
 dir13bc
+dir13b
 +dir13b/
 `
 		expected := pathInfo{
@@ -419,6 +387,24 @@ func TestExclude_EmptySpec(t *testing.T) {
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
 	})
+}
+
+func TestExclude_ParentNotIncluded(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir15/subdir1515/file151515a",
+		}
+		content := `
+dir15
++dir15/subdir1515
+`
+		expected := pathInfo{}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.Assert(err != nil, "include of subdir passed even when parent "+
+			"not included")
+	})
+
 }
 
 // TestBasicExclude tests the advanced exclude file
@@ -465,17 +451,14 @@ dir3/subdir33a/.file333a
 
 #include an excluded empty subdir
 dir4/subdir44a
-+dir4
 +dir4/subdir44a
 
 #include an excluded subdir, with all contents
 dir5/subdir55a
-+dir5
 +dir5/subdir55a/
 
 #include an excluded subdir, with selective content
 dir6/subdir66a
-+dir6
 +dir6/subdir66a
 +dir6/subdir66a/content666b
 
