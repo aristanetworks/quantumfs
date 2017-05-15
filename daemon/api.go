@@ -580,8 +580,9 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	dst := strings.Split(wsr, "/")
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	defer cleanup()
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -602,8 +603,9 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 	}
 
 	wsr := cmd.WorkspaceRoot
-	parts := strings.Split(wsr, "/")
-	workspace, ok := c.qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	dst := strings.Split(wsr, "/")
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	defer cleanup()
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -644,7 +646,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
-	workspace, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
+	defer cleanup()
 	if !ok {
 		c.vlog("Workspace not found: %s", wsr)
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -667,7 +670,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	// get immediate parent of the target node
-	p, err := func() (Inode, error) {
+	p, cleanup, err := func() (Inode, func(), error) {
 		// The ApiInode uses tree lock of NamespaceList and not any
 		// particular workspace. Thus at this point in the code, we don't
 		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
@@ -676,6 +679,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		defer (&workspace.Directory).LockTree().Unlock()
 		return (&workspace.Directory).followPath_DOWN(c, dst)
 	}()
+	defer cleanup()
 	if err != nil {
 		c.vlog("Path does not exist: %s", cmd.DstPath)
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,

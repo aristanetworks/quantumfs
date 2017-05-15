@@ -250,7 +250,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 }
 
 func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId {
-	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeIde", "linkId %d",
+	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeId", "linkId %d",
 		linkId).Out()
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -676,6 +676,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
+	defer wsr.childRecordLock.Lock().Unlock()
 	for _, entry := range wsr.children.recordCopies(c) {
 		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
