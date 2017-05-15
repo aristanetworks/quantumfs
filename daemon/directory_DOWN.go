@@ -133,26 +133,42 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	return typeKey, fuse.OK
 }
 
-// go along the given path to the destination
-// The path is stored in a string slice, each cell index contains an inode
-func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
-	defer c.funcIn("Directory::followPath_DOWN").Out()
+// The returned cleanup function of terminal directory should be called at the end of
+// the caller
+func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
+	cleanup func(), err error) {
 
-	// traverse through the workspace, reach the target inode
+	defer c.funcIn("Directory::followPath_DOWN").Out()
+	// Traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	// skip the first three Inodes: typespace / namespace / workspace
+	// Indicate we've started instantiating inodes and therefore need to start
+	// Forgetting them
+	startForgotten := false
+	// Go along the given path to the destination. The path is stored in a string
+	// slice, each cell index contains an inode.
+	// Skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
-		// all preceding nodes have to be directories
-		child, err := currDir.lookupInternal(c, path[num],
-			quantumfs.ObjectTypeDirectory)
-		if err != nil {
-			return child, err
+		if startForgotten {
+			// The lookupInternal() doesn't increase the lookupCount of
+			// the current directory, so it should be forgotten with 0
+			defer c.qfs.Forget(uint64(currDir.inodeNum()), 0)
 		}
+		// all preceding nodes have to be directories
+		child, instantiated, err := currDir.lookupInternal(c, path[num],
+			quantumfs.ObjectTypeDirectory)
+		startForgotten = !instantiated
+		if err != nil {
+			return child, func() {}, err
+		}
+
 		currDir = child.(*Directory)
 	}
 
-	return currDir, nil
+	cleanup = func() {
+		c.qfs.Forget(uint64(currDir.inodeNum()), 0)
+	}
+	return currDir, cleanup, nil
 }
 
 // the toLink parentLock must be locked
