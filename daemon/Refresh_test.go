@@ -108,7 +108,8 @@ func markMutable(ctx *ctx, workspace string) {
 }
 
 func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectKey) {
-	wsr := test.getWorkspaceRoot(workspace)
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
 	test.Assert(wsr != nil, "workspace root does not exist")
 	wsr.refresh(c, dst)
 }
