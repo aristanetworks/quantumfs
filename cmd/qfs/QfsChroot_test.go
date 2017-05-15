@@ -234,7 +234,7 @@ func testPersistentChroot(t *testing.T, dirTest string) {
 	}
 
 	if err := os.Chdir(dirTest); err != nil {
-		t.Fatal("Changing to directory %s error: %s", dirTest, err.Error())
+		t.Fatalf("Changing to directory %s error: %s", dirTest, err.Error())
 	}
 
 	cmdChroot := exec.Command(testqfs, "chroot")
@@ -309,7 +309,7 @@ func testNetnsPersistency(t *testing.T, dirTest string) {
 	}
 
 	if err := os.Chdir(dirTest); err != nil {
-		t.Fatal("Changing directory to %s error", dirTest)
+		t.Fatalf("Changing directory to %s error", dirTest)
 	}
 
 	cmdChroot := exec.Command(testqfs, "chroot")
