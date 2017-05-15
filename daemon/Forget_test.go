@@ -274,16 +274,11 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 
 		// Uninstatiate the inodes instantiated by kernel, and then restore
 		// them back at the end of the test
-		/* test.qfs.Forget(uint64(fileId), 1)
+		test.qfs.Forget(uint64(fileId), 1)
 		test.qfs.Forget(uint64(wsrId), 1)
 		defer test.qfs.increaseLookupCount(fileId)
 		defer test.qfs.increaseLookupCount(wsrId)
-		test.SyncAllWorkspaces() */
-
-		test.remountFilesystem()
 		test.SyncAllWorkspaces()
-		test.AssertLogContains("Forget called",
-			"No inode forget triggered during dentry drop.")
 
 		api := test.getApi()
 		key := getExtendedKeyHelper(test, dir1+"/srcMarker", "file")
