@@ -145,7 +145,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 
 	c.dlog("Opened Inode %d as Fh: %d", fi.inodeNum(), fileHandleNum)
 
-	out.OpenFlags = 0
+	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 	out.Fh = uint64(fileHandleNum)
 
 	return fuse.OK
