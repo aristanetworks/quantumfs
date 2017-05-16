@@ -538,19 +538,6 @@ func resize(buffer []byte, size int) []byte {
 	return buffer
 }
 
-func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
-	defer c.funcIn("pushData").Out()
-
-	key, err := buffer.Key(&c.Ctx)
-	if err != nil {
-		c.elog("Unable to write data to the datastore")
-		return quantumfs.ObjectKey{},
-			errors.New("Unable to write to the datastore")
-	}
-
-	return key, nil
-}
-
 func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 	switch {
 	case numBlocks <= 1:
