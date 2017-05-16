@@ -354,14 +354,14 @@ func main() {
 	if cliParams.referenceWS != "" {
 		err = byPass(c, &cliParams)
 		if err != nil {
-			c.Elog("Bypass failed: ", err)
+			c.Elog("Bypass failed: %v", err)
 			os.Exit(exitErrUpload)
 		}
 		c.Vlog("Bypass completed")
 	} else {
 		err = upload(c, &cliParams, relpath, exInfo)
 		if err != nil {
-			c.Elog("Upload failed: ", err)
+			c.Elog("Upload failed: %v", err)
 			os.Exit(exitErrUpload)
 		}
 		c.Vlog("Upload completed")
