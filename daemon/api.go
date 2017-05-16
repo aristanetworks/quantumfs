@@ -483,7 +483,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	var cmd quantumfs.BranchRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	src := strings.Split(cmd.Src, "/")
@@ -512,7 +513,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	var err error
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	baseRootId := quantumfs.EmptyWorkspaceKey
