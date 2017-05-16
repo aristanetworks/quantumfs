@@ -1063,6 +1063,10 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 
 }
 
+func (qfs *QuantumFs) invalidateInode(inodeId InodeId) fuse.Status {
+	return qfs.server.InodeNotify(uint64(inodeId), 0, -1)
+}
+
 func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
 	flags uint32) bool {
 
