@@ -416,6 +416,32 @@ dir1/dir11a/file111a
 	})
 }
 
+func TestPathnameOverlap(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir1/file11a",
+			"dir1/file11b",
+			"dir1b/file11a",
+			"dir1bc/file11a",
+		}
+		content := `
+
+dir1
+dir1bc
+dir1b
++dir1b/
+`
+		expected := pathInfo{
+			"/":             1,
+			"dir1b":         1,
+			"dir1b/file11a": 0,
+		}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
+
 // --- advanced error free spec ---
 func TestAdvanceSpec(t *testing.T) {
 	runTest(t, func(test *testHelper) {
