@@ -44,7 +44,15 @@ $(COMMANDS): cleanup encoding/metadata.capnp.go
 $(PKGS_TO_TEST): cleanup encoding/metadata.capnp.go
 	sudo -E go test -gcflags '-e' github.com/aristanetworks/$@
 
-rpm: $(COMMANDS)
+quploadRPM:
+	fpm -f -s dir -t rpm -m 'ether-dev@arista.com' -n QuantumFS-upload --no-depends \
+		--license='Arista Proprietary' \
+		--vendor='Arista Networks' \
+		--url http://gut/repos/quantumfs \
+		--description='A tool to upload directory hierarchy into datastore' \
+		--version $(version) \
+		./qupload=/usr/bin/qupload
+qfsRPM:
 	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
 		--license='Arista Proprietary' \
 		--vendor='Arista Networks' \
@@ -59,17 +67,8 @@ rpm: $(COMMANDS)
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse \
-		./qupload=/usr/bin/qupload \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
-quploadrpm: qupload
-	fpm -f -s dir -t rpm -m 'ether-dev@arista.com' -n qubit-upload --no-depends \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
-		--description='A tool to upload directory hierarchy into datastore' \
-		--version $(version) \
-		./qupload=/usr/bin/qupload
-
+rpm: $(COMMANDS) qfsRPM quploadRPM
 
 include QFSClient/Makefile
