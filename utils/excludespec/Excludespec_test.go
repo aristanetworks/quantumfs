@@ -433,6 +433,23 @@ dir14b/file
 	})
 }
 
+func TestExclude_EmptySpec(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir15/subdir1515/file151515a",
+		}
+		content := ""
+		expected := pathInfo{
+			"dir15":                        1,
+			"dir15/subdir1515":             1,
+			"dir15/subdir1515/file151515a": 0,
+		}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
+
 // TestBasicExclude tests the advanced exclude file
 func TestAdvancedExclude(t *testing.T) {
 	runTest(t, func(test *testHelper) {
