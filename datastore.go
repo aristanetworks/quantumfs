@@ -1341,17 +1341,17 @@ func init() {
 }
 
 type ThinRecord struct {
-	filename	string
-	id		ObjectKey
-	filetype	ObjectType
-	permissions	uint32
-	owner		UID
-	group		GID
-	size		uint64
-	xattr		ObjectKey
-	ctime		Time
-	mtime		Time
-	Nlinks_		uint32
+	filename    string
+	id          ObjectKey
+	filetype    ObjectType
+	permissions uint32
+	owner       UID
+	group       GID
+	size        uint64
+	xattr       ObjectKey
+	ctime       Time
+	mtime       Time
+	Nlinks_     uint32
 }
 
 func (th *ThinRecord) Filename() string {
