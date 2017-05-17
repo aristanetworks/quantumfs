@@ -6,7 +6,6 @@ package daemon
 import "testing"
 import "syscall"
 import "os"
-import "time"
 import "fmt"
 
 import "github.com/aristanetworks/quantumfs"
@@ -34,63 +33,67 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	test.AssertNoErr(err)
 }
 
+func createTestFileNoSync(test *testHelper,
+	workspace string, name string, size int) {
+
+	filename := workspace + "/" + name
+	err := testutils.PrintToFile(filename, string(GenData(size)))
+	test.AssertNoErr(err)
+}
+
 func createTestFile(c *ctx, test *testHelper,
 	workspace string, name string, size int) quantumfs.ObjectKey {
 
 	oldRootId := getRootId(test, workspace)
-	filename := workspace + "/" + name
-	err := testutils.PrintToFile(filename, string(GenData(size)))
-	test.AssertNoErr(err)
-
+	createTestFileNoSync(test, workspace, name, size)
 	test.SyncAllWorkspaces()
-
 	newRootId := getRootId(test, workspace)
-
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-
 	c.vlog("Created file %s and new rootID is %s", name, newRootId.String())
 
 	return newRootId
+}
+
+func removeTestFileNoSync(test *testHelper,
+	workspace string, name string) {
+
+	filename := workspace + "/" + name
+	err := os.Remove(filename)
+	test.AssertNoErr(err)
 }
 
 func removeTestFile(c *ctx, test *testHelper,
 	workspace string, name string) quantumfs.ObjectKey {
 
 	oldRootId := getRootId(test, workspace)
-
-	filename := workspace + "/" + name
-
-	err := os.Remove(filename)
-	test.AssertNoErr(err)
-
+	removeTestFileNoSync(test, workspace, name)
 	test.SyncAllWorkspaces()
-
 	newRootId := getRootId(test, workspace)
-
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-
 	c.vlog("Removed file %s and new rootID is %s", name, newRootId.String())
 
 	return newRootId
+}
+
+func linkTestFileNoSync(c *ctx, test *testHelper,
+	workspace string, src string, dst string) {
+
+	srcfilename := workspace + "/" + src
+	dstfilename := workspace + "/" + dst
+	c.vlog("Before link %s -> %s", src, dst)
+	err := syscall.Link(srcfilename, dstfilename)
+	test.AssertNoErr(err)
+
 }
 
 func linkTestFile(c *ctx, test *testHelper,
 	workspace string, src string, dst string) quantumfs.ObjectKey {
 
 	oldRootId := getRootId(test, workspace)
-	srcfilename := workspace + "/" + src
-	dstfilename := workspace + "/" + dst
-
-	c.vlog("Before link %s -> %s", src, dst)
-	err := syscall.Link(srcfilename, dstfilename)
-	test.AssertNoErr(err)
-
+	linkTestFileNoSync(c, test, workspace, src, dst)
 	test.SyncAllWorkspaces()
-
 	newRootId := getRootId(test, workspace)
-
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-
 	c.vlog("Created link %s -> %s and new rootID is %s", src, dst,
 		newRootId.String())
 
@@ -108,7 +111,8 @@ func markMutable(ctx *ctx, workspace string) {
 }
 
 func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectKey) {
-	wsr := test.getWorkspaceRoot(workspace)
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
 	test.Assert(wsr != nil, "workspace root does not exist")
 	wsr.refresh(c, dst)
 }
@@ -321,14 +325,6 @@ func assertOpenFileIsOfSize(test *testHelper, fd int, size int64) {
 		"Incorrect file size. Expected: %d", stat.Size)
 }
 
-// Changing mtime/atime of a file has the side-effect of invalidating
-// the inode cache in the VFS layer and forcing the inode to be
-// re-read from fuse
-func reloadFile(test *testHelper, fullname string) {
-	err := os.Chtimes(fullname, time.Now(), time.Now())
-	test.AssertNoErr(err)
-}
-
 func TestRefreshOpenFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -350,7 +346,6 @@ func TestRefreshOpenFile(t *testing.T) {
 		newRootId3 := getRootId(test, workspace)
 		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
 
-		reloadFile(test, fullname)
 		assertOpenFileIsOfSize(test, int(file.Fd()), 1000)
 		assertFileIsOfSize(test, fullname, 1000)
 
@@ -358,5 +353,95 @@ func TestRefreshOpenFile(t *testing.T) {
 		test.AssertNoErr(err)
 
 		removeTestFile(ctx, test, workspace, name)
+	})
+}
+
+func TestRefreshUninstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		const (
+			nfiles = 30
+			ndirs  = 10
+			pardir = "/pardir"
+		)
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+pardir, 0777)
+		for i := 0; i < ndirs; i++ {
+			name := fmt.Sprintf("%s/%s/%d", workspace, pardir, i)
+			utils.MkdirAll(name, 0777)
+		}
+
+		ctx := test.TestCtx()
+
+		for i := 0; i < nfiles; i++ {
+			name := fmt.Sprintf("%s/%d/%d", pardir, i%ndirs, i)
+			createTestFileNoSync(test, workspace, name, 1000)
+		}
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		for i := 0; i < nfiles; i++ {
+			name := fmt.Sprintf("%s/%d/%d", pardir, i%ndirs, i)
+			removeTestFileNoSync(test, workspace, name)
+		}
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		test.AssertLogContains("Adding uninstantiated",
+			"There are no uninstantiated inodes")
+
+		for i := 0; i < nfiles; i++ {
+			name := fmt.Sprintf("%s/%d/%d", pardir, i%ndirs, i)
+			removeTestFile(ctx, test, workspace, name)
+		}
+	})
+}
+
+func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		linkfile := "linkFile"
+
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId1 := linkTestFile(ctx, test, workspace, name, linkfile)
+		removeTestFileNoSync(test, workspace, name)
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		removeTestFile(ctx, test, workspace, name)
+		removeTestFile(ctx, test, workspace, linkfile)
+	})
+}
+
+func TestRefreshChangeTypeFileToDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+		removeTestFileNoSync(test, workspace, name)
+		newRootId2 := createTestFile(ctx, test, workspace, name, 1000)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		err := syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
 	})
 }

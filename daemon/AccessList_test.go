@@ -402,7 +402,8 @@ func TestAccessSpecialFiles(t *testing.T) {
 
 		accessList["/test4"] = true
 
-		wsr := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 
 		eq := reflect.DeepEqual(accessList, wsr.accessList)
 		msg := fmt.Sprintf("testlist:%v wsrlist: %v",
@@ -504,7 +505,8 @@ func TestAccessListClear(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		wsr := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		wsr.clearList()
 		accessList = make(map[string]bool)
 		wsrlist = test.getAccessList(workspace)
