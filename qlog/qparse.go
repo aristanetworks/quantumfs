@@ -1,7 +1,8 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// qparse is the shared memory log parser for the qlog quantumfs subsystem
+// qparse is a shared memory log parser for the qlog quantumfs subsystem.
+// It is used for parsing a qlog file completely in a single pass
 package qlog
 
 import "bytes"
@@ -602,16 +603,22 @@ func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
 	}
 }
 
-func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
-	strMapRtn []LogStr) {
-
-	data := grabMemory(filepath)
+func ExtractHeader(data []byte) *MmapHeader {
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
 
 	if header.Version != QlogVersion {
 		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
 			header.Version, QlogVersion))
 	}
+
+	return header
+}
+
+func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
+	strMapRtn []LogStr) {
+
+	data := grabMemory(filepath)
+	header := ExtractHeader(data)
 
 	mmapHeaderSize := uint64(unsafe.Sizeof(MmapHeader{}))
 
