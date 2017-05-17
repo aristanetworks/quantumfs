@@ -77,13 +77,14 @@ func (cmap *ChildMap) loadInodeId(c *ctx, entry quantumfs.DirectoryRecord,
 		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, linkId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
-		// should match the actual inodeId for the hardlink or else
-		// something is really wrong in the system
+		// should normally match the actual inodeId.
+		// The only exception is when the file used to be of another type,
+		// but after a refresh it has been changed to be a hardlink.
 		if inodeId != quantumfs.InodeIdInvalid &&
 			inodeId != establishedInodeId {
 
-			c.elog("Attempt to set hardlink with mismatched inodeId, "+
-				"%d vs %d", inodeId, establishedInodeId)
+			c.wlog("requested hardlink inodeId %d exists as %d",
+				inodeId, establishedInodeId)
 		}
 		inodeId = establishedInodeId
 	} else if inodeId == quantumfs.InodeIdInvalid {
