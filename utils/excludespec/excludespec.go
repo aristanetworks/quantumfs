@@ -9,21 +9,26 @@ file must follow rules outlined below:
  - One path per line.
  - Comments and empty lines are allowed. A comment is any line that starts with "#".
  - Path must be under the base directory specified.
- - Absolute path is not allowed.
+ - Absolute paths are not allowed.
  - Exclude path must not be "/" suffixed.
  - Path to be included is prefixed with "+".
- - The parent and grand-parents of path to be included must be included (explicitly
+ - The parent and ancestors of path to be included must be included (explicitly
    or implicitly) already.
  - The order of exclude and include paths in the file does not matter.
  - Use ordering that makes the file more readable.
  - All excludes are processed first and then includes are processed.
- - A path cannot be included more than once.
+ - A path cannot be included or excluded more than once.
 
-A path is considered as included if it meets following criteria:
+A path is considered to be included if it meets following criteria:
  - if the path is not covered by any exclude directives (implict inclusion)
  - if the path has been explicitly included
 
-Example:
+Consider a base directory called "/rootdir". Some examples of exclude files
+are listed below. All paths used in the examples are under the base
+directory "rootdir". In other words, the absolute path for dir1 is
+"/rootdir/dir1".
+
+ Example-1:
 
  # exclude dir1 and all its contents
  dir1
@@ -35,6 +40,12 @@ Example:
  +dir1/subdir1/file1
  # create dir1/subdir4 (not its contents)
  +dir1/subdir4
+ # include contents of a dir1/subdir3/subsubdir1
+ # ignore siblings of dir1/subdir3
+ +dir/subdir3
+ +dir1/subdir3/subsubdir3/
+
+ Example-2:
 
  # exclude dir2/subdir2
  # implicitly includes dir2 and all other content in dir2
@@ -326,7 +337,7 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	onlyDir, _ := exInfo.includes[path]
 	if !onlyDir {
 		// If directory with its sub-dirs is being included
-		// then its record count needs to be setup.
+		// then it's record count needs to be setup.
 		err := initRecordCount(exInfo, base, path)
 		if err != nil {
 			return err
