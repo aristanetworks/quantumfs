@@ -405,6 +405,7 @@ dir14b/file
 +dir14b/file
 `
 		expected := pathInfo{
+			"/":             3,
 			"dir14":         1,
 			"dir14/fileABC": 0,
 			"dir14b":        1,
@@ -425,6 +426,7 @@ func TestExclude_EmptySpec(t *testing.T) {
 		}
 		content := ""
 		expected := pathInfo{
+			"/":                            1,
 			"dir15":                        1,
 			"dir15/subdir1515":             1,
 			"dir15/subdir1515/file151515a": 0,
@@ -549,7 +551,7 @@ dir14b/file
 +dir14b/file
 `
 		expected := pathInfo{
-			"/": 10,
+			"/": 14,
 
 			"dir1":                     0,
 			"dir2":                     0,
