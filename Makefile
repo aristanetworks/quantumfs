@@ -36,7 +36,7 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 	@if which capnp &>/dev/null; then \
 		cd encoding; capnp compile -ogo metadata.capnp; \
 	else \
-		echo "Error: capnp not found. If you didn't modify encoding/metadata.capnp try 'touch encoding/metadata.capnp.go to fix the build."; \
+		echo "Error: capnp not found. If you didn't modify encoding/metadata.capnp try 'touch encoding/metadata.capnp.go' to fix the build."; \
 		exit 1; \
 	fi
 
