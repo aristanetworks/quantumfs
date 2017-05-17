@@ -87,11 +87,10 @@ func (th *TestHelper) EndTest() {
 
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs "+
-					"instance after aborting: %s", err.Error())
+					"after aborting: %s", err.Error())
 			}
-			th.Log("ERROR: Failed to unmount quantumfs instance, "+
-				"are you leaking a file descriptor?: %s",
-				err.Error())
+			th.Log("ERROR: Failed to unmount quantumfs instance.")
+			th.Log("Are you leaking a file descriptor?: %s", err.Error())
 		}
 	}
 
@@ -179,6 +178,10 @@ func serveSafely(th *TestHelper) {
 	mountOptions.Options = append(mountOptions.Options, "suid")
 	mountOptions.Options = append(mountOptions.Options, "dev")
 
+	// Ensure that, since we're in a test, we only sync when syncAll is called.
+	// Otherwise, we shouldn't ever need to flush.
+	th.qfs.skipFlush = true
+
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
 	th.qfs.Serve(mountOptions)
@@ -224,10 +227,17 @@ func (th *TestHelper) getApi() *quantumfs.Api {
 		return th.api
 	}
 
-	api, err := quantumfs.NewApiWithPath(th.absPath(quantumfs.ApiPath))
+	api, err := quantumfs.NewApiWithPath(th.AbsPath(quantumfs.ApiPath))
 	th.Assert(err == nil, "Error getting api: %v", err)
 	th.api = api
 	return th.api
+}
+
+func (th *TestHelper) putApi() {
+	if th.api != nil {
+		th.api.Close()
+	}
+	th.api = nil
 }
 
 func (th *TestHelper) getUniqueApi(fdPath string) *quantumfs.Api {
@@ -237,7 +247,7 @@ func (th *TestHelper) getUniqueApi(fdPath string) *quantumfs.Api {
 }
 
 // Make the given path absolute to the mount root
-func (th *TestHelper) absPath(path string) string {
+func (th *TestHelper) AbsPath(path string) string {
 	return th.TempDir + "/mnt/" + path
 }
 
@@ -267,7 +277,7 @@ func (th *TestHelper) nullWorkspaceRel() string {
 }
 
 func (th *TestHelper) nullWorkspace() string {
-	return th.absPath(th.nullWorkspaceRel())
+	return th.AbsPath(th.nullWorkspaceRel())
 }
 
 func (th *TestHelper) newWorkspaceWithoutWritePerm() string {
@@ -283,7 +293,7 @@ func (th *TestHelper) newWorkspaceWithoutWritePerm() string {
 	err := api.Branch(src, dst)
 	th.Assert(err == nil, "Failed to branch workspace: %v", err)
 
-	return th.absPath(dst)
+	return th.AbsPath(dst)
 }
 
 // Create a new workspace to test within

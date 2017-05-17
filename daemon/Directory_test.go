@@ -144,7 +144,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
-		test.Assert(oldRootId != newRootId, "Workspace rootId didn't change")
+		test.Assert(!oldRootId.IsEqualTo(newRootId),
+			"Workspace rootId didn't change")
 
 		syscall.Close(fd)
 	})
@@ -164,7 +165,7 @@ func TestDirectoryUpdate(t *testing.T) {
 		dst := "branch/dirupdate/test"
 
 		// First create a file
-		testFilename := test.absPath(src + "/" + "test")
+		testFilename := test.AbsPath(src + "/" + "test")
 		fd, err := os.Create(testFilename)
 		fd.Close()
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -174,7 +175,7 @@ func TestDirectoryUpdate(t *testing.T) {
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
 
 		// Ensure the new workspace has the correct file
-		testFilename = test.absPath(dst + "/" + "test")
+		testFilename = test.AbsPath(dst + "/" + "test")
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFilename, &stat)
 		test.Assert(err == nil, "Workspace copy doesn't match: %v", err)
@@ -198,7 +199,7 @@ func TestDirectoryFileDeletion(t *testing.T) {
 		test.Assert(err != nil, "Error test file not deleted: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFilename = workspace + "/" + "test"
 		err = syscall.Stat(testFilename, &stat)
 		test.Assert(err != nil, "Error test file not deleted: %v", err)
@@ -272,8 +273,7 @@ func testPermissions(test *testHelper, onDirectory bool, asRoot bool,
 	}
 
 	if !asRoot {
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 	}
 
 	// first check if we can rename
@@ -473,8 +473,7 @@ func TestPermissionsAsUserMissingFileInWorkspaceRoot(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		err := syscall.Unlink(workspace + "/file")
 		test.Assert(err == syscall.ENOENT, "Wrong error when unlinking: %v",
@@ -585,7 +584,7 @@ func TestDirectoryChildTypes(t *testing.T) {
 		test.Assert(err == nil, "Error writing to file: %v", err)
 		fd.Close()
 
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFile = workspace + "/testdir/testfile"
 
 		data, err := ioutil.ReadFile(testFile)
@@ -634,7 +633,7 @@ func TestLargeDirectory(t *testing.T) {
 
 		// Confirm all the children are accounted for in a branched
 		// workspace
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testdir = workspace + "/testlargedir"
 		files, err = ioutil.ReadDir(testdir)
 		test.Assert(err == nil, "Error reading directory %v", err)
@@ -651,7 +650,6 @@ func TestLargeDirectory(t *testing.T) {
 			test.Assert(attendance[testFile], "File %s missing",
 				testFile)
 		}
-
 	})
 }
 
@@ -696,7 +694,7 @@ func TestIntraDirectoryRename(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFilename2 = workspace + "/test2"
 		err = syscall.Stat(testFilename2, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -733,7 +731,7 @@ func interDirectoryRename(test *testHelper) {
 	test.Assert(err == nil, "Rename failed: %v", err)
 
 	// Confirm after branch
-	workspace = test.absPath(test.branchWorkspace(workspace))
+	workspace = test.AbsPath(test.branchWorkspace(workspace))
 	testFilename2 = workspace + "/dir2/test2"
 	err = syscall.Stat(testFilename2, &stat)
 	test.Assert(err == nil, "Rename failed: %v", err)
@@ -764,7 +762,7 @@ func TestRenameIntoParent(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		parentFile = workspace + "/parent/test2"
 		err = syscall.Stat(parentFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -796,7 +794,7 @@ func TestRenameIntoChild(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		childFile = workspace + "/parent/child/test2"
 		err = syscall.Stat(childFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -828,7 +826,7 @@ func TestRenameIntoIndirectParent(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		parentFile = workspace + "/parent/test2"
 		err = syscall.Stat(parentFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -860,7 +858,7 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 		test.Assert(err == nil, "Rename failed: %v", err)
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		childFile = workspace + "/parent/indirect/child/test2"
 		err = syscall.Stat(childFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
@@ -886,7 +884,7 @@ func TestSUIDPerms(t *testing.T) {
 			"Changed permissions incorrect %d", info.Mode())
 
 		// Confirm after branch
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		testFilename = workspace + "/test"
 		info, err = os.Stat(testFilename)
 		test.Assert(err == nil, "Failed getting dir info: %v", err)
@@ -918,7 +916,7 @@ func TestLoadOnDemand(t *testing.T) {
 		err = testutils.PrintToFile(workspace+fileC, string(dataC))
 		test.Assert(err == nil, "Error creating file: %v", err)
 
-		newspace := test.absPath(test.branchWorkspace(workspace))
+		newspace := test.AbsPath(test.branchWorkspace(workspace))
 		fileA = newspace + "/layerA/fileA"
 		dirB := newspace + "/layerA/layerB"
 		fileB = dirB + "/fileB"
@@ -1157,8 +1155,7 @@ func TestInodeCreatePermissionsAsNonOwnerNoPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1171,8 +1168,7 @@ func TestInodeCreatePermissionsAsNonOwnerUserPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1185,8 +1181,7 @@ func TestInodeCreatePermissionsAsNonOwnerGroupPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1199,8 +1194,7 @@ func TestInodeCreatePermissionsAsNonOwnerOtherPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, true,
 			"Failed creating directory as root with ownership")
@@ -1213,8 +1207,7 @@ func TestInodeCreatePermissionsAsGroupMemberNoPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1227,8 +1220,7 @@ func TestInodeCreatePermissionsAsGroupMemberUserPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1242,8 +1234,7 @@ func TestInodeCreatePermissionsAsGroupMemberGroupPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, true,
 			"Fail creating directory as group member")
@@ -1256,8 +1247,7 @@ func TestInodeCreatePermissionsAsGroupMemberOtherPerms(t *testing.T) {
 		testDir := workspace + "/test"
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		testInodeCreatePermissions(test, testDir, false,
 			"Didn't fail creating directory")
@@ -1269,8 +1259,7 @@ func TestInodeCreatePermissionsAsUserNoPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		err := syscall.Mkdir(testDir, 0000)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1285,8 +1274,7 @@ func TestInodeCreatePermissionsAsUserUserPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		err := syscall.Mkdir(testDir, 0700)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1301,8 +1289,7 @@ func TestInodeCreatePermissionsAsUserGroupPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		err := syscall.Mkdir(testDir, 0070)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1317,8 +1304,7 @@ func TestInodeCreatePermissionsAsUserOtherPerms(t *testing.T) {
 		workspace := test.NewWorkspace()
 		testDir := workspace + "/test"
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		err := syscall.Mkdir(testDir, 0007)
 		test.Assert(err == nil, "Failed creating directory: %v", err)
@@ -1374,8 +1360,7 @@ func TestStickyDirPerms(t *testing.T) {
 		err = os.Chown(testFile, 99, 99)
 		test.AssertNoErr(err)
 
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 
 		// we should be able to remove it, even though sticky bit is set
 		err = os.Remove(testFile)

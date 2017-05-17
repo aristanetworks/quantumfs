@@ -33,6 +33,7 @@ func TestForgetOnDirectory(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -64,6 +65,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -95,9 +97,9 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
@@ -138,7 +140,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// Now branch this workspace so we have a workspace full of
 		// uninstantiated Inodes
 		workspace = test.branchWorkspace(workspace)
-		dirName = test.absPath(workspace + "/dir")
+		dirName = test.AbsPath(workspace + "/dir")
 
 		// Get the listing from the directory to instantiate that directory
 		// and add its children to the uninstantiated inode list.
@@ -162,6 +164,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
@@ -203,6 +206,7 @@ func TestMultipleLookupCount(t *testing.T) {
 
 		// Forget Inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		test.AssertTestLog([]testutils.TLA{
 			testutils.TLA{true, "Looked up 2 Times",
@@ -235,9 +239,9 @@ func TestLookupCountAfterCommand(t *testing.T) {
 
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 		test.AssertLogContains("Forget called",
 			"No inode forget triggered during dentry drop.")
-		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
@@ -259,23 +263,28 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.AssertNoErr(err)
 
 		dstWorkspaceName := test.branchWorkspace(srcWorkspace)
-		dstWorkspace := test.absPath(dstWorkspaceName)
+		dstWorkspace := test.AbsPath(dstWorkspaceName)
 		// Create one marker file in srcWorkspace and dstWorkspace
 		err = testutils.PrintToFile(dir1+"/srcMarker", "testSomething")
 		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+
+		wsrId := test.getInodeNum(dstWorkspace)
+		fileId := test.getInodeNum(dstWorkspace + "/dir1")
+
+		// Uninstatiate the inodes instantiated by kernel, and then restore
+		// them back at the end of the test
+		test.qfs.Forget(uint64(fileId), 1)
+		test.qfs.Forget(uint64(wsrId), 1)
+		defer test.qfs.increaseLookupCount(fileId)
+		defer test.qfs.increaseLookupCount(wsrId)
+		test.SyncAllWorkspaces()
 
 		api := test.getApi()
 		key := getExtendedKeyHelper(test, dir1+"/srcMarker", "file")
 		err = api.InsertInode(dstWorkspaceName+"/dir1/dstMarker",
 			key, 0777, 0, 0)
-
-		wsrId := test.getInodeNum(dstWorkspace)
-		fileId := test.getInodeNum(dstWorkspace + "/dir1")
-
-		// Now force the kernel to drop all cached inodes
-		test.remountFilesystem()
-		test.AssertLogContains("Forget called",
-			"No inode forget triggered during dentry drop.")
+		test.Assert(err == nil, "Failed inserting inode: %v", err)
 		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
@@ -286,6 +295,7 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
 		test.Assert(wsrInode == nil,
 			"Failed to forgot workspace inode")
+
 	})
 }
 

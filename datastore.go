@@ -79,7 +79,8 @@ const (
 
 	// The reserved typespace/namespace/workspace name for the empty workspace,
 	// ie. _/_/_.
-	NullSpaceName = "_"
+	NullSpaceName     = "_"
+	NullWorkspaceName = "_/_/_"
 )
 
 // Special reserved inode numbers
@@ -202,6 +203,20 @@ func (key ObjectKey) String() string {
 	return hex
 }
 
+func (key ObjectKey) Text() string {
+	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
+		hex.EncodeToString(key.Value()))
+}
+
+func FromText(text string) (ObjectKey, error) {
+	bytes, err := hex.DecodeString(text)
+	if err != nil {
+		return ZeroKey,
+			fmt.Errorf("text is not valid ObjectKey err: %v", err)
+	}
+	return NewObjectKeyFromBytes(bytes), nil
+}
+
 func (key ObjectKey) Bytes() []byte {
 	return key.key.Segment.Data
 }
@@ -257,8 +272,20 @@ type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
 
-func NewDirectoryEntry() *DirectoryEntry {
-	return newDirectoryEntryRecords(MaxDirectoryRecords())
+func newDirectoryEntry(entryCapacity int) *DirectoryEntry {
+	return newDirectoryEntryRecords(entryCapacity)
+}
+
+func NewDirectoryEntry(entryCapacity int) (remain int, dirEntry *DirectoryEntry) {
+	remain = 0
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryCapacity - recs
+	}
+	dirEntry = newDirectoryEntry(recs)
+
+	return remain, dirEntry
 }
 
 func newDirectoryEntryRecords(recs int) *DirectoryEntry {
@@ -292,8 +319,8 @@ func (s sortDirRecordsByName) Len() int {
 }
 
 func (s sortDirRecordsByName) Swap(i, j int) {
-	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).ShallowCopy()
-	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).ShallowCopy()
+	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).Clone()
+	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).Clone()
 	s.de.dir.Entries().Set(i, curj.Record().record)
 	s.de.dir.Entries().Set(j, oldi.Record().record)
 }
@@ -343,7 +370,7 @@ func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 const (
 	ObjectTypeInvalid           = 0
 	ObjectTypeBuildProduct      = 1
-	ObjectTypeDirectoryEntry    = 2
+	ObjectTypeDirectory         = 2
 	ObjectTypeExtendedAttribute = 3
 	ObjectTypeHardlink          = 4
 	ObjectTypeSymlink           = 5
@@ -360,8 +387,8 @@ func ObjectType2String(typ ObjectType) string {
 	switch typ {
 	case ObjectTypeBuildProduct:
 		return "ObjectTypeBuildProduct"
-	case ObjectTypeDirectoryEntry:
-		return "ObjectTypeDirectoryEntry"
+	case ObjectTypeDirectory:
+		return "ObjectTypeDirectory"
 	case ObjectTypeExtendedAttribute:
 		return "ObjectTypeExtendedAttribute"
 	case ObjectTypeHardlink:
@@ -541,7 +568,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 var EmptyDirKey ObjectKey
 
 func createEmptyDirectory() ObjectKey {
-	emptyDir := NewDirectoryEntry()
+	_, emptyDir := NewDirectoryEntry(MaxDirectoryRecords())
 
 	bytes := emptyDir.Bytes()
 
@@ -631,7 +658,7 @@ type HardlinkEntry struct {
 	entry encoding.HardlinkEntry
 }
 
-func NewHardlinkEntry() *HardlinkEntry {
+func newHardlinkEntry(entryCapacity int) *HardlinkEntry {
 	segment := capn.NewBuffer(nil)
 
 	dirEntry := HardlinkEntry{
@@ -639,10 +666,22 @@ func NewHardlinkEntry() *HardlinkEntry {
 	}
 	dirEntry.entry.SetNumEntries(0)
 
-	recordList := encoding.NewHardlinkRecordList(segment, MaxDirectoryRecords())
+	recordList := encoding.NewHardlinkRecordList(segment, entryCapacity)
 	dirEntry.entry.SetEntries(recordList)
 
 	return &dirEntry
+}
+
+func NewHardlinkEntry(entryCapacity int) (remain int, hardlink *HardlinkEntry) {
+	remain = 0
+	recs := entryCapacity
+	if entryCapacity > MaxDirectoryRecords() {
+		recs = MaxDirectoryRecords()
+		remain = entryCapacity - recs
+	}
+	hardlink = newHardlinkEntry(recs)
+
+	return remain, hardlink
 }
 
 func OverlayHardlinkEntry(edir encoding.HardlinkEntry) HardlinkEntry {
@@ -938,25 +977,32 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 }
 
 func (record *DirectRecord) ShallowCopy() DirectoryRecord {
+	var newEntry ThinRecord
+	RecordCopy(record, &newEntry)
+	newEntry.Nlinks_ = record.Nlinks()
+
+	return &newEntry
+}
+
+func (record *DirectRecord) Clone() DirectoryRecord {
 	newEntry := NewDirectoryRecord()
+	RecordCopy(record, newEntry)
 	newEntry.SetNlinks(record.Nlinks())
-	newEntry.SetFilename(record.Filename())
-	newEntry.SetID(record.ID())
-	newEntry.SetType(record.Type())
-	newEntry.SetPermissions(record.Permissions())
-	newEntry.SetOwner(record.Owner())
-	newEntry.SetGroup(record.Group())
-	newEntry.SetSize(record.Size())
-	newEntry.SetExtendedAttributes(record.ExtendedAttributes())
-	newEntry.SetContentTime(record.ContentTime())
-	newEntry.SetModificationTime(record.ModificationTime())
 
 	return newEntry
 }
 
-func (record *DirectRecord) Clone() DirectoryRecord {
-	// For DirectRecord, ShallowCopy is as good as a clone
-	return record.ShallowCopy()
+func RecordCopy(src DirectoryRecord, dst DirectoryRecord) {
+	dst.SetFilename(src.Filename())
+	dst.SetID(src.ID())
+	dst.SetType(src.Type())
+	dst.SetPermissions(src.Permissions())
+	dst.SetOwner(src.Owner())
+	dst.SetGroup(src.Group())
+	dst.SetSize(src.Size())
+	dst.SetExtendedAttributes(src.ExtendedAttributes())
+	dst.SetContentTime(src.ContentTime())
+	dst.SetModificationTime(src.ModificationTime())
 }
 
 func EncodeExtendedKey(key ObjectKey, type_ ObjectType,
@@ -1047,15 +1093,27 @@ func (mb *MultiBlockFile) Bytes() []byte {
 	return mb.mb.Segment.Data
 }
 
-func NewVeryLargeFile() *VeryLargeFile {
+func newVeryLargeFile(entryCapacity int) *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
 		vlf: encoding.NewRootVeryLargeFile(segment),
 	}
 
-	largeFiles := encoding.NewObjectKeyList(segment, MaxPartsVeryLargeFile())
+	largeFiles := encoding.NewObjectKeyList(segment, entryCapacity)
 	vlf.vlf.SetLargeFileKeys(largeFiles)
 	return &vlf
+}
+
+func NewVeryLargeFile(entryCapacity int) (remain int, vlf *VeryLargeFile) {
+	remain = 0
+	recs := entryCapacity
+	if recs > MaxPartsVeryLargeFile() {
+		recs = MaxPartsVeryLargeFile()
+		remain = entryCapacity - recs
+	}
+
+	vlf = newVeryLargeFile(recs)
+	return remain, vlf
 }
 
 func OverlayVeryLargeFile(evlf encoding.VeryLargeFile) VeryLargeFile {
@@ -1280,4 +1338,122 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
+}
+
+type ThinRecord struct {
+	filename    string
+	id          ObjectKey
+	filetype    ObjectType
+	permissions uint32
+	owner       UID
+	group       GID
+	size        uint64
+	xattr       ObjectKey
+	ctime       Time
+	mtime       Time
+	Nlinks_     uint32
+}
+
+func (th *ThinRecord) Filename() string {
+	return th.filename
+}
+
+func (th *ThinRecord) SetFilename(v string) {
+	th.filename = v
+}
+
+func (th *ThinRecord) ID() ObjectKey {
+	return th.id
+}
+
+func (th *ThinRecord) SetID(v ObjectKey) {
+	th.id = v
+}
+
+func (th *ThinRecord) Type() ObjectType {
+	return th.filetype
+}
+
+func (th *ThinRecord) SetType(v ObjectType) {
+	th.filetype = v
+}
+
+func (th *ThinRecord) Permissions() uint32 {
+	return th.permissions
+}
+
+func (th *ThinRecord) SetPermissions(v uint32) {
+	th.permissions = v
+}
+
+func (th *ThinRecord) Owner() UID {
+	return th.owner
+}
+
+func (th *ThinRecord) SetOwner(v UID) {
+	th.owner = v
+}
+
+func (th *ThinRecord) Group() GID {
+	return th.group
+}
+
+func (th *ThinRecord) SetGroup(v GID) {
+	th.group = v
+}
+
+func (th *ThinRecord) Size() uint64 {
+	return th.size
+}
+
+func (th *ThinRecord) SetSize(v uint64) {
+	th.size = v
+}
+
+func (th *ThinRecord) ExtendedAttributes() ObjectKey {
+	return th.xattr
+}
+
+func (th *ThinRecord) SetExtendedAttributes(v ObjectKey) {
+	th.xattr = v
+}
+
+func (th *ThinRecord) ContentTime() Time {
+	return th.ctime
+}
+
+func (th *ThinRecord) SetContentTime(v Time) {
+	th.ctime = v
+}
+
+func (th *ThinRecord) ModificationTime() Time {
+	return th.mtime
+}
+
+func (th *ThinRecord) SetModificationTime(v Time) {
+	th.mtime = v
+}
+
+func (th *ThinRecord) Record() DirectRecord {
+	panic("DirectRecord requested from ThinRecord")
+}
+
+func (th *ThinRecord) Nlinks() uint32 {
+	return th.Nlinks_
+}
+
+func (th *ThinRecord) EncodeExtendedKey() []byte {
+	return EncodeExtendedKey(th.ID(), th.Type(), th.Size())
+}
+
+func (th *ThinRecord) ShallowCopy() DirectoryRecord {
+	return th.Clone()
+}
+
+func (th *ThinRecord) Clone() DirectoryRecord {
+	var newEntry ThinRecord
+	RecordCopy(th, &newEntry)
+	newEntry.Nlinks_ = th.Nlinks()
+
+	return &newEntry
 }

@@ -178,8 +178,7 @@ func TestFileDescriptorPermissions(t *testing.T) {
 		err := syscall.Mkdir(testDir, 0777)
 		test.Assert(err == nil, "Error creating directories: %v", err)
 
-		test.SetUidGid(99, -1)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		// Now create the test file
 		fd, err := syscall.Creat(testFilename, 0000)
@@ -403,7 +402,8 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 			wsWorkspaceName)
 
-		test.Assert(oldRootId != newRootId, "Workspace rootId didn't change")
+		test.Assert(!oldRootId.IsEqualTo(newRootId),
+			"Workspace rootId didn't change")
 
 		syscall.Close(fd)
 	})
@@ -420,7 +420,7 @@ func TestFileAttrUpdate(t *testing.T) {
 		dst := "dst/attrupdate/test"
 
 		// First create a file
-		testFile := test.absPath(src + "/" + "test")
+		testFile := test.AbsPath(src + "/" + "test")
 		fd, err := os.Create(testFile)
 		fd.Close()
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -432,7 +432,7 @@ func TestFileAttrUpdate(t *testing.T) {
 		err = api.Branch(src, dst)
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
 
-		testFile = test.absPath(dst + "/" + "test")
+		testFile = test.AbsPath(dst + "/" + "test")
 		// Ensure the new workspace has the correct file attributes
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFile, &stat)
@@ -458,7 +458,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 		dst := "dst/attrwriteupdate/test"
 
 		// First create a file
-		testFile := test.absPath(src + "/" + "test")
+		testFile := test.AbsPath(src + "/" + "test")
 		fd, err := os.Create(testFile)
 		fd.Close()
 		test.Assert(err == nil, "Error creating test file: %v", err)
@@ -474,7 +474,7 @@ func TestFileAttrWriteUpdate(t *testing.T) {
 		err = api.Branch(src, dst)
 		test.Assert(err == nil, "Failed to branch workspace: %v", err)
 
-		testFile = test.absPath(dst + "/" + "test")
+		testFile = test.AbsPath(dst + "/" + "test")
 		// Ensure the new workspace has the correct file attributes
 		var stat syscall.Stat_t
 		err = syscall.Stat(testFile, &stat)
@@ -658,8 +658,7 @@ func TestFileOwnership(t *testing.T) {
 		err = syscall.Chmod(dirName, 0555)
 		test.AssertNoErr(err)
 
-		test.SetUidGid(99, 99)
-		defer test.SetUidGidToDefault()
+		defer test.SetUidGid(99, 99, nil).Revert()
 
 		// try to remove the file
 		err = os.Remove(testFileA)

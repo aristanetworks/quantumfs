@@ -44,6 +44,7 @@ type TestHelper struct {
 	StartTime         time.Time
 	ShouldFail        bool
 	ShouldFailLogscan bool
+	Timeout           time.Duration
 }
 
 // TestName returns name of the test by looking
@@ -81,6 +82,7 @@ func NewTestHelper(testName string, testRunDir string,
 		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
 			60*10000*24, NoStdOut),
 		TempDir: TestRunDir + "/" + testName,
+		Timeout: 1500 * time.Millisecond,
 	}
 }
 
@@ -186,7 +188,7 @@ func (th *TestHelper) EndTest() {
 func (th *TestHelper) WaitForResult() string {
 	var testResult string
 	select {
-	case <-time.After(1500 * time.Millisecond):
+	case <-time.After(th.Timeout):
 		testResult = "ERROR: TIMED OUT"
 
 	case testResult = <-th.TestResult:
@@ -226,12 +228,17 @@ func (th *TestHelper) AssertTestLog(logs []TLA) {
 }
 
 func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
+	err := th.Logger.Sync()
+	th.Assert(err == 0, "Sync failed with errno %d", err)
+
 	logFile := th.TempDir + "/ramfs/qlog"
 	logLines := qlog.ParseLogsRaw(logFile)
 
+	nLines := 0
 	containChecker := make([]bool, len(logs))
 
 	for _, rawlog := range logLines {
+		nLines++
 		logOutput := rawlog.ToString()
 		for idx, tla := range logs {
 			exists := strings.Contains(logOutput, tla.Text)
@@ -240,6 +247,7 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
 			}
 		}
 	}
+	th.Log("Inspected %d log lines looking for patterns", nLines)
 
 	return containChecker
 }
@@ -275,6 +283,27 @@ type TimeData struct {
 	TestName string
 }
 
+func writeToFile(file *os.File, data string) error {
+	written := 0
+	for written < len(data) {
+		writeIt, err := file.Write([]byte(data[written:]))
+		written += writeIt
+		if err != nil {
+			return errors.New("Unable to write all data")
+		}
+	}
+	return nil
+}
+
+func OverWriteFile(filename string, data string) error {
+	file, err := os.OpenFile(filename, os.O_RDWR, 0777)
+	if file == nil || err != nil {
+		return err
+	}
+	defer file.Close()
+	return writeToFile(file, data)
+}
+
 func PrintToFile(filename string, data string) error {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR,
 		0777)
@@ -282,18 +311,7 @@ func PrintToFile(filename string, data string) error {
 		return err
 	}
 	defer file.Close()
-
-	written := 0
-	for written < len(data) {
-		var writeIt int
-		writeIt, err = file.Write([]byte(data[written:]))
-		written += writeIt
-		if err != nil {
-			return errors.New("Unable to write all data")
-		}
-	}
-
-	return nil
+	return writeToFile(file, data)
 }
 
 func (th *TestHelper) ReadTo(file *os.File, offset int, num int) []byte {
@@ -371,9 +389,32 @@ func (th *TestHelper) Logscan() (foundErrors bool) {
 	return true
 }
 
+type SetDefaultUidGids struct {
+	originalSupplementaryGroups []int
+	test                        *TestHelper
+}
+
+func (sdug SetDefaultUidGids) Revert() {
+	// Set the UID and GID back to the defaults
+	defer runtime.UnlockOSThread()
+
+	// Test always runs as root, so its euid and egid is 0
+	err1 := syscall.Setreuid(-1, 0)
+	err2 := syscall.Setregid(-1, 0)
+
+	sdug.test.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
+	sdug.test.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+
+	syscall.Setgroups(sdug.originalSupplementaryGroups)
+}
+
 // Change the UID/GID the test thread to the given values. Use -1 not to change
-// either the UID or GID.
-func (th *TestHelper) SetUidGid(uid int, gid int) {
+// either the UID or GID. nil sets an empty supplementaryGid set.
+//
+// Use this like "defer test.SetUidGid(...)()".
+func (th *TestHelper) SetUidGid(uid int, gid int,
+	supplementaryGids []int) SetDefaultUidGids {
+
 	// The quantumfs tests are run as root because some tests require
 	// root privileges. However, root can read or write any file
 	// irrespective of the file permissions. Obviously if we want to
@@ -386,12 +427,23 @@ func (th *TestHelper) SetUidGid(uid int, gid int) {
 	// follow this precise cleanup order other tests or goroutines may
 	// run using the other UID incorrectly.
 	runtime.LockOSThread()
+
+	oldGroups, err := syscall.Getgroups()
+	th.AssertNoErr(err)
+
+	if supplementaryGids == nil {
+		supplementaryGids = []int{}
+	}
+
+	err = syscall.Setgroups(supplementaryGids)
+	th.AssertNoErr(err)
+
 	if gid != -1 {
 		err := syscall.Setregid(-1, gid)
 		if err != nil {
 			runtime.UnlockOSThread()
 		}
-		th.Assert(err == nil, "Faild to change test EGID: %v", err)
+		th.Assert(err == nil, "Failed to change test EGID: %v", err)
 	}
 
 	if uid != -1 {
@@ -402,18 +454,11 @@ func (th *TestHelper) SetUidGid(uid int, gid int) {
 		}
 		th.Assert(err == nil, "Failed to change test EUID: %v", err)
 	}
-}
 
-// Set the UID and GID back to the defaults
-func (th *TestHelper) SetUidGidToDefault() {
-	defer runtime.UnlockOSThread()
-
-	// Test always runs as root, so its euid and egid is 0
-	err1 := syscall.Setreuid(-1, 0)
-	err2 := syscall.Setregid(-1, 0)
-
-	th.Assert(err1 == nil, "Failed to set test EGID back to 0: %v", err1)
-	th.Assert(err2 == nil, "Failed to set test EUID back to 0: %v", err2)
+	return SetDefaultUidGids{
+		originalSupplementaryGroups: oldGroups,
+		test: th,
+	}
 }
 
 func ShowSummary() {

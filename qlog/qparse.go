@@ -624,7 +624,7 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 
 	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
 		mmapHeaderSize {
-		fmt.Println("Data length inconsistent with expectations. %d",
+		fmt.Println("Data length inconsistent with expectations. ",
 			len(data))
 	}
 
