@@ -8,7 +8,6 @@ package daemon
 import "github.com/aristanetworks/quantumfs"
 import "errors"
 import "math"
-import "fmt"
 
 type SmallFile struct {
 	key  quantumfs.ObjectKey
@@ -125,7 +124,7 @@ func (fi *SmallFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	fi.key = key
 	fi.buf = c.dataStore.Get(&c.Ctx, fi.key)
 	if fi.buf == nil {
-		panic(fmt.Sprintf("did not find key %d", key))
+		panic(key.Text())
 	}
 	fi.size = fi.buf.Size()
 }

@@ -536,7 +536,9 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func contentTest(ctx *ctx, test *testHelper, content string, create func(string) error) {
+func contentTest(ctx *ctx, test *testHelper, content string,
+	create func(string) error) {
+
 	workspace := test.NewWorkspace()
 	utils.MkdirAll(workspace+"/subdir", 0777)
 	name := "subdir/testFile"
