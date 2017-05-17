@@ -5,6 +5,14 @@ package excludespec
 
 import "testing"
 
+// Terminology:
+//
+// hierarchy = List of paths that should be setup prior to the test.
+//	    The directory must be suffixed by "/"
+// content = Content of exclude file
+// expected = List of paths from hierarchy that are expected to be included,
+//          along with the count of sub-paths
+
 // --- exclude file syntax tests ---
 var syntaxTestHierarchy = []string{
 	".file1",
@@ -102,11 +110,6 @@ func TestExcludeSyntax_DotDotPrefix(t *testing.T) {
 }
 
 // --- exclude file processing tests ---
-//hierarchy = List of paths that should be setup prior to the test.
-//	    The directory must be suffixed by "/"
-//content = Content of exclude file
-//expected = List of paths from hierarchy that are expected to be included,
-//          along with the count of sub-paths for a directory
 
 // TestBasicExclude tests the basic exclude file
 func TestBasicExclude(t *testing.T) {
