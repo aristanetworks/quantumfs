@@ -18,6 +18,12 @@ func init() {
 
 func main() {
 
+	if len(os.Args) < 2 {
+		flag.Usage()
+		exit(0)
+	}
+	reader := newReader(os.Args[1])
+
 	// Run indefinitely
 	for {
 
