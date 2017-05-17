@@ -42,7 +42,7 @@ func init() {
 		defaultCachePath        = "/dev/shm/quantumfs"
 		defaultCacheSize        = "8G"
 		defaultMountPath        = "/qfs"
-		defaultCacheTimeSeconds = 1
+		defaultCacheTimeSeconds = 300
 		defaultCacheTimeNsecs   = 0
 		defaultMemLogMegabytes  = 100
 	)
