@@ -350,7 +350,7 @@ dir12
 	})
 }
 
-func TestExclude_PathnameOverlap(t *testing.T) {
+func TestExclude_DirnameOverlap(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		hierarchy := []string{
@@ -375,17 +375,46 @@ dir13b
 	})
 }
 
+func TestExclude_FilenameOverlap(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir14/file",
+			"dir14/fileABC",
+			"dir14b/file",
+			"dir14bc/file",
+		}
+		content := `
+
+dir14/file
+dir14b/file
++dir14b
++dir14b/file
+`
+		expected := pathInfo{
+			"dir14":         1,
+			"dir14/fileABC": 0,
+			"dir14b":        1,
+			"dir14b/file":   0,
+			"dir14bc":       1,
+			"dir14bc/file":  0,
+		}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
+
 func TestExclude_EmptySpec(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		hierarchy := []string{
-			"dir14/subdir1414/file141414a",
+			"dir15/subdir1515/file151515a",
 		}
 		content := ""
 		expected := pathInfo{
-			"dir14":                        1,
-			"dir14/subdir1414":             1,
-			"dir14/subdir1414/file141414a": 0,
+			"dir15":                        1,
+			"dir15/subdir1515":             1,
+			"dir15/subdir1515/file151515a": 0,
 		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
@@ -439,6 +468,14 @@ func TestAdvancedExclude(t *testing.T) {
 			"dir11/content1111b",
 			"dir12/content1212a",
 			"dir12/content1212b",
+			"dir13/file1313a",
+			"dir13/file1313b",
+			"dir13b/file1313a",
+			"dir13bc/file1313a",
+			"dir14/file",
+			"dir14/fileABC",
+			"dir14b/file",
+			"dir14bc/file",
 		}
 
 		content := `
@@ -486,6 +523,17 @@ dir11
 dir12
 +dir12
 +dir12/content1212b
+
+# dirname overlap
+dir13
+dir13bc
++dir13b/
+
+# filename overlap
+dir14/file
+dir14b/file
++dir14b
++dir14b/file
 `
 		expected := pathInfo{
 			"dir1":                     0,
@@ -511,6 +559,14 @@ dir12
 			"dir11/content1111b": 0,
 			"dir12":              1,
 			"dir12/content1212b": 0,
+			"dir13b":             1,
+			"dir13b/file1313a":   0,
+			"dir14":              1,
+			"dir14/fileABC":      0,
+			"dir14b":             1,
+			"dir14b/file":        0,
+			"dir14bc":            1,
+			"dir14bc/file":       0,
 		}
 
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
