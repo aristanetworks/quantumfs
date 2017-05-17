@@ -18,7 +18,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
 	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
 
-	defer c.FuncIn("newSpecial", "name %s", name).out()
+	defer c.FuncIn("newSpecial", "name %s", name).Out()
 
 	var filetype uint32
 	var device uint32
@@ -67,14 +67,14 @@ type Special struct {
 func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
-	defer c.funcIn("Special::Access").out()
+	defer c.funcIn("Special::Access").Out()
 
 	special.self.markSelfAccessed(c, false)
 	return hasAccessPermission(c, special, mask, uid, gid)
 }
 
 func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.funcIn("Special::GetAttr").out()
+	defer c.funcIn("Special::GetAttr").Out()
 
 	record, err := special.parentGetChildRecordCopy(c, special.InodeCommon.id)
 	if err != nil {
@@ -118,7 +118,7 @@ func (special *Special) Create(c *ctx, input *fuse.CreateIn, name string,
 func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	defer c.funcIn("Special::SetAttr").out()
+	defer c.funcIn("Special::SetAttr").Out()
 	return special.parentSetChildAttr(c, special.InodeCommon.id,
 		nil, attr, out, false)
 }
@@ -266,7 +266,7 @@ func (special *Special) getChildRecordCopy(c *ctx,
 }
 
 func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
-	defer c.funcIn("Special::flush").out()
+	defer c.funcIn("Special::flush").Out()
 
 	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 

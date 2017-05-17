@@ -29,7 +29,7 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	store.test.Assert(store.shouldRead, "Received unexpected Get for %s",
-		key.String())
+		key.Text())
 	return store.datastore.Get(c, key, buf)
 }
 

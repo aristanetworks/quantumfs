@@ -34,7 +34,8 @@ func TestHardlinkReload(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// artificially insert some hardlinks into the map
-		wsr := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 
 		err = syscall.Link(testFileA, workspace+"/subdir/linkFileA")
 		test.AssertNoErr(err)
@@ -44,7 +45,7 @@ func TestHardlinkReload(t *testing.T) {
 		err = syscall.Link(testFileB, workspace+"/linkFileB")
 		test.AssertNoErr(err)
 
-		// Write data to the hardlink to ensure it's syncChild function works
+		// Write data to the hardlink to ensure its syncChild function works
 		err = testutils.PrintToFile(
 			workspace+"/subdir/grandchild/linkFileA2",
 			string(data[1000:]))
@@ -74,10 +75,11 @@ func TestHardlinkReload(t *testing.T) {
 		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.Assert(err == nil, "Unable to branch")
 
-		wsrB := test.getWorkspaceRoot(workspaceB)
+		wsrB, cleanup := test.getWorkspaceRoot(workspaceB)
+		defer cleanup()
 
 		// ensure that the hardlink was able to sync
-		wsrBFileA := test.absPath(workspaceB +
+		wsrBFileA := test.AbsPath(workspaceB +
 			"/subdir/grandchild/linkFileA2")
 		readData, err := ioutil.ReadFile(wsrBFileA)
 		test.AssertNoErr(err)
@@ -209,6 +211,7 @@ func TestHardlinkForget(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		// Check that it's uninstantiated
 		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated",
@@ -253,6 +256,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		test.qfs.increaseLookupCount(linkInode)
 
 		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.
@@ -293,7 +297,8 @@ func TestHardlinkConversion(t *testing.T) {
 
 		linkInode := test.getInodeNum(linkFile)
 
-		wsr := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		linkId := func() HardlinkId {
 			defer wsr.linkLock.Lock().Unlock()
 			return wsr.inodeToLink[linkInode]
@@ -319,9 +324,10 @@ func TestHardlinkConversion(t *testing.T) {
 		test.Assert(bytes.Equal(output, data),
 			"File not working after conversion from hardlink")
 
-		wsr = test.getWorkspaceRoot(workspace)
-		defer wsr.linkLock.Lock().Unlock()
-		_, exists := wsr.hardlinks[linkId]
+		wsrB, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+		defer wsrB.linkLock.Lock().Unlock()
+		_, exists := wsrB.hardlinks[linkId]
 		test.Assert(!exists, "hardlink not converted back to file")
 	})
 }
@@ -489,7 +495,8 @@ func TestHardlinkExtraction(t *testing.T) {
 			"Error getting the file key: %v with a size of %d",
 			err, sz)
 
-		wsr := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
 		matchXAttrHardlinkExtendedKey(filename, dst, test,
 			quantumfs.ObjectTypeSmallFile, wsr)
 
@@ -613,7 +620,7 @@ func TestHardlinkUninstantiated(t *testing.T) {
 		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.AssertNoErr(err)
 
-		readData, err := ioutil.ReadFile(test.absPath(workspaceB +
+		readData, err := ioutil.ReadFile(test.AbsPath(workspaceB +
 			"/subdir/grandchild/fileB"))
 		test.AssertNoErr(err)
 		test.Assert(bytes.Equal(readData, data),

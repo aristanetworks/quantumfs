@@ -34,21 +34,26 @@ func TestHardlink(t *testing.T) {
 		test.Assert(bytes.Equal(data, testData), "Data corrupt!")
 
 		// Take note of the nextHardlinkId
-		nextHardlinkId := test.getWorkspaceRoot(workspace).nextHardlinkId
+		wsrA, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+		nextHardlinkId := wsrA.nextHardlinkId
 
 		// Branch and confirm the hardlink is still there
-		workspace = test.absPath(test.branchWorkspace(workspace))
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		file1 = workspace + "/orig_file"
 		file2 = workspace + "/hardlink"
 		data, err = ioutil.ReadFile(file2)
 		test.Assert(err == nil, "Error reading linked file: %v", err)
 		test.Assert(bytes.Equal(data, testData), "Data corrupt!")
 
-		wsr := test.getWorkspaceRoot(workspace)
-		test.Assert(len(wsr.hardlinks) == 1, "Wsr hardlink link len is %d",
-			len(wsr.hardlinks))
+		wsrB, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+		test.Assert(len(wsrB.hardlinks) == 1, "Wsr hardlink link len is %d",
+			len(wsrB.hardlinks))
 
-		nextHardlinkId_ := test.getWorkspaceRoot(workspace).nextHardlinkId
+		wsrC, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+		nextHardlinkId_ := wsrC.nextHardlinkId
 		test.Assert(nextHardlinkId == nextHardlinkId_ && nextHardlinkId != 0,
 			"nextHardlinkId unset or not saved/loaded")
 
@@ -59,12 +64,12 @@ func TestHardlink(t *testing.T) {
 		parentInode := test.getInode(workspace)
 		parentDir := parentInode.(*WorkspaceRoot).Directory
 		defer parentDir.childRecordLock.Lock().Unlock()
-		test.Assert(parentDir.children.record(file1InodeNum).Type() ==
-			quantumfs.ObjectTypeHardlink,
+		test.Assert(parentDir.children.recordCopy(&test.qfs.c,
+			file1InodeNum).Type() == quantumfs.ObjectTypeHardlink,
 			"file1 not replaced with hardlink %d %v", file1InodeNum,
-			parentDir.children.childrenRecords)
-		test.Assert(parentDir.children.record(file2InodeNum).Type() ==
-			quantumfs.ObjectTypeHardlink,
+			parentDir.children.records)
+		test.Assert(parentDir.children.recordCopy(&test.qfs.c,
+			file2InodeNum).Type() == quantumfs.ObjectTypeHardlink,
 			"file2 not created as hardlink")
 	})
 }
@@ -102,7 +107,7 @@ func TestSymlinkAndReadlinkThroughBranch(t *testing.T) {
 		test.Assert(err == nil, "Error creating symlink: %v", err)
 
 		workspace = test.branchWorkspace(workspace)
-		link = test.absPath(workspace + "/symlink")
+		link = test.AbsPath(workspace + "/symlink")
 
 		path, err := os.Readlink(link)
 		test.Assert(err == nil, "Error reading symlink: %v", err)

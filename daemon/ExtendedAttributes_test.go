@@ -275,7 +275,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 			err, sz)
 
 		matchXAttrExtendedKey(dirName, dst, test,
-			quantumfs.ObjectTypeDirectoryEntry)
+			quantumfs.ObjectTypeDirectory)
 
 		// check the symlink
 		sz, err, dst = utils.LGetXattr(linkName, quantumfs.XAttrTypeKey,

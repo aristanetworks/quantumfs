@@ -142,7 +142,7 @@ type Inode interface {
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx) // Mark this Inode dirty
-	markClean()   // Mark this Inode as cleaned
+	markClean_()  // Mark this Inode as cleaned
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child InodeId)
 
@@ -151,7 +151,7 @@ type Inode interface {
 	queueToForget(c *ctx)
 
 	// Returns this inode's place in the dirtyQueue
-	dirtyElement() *list.Element
+	dirtyElement_() *list.Element
 
 	// Compute a new object key, schedule the object data to be uploaded to the
 	// datastore and update the parent with the new key.
@@ -173,7 +173,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	directChildInodes() []InodeId
+	directChildInodes(c *ctx) []InodeId
 }
 
 type InodeCommon struct {
@@ -198,10 +198,8 @@ type InodeCommon struct {
 	// to ensure that all Inode locks are only acquired child to parent.
 	treeLock_ *sync.RWMutex
 
-	// This field is accessed using atomic instructions
-	dirty_           uint32 // 1 if this Inode or any children are dirty
-	dirtyElementLock utils.DeferableMutex
-	dirtyElement_    *list.Element
+	// This element is protected by the DirtyQueueLock
+	dirtyElement__ *list.Element
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -213,10 +211,11 @@ func (inode *InodeCommon) parentId_() InodeId {
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
 // returned Inode is used
 func (inode *InodeCommon) parent_(c *ctx) Inode {
-	defer c.funcIn("InodeCommon::parent_").out()
+	defer c.funcIn("InodeCommon::parent_").Out()
 	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
-		c.elog("Parent was unloaded before child! %d", inode.parentId)
+		c.elog("Parent (%d) was unloaded before child (%d)!",
+			inode.parentId, inode.id)
 		parent = c.qfs.inode(c, inode.parentId)
 	}
 
@@ -225,7 +224,7 @@ func (inode *InodeCommon) parent_(c *ctx) Inode {
 
 func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string, created bool) {
 	defer c.FuncIn("InodeCommon::parentMarkAccessed", "path %s created %t", path,
-		created).out()
+		created).Out()
 	defer inode.parentLock.RLock().RUnlock()
 
 	inode.parent_(c).markAccessed(c, path, created)
@@ -235,7 +234,7 @@ func (inode *InodeCommon) parentSyncChild(c *ctx, childId InodeId,
 	publishFn func() quantumfs.ObjectKey) {
 
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d of %d", childId,
-		inode.id).out()
+		inode.id).Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 
@@ -256,7 +255,7 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer c.funcIn("InodeCommon::parentSetChildAttr").out()
+	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
@@ -266,7 +265,7 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
-	defer c.funcIn("InodeCommon::parentGetChildXAttrSize").out()
+	defer c.funcIn("InodeCommon::parentGetChildXAttrSize").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).getChildXAttrSize(c, inodeNum, attr)
@@ -275,7 +274,7 @@ func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
-	defer c.funcIn("InodeCommon::parentGetChildXAttrData").out()
+	defer c.funcIn("InodeCommon::parentGetChildXAttrData").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).getChildXAttrData(c, inodeNum, attr)
@@ -284,7 +283,7 @@ func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentListChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
-	defer c.funcIn("InodeCommon::parentListChildXAttr").out()
+	defer c.funcIn("InodeCommon::parentListChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).listChildXAttr(c, inodeNum)
@@ -293,7 +292,7 @@ func (inode *InodeCommon) parentListChildXAttr(c *ctx,
 func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
-	defer c.funcIn("InodeCommon::parentSetChildXAttr").out()
+	defer c.funcIn("InodeCommon::parentSetChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
@@ -302,7 +301,7 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	defer c.funcIn("InodeCommon::parentRemoveChildXAttr").out()
+	defer c.funcIn("InodeCommon::parentRemoveChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
@@ -311,7 +310,7 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").out()
+	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 	return inode.parent_(c).getChildRecordCopy(c, inodeNum)
@@ -351,7 +350,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 
 // Locks the parent
 func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
-	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).out()
+	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
 
 	// Ensure we lock in the UP direction
 	defer inode.parentLock.Lock().Unlock()
@@ -359,7 +358,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.record(inode.id)
+	record := parent.children.recordCopy(c, inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return
@@ -419,29 +418,23 @@ func (inode *InodeCommon) inodeNum() InodeId {
 
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
-	defer c.funcIn("InodeCommon::dirty").out()
+	defer c.funcIn("InodeCommon::dirty").Out()
 	if inode.isOrphaned() {
 		c.vlog("Not dirtying inode %d because it is orphaned", inode.id)
 		return
 	}
 
-	de := inode.dirtyElement()
-
-	if de == nil {
+	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
-		de = c.qfs.queueDirtyInode(c, inode.self)
-
-		// queueDirtyInode requests the dirtyElement so we cannot hold the
-		// dirtyElementLock over that call.
-		defer inode.dirtyElementLock.Lock().Unlock()
-		inode.dirtyElement_ = de
+		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
 	}
 }
 
 // Mark this Inode as having been cleaned
-func (inode *InodeCommon) markClean() {
-	defer inode.dirtyElementLock.Lock().Unlock()
-	inode.dirtyElement_ = nil
+// dirtyQueueLock must be locked when calling this function
+func (inode *InodeCommon) markClean_() {
+	inode.dirtyElement__ = nil
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
@@ -451,16 +444,16 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 }
 
 func (inode *InodeCommon) queueToForget(c *ctx) {
-	defer c.funcIn("InodeCommon::queueToForget").out()
-	de := c.qfs.queueInodeToForget(c, inode.self)
+	defer c.funcIn("InodeCommon::queueToForget").Out()
 
-	defer inode.dirtyElementLock.Lock().Unlock()
-	inode.dirtyElement_ = de
+	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	de := c.qfs.queueInodeToForget_(c, inode.self)
+	inode.dirtyElement__ = de
 }
 
-func (inode *InodeCommon) dirtyElement() *list.Element {
-	defer inode.dirtyElementLock.Lock().Unlock()
-	return inode.dirtyElement_
+// dirtyQueueLock must be locked when calling this function
+func (inode *InodeCommon) dirtyElement_() *list.Element {
+	return inode.dirtyElement__
 }
 
 func (inode *InodeCommon) name() string {
@@ -509,7 +502,7 @@ func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	defer c.FuncIn("InodeCommon::markAccessed", "path %s created %t", path,
-		created).out()
+		created).Out()
 	if inode.isWorkspaceRoot() {
 		panic("Workspaceroot didn't call .self")
 	}
@@ -527,7 +520,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 }
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
-	defer c.FuncIn("InodeCommon::markSelfAccessed", "created %t", created).out()
+	defer c.FuncIn("InodeCommon::markSelfAccessed", "created %t", created).Out()
 	ac := inode.accessed()
 	if !created && ac {
 		return
@@ -547,7 +540,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 	deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 		err fuse.Status)) fuse.Status {
 
-	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).out()
+	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).Out()
 
 	defer inode.lock.Lock().Unlock()
 

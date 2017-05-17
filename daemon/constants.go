@@ -11,7 +11,7 @@ import "github.com/hanwen/go-fuse/fuse"
 // Mapping between datastore object types and the FUSE filetype
 // Returns 0 if there is no valid FUSE filetype
 func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
-	defer c.FuncIn("objectTypeToFileType", "type %d", objectType).out()
+	defer c.FuncIn("objectTypeToFileType", "type %d", objectType).Out()
 
 	switch objectType {
 	case quantumfs.ObjectTypeSmallFile,
@@ -22,7 +22,7 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 		quantumfs.ObjectTypeBuildProduct: // Do we need recursive evaluation?
 		return fuse.S_IFREG
 
-	case quantumfs.ObjectTypeDirectoryEntry:
+	case quantumfs.ObjectTypeDirectory:
 		return fuse.S_IFDIR
 
 	case quantumfs.ObjectTypeSymlink:

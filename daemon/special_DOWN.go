@@ -15,7 +15,7 @@ func (special *Special) link_DOWN(c *ctx, srcInode Inode, newName string,
 }
 
 func (special *Special) Sync_DOWN(c *ctx) fuse.Status {
-	defer c.funcIn("Special::Sync_DOWN").out()
+	defer c.funcIn("Special::Sync_DOWN").Out()
 	special.flush(c)
 
 	return fuse.OK

@@ -23,7 +23,7 @@ const F_OK = 0
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
-	defer c.funcIn("modifyEntryWithAttr").out()
+	defer c.funcIn("modifyEntryWithAttr").Out()
 
 	// Update the type if needed
 	if newType != nil {
@@ -96,7 +96,7 @@ func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAt
 
 // Return the fuse connection id for the filesystem mounted at the given path
 func findFuseConnection(c *ctx, mountPath string) int {
-	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath).out()
+	defer c.FuncIn("findFuseConnection", "mountPath %s", mountPath).Out()
 	c.dlog("Finding FUSE Connection ID...")
 	for i := 0; i < 100; i++ {
 		c.dlog("Waiting for mount try %d...", i)
@@ -153,7 +153,8 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 		checkFlags |= quantumfs.PermExecAll
 	}
 
-	return hasPermissionIds(c, inode, uid, gid, checkFlags, -1)
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, uid, gid, pid, checkFlags, -1)
 }
 
 func hasDirectoryWritePermSticky(c *ctx, inode Inode,
@@ -161,7 +162,8 @@ func hasDirectoryWritePermSticky(c *ctx, inode Inode,
 
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags,
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags,
 		int32(childOwner))
 }
 
@@ -171,7 +173,8 @@ func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
 
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
 }
 
 func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
@@ -193,14 +196,88 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	}
 
 	owner := c.fuseCtx.Owner
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, checkFlags, -1)
+	pid := c.fuseCtx.Pid
+	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
+}
+
+// Determine if the process has a matching group. Normally the primary group is all
+// we need to check, but sometimes we also much check the supplementary groups.
+func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
+	defer c.FuncIn("hasMatchingGid",
+		"user gid %d pid %d inode gid %d", userGid, pid, inodeGid).Out()
+
+	// First check the common case where we do the least work
+	if userGid == inodeGid {
+		c.vlog("user GID matches inode")
+		return true
+	}
+
+	// The primary group doesn't match. We now need to check the supplementary
+	// groups. Unfortunately FUSE doesn't give us these so we need to parse them
+	// ourselves out of /proc.
+	file, err := os.Open(fmt.Sprintf("/proc/%d/task/%d/status", pid, pid))
+	if err != nil {
+		c.dlog("Unable to open /proc/status for %d: %s", pid, err.Error())
+		return false
+	}
+	defer file.Close()
+	procStatus := bufio.NewReader(file)
+
+	// Find "Groups:" line
+	for {
+		bline, _, err := procStatus.ReadLine()
+		if err != nil {
+			c.dlog("Error reading proc status line: %s", err.Error())
+			return false
+		}
+
+		line := string(bline)
+
+		if !strings.HasPrefix(line, "Groups:") {
+			continue
+		}
+
+		// We now have something like "Groups:\t10 10545 ", get all the GIDs
+		// and skip the prefix
+		groups := strings.Split(line, "\t")[1:]
+		c.vlog("Groups: %s", groups[0])
+
+		// Now we need to split the groups themselves up
+		groups = strings.Split(groups[0], " ")
+
+		for _, sgid := range groups {
+			if sgid == "" {
+				continue
+			}
+
+			gid, err := strconv.Atoi(sgid)
+			if err != nil {
+				c.elog("Failed to parse gid from '%s' out of '%s'",
+					sgid, line)
+				continue
+			}
+			if uint32(gid) == inodeGid {
+				c.vlog("Supplementary group %d matches inode", gid)
+				return true
+			}
+		}
+
+		// We've processed the only line which matters. Since we didn't find
+		// a matching group we are done. However, to protect against the
+		// possibility that the Groups line is empty we do not return here.
+		break
+	}
+
+	c.vlog("No matching user groups")
+	return false
 }
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
-	checkGid uint32, checkFlags uint32, stickyAltOwner int32) fuse.Status {
+	checkGid uint32, pid uint32, checkFlags uint32,
+	stickyAltOwner int32) fuse.Status {
 
-	defer c.FuncIn("hasPermissionIds", "%d %d %d %o", checkUid, checkGid,
-		stickyAltOwner, checkFlags).out()
+	defer c.FuncIn("hasPermissionIds", "%d %d %d %d %o", checkUid, checkGid,
+		pid, stickyAltOwner, checkFlags).Out()
 
 	// Root permission can bypass the permission, and the root is only verified
 	// by uid
@@ -233,7 +310,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 		stickyUid := quantumfs.SystemUid(quantumfs.UID(stickyAltOwner),
 			checkUid)
 
-		if record.Type() == quantumfs.ObjectTypeDirectoryEntry &&
+		if record.Type() == quantumfs.ObjectTypeDirectory &&
 			utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) &&
 			checkUid != inodeOwner && checkUid != stickyUid {
 
@@ -247,7 +324,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	if checkUid == inodeOwner {
 		permMask = quantumfs.PermReadOwner | quantumfs.PermWriteOwner |
 			quantumfs.PermExecOwner
-	} else if checkGid == inodeGroup {
+	} else if hasMatchingGid(c, checkGid, pid, inodeGroup) {
 		permMask = quantumfs.PermReadGroup | quantumfs.PermWriteGroup |
 			quantumfs.PermExecGroup
 	} else { // all the other
@@ -284,4 +361,14 @@ func asDirectory(inode Inode) *Directory {
 		// panic like usual
 		panic(fmt.Sprintf("Inode %d is not a Directory", inode.inodeNum()))
 	}
+}
+
+// Notify the kernel that the requested entry isn't found and further that the kernel
+// should cache that fact.
+func kernelCacheNegativeEntry(c *ctx, out *fuse.EntryOut) fuse.Status {
+	// The FUSE API for notifying the kernel of a negative lookup is by returning
+	// success with a zero NodeId. See struct fuse_entry_param in libfuse.
+	fillEntryOutCacheData(c, out)
+	out.NodeId = 0
+	return fuse.OK
 }
