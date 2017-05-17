@@ -13,6 +13,8 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/testutils"
 
+const enableExtendedTests = false
+
 func getRootId(test *testHelper, workspace string) quantumfs.ObjectKey {
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)
@@ -536,46 +538,87 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func TestRefreshOpenFileContentCheck(t *testing.T) {
+func contentTest(ctx *ctx, test *testHelper, str1 string, str2 string) {
+	workspace := test.NewWorkspace()
+	utils.MkdirAll(workspace+"/subdir", 0777)
+	name := "subdir/testFile"
+	fullname := workspace + "/" + name
+
+	err := testutils.PrintToFile(fullname, str1)
+	test.AssertNoErr(err)
+	test.SyncAllWorkspaces()
+	newRootId1 := getRootId(test, workspace)
+
+	err = testutils.OverWriteFile(fullname, str2)
+	test.AssertNoErr(err)
+	test.SyncAllWorkspaces()
+	newRootId2 := getRootId(test, workspace)
+
+	file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+	test.AssertNoErr(err)
+
+	_, err = ioutil.ReadFile(fullname)
+	test.AssertNoErr(err)
+
+	refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+	newRootId3 := getRootId(test, workspace)
+	test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+
+	err = file.Close()
+	test.AssertNoErr(err)
+
+	content2, err := ioutil.ReadFile(fullname)
+	test.AssertNoErr(err)
+	test.Assert(str1 == string(content2), "content mismatch")
+	removeTestFile(ctx, test, workspace, name)
+}
+
+func TestRefreshOpenFileContentCheckS2S(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		utils.MkdirAll(workspace+"/subdir", 0777)
-		name := "subdir/testFile"
-		fullname := workspace + "/" + name
-		content1 := "The original content"
-
 		ctx := test.TestCtx()
-		err := testutils.PrintToFile(fullname, content1)
-		test.AssertNoErr(err)
-		test.SyncAllWorkspaces()
-		newRootId1 := getRootId(test, workspace)
+		contentTest(ctx, test,
+			"The original content",
+			"Not the original content")
+	})
+}
 
-		err = testutils.OverWriteFile(fullname, "Not the original content")
-		test.AssertNoErr(err)
-		test.SyncAllWorkspaces()
-		newRootId2 := getRootId(test, workspace)
+func TestRefreshOpenFileContentCheckM2S(t *testing.T) {
+	if !enableExtendedTests {
+		t.Skip("Slow test disabled by default")
+	}
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		str1 := string(GenData(quantumfs.MaxBlockSize*
+			quantumfs.MaxBlocksMediumFile() + 1))
+		str2 := string(GenData(10))
+		contentTest(ctx, test, str1, str2)
+	})
+}
 
-		file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
-		test.AssertNoErr(err)
+func TestRefreshOpenFileContentCheckS2M(t *testing.T) {
+	if !enableExtendedTests {
+		t.Skip("Slow test disabled by default")
+	}
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		str1 := string(GenData(10))
+		str2 := string(GenData(quantumfs.MaxBlockSize*
+			quantumfs.MaxBlocksMediumFile() + 1))
+		contentTest(ctx, test, str1, str2)
+	})
+}
 
-		content2, err := ioutil.ReadFile(fullname)
-		test.AssertNoErr(err)
-
-		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
-
-		newRootId3 := getRootId(test, workspace)
-		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
-
-		err = file.Close()
-		test.AssertNoErr(err)
-
-		content3, err := ioutil.ReadFile(fullname)
-		test.AssertNoErr(err)
-
-		ctx.vlog("content1 %s, content2 %s, content3 %s",
-			string(content1), string(content2), string(content3))
-		test.Assert(string(content1) == string(content3), "content mismatch")
-
-		removeTestFile(ctx, test, workspace, name)
+func TestRefreshOpenFileContentCheckM2M(t *testing.T) {
+	if !enableExtendedTests {
+		t.Skip("Slow test disabled by default")
+	}
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		str1 := string(GenData(quantumfs.MaxBlockSize*
+			quantumfs.MaxBlocksMediumFile() + 1))
+		str2 := "shift " + string(GenData(quantumfs.MaxBlockSize*
+			quantumfs.MaxBlocksMediumFile()+1))
+		contentTest(ctx, test, str1, str2)
 	})
 }

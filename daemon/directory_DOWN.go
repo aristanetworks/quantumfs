@@ -211,7 +211,7 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
 func (dir *Directory) handleInstantiatedInodeChange_DOWN(c *ctx, inode Inode,
 	inodeId InodeId, remoteRecord *quantumfs.DirectRecord) {
 
-	defer c.FuncIn("Directory::handleInstantiatedInodeChange_DOWN", "%s: %s",
+	defer c.FuncIn("Directory::handleInstantiatedInodeChange_DOWN", "%s: %d",
 		remoteRecord.Filename(), remoteRecord.Type()).Out()
 
 	switch remoteRecord.Type() {
@@ -290,8 +290,6 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 			dir.id, childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
 
-		// We have not observed a situation in the following
-		// call is necessary
 		c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
 	} else if !remoteRecord.ID().IsEqualTo(localRecord.ID()) {
 		dir.handleDirectoryEntryUpdate_DOWN(c, localRecord, remoteRecord)
