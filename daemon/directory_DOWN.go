@@ -195,12 +195,11 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
 	inodeId InodeId, localRecord quantumfs.DirectoryRecord) {
 
-	c.FuncIn("Directory::destroyChild_DOWN", " inode %d", inodeId)
+	defer c.FuncIn("Directory::destroyChild_DOWN", "inode %d", inodeId).Out()
 	if localRecord.Type() == quantumfs.ObjectTypeDirectory {
 		subdir := inode.(*Directory)
 		subdir.children.iterateOverInMemoryRecords(c,
 			func(childname string, childId InodeId) {
-
 				subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
 					childId)
 			})
