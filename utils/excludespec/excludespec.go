@@ -337,7 +337,7 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	onlyDir, _ := exInfo.includes[path]
 	if !onlyDir {
 		// If directory with its sub-dirs is being included
-		// then it's record count needs to be setup.
+		// then its record count needs to be set up.
 		err := initRecordCount(exInfo, base, path)
 		if err != nil {
 			return err
@@ -345,7 +345,7 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	}
 	// Only parent's record count is affected.
 	// Ancestor record count is not affected.
-	// Its gauranteed that parent exists in dirRecordCounts
+	// It's guaranteed that parent exists in dirRecordCounts
 	// since all explicitly included paths are present and
 	// re-includes aren't supported.
 	parent := getParent(path)
