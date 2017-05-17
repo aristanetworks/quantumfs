@@ -405,7 +405,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		}()
 		if inodeNum == quantumfs.InodeIdInvalid {
 			c.vlog("Inode not found")
-			return inodeNum, fuse.ENOENT
+			return inodeNum, kernelCacheNegativeEntry(c, out)
 		}
 
 		c.vlog("Directory::Lookup found inode %d", inodeNum)
