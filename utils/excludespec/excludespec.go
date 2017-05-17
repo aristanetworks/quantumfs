@@ -182,6 +182,20 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	return nil
 }
 
+func compileRE(s []string) (*regexp.Regexp, error) {
+	var re *regexp.Regexp
+	var err error
+	// empty s creates a nil Regexp
+	if len(s) != 0 {
+		res := strings.Join(s, "|")
+		re, err = regexp.Compile(res)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return re, nil
+}
+
 // processing the words involves:
 //  a) setup the exclude and include RE based on the maps
 //  b) setup the record counts based on the maps
@@ -190,20 +204,18 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 // helps in avoiding to edit the regex
 func processWords(exInfo *ExcludeInfo, base string) error {
 	var err error
-	exRE := make([]string, 0)
-	inRE := make([]string, 0)
+	reWords := make([]string, 0)
 
 	for word, _ := range exInfo.excludes {
 		// Avoid dir10 regex to match dir103
 		// by adding ^dir10$ and ^dir10/
-		exRE = append(exRE, "^"+regexp.QuoteMeta(word)+"$")
+		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		// Adding trailing slash even for file excludes
 		// is ok since file excludes will match it.
-		exRE = append(exRE, "^"+regexp.QuoteMeta(word)+"/")
+		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
 		excludeSetRecordCount(exInfo, base, word)
 	}
-	re := strings.Join(exRE, "|")
-	exInfo.excludeRE, err = regexp.Compile(re)
+	exInfo.excludeRE, err = compileRE(reWords)
 	if err != nil {
 		return err
 	}
@@ -212,32 +224,36 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	// will have a dollar suffix in regex.
 	// Include paths which refer to directory and its nested content will
 	// have both dollar suffixed and slash suffixed entries in regex.
+	reWords = make([]string, 0)
 	for word, onlyDir := range exInfo.includes {
 		includeSetRecordCount(exInfo, base, word)
-		inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"$")
+		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		if !onlyDir {
-			inRE = append(inRE, "^"+regexp.QuoteMeta(word)+"/")
+			reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
 		}
 	}
-	re = strings.Join(inRE, "|")
-	if re != "" {
-		exInfo.includeRE, err = regexp.Compile(re)
-		if err != nil {
-			return err
-		}
+	exInfo.includeRE, err = compileRE(reWords)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
+// PathExcluded returns true if path is excluded as per exclude
+// file spec.
 func (e *ExcludeInfo) PathExcluded(path string) bool {
-	// a path is excluded if theres a match in excludeRE
-	// and no match in includeRE
-	// if a path doesn't match excludeRE then no need to check
-	// includeRE
-	excl := e.excludeRE.MatchString(path)
-	incl := false
+	// A path is excluded if theres a match in excludeRE
+	// and no match in includeRE.
+	// If a path doesn't match excludeRE then no need to check
+	// includeRE.
+
+	// by default everything is included
+	excl := false
+	if e.excludeRE != nil {
+		excl = e.excludeRE.MatchString(path)
+	}
 	if excl && e.includeRE != nil {
-		incl = e.includeRE.MatchString(path)
+		incl := e.includeRE.MatchString(path)
 		excl = excl && !incl
 	}
 	return excl
