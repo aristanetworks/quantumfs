@@ -378,8 +378,6 @@ func TestExclude_DirnameOverlap(t *testing.T) {
 
 dir13
 dir13bc
-dir13b
-+dir13b/
 `
 		expected := pathInfo{
 			"/":                1,
@@ -404,7 +402,6 @@ func TestExclude_FilenameOverlap(t *testing.T) {
 
 dir14/file
 dir14b/file
-+dir14b
 +dir14b/file
 `
 		expected := pathInfo{
@@ -545,12 +542,10 @@ dir12
 # dirname overlap
 dir13
 dir13bc
-+dir13b/
 
 # filename overlap
 dir14/file
 dir14b/file
-+dir14b
 +dir14b/file
 `
 		expected := pathInfo{
