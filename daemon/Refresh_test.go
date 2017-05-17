@@ -13,8 +13,6 @@ import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/testutils"
 
-const enableExtendedTests = false
-
 func getRootId(test *testHelper, workspace string) quantumfs.ObjectKey {
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)
@@ -538,18 +536,18 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func contentTest(ctx *ctx, test *testHelper, str1 string, str2 string) {
+func contentTest(ctx *ctx, test *testHelper, content string, create func(string) error) {
 	workspace := test.NewWorkspace()
 	utils.MkdirAll(workspace+"/subdir", 0777)
 	name := "subdir/testFile"
 	fullname := workspace + "/" + name
 
-	err := testutils.PrintToFile(fullname, str1)
+	err := testutils.PrintToFile(fullname, content)
 	test.AssertNoErr(err)
 	test.SyncAllWorkspaces()
 	newRootId1 := getRootId(test, workspace)
 
-	err = testutils.OverWriteFile(fullname, str2)
+	err = create(fullname)
 	test.AssertNoErr(err)
 	test.SyncAllWorkspaces()
 	newRootId2 := getRootId(test, workspace)
@@ -568,57 +566,44 @@ func contentTest(ctx *ctx, test *testHelper, str1 string, str2 string) {
 	err = file.Close()
 	test.AssertNoErr(err)
 
-	content2, err := ioutil.ReadFile(fullname)
+	newContent, err := ioutil.ReadFile(fullname)
 	test.AssertNoErr(err)
-	test.Assert(str1 == string(content2), "content mismatch")
+	test.Assert(content == string(newContent),
+		fmt.Sprintf("content mismatch %s", newContent))
 	removeTestFile(ctx, test, workspace, name)
+}
+
+func createSparseFile(name string, size int64) error {
+	fd, err := syscall.Creat(name, 0124)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	return os.Truncate(name, size)
+}
+
+func createSmallFile(name string) error {
+	return testutils.OverWriteFile(name, "small file content")
+}
+
+func createMediumFile(name string) error {
+	size := int64(quantumfs.MaxMediumFileSize()) -
+		int64(quantumfs.MaxBlockSize)
+	return createSparseFile(name, size)
+}
+
+func createLargeFile(name string) error {
+	size := int64(quantumfs.MaxMediumFileSize()) +
+		int64(quantumfs.MaxBlockSize)
+	return createSparseFile(name, size)
 }
 
 func TestRefreshOpenFileContentCheckS2S(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
-		contentTest(ctx, test,
-			"The original content",
-			"Not the original content")
-	})
-}
-
-func TestRefreshOpenFileContentCheckM2S(t *testing.T) {
-	if !enableExtendedTests {
-		t.Skip("Slow test disabled by default")
-	}
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		str1 := string(GenData(quantumfs.MaxBlockSize*
-			quantumfs.MaxBlocksMediumFile() + 1))
-		str2 := string(GenData(10))
-		contentTest(ctx, test, str1, str2)
-	})
-}
-
-func TestRefreshOpenFileContentCheckS2M(t *testing.T) {
-	if !enableExtendedTests {
-		t.Skip("Slow test disabled by default")
-	}
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		str1 := string(GenData(10))
-		str2 := string(GenData(quantumfs.MaxBlockSize*
-			quantumfs.MaxBlocksMediumFile() + 1))
-		contentTest(ctx, test, str1, str2)
-	})
-}
-
-func TestRefreshOpenFileContentCheckM2M(t *testing.T) {
-	if !enableExtendedTests {
-		t.Skip("Slow test disabled by default")
-	}
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		str1 := string(GenData(quantumfs.MaxBlockSize*
-			quantumfs.MaxBlocksMediumFile() + 1))
-		str2 := "shift " + string(GenData(quantumfs.MaxBlockSize*
-			quantumfs.MaxBlocksMediumFile()+1))
-		contentTest(ctx, test, str1, str2)
+		contentTest(ctx, test, "The original content", createSmallFile)
 	})
 }
