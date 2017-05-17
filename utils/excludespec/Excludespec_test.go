@@ -5,6 +5,16 @@ package excludespec
 
 import "testing"
 
+// Terminology:
+//
+// hierarchy = List of paths that should be setup prior to the test.
+//	    The directory must be suffixed by "/"
+// content = Content of exclude file
+// expected = List of paths from hierarchy that are expected to be included,
+//          along with the count of sub-paths
+
+// --- exclude file syntax tests ---
+
 var syntaxTestHierarchy = []string{
 	".file1",
 	"dir1/",
@@ -139,12 +149,6 @@ dir1
 }
 
 // --- exclude file processing tests ---
-//
-//hierarchy = List of paths that should be setup prior to the test.
-//	    The directory must be suffixed by "/"
-//content = Content of exclude file
-//expected = List of paths from hierarchy that are expected to be included,
-//          along with the count of sub-paths for a directory
 
 func TestBasicSpec(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -416,7 +420,7 @@ dir1/dir11a/file111a
 	})
 }
 
-func TestPathnameOverlap(t *testing.T) {
+func TestExclude_DirnameOverlap(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		hierarchy := []string{
@@ -426,16 +430,45 @@ func TestPathnameOverlap(t *testing.T) {
 			"dir1bc/file11a",
 		}
 		content := `
-
 dir1
-dir1bc
 dir1b
 +dir1b/
 `
 		expected := pathInfo{
-			"/":             1,
-			"dir1b":         1,
-			"dir1b/file11a": 0,
+			"/":              2,
+			"dir1b":          1,
+			"dir1b/file11a":  0,
+			"dir1bc":         1,
+			"dir1bc/file11a": 0,
+		}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
+
+func TestExclude_FilenameOverlap(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir1/file",
+			"dir1/fileABC",
+			"dir1b/file",
+			"dir1bc/file",
+		}
+		content := `
+
+dir1/file
+dir1b/file
++dir1b/file
+`
+		expected := pathInfo{
+			"/":            3,
+			"dir1":         1,
+			"dir1/fileABC": 0,
+			"dir1b":        1,
+			"dir1b/file":   0,
+			"dir1bc":       1,
+			"dir1bc/file":  0,
 		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
@@ -474,6 +507,18 @@ func TestAdvanceSpec(t *testing.T) {
 
 			// implicitly include parent
 			"dir7/dir77a/file777a",
+
+			// dirname overlap
+			"dir8/file88a",
+			"dir8/file88b",
+			"dir8b/file88a",
+			"dir8bc/file88a",
+
+			// pathname overlap
+			"dir9/file",
+			"dir9/fileABC",
+			"dir9b/file",
+			"dir9bc/file",
 		}
 
 		content := `
@@ -504,12 +549,21 @@ dir6
 # implictly include parent
 dir7/dir77a/file777a
 +dir7/dir77a/file777a
+
+# dirname overlap
+dir8
+dir8b
++dir8b/
+
+# filename overlap
+dir9/file
+dir9b/file
++dir9b/file
 `
 		expected := pathInfo{
-			"/": 7,
+			"/": 12,
 
-			"dir1": 0,
-
+			"dir1":                     0,
 			"dir2":                     2,
 			"dir2/subdir22a":           1,
 			"dir2/subdir22b":           0,
@@ -531,6 +585,18 @@ dir7/dir77a/file777a
 			"dir7":                 1,
 			"dir7/dir77a":          1,
 			"dir7/dir77a/file777a": 0,
+
+			"dir8b":          1,
+			"dir8b/file88a":  0,
+			"dir8bc":         1,
+			"dir8bc/file88a": 0,
+
+			"dir9":         1,
+			"dir9/fileABC": 0,
+			"dir9b":        1,
+			"dir9b/file":   0,
+			"dir9bc":       1,
+			"dir9bc/file":  0,
 		}
 
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
