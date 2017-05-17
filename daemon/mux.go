@@ -441,6 +441,7 @@ func (qfs *QuantumFs) adjustKernelKnobs() {
 	}
 
 	adjustBdi(&qfs.c, mountId)
+	adjustVmDirtyBackgroundBytes(&qfs.c)
 }
 
 func adjustBdi(c *ctx, mountId int) {
@@ -448,12 +449,12 @@ func adjustBdi(c *ctx, mountId int) {
 
 	// /sys/class/bdi/<mount>/read_ahead_kb indicates how much data, up to the
 	// end of the file, should be speculatively read by the kernel. Setting this
-	// to the block size should improve the correlation between the what the
-	// kernel reads and what QuantumFS can provide most efficiently. Since this
-	// is the amount in addition to the original read the kernel will read the
-	// entire block containing the user's read and then some portion of the next
-	// block. Thus QuantumFS will have time to fetch the next block in advance of
-	// it being required.
+	// to the block size should improve the correlation between what the kernel
+	// reads and what QuantumFS can provide most efficiently. Since this is the
+	// amount in addition to the original read the kernel will read the entire
+	// block containing the user's read and then some portion of the next block.
+	// Thus QuantumFS will have time to fetch the next block in advance of it
+	// being required.
 	filename := fmt.Sprintf("/sys/class/bdi/0:%d/read_ahead_kb", mountId)
 	value := fmt.Sprintf("%d", quantumfs.MaxBlockSize/1024)
 	err := ioutil.WriteFile(filename, []byte(value), 000)
@@ -472,6 +473,23 @@ func adjustBdi(c *ctx, mountId int) {
 	err = ioutil.WriteFile(filename, []byte("100"), 000)
 	if err != nil {
 		c.wlog("Unable to set bdi max_ratio: %s", err.Error())
+	}
+}
+
+func adjustVmDirtyBackgroundBytes(c *ctx) {
+	defer c.funcIn("adjustVmDirtyBackgroundBytes").Out()
+
+	// Sometimes, for reasons which have not been root caused yet, the kernel
+	// will start delaying FUSE requests for about 200ms. This appears related to
+	// some IO throughput control mechanism erroneously trending to zero for
+	// QuantumFS.
+	//
+	// Work around this for now by setting vm.dirty_background_bytes to a low
+	// number, which prevents FUSE from getting stuck in this manner.
+	err := ioutil.WriteFile("/proc/sys/vm/dirty_background_bytes",
+		[]byte("100000"), 000)
+	if err != nil {
+		c.wlog("Unable to set vm.dirty_background_bytes: %s", err.Error())
 	}
 }
 
@@ -685,13 +703,18 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 // Increase an Inode's lookup count. This must be called whenever a fuse.EntryOut is
 // returned.
 func (qfs *QuantumFs) increaseLookupCount(inodeId InodeId) {
-	defer qfs.c.FuncIn("Mux::increaseLookupCount", "inode %d", inodeId).Out()
+	qfs.increaseLookupCountWithNum(inodeId, 1)
+}
+
+func (qfs *QuantumFs) increaseLookupCountWithNum(inodeId InodeId, num uint64) {
+	defer qfs.c.FuncIn("Mux::increaseLookupCountWithNum",
+		"inode %d with value %d", inodeId, num).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		qfs.lookupCounts[inodeId] = 1
+		qfs.lookupCounts[inodeId] = num
 	} else {
-		qfs.lookupCounts[inodeId] = prev + 1
+		qfs.lookupCounts[inodeId] = prev + num
 	}
 }
 
@@ -932,8 +955,10 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
+// The returned cleanup function of workspaceroot should be called at the end of the
+// caller
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
-	workspace string) (*WorkspaceRoot, bool) {
+	workspace string) (wsr *WorkspaceRoot, cleanup func(), ok bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
@@ -947,13 +972,15 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	// For now, all getWorkspaceRoot() are called from internal functions, so
 	// nLookup is always 1.
 	var nLookup uint64 = 1
-
+	// Before workspace root is successfully instantiated, there is no need to
+	// uninstantiated it, so cleanup() should be a no-op
+	cleanup = func() {}
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, cleanup, false
 	}
 	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
 
@@ -961,7 +988,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, cleanup, false
 	}
 	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
 
@@ -970,14 +997,16 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
 	if result != fuse.OK {
-		return nil, false
+		return nil, cleanup, false
 	}
-	defer qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+	cleanup = func() {
+		qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+	}
 
 	// Fetch the WorkspaceRoot object itelf
-	wsr := qfs.inode(c, InodeId(workspaceRootAttr.NodeId))
+	wsr = qfs.inode(c, InodeId(workspaceRootAttr.NodeId)).(*WorkspaceRoot)
 
-	return wsr.(*WorkspaceRoot), wsr != nil
+	return wsr, cleanup, wsr != nil
 }
 
 func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
@@ -1032,6 +1061,10 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 
 	return true
 
+}
+
+func (qfs *QuantumFs) invalidateInode(inodeId InodeId) fuse.Status {
+	return qfs.server.InodeNotify(uint64(inodeId), 0, -1)
 }
 
 func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
