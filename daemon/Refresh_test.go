@@ -453,9 +453,9 @@ func TestRefreshCachedDeletedEntry(t *testing.T) {
 		newRootId2 := getRootId(test, workspace)
 
 		_, err = os.Stat(fulldirame)
-		test.Assert(err != nil, "stat succeeded after delete")
+		test.AssertErr(err)
 		_, err = os.Stat(fullfilename)
-		test.Assert(err != nil, "stat succeeded after delete")
+		test.AssertErr(err)
 
 		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 
@@ -506,13 +506,13 @@ func TestRefreshChangeTypeDirToFile(t *testing.T) {
 		removeTestFile(ctx, test, workspace, name)
 
 		_, err = os.OpenFile(subfile1name, os.O_RDONLY, 0777)
-		test.Assert(err != nil, " err is not nil")
+		test.AssertErr(err)
 
 		_, err = os.OpenFile(subfile2name, os.O_RDONLY, 0777)
-		test.Assert(err != nil, " err is not nil")
+		test.AssertErr(err)
 
 		_, err = os.Stat(workspace + "/" + name + "/subdir/subdir1")
-		test.Assert(err != nil, "stat succeeded after refresh")
+		test.AssertErr(err)
 	})
 }
 
