@@ -21,6 +21,7 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 	"github.com/aristanetworks/quantumfs/walker"
+	"github.com/aristanetworks/qubit/tools/qwalker/walktypes"
 )
 
 // Various exit reasons, will be returned to the shell as an exit code
@@ -338,33 +339,18 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 	if rootID, err = getWorkspaceRootID(c, qfsdb, wsname); err != nil {
 		return err
 	}
-	// Internal Walker for TTL.
-	var ttlWalker = func(c *walker.Ctx, path string,
+
+	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
-		if walker.SkipKey(c, key) {
-			return nil
-		}
-
-		ks := key.String()
-		metadata, err := cqlds.Metadata(ks)
-		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
-		}
-
-		err = refreshTTL(cqlds, ks, metadata)
-		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
-		}
-
-		//  TODO if isDir() and TTL is good, return walker.SkipDir
-		return nil
+		return walktypes.RefreshTTL(c, path, key, size, isDir, cqlds,
+			refreshTTLTimeSecs, refreshTTLValueSecs)
 	}
 
 	// Walk
-	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
+	if err = walker.Walk(c, qfsds, rootID, walkFunc); err != nil {
 		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
 	}
 	fmt.Println()
@@ -405,30 +391,16 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 		return err
 	}
 	// Internal Walker for TTL.
-	var ttlWalker = func(c *walker.Ctx, path string,
+	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		atomic.AddUint64(&totalKeys, 1)
 		defer showProgress(progress, start, totalKeys)
-		if walker.SkipKey(c, key) {
-			return nil
-		}
-
-		ks := key.String()
-		metadata, err := cqlds.Metadata(ks)
-		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
-		}
-
-		err = refreshTTL(cqlds, ks, metadata)
-		if err != nil {
-			return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
-		}
-
-		//  TODO if isDir() and TTL is good, return walker.SkipDir
-		return nil
+		return walktypes.RefreshTTL(c, path, key, size, isDir, cqlds,
+			refreshTTLTimeSecs, refreshTTLValueSecs)
 	}
-	if err = walker.Walk(c, qfsds, rootID, ttlWalker); err != nil {
+
+	if err = walker.Walk(c, qfsds, rootID, walkFunc); err != nil {
 		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
 	}
 	fmt.Println()

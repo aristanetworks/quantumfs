@@ -8,12 +8,9 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/aristanetworks/ether/blobstore"
-	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -95,46 +92,6 @@ func loadCqlWalkerConfig(path string) error {
 	// we can add more checks here later on eg: min of 1 day etc
 
 	return nil
-}
-
-// asserts that metadata is !nil and it contains cql.TimeToLive
-// once Metadata API is refactored, above assertions will be
-// revisited
-
-// TTL will be set using Insert when
-//  key exists and current TTL < refreshTTLTimeSecs
-func refreshTTL(b blobstore.BlobStore, key string,
-	metadata map[string]string) error {
-
-	if metadata == nil {
-		return fmt.Errorf("Store must have metadata")
-	}
-	ttl, ok := metadata[cql.TimeToLive]
-	if !ok {
-		return fmt.Errorf("Store must return metadata with " +
-			"TimeToLive")
-	}
-	ttlVal, err := strconv.ParseInt(ttl, 10, 64)
-	if err != nil {
-		return fmt.Errorf("Invalid TTL value in metadata %s ",
-			ttl)
-	}
-
-	// if key exists and TTL doesn't need to be refreshed
-	// then return
-	if ttlVal >= refreshTTLTimeSecs {
-		return nil
-	}
-
-	buf, _, err := b.Get(key)
-	if err != nil {
-		return fmt.Errorf("Err if blobstore.Get() for key %v",
-			key)
-
-	}
-	newmetadata := make(map[string]string)
-	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", refreshTTLValueSecs)
-	return b.Insert(key, buf, newmetadata)
 }
 
 func humanizeBytes(size uint64) string {
