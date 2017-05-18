@@ -25,7 +25,7 @@ func newChildMap(c *ctx, key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) (*ChildMa
 
 	// allocate inode ids
 	uninstantiated := make([]InodeId, 0)
-	rtn.records.iterateOverRecords(c,
+	rtn.records.iterateOverRecords(c, false,
 		func(record quantumfs.DirectoryRecord) {
 
 			inodeId := rtn.loadInodeId(c, record,
@@ -237,7 +237,7 @@ func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
 func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 	rtn := make([]quantumfs.DirectoryRecord, 0)
 
-	cmap.records.iterateOverRecords(c,
+	cmap.records.iterateOverRecords(c, true,
 		func(record quantumfs.DirectoryRecord) {
 
 			rtn = append(rtn, record)
@@ -427,7 +427,9 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 	return nil
 }
 
-func (rd *recordsOnDemand) iterateOverRecords(c *ctx,
+// for performance, we only want real records when we *have* to. Take thin records
+// when we're just polling superficial record details (name, mtime, owner, etc)
+func (rd *recordsOnDemand) iterateOverRecords(c *ctx, thinRecords bool,
 	fxn func(quantumfs.DirectoryRecord)) {
 
 	existingEntries := make(map[string]bool, 0)
@@ -450,8 +452,14 @@ func (rd *recordsOnDemand) iterateOverRecords(c *ctx,
 					fxn(record)
 				}
 			} else {
+				entry = convertRecord(rd.wsr, entry)
+
 				// Ensure we Clone() so the rest of memory is freed
-				entry = convertRecord(rd.wsr, entry).Clone()
+				if thinRecords {
+					entry = entry.ShallowCopy()
+				} else {
+					entry = entry.Clone()
+				}
 
 				// ensure we use the newest key
 				entryInodeId := rd.nameToInode[entry.Filename()]
@@ -599,7 +607,7 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 	// metadata block
 	entryCapacity, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
 	entryIdx := 0
-	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
+	rd.iterateOverRecords(c, false, func(record quantumfs.DirectoryRecord) {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			c.vlog("Block full with %d entries", entryIdx)
@@ -627,7 +635,7 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	// re-set our map of indices into directory entries
 	rd.nameToEntryIdx = make(map[string]uint32)
-	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
+	rd.iterateOverRecords(c, true, func(record quantumfs.DirectoryRecord) {
 		// don't need to do anything while we iterate
 	})
 
