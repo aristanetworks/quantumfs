@@ -3,6 +3,7 @@
 
 package daemon
 
+import "io"
 import "io/ioutil"
 import "testing"
 import "syscall"
@@ -536,20 +537,22 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func contentTest(ctx *ctx, test *testHelper, content string,
-	create func(string) error) {
+func contentTest(ctx *ctx, test *testHelper,
+	content string,
+	create1 func(string, string) error,
+	create2 func(string) error) {
 
 	workspace := test.NewWorkspace()
 	utils.MkdirAll(workspace+"/subdir", 0777)
 	name := "subdir/testFile"
 	fullname := workspace + "/" + name
 
-	err := testutils.PrintToFile(fullname, content)
+	err := create1(fullname, content)
 	test.AssertNoErr(err)
 	test.SyncAllWorkspaces()
 	newRootId1 := getRootId(test, workspace)
 
-	err = create(fullname)
+	err = create2(fullname)
 	test.AssertNoErr(err)
 	test.SyncAllWorkspaces()
 	newRootId2 := getRootId(test, workspace)
@@ -568,10 +571,15 @@ func contentTest(ctx *ctx, test *testHelper, content string,
 	err = file.Close()
 	test.AssertNoErr(err)
 
-	newContent, err := ioutil.ReadFile(fullname)
+	file, err = os.Open(fullname)
+	test.AssertNoErr(err)
+	newContent := make([]byte, len(content))
+	_, err = io.ReadFull(file, newContent)
+	test.AssertNoErr(err)
+	err = file.Close()
 	test.AssertNoErr(err)
 	test.Assert(content == string(newContent),
-		fmt.Sprintf("content mismatch %s", newContent))
+		fmt.Sprintf("content mismatch %d", len(newContent)))
 	removeTestFile(ctx, test, workspace, name)
 }
 
@@ -587,8 +595,12 @@ func createSparseFile(name string, size int64) error {
 	return os.Truncate(name, size)
 }
 
+func createSmallFileWithContent(name string, content string) error {
+	return testutils.PrintToFile(name, content)
+}
+
 func createSmallFile(name string) error {
-	return testutils.OverWriteFile(name, "small file content")
+	return createSmallFileWithContent(name, "small file content")
 }
 
 func createMediumFile(name string) error {
@@ -597,15 +609,65 @@ func createMediumFile(name string) error {
 	return createSparseFile(name, size)
 }
 
+func createMediumFileWithContent(name string, content string) error {
+	err := createMediumFile(name)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
 func createLargeFile(name string) error {
 	size := int64(quantumfs.MaxMediumFileSize()) +
 		int64(quantumfs.MaxBlockSize)
 	return createSparseFile(name, size)
 }
 
+func createLargeFileWithContent(name string, content string) error {
+	err := createLargeFile(name)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func createVeryLargeFile(name string) error {
+	size := int64(quantumfs.MaxLargeFileSize()) +
+		int64(quantumfs.MaxBlockSize)
+	return createSparseFile(name, size)
+}
+
+func createVeryLargeFileWithContent(name string, content string) error {
+	err := createVeryLargeFile(name)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
 func TestRefreshOpenFileContentCheckS2S(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
-		contentTest(ctx, test, "The original content", createSmallFile)
+		contentTest(ctx, test, "The original content",
+			createSmallFileWithContent,
+			createSmallFile)
+	})
+}
+
+func TestRefreshOpenFileContentCheckM2M(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createMediumFileWithContent,
+			createMediumFile)
+	})
+}
+
+func TestRefreshOpenFileContentCheckL2L(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createLargeFileWithContent,
+			createLargeFile)
 	})
 }
