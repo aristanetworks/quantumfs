@@ -33,7 +33,12 @@ cppstyle:
 	./cpplint.py QFSClient/*.cc QFSClient/*.h
 
 encoding/metadata.capnp.go: encoding/metadata.capnp
-	cd encoding; capnp compile -ogo metadata.capnp
+	@if which capnp &>/dev/null; then \
+		cd encoding; capnp compile -ogo metadata.capnp; \
+	else \
+		echo "Error: capnp not found. If you didn't modify encoding/metadata.capnp try 'touch encoding/metadata.capnp.go' to fix the build."; \
+		exit 1; \
+	fi
 
 $(COMMANDS): cleanup encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
