@@ -647,38 +647,67 @@ func createVeryLargeFileWithContent(name string, content string) error {
 	return testutils.OverWriteFile(name, content)
 }
 
-func TestRefreshOpenFileContentCheckS2S(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		contentTest(ctx, test, "The original content",
-			createSmallFileWithContent,
-			createSmallFile)
-	})
-}
-
-func TestRefreshOpenFileContentCheckM2M(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		contentTest(ctx, test, "The original content",
-			createMediumFileWithContent,
-			createMediumFile)
-	})
-}
-
-func TestRefreshOpenFileContentCheckL2L(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		contentTest(ctx, test, "The original content",
-			createLargeFileWithContent,
-			createLargeFile)
-	})
-}
-
-func TestRefreshOpenFileContentCheckVL2VL(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		ctx := test.TestCtx()
-		contentTest(ctx, test, "The original content",
-			createVeryLargeFileWithContent,
-			createVeryLargeFile)
-	})
+func TestRefreshContentCheck(t *testing.T) {
+	type ContentCheckTest struct {
+		name string
+		c1   func(string, string) error
+		c2   func(string) error
+	}
+	contentCheckTests := []ContentCheckTest{
+		ContentCheckTest{c1: createSmallFileWithContent,
+			c2:   createSmallFile,
+			name: "S2S"},
+		ContentCheckTest{c1: createSmallFileWithContent,
+			c2:   createMediumFile,
+			name: "M2S"},
+		ContentCheckTest{c1: createSmallFileWithContent,
+			c2:   createLargeFile,
+			name: "L2S"},
+		ContentCheckTest{c1: createSmallFileWithContent,
+			c2:   createVeryLargeFile,
+			name: "VL2S"},
+		ContentCheckTest{c1: createMediumFileWithContent,
+			c2:   createSmallFile,
+			name: "S2M"},
+		ContentCheckTest{c1: createMediumFileWithContent,
+			c2:   createMediumFile,
+			name: "M2M"},
+		ContentCheckTest{c1: createMediumFileWithContent,
+			c2:   createLargeFile,
+			name: "L2M"},
+		ContentCheckTest{c1: createMediumFileWithContent,
+			c2:   createVeryLargeFile,
+			name: "VL2M"},
+		ContentCheckTest{c1: createLargeFileWithContent,
+			c2:   createSmallFile,
+			name: "S2L"},
+		ContentCheckTest{c1: createLargeFileWithContent,
+			c2:   createMediumFile,
+			name: "M2L"},
+		ContentCheckTest{c1: createLargeFileWithContent,
+			c2:   createLargeFile,
+			name: "L2L"},
+		ContentCheckTest{c1: createLargeFileWithContent,
+			c2:   createVeryLargeFile,
+			name: "VL2L"},
+		ContentCheckTest{c1: createVeryLargeFileWithContent,
+			c2:   createSmallFile,
+			name: "S2VL"},
+		ContentCheckTest{c1: createVeryLargeFileWithContent,
+			c2:   createMediumFile,
+			name: "M2VL"},
+		ContentCheckTest{c1: createVeryLargeFileWithContent,
+			c2:   createLargeFile,
+			name: "L2VL"},
+		ContentCheckTest{c1: createVeryLargeFileWithContent,
+			c2:   createVeryLargeFile,
+			name: "VL2VL"},
+	}
+	for _, cct := range contentCheckTests {
+		runExpensiveTest(t, func(test *testHelper) {
+			ctx := test.TestCtx()
+			ctx.vlog("Running test %s", cct.name)
+			contentTest(ctx, test, "original content", cct.c1, cct.c2)
+		})
+	}
 }
