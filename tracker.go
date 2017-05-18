@@ -49,7 +49,7 @@ func (t *tracker) addKey(key string, path string, size uint64) {
 		return
 	}
 	s := t.keys[key]
-	s.count += 1
+	s.count++
 	s.size += size
 	if t.trackPathInfo {
 		s.otherPaths[path] = true
@@ -78,8 +78,7 @@ func (t *tracker) printDedupeReport() {
 			}
 			data, err := hex.DecodeString(k)
 			if err != nil {
-				fmt.Println("%s KeyDecodeError: %v\n",
-					k, err)
+				fmt.Printf("%s KeyDecodeError: %v\n", k, err)
 				continue
 			}
 			qKey := quantumfs.NewObjectKeyFromBytes(data)
@@ -113,7 +112,7 @@ func (t *tracker) printKeyPathInfo(keys []string) {
 func (t *tracker) trackerKeyDiff(t1 *tracker) ([]string, uint64) {
 	uniq := make([]string, 0)
 	var usize uint64
-	for k, _ := range t.keys {
+	for k := range t.keys {
 		if _, exists := t1.keys[k]; !exists {
 			uniq = append(uniq, k)
 			usize += t.keys[k].size
