@@ -44,7 +44,7 @@ func init() {
 		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 300
 		defaultCacheTimeNsecs   = 0
-		defaultMemLogMegabytes  = 100
+		defaultMemLogMegabytes  = 500
 	)
 
 	fmt.Printf("QuantumFS version %s\n", version)
