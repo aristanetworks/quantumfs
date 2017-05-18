@@ -120,8 +120,10 @@ func (fi *VeryLargeFile) fileLength(c *ctx) uint64 {
 			uint64(quantumfs.MaxBlocksLargeFile())
 	}
 
-	// And add what's in the last block
-	length += fi.parts[len(fi.parts)-1].fileLength(c)
+	if len(fi.parts) > 0 {
+		// And add what's in the last block
+		length += fi.parts[len(fi.parts)-1].fileLength(c)
+	}
 
 	return length
 }
