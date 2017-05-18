@@ -4,7 +4,6 @@
 package daemon
 
 import "io"
-import "io/ioutil"
 import "testing"
 import "syscall"
 import "os"
@@ -537,6 +536,17 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
+func readFirstNBytes(test *testHelper, name string, n int) string {
+	file, err := os.Open(name)
+	test.AssertNoErr(err)
+	newContent := make([]byte, n)
+	_, err = io.ReadFull(file, newContent)
+	test.AssertNoErr(err)
+	err = file.Close()
+	test.AssertNoErr(err)
+	return string(newContent)
+}
+
 func contentTest(ctx *ctx, test *testHelper,
 	content string,
 	create1 func(string, string) error,
@@ -559,9 +569,7 @@ func contentTest(ctx *ctx, test *testHelper,
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
 	test.AssertNoErr(err)
-
-	_, err = ioutil.ReadFile(fullname)
-	test.AssertNoErr(err)
+	readFirstNBytes(test, fullname, len(content))
 
 	refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 
@@ -571,14 +579,8 @@ func contentTest(ctx *ctx, test *testHelper,
 	err = file.Close()
 	test.AssertNoErr(err)
 
-	file, err = os.Open(fullname)
-	test.AssertNoErr(err)
-	newContent := make([]byte, len(content))
-	_, err = io.ReadFull(file, newContent)
-	test.AssertNoErr(err)
-	err = file.Close()
-	test.AssertNoErr(err)
-	test.Assert(content == string(newContent),
+	newContent := readFirstNBytes(test, fullname, len(content))
+	test.Assert(content == newContent,
 		fmt.Sprintf("content mismatch %d", len(newContent)))
 	removeTestFile(ctx, test, workspace, name)
 }
@@ -669,5 +671,14 @@ func TestRefreshOpenFileContentCheckL2L(t *testing.T) {
 		contentTest(ctx, test, "The original content",
 			createLargeFileWithContent,
 			createLargeFile)
+	})
+}
+
+func TestRefreshOpenFileContentCheckVL2VL(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createVeryLargeFileWithContent,
+			createVeryLargeFile)
 	})
 }
