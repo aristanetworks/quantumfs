@@ -173,14 +173,14 @@ func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 	}
 
 	start := time.Now()
-	var totalKeys uint64
+	var keysWalked uint64
 	tracker := newTracker(false)
 	var mapLock utils.DeferableMutex
 	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		defer mapLock.Lock().Unlock()
 		if !strings.HasPrefix(path, searchPath) {
 			return nil
@@ -217,13 +217,13 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 	}
 
 	var mapLock utils.DeferableMutex
-	var totalKeys uint64
+	var keysWalked uint64
 	tracker := newTracker(showDedupeInfo)
 	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		defer mapLock.Lock().Unlock()
 		tracker.addKey(hex.EncodeToString(key.Value()), path, size)
 		return nil
@@ -271,7 +271,7 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 		showKeys = true
 	}
 	var rootID1, rootID2 quantumfs.ObjectKey
-	var totalKeys uint64
+	var keysWalked uint64
 	var err error
 	if rootID1, err = getWorkspaceRootID(c, qfsdb, wsname1); err != nil {
 		return err
@@ -282,8 +282,8 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 	keyRecorder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		defer mapLock.Lock().Unlock()
 		tracker.addKey(hex.EncodeToString(key.Value()), path, size)
 		return nil
@@ -334,7 +334,7 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 	wsname := walkFlags.Arg(1)
 	var err error
 	var rootID quantumfs.ObjectKey
-	var totalKeys uint64
+	var keysWalked uint64
 	start := time.Now()
 	if rootID, err = getWorkspaceRootID(c, qfsdb, wsname); err != nil {
 		return err
@@ -343,8 +343,8 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		return walktypes.RefreshTTL(c, path, key, size, isDir, cqlds,
 			refreshTTLTimeSecs, refreshTTLValueSecs)
 	}
@@ -386,7 +386,7 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 
 	// Get RootID
 	var rootID quantumfs.ObjectKey
-	var totalKeys uint64
+	var keysWalked uint64
 	if rootID, err = getWorkspaceRootID(c, qfsdb, wsname); err != nil {
 		return err
 	}
@@ -394,8 +394,8 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		return walktypes.RefreshTTL(c, path, key, size, isDir, cqlds,
 			refreshTTLTimeSecs, refreshTTLValueSecs)
 	}
@@ -466,13 +466,13 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 	wsname := walkFlags.Arg(1)
 	start := time.Now()
 
-	var totalKeys uint64
+	var keysWalked uint64
 	hist := newHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		if walker.SkipKey(c, key) {
 			return nil
 		}
@@ -547,12 +547,12 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 	start := time.Now()
 	var listLock utils.DeferableMutex
 	keyList := make([]quantumfs.ObjectKey, 0, 10)
-	var totalKeys uint64
+	var keysWalked uint64
 	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 		if strings.Compare(path, searchPath) == 0 {
 			defer listLock.Lock().Unlock()
 			keyList = append(keyList, key)
@@ -611,12 +611,12 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 		p string
 		t int64
 	})
-	var totalKeys uint64
+	var keysWalked uint64
 	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&totalKeys, 1)
-		defer showProgress(progress, start, totalKeys)
+		atomic.AddUint64(&keysWalked, 1)
+		defer showProgress(progress, start, keysWalked)
 
 		// Print the key if:
 		// - It is of type Constant,

@@ -172,10 +172,10 @@ func (h *histogram) Print() {
 	fmt.Printf("%20v : %v\n", "Total Keys", h.totalKeys)
 }
 
-func showProgress(progress bool, start time.Time, totalKeys uint64) {
+func showProgress(progress bool, start time.Time, keysWalked uint64) {
 
 	if progress {
 		fmt.Printf("\r %10v %v %20v %v",
-			"Time", time.Since(start), "Keys Walked", totalKeys)
+			"Time", time.Since(start), "Keys Walked", keysWalked)
 	}
 }
