@@ -166,6 +166,7 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 }
 
 func (fi *VeryLargeFile) reload(c *ctx, key quantumfs.ObjectKey) {
+	defer c.funcIn("VeryLargeFile::reload").Out()
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		panic("Unable to fetch metadata for reload")
