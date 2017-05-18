@@ -3,6 +3,7 @@
 
 package daemon
 
+import "io"
 import "testing"
 import "syscall"
 import "os"
@@ -424,6 +425,95 @@ func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 	})
 }
 
+func TestRefreshCachedDeletedEntry(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		fulldirame := workspace + "/subdir"
+		filename := "testfile"
+		fullfilename := workspace + "/" + filename
+
+		utils.MkdirAll(fulldirame, 0777)
+		_, err := os.Stat(fulldirame)
+		test.AssertNoErr(err)
+
+		test.SyncAllWorkspaces()
+		newRootId1 := createTestFile(ctx, test, workspace, filename, 1000)
+		_, err = os.Stat(fullfilename)
+		test.AssertNoErr(err)
+
+		err = os.RemoveAll(fulldirame)
+		test.AssertNoErr(err)
+
+		err = os.RemoveAll(fullfilename)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		_, err = os.Stat(fulldirame)
+		test.AssertErr(err)
+		_, err = os.Stat(fullfilename)
+		test.AssertErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		_, err = os.Stat(fulldirame)
+		test.AssertNoErr(err)
+		_, err = os.Stat(fullfilename)
+		test.AssertNoErr(err)
+	})
+}
+
+func TestRefreshChangeTypeDirToFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		newRootId1 := createTestFile(ctx, test, workspace, name, 1000)
+
+		removeTestFileNoSync(test, workspace, name)
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		utils.MkdirAll(workspace+"/"+name+"/subdir", 0777)
+		createTestFileNoSync(test, workspace, name+"/subfile", 1000)
+		createTestFileNoSync(test, workspace, name+"/subdir/subfile", 1000)
+		utils.MkdirAll(workspace+"/"+name+"/subdir/subdir1", 0777)
+
+		subfile1name := workspace + "/" + name + "/subfile"
+		subfile1, err := os.OpenFile(subfile1name, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+
+		subfile2name := workspace + "/" + name + "/subdir/subfile"
+		subfile2, err := os.OpenFile(subfile2name, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+		test.Assert(!newRootId2.IsEqualTo(newRootId1),
+			"no changes to the rootId")
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		err = subfile1.Close()
+		test.AssertNoErr(err)
+
+		err = subfile2.Close()
+		test.AssertNoErr(err)
+
+		removeTestFile(ctx, test, workspace, name)
+
+		_, err = os.OpenFile(subfile1name, os.O_RDONLY, 0777)
+		test.AssertErr(err)
+
+		_, err = os.OpenFile(subfile2name, os.O_RDONLY, 0777)
+		test.AssertErr(err)
+
+		_, err = os.Stat(workspace + "/" + name + "/subdir/subdir1")
+		test.AssertErr(err)
+	})
+}
+
 func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -443,5 +533,152 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
 		err := syscall.Rmdir(workspace + "/" + name)
 		test.AssertNoErr(err)
+	})
+}
+
+func readFirstNBytes(test *testHelper, name string, n int) string {
+	file, err := os.Open(name)
+	test.AssertNoErr(err)
+	newContent := make([]byte, n)
+	_, err = io.ReadFull(file, newContent)
+	test.AssertNoErr(err)
+	err = file.Close()
+	test.AssertNoErr(err)
+	return string(newContent)
+}
+
+func contentTest(ctx *ctx, test *testHelper,
+	content string,
+	create1 func(string, string) error,
+	create2 func(string) error) {
+
+	workspace := test.NewWorkspace()
+	utils.MkdirAll(workspace+"/subdir", 0777)
+	name := "subdir/testFile"
+	fullname := workspace + "/" + name
+
+	err := create1(fullname, content)
+	test.AssertNoErr(err)
+	test.SyncAllWorkspaces()
+	newRootId1 := getRootId(test, workspace)
+
+	err = create2(fullname)
+	test.AssertNoErr(err)
+	test.SyncAllWorkspaces()
+	newRootId2 := getRootId(test, workspace)
+
+	file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+	test.AssertNoErr(err)
+	readFirstNBytes(test, fullname, len(content))
+
+	refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+	newRootId3 := getRootId(test, workspace)
+	test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+
+	err = file.Close()
+	test.AssertNoErr(err)
+
+	newContent := readFirstNBytes(test, fullname, len(content))
+	test.Assert(content == newContent,
+		fmt.Sprintf("content mismatch %d", len(newContent)))
+	removeTestFile(ctx, test, workspace, name)
+}
+
+func createSparseFile(name string, size int64) error {
+	fd, err := syscall.Creat(name, 0124)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	return os.Truncate(name, size)
+}
+
+func createSmallFileWithContent(name string, content string) error {
+	return testutils.PrintToFile(name, content)
+}
+
+func createSmallFile(name string) error {
+	return createSmallFileWithContent(name, "small file content")
+}
+
+func createMediumFile(name string) error {
+	size := int64(quantumfs.MaxMediumFileSize()) -
+		int64(quantumfs.MaxBlockSize)
+	return createSparseFile(name, size)
+}
+
+func createMediumFileWithContent(name string, content string) error {
+	err := createMediumFile(name)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func createLargeFile(name string) error {
+	size := int64(quantumfs.MaxMediumFileSize()) +
+		int64(quantumfs.MaxBlockSize)
+	return createSparseFile(name, size)
+}
+
+func createLargeFileWithContent(name string, content string) error {
+	err := createLargeFile(name)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func createVeryLargeFile(name string) error {
+	size := int64(quantumfs.MaxLargeFileSize()) +
+		int64(quantumfs.MaxBlockSize)
+	return createSparseFile(name, size)
+}
+
+func createVeryLargeFileWithContent(name string, content string) error {
+	err := createVeryLargeFile(name)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func TestRefreshOpenFileContentCheckS2S(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createSmallFileWithContent,
+			createSmallFile)
+	})
+}
+
+func TestRefreshOpenFileContentCheckM2M(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createMediumFileWithContent,
+			createMediumFile)
+	})
+}
+
+func TestRefreshOpenFileContentCheckL2L(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createLargeFileWithContent,
+			createLargeFile)
+	})
+}
+
+func TestRefreshOpenFileContentCheckVL2VL(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "The original content",
+			createVeryLargeFileWithContent,
+			createVeryLargeFile)
 	})
 }

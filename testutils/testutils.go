@@ -128,6 +128,10 @@ func (th *TestHelper) AssertNoErr(err error) {
 	}
 }
 
+func (th *TestHelper) AssertErr(err error) {
+	th.Assert(err != nil, "An error was expected")
+}
+
 func (th *TestHelper) Execute(test QuantumFsTest) {
 	// Catch any panics and covert them into test failures
 	defer func(th *TestHelper) {
