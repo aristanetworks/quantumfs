@@ -377,7 +377,7 @@ func makeErrorResponse(code uint32, message string) []byte {
 func (api *ApiHandle) queueErrorResponse(code uint32, format string,
 	a ...interface{}) int {
 
-	message := fmt.Sprintf(format, a)
+	message := fmt.Sprintf(format, a...)
 	bytes := makeErrorResponse(code, message)
 	api.responses <- fuse.ReadResultData(bytes)
 
@@ -420,7 +420,7 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 	if err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		api.queueErrorResponse(quantumfs.ErrorBadJson, "%s", err.Error())
 	}
 
 	var responseSize int
@@ -483,7 +483,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	var cmd quantumfs.BranchRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	src := strings.Split(cmd.Src, "/")
@@ -499,7 +500,7 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 
 		c.vlog("branch failed: %s", err.Error())
 		return api.queueErrorResponse(
-			quantumfs.ErrorCommandFailed, err.Error())
+			quantumfs.ErrorCommandFailed, "%s", err.Error())
 	}
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Branch Succeeded")
@@ -512,7 +513,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	var err error
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	baseRootId := quantumfs.EmptyWorkspaceKey
@@ -576,7 +578,8 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 	var cmd quantumfs.AccessedRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	wsr := cmd.WorkspaceRoot
@@ -599,7 +602,8 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 	var cmd quantumfs.AccessedRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	wsr := cmd.WorkspaceRoot
@@ -630,7 +634,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	var cmd quantumfs.InsertInodeRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	dst := strings.Split(cmd.DstPath, "/")
@@ -710,7 +715,8 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 	var cmd quantumfs.DeleteWorkspaceRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	workspacePath := cmd.WorkspacePath
@@ -720,7 +726,7 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 
 		c.vlog("DeleteWorkspace failed: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			err.Error())
+			"%s", err.Error())
 	}
 
 	// Remove the record of the removed workspace from workspaceMutability map
@@ -738,7 +744,8 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 	var cmd quantumfs.EnableRootWriteRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	workspacePath := cmd.Workspace
@@ -785,13 +792,14 @@ func (api *ApiHandle) setBlock(c *ctx, buf []byte) int {
 	var cmd quantumfs.SetBlockRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	if len(cmd.Key) != quantumfs.HashSize {
 		c.vlog("Key incorrect size %d", len(cmd.Key))
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			fmt.Sprintf("Key must be %d bytes", quantumfs.HashSize))
+			"Key must be %d bytes", quantumfs.HashSize)
 	}
 
 	var hash [quantumfs.HashSize]byte
@@ -803,7 +811,7 @@ func (api *ApiHandle) setBlock(c *ctx, buf []byte) int {
 	err := c.dataStore.durableStore.Set(&c.Ctx, key, buffer)
 	if err != nil {
 		c.vlog("Setting block in datastore failed: %s", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, "%s",
 			err.Error())
 	}
 
@@ -816,13 +824,14 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) int {
 	var cmd quantumfs.GetBlockRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		c.vlog("Error unmarshaling JSON: %s ", err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	if len(cmd.Key) != quantumfs.HashSize {
 		c.vlog("Key incorrect size %d", len(cmd.Key))
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			fmt.Sprintf("Key must be %d bytes", quantumfs.HashSize))
+			"Key must be %d bytes", quantumfs.HashSize)
 	}
 
 	var hash [quantumfs.HashSize]byte
@@ -862,7 +871,8 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 
 	var cmd quantumfs.SetWorkspaceImmutableRequest
 	if err := json.Unmarshal(buf, &cmd); err != nil {
-		return api.queueErrorResponse(quantumfs.ErrorBadJson, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
 	}
 
 	workspacePath := cmd.WorkspacePath
