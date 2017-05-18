@@ -467,6 +467,8 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 	start := time.Now()
 
 	var keysWalked uint64
+	tracker := make(map[quantumfs.ObjectKey]bool)
+	var maplock utils.DeferableMutex
 	hist := newHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
@@ -474,6 +476,19 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		atomic.AddUint64(&keysWalked, 1)
 		defer showProgress(progress, start, keysWalked)
 		if walker.SkipKey(c, key) {
+			return nil
+		}
+
+		// So that the lock is not held during cql ops.
+		present := func() bool {
+			defer maplock.Lock().Unlock()
+			if _, ok := tracker[key]; ok {
+				return true
+			}
+			tracker[key] = true
+			return false
+		}()
+		if present {
 			return nil
 		}
 
