@@ -197,13 +197,12 @@ func parseExcludeLine(base string, line string) (string, error) {
 // in a special way.
 func addWord(exInfo *ExcludeInfo, word string, includePath bool) error {
 	if !includePath {
-		if _, exists := exInfo.excludes[word]; exists {
-			return fmt.Errorf("path %q already excluded", word)
+		if _, exists := exInfo.excludes[word]; !exists {
+			exInfo.excludes[word] = empty
+			exInfo.sortedExcWords = append(exInfo.sortedExcWords,
+				word)
+			sort.Strings(exInfo.sortedExcWords)
 		}
-		exInfo.excludes[word] = empty
-		exInfo.sortedExcWords = append(exInfo.sortedExcWords,
-			word)
-		sort.Strings(exInfo.sortedExcWords)
 		return nil
 	}
 	dirOnly := true
@@ -211,13 +210,25 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) error {
 		dirOnly = false
 	}
 	word = strings.TrimSuffix(word, "/")
-	if _, exists := exInfo.includes[word]; exists {
-		return fmt.Errorf("path %q already included", word)
+	if _, exists := exInfo.includes[word]; !exists {
+		curParent := word
+		for {
+			parent := getParent(curParent)
+			if parent == "/" {
+				break
+			}
+			if _, ok := exInfo.includes[parent]; !ok {
+				exInfo.includes[parent] = true
+				exInfo.sortedIncWords =
+					append(exInfo.sortedIncWords, parent)
+			}
+			curParent = parent
+		}
+		exInfo.includes[word] = dirOnly
+		exInfo.sortedIncWords = append(exInfo.sortedIncWords,
+			word)
+		sort.Strings(exInfo.sortedIncWords)
 	}
-	exInfo.includes[word] = dirOnly
-	exInfo.sortedIncWords = append(exInfo.sortedIncWords,
-		word)
-	sort.Strings(exInfo.sortedIncWords)
 	return nil
 }
 
@@ -227,6 +238,10 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	reWords := make([]string, 0)
 
 	for _, word := range exInfo.sortedExcWords {
+		// skip paths that are already excluded
+		if exInfo.PathExcluded(word) {
+			continue
+		}
 		// Avoid dir10 regex to match dir103
 		// by adding ^dir10$ and ^dir10/
 		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
@@ -234,10 +249,10 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		// is ok since file excludes will match it.
 		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
 		excludeSetRecordCount(exInfo, base, word)
-	}
-	exInfo.excludeRE, err = compileRE(reWords)
-	if err != nil {
-		return err
+		exInfo.excludeRE, err = compileRE(reWords)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Include paths which refer to a file or directory-without content
@@ -246,11 +261,10 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	// have both dollar suffixed and slash suffixed entries in regex.
 	reWords = make([]string, 0)
 	for _, word := range exInfo.sortedIncWords {
-		// Path shouldn't already be included (implicitly).
+		// ignore paths which are already included
 		if !exInfo.PathExcluded(word) {
-			return fmt.Errorf("path %q already included", word)
+			continue
 		}
-
 		// A path can be included only if all its ancestors
 		// are included.
 		parent := getParent(word)
@@ -261,6 +275,7 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 					"Add appropriate include paths.", word)
 			}
 		}
+
 		onlyDir := exInfo.includes[word]
 		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		if !onlyDir {
@@ -272,12 +287,7 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		if err != nil {
 			return err
 		}
-
 		includeSetRecordCount(exInfo, base, word)
-	}
-	exInfo.includeRE, err = compileRE(reWords)
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -335,9 +345,11 @@ func getParent(path string) string {
 
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	onlyDir, _ := exInfo.includes[path]
+	// when a path is included its record count is initialized to 0
+	exInfo.dirRecordCounts[path] = 0
 	if !onlyDir {
 		// If directory with its sub-dirs is being included
-		// then it's record count needs to be setup.
+		// then its record count needs to be set up.
 		err := initRecordCount(exInfo, base, path)
 		if err != nil {
 			return err
@@ -345,11 +357,13 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	}
 	// Only parent's record count is affected.
 	// Ancestor record count is not affected.
-	// Its gauranteed that parent exists in dirRecordCounts
-	// since all explicitly included paths are present and
-	// re-includes aren't supported.
+	// It's guaranteed that parent exists in dirRecordCounts
+	// since all explicitly included paths and their
+	// ancestors are present
 	parent := getParent(path)
 	exInfo.dirRecordCounts[parent]++
+	//fmt.Println("includeSetRecordCount ", exInfo.dirRecordCounts[parent],
+	//	parent, " ", path)
 	return nil
 }
 

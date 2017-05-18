@@ -238,7 +238,6 @@ func TestExclude_IncludeExcludedSubdirSelectiveContent(t *testing.T) {
 		}
 		content := `
 dir6/subdir66a
-+dir6/subdir66a
 +dir6/subdir66a/content666b
 `
 		expected := pathInfo{
@@ -352,7 +351,6 @@ func TestExclude_IncludeExcludedDirSelectiveContent(t *testing.T) {
 		content := `
 
 dir12
-+dir12
 +dir12/content1212b
 `
 		expected := pathInfo{
@@ -436,26 +434,6 @@ func TestExclude_EmptySpec(t *testing.T) {
 	})
 }
 
-func TestExclude_ParentNotIncluded(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-
-		hierarchy := []string{
-			"dir16/subdir1616/file161616a",
-		}
-		content := `
-dir16
-+dir16/subdir1616
-`
-		expected := pathInfo{
-			"/": 0,
-		}
-		err := runSpecTest(test.TempDir, hierarchy, content, expected)
-		test.Assert(err != nil, "include of subdir passed even when parent "+
-			"not included")
-	})
-
-}
-
 // TestBasicExclude tests the advanced exclude file
 func TestAdvancedExclude(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -516,7 +494,6 @@ dir5/subdir55a
 
 #include an excluded subdir, with selective content
 dir6/subdir66a
-+dir6/subdir66a
 +dir6/subdir66a/content666b
 
 #exclude empty dir
@@ -538,7 +515,6 @@ dir11
 
 #include an excluded dir, with selective content
 dir12
-+dir12
 +dir12/content1212b
 
 # dirname overlap
