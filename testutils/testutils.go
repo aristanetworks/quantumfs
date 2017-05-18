@@ -283,6 +283,27 @@ type TimeData struct {
 	TestName string
 }
 
+func writeToFile(file *os.File, data string) error {
+	written := 0
+	for written < len(data) {
+		writeIt, err := file.Write([]byte(data[written:]))
+		written += writeIt
+		if err != nil {
+			return errors.New("Unable to write all data")
+		}
+	}
+	return nil
+}
+
+func OverWriteFile(filename string, data string) error {
+	file, err := os.OpenFile(filename, os.O_RDWR, 0777)
+	if file == nil || err != nil {
+		return err
+	}
+	defer file.Close()
+	return writeToFile(file, data)
+}
+
 func PrintToFile(filename string, data string) error {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR,
 		0777)
@@ -290,18 +311,7 @@ func PrintToFile(filename string, data string) error {
 		return err
 	}
 	defer file.Close()
-
-	written := 0
-	for written < len(data) {
-		var writeIt int
-		writeIt, err = file.Write([]byte(data[written:]))
-		written += writeIt
-		if err != nil {
-			return errors.New("Unable to write all data")
-		}
-	}
-
-	return nil
+	return writeToFile(file, data)
 }
 
 func (th *TestHelper) ReadTo(file *os.File, offset int, num int) []byte {
