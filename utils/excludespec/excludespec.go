@@ -144,11 +144,7 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 			word = strings.TrimPrefix(word, "+")
 		}
 
-		err = addWord(&exInfo, word, includePath)
-		if err != nil {
-			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
-				filename, lineno, err)
-		}
+		addWord(&exInfo, word, includePath)
 	}
 
 	if err = s.Err(); err != nil {
@@ -195,7 +191,7 @@ func parseExcludeLine(base string, line string) (string, error) {
 // Separating addition and processing of words, simplifies maintaining
 // regex. Otherwise, things like duplicate words need to be handled
 // in a special way.
-func addWord(exInfo *ExcludeInfo, word string, includePath bool) error {
+func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 	if !includePath {
 		if _, exists := exInfo.excludes[word]; !exists {
 			exInfo.excludes[word] = empty
@@ -203,7 +199,7 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) error {
 				word)
 			sort.Strings(exInfo.sortedExcWords)
 		}
-		return nil
+		return
 	}
 	dirOnly := true
 	if strings.HasSuffix(word, "/") {
@@ -229,7 +225,7 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) error {
 			word)
 		sort.Strings(exInfo.sortedIncWords)
 	}
-	return nil
+	return
 }
 
 // Setup regex and record counts.
@@ -261,8 +257,29 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	// have both dollar suffixed and slash suffixed entries in regex.
 	reWords = make([]string, 0)
 	for _, word := range exInfo.sortedIncWords {
-		// ignore paths which are already included
-		if !exInfo.PathExcluded(word) {
+		//fmt.Println("inc word: ", word)
+		// Its possible for excludeSetRecordCount to have set up
+		// record count for path under "word". Clean up such paths
+		// now since "word" is being included.
+		//fmt.Println("before word: ", word, exInfo.dirRecordCounts)
+		newMap := make(map[string]int)
+		deletions := 0
+		for exPath, rc := range exInfo.dirRecordCounts {
+			if strings.HasPrefix(exPath, word+"/") {
+				deletions++
+				continue
+			}
+			newMap[exPath] = rc
+		}
+		exInfo.dirRecordCounts = newMap
+
+		// Ignore paths which are already included.
+		// However, its possible that word is implicitly
+		// included but there are paths under word which
+		// were explicitly included. In such cases, word
+		// must be added to the include regex but not update
+		// the record counts.
+		if !exInfo.PathExcluded(word) && deletions == 0 {
 			continue
 		}
 		// A path can be included only if all its ancestors
@@ -271,8 +288,10 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		if parent != excludeTopDir {
 			// root is never excluded
 			if exInfo.PathExcluded(parent) {
-				return fmt.Errorf("Ancestor(s) of %q not included. "+
-					"Add appropriate include paths.", word)
+				// As ancestors are auto-included by
+				// include directives, this condition is a bug
+				panic(fmt.Sprintf("Ancestor(s) of %q not "+
+					"included. Details: %s", word, exInfo))
 			}
 		}
 
@@ -287,7 +306,10 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		if err != nil {
 			return err
 		}
-		includeSetRecordCount(exInfo, base, word)
+		if deletions == 0 {
+			includeSetRecordCount(exInfo, base, word)
+			//fmt.Println("after word:", word, newMap)
+		}
 	}
 	return nil
 }
@@ -363,7 +385,7 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	parent := getParent(path)
 	exInfo.dirRecordCounts[parent]++
 	//fmt.Println("includeSetRecordCount ", exInfo.dirRecordCounts[parent],
-	//	parent, " ", path)
+	//		parent, " ", path)
 	return nil
 }
 
