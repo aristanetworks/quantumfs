@@ -133,7 +133,7 @@ func TestSyntax_DoubleExclude(t *testing.T) {
 dir1
 dir1
 `
-		testSyntaxErr(test, excludeFileContent)
+		testSyntaxNoErr(test, excludeFileContent)
 	})
 }
 
@@ -144,7 +144,7 @@ dir1
 +dir1
 +dir1
 `
-		testSyntaxErr(test, excludeFileContent)
+		testSyntaxNoErr(test, excludeFileContent)
 	})
 }
 
@@ -355,16 +355,19 @@ func TestEmptySpec(t *testing.T) {
 	})
 }
 
-// --- exclude file processing negative tests ---
 func TestOnlyIncludes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		hierarchy := []string{
-			"errdir1/errdir1111/",
+			"dir1/dir1111/",
 		}
 		content := "+dir1"
-		expected := pathInfo{}
+		expected := pathInfo{
+			"/":            1,
+			"dir1":         1,
+			"dir1/dir1111": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
-		test.Assert(err != nil, "re-included path did not fail")
+		test.AssertNoErr(err)
 	})
 }
 
@@ -375,12 +378,15 @@ func TestExcludeAllIncludeAllReinclude(t *testing.T) {
 		}
 		content := `
 dir1
-+dir1
 +dir1/
 `
-		expected := pathInfo{}
+		expected := pathInfo{
+			"/":          1,
+			"dir1":       1,
+			"dir1/dir11": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
-		test.Assert(err != nil, "re-included path did not fail")
+		test.AssertNoErr(err)
 	})
 }
 
@@ -393,10 +399,13 @@ func TestIncludeAncestorNotIncluded(t *testing.T) {
 dir1
 +dir1/dir11
 `
-		expected := pathInfo{}
+		expected := pathInfo{
+			"/":          1,
+			"dir1":       1,
+			"dir1/dir11": 0,
+		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
-		test.Assert(err != nil, "include succeeded withour ancestors "+
-			"being included")
+		test.AssertNoErr(err)
 	})
 }
 
