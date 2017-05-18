@@ -38,6 +38,30 @@ type dataStore struct {
 	freeSpace int
 }
 
+func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
+	defer c.FuncInName(qlog.LogDaemon, "dataStore::storeInCache").Out()
+
+	size := buf.Size()
+
+	// Store in cache
+	defer store.cacheLock.Lock().Unlock()
+
+	if size > store.cacheSize {
+		c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
+			" total capacity of the cache")
+		return
+	}
+
+	store.freeSpace -= size
+	for store.freeSpace < 0 {
+		evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
+		store.freeSpace += evictedBuf.Size()
+		delete(store.cache, evictedBuf.key)
+	}
+	store.cache[buf.key] = &buf
+	buf.lruElement = store.lru.PushBack(buf)
+}
+
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
@@ -74,26 +98,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 	err = store.durableStore.Get(c, key, &buf)
 	if err == nil {
-		size := buf.Size()
-
-		// Store in cache
-		defer store.cacheLock.Lock().Unlock()
-
-		if size > store.cacheSize {
-			c.Vlog(qlog.LogDaemon, "The size of content is greater than"+
-				" total capacity of the cache")
-			return &buf
-		}
-
-		store.freeSpace -= size
-		for store.freeSpace < 0 {
-			evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
-			store.freeSpace += evictedBuf.Size()
-			delete(store.cache, evictedBuf.key)
-		}
-		store.cache[buf.key] = &buf
-		buf.lruElement = store.lru.PushBack(buf)
-
+		store.storeInCache(c, buf)
 		c.Vlog(qlog.LogDaemon, "Found key in durable store store")
 		return &buf
 	}
