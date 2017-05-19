@@ -20,6 +20,7 @@ import (
 func WriteWorkspaceWalkDuration(c *Ctx, ts string, ns string, pass bool,
 	ws string, dur time.Duration) {
 
+	measurement := "workspaceWalkDuration"
 	tags := map[string]string{
 		"typeSpace": ts,
 		"nameSpace": ns,
@@ -29,16 +30,15 @@ func WriteWorkspaceWalkDuration(c *Ctx, ts string, ns string, pass bool,
 		"workSpace":   ws,
 		"walkTimeSec": uint(dur / time.Second),
 	}
-	measurement := "workspaceWalkDuration"
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Error writing %s to influxDB for "+
+		c.elog("Writing %s to influxDB for "+
 			"%s/%s/%s walkSuccess=%v err:%v\n", measurement, ts, ns, ws, pass, err)
 		return
 	}
-	c.vlog("Success writing %s=%v to influxDB for "+
-		"%s/%s/%s walkSuccess=%v \n", measurement, dur, ts, ns, ws, pass)
+	c.vlog("%s Writing %s=%v to influxDB for "+
+		"%s/%s/%s walkSuccess=%v \n", successPrefix, measurement, dur, ts, ns, ws, pass)
 }
 
 // WriteWalkerStride is a measurement point writer
@@ -50,22 +50,22 @@ func WriteWorkspaceWalkDuration(c *Ctx, ts string, ns string, pass bool,
 //         countSuccess - Num successful walks
 //         countError   - Num failed walks
 //
-func WriteWalkerStride(c *Ctx, dur time.Duration, numSuccess uint,
-	numError uint) {
+func WriteWalkerStride(c *Ctx, dur time.Duration, numSuccess uint32,
+	numError uint32) {
 
+	measurement := "walkerStride"
 	tags := map[string]string{}
 	fields := map[string]interface{}{
 		"walkTimeMin":  uint(dur / time.Minute),
 		"countSuccess": numSuccess,
 		"countError":   numError,
 	}
-	measurement := "walkerStride"
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Error writing %s to influxDB err: %v\n", measurement, err)
+		c.elog("Writing %s to influxDB err: %v\n", measurement, err)
 		return
 	}
-	c.vlog("Success writing %s=%v numSuccess=%v numError=%v to influxDB\n",
-		measurement, dur, numSuccess, numError)
+	c.vlog("%s Writing %s=%v numSuccess=%v numError=%v to influxDB\n",
+		successPrefix, measurement, dur, numSuccess, numError)
 }
