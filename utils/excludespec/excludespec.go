@@ -12,12 +12,9 @@ file must follow rules outlined below:
  - Absolute paths are not allowed.
  - Exclude path must not be "/" suffixed.
  - Path to be included is prefixed with "+".
- - The parent and ancestors of path to be included must be included (explicitly
-   or implicitly) already.
  - The order of exclude and include paths in the file does not matter.
  - Use ordering that makes the file more readable.
  - All excludes are processed first and then includes are processed.
- - A path cannot be included or excluded more than once.
 
 A path is considered to be included if it meets following criteria:
  - if the path is not covered by any exclude directives (implict inclusion)
@@ -32,17 +29,15 @@ directory "rootdir". In other words, the absolute path for dir1 is
 
  # exclude dir1 and all its contents
  dir1
- # create only dir1 (not its contents)
+ # include only dir1 (not its contents)
  +dir1
- # create dir1/subdir1 (not its contents)
+ # include dir1/subdir1 (not its contents)
  +dir1/subdir1
- # create dir1/subdir1/file1
+ # include dir1/subdir1/file1
  +dir1/subdir1/file1
- # create dir1/subdir4 (not its contents)
+ # include dir1/subdir4 (not its contents)
  +dir1/subdir4
- # include contents of a dir1/subdir3/subsubdir1
- # ignore siblings of dir1/subdir3
- +dir/subdir3
+ # include contents of dir1/subdir3/subsubdir1
  +dir1/subdir3/subsubdir3/
 
  Example-2:
@@ -228,6 +223,64 @@ func addWord(exInfo *ExcludeInfo, word string, includePath bool) {
 	return
 }
 
+// Returns true if new content will be included by "word".
+// In other words, when the content referred by "word" is excluded
+// and not included.
+func includingNewContent(exInfo *ExcludeInfo, word string, dirOnly bool) bool {
+	excluded := false
+	included := false
+
+	if exInfo.excludeRE != nil {
+		excluded = exInfo.excludeRE.MatchString(word)
+	}
+
+	if !excluded && !dirOnly {
+		path := word + "/"
+		for _, exWord := range exInfo.sortedExcWords {
+			if strings.HasPrefix(exWord, path) {
+				excluded = true
+				break
+			}
+		}
+	}
+
+	if excluded {
+		if exInfo.includeRE != nil {
+			included = exInfo.includeRE.MatchString(word)
+		}
+	}
+
+	return excluded && !included
+}
+
+// Explicitly excluded path must not get included.
+// Thus following is invalid:
+//
+// d1/d2/d3
+// +d1/
+//
+func explicitExcludeTurnsInclude(exInfo *ExcludeInfo, path string,
+	onlyDir bool) error {
+
+	words := make([]string, 0)
+	words = append(words, "^"+regexp.QuoteMeta(path)+"$")
+	if !onlyDir {
+		words = append(words, "^"+regexp.QuoteMeta(path)+"/")
+	}
+	re, err := compileRE(words)
+	if err != nil {
+		return err
+	}
+
+	for _, exWord := range exInfo.sortedExcWords {
+		if exWord != path && re.MatchString(exWord) {
+			return fmt.Errorf("explicit exclude %q now included",
+				exWord)
+		}
+	}
+	return nil
+}
+
 // Setup regex and record counts.
 func processWords(exInfo *ExcludeInfo, base string) error {
 	var err error
@@ -257,29 +310,15 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 	// have both dollar suffixed and slash suffixed entries in regex.
 	reWords = make([]string, 0)
 	for _, word := range exInfo.sortedIncWords {
-		//fmt.Println("inc word: ", word)
-		// Its possible for excludeSetRecordCount to have set up
-		// record count for path under "word". Clean up such paths
-		// now since "word" is being included.
-		//fmt.Println("before word: ", word, exInfo.dirRecordCounts)
-		newMap := make(map[string]int)
-		deletions := 0
-		for exPath, rc := range exInfo.dirRecordCounts {
-			if strings.HasPrefix(exPath, word+"/") {
-				deletions++
-				continue
-			}
-			newMap[exPath] = rc
-		}
-		exInfo.dirRecordCounts = newMap
+		onlyDir := exInfo.includes[word]
 
-		// Ignore paths which are already included.
-		// However, its possible that word is implicitly
-		// included but there are paths under word which
-		// were explicitly included. In such cases, word
-		// must be added to the include regex but not update
-		// the record counts.
-		if !exInfo.PathExcluded(word) && deletions == 0 {
+		err = explicitExcludeTurnsInclude(exInfo, word, onlyDir)
+		if err != nil {
+			return err
+		}
+		// If no new content is being included then don't process
+		// the include directive. This keeps the later coder simple.
+		if !includingNewContent(exInfo, word, onlyDir) {
 			continue
 		}
 		// A path can be included only if all its ancestors
@@ -294,8 +333,6 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 					"included. Details: %s", word, exInfo))
 			}
 		}
-
-		onlyDir := exInfo.includes[word]
 		reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"$")
 		if !onlyDir {
 			reWords = append(reWords, "^"+regexp.QuoteMeta(word)+"/")
@@ -306,10 +343,12 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		if err != nil {
 			return err
 		}
-		if deletions == 0 {
-			includeSetRecordCount(exInfo, base, word)
-			//fmt.Println("after word:", word, newMap)
-		}
+		// Only parent's record count is affected.
+		// Ancestor record count is not affected.
+		// It's guaranteed that parent exists in dirRecordCounts
+		// since all explicitly included paths and their
+		// ancestors are present.
+		includeSetRecordCount(exInfo, base, word)
 	}
 	return nil
 }
@@ -367,7 +406,6 @@ func getParent(path string) string {
 
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	onlyDir, _ := exInfo.includes[path]
-	// when a path is included its record count is initialized to 0
 	exInfo.dirRecordCounts[path] = 0
 	if !onlyDir {
 		// If directory with its sub-dirs is being included
@@ -377,15 +415,9 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 			return err
 		}
 	}
-	// Only parent's record count is affected.
-	// Ancestor record count is not affected.
-	// It's guaranteed that parent exists in dirRecordCounts
-	// since all explicitly included paths and their
-	// ancestors are present
+
 	parent := getParent(path)
 	exInfo.dirRecordCounts[parent]++
-	//fmt.Println("includeSetRecordCount ", exInfo.dirRecordCounts[parent],
-	//		parent, " ", path)
 	return nil
 }
 
