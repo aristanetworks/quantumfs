@@ -23,6 +23,18 @@ func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
 	c.Events.DisableSchemaEvents = true
 
+	if clusterCfg.Username != "" && clusterCfg.Password != "" {
+		c.Authenticator = gocql.PasswordAuthenticator{
+			Username: clusterCfg.Username,
+			Password: clusterCfg.Password,
+		}
+	} else {
+		c.Authenticator = gocql.PasswordAuthenticator{
+			Username: scyllaUsername,
+			Password: scyllaPassword,
+		}
+	}
+
 	if clusterCfg.NumRetries == 0 {
 		clusterCfg.NumRetries = 2
 	}

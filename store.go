@@ -11,6 +11,9 @@ import (
 	"github.com/aristanetworks/ether/utils"
 )
 
+var scyllaUsername = "ether"
+var scyllaPassword = "ether"
+
 // Config struct holds the info needed to connect to a cql cluster
 // and knobs for the different APIs
 type Config struct {
@@ -27,6 +30,8 @@ type ClusterConfig struct {
 	NumRetries int           `json:"numretries"`
 	KeySpace   string        `json:"keyspace"`
 	Timeout    time.Duration `json:"timeout"`
+	Username   string        `json:"username"`
+	Password   string        `json:"password"`
 }
 
 // BlobStoreConfig holds config values specific to BlobStore API

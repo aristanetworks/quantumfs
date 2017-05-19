@@ -147,6 +147,10 @@ func getTestClusterConfig(clusterCfg ClusterConfig) *gocql.ClusterConfig {
 	// Hardcoded for testing
 	cluster.Timeout = schemaTimeout
 	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: schemaRetries}
+	cluster.Authenticator = gocql.PasswordAuthenticator{
+		Username: clusterCfg.Username,
+		Password: clusterCfg.Password,
+	}
 
 	return cluster
 }
