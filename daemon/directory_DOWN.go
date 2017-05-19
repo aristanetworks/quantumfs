@@ -232,25 +232,6 @@ func (dir *Directory) handleInstantiatedInodeChange_DOWN(c *ctx, inode Inode,
 	}
 }
 
-func (dir *Directory) handleRegularFileTypeChange_DOWN(c *ctx,
-	inode Inode, remoteRecord *quantumfs.DirectRecord) {
-
-	defer c.FuncIn("Directory::handleRegularFileTypeChange_DOWN", "%s: %d",
-		remoteRecord.Filename(), remoteRecord.Type()).Out()
-	regFile := inode.(*File)
-	switch remoteRecord.Type() {
-	case quantumfs.ObjectTypeSmallFile:
-		regFile.accessor = newSmallAccessor(c, 0, remoteRecord.ID())
-		regFile.accessor.reload(c, remoteRecord.ID())
-	case quantumfs.ObjectTypeMediumFile:
-		regFile.accessor = newMediumAccessor(c, remoteRecord.ID())
-	case quantumfs.ObjectTypeLargeFile:
-		regFile.accessor = newLargeAccessor(c, remoteRecord.ID())
-	case quantumfs.ObjectTypeVeryLargeFile:
-		regFile.accessor = newVeryLargeAccessor(c, remoteRecord.ID())
-	}
-}
-
 func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	localRecord quantumfs.DirectoryRecord,
 	remoteRecord *quantumfs.DirectRecord) {
@@ -273,7 +254,7 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 			dir.handleInstantiatedInodeChange_DOWN(c, inode, inodeId,
 				remoteRecord)
 		} else if localRecord.Type().Matches(remoteRecord.Type()) {
-			dir.handleRegularFileTypeChange_DOWN(c, inode, remoteRecord)
+			inode.(*File).handleTypeChange(c, remoteRecord)
 		} else {
 			dir.destroyChild_DOWN(c, inode, inodeId, localRecord)
 		}
