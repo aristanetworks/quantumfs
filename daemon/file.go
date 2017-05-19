@@ -591,6 +591,9 @@ type blockAccessor interface {
 	// Write file's metadata to the datastore and provide the key
 	sync(c *ctx) quantumfs.ObjectKey
 
+	// Reload the content of the file from datastore
+	reload(c *ctx, key quantumfs.ObjectKey)
+
 	// Truncate to lessen length *only*, error otherwise
 	truncate(c *ctx, newLength uint64) error
 }
