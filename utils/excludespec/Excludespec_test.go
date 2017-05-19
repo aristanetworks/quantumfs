@@ -273,25 +273,22 @@ func TestExcludeSomeIncludeAll(t *testing.T) {
 
 		hierarchy := []string{
 			"dir1/subdir11a/.file111a",
-			"dir1/subdir11b/.file111b",
+			"dir1/subdir11a/subdir111b/file1111c",
 			"file1",
 			"file2",
 		}
 		content := `
 dir1/subdir11a/.file111a
-+dir1/
-+file1
-+file2
++dir1/subdir11a/subdir111b
 `
 		expected := pathInfo{
-			"/":                        3,
-			"file1":                    0,
-			"file2":                    0,
-			"dir1":                     2,
-			"dir1/subdir11a":           1,
-			"dir1/subdir11b":           1,
-			"dir1/subdir11a/.file111a": 0,
-			"dir1/subdir11b/.file111b": 0,
+			"/":                                   3,
+			"file1":                               0,
+			"file2":                               0,
+			"dir1":                                1,
+			"dir1/subdir11a":                      1,
+			"dir1/subdir11a/subdir111b":           1,
+			"dir1/subdir11a/subdir111b/file1111c": 0,
 		}
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
 		test.AssertNoErr(err)
