@@ -138,12 +138,9 @@ The exclude file should be formatted based on following rules:
  - Absolute paths are not allowed.
  - Exclude path must not be "/" suffixed.
  - Path to be included is prefixed with "+".
- - The parent and ancestors of path to be included must be included (explicitly
-   or implicitly) already.
  - The order of exclude and include paths in the file does not matter.
  - Use ordering that makes the file more readable.
  - All excludes are processed first and then includes are processed.
- - A path cannot be included or excluded  more than once.
 
 A path is considered to be included if it meets following criteria:
  - if the path is not covered by any exclude directives (implict inclusion)
@@ -158,17 +155,15 @@ directory "rootdir". In other words, the absolute path for dir1 is
 
  # exclude dir1 and all its contents
  dir1
- # create only dir1 (not its contents)
+ # include only dir1 (not its contents)
  +dir1
- # create dir1/subdir1 (not its contents)
+ # include dir1/subdir1 (not its contents)
  +dir1/subdir1
- # create dir1/subdir1/file1
+ # include dir1/subdir1/file1
  +dir1/subdir1/file1
- # create dir1/subdir4 (not its contents)
+ # include dir1/subdir4 (not its contents)
  +dir1/subdir4
- # include contents of a dir1/subdir3/subsubdir1
- # ignore siblings of dir1/subdir3 
- +dir/subdir3
+ # include contents of dir1/subdir3/subsubdir1
  +dir1/subdir3/subsubdir3/
 
  Example-2:
