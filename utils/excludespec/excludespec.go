@@ -406,6 +406,7 @@ func getParent(path string) string {
 
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	onlyDir, _ := exInfo.includes[path]
+	exInfo.dirRecordCounts[path] = 0
 	if !onlyDir {
 		// If directory with its sub-dirs is being included
 		// then its record count needs to be set up.
