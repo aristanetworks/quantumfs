@@ -24,7 +24,6 @@ import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
-const defaultCacheSize = 8 * 1024 * 1024 * 1024
 const flushSanityTimeout = time.Minute
 
 type dirtyInode struct {
@@ -57,7 +56,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 			config:      &config,
 			workspaceDB: config.WorkspaceDB,
 			dataStore: newDataStore(config.DurableStore,
-				defaultCacheSize),
+				int(config.CacheSize)),
 		},
 	}
 
