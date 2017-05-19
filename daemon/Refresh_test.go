@@ -598,7 +598,15 @@ func createSparseFile(name string, size int64) error {
 }
 
 func createSmallFileWithContent(name string, content string) error {
-	return testutils.PrintToFile(name, content)
+	fd, err := syscall.Creat(name, 0124)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
 }
 
 func createSmallFile(name string) error {
@@ -703,7 +711,9 @@ func TestRefreshContentCheck(t *testing.T) {
 			c2:   createVeryLargeFile,
 			name: "VL2VL"},
 	}
+	t.Parallel()
 	for _, cct := range contentCheckTests {
+		// This test is already running in parallel with the other tests
 		runExpensiveTest(t, func(test *testHelper) {
 			ctx := test.TestCtx()
 			ctx.vlog("Running test %s", cct.name)
