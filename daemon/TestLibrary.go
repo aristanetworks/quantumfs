@@ -136,7 +136,7 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 
 	config := QuantumFsConfig{
 		CachePath:        th.TempDir + "/ramfs",
-		CacheSize:        1 * 1024 * 1024,
+		CacheSize:        64 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
 		DirtyFlushDelay:  30 * time.Second,
