@@ -40,7 +40,7 @@ var showMaxSizes bool
 func init() {
 	const (
 		defaultCachePath        = "/dev/shm/quantumfs"
-		defaultCacheSize        = "8G"
+		defaultCacheSize        = "24G"
 		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 300
 		defaultCacheTimeNsecs   = 0
