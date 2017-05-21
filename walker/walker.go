@@ -7,11 +7,14 @@ import "errors"
 import "fmt"
 import "path/filepath"
 import "runtime"
+import "runtime/debug"
+import "strings"
 
 import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 import "github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
 
@@ -46,6 +49,33 @@ type workerData struct {
 	size uint64
 }
 
+func panicHandler(result *string) {
+	err := recover()
+	trace := ""
+
+	// If the test passed pass that fact back to runTest()
+	if err == nil {
+		err = ""
+	} else {
+		// Capture the stack trace of the failure
+		trace = utils.BytesToString(debug.Stack())
+		trace = strings.SplitN(trace, "\n", 8)[7]
+	}
+
+	switch err.(type) {
+	default:
+		*result = fmt.Sprintf("Unknown panic type: %v", err)
+	case string:
+		*result = err.(string)
+	case error:
+		*result = err.(error).Error()
+	}
+
+	if trace != "" {
+		*result += "\nStack Trace:\n" + trace
+	}
+}
+
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
@@ -71,6 +101,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	group, groupCtx := errgroup.WithContext(context.Background())
 	keyChan := make(chan *workerData, 100)
+	var result string
 
 	c := &Ctx{
 		Context: groupCtx,
@@ -82,11 +113,13 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	for i := 0; i < conc; i++ {
 
 		group.Go(func() error {
+			defer panicHandler(&result)
 			return worker(c, keyChan, wf)
 		})
 	}
 
 	group.Go(func() error {
+		defer panicHandler(&result)
 		defer close(keyChan)
 
 		if err := writeToChan(c, keyChan, "", rootID,
@@ -109,7 +142,13 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		}
 		return nil
 	})
-	return group.Wait()
+
+	err := group.Wait()
+	if result != "" {
+		err = fmt.Errorf("panic in walker")
+		fmt.Println(result)
+	}
+	return err
 }
 
 func handleHardLinks(c *Ctx, ds quantumfs.DataStore,

@@ -5,6 +5,7 @@ package walker
 
 import "io/ioutil"
 import "os"
+import "strings"
 import "strconv"
 import "testing"
 
@@ -333,5 +334,52 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 			link, err)
 
 		test.readWalkCompareSkip(workspace)
+	})
+}
+
+func TestWalkPanic(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(1024 * 1024 * 33)
+		workspace := test.NewWorkspace()
+
+		// Write File 1
+		filename := workspace + "/file"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		// Mark Hard Link 1
+		link := workspace + "/filelink"
+		err = os.Link(filename, link)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link, err)
+
+		test.SyncAllWorkspaces()
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		// Use Walker to walk all the blocks in the workspace.
+		c := &test.TestCtx().Ctx
+		root := strings.Split(test.RelPath(workspace), "/")
+		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		test.Assert(err == nil, "Error getting rootID for %v: %v",
+			root, err)
+
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, isDir bool) error {
+
+			// Skip, since constant and embedded keys will not
+			// show up in regular walk.
+			if SkipKey(c, key) {
+				return nil
+			}
+			return nil
+		}
+
+		// TODO(sid) Do Something to induce panic in Walk ??
+		err = Walk(c, ds, rootID, wf)
+		// TODO(sid) This should be changed to err != nil
+		// after we have induced an panic
+		test.Assert(err == nil, "Walk should have failedi")
 	})
 }
