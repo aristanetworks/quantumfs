@@ -12,6 +12,7 @@ import "io"
 import "os"
 import "runtime"
 import "runtime/debug"
+import "runtime/pprof"
 import "sort"
 import "strings"
 import "sync"
@@ -127,6 +128,10 @@ func (th *TestHelper) AssertNoErr(err error) {
 	}
 }
 
+func (th *TestHelper) AssertErr(err error) {
+	th.Assert(err != nil, "An error was expected")
+}
+
 func (th *TestHelper) Execute(test QuantumFsTest) {
 	// Catch any panics and covert them into test failures
 	defer func(th *TestHelper) {
@@ -185,11 +190,16 @@ func (th *TestHelper) EndTest() {
 	}
 }
 
+func (th *TestHelper) dumpStackTraces() {
+	pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
+}
+
 func (th *TestHelper) WaitForResult() string {
 	var testResult string
 	select {
 	case <-time.After(th.Timeout):
 		testResult = "ERROR: TIMED OUT"
+		th.dumpStackTraces()
 
 	case testResult = <-th.TestResult:
 	}
