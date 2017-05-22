@@ -422,6 +422,18 @@ func (v ObjectType) Primitive() interface{} {
 	return uint8(v)
 }
 
+func (v ObjectType) isRegular() bool {
+	return v == ObjectTypeSmallFile || v == ObjectTypeMediumFile ||
+		v == ObjectTypeLargeFile || v == ObjectTypeVeryLargeFile
+}
+
+func (v ObjectType) Matches(o ObjectType) bool {
+	if v.isRegular() {
+		return o.isRegular()
+	}
+	return v == o
+}
+
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
 // be owned by some special system accounts or the current user. The translation to
 // UID is done at access time.
