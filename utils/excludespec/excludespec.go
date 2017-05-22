@@ -172,6 +172,11 @@ func parseExcludeLine(base string, line string) (string, error) {
 	case strings.HasPrefix(line, ".."):
 		return "", fmt.Errorf("path has .. prefix")
 	case !isIncludePath(line) && strings.HasSuffix(line, "/"):
+		// Exclude directive implies that both directory and its
+		// contents are excluded so there is no need for using
+		// slash suffix. Since include directives have specific
+		// behavior of slash suffix to avoid confusion, slash suffixes
+		// for exclude directives are prohibited.
 		return "", fmt.Errorf("exclude path has / suffix")
 	}
 	// check to ensure the path entry in exclude file is valid
@@ -244,10 +249,8 @@ func includingNewContent(exInfo *ExcludeInfo, word string, dirOnly bool) bool {
 		}
 	}
 
-	if excluded {
-		if exInfo.includeRE != nil {
-			included = exInfo.includeRE.MatchString(word)
-		}
+	if excluded && exInfo.includeRE != nil {
+		included = exInfo.includeRE.MatchString(word)
 	}
 
 	return excluded && !included
