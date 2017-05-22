@@ -32,7 +32,7 @@ type Ctx struct {
 	numSuccess uint32
 	numError   uint32
 	numWalkers int
-	strideID   uint32
+	iteration  uint
 }
 
 func getWalkerDaemonContext(influxServer string, influxPort int,
@@ -132,6 +132,6 @@ func (c *Ctx) newRequestID() *Ctx {
 		numSuccess: c.numSuccess,
 		numError:   c.numError,
 		numWalkers: c.numWalkers,
-		strideID:   c.strideID,
+		iteration:  c.iteration,
 	}
 }

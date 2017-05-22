@@ -29,19 +29,22 @@ func WriteWorkspaceWalkDuration(c *Ctx, ts string, ns string, pass bool,
 	fields := map[string]interface{}{
 		"workSpace":   ws,
 		"walkTimeSec": uint(dur / time.Second),
+		"iteration":   c.iteration,
 	}
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("Writing %s to influxDB for "+
-			"%s/%s/%s walkSuccess=%v err:%v\n", measurement, ts, ns, ws, pass, err)
+			"%s/%s/%s iteration=%v walkSuccess=%v err:%v\n",
+			measurement, ts, ns, ws, c.iteration, pass, err)
 		return
 	}
 	c.vlog("%s Writing %s=%v to influxDB for "+
-		"%s/%s/%s walkSuccess=%v \n", successPrefix, measurement, dur, ts, ns, ws, pass)
+		"%s/%s/%s iteration=%v walkSuccess=%v \n",
+		successPrefix, measurement, dur, ts, ns, ws, c.iteration, pass)
 }
 
-// WriteWalkerStride is a measurement point writer
+// WriteWalkerIteration is a measurement point writer
 //
 // tags:   none
 //
@@ -50,22 +53,24 @@ func WriteWorkspaceWalkDuration(c *Ctx, ts string, ns string, pass bool,
 //         countSuccess - Num successful walks
 //         countError   - Num failed walks
 //
-func WriteWalkerStride(c *Ctx, dur time.Duration, numSuccess uint32,
-	numError uint32) {
+func WriteWalkerIteration(c *Ctx, dur time.Duration,
+	numSuccess uint32, numError uint32) {
 
-	measurement := "walkerStride"
+	measurement := "walkerIteration"
 	tags := map[string]string{}
 	fields := map[string]interface{}{
 		"walkTimeMin":  uint(dur / time.Minute),
+		"iteration":    c.iteration,
 		"countSuccess": numSuccess,
 		"countError":   numError,
 	}
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Writing %s to influxDB err: %v\n", measurement, err)
+		c.elog("Writing %s iteration=%v to influxDB err: %v\n",
+			measurement, c.iteration, err)
 		return
 	}
-	c.vlog("%s Writing %s=%v numSuccess=%v numError=%v to influxDB\n",
-		successPrefix, measurement, dur, numSuccess, numError)
+	c.vlog("%s Writing %s=%v iteration=%v numSuccess=%v numError=%v to influxDB\n",
+		successPrefix, measurement, dur, c.iteration, numSuccess, numError)
 }

@@ -106,20 +106,20 @@ func main() {
 
 func walkFullWSDBLoop(c *Ctx) {
 	for {
-		c.strideID++
+		c.iteration++
 		startTimeOuter := time.Now()
-		c.vlog("Iteration[%v] started at %v", c.strideID, startTimeOuter)
+		c.vlog("Iteration[%v] started at %v", c.iteration, startTimeOuter)
 
 		if err := walkFullWSDBSetup(c); err != nil {
 			dur := time.Since(startTimeOuter)
-			c.elog("Iteration[%v] ended at %v err(%v) took %v",
-				c.strideID, time.Now(), err, dur)
+			c.vlog("Iteration[%v] ended at %v err(%v) took %v",
+				c.iteration, time.Now(), err, dur)
 			break
 		}
 
 		dur := time.Since(startTimeOuter)
-		c.vlog("Iteration[%v] ended at %v took %v", c.strideID, time.Now(), dur)
-		WriteWalkerStride(c, dur, c.numSuccess, c.numError)
+		c.vlog("Iteration[%v] ended at %v took %v", c.iteration, time.Now(), dur)
+		WriteWalkerIteration(c, dur, c.numSuccess, c.numError)
 	}
 }
 
@@ -131,7 +131,6 @@ func walkFullWSDBLoop(c *Ctx) {
 // When an error occurs in any of the gouroutines, c.Done() is triggered and
 // all the goroutines exit. Errors returned from walker.Walk() are
 // ignored.
-//
 func walkFullWSDBSetup(c *Ctx) error {
 
 	group, groupCtx := errgroup.WithContext(context.Background())
