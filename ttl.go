@@ -24,7 +24,7 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		return nil
 	}
 
-	ks := key.String()
+	ks := key.Text()
 	metadata, err := cqlds.Metadata(ToECtx(c), ks)
 	if err != nil {
 		return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
