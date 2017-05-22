@@ -1067,6 +1067,16 @@ func (qfs *QuantumFs) invalidateInode(inodeId InodeId) fuse.Status {
 	return qfs.server.InodeNotify(uint64(inodeId), 0, -1)
 }
 
+func (qfs *QuantumFs) noteDeletedInode(parentId InodeId, childId InodeId,
+	name string) fuse.Status {
+
+	return qfs.server.DeleteNotify(uint64(parentId), uint64(childId), name)
+}
+
+func (qfs *QuantumFs) noteChildCreated(parentId InodeId, name string) fuse.Status {
+	return qfs.server.EntryNotify(uint64(parentId), name)
+}
+
 func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
 	flags uint32) bool {
 
