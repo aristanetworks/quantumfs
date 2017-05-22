@@ -75,7 +75,7 @@ func testWorkspaceWriteNoWritePermission(test *testHelper, subdirectory string) 
 		testPreparation(test, subdirectory)
 
 	wsr := test.branchWorkspaceWithoutWritePerm(baseWorkspace)
-	workspace := test.absPath(wsr)
+	workspace := test.AbsPath(wsr)
 
 	dirName := workspace + subdirectory + "/dir1"
 	err := syscall.Mkdir(dirName, 0666)
@@ -155,7 +155,7 @@ func testWorkspaceReadNoWritePermission(test *testHelper, subdirectory string) {
 	test.Assert(err == nil, "Error creating a small file: %v", err)
 
 	wsr := test.branchWorkspaceWithoutWritePerm(baseWorkspace)
-	workspace := test.absPath(wsr)
+	workspace := test.AbsPath(wsr)
 
 	targetFile := workspace + subdirectory + "/file"
 	file, err = os.OpenFile(targetFile, os.O_RDONLY, 0)
@@ -327,7 +327,9 @@ func TestSetRemoteWorkspaceImmutable(t *testing.T) {
 func TestWorkspaceRootChecker(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		wsr := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+
 		var inode Inode
 		inode = wsr
 

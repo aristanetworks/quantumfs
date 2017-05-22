@@ -362,3 +362,13 @@ func asDirectory(inode Inode) *Directory {
 		panic(fmt.Sprintf("Inode %d is not a Directory", inode.inodeNum()))
 	}
 }
+
+// Notify the kernel that the requested entry isn't found and further that the kernel
+// should cache that fact.
+func kernelCacheNegativeEntry(c *ctx, out *fuse.EntryOut) fuse.Status {
+	// The FUSE API for notifying the kernel of a negative lookup is by returning
+	// success with a zero NodeId. See struct fuse_entry_param in libfuse.
+	fillEntryOutCacheData(c, out)
+	out.NodeId = 0
+	return fuse.OK
+}

@@ -175,6 +175,22 @@ func (fi *MultiBlockFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	return int(blkIdx), remainingOffset
 }
 
+func (fi *MultiBlockFile) reload(c *ctx, key quantumfs.ObjectKey) {
+	defer c.funcIn("MultiBlockFile::reload").Out()
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		panic("Unable to fetch metadata for reloading")
+	}
+
+	store := buffer.AsMultiBlockFile()
+
+	fi.metadata.BlockSize = store.BlockSize()
+	fi.metadata.LastBlockBytes = store.SizeOfLastBlock()
+	fi.metadata.Blocks = store.ListOfBlocks()
+	fi.toSync = make(map[int]quantumfs.Buffer)
+}
+
 func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("MultiBlockFile::sync").Out()
 
@@ -188,7 +204,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 		delete(fi.toSync, i)
 	}
 
-	store := quantumfs.NewMultiBlockFile(fi.maxBlocks)
+	store := quantumfs.NewMultiBlockFile(len(fi.metadata.Blocks))
 	store.SetBlockSize(fi.metadata.BlockSize)
 	store.SetNumberOfBlocks(len(fi.metadata.Blocks))
 	store.SetSizeOfLastBlock(fi.metadata.LastBlockBytes)

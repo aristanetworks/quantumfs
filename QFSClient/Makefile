@@ -22,7 +22,7 @@ DEPS      := $(SRCS:.cc=.d)
 TEST_SRCS := $(d)/qfs_client_test.cc $(d)/qfs_client_util_test.cc
 TEST_OBJS := $(TEST_SRCS:.cc=.o)
 
-CXX_FLAGS      := -xc++ -I.. -fPIC -g -Werror -std=c++11
+CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -shared -Wl,-rpath,.
 TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
 
@@ -46,7 +46,11 @@ $(OBJS): $(DEPS)
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^
 
-test: cleanuplocal $(TEST_TARGET)
+gotests:
+	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
+		go test github.com/aristanetworks/quantumfs/qfsclientc
+
+test: cleanuplocal $(TEST_TARGET) gotests
 	LD_LIBRARY_PATH=$(d) $(TEST_TARGET)
 
 $(TEST_TARGET): $(TEST_OBJS) $(TARGET)
