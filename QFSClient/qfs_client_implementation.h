@@ -12,7 +12,6 @@
 #include <gtest/gtest_prod.h>
 #include <jansson.h>
 
-#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -62,6 +61,9 @@ class ApiImpl: public Api {
 	// indicate the outcome.
 	Error Open();
 
+	// Open the Api file without DIRECT_IO. Not for use with real quantumfs
+	Error TestOpen();
+
 	// Closes the api file if it's still open.
 	void Close();
 
@@ -83,6 +85,9 @@ class ApiImpl: public Api {
 			       std::vector<byte> *data);
 
  private:
+	// Open an Api
+	Error OpenCommon(bool directIo);
+
 	// Work out the location of the api file (which must be called 'api'
 	// and have an inode ID of 2) by looking in the current directory
 	// and walking up the directory tree towards the root until it's found.
@@ -110,7 +115,7 @@ class ApiImpl: public Api {
 	// indicate the path's validity.
 	Error CheckWorkspacePathValid(const char *workspace_path);
 
-	std::fstream file;
+	int fd;
 
 	// We use the presence of a value in this member variable to indicate that
 	// the API file's location is known (either because it was passed to the

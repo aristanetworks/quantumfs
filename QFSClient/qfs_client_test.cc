@@ -130,7 +130,7 @@ void QfsClientTest::TearDown() {
 TEST_F(QfsClientTest, OpenTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// Test again with path passed to constructor
@@ -140,7 +140,7 @@ TEST_F(QfsClientTest, OpenTest) {
 	ASSERT_EQ(err.code, kSuccess);
 	this->api->api_inode_id = this->api_inode_id;
 
-	err = this->api->Open();
+	err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 }
 
@@ -149,11 +149,14 @@ TEST_F(QfsClientTest, OpenTest) {
 TEST_F(QfsClientTest, SendCommandTest) {
 	ASSERT_FALSE(this->api == NULL);
 
+	Error err = this->api->TestOpen();
+	ASSERT_EQ(err.code, kSuccess);
+
 	CommandBuffer send;
 	send.CopyString("sausages");
 	CommandBuffer result;
 
-	Error err = this->api->SendCommand(send, &result);
+	err = this->api->SendCommand(send, &result);
 
 	ASSERT_EQ(err.code, kSuccess);
 	ASSERT_EQ(send.Size(), result.Size());
@@ -162,6 +165,9 @@ TEST_F(QfsClientTest, SendCommandTest) {
 
 TEST_F(QfsClientTest, SendLargeCommandTest) {
 	ASSERT_FALSE(this->api == NULL);
+
+	Error err = this->api->TestOpen();
+	ASSERT_EQ(err.code, kSuccess);
 
 	const size_t size = 129 * 1024;
 	byte datum = 0x00;
@@ -174,7 +180,7 @@ TEST_F(QfsClientTest, SendLargeCommandTest) {
 
 	CommandBuffer result;
 
-	Error err = this->api->SendCommand(send, &result);
+	err = this->api->SendCommand(send, &result);
 
 	ASSERT_EQ(err.code, kSuccess);
 	ASSERT_EQ(send.Size(), result.Size());
@@ -291,7 +297,7 @@ Error QfsClientApiTest::PreReadHook(CommandBuffer *read_result) {
 TEST_F(QfsClientApiTest, GetAccessedTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// set up expected written JSON:
@@ -321,7 +327,7 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 TEST_F(QfsClientApiTest, InsertInodeTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// set up expected written JSON:
@@ -359,7 +365,7 @@ TEST_F(QfsClientApiTest, InsertInodeTest) {
 TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// set up expected written JSON:
@@ -393,7 +399,7 @@ TEST_F(QfsClientApiTest, InsertInodeErrorTest) {
 TEST_F(QfsClientApiTest, BranchTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// set up expected written JSON:
@@ -421,7 +427,7 @@ TEST_F(QfsClientApiTest, BranchTest) {
 TEST_F(QfsClientApiTest, SetBlockTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// set up expected written JSON:
@@ -456,7 +462,7 @@ TEST_F(QfsClientApiTest, SetBlockTest) {
 TEST_F(QfsClientApiTest, GetBlockTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->Open();
+	Error err = this->api->TestOpen();
 	ASSERT_EQ(err.code, kSuccess);
 
 	// set up expected written JSON:
@@ -495,6 +501,9 @@ TEST_F(QfsClientApiTest, GetBlockTest) {
 TEST_F(QfsClientApiTest, SendJsonTest) {
 	ASSERT_FALSE(this->api == NULL);
 
+	Error err = this->api->TestOpen();
+	ASSERT_EQ(err.code, kSuccess);
+
 	// create JSON for request
 	json_error_t json_error;
 	json_t *request_json = json_pack_ex(&json_error, 0,
@@ -512,7 +521,7 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 
 	ApiContext context;
 	context.SetRequestJsonObject(request_json);
-	Error err = this->api->SendJson(&context);
+	err = this->api->SendJson(&context);
 	json_decref(request_json);  // release the JSON object
 	ASSERT_EQ(err.code, kSuccess);
 

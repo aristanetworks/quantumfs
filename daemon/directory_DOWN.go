@@ -6,6 +6,7 @@ package daemon
 // This is _DOWN counterpart to directory.go
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -132,26 +133,42 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	return typeKey, fuse.OK
 }
 
-// go along the given path to the destination
-// The path is stored in a string slice, each cell index contains an inode
-func (dir *Directory) followPath_DOWN(c *ctx, path []string) (Inode, error) {
-	defer c.funcIn("Directory::followPath_DOWN").Out()
+// The returned cleanup function of terminal directory should be called at the end of
+// the caller
+func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
+	cleanup func(), err error) {
 
-	// traverse through the workspace, reach the target inode
+	defer c.funcIn("Directory::followPath_DOWN").Out()
+	// Traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	// skip the first three Inodes: typespace / namespace / workspace
+	// Indicate we've started instantiating inodes and therefore need to start
+	// Forgetting them
+	startForgotten := false
+	// Go along the given path to the destination. The path is stored in a string
+	// slice, each cell index contains an inode.
+	// Skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
-		// all preceding nodes have to be directories
-		child, err := currDir.lookupInternal(c, path[num],
-			quantumfs.ObjectTypeDirectory)
-		if err != nil {
-			return child, err
+		if startForgotten {
+			// The lookupInternal() doesn't increase the lookupCount of
+			// the current directory, so it should be forgotten with 0
+			defer c.qfs.Forget(uint64(currDir.inodeNum()), 0)
 		}
+		// all preceding nodes have to be directories
+		child, instantiated, err := currDir.lookupInternal(c, path[num],
+			quantumfs.ObjectTypeDirectory)
+		startForgotten = !instantiated
+		if err != nil {
+			return child, func() {}, err
+		}
+
 		currDir = child.(*Directory)
 	}
 
-	return currDir, nil
+	cleanup = func() {
+		c.qfs.Forget(uint64(currDir.inodeNum()), 0)
+	}
+	return currDir, cleanup, nil
 }
 
 // the toLink parentLock must be locked
@@ -173,4 +190,161 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	defer dir.childRecordLock.Lock().Unlock()
 
 	return dir.children.makeHardlink(c, toLink.inodeNum())
+}
+
+func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
+	inodeId InodeId, localRecord quantumfs.DirectoryRecord) {
+
+	defer c.FuncIn("Directory::destroyChild_DOWN", "inode %d", inodeId).Out()
+	if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+		subdir := inode.(*Directory)
+		subdir.children.iterateOverInMemoryRecords(c,
+			func(childname string, childId InodeId) {
+				subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
+					childId)
+			})
+	}
+	c.qfs.noteDeletedInode(dir.id, inodeId, localRecord.Filename())
+}
+
+func (dir *Directory) handleInstantiatedInodeChange_DOWN(c *ctx, inode Inode,
+	inodeId InodeId, remoteRecord *quantumfs.DirectRecord) {
+
+	defer c.FuncIn("Directory::handleInstantiatedInodeChange_DOWN", "%s: %d",
+		remoteRecord.Filename(), remoteRecord.Type()).Out()
+
+	switch remoteRecord.Type() {
+	case quantumfs.ObjectTypeDirectory:
+		subdir := inode.(*Directory)
+		uninstantiated, removedUninstantiated :=
+			subdir.refresh_DOWN(c, remoteRecord.ID())
+		c.qfs.addUninstantiated(c, uninstantiated, inodeId)
+		c.qfs.removeUninstantiated(c, removedUninstantiated)
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeMediumFile:
+		fallthrough
+	case quantumfs.ObjectTypeLargeFile:
+		fallthrough
+	case quantumfs.ObjectTypeVeryLargeFile:
+		regFile := inode.(*File)
+		regFile.accessor.reload(c, remoteRecord.ID())
+	}
+}
+
+func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
+	localRecord quantumfs.DirectoryRecord,
+	remoteRecord *quantumfs.DirectRecord) {
+
+	defer c.funcIn("Directory::handleDirectoryEntryUpdate_DOWN").Out()
+	inodeId := dir.children.inodeNum(remoteRecord.Filename())
+
+	c.wlog("entry %s with inodeid %d goes %s -> %s",
+		remoteRecord.Filename(), inodeId,
+		localRecord.ID().Text(), remoteRecord.ID().Text())
+
+	newInodeId := dir.children.loadChild(c, remoteRecord, inodeId)
+	if newInodeId != inodeId {
+		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
+			"inode mismatch %d vs. %d", inodeId, newInodeId)
+		c.wlog("leaking inode %d", inodeId)
+	}
+	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+		if localRecord.Type() == remoteRecord.Type() {
+			dir.handleInstantiatedInodeChange_DOWN(c, inode, inodeId,
+				remoteRecord)
+		} else {
+			dir.destroyChild_DOWN(c, inode, inodeId, localRecord)
+		}
+	} else {
+		c.wlog("nothing to do for uninstantiated inode %d", inodeId)
+	}
+
+	if status := c.qfs.invalidateInode(inodeId); status != fuse.OK &&
+		status != fuse.ENOENT {
+
+		c.wlog("invalidating %d failed with %d", inodeId, status)
+		panic("XXX: handle invalidation failure")
+	}
+}
+
+func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
+	remoteRecord *quantumfs.DirectRecord) []InodeId {
+
+	defer c.FuncIn("Directory::handleRemoteRecord_DOWN", "%s",
+		remoteRecord.Filename()).Out()
+	defer dir.childRecordLock.Lock().Unlock()
+
+	uninstantiated := make([]InodeId, 0)
+
+	localRecord := dir.children.recordByName(c, remoteRecord.Filename())
+	if localRecord == nil {
+		// Record not found. load()
+
+		c.wlog("Did not find a record for %s.", remoteRecord.Filename())
+
+		childInodeNum := dir.children.loadChild(c, remoteRecord,
+			quantumfs.InodeIdInvalid)
+		c.vlog("directory with inodeid %d now has child %d",
+			dir.id, childInodeNum)
+		uninstantiated = append(uninstantiated, childInodeNum)
+
+		c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
+	} else if !remoteRecord.ID().IsEqualTo(localRecord.ID()) {
+		dir.handleDirectoryEntryUpdate_DOWN(c, localRecord, remoteRecord)
+	}
+	return uninstantiated
+}
+
+func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
+	childId InodeId) {
+
+	defer c.FuncIn("Directory::handleDeletedInMemoryRecord_DOWN", "%s",
+		childname).Out()
+
+	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
+		dir.children.deleteChild(c, childname)
+	} else {
+		result := child.deleteSelf(c, child,
+			func() (quantumfs.DirectoryRecord, fuse.Status) {
+				delRecord := dir.children.deleteChild(c, childname)
+				return delRecord, fuse.OK
+			})
+		if result != fuse.OK {
+			panic("XXX handle deletion failure")
+		}
+	}
+}
+
+// Returns the list of new uninstantiated inodes ids and the list of
+// inode ids that should be removed
+func (dir *Directory) refresh_DOWN(c *ctx,
+	baseLayerId quantumfs.ObjectKey) ([]InodeId, []InodeId) {
+
+	defer c.funcIn("Directory::refresh_DOWN").Out()
+	uninstantiated := make([]InodeId, 0)
+	deletedInodeIds := make([]InodeId, 0)
+
+	remoteEntries := make(map[string]bool, 0)
+
+	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+		remoteEntries[record.Filename()] = true
+		uninstantiated = append(uninstantiated,
+			dir.handleRemoteRecord_DOWN(c, record)...)
+	})
+
+	defer dir.childRecordLock.Lock().Unlock()
+
+	dir.children.iterateOverInMemoryRecords(c, func(childname string,
+		childId InodeId) {
+
+		if _, exists := remoteEntries[childname]; !exists {
+			dir.handleDeletedInMemoryRecord_DOWN(c, childname, childId)
+			deletedInodeIds = append(deletedInodeIds, childId)
+		} else {
+			c.vlog("Child %s not deleted", childname)
+		}
+
+	})
+	return uninstantiated, deletedInodeIds
 }

@@ -25,7 +25,7 @@ func newChildMap(c *ctx, key quantumfs.ObjectKey, wsr_ *WorkspaceRoot) (*ChildMa
 
 	// allocate inode ids
 	uninstantiated := make([]InodeId, 0)
-	rtn.records.iterateOverRecords(c,
+	rtn.records.iterateOverRecords(c, false,
 		func(record quantumfs.DirectoryRecord) {
 
 			inodeId := rtn.loadInodeId(c, record,
@@ -77,13 +77,14 @@ func (cmap *ChildMap) loadInodeId(c *ctx, entry quantumfs.DirectoryRecord,
 		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, linkId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
-		// should match the actual inodeId for the hardlink or else
-		// something is really wrong in the system
+		// should normally match the actual inodeId.
+		// The only exception is when the file used to be of another type,
+		// but after a refresh it has been changed to be a hardlink.
 		if inodeId != quantumfs.InodeIdInvalid &&
 			inodeId != establishedInodeId {
 
-			c.elog("Attempt to set hardlink with mismatched inodeId, "+
-				"%d vs %d", inodeId, establishedInodeId)
+			c.wlog("requested hardlink inodeId %d exists as %d",
+				inodeId, establishedInodeId)
 		}
 		inodeId = establishedInodeId
 	} else if inodeId == quantumfs.InodeIdInvalid {
@@ -115,6 +116,14 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 func (cmap *ChildMap) count() uint64 {
 	return uint64(len(cmap.records.nameToInode))
+}
+
+func (cmap *ChildMap) iterateOverInMemoryRecords(c *ctx,
+	fxn func(name string, inodeId InodeId)) {
+
+	for childname, childId := range cmap.records.nameToInode {
+		fxn(childname, childId)
+	}
 }
 
 func (cmap *ChildMap) deleteChild(c *ctx,
@@ -228,7 +237,7 @@ func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
 func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 	rtn := make([]quantumfs.DirectoryRecord, 0)
 
-	cmap.records.iterateOverRecords(c,
+	cmap.records.iterateOverRecords(c, true,
 		func(record quantumfs.DirectoryRecord) {
 
 			rtn = append(rtn, record)
@@ -382,12 +391,7 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 
 	key := rd.base
 	for {
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			panic("No baseLayer object")
-		}
-
-		baseLayer := buffer.AsDirectoryEntry()
+		baseLayer := getBaseLayer(c, key)
 
 		if int(baseLayer.NumEntries()) > offset {
 			// the record should be in this DirectoryEntry
@@ -423,7 +427,9 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 	return nil
 }
 
-func (rd *recordsOnDemand) iterateOverRecords(c *ctx,
+// for performance, we only want real records when we *have* to. Take thin records
+// when we're just polling superficial record details (name, mtime, owner, etc)
+func (rd *recordsOnDemand) iterateOverRecords(c *ctx, thinRecords bool,
 	fxn func(quantumfs.DirectoryRecord)) {
 
 	existingEntries := make(map[string]bool, 0)
@@ -431,12 +437,7 @@ func (rd *recordsOnDemand) iterateOverRecords(c *ctx,
 
 	key := rd.base
 	for {
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			panic(fmt.Sprintf("No baseLayer object for %s", key.Text()))
-		}
-
-		baseLayer := buffer.AsDirectoryEntry()
+		baseLayer := getBaseLayer(c, key)
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
@@ -451,8 +452,14 @@ func (rd *recordsOnDemand) iterateOverRecords(c *ctx,
 					fxn(record)
 				}
 			} else {
+				entry = convertRecord(rd.wsr, entry)
+
 				// Ensure we Clone() so the rest of memory is freed
-				entry = convertRecord(rd.wsr, entry).Clone()
+				if thinRecords {
+					entry = entry.ShallowCopy()
+				} else {
+					entry = entry.Clone()
+				}
 
 				// ensure we use the newest key
 				entryInodeId := rd.nameToInode[entry.Filename()]
@@ -555,6 +562,38 @@ func (rd *recordsOnDemand) delRecord(name string, inodeId InodeId) {
 	delete(rd.cacheKey, inodeId)
 }
 
+func (rd *recordsOnDemand) countEntryCapacity(c *ctx) int {
+	entryCapacity := 0
+	key := rd.base
+	for {
+		baseLayer := getBaseLayer(c, key)
+
+		entryCapacity += baseLayer.NumEntries()
+		for i := 0; i < baseLayer.NumEntries(); i++ {
+			entry := quantumfs.DirectoryRecord(baseLayer.Entry(i))
+			// If the inode is already modified locally, it shouldn't be
+			// added twice.
+			if _, exists := rd.cache[entry.Filename()]; exists {
+				entryCapacity -= 1
+			}
+		}
+		if baseLayer.HasNext() {
+			key = baseLayer.Next()
+		} else {
+			break
+		}
+	}
+
+	// Take into account of the local dirty inodes
+	for _, record := range rd.cache {
+		if record == nil {
+			continue
+		}
+		entryCapacity += 1
+	}
+	return entryCapacity
+}
+
 func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	defer c.funcIn("recordsOnDemand::publish").Out()
@@ -563,18 +602,20 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 	// in the datastore.
 	newBaseLayerId := quantumfs.EmptyDirKey
 
+	entryCapacity := rd.countEntryCapacity(c)
 	// childIdx indexes into dir.records, entryIdx indexes into the
 	// metadata block
-	baseLayer := quantumfs.NewDirectoryEntry()
+	entryCapacity, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
 	entryIdx := 0
-	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
+	rd.iterateOverRecords(c, false, func(record quantumfs.DirectoryRecord) {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			c.vlog("Block full with %d entries", entryIdx)
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
 				newBaseLayerId)
-			baseLayer = quantumfs.NewDirectoryEntry()
+			entryCapacity, baseLayer = quantumfs.NewDirectoryEntry(
+				entryCapacity)
 			entryIdx = 0
 		}
 
@@ -594,7 +635,7 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	// re-set our map of indices into directory entries
 	rd.nameToEntryIdx = make(map[string]uint32)
-	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
+	rd.iterateOverRecords(c, true, func(record quantumfs.DirectoryRecord) {
 		// don't need to do anything while we iterate
 	})
 
@@ -616,4 +657,14 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	}
 
 	return newKey
+}
+
+func getBaseLayer(c *ctx, key quantumfs.ObjectKey) quantumfs.DirectoryEntry {
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		panic(fmt.Sprintf("No baseLayer object for %s", key.Text()))
+	}
+
+	baseLayer := buffer.AsDirectoryEntry()
+	return baseLayer
 }

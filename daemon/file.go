@@ -145,7 +145,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 
 	c.dlog("Opened Inode %d as Fh: %d", fi.inodeNum(), fileHandleNum)
 
-	out.OpenFlags = 0
+	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 	out.Fh = uint64(fileHandleNum)
 
 	return fuse.OK
@@ -538,19 +538,6 @@ func resize(buffer []byte, size int) []byte {
 	return buffer
 }
 
-func pushData(c *ctx, buffer quantumfs.Buffer) (quantumfs.ObjectKey, error) {
-	defer c.funcIn("pushData").Out()
-
-	key, err := buffer.Key(&c.Ctx)
-	if err != nil {
-		c.elog("Unable to write data to the datastore")
-		return quantumfs.ObjectKey{},
-			errors.New("Unable to write to the datastore")
-	}
-
-	return key, nil
-}
-
 func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 	switch {
 	case numBlocks <= 1:
@@ -603,6 +590,9 @@ type blockAccessor interface {
 
 	// Write file's metadata to the datastore and provide the key
 	sync(c *ctx) quantumfs.ObjectKey
+
+	// Reload the content of the file from datastore
+	reload(c *ctx, key quantumfs.ObjectKey)
 
 	// Truncate to lessen length *only*, error otherwise
 	truncate(c *ctx, newLength uint64) error

@@ -18,6 +18,7 @@ import "golang.org/x/sync/errgroup"
 import "github.com/aristanetworks/quantumfs"
 import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 import "github.com/aristanetworks/quantumfs/utils"
+import exs "github.com/aristanetworks/quantumfs/utils/excludespec"
 import "github.com/aristanetworks/quantumfs/qlog"
 
 // Design notes about qupload parallelism:
@@ -71,6 +72,24 @@ func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
 	rootTracker = false
 }
 
+func dumpUploadState() {
+	// exclude info
+	fmt.Println(exInfo)
+	// dump paths which have pending writes
+	for path, tracker := range dirEntryTrackers {
+		if len(tracker.records) != cap(tracker.records) {
+			fmt.Printf("%q (root: %v) is pending writes\n",
+				path, tracker.root)
+			fmt.Printf("  len: %d cap: %d\n",
+				len(tracker.records),
+				cap(tracker.records))
+			for _, rec := range tracker.records {
+				fmt.Printf("   %s\n", rec.Filename())
+			}
+		}
+	}
+}
+
 func handleDirRecord(qctx *quantumfs.Ctx,
 	record quantumfs.DirectoryRecord, path string) error {
 
@@ -80,7 +99,8 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 	for {
 		tracker, ok := dirEntryTrackers[path]
 		if !ok {
-			panic(fmt.Sprintf("BUG: Directory state tracker must "+
+			dumpUploadState()
+			panic(fmt.Sprintf("Directory state tracker must "+
 				"exist for %q", path))
 		}
 
@@ -169,8 +189,7 @@ func relativePath(path string, base string) (string, error) {
 }
 
 func pathWalker(c *Ctx, piChan chan<- *pathInfo,
-	path string, root string, info os.FileInfo, err error,
-	exInfo *ExcludeInfo) error {
+	path string, root string, info os.FileInfo, err error) error {
 
 	// when basedir is "./somebase" or "/somebase" or "somebase" then
 	// pathWalker is called with path as "somebase" then path as
@@ -203,7 +222,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		}
 		expectedDirRecords := len(dirEnts)
 		if exInfo != nil {
-			expectedDirRecords = exInfo.RecordsExcluded(checkPath,
+			expectedDirRecords = exInfo.RecordCount(checkPath,
 				expectedDirRecords)
 		}
 		// Empty directory is like a file with no content
@@ -248,9 +267,15 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(c *Ctx, ws string, alias_ws string, root string,
-	exInfo *ExcludeInfo, conc uint) error {
+func upload(c *Ctx, cli *params, relpath string,
+	exInfo *exs.ExcludeInfo) error {
 
+	ws := cli.ws
+	aliasWS := cli.alias
+	root := filepath.Join(cli.baseDir, relpath)
+	conc := cli.conc
+
+	start := time.Now()
 	// launch walker in same task group so that
 	// error in walker will exit workers and vice versa
 	var group *errgroup.Group
@@ -268,7 +293,7 @@ func upload(c *Ctx, ws string, alias_ws string, root string,
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
 				return pathWalker(c, piChan, path,
-					root, info, err, exInfo)
+					root, info, err)
 			})
 		close(piChan)
 		return err
@@ -279,12 +304,34 @@ func upload(c *Ctx, ws string, alias_ws string, root string,
 		return err
 	}
 
+	if topDirRecord == nil {
+		dumpUploadState()
+		panic("workspace root dir not written yet but all " +
+			"writes to workspace completed. This is unexpected. " +
+			"Use debug dump to diagnose.")
+	}
+
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, topDirRecord.ID(),
 		dataStore)
 	if wsrErr != nil {
 		return wsrErr
 	}
-	return uploadCompleted(c.Qctx, wsDB, ws, alias_ws, wsrKey)
+	err = uploadCompleted(c.Qctx, wsDB, ws, aliasWS, wsrKey)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("\nUpload completed. Total: %d bytes "+
+		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
+		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
+		qwr.DataBytesWritten,
+		(qwr.DataBytesWritten*100)/
+			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		qwr.MetadataBytesWritten,
+		(qwr.MetadataBytesWritten*100)/
+			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		time.Since(start).Seconds(), ws)
+	return nil
 }
 
 // Uploads to existing workspaces should be supported.
@@ -332,19 +379,40 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 }
 
 func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
-	alias_ws string, newWsrKey quantumfs.ObjectKey) error {
+	aliasWS string, newWsrKey quantumfs.ObjectKey) error {
 
 	err := branchThenAdvance(qctx, wsdb, ws, newWsrKey)
 	if err != nil {
 		return err
 	}
 
-	if alias_ws != "" {
-		err := branchThenAdvance(qctx, wsdb, alias_ws, newWsrKey)
+	if aliasWS != "" {
+		err := branchThenAdvance(qctx, wsdb, aliasWS, newWsrKey)
 		if err != nil {
 			return err
 		}
 	}
 
+	return nil
+}
+
+func byPass(c *Ctx, cli *params) error {
+
+	ws := cli.ws
+	aliasWS := cli.alias
+	referenceWS := cli.referenceWS
+	refWSParts := strings.Split(referenceWS, "/")
+
+	refKey, err := wsDB.Workspace(c.Qctx,
+		refWSParts[0], refWSParts[1], refWSParts[2])
+	if err != nil {
+		return err
+	}
+
+	err = uploadCompleted(c.Qctx, wsDB, ws, aliasWS, refKey)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("ByPass Completed: %v -> %v\n", ws, referenceWS)
 	return nil
 }

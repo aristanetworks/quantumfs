@@ -9,7 +9,7 @@ import "testing"
 
 func TestDirectoryRecordSort(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		dirEntry := NewDirectoryEntry()
+		_, dirEntry := NewDirectoryEntry(3)
 		dirEntry.SetNumEntries(3)
 
 		dr1 := NewDirectoryRecord()
@@ -33,6 +33,31 @@ func TestDirectoryRecordSort(t *testing.T) {
 		test.Assert(dirEntry.Entry(2).Filename() == "name2",
 			"Wrong sort. Found %s expects \"name2\"",
 			dirEntry.Entry(2).Filename())
+
+	})
+}
+
+func TestDirectoryRecordsListSize(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		// Measure the block size of directory entries
+		remain, dirEntry := NewDirectoryEntry(4)
+		cacheNum := dirEntry.dir.Entries().Len()
+		test.Assert(remain == 0 && cacheNum == 4, "Incorrect size of the "+
+			"remain: %d != 0 and of the cache: %d != 4",
+			remain, cacheNum)
+
+		// Measure the block size of very large files
+		remain, vlf := NewVeryLargeFile(5)
+		cacheNum = vlf.vlf.LargeFileKeys().Len()
+		test.Assert(remain == 0 && cacheNum == 5, "Incorrect size of the i"+
+			"cache: %d != 5", cacheNum)
+
+		// Measure the block size of entries containing Extended Attributes
+		remain, hlEntry := NewHardlinkEntry(6)
+		cacheNum = hlEntry.entry.Entries().Len()
+		test.Assert(remain == 0 && cacheNum == 6, "Incorrect size of the "+
+			"remain: %d != 0 and of the cache: %d != 4",
+			remain, cacheNum)
 	})
 }
 
