@@ -346,6 +346,11 @@ func processWords(exInfo *ExcludeInfo, base string) error {
 		if err != nil {
 			return err
 		}
+		// Only parent's record count is affected.
+		// Ancestor record count is not affected.
+		// It's guaranteed that parent exists in dirRecordCounts
+		// since all explicitly included paths and their
+		// ancestors are present.
 		includeSetRecordCount(exInfo, base, word)
 	}
 	return nil
@@ -404,6 +409,7 @@ func getParent(path string) string {
 
 func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error {
 	onlyDir, _ := exInfo.includes[path]
+	exInfo.dirRecordCounts[path] = 0
 	if !onlyDir {
 		// If directory with its sub-dirs is being included
 		// then its record count needs to be set up.
@@ -416,7 +422,7 @@ func includeSetRecordCount(exInfo *ExcludeInfo, base string, path string) error 
 	// Ancestor record count is not affected.
 	// It's guaranteed that parent exists in dirRecordCounts
 	// since all explicitly included paths and their
-	// ancestors are present.
+	// ancestors are present
 	parent := getParent(path)
 	exInfo.dirRecordCounts[parent]++
 	return nil
