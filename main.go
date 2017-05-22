@@ -21,7 +21,7 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 	"github.com/aristanetworks/quantumfs/walker"
-	"github.com/aristanetworks/qubit/tools/qwalker/walktypes"
+	walkutils "github.com/aristanetworks/qubit/tools/qwalker/utils"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
@@ -346,7 +346,7 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 
 		atomic.AddUint64(&keysWalked, 1)
 		defer showProgress(progress, start, keysWalked)
-		return walktypes.RefreshTTL(c, path, key, size, isDir, cqlds,
+		return walkutils.RefreshTTL(c, path, key, size, isDir, cqlds,
 			ttlCfg.TTLThreshold, ttlCfg.TTLNew)
 	}
 
@@ -393,7 +393,7 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 
 		atomic.AddUint64(&keysWalked, 1)
 		defer showProgress(progress, start, keysWalked)
-		return walktypes.RefreshTTL(c, path, key, size, isDir, cqlds,
+		return walkutils.RefreshTTL(c, path, key, size, isDir, cqlds,
 			newTTL, newTTL)
 	}
 
@@ -490,7 +490,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		}
 
 		ks := key.String()
-		metadata, err := cqlds.Metadata(ks)
+		metadata, err := cqlds.Metadata(walkutils.ToECtx(c), ks)
 		if err != nil {
 			return fmt.Errorf("path:%v key %v: %v", path, key.Text(), err)
 		}
@@ -639,7 +639,8 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 			if err := cds.Get(nil, key, buf); err != nil {
 
 				ks := key.String()
-				metadata, err := cqlds.Metadata(ks)
+				metadata, err := cqlds.Metadata(
+					walkutils.ToECtx(c), ks)
 				if err != nil {
 					return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 				}
