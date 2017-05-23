@@ -49,31 +49,34 @@ type workerData struct {
 	size uint64
 }
 
-func panicHandler(result *string) {
-	err := recover()
+func panicHandler() (err error) {
+	panicData := recover()
 	trace := ""
+	result := ""
 
-	// If the test passed pass that fact back to runTest()
-	if err == nil {
-		err = ""
+	if panicData == nil {
+		trace = ""
 	} else {
 		// Capture the stack trace of the failure
 		trace = utils.BytesToString(debug.Stack())
 		trace = strings.SplitN(trace, "\n", 8)[7]
 	}
 
-	switch err.(type) {
+	switch panicData.(type) {
 	default:
-		*result = fmt.Sprintf("Unknown panic type: %v", err)
+		result = fmt.Sprintf("Unknown panic type: %v", panicData)
 	case string:
-		*result = err.(string)
+		result = panicData.(string)
 	case error:
-		*result = err.(error).Error()
+		result = panicData.(error).Error()
 	}
 
 	if trace != "" {
-		*result += "\nStack Trace:\n" + trace
+		result += "\nStack Trace:\n" + trace
+		err = panicData.(error)
 	}
+	fmt.Println("PanicHandler returning", err)
+	return err
 }
 
 // Walk the workspace hierarchy
@@ -101,7 +104,6 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	group, groupCtx := errgroup.WithContext(context.Background())
 	keyChan := make(chan *workerData, 100)
-	var result string
 
 	c := &Ctx{
 		Context: groupCtx,
@@ -113,13 +115,13 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	for i := 0; i < conc; i++ {
 
 		group.Go(func() error {
-			defer panicHandler(&result)
+			defer panicHandler()
 			return worker(c, keyChan, wf)
 		})
 	}
 
 	group.Go(func() error {
-		defer panicHandler(&result)
+		defer panicHandler()
 		defer close(keyChan)
 
 		if err := writeToChan(c, keyChan, "", rootID,
@@ -142,13 +144,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		}
 		return nil
 	})
-
-	err := group.Wait()
-	if result != "" {
-		err = fmt.Errorf("panic in walker")
-		fmt.Println(result)
-	}
-	return err
+	return group.Wait()
 }
 
 func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
