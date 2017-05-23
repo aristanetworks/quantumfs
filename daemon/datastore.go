@@ -52,6 +52,26 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		return
 	}
 
+	if _, exists := store.cache[buf.key]; exists {
+		// It is possible when storing dirty data that we could reproduce the
+		// contents which already exist in the cache. We don't want to have
+		// the same data in the LRU queue twice as that is wasteful, though
+		// eventually the 'overwritten' buffer will be evicted and the space
+		// recovered.
+		//
+		// Now if we have reproduced the same data already in the cache we
+		// could move/set the buffer to be the least recently used. We choose
+		// not to do that because inserting newly uploaded data into the
+		// cache is an optimization for the relatively common case where a
+		// file is written and then read shortly afterwards. However, that
+		// doesn't always happen. Instead we will leave the data's LRU
+		// position unchanged. Should the data be reread in short order then
+		// it is likely to still be in the cache. However, if the data isn't
+		// read in short order then marking that data most recently used will
+		// simply force something else out of the cache.
+		return
+	}
+
 	store.freeSpace -= size
 	for store.freeSpace < 0 {
 		evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
