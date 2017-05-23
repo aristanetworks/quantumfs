@@ -37,7 +37,7 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 // Ctx maintains context for the walker library.
 type Ctx struct {
 	context.Context
-	qctx *quantumfs.Ctx
+	Qctx *quantumfs.Ctx
 }
 
 type workerData struct {
@@ -74,7 +74,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	c := &Ctx{
 		Context: groupCtx,
-		qctx:    cq,
+		Qctx:    cq,
 	}
 
 	// Start Workers
@@ -134,7 +134,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 
 		key := hle.Next()
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.qctx, key, buf); err != nil {
+		if err := ds.Get(c.Qctx, key, buf); err != nil {
 			return err
 		}
 
@@ -156,7 +156,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.qctx, key, buf); err != nil {
+	if err := ds.Get(c.Qctx, key, buf); err != nil {
 		return err
 	}
 
@@ -190,7 +190,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.qctx, key, buf); err != nil {
+	if err := ds.Get(c.Qctx, key, buf); err != nil {
 		return err
 	}
 
@@ -218,7 +218,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 	for {
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.qctx, key, buf); err != nil {
+		if err := ds.Get(c.Qctx, key, buf); err != nil {
 			return err
 		}
 
@@ -324,7 +324,7 @@ func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
 	cds := quantumfs.ConstantStore
 	buf := simplebuffer.New(nil, key)
 
-	if err := cds.Get(c.qctx, key, buf); err != nil {
+	if err := cds.Get(c.Qctx, key, buf); err != nil {
 		return false // Not a ConstKey, so do not Skip.
 	}
 	return true
