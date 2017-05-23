@@ -4,6 +4,7 @@
 package quantumfs
 
 import "bufio"
+import "bytes"
 import "fmt"
 import "encoding/json"
 import "os"
@@ -351,7 +352,7 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 		result = append(result, buf[:size]...)
 	}
 
-	return result, nil
+	return bytes.TrimRight(result, "\u0000"), nil
 }
 
 // branch the src workspace into a new workspace called dst.
@@ -383,7 +384,7 @@ func (api *Api) Branch(src string, dst string) error {
 	var errorResponse ErrorResponse
 	err = json.Unmarshal(buf, &errorResponse)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s. buffer: %q", err.Error(), buf)
 	}
 	if errorResponse.ErrorCode != ErrorOK {
 		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
