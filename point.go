@@ -57,7 +57,6 @@ func WriteWalkerIteration(c *Ctx, dur time.Duration,
 	numSuccess uint32, numError uint32) {
 
 	measurement := "walkerIteration"
-	tags := map[string]string{}
 	fields := map[string]interface{}{
 		"walkTimeMin":  uint(dur / time.Minute),
 		"iteration":    c.iteration,
@@ -65,7 +64,7 @@ func WriteWalkerIteration(c *Ctx, dur time.Duration,
 		"countError":   numError,
 	}
 
-	err := c.Influx.WritePoint(measurement, tags, fields)
+	err := c.Influx.WritePoint(measurement, nil, fields)
 	if err != nil {
 		c.elog("Writing %s iteration=%v to influxDB err: %v\n",
 			measurement, c.iteration, err)
@@ -73,4 +72,25 @@ func WriteWalkerIteration(c *Ctx, dur time.Duration,
 	}
 	c.vlog("%s Writing %s=%v iteration=%v numSuccess=%v numError=%v to influxDB\n",
 		successPrefix, measurement, dur, c.iteration, numSuccess, numError)
+}
+
+// Write point to indicate that walker is alive.
+//
+// tags:   none
+//
+// fields: alive - a place holder. Since, we have to have a field.
+//
+func WriteWalkerHeartBeat(c *Ctx) {
+
+	measurement := "walkerHeartBeat"
+	fields := map[string]interface{}{
+		"alive": 1,
+	}
+
+	err := c.Influx.WritePoint(measurement, nil, fields)
+	if err != nil {
+		c.elog("Error:   Writing %s to influxDB err: %v\n", measurement, err)
+		return
+	}
+	c.vlog("Success: Writing %s to influxDB\n", measurement)
 }

@@ -26,6 +26,7 @@ const (
 )
 
 const maxNumWalkers = 4 // default num goroutines calling the actual walk lib.
+const heartBeatInterval = 1 * time.Minute
 const successPrefix = "Success:"
 const eventPrefix = "Event:  "
 const startPrefix = "Start:  "
@@ -100,6 +101,10 @@ func main() {
 
 	c := getWalkerDaemonContext(*influxServer, *influxPort, *influxDBName,
 		*config, *logdir, *numWalkers)
+
+	// Start heart beat messaging.
+	timer := time.Tick(heartBeatInterval)
+	go heartBeat(c, timer)
 
 	walkFullWSDBLoop(c)
 }
@@ -269,4 +274,15 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		WriteWorkspaceWalkDuration(c, ts, ns, true, ws, time.Since(start))
 	}
 	return err
+}
+
+// Send out a heartbeat whenever the timer ticks.
+func heartBeat(c *Ctx, timer <-chan time.Time) {
+	WriteWalkerHeartBeat(c)
+	for {
+		select {
+		case <-timer:
+			WriteWalkerHeartBeat(c)
+		}
+	}
 }
