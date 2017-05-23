@@ -525,7 +525,7 @@ func PacketStats(filepath string, statusBar bool, fn writeFn) {
 		// clear the completion bit
 		packetLen &= ^(uint16(entryCompleteBit))
 
-		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
 		readCount += uint64(packetLen) + 2
 
 		if statusBar {
@@ -820,7 +820,12 @@ func wrapRead(idx uint64, num uint64, data []byte) []byte {
 	return rtn
 }
 
-func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen int) {
+func wrapMinus(lhs uint64, rhs uint64, bufLen uint64) uint64 {
+	wrapMinusEquals(&lhs, rhs, bufLen)
+	return lhs
+}
+
+func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
 	if *lhs < rhs {
 		*lhs += uint64(bufLen)
 	}
@@ -836,7 +841,7 @@ func readBack(pastIdx *uint64, data []byte, outputType interface{},
 
 	dataLen := uint64(reflect.TypeOf(outputType).Size())
 
-	wrapMinusEquals(pastIdx, dataLen, len(data))
+	wrapMinusEquals(pastIdx, dataLen, uint64(len(data)))
 	rawData := wrapRead(*pastIdx, dataLen, data)
 
 	buf := bytes.NewReader(rawData)
@@ -1046,7 +1051,7 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 		packetLen &= ^(uint16(entryCompleteBit))
 
 		// Prepare the pastEndIdx and readCount variables to allow us to skip
-		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
 		readCount += uint64(packetLen) + 2
 
 		// Update a status bar if needed

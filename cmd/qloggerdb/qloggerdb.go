@@ -7,12 +7,14 @@ package main
 
 import "flag"
 import "fmt"
+import "os"
+import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
 func init() {
 	flag.Usage = func() {
-		fmt.Printf("Usage: %s <qlogPath>")
+		fmt.Printf("Usage: %s <qlogPath>\n")
 	}
 }
 
@@ -20,13 +22,17 @@ func main() {
 
 	if len(os.Args) < 2 {
 		flag.Usage()
-		exit(0)
+		return
 	}
-	reader := newReader(os.Args[1])
+	reader := qlog.NewReader(os.Args[1])
 
 	// Run indefinitely
 	for {
+		newLogs := reader.ReadMore()
+		for _, v := range newLogs {
+			fmt.Printf(v.ToString())
+		}
 
-
+		time.Sleep(500 * time.Millisecond)
 	}
 }
