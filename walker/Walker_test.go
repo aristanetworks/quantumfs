@@ -3,6 +3,7 @@
 
 package walker
 
+import "fmt"
 import "io/ioutil"
 import "os"
 import "strings"
@@ -340,20 +341,15 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 func TestWalkPanic(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		data := daemon.GenData(1024 * 1024 * 33)
+		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
+		expectedErr := fmt.Errorf("raised panic")
 
 		// Write File 1
-		filename := workspace + "/file"
+		filename := workspace + "/panicFIle"
 		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
-
-		// Mark Hard Link 1
-		link := workspace + "/filelink"
-		err = os.Link(filename, link)
-		test.Assert(err == nil, "Link failed (%s): %s",
-			link, err)
 
 		test.SyncAllWorkspaces()
 		db := test.GetWorkspaceDB()
@@ -368,18 +364,14 @@ func TestWalkPanic(t *testing.T) {
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
 			size uint64, isDir bool) error {
 
-			// Skip, since constant and embedded keys will not
-			// show up in regular walk.
-			if SkipKey(c, key) {
-				return nil
+			if strings.HasSuffix(path, "/panicFile") {
+				panic(expectedErr)
 			}
 			return nil
 		}
-
-		// TODO(sid) Do Something to induce panic in Walk ??
 		err = Walk(c, ds, rootID, wf)
-		// TODO(sid) This should be changed to err != nil
-		// after we have induced an panic
-		test.Assert(err == nil, "Walk should have failedi")
+
+		test.Assert(err == expectedErr,
+			"Walk did not get the expectedErr value, instead got %v", err)
 	})
 }
