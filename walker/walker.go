@@ -8,12 +8,12 @@ import "fmt"
 import "path/filepath"
 import "runtime"
 import "runtime/debug"
-import "strings"
 
 import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
 import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 import "github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
@@ -40,7 +40,7 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 // Ctx maintains context for the walker library.
 type Ctx struct {
 	context.Context
-	qctx *quantumfs.Ctx
+	Qctx *quantumfs.Ctx
 }
 
 type workerData struct {
@@ -49,34 +49,27 @@ type workerData struct {
 	size uint64
 }
 
-func panicHandler() (err error) {
-	panicData := recover()
-	trace := ""
-	result := ""
-
-	if panicData == nil {
-		trace = ""
-	} else {
-		// Capture the stack trace of the failure
-		trace = utils.BytesToString(debug.Stack())
-		trace = strings.SplitN(trace, "\n", 8)[7]
+func panicHandler(c *Ctx, err *error) {
+	exception := recover()
+	if exception == nil {
+		return
 	}
 
-	switch panicData.(type) {
+	var result string
+	switch exception.(type) {
 	default:
-		result = fmt.Sprintf("Unknown panic type: %v", panicData)
+		result = fmt.Sprintf("Unknown panic type: %v", exception)
+		*err = fmt.Errorf("%s", result)
 	case string:
-		result = panicData.(string)
+		result = exception.(string)
+		*err = fmt.Errorf(result)
 	case error:
-		result = panicData.(error).Error()
+		result = exception.(error).Error()
+		*err = exception.(error)
 	}
 
-	if trace != "" {
-		result += "\nStack Trace:\n" + trace
-		err = panicData.(error)
-	}
-	fmt.Println("PanicHandler returning", err)
-	return err
+	trace := utils.BytesToString(debug.Stack())
+	c.Qctx.Elog(qlog.LogTool, "%s\n%v", result, trace)
 }
 
 // Walk the workspace hierarchy
@@ -107,42 +100,43 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	c := &Ctx{
 		Context: groupCtx,
-		qctx:    cq,
+		Qctx:    cq,
 	}
 
 	// Start Workers
 	conc := runtime.GOMAXPROCS(-1)
 	for i := 0; i < conc; i++ {
 
-		group.Go(func() error {
-			defer panicHandler()
-			return worker(c, keyChan, wf)
+		group.Go(func() (err error) {
+			defer panicHandler(c, &err)
+			err = worker(c, keyChan, wf)
+			return
 		})
 	}
 
-	group.Go(func() error {
-		defer panicHandler()
+	group.Go(func() (err error) {
+		defer panicHandler(c, &err)
 		defer close(keyChan)
 
-		if err := writeToChan(c, keyChan, "", rootID,
+		if err = writeToChan(c, keyChan, "", rootID,
 			uint64(buf.Size())); err != nil {
-			return err
+			return
 		}
 
-		if err := handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
+		if err = handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
-			return err
+			return
 		}
 
 		// Skip WSR
-		if err := handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
+		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
 			if err == SkipDir {
 				return nil
 			}
-			return err
+			return
 		}
-		return nil
+		return
 	})
 	return group.Wait()
 }
@@ -169,7 +163,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 
 		key := hle.Next()
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.qctx, key, buf); err != nil {
+		if err := ds.Get(c.Qctx, key, buf); err != nil {
 			return err
 		}
 
@@ -191,7 +185,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.qctx, key, buf); err != nil {
+	if err := ds.Get(c.Qctx, key, buf); err != nil {
 		return err
 	}
 
@@ -225,7 +219,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.qctx, key, buf); err != nil {
+	if err := ds.Get(c.Qctx, key, buf); err != nil {
 		return err
 	}
 
@@ -253,7 +247,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 	for {
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.qctx, key, buf); err != nil {
+		if err := ds.Get(c.Qctx, key, buf); err != nil {
 			return err
 		}
 
@@ -359,7 +353,7 @@ func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
 	cds := quantumfs.ConstantStore
 	buf := simplebuffer.New(nil, key)
 
-	if err := cds.Get(c.qctx, key, buf); err != nil {
+	if err := cds.Get(c.Qctx, key, buf); err != nil {
 		return false // Not a ConstKey, so do not Skip.
 	}
 	return true
