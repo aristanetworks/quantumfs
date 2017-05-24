@@ -420,10 +420,10 @@ func TestWalkErr(t *testing.T) {
 
 		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
-		expectedErr := fmt.Errorf("raised panic")
+		expectedErr := fmt.Errorf("send error")
 
 		// Write File 1
-		filename := workspace + "/panicFile"
+		filename := workspace + "/errorFile"
 		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
@@ -441,7 +441,7 @@ func TestWalkErr(t *testing.T) {
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
 			size uint64, isDir bool) error {
 
-			if strings.HasSuffix(path, "/panicFile") {
+			if strings.HasSuffix(path, "/errorFile") {
 				return expectedErr
 			}
 			return nil
