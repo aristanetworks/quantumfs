@@ -90,6 +90,22 @@ type File struct {
 	unlinkLock   utils.DeferableRwMutex
 }
 
+func (fi *File) handleTypeChange(c *ctx, remoteRecord *quantumfs.DirectRecord) {
+	defer c.FuncIn("File::handleTypeChange", "%s: %d",
+		remoteRecord.Filename(), remoteRecord.Type()).Out()
+	switch remoteRecord.Type() {
+	case quantumfs.ObjectTypeSmallFile:
+		fi.accessor = newSmallAccessor(c, 0, remoteRecord.ID())
+		fi.accessor.reload(c, remoteRecord.ID())
+	case quantumfs.ObjectTypeMediumFile:
+		fi.accessor = newMediumAccessor(c, remoteRecord.ID())
+	case quantumfs.ObjectTypeLargeFile:
+		fi.accessor = newLargeAccessor(c, remoteRecord.ID())
+	case quantumfs.ObjectTypeVeryLargeFile:
+		fi.accessor = newVeryLargeAccessor(c, remoteRecord.ID())
+	}
+}
+
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	c.FuncIn("FuncIn::dirtyChild", "inode %d", child).Out()
 	if child != fi.inodeNum() {
