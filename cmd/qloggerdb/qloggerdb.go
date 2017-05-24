@@ -33,6 +33,6 @@ func main() {
 			fmt.Printf(v.ToString())
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
