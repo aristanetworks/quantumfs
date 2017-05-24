@@ -160,6 +160,10 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	cmap.records.delRecord(name, inodeId)
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
+		if !cmap.wsr.hardlinkExists(c, link.linkId) {
+			c.vlog("hardlink does not exist")
+			return nil
+		}
 		if cmap.wsr.hardlinkDec(link.linkId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
