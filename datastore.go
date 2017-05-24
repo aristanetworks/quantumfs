@@ -4,6 +4,7 @@
 // The datastore interface
 package quantumfs
 
+import "bytes"
 import "encoding/base64"
 import "encoding/binary"
 import "encoding/hex"
@@ -707,6 +708,14 @@ func (dir *HardlinkEntry) Bytes() []byte {
 	return dir.entry.Segment.Data
 }
 
+func (entry *HardlinkEntry) String() (string, error) {
+	bs := bytes.NewBufferString("HardlinkEntry: ")
+	if err := entry.entry.WriteJSON(bs); err != nil {
+		return "", err
+	}
+	return bs.String(), nil
+}
+
 func (dir *HardlinkEntry) NumEntries() int {
 	return int(dir.entry.NumEntries())
 }
@@ -733,6 +742,14 @@ func (dir *HardlinkEntry) HasNext() bool {
 
 func (dir *HardlinkEntry) SetNext(key ObjectKey) {
 	dir.entry.SetNext(key.key)
+}
+
+func (wsr *WorkspaceRoot) String() (string, error) {
+	bs := bytes.NewBufferString("WorkspaceRoot: ")
+	if err := wsr.wsr.WriteJSON(bs); err != nil {
+		return "", err
+	}
+	return bs.String(), nil
 }
 
 func (wsr *WorkspaceRoot) HardlinkEntry() HardlinkEntry {
