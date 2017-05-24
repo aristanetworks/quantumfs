@@ -255,10 +255,10 @@ func TestCacheCaching(t *testing.T) {
 
 		// Because of the size constraint, the least recent used entry
 		// keys[1] should be deleted from cache
-		_, exists := datastore.cache[keys[1]]
+		_, exists := datastore.cache[keys[1].Text()]
 		test.Assert(!exists, "Failed to forget block 1")
 		// The content is oversized, so it should be stored in the cache
-		_, exists = datastore.cache[keys[257]]
+		_, exists = datastore.cache[keys[257].Text()]
 		test.Assert(!exists, "Failed to forget block 257")
 
 		// Reading again should come entirely from the cache. If not
