@@ -7,11 +7,14 @@ import "errors"
 import "fmt"
 import "path/filepath"
 import "runtime"
+import "runtime/debug"
 
 import "golang.org/x/net/context"
 import "golang.org/x/sync/errgroup"
 
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
 import "github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
 
@@ -44,6 +47,29 @@ type workerData struct {
 	path string
 	key  quantumfs.ObjectKey
 	size uint64
+}
+
+func panicHandler(c *Ctx, err *error) {
+	exception := recover()
+	if exception == nil {
+		return
+	}
+
+	var result string
+	switch exception.(type) {
+	default:
+		result = fmt.Sprintf("Unknown panic type: %v", exception)
+		*err = fmt.Errorf("%s", result)
+	case string:
+		result = exception.(string)
+		*err = fmt.Errorf(result)
+	case error:
+		result = exception.(error).Error()
+		*err = exception.(error)
+	}
+
+	trace := utils.BytesToString(debug.Stack())
+	c.Qctx.Elog(qlog.LogTool, "%s\n%v", result, trace)
 }
 
 // Walk the workspace hierarchy
@@ -81,33 +107,36 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	conc := runtime.GOMAXPROCS(-1)
 	for i := 0; i < conc; i++ {
 
-		group.Go(func() error {
-			return worker(c, keyChan, wf)
+		group.Go(func() (err error) {
+			defer panicHandler(c, &err)
+			err = worker(c, keyChan, wf)
+			return
 		})
 	}
 
-	group.Go(func() error {
+	group.Go(func() (err error) {
+		defer panicHandler(c, &err)
 		defer close(keyChan)
 
-		if err := writeToChan(c, keyChan, "", rootID,
+		if err = writeToChan(c, keyChan, "", rootID,
 			uint64(buf.Size())); err != nil {
-			return err
+			return
 		}
 
-		if err := handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
+		if err = handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
-			return err
+			return
 		}
 
 		// Skip WSR
-		if err := handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
+		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
 			if err == SkipDir {
 				return nil
 			}
-			return err
+			return
 		}
-		return nil
+		return
 	})
 	return group.Wait()
 }
