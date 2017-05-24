@@ -740,13 +740,16 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 
 	record := dir.children.recordCopy(c, inodeNum)
 	if record != nil {
+		c.vlog("Record found")
 		return record
 	}
 
 	// if we don't have the child, maybe we're wsr and it's a hardlink
 	if dir.self.isWorkspaceRoot() {
+		c.vlog("Checking hardlink table")
 		valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
 		if valid {
+			c.vlog("Hardlink found")
 			return linkRecord
 		}
 	}

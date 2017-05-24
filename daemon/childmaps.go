@@ -249,15 +249,19 @@ func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 func (cmap *ChildMap) recordCopy(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("ChildMap::recordCopy", "inode %d", inodeId).Out()
+
 	// check if there's an entry first
 	recordName, exists := cmap.records.firstName(inodeId)
 	if !exists {
+		c.vlog("Inode not a child")
 		return nil
 	}
 
 	// Check if the dirty cache already has an entry
 	record, exists := cmap.records.getCached(recordName)
 	if exists {
+		c.vlog("Found dirty record")
 		return record
 	}
 
@@ -383,8 +387,11 @@ func (rd *recordsOnDemand) mapInodeId(name string, inodeId InodeId) {
 func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 	name string) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("recordsOnDemand::fetchFromBase", "name %s", name).Out()
+
 	nameOffset, exists := rd.nameToEntryIdx[name]
 	if !exists {
+		c.vlog("Name doesn't exist")
 		return nil
 	}
 	offset := int(nameOffset)
@@ -411,8 +418,10 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 				entry.SetID(newerKey)
 			}
 
+			c.vlog("Returning entry")
 			return entry
 		} else {
+			c.vlog("Walking to next block")
 			offset -= baseLayer.NumEntries()
 
 			// go to the next page
@@ -424,6 +433,7 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 		}
 	}
 
+	c.vlog("Name not found")
 	return nil
 }
 
@@ -660,6 +670,8 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 }
 
 func getBaseLayer(c *ctx, key quantumfs.ObjectKey) quantumfs.DirectoryEntry {
+	defer c.funcIn("getBaseLayer").Out()
+
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		panic(fmt.Sprintf("No baseLayer object for %s", key.Text()))
