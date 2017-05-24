@@ -156,9 +156,10 @@ func testSpec(base string, filename string, expected pathInfo) error {
 			return err
 		}
 
-		// in expected test outputs we don't track base dir itself
+		// paths in the base directory are treated as slash by
+		// exclude spec processing
 		if testDirRelPath == "." {
-			return nil
+			testDirRelPath = "/"
 		}
 
 		if exInfo.PathExcluded(testDirRelPath) {
