@@ -253,6 +253,8 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 		if localRecord.Type() == remoteRecord.Type() {
 			dir.handleInstantiatedInodeChange_DOWN(c, inode, inodeId,
 				remoteRecord)
+		} else if localRecord.Type().Matches(remoteRecord.Type()) {
+			inode.(*File).handleTypeChange(c, remoteRecord)
 		} else {
 			dir.destroyChild_DOWN(c, inode, inodeId, localRecord)
 		}
