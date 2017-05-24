@@ -16,6 +16,7 @@ import "os"
 import "strconv"
 import "time"
 
+import "github.com/aristanetworks/ether"
 import "github.com/aristanetworks/ether/blobstore"
 import "github.com/aristanetworks/ether/cql"
 import "github.com/aristanetworks/ether/filesystem"
@@ -149,6 +150,7 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
+
 	translator := EtherBlobStoreTranslator{
 		Blobstore:      blobstore,
 		ApplyTTLPolicy: true,
@@ -175,8 +177,9 @@ type EtherBlobStoreTranslator struct {
 // TTL will be set using Insert under following scenarios:
 //  a) key exists and current TTL < refreshTTLTimeSecs
 //  b) key doesn't exist
-func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
-	metadata map[string]string, buf []byte) error {
+func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
+	keyExist bool, key string, metadata map[string]string,
+	buf []byte) error {
 
 	setTTL := defaultTTLValueSecs
 
@@ -210,7 +213,7 @@ func refreshTTL(b blobstore.BlobStore, keyExist bool, key string,
 	// if key doesn't exist then use default TTL
 	newmetadata := make(map[string]string)
 	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", setTTL)
-	return b.Insert(key, buf, newmetadata)
+	return b.Insert((*dsApiCtx)(c), key, buf, newmetadata)
 }
 
 // Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
@@ -221,13 +224,13 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 		"key %s", key.Text()).Out()
 
 	ks := key.String()
-	data, metadata, err := ebt.Blobstore.Get(ks)
+	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), ks)
 	if err != nil {
 		return err
 	}
 
 	if ebt.ApplyTTLPolicy {
-		err = refreshTTL(ebt.Blobstore, true, ks, metadata, data)
+		err = refreshTTL(c, ebt.Blobstore, true, ks, metadata, data)
 		if err != nil {
 			return err
 		}
@@ -247,14 +250,14 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 		"key %s", key.Text()).Out()
 
 	ks := key.String()
-	metadata, err := ebt.Blobstore.Metadata(ks)
+	metadata, err := ebt.Blobstore.Metadata((*dsApiCtx)(c), ks)
 
 	switch {
 	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
-		return refreshTTL(ebt.Blobstore, false, ks, nil, buf.Get())
+		return refreshTTL(c, ebt.Blobstore, false, ks, nil, buf.Get())
 
 	case err == nil:
-		return refreshTTL(ebt.Blobstore, true, ks, metadata, buf.Get())
+		return refreshTTL(c, ebt.Blobstore, true, ks, metadata, buf.Get())
 
 	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
 		// if metadata error other than ErrKeyNotFound then fail
@@ -435,7 +438,8 @@ func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 		"EtherWsdbTranslator::WorkspaceExists",
 		"%s/%s/%s", typespace, namespace, workspace).Out()
 
-	exists, err := w.wsdb.WorkspaceExists(typespace, namespace, workspace)
+	exists, err := w.wsdb.WorkspaceExists(typespace,
+		namespace, workspace)
 	if err != nil {
 		return exists, convertWsdbError(err)
 	}
@@ -467,8 +471,8 @@ func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 		srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace).Out()
 
-	err := w.wsdb.BranchWorkspace(srcTypespace, srcNamespace, srcWorkspace,
-		dstTypespace, dstNamespace, dstWorkspace)
+	err := w.wsdb.BranchWorkspace(srcTypespace, srcNamespace,
+		srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
 		return convertWsdbError(err)
 	}
@@ -520,4 +524,36 @@ func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (bool, error) {
 
 	return false, nil
+}
+
+type dsApiCtx quantumfs.Ctx
+
+func (dc *dsApiCtx) Elog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Elog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) Wlog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Wlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) Dlog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Dlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+func (dc *dsApiCtx) Vlog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(dc).Vlog(qlog.LogDatastore, fmtStr, args...)
+}
+
+type etherFuncOut quantumfs.ExitFuncLog
+
+func (e etherFuncOut) Out() {
+	(quantumfs.ExitFuncLog)(e).Out()
+}
+
+func (dc *dsApiCtx) FuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.FuncOut {
+
+	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
+		fmtStr, args...)
+	return (etherFuncOut)(el)
 }
