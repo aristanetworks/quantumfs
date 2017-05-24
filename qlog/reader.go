@@ -14,22 +14,21 @@ import "reflect"
 import "strings"
 import "unsafe"
 
-
 type Reader struct {
-	file            *os.File
+	file *os.File
 
-	headerSize	uint64
-	circBufSize	uint64
+	headerSize  uint64
+	circBufSize uint64
 
-	lastPastEndIdx  uint64
+	lastPastEndIdx uint64
 
-	strMap		[]LogStr
-	strMapLastRead	uint64
+	strMap         []LogStr
+	strMapLastRead uint64
 }
 
 func NewReader(qlogFile string) *Reader {
-	rtn := Reader {
-		headerSize:     uint64(unsafe.Sizeof(MmapHeader{})),
+	rtn := Reader{
+		headerSize: uint64(unsafe.Sizeof(MmapHeader{})),
 	}
 
 	file, err := os.Open(qlogFile)
@@ -147,12 +146,12 @@ func (read *Reader) readLogAt(pastEndIdx uint64) (uint64, LogOutput, bool) {
 
 	if !packetReady {
 		// packet not ready yet
-		return 2+uint64(packetLen), LogOutput{}, false
+		return 2 + uint64(packetLen), LogOutput{}, false
 	}
 
 	// now read the data
 	packetData := read.wrapRead(pastEndIdx-uint64(packetLen), uint64(packetLen))
-	return 2+uint64(packetLen), read.dataToLog(packetData), true
+	return 2 + uint64(packetLen), read.dataToLog(packetData), true
 }
 
 func (read *Reader) dataToLog(packetData []byte) LogOutput {
@@ -200,7 +199,7 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 			return newLog(LogQlog, QlogReqId, 0,
 				"Not enough entries in string map (%d %d)\n",
 				[]interface{}{strMapId,
-				len(read.strMap) / LogStrSize})
+					len(read.strMap) / LogStrSize})
 		}
 	}
 	mapEntry := read.strMap[strMapId]
