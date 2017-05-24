@@ -212,8 +212,8 @@ func TestRefreshFileRemove(t *testing.T) {
 	})
 }
 
-func TestRefreshHardlinkAddition(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+func refreshHardlinkAdditionTestGen(t *testing.T, rmLink bool) {
+	runTestCommon(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
 		linkfile := "linkFile"
@@ -222,6 +222,9 @@ func TestRefreshHardlinkAddition(t *testing.T) {
 		oldRootId := createTestFile(ctx, test, workspace, "otherfile", 1000)
 		createTestFile(ctx, test, workspace, name, 1000)
 		newRootId1 := linkTestFile(ctx, test, workspace, name, linkfile)
+		if rmLink {
+			removeTestFileNoSync(test, workspace, linkfile)
+		}
 		newRootId2 := removeTestFile(ctx, test, workspace, name)
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
@@ -230,7 +233,15 @@ func TestRefreshHardlinkAddition(t *testing.T) {
 		newRootId3 := removeTestFile(ctx, test, workspace, linkfile)
 
 		test.Assert(newRootId3.IsEqualTo(oldRootId), "Unexpected rootid")
-	})
+	}, true, nil)
+}
+
+func TestRefreshHardlinkAddition1(t *testing.T) {
+	refreshHardlinkAdditionTestGen(t, false)
+}
+
+func TestRefreshHardlinkAddition2(t *testing.T) {
+	refreshHardlinkAdditionTestGen(t, true)
 }
 
 func TestRefreshHardlinkRemoval(t *testing.T) {
