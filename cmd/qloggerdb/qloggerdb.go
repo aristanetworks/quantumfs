@@ -14,12 +14,11 @@ import "github.com/aristanetworks/quantumfs/qlog"
 
 func init() {
 	flag.Usage = func() {
-		fmt.Printf("Usage: %s <qlogPath>\n")
+		fmt.Printf("Usage: %s <qlogPath>\n", os.Args[0])
 	}
 }
 
 func main() {
-
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return

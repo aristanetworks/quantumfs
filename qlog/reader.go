@@ -45,10 +45,7 @@ func NewReader(qlogFile string) *Reader {
 }
 
 func (read *Reader) readDataBlock(pos uint64, len uint64, outbuf []byte) {
-	num, err := read.file.ReadAt(outbuf[:len], int64(pos+read.headerSize))
-	if uint64(num) != len {
-		panic(fmt.Sprintf("Read length doesn't match: %d vs %d", len, num))
-	}
+	_, err := read.file.ReadAt(outbuf[:len], int64(pos+read.headerSize))
 	if err != nil {
 		panic(fmt.Sprintf("Unable to read data from qlog file: %s", err))
 	}
@@ -65,11 +62,13 @@ func (read *Reader) RefreshStrMap() {
 		_, err := read.file.ReadAt(buf,
 			int64(fileOffset+read.strMapLastRead))
 		if err != nil {
+			fmt.Printf("Unable to read entries for strMap: %s\n", err)
 			break
 		}
 
 		mapEntry := (*LogStr)(unsafe.Pointer(&buf[0]))
 		if mapEntry.Text[0] == '\x00' {
+			// No more strMap entries filled, stop looping
 			break
 		}
 
