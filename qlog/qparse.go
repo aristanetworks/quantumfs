@@ -983,7 +983,7 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 		}
 
 		// Grab the string and output
-		if int(strMapId) > len(strMap) {
+		if int(strMapId) >= len(strMap) {
 			*out = newLog(LogQlog, QlogReqId, 0,
 				"Not enough entries in "+
 					"string map (%d %d)\n",

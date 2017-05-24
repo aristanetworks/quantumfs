@@ -70,7 +70,7 @@ func (read *Reader) RefreshStrMap() {
 		}
 
 		mapEntry := (*LogStr)(unsafe.Pointer(&buf[0]))
-		if string(mapEntry.Text[:]) == "" {
+		if mapEntry.Text[0] == '\x00' {
 			break
 		}
 
@@ -193,10 +193,10 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 	}
 
 	// Grab the string and output
-	if int(strMapId) > len(read.strMap) {
+	if int(strMapId) >= len(read.strMap) {
 		read.RefreshStrMap()
 
-		if int(strMapId) > len(read.strMap) {
+		if int(strMapId) >= len(read.strMap) {
 			return newLog(LogQlog, QlogReqId, 0,
 				"Not enough entries in string map (%d %d)\n",
 				[]interface{}{strMapId,
