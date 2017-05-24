@@ -120,7 +120,9 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	if err == nil {
 		store.storeInCache(c, buf)
 		c.Vlog(qlog.LogDaemon, "Found key in durable store store")
-		return &buf
+		// buf is stored in the cache, give the client a copy to prevent
+		// it from screwing up the content in the cache.
+		return buf.clone()
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
 		err.Error(), key.Text())
