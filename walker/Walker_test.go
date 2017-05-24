@@ -3,8 +3,10 @@
 
 package walker
 
+import "fmt"
 import "io/ioutil"
 import "os"
+import "strings"
 import "strconv"
 import "testing"
 
@@ -333,5 +335,120 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 			link, err)
 
 		test.readWalkCompareSkip(workspace)
+	})
+}
+
+func TestWalkPanicString(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(133)
+		workspace := test.NewWorkspace()
+		expectedString := "raised panic"
+		expectedErr := fmt.Errorf(expectedString)
+
+		// Write File 1
+		filename := workspace + "/panicFile"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		test.SyncAllWorkspaces()
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		// Use Walker to walk all the blocks in the workspace.
+		c := &test.TestCtx().Ctx
+		root := strings.Split(test.RelPath(workspace), "/")
+		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		test.Assert(err == nil, "Error getting rootID for %v: %v",
+			root, err)
+
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, isDir bool) error {
+
+			if strings.HasSuffix(path, "/panicFile") {
+				panic(expectedString)
+			}
+			return nil
+		}
+		err = Walk(c, ds, rootID, wf)
+		test.Assert(err.Error() == expectedErr.Error(),
+			"Walk did not get the %v, instead got %v", expectedErr,
+			err)
+	})
+}
+
+func TestWalkPanicErr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(133)
+		workspace := test.NewWorkspace()
+		expectedErr := fmt.Errorf("raised panic")
+
+		// Write File 1
+		filename := workspace + "/panicFile"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		test.SyncAllWorkspaces()
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		// Use Walker to walk all the blocks in the workspace.
+		c := &test.TestCtx().Ctx
+		root := strings.Split(test.RelPath(workspace), "/")
+		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		test.Assert(err == nil, "Error getting rootID for %v: %v",
+			root, err)
+
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, isDir bool) error {
+
+			if strings.HasSuffix(path, "/panicFile") {
+				panic(expectedErr)
+			}
+			return nil
+		}
+		err = Walk(c, ds, rootID, wf)
+		test.Assert(err == expectedErr,
+			"Walk did not get the expectedErr value, instead got %v",
+			err)
+	})
+}
+
+func TestWalkErr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(133)
+		workspace := test.NewWorkspace()
+		expectedErr := fmt.Errorf("send error")
+
+		// Write File 1
+		filename := workspace + "/errorFile"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		test.SyncAllWorkspaces()
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		// Use Walker to walk all the blocks in the workspace.
+		c := &test.TestCtx().Ctx
+		root := strings.Split(test.RelPath(workspace), "/")
+		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		test.Assert(err == nil, "Error getting rootID for %v: %v",
+			root, err)
+
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, isDir bool) error {
+
+			if strings.HasSuffix(path, "/errorFile") {
+				return expectedErr
+			}
+			return nil
+		}
+		err = Walk(c, ds, rootID, wf)
+		test.Assert(err.Error() == expectedErr.Error(),
+			"Walk did not get the %v, instead got %v", expectedErr,
+			err)
 	})
 }
