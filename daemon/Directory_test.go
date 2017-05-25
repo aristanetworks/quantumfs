@@ -650,6 +650,7 @@ func TestLargeDirectory(t *testing.T) {
 			test.Assert(attendance[testFile], "File %s missing",
 				testFile)
 		}
+
 	})
 }
 
