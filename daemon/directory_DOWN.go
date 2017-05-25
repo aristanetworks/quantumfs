@@ -197,12 +197,14 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
 
 	defer c.FuncIn("Directory::destroyChild_DOWN", "inode %d", inodeId).Out()
 	if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+		/* TODO
 		subdir := inode.(*Directory)
 		subdir.children.iterateOverInMemoryRecords(c,
 			func(childname string, childId InodeId) {
 				subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
 					childId)
 			})
+		*/
 	}
 	c.qfs.noteDeletedInode(dir.id, inodeId, localRecord.Filename())
 }
@@ -337,6 +339,7 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 
 	defer dir.childRecordLock.Lock().Unlock()
 
+	/* TODO
 	dir.children.iterateOverInMemoryRecords(c, func(childname string,
 		childId InodeId) {
 
@@ -348,5 +351,6 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 
 	})
+	*/
 	return uninstantiated, deletedInodeIds
 }

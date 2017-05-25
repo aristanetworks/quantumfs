@@ -141,6 +141,7 @@ func (cmap *ChildMap) count() uint64 {
 	return uint64(len(cmap.children))
 }
 
+/* TODO
 func (cmap *ChildMap) iterateOverInMemoryRecords(c *ctx,
 	fxn func(name string, inodeId InodeId)) {
 
@@ -148,6 +149,7 @@ func (cmap *ChildMap) iterateOverInMemoryRecords(c *ctx,
 		fxn(childname, childId)
 	}
 }
+*/
 
 func (cmap *ChildMap) deleteChild(c *ctx,
 	name string) (needsReparent quantumfs.DirectoryRecord) {

@@ -138,6 +138,7 @@ func refreshTest(ctx *ctx, test *testHelper, workspace string,
 }
 
 func TestRefreshFileAddition(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -154,6 +155,7 @@ func TestRefreshFileAddition(t *testing.T) {
 }
 
 func TestRefreshUnchanged(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -173,6 +175,7 @@ func TestRefreshUnchanged(t *testing.T) {
 }
 
 func TestRefreshFileRewrite(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		utils.MkdirAll(workspace+"/subdir", 0777)
@@ -193,6 +196,7 @@ func TestRefreshFileRewrite(t *testing.T) {
 }
 
 func TestRefreshFileRemove(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		utils.MkdirAll(workspace+"/subdir", 0777)
@@ -213,6 +217,7 @@ func TestRefreshFileRemove(t *testing.T) {
 }
 
 func TestRefreshHardlinkAddition(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -234,6 +239,7 @@ func TestRefreshHardlinkAddition(t *testing.T) {
 }
 
 func TestRefreshHardlinkRemoval(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -254,6 +260,7 @@ func TestRefreshHardlinkRemoval(t *testing.T) {
 }
 
 func TestRefreshNlinkDrop(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -278,6 +285,7 @@ func TestRefreshNlinkDrop(t *testing.T) {
 }
 
 func TestRefreshNlinkBump(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -327,6 +335,7 @@ func assertOpenFileIsOfSize(test *testHelper, fd int, size int64) {
 }
 
 func TestRefreshOpenFile(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		utils.MkdirAll(workspace+"/subdir", 0777)
@@ -358,6 +367,7 @@ func TestRefreshOpenFile(t *testing.T) {
 }
 
 func TestRefreshUninstantiated(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		const (
 			nfiles = 30
@@ -401,6 +411,7 @@ func TestRefreshUninstantiated(t *testing.T) {
 }
 
 func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 
 		workspace := test.NewWorkspace()
@@ -426,6 +437,7 @@ func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 }
 
 func TestRefreshCachedDeletedEntry(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
 		workspace := test.NewWorkspace()
@@ -465,6 +477,7 @@ func TestRefreshCachedDeletedEntry(t *testing.T) {
 }
 
 func TestRefreshChangeTypeDirToFile(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -515,6 +528,7 @@ func TestRefreshChangeTypeDirToFile(t *testing.T) {
 }
 
 func TestRefreshChangeTypeFileToDir(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 
 		workspace := test.NewWorkspace()
@@ -656,6 +670,7 @@ func createVeryLargeFileWithContent(name string, content string) error {
 }
 
 func TestRefreshContentCheck(t *testing.T) {
+	t.Skip()
 	type ContentCheckTest struct {
 		name string
 		c1   func(string, string) error
