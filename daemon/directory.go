@@ -373,13 +373,15 @@ func publishDirectoryRecords(c *ctx,
 
 	defer c.funcIn("publishDirectoryRecords").Out()
 
+	numEntries := len(records)
+
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
 	newBaseLayerId := quantumfs.EmptyDirKey
 
 	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
 	// metadata block
-	baseLayer := quantumfs.NewDirectoryEntry()
+	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
 	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
@@ -388,7 +390,8 @@ func publishDirectoryRecords(c *ctx,
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
 				newBaseLayerId)
-			baseLayer = quantumfs.NewDirectoryEntry()
+			numEntries, baseLayer =
+				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
 		}
 
