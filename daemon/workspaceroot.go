@@ -678,7 +678,7 @@ func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
 	defer wsr.childRecordLock.Lock().Unlock()
 	for _, entry := range wsr.children.records() {
-		if entry.Type() == quantumfs.ObjectTypeDirectoryEntry {
+		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
 		}
 	}
