@@ -478,7 +478,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		inode.(*File).handleTypeChange(c, hardlink.Record())
 
 		status := c.qfs.invalidateInode(entry.inodeId)
-		utils.Assert(status == fuse.OK || status == fuse.ENOENT,
+		utils.Assert(status == fuse.OK,
 			"invalidating %d failed with %d", entry.inodeId, status)
 	}
 }
