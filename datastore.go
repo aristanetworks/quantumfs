@@ -4,7 +4,6 @@
 // The datastore interface
 package quantumfs
 
-import "bytes"
 import "encoding/base64"
 import "encoding/binary"
 import "encoding/hex"
@@ -13,6 +12,7 @@ import "sort"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
+import "github.com/aristanetworks/quantumfs/utils"
 import capn "github.com/glycerine/go-capnproto"
 
 // 160 bit hash, must match hash.HashSize
@@ -709,11 +709,7 @@ func (dir *HardlinkEntry) Bytes() []byte {
 }
 
 func (entry *HardlinkEntry) String() (string, error) {
-	bs := bytes.NewBufferString("HardlinkEntry: ")
-	if err := entry.entry.WriteJSON(bs); err != nil {
-		return "", err
-	}
-	return bs.String(), nil
+	return utils.GetDebugString(entry.entry, "hardlinkentry")
 }
 
 func (dir *HardlinkEntry) NumEntries() int {
@@ -745,11 +741,7 @@ func (dir *HardlinkEntry) SetNext(key ObjectKey) {
 }
 
 func (wsr *WorkspaceRoot) String() (string, error) {
-	bs := bytes.NewBufferString("WorkspaceRoot: ")
-	if err := wsr.wsr.WriteJSON(bs); err != nil {
-		return "", err
-	}
-	return bs.String(), nil
+	return utils.GetDebugString(wsr.wsr, "workspaceroot")
 }
 
 func (wsr *WorkspaceRoot) HardlinkEntry() HardlinkEntry {
