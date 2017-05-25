@@ -262,12 +262,9 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 		c.wlog("nothing to do for uninstantiated inode %d", inodeId)
 	}
 
-	if status := c.qfs.invalidateInode(inodeId); status != fuse.OK &&
-		status != fuse.ENOENT {
-
-		c.wlog("invalidating %d failed with %d", inodeId, status)
-		panic("XXX: handle invalidation failure")
-	}
+	status := c.qfs.invalidateInode(inodeId)
+	utils.Assert(status == fuse.OK,
+		"invalidating %d failed with %d", inodeId, status)
 }
 
 func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
