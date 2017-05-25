@@ -489,10 +489,10 @@ func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	defer c.funcIn("File::setChildXAttr").Out()
+	defer c.funcIn("File::removeChildXAttr").Out()
 
 	if !fi.isOrphaned() {
-		c.elog("Invalid setChildXAttr on File")
+		c.elog("Invalid removeChildXAttr on File")
 		return fuse.EIO
 	}
 
