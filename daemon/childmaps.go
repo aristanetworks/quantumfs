@@ -83,7 +83,7 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecord {
 func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 	name string) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).out()
+	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).Out()
 
 	list, exists := cmap.childrenRecords[inodeId]
 	if !exists {
@@ -103,7 +103,7 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
-	defer c.FuncIn("ChildMap::loadChild", "inode %d", inodeId).out()
+	defer c.FuncIn("ChildMap::loadChild", "inode %d", inodeId).Out()
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		linkId := decodeHardlinkKey(entry.ID())
@@ -273,7 +273,7 @@ func (cmap *ChildMap) record(inodeNum InodeId) quantumfs.DirectoryRecord {
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecord {
-	defer c.FuncIn("ChildMap::recordByName", "name %s", name).out()
+	defer c.FuncIn("ChildMap::recordByName", "name %s", name).Out()
 
 	inodeNum, exists := cmap.children[name]
 	if !exists {

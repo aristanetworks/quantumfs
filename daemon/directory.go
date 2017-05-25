@@ -354,7 +354,7 @@ func modeToPermissions(mode uint32, umask uint32) uint32 {
 func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
 
-	defer c.funcIn("publishDirectoryEntry").out()
+	defer c.funcIn("publishDirectoryEntry").Out()
 
 	layer.SetNext(nextKey)
 	bytes := layer.Bytes()
@@ -371,7 +371,7 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 func publishDirectoryRecords(c *ctx,
 	records []quantumfs.DirectoryRecord) quantumfs.ObjectKey {
 
-	defer c.funcIn("publishDirectoryRecords").out()
+	defer c.funcIn("publishDirectoryRecords").Out()
 
 	// Compile the internal records into a series of blocks which can be placed
 	// in the datastore.
