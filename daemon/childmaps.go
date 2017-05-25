@@ -103,7 +103,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	entry = convertRecord(cmap.wsr, entry)
 	if entry == nil {
-		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
+		panic(fmt.Sprintf("Nil DirectoryEntry for inode %d", inodeId))
 	}
 
 	inodeId = cmap.loadInodeId(c, entry, inodeId)
