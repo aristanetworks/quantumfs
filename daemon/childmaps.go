@@ -33,15 +33,23 @@ func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
 		childrenRecords_: make(map[InodeId][]quantumfs.DirectoryRecord),
 	}
 
+	uninstantiated := cmap.loadAllChildren(c)
+
+	return cmap, uninstantiated
+}
+
+func (cmap *ChildMap) loadAllChildren(c *ctx) []InodeId {
+	defer c.funcIn("ChildMap::loadAllChildren").Out()
+
 	uninstantiated := make([]InodeId, 200) // 200 arbitrarily chosen
 
-	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+	foreachDentry(c, cmap.baseLayer, func(record *quantumfs.DirectRecord) {
 		childInodeNum := cmap.loadChild(c, record, quantumfs.InodeIdInvalid)
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
 	})
 
-	return cmap, uninstantiated
+	return uninstantiated
 }
 
 func (cmap *ChildMap) childrenRecords() map[InodeId][]quantumfs.DirectoryRecord {
