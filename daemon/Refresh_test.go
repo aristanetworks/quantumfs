@@ -140,6 +140,23 @@ func setXattrTestFile(c *ctx, test *testHelper,
 	})
 }
 
+func delXattrTestFileNoSync(c *ctx, test *testHelper,
+	workspace string, testfile string, attr string) {
+
+	testFilename := workspace + "/" + testfile
+	c.vlog("Before removing xattr %s on %s", attr, testfile)
+	err := syscall.Removexattr(testFilename, attr)
+	test.AssertNoErr(err)
+}
+
+func delXattrTestFile(c *ctx, test *testHelper,
+	workspace string, testfile string, attr string) quantumfs.ObjectKey {
+
+	return synced_op(c, test, workspace, func() {
+		delXattrTestFileNoSync(c, test, workspace, testfile, attr)
+	})
+}
+
 func markImmutable(ctx *ctx, workspace string) {
 	defer ctx.qfs.mutabilityLock.Lock().Unlock()
 	ctx.qfs.workspaceMutability[workspace] = workspaceImmutable
@@ -837,5 +854,26 @@ func TestRefreshXattrsRemove(t *testing.T) {
 
 		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 		verifyNoXattr(test, workspace, testfile, attr)
+	})
+}
+
+func TestRefreshXattrsAddition(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+
+		testfile := "test"
+		attr := "user.data"
+		content := []byte("extendedattributedata")
+
+		createTestFileNoSync(test, workspace, testfile, 1000)
+		newRootId1 := setXattrTestFile(ctx, test, workspace, testfile,
+			attr, content)
+		verifyXattr(test, workspace, testfile, attr, content)
+		newRootId2 := delXattrTestFile(ctx, test, workspace, testfile, attr)
+		verifyNoXattr(test, workspace, testfile, attr)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+		verifyXattr(test, workspace, testfile, attr, content)
 	})
 }
