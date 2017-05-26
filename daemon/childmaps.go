@@ -41,7 +41,7 @@ func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
 func (cmap *ChildMap) loadAllChildren(c *ctx) []InodeId {
 	defer c.funcIn("ChildMap::loadAllChildren").Out()
 
-	uninstantiated := make([]InodeId, 200) // 200 arbitrarily chosen
+	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
 
 	foreachDentry(c, cmap.baseLayer, func(record *quantumfs.DirectRecord) {
 		inodeNum, exists := cmap.children[record.Filename()]
