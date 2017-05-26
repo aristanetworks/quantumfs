@@ -12,6 +12,7 @@ import "sort"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/encoding"
+import "github.com/aristanetworks/quantumfs/utils"
 import capn "github.com/glycerine/go-capnproto"
 
 // 160 bit hash, must match hash.HashSize
@@ -707,6 +708,10 @@ func (dir *HardlinkEntry) Bytes() []byte {
 	return dir.entry.Segment.Data
 }
 
+func (entry *HardlinkEntry) String() (string, error) {
+	return utils.GetDebugString(entry.entry, "hardlinkentry")
+}
+
 func (dir *HardlinkEntry) NumEntries() int {
 	return int(dir.entry.NumEntries())
 }
@@ -733,6 +738,10 @@ func (dir *HardlinkEntry) HasNext() bool {
 
 func (dir *HardlinkEntry) SetNext(key ObjectKey) {
 	dir.entry.SetNext(key.key)
+}
+
+func (wsr *WorkspaceRoot) String() (string, error) {
+	return utils.GetDebugString(wsr.wsr, "workspaceroot")
 }
 
 func (wsr *WorkspaceRoot) HardlinkEntry() HardlinkEntry {

@@ -608,6 +608,22 @@ func createSparseFile(name string, size int64) error {
 	return os.Truncate(name, size)
 }
 
+func createHardlinkWithContent(name string, content string) error {
+	fd, err := syscall.Creat(name, syscall.O_CREAT)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	err = testutils.OverWriteFile(name, content)
+	if err != nil {
+		return err
+	}
+	return syscall.Link(name, name+"_link")
+}
+
 func createSmallFileWithContent(name string, content string) error {
 	fd, err := syscall.Creat(name, 0124)
 	if err != nil {
@@ -666,69 +682,111 @@ func createVeryLargeFileWithContent(name string, content string) error {
 	return testutils.OverWriteFile(name, content)
 }
 
-func TestRefreshContentCheck(t *testing.T) {
-	type ContentCheckTest struct {
-		name string
-		c1   func(string, string) error
-		c2   func(string) error
+func contentCheckTestGen(c1 func(string, string) error,
+	c2 func(string) error) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		contentTest(ctx, test, "original content", c1, c2)
 	}
-	contentCheckTests := []ContentCheckTest{
-		ContentCheckTest{c1: createSmallFileWithContent,
-			c2:   createSmallFile,
-			name: "S2S"},
-		ContentCheckTest{c1: createSmallFileWithContent,
-			c2:   createMediumFile,
-			name: "M2S"},
-		ContentCheckTest{c1: createSmallFileWithContent,
-			c2:   createLargeFile,
-			name: "L2S"},
-		ContentCheckTest{c1: createSmallFileWithContent,
-			c2:   createVeryLargeFile,
-			name: "VL2S"},
-		ContentCheckTest{c1: createMediumFileWithContent,
-			c2:   createSmallFile,
-			name: "S2M"},
-		ContentCheckTest{c1: createMediumFileWithContent,
-			c2:   createMediumFile,
-			name: "M2M"},
-		ContentCheckTest{c1: createMediumFileWithContent,
-			c2:   createLargeFile,
-			name: "L2M"},
-		ContentCheckTest{c1: createMediumFileWithContent,
-			c2:   createVeryLargeFile,
-			name: "VL2M"},
-		ContentCheckTest{c1: createLargeFileWithContent,
-			c2:   createSmallFile,
-			name: "S2L"},
-		ContentCheckTest{c1: createLargeFileWithContent,
-			c2:   createMediumFile,
-			name: "M2L"},
-		ContentCheckTest{c1: createLargeFileWithContent,
-			c2:   createLargeFile,
-			name: "L2L"},
-		ContentCheckTest{c1: createLargeFileWithContent,
-			c2:   createVeryLargeFile,
-			name: "VL2L"},
-		ContentCheckTest{c1: createVeryLargeFileWithContent,
-			c2:   createSmallFile,
-			name: "S2VL"},
-		ContentCheckTest{c1: createVeryLargeFileWithContent,
-			c2:   createMediumFile,
-			name: "M2VL"},
-		ContentCheckTest{c1: createVeryLargeFileWithContent,
-			c2:   createLargeFile,
-			name: "L2VL"},
-		ContentCheckTest{c1: createVeryLargeFileWithContent,
-			c2:   createVeryLargeFile,
-			name: "VL2VL"},
-	}
-	t.Parallel()
-	for _, cct := range contentCheckTests {
-		// This test is already running in parallel with the other tests
-		runExpensiveTest(t, func(test *testHelper) {
-			ctx := test.TestCtx()
-			ctx.vlog("Running test %s", cct.name)
-			contentTest(ctx, test, "original content", cct.c1, cct.c2)
-		})
-	}
+}
+
+func TestRefreshType_S2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createSmallFileWithContent,
+		createSmallFile))
+}
+
+func TestRefreshType_M2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createSmallFileWithContent,
+		createMediumFile))
+}
+
+func TestRefreshType_L2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createSmallFileWithContent,
+		createLargeFile))
+}
+
+func TestRefreshType_VL2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createSmallFileWithContent,
+		createVeryLargeFile))
+}
+
+func TestRefreshType_S2M(t *testing.T) {
+	runTest(t, contentCheckTestGen(createMediumFileWithContent,
+		createSmallFile))
+}
+
+func TestRefreshType_M2M(t *testing.T) {
+	runTest(t, contentCheckTestGen(createMediumFileWithContent,
+		createMediumFile))
+}
+
+func TestRefreshType_L2M(t *testing.T) {
+	runTest(t, contentCheckTestGen(createMediumFileWithContent,
+		createLargeFile))
+}
+
+func TestRefreshType_VL2M(t *testing.T) {
+	runTest(t, contentCheckTestGen(createMediumFileWithContent,
+		createVeryLargeFile))
+}
+
+func TestRefreshType_S2L(t *testing.T) {
+	runTest(t, contentCheckTestGen(createLargeFileWithContent,
+		createSmallFile))
+}
+
+func TestRefreshType_M2L(t *testing.T) {
+	runTest(t, contentCheckTestGen(createLargeFileWithContent,
+		createMediumFile))
+}
+
+func TestRefreshType_L2L(t *testing.T) {
+	runTest(t, contentCheckTestGen(createLargeFileWithContent,
+		createLargeFile))
+}
+
+func TestRefreshType_VL2L(t *testing.T) {
+	runTest(t, contentCheckTestGen(createLargeFileWithContent,
+		createVeryLargeFile))
+}
+
+func TestRefreshType_S2VL(t *testing.T) {
+	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
+		createSmallFile))
+}
+
+func TestRefreshType_M2VL(t *testing.T) {
+	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
+		createMediumFile))
+}
+
+func TestRefreshType_L2VL(t *testing.T) {
+	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
+		createLargeFile))
+}
+
+func TestRefreshType_VL2VL(t *testing.T) {
+	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
+		createVeryLargeFile))
+}
+
+func TestRefreshType_H2H_S2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createHardlinkWithContent,
+		createSmallFile))
+}
+
+func TestRefreshType_H2H_S2M(t *testing.T) {
+	runTest(t, contentCheckTestGen(createHardlinkWithContent,
+		createMediumFile))
+}
+
+func TestRefreshType_H2H_S2L(t *testing.T) {
+	runTest(t, contentCheckTestGen(createHardlinkWithContent,
+		createLargeFile))
+}
+
+func TestRefreshType_H2H_S2VL(t *testing.T) {
+	runTest(t, contentCheckTestGen(createHardlinkWithContent,
+		createVeryLargeFile))
 }

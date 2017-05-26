@@ -476,6 +476,18 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
 		entry.nlink = hardlink.Nlinks()
 		wsr.hardlinks[id] = entry
+
+		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
+		if inode == nil {
+			return
+		}
+		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
+			entry.record.ID().Text(), hardlink.Record().ID().Text())
+		inode.(*File).handleTypeChange(c, hardlink.Record())
+
+		status := c.qfs.invalidateInode(entry.inodeId)
+		utils.Assert(status == fuse.OK,
+			"invalidating %d failed with %d", entry.inodeId, status)
 	}
 }
 
