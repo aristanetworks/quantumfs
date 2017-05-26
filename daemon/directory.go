@@ -686,7 +686,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 func (dir *Directory) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
-	defer c.funcIn("Directory::getChildRecord").Out()
+	defer c.funcIn("Directory::getChildRecordCopy").Out()
 
 	defer dir.RLock().RUnlock()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -1600,7 +1600,7 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 func (dir *Directory) lookupInternal(c *ctx, name string,
 	entryType quantumfs.ObjectType) (child Inode, instantiated bool, err error) {
 
-	defer c.FuncIn("Directory::LookupInternal", "name %s", name).Out()
+	defer c.FuncIn("Directory::lookupInternal", "name %s", name).Out()
 
 	defer dir.RLock().RUnlock()
 	inodeNum, record, err := dir.lookupChildRecord_(c, name)
@@ -1608,7 +1608,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 		return nil, false, err
 	}
 
-	c.vlog("Directory::LookupInternal found inode %d Name %s", inodeNum, name)
+	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
 	_, instantiated = c.qfs.lookupCount(inodeNum)
 	child = c.qfs.inode(c, inodeNum)
 	child.markSelfAccessed(c, false)
@@ -1627,7 +1627,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
 	quantumfs.DirectoryRecord, error) {
 
-	defer c.FuncIn("Directory::LookupChildRecord_", "name %s", name).Out()
+	defer c.FuncIn("Directory::lookupChildRecord_", "name %s", name).Out()
 
 	defer dir.childRecordLock.Lock().Unlock()
 	record := dir.children.recordByName(c, name)
@@ -1666,7 +1666,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	return entry
 }
 
-// Needs exlusive Inode lock
+// Needs exclusive Inode lock
 func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask uint32,
 	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
 	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
@@ -1783,7 +1783,6 @@ func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	utils.Assert(true, "Illegal call on Directory::Write()")
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
