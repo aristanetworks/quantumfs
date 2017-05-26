@@ -473,6 +473,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdMergeWorkspaces:
 		c.vlog("Received merge request")
 		responseSize = api.mergeWorkspace(c, buf)
+	case quantumfs.CmdRefreshWorkspace:
+		c.vlog("Received refresh request")
+		responseSize = api.refreshWorkspace(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -573,6 +576,38 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
+}
+
+func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
+	defer c.funcIn("ApiHandle::refreshWorkspace").Out()
+
+	var cmd quantumfs.RefreshRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		c.vlog("Error unmarshaling JSON: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
+	}
+	c.vlog("Refreshing %s", cmd.Workspace)
+
+	workspace := strings.Split(cmd.Workspace, "/")
+	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
+		workspace[1], workspace[2])
+	defer cleanup()
+	if !ok {
+		c.vlog("Workspace not found: %s", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"Workspace %s does not exist or is not active",
+			cmd.Workspace)
+	}
+	key, _, _, err := quantumfs.DecodeExtendedKey(cmd.Key)
+	if err != nil {
+		c.vlog("Could not decode key %s", cmd.Key)
+		return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
+			"Key %s does not exist in the datastore", cmd.Key)
+	}
+	wsr.refresh(c, key)
+
+	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
 }
 
 func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
