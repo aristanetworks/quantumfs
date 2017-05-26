@@ -3,6 +3,7 @@
 
 package daemon
 
+import "bytes"
 import "io"
 import "testing"
 import "syscall"
@@ -97,6 +98,52 @@ func linkTestFile(c *ctx, test *testHelper,
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
 	c.vlog("Created link %s -> %s and new rootID is %s", src, dst,
 		newRootId.String())
+
+	return newRootId
+}
+
+func setXattrTestFileNoSync(test *testHelper, workspace string,
+	testfile string, attr string, data []byte) {
+
+	testFilename := workspace + "/" + testfile
+	test.Log("Before setting xattr %s on %s", attr, testfile)
+	err := syscall.Setxattr(testFilename, attr, data, 0)
+	test.AssertNoErr(err)
+}
+
+func verifyXattr(test *testHelper, workspace string,
+	testfile string, attr string, content []byte) {
+
+	data := make([]byte, 100)
+	size, err := syscall.Getxattr(workspace+"/"+testfile, attr, data)
+	test.Assert(err == nil, "Error reading data XAttr: %v", err)
+	test.Assert(size == len(content),
+		"data XAttr size incorrect: %d", size)
+	test.Assert(bytes.Equal(data[:size], content),
+		"Didn't get the same data back '%s' '%s'", data,
+		content)
+}
+
+func verifyNoXattr(test *testHelper, workspace string,
+	testfile string, attr string) {
+
+	data := make([]byte, 100)
+	_, err := syscall.Getxattr(workspace+"/"+testfile, attr, data)
+	test.AssertErr(err)
+	test.Assert(err == syscall.ENODATA, "xattr must not exist %s", err.Error())
+}
+
+func setXattrTestFile(c *ctx, test *testHelper,
+	workspace string, testfile string, attr string,
+	data []byte) quantumfs.ObjectKey {
+
+	oldRootId := getRootId(test, workspace)
+	setXattrTestFileNoSync(test, workspace, testfile, attr, data)
+	test.SyncAllWorkspaces()
+	newRootId := getRootId(test, workspace)
+	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
+	test.Log("Set xattr %s on %s and new rootID is %s", attr, testfile,
+		newRootId.Text())
 
 	return newRootId
 }
@@ -789,4 +836,25 @@ func TestRefreshType_H2H_S2L(t *testing.T) {
 func TestRefreshType_H2H_S2VL(t *testing.T) {
 	runTest(t, contentCheckTestGen(createHardlinkWithContent,
 		createVeryLargeFile))
+}
+
+func TestRefreshXattrsRemove(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+
+		testfile := "test"
+		attr := "user.data"
+		content := []byte("extendedattributedata")
+
+		newRootId1 := createTestFile(ctx, test, workspace, testfile, 1000)
+		verifyNoXattr(test, workspace, testfile, attr)
+
+		newRootId2 := setXattrTestFile(ctx, test, workspace, testfile,
+			attr, content)
+		verifyXattr(test, workspace, testfile, attr, content)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+		verifyNoXattr(test, workspace, testfile, attr)
+	})
 }
