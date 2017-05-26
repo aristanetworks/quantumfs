@@ -11,7 +11,8 @@ import "github.com/hanwen/go-fuse/fuse"
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
 	wsr *WorkspaceRoot
-	dir *Directory
+
+	baseLayer quantumfs.ObjectKey
 
 	// can be many to one
 	children map[string]InodeId
@@ -20,14 +21,27 @@ type ChildMap struct {
 	childrenRecords_ map[InodeId][]quantumfs.DirectoryRecord
 }
 
-func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
-	return &ChildMap{
-		wsr:      wsr_,
-		dir:      owner,
-		children: make(map[string]InodeId, numEntries),
-		childrenRecords_: make(map[InodeId][]quantumfs.DirectoryRecord,
-			numEntries),
+func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
+	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
+
+	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.Text()).Out()
+
+	cmap := &ChildMap{
+		wsr:              wsr_,
+		baseLayer:        baseLayerId,
+		children:         make(map[string]InodeId),
+		childrenRecords_: make(map[InodeId][]quantumfs.DirectoryRecord),
 	}
+
+	uninstantiated := make([]InodeId, 200) // 200 arbitrarily chosen
+
+	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+		childInodeNum := cmap.loadChild(c, record, quantumfs.InodeIdInvalid)
+		c.vlog("loaded child %d", childInodeNum)
+		uninstantiated = append(uninstantiated, childInodeNum)
+	})
+
+	return cmap, uninstantiated
 }
 
 func (cmap *ChildMap) childrenRecords() map[InodeId][]quantumfs.DirectoryRecord {
