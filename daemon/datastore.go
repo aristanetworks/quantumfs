@@ -22,7 +22,7 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	entryNum := cacheSize / 102400
 	return &dataStore{
 		durableStore: durableStore,
-		cache:        make(map[quantumfs.ObjectKey]*buffer, entryNum),
+		cache:        make(map[string]*buffer, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
 	}
@@ -33,13 +33,14 @@ type dataStore struct {
 
 	cacheLock utils.DeferableMutex
 	lru       list.List // Back is most recently used
-	cache     map[quantumfs.ObjectKey]*buffer
+	cache     map[string]*buffer
 	cacheSize int
 	freeSpace int
 }
 
 func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
-	defer c.FuncInName(qlog.LogDaemon, "dataStore::storeInCache").Out()
+	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
+		buf.key.Text()).Out()
 
 	size := buf.Size()
 
@@ -52,7 +53,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		return
 	}
 
-	if _, exists := store.cache[buf.key]; exists {
+	if _, exists := store.cache[buf.key.Text()]; exists {
 		// It is possible when storing dirty data that we could reproduce the
 		// contents which already exist in the cache. We don't want to have
 		// the same data in the LRU queue twice as that is wasteful, though
@@ -69,6 +70,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		// it is likely to still be in the cache. However, if the data isn't
 		// read in short order then marking that data most recently used will
 		// simply force something else out of the cache.
+		c.Vlog(qlog.LogDaemon, "Not touching key in cache")
 		return
 	}
 
@@ -76,9 +78,9 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	for store.freeSpace < 0 {
 		evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
 		store.freeSpace += evictedBuf.Size()
-		delete(store.cache, evictedBuf.key)
+		delete(store.cache, evictedBuf.key.Text())
 	}
-	store.cache[buf.key] = &buf
+	store.cache[buf.key.Text()] = &buf
 	buf.lruElement = store.lru.PushBack(buf)
 }
 
@@ -96,7 +98,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	bufResult := func() quantumfs.Buffer {
 		defer store.cacheLock.Lock().Unlock()
 
-		if buf, exists := store.cache[key]; exists {
+		if buf, exists := store.cache[key.Text()]; exists {
 			store.lru.MoveToBack(buf.lruElement)
 			return buf.clone()
 		}
