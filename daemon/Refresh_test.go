@@ -35,6 +35,19 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	test.AssertNoErr(err)
 }
 
+func synced_op(c *ctx, test *testHelper, workspace string,
+	nosync_op func()) quantumfs.ObjectKey {
+
+	oldRootId := getRootId(test, workspace)
+	nosync_op()
+	test.SyncAllWorkspaces()
+	newRootId := getRootId(test, workspace)
+	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
+	c.vlog("new rootID %s", newRootId.Text())
+
+	return newRootId
+}
+
 func createTestFileNoSync(test *testHelper,
 	workspace string, name string, size int) {
 
@@ -46,14 +59,9 @@ func createTestFileNoSync(test *testHelper,
 func createTestFile(c *ctx, test *testHelper,
 	workspace string, name string, size int) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	createTestFileNoSync(test, workspace, name, size)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Created file %s and new rootID is %s", name, newRootId.String())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		createTestFileNoSync(test, workspace, name, size)
+	})
 }
 
 func removeTestFileNoSync(test *testHelper,
@@ -67,14 +75,9 @@ func removeTestFileNoSync(test *testHelper,
 func removeTestFile(c *ctx, test *testHelper,
 	workspace string, name string) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	removeTestFileNoSync(test, workspace, name)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Removed file %s and new rootID is %s", name, newRootId.String())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		removeTestFileNoSync(test, workspace, name)
+	})
 }
 
 func linkTestFileNoSync(c *ctx, test *testHelper,
@@ -91,15 +94,9 @@ func linkTestFileNoSync(c *ctx, test *testHelper,
 func linkTestFile(c *ctx, test *testHelper,
 	workspace string, src string, dst string) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	linkTestFileNoSync(c, test, workspace, src, dst)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Created link %s -> %s and new rootID is %s", src, dst,
-		newRootId.String())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		linkTestFileNoSync(c, test, workspace, src, dst)
+	})
 }
 
 func setXattrTestFileNoSync(c *ctx, test *testHelper,
@@ -138,15 +135,9 @@ func setXattrTestFile(c *ctx, test *testHelper,
 	workspace string, testfile string, attr string,
 	data []byte) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	setXattrTestFileNoSync(c, test, workspace, testfile, attr, data)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Set xattr %s on %s and new rootID is %s", attr, testfile,
-		newRootId.Text())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		setXattrTestFileNoSync(c, test, workspace, testfile, attr, data)
+	})
 }
 
 func markImmutable(ctx *ctx, workspace string) {
