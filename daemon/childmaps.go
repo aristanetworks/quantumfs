@@ -44,7 +44,11 @@ func (cmap *ChildMap) loadAllChildren(c *ctx) []InodeId {
 	uninstantiated := make([]InodeId, 200) // 200 arbitrarily chosen
 
 	foreachDentry(c, cmap.baseLayer, func(record *quantumfs.DirectRecord) {
-		childInodeNum := cmap.loadChild(c, record, quantumfs.InodeIdInvalid)
+		inodeNum, exists := cmap.children[record.Filename()]
+		if !exists {
+			inodeNum = quantumfs.InodeIdInvalid
+		}
+		childInodeNum := cmap.loadChild(c, record, inodeNum)
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
 	})
