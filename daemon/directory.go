@@ -380,7 +380,7 @@ func (dir *Directory) publish_(c *ctx) {
 	defer c.FuncIn("Directory::publish_", "%s", dir.name_).Out()
 
 	oldBaseLayer := dir.baseLayerId
-	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records())
+	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records(c))
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.Text(),
 		dir.baseLayerId.Text())
@@ -584,7 +584,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	c.vlog("Adding real children")
 
 	defer dir.childRecordLock.Lock().Unlock()
-	records := dir.children.records()
+	records := dir.children.records(c)
 
 	for _, entry := range records {
 		filename := entry.Filename()
@@ -762,7 +762,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	defer c.FuncIn("DirectoryRecord::getRecordChildCall_", "inode %d",
 		inodeNum).Out()
 
-	record := dir.children.record(inodeNum)
+	record := dir.children.record(c, inodeNum)
 	if record != nil {
 		c.vlog("Record found")
 		return record
@@ -781,10 +781,10 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) directChildInodes() []InodeId {
+func (dir *Directory) directChildInodes(c *ctx) []InodeId {
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.directInodes()
+	return dir.children.directInodes(c)
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
@@ -1547,7 +1547,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	entry := dir.children.record(inodeNum)
+	entry := dir.children.record(c, inodeNum)
 	if entry == nil {
 		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
 			inodeNum))
