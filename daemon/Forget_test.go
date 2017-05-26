@@ -106,11 +106,11 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
-			"Failed to forgot file inode")
+			"Failed to forget file inode")
 
 		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
 		test.Assert(wsrInode == nil,
-			"Failed to forgot workspace inode")
+			"Failed to forget workspace inode")
 
 		// Verify the mutability is preserved
 		fd, err := syscall.Creat(workspace+"/file1", 0124)
@@ -248,11 +248,11 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
-			"Failed to forgot file inode")
+			"Failed to forget file inode")
 
 		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
 		test.Assert(wsrInode == nil,
-			"Failed to forgot workspace inode")
+			"Failed to forget workspace inode")
 	})
 }
 
@@ -292,11 +292,11 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
-			"Failed to forgot directory inode")
+			"Failed to forget directory inode")
 
 		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
 		test.Assert(wsrInode == nil,
-			"Failed to forgot workspace inode")
+			"Failed to forget workspace inode")
 
 	})
 }
