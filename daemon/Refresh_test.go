@@ -102,12 +102,11 @@ func linkTestFile(c *ctx, test *testHelper,
 	return newRootId
 }
 
-func setXattrTestFileNoSync(c *ctx, test *testHelper,
-	workspace string, testfile string, attr string,
-	data []byte) {
+func setXattrTestFileNoSync(test *testHelper, workspace string,
+	testfile string, attr string, data []byte) {
 
 	testFilename := workspace + "/" + testfile
-	c.vlog("Before setting xattr %s on %s", attr, testfile)
+	test.Log("Before setting xattr %s on %s", attr, testfile)
 	err := syscall.Setxattr(testFilename, attr, data, 0)
 	test.AssertNoErr(err)
 }
@@ -139,11 +138,11 @@ func setXattrTestFile(c *ctx, test *testHelper,
 	data []byte) quantumfs.ObjectKey {
 
 	oldRootId := getRootId(test, workspace)
-	setXattrTestFileNoSync(c, test, workspace, testfile, attr, data)
+	setXattrTestFileNoSync(test, workspace, testfile, attr, data)
 	test.SyncAllWorkspaces()
 	newRootId := getRootId(test, workspace)
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Set xattr %s on %s and new rootID is %s", attr, testfile,
+	test.Log("Set xattr %s on %s and new rootID is %s", attr, testfile,
 		newRootId.Text())
 
 	return newRootId
