@@ -83,39 +83,8 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
-	uninstantiated := make([]InodeId, 0)
-
-	key := baseLayerId
-	for {
-		c.vlog("Fetching baselayer %s", key.Text())
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			panic("No baseLayer object")
-		}
-
-		baseLayer := buffer.AsDirectoryEntry()
-
-		if dir.children == nil {
-			dir.children = newChildMap(baseLayer.NumEntries(), wsr, dir)
-		}
-
-		for i := 0; i < baseLayer.NumEntries(); i++ {
-			childInodeNum := func() InodeId {
-				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.loadChild(c, baseLayer.Entry(i),
-					quantumfs.InodeIdInvalid)
-			}()
-			c.vlog("initDirectory %d getting child %d", inodeNum,
-				childInodeNum)
-			uninstantiated = append(uninstantiated, childInodeNum)
-		}
-
-		if baseLayer.HasNext() {
-			key = baseLayer.Next()
-		} else {
-			break
-		}
-	}
+	cmap, uninstantiated := newChildMap(c, wsr, dir.baseLayerId)
+	dir.children = cmap
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 
