@@ -170,6 +170,7 @@ func reduceGCPercent() {
 		if memStats.HeapAlloc > 10*1024*1024*1024 {
 			// 10% of 10G is 1G, which seems a reasonable compromise on
 			// working set size variability.
+			fmt.Printf("Changing GCPercent to 10\n")
 			debug.SetGCPercent(10)
 			return
 		}
