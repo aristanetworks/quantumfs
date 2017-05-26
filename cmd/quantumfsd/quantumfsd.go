@@ -9,6 +9,7 @@ import "fmt"
 import "net/http"
 import _ "net/http/pprof"
 import "os"
+import "runtime"
 import "runtime/debug"
 import "time"
 
@@ -153,6 +154,30 @@ func processArgs() {
 	loadWorkspaceDB()
 }
 
+// Reduce the amount of "unused memory" QuantumFS uses when running as a
+// daemon. Doubling memory use before running GC is an excessive amount of
+// memory to use in the steady state.
+//
+// If we expect quantumfsd to consume about 30G of memory legitimately, then
+// a 10% increase is about 3G. This function reduces the GC percentage threshold once
+// the total heap use has grown large enough that the default setting consumes too
+// much memory.
+func reduceGCPercent() {
+	for {
+		var memStats runtime.MemStats
+		runtime.ReadMemStats(&memStats)
+
+		if memStats.HeapAlloc > 10*1024*1024*1024 {
+			// 10% of 10G is 1G, which seems a reasonable compromise on
+			// working set size variability.
+			debug.SetGCPercent(10)
+			return
+		}
+
+		time.Sleep(1 * time.Minute)
+	}
+}
+
 func main() {
 	processArgs()
 
@@ -160,16 +185,7 @@ func main() {
 		fmt.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	// Reduce the amount of "unused memory" QuantumFS uses when running as a
-	// daemon. Doubling memory use before running GC is an excessive amount of
-	// memory to use.
-	//
-	// If we expect quantumfsd to consume about 30G of memory legitimately, then
-	// a 10% increase is about 3G. We cannot use a significantly smaller constant
-	// value because when we first start QuantumFS its memory usage will be tiny,
-	// and, say, 1% of 1G results in constantly running GC and not making
-	// substantial forward progress.
-	debug.SetGCPercent(10)
+	go reduceGCPercent()
 
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
