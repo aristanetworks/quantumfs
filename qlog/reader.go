@@ -88,6 +88,60 @@ func (read *Reader) ReadHeader() *MmapHeader {
 	return ExtractHeader(headerData)
 }
 
+func (read *Reader) ReadWritten() []LogOutput {
+	freshHeader := read.ReadHeader()
+
+	rtn := make([]LogOutput, 0)
+	pastEndIdx := freshHeader.CircBuf.PastEndIdx
+
+	read.lastPastEndIdx = pastEndIdx + 1
+	if read.lastPastEndIdx >= read.circBufSize {
+		read.lastPastEndIdx -= read.circBufSize
+	}
+
+	rtnPastEndIdx := pastEndIdx
+	remaining := wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize)
+
+	for {
+		readLen, logOutput, ready := read.readLogAt(pastEndIdx)
+		if readLen <= 2 {
+			fmt.Printf("ERROR: Read zero length - escaping\n")
+			break
+		}
+
+		if !ready {
+			// throw away the logs we've seen so far 'cause of this hole
+			rtn = make([]LogOutput, 0)
+		}
+
+		if readLen > remaining {
+			errorLog := newLog(LogQlog, QlogReqId, 0,
+				"ERROR: Packet over-read error", nil)
+			rtn = append([]LogOutput{errorLog}, rtn...)
+			break
+		}
+
+		remaining -= readLen
+		wrapMinusEquals(&pastEndIdx, readLen, read.circBufSize)
+
+		if ready {
+if false{
+			rtn = append([]LogOutput{logOutput}, rtn...)
+			//fmt.Printf(logOutput.ToString())
+}
+		} else {
+			rtnPastEndIdx = pastEndIdx
+		}
+
+		if remaining == 0 {
+			break
+		}
+	}
+	read.lastPastEndIdx = rtnPastEndIdx
+
+	return rtn
+}
+
 func (read *Reader) ReadMore() []LogOutput {
 	freshHeader := read.ReadHeader()
 	if freshHeader.CircBuf.PastEndIdx == read.lastPastEndIdx {

@@ -12,7 +12,6 @@ import "errors"
 import "fmt"
 import "io"
 import "io/ioutil"
-import "math"
 import "os"
 import "reflect"
 import "sort"
@@ -494,7 +493,9 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
 
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
-
+if true {
+return
+}
 	FormatLogs(logs, tabSpaces, statusBar, fn)
 }
 
@@ -779,28 +780,16 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 			return nil, err
 		}
 
-		var rtnRaw [math.MaxUint16]byte
-
-		// check to see if the string is all there
-		stringData := data
-
 		stringPastEnd := *idx + uint64(strLen)
-		if uint64(len(data)) >= stringPastEnd {
-			stringData = data[:stringPastEnd]
-		}
-		strLen = uint16(uint64(len(stringData)) - *idx)
-
-		err = readPacket(idx, stringData, reflect.ValueOf(&rtnRaw))
-		if err != nil {
-			return nil, err
-		}
+		substr := data[*idx:stringPastEnd]
+		*idx += uint64(strLen)
 
 		if byteType == TypeString {
-			return string(rtnRaw[:strLen]), nil
+			return string(substr), nil
 		}
 
 		// Otherwise, return []byte if type is TypeByteArray
-		return rtnRaw[:strLen], nil
+		return substr, nil
 	}
 
 	return nil, errors.New(fmt.Sprintf("Unsupported field type %d\n", byteType))
@@ -855,26 +844,6 @@ func readBack(pastIdx *uint64, data []byte, outputType interface{},
 func readPacket(idx *uint64, data []byte, output reflect.Value) error {
 
 	dataLen := uint64(output.Elem().Type().Size())
-
-	// If this is a string, then consume the rest of data provided
-	if byteArray, ok := output.Interface().(*[math.MaxUint16]byte); ok {
-		dataLen = uint64(len(data)) - *idx
-		// Because binary.Read is dumb and can't read less than the given
-		// array without EOFing *and* needs a fixed array, we have to do this
-		var singleArray [1]byte
-		for i := uint64(0); i < dataLen; i++ {
-			buf := bytes.NewReader(data[*idx+i : *idx+i+1])
-			err := binary.Read(buf, binary.LittleEndian, &singleArray)
-			if err != nil {
-				return err
-			}
-			(*byteArray)[i] = singleArray[0]
-		}
-
-		*idx += dataLen
-
-		return nil
-	}
 
 	if dataLen+*idx > uint64(len(data)) {
 		return errors.New(fmt.Sprintf("Packet has been clipped. (%d %d %d)",
@@ -1100,6 +1069,9 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	printStatus bool) []LogOutput {
 
 	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
+if true {
+	return nil
+}
 
 	// Go through the logs and fix any missing timestamps. Use the last entry's,
 	// and de-pointer-ify them.
