@@ -522,6 +522,29 @@ func TestRefreshCachedDeletedEntry(t *testing.T) {
 	})
 }
 
+func TestRefreshDeleteRootFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId1 := removeTestFile(ctx, test, workspace, name)
+		newRootId2 := createTestFile(ctx, test, workspace, name, 1000)
+
+		f, err := os.OpenFile(workspace+"/"+name, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		err = f.Close()
+		test.AssertNoErr(err)
+
+		_, err = os.OpenFile(workspace+"/"+name, os.O_RDONLY, 0777)
+		test.AssertErr(err)
+	})
+}
+
 func TestRefreshChangeTypeDirToFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
