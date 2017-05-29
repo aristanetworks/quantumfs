@@ -587,7 +587,7 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
 	}
-	c.vlog("Refreshing %s", cmd.Workspace)
+	c.vlog("Refreshing %s to %s", cmd.Workspace, cmd.Remote)
 
 	workspace := strings.Split(cmd.Workspace, "/")
 	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
