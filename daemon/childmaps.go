@@ -320,6 +320,10 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	return &linkCopy, fuse.OK
 }
 
+func (cmap *ChildMap) reload(c *ctx, baseLayerId quantumfs.ObjectKey) {
+	cmap.records.reload(c, baseLayerId)
+}
+
 func (cmap *ChildMap) publish(c *ctx) quantumfs.ObjectKey {
 	return cmap.records.publish(c)
 }
@@ -608,6 +612,21 @@ func (rd *recordsOnDemand) countEntryCapacity(c *ctx) int {
 	return entryCapacity
 }
 
+func (rd *recordsOnDemand) reload(c *ctx, newBaseLayerId quantumfs.ObjectKey) {
+	defer c.funcIn("recordsOnDemand::reload").Out()
+
+	// update our state
+	rd.base = newBaseLayerId
+	rd.cache = make(map[string]quantumfs.DirectoryRecord)
+	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
+
+	// re-set our map of indices into directory entries
+	rd.nameToEntryIdx = make(map[string]uint32)
+	rd.iterateOverRecords(c, true, func(record quantumfs.DirectoryRecord) {
+		// don't need to do anything while we iterate
+	})
+}
+
 func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	defer c.funcIn("recordsOnDemand::publish").Out()
@@ -641,17 +660,7 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	baseLayer.SetNumEntries(entryIdx)
 	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
-
-	// update our state
-	rd.base = newBaseLayerId
-	rd.cache = make(map[string]quantumfs.DirectoryRecord)
-	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
-
-	// re-set our map of indices into directory entries
-	rd.nameToEntryIdx = make(map[string]uint32)
-	rd.iterateOverRecords(c, true, func(record quantumfs.DirectoryRecord) {
-		// don't need to do anything while we iterate
-	})
+	rd.reload(c, newBaseLayerId)
 
 	return newBaseLayerId
 }
