@@ -288,7 +288,7 @@ type MergeRequest struct {
 type RefreshRequest struct {
 	CommandCommon
 	Workspace string
-	Key       string
+	Remote    string
 }
 
 type AccessedRequest struct {
@@ -441,7 +441,7 @@ func (api *Api) Merge3Way(base string, remote string, local string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *Api) Refresh(workspace string, key string) error {
+func (api *Api) Refresh(workspace string, remote string) error {
 	if !isWorkspaceNameValid(workspace) {
 		return fmt.Errorf("\"%s\" must be an empty string or "+
 			"contain precisely two \"/\"\n", workspace)
@@ -449,7 +449,7 @@ func (api *Api) Refresh(workspace string, key string) error {
 	cmd := RefreshRequest{
 		CommandCommon: CommandCommon{CommandId: CmdRefreshWorkspace},
 		Workspace:     workspace,
-		Key:           key,
+		Remote:        remote,
 	}
 	return api.processCmd(cmd, nil)
 }

@@ -599,13 +599,17 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 			"Workspace %s does not exist or is not active",
 			cmd.Workspace)
 	}
-	key, _, _, err := quantumfs.DecodeExtendedKey(cmd.Key)
+
+	remote := strings.Split(cmd.Remote, "/")
+	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
+		remote[2])
+
 	if err != nil {
-		c.vlog("Could not decode key %s", cmd.Key)
-		return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
-			"Key %s does not exist in the datastore", cmd.Key)
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"Workspace %s does not exist or is not active",
+			cmd.Remote)
 	}
-	wsr.refresh(c, key)
+	wsr.refresh(c, remoteRootId)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
 }
