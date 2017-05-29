@@ -19,6 +19,11 @@ type ChildMap struct {
 
 	// Use childrenRecords() to access this
 	childrenRecords_ map[InodeId][]quantumfs.DirectoryRecord
+
+	// This is false if the baseLayer metadata object is up to date with all
+	// changes. It is true if there are changes in this object which have not
+	// been uploaded to the datastore.
+	dirty_ bool
 }
 
 func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
@@ -48,6 +53,7 @@ func (cmap *ChildMap) loadAllChildren(c *ctx) []InodeId {
 		if !exists {
 			inodeNum = quantumfs.InodeIdInvalid
 		}
+		c.vlog("Loading child with id %d", inodeNum)
 		childInodeNum := cmap.loadChild(c, record, inodeNum)
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
@@ -56,12 +62,30 @@ func (cmap *ChildMap) loadAllChildren(c *ctx) []InodeId {
 	return uninstantiated
 }
 
+func (cmap *ChildMap) dirty() {
+	cmap.dirty_ = true
+}
+
+func (cmap *ChildMap) baseLayerIs(key quantumfs.ObjectKey) {
+	cmap.baseLayer = key
+	cmap.dirty_ = false
+	cmap.childrenRecords_ = nil
+}
+
 func (cmap *ChildMap) childrenRecords(c *ctx) map[InodeId][]quantumfs.DirectoryRecord {
+	if cmap.childrenRecords_ == nil {
+		c.vlog("child record was nil, reloading from %s",
+			cmap.baseLayer.Text())
+		cmap.childrenRecords_ = make(map[InodeId][]quantumfs.DirectoryRecord)
+		cmap.loadAllChildren(c)
+	}
 	return cmap.childrenRecords_
 }
 
 func (cmap *ChildMap) setRecord(c *ctx, inodeId InodeId,
 	record quantumfs.DirectoryRecord) {
+
+	cmap.dirty()
 
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(c, inodeId, record.Filename())
@@ -77,6 +101,8 @@ func (cmap *ChildMap) setRecord(c *ctx, inodeId InodeId,
 
 func (cmap *ChildMap) delRecord(c *ctx, inodeId InodeId,
 	name string) quantumfs.DirectoryRecord {
+
+	cmap.dirty()
 
 	list, exists := cmap.childrenRecords(c)[inodeId]
 	if !exists {
@@ -187,6 +213,8 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 
 	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
 
+	cmap.dirty()
+
 	inodeId, exists := cmap.children[name]
 	if !exists {
 		c.vlog("name does not exist")
@@ -231,6 +259,8 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 
 	defer c.FuncIn("ChildMap::renameChild", "oldName %s newName %s", oldName,
 		newName).Out()
+
+	cmap.dirty()
 
 	if oldName == newName {
 		c.vlog("Names are identical")
@@ -358,6 +388,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 
 	// It needs to become a hardlink now. Hand it off to wsr
 	c.vlog("Converting into a hardlink")
+	cmap.dirty()
 	newLink := cmap.wsr.newHardlink(c, childId, child)
 
 	cmap.setRecord(c, childId, newLink)
