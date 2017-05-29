@@ -162,16 +162,19 @@ func processArgs() {
 // a 10% increase is about 3G. This function reduces the GC percentage threshold once
 // the total heap use has grown large enough that the default setting consumes too
 // much memory.
-func reduceGCPercent() {
+func reduceGCPercent(cacheSize uint64) {
 	for {
 		var memStats runtime.MemStats
 		runtime.ReadMemStats(&memStats)
 
-		if memStats.HeapAlloc > 10*1024*1024*1024 {
-			// 10% of 10G is 1G, which seems a reasonable compromise on
-			// working set size variability.
-			fmt.Printf("Changing GCPercent to 10\n")
-			debug.SetGCPercent(10)
+		if memStats.HeapAlloc > cacheSize {
+			// Approximately 1G seems a reasonable garbage to produce
+			// before running garbage collection. Once we've surpassed
+			// the configured cache size for total heap used, switch to
+			// the more frequent garbage collection.
+			oneGPercent := (100 * (1 * 1024 * 1024 * 1024)) / cacheSize
+			fmt.Printf("Changing GCPercent to %d\n", oneGPercent)
+			debug.SetGCPercent(int(oneGPercent))
 			return
 		}
 
@@ -186,7 +189,7 @@ func main() {
 		fmt.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	go reduceGCPercent()
+	go reduceGCPercent(config.CacheSize)
 
 	var mountOptions = fuse.MountOptions{
 		AllowOther:    true,
