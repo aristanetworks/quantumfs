@@ -158,10 +158,11 @@ func processArgs() {
 // daemon. Doubling memory use before running GC is an excessive amount of
 // memory to use in the steady state.
 //
-// If we expect quantumfsd to consume about 30G of memory legitimately, then
-// a 10% increase is about 3G. This function reduces the GC percentage threshold once
-// the total heap use has grown large enough that the default setting consumes too
-// much memory.
+// However, much of the GC time spent before QuantumFS has filled its
+// readcache is wasted. Therefore we wait until QuantumFS has mostly
+// filled its readcache and then set GCPercent to a value which will
+// allow approximately 1GB of garbage to accrue before collection is
+// triggered.
 func reduceGCPercent(cacheSize uint64) {
 	for {
 		var memStats runtime.MemStats
