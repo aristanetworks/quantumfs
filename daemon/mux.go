@@ -1063,7 +1063,12 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 }
 
 func (qfs *QuantumFs) invalidateInode(inodeId InodeId) fuse.Status {
-	return qfs.server.InodeNotify(uint64(inodeId), 0, -1)
+	err := qfs.server.InodeNotify(uint64(inodeId), 0, -1)
+	if err == fuse.ENOENT {
+		// The kernel did not know about the inode already
+		return fuse.OK
+	}
+	return err
 }
 
 func (qfs *QuantumFs) noteDeletedInode(parentId InodeId, childId InodeId,
