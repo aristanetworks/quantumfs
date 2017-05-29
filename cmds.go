@@ -355,6 +355,34 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	return bytes.TrimRight(result, "\u0000"), nil
 }
 
+func (api *Api) processCmd(cmd interface{}, res interface{}) error {
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	if res == nil {
+		var errorResponse ErrorResponse
+		err = json.Unmarshal(buf, &errorResponse)
+		if err != nil {
+			return fmt.Errorf("%s. buffer: %q", err.Error(), buf)
+		}
+		if errorResponse.ErrorCode != ErrorOK {
+			return fmt.Errorf("qfs command Error:%s",
+				errorResponse.Message)
+		}
+	} else {
+		// The client must check res.errorResponse.ErrorCode
+		return json.Unmarshal(buf, res)
+	}
+	return nil
+}
+
 // branch the src workspace into a new workspace called dst.
 func (api *Api) Branch(src string, dst string) error {
 	if !isWorkspaceNameValid(src) {
@@ -370,27 +398,7 @@ func (api *Api) Branch(src string, dst string) error {
 		Src:           src,
 		Dst:           dst,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return fmt.Errorf("%s. buffer: %q", err.Error(), buf)
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 func (api *Api) Merge(remote string, local string) error {
@@ -423,27 +431,7 @@ func (api *Api) Merge3Way(base string, remote string, local string) error {
 		RemoteWorkspace: remote,
 		LocalWorkspace:  local,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 // Get the list of accessed file from workspaceroot
@@ -458,29 +446,14 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 		WorkspaceRoot: wsr,
 	}
 
-	cmdBuf, err := json.Marshal(cmd)
+	var accesslistResponse AccessListResponse
+	err := api.processCmd(cmd, &accesslistResponse)
 	if err != nil {
 		return nil, err
 	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return nil, err
-	}
+	errorResponse := accesslistResponse.ErrorResponse
 	if errorResponse.ErrorCode != ErrorOK {
 		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-
-	var accesslistResponse AccessListResponse
-	err = json.Unmarshal(buf, &accesslistResponse)
-	if err != nil {
-		return nil, err
 	}
 
 	printAccessList(accesslistResponse.AccessList)
@@ -497,26 +470,7 @@ func (api *Api) ClearAccessed(wsr string) error {
 		CommandCommon: CommandCommon{CommandId: CmdClearAccessed},
 		WorkspaceRoot: wsr,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 // Sync all the active workspaces
@@ -558,26 +512,7 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 		Gid:           gid,
 		Permissions:   permissions,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 // Enable the chosen workspace mutable
@@ -592,26 +527,7 @@ func (api *Api) EnableRootWrite(dst string) error {
 		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
 		Workspace:     dst,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 // Make the chosen workspace irreversibly immutable
@@ -627,26 +543,7 @@ func (api *Api) SetWorkspaceImmutable(workspacepath string) error {
 		CommandCommon: CommandCommon{CommandId: CmdSetWorkspaceImmutable},
 		WorkspacePath: workspacepath,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 // Delete the given workspace.
@@ -662,26 +559,7 @@ func (api *Api) DeleteWorkspace(workspacepath string) error {
 		CommandCommon: CommandCommon{CommandId: CmdDeleteWorkspace},
 		WorkspacePath: workspacepath,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 func (api *Api) SetBlock(key []byte, data []byte) error {
@@ -691,26 +569,7 @@ func (api *Api) SetBlock(key []byte, data []byte) error {
 		Key:           key,
 		Data:          data,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 // Note that, because we report the size of Api as 1024, we can't read more than
@@ -722,19 +581,8 @@ func (api *Api) GetBlock(key []byte) ([]byte, error) {
 		CommandCommon: CommandCommon{CommandId: CmdGetBlock},
 		Key:           key,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return nil, err
-	}
-
 	var getBlockResponse GetBlockResponse
-	err = json.Unmarshal(buf, &getBlockResponse)
+	err := api.processCmd(cmd, &getBlockResponse)
 	if err != nil {
 		return nil, err
 	}
