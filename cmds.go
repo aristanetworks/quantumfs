@@ -242,6 +242,10 @@ const (
 	CmdEnableRootWrite       = 10
 	CmdSetWorkspaceImmutable = 11
 	CmdMergeWorkspaces       = 12
+
+	// The following commands might be removed in the future versions so we
+	// do not allocate a known id for them
+	CmdRefreshWorkspace = 10001 + iota
 )
 
 // The various error codes
@@ -282,6 +286,12 @@ type MergeRequest struct {
 	BaseWorkspace   string
 	RemoteWorkspace string
 	LocalWorkspace  string
+}
+
+type RefreshRequest struct {
+	CommandCommon
+	Workspace       string
+	RemoteWorkspace string
 }
 
 type AccessedRequest struct {
@@ -430,6 +440,19 @@ func (api *Api) Merge3Way(base string, remote string, local string) error {
 		BaseWorkspace:   base,
 		RemoteWorkspace: remote,
 		LocalWorkspace:  local,
+	}
+	return api.processCmd(cmd, nil)
+}
+
+func (api *Api) Refresh(workspace string, remoteWorkspace string) error {
+	if !isWorkspaceNameValid(workspace) {
+		return fmt.Errorf("\"%s\" must be an empty string or "+
+			"contain precisely two \"/\"\n", workspace)
+	}
+	cmd := RefreshRequest{
+		CommandCommon:   CommandCommon{CommandId: CmdRefreshWorkspace},
+		Workspace:       workspace,
+		RemoteWorkspace: remoteWorkspace,
 	}
 	return api.processCmd(cmd, nil)
 }
