@@ -22,37 +22,44 @@ const (
 	exitApiNotFound = iota
 )
 
+func printUsage() {
+	fmt.Println("qfs version", version)
+	fmt.Println("usage: qfs [options] <command> [ARG1[,ARG2[,...]]]")
+	flag.PrintDefaults()
+	fmt.Println()
+	fmt.Println("Available commands:")
+	fmt.Println("  branch <workspaceO> <workspaceN>")
+	fmt.Println("         - create a new workspaceN which is a copy of" +
+		" workspaceO")
+	fmt.Println("           as of this point in time")
+	fmt.Println("  chroot")
+	fmt.Println("         - Run shell in the specified workspace tree")
+	fmt.Println("  accessedFiles <workspace>")
+	fmt.Println("         - get the access list of workspace")
+	fmt.Println("  clearAccessedFiles <workspace>")
+	fmt.Println("         - clear the access list of workspace")
+	fmt.Println("  insertInode <dstPath> <key> <uid> <gid> <permission>")
+	fmt.Println("         - copy an inode corresponding to an extended" +
+		" key under the location of dstPath with specifications of" +
+		" user <uid>, group <gid>, and RWX permission <permission>" +
+		" in octal format")
+	fmt.Println("  deleteWorkspace <workspace>")
+	fmt.Println("         - delete <workspace> from the WorkspaceDB")
+	fmt.Println("  enableRootWrite <workspace>")
+	fmt.Println("         - enable <workspace> the write permission")
+	fmt.Println("  setWorkspaceImmutable <workspace>")
+	fmt.Println("         - make <workspace> irreversibly immutable")
+	fmt.Println("  refresh <workspace> <remoteWorkspace>")
+}
+
 func main() {
+	displayHelp := false
+	flag.BoolVar(&displayHelp, "help", false, "Display usage help")
 	flag.Parse()
 
-	if flag.NArg() == 0 {
-		fmt.Println("qfs version", version)
-		fmt.Println("usage: qfs [options] <command> [ARG1[,ARG2[,...]]]")
-		flag.PrintDefaults()
-		fmt.Println("Available commands:")
-		fmt.Println("  branch <workspaceO> <workspaceN>")
-		fmt.Println("         - create a new workspaceN which is a copy of" +
-			" workspaceO")
-		fmt.Println("           as of this point in time")
-		fmt.Println("  chroot")
-		fmt.Println("         - Run shell in the specified workspace tree")
-		fmt.Println("  accessedFiles <workspace>")
-		fmt.Println("         - get the access list of workspace")
-		fmt.Println("  clearAccessedFiles <workspace>")
-		fmt.Println("         - clear the access list of workspace")
-		fmt.Println("  insertInode <dstPath> <key> <uid> <gid> <permission>")
-		fmt.Println("         - copy an inode corresponding to an extended" +
-			" key under the location of dstPath with specifications of" +
-			" user <uid>, group <gid>, and RWX permission <permission>" +
-			" in octal format")
-		fmt.Println("  deleteWorkspace <workspace>")
-		fmt.Println("         - delete <workspace> from the WorkspaceDB")
-		fmt.Println("  enableRootWrite <workspace>")
-		fmt.Println("         - enable <workspace> the write permission")
-		fmt.Println("  setWorkspaceImmutable <workspace>")
-		fmt.Println("         - make <workspace> irreversibly immutable")
-		fmt.Println("  refresh <workspace> <remoteWorkspace>")
-		os.Exit(exitBadCmd)
+	if flag.NArg() == 0 || displayHelp {
+		printUsage()
+		os.Exit(exitOk)
 	}
 
 	cmd := flag.Arg(0)
