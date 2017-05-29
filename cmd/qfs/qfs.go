@@ -54,7 +54,7 @@ func printUsage() {
 
 func main() {
 	displayHelp := false
-	flag.BoolVar(&displayHelp, "h", false, "Display this help")
+	flag.BoolVar(&displayHelp, "help", false, "Display usage help")
 	flag.Parse()
 
 	if flag.NArg() == 0 || displayHelp {
