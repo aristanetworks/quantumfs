@@ -125,10 +125,7 @@ func (read *Reader) ReadWritten() []LogOutput {
 		wrapMinusEquals(&pastEndIdx, readLen, read.circBufSize)
 
 		if ready {
-if false{
 			rtn = append([]LogOutput{logOutput}, rtn...)
-			//fmt.Printf(logOutput.ToString())
-}
 		} else {
 			rtnPastEndIdx = pastEndIdx
 		}

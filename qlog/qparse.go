@@ -493,9 +493,6 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
 
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
-if true {
-return
-}
 	FormatLogs(logs, tabSpaces, statusBar, fn)
 }
 
@@ -1069,9 +1066,6 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	printStatus bool) []LogOutput {
 
 	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
-if true {
-	return nil
-}
 
 	// Go through the logs and fix any missing timestamps. Use the last entry's,
 	// and de-pointer-ify them.
