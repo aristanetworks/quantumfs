@@ -35,6 +35,19 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	test.AssertNoErr(err)
 }
 
+func synced_op(c *ctx, test *testHelper, workspace string,
+	nosync_op func()) quantumfs.ObjectKey {
+
+	oldRootId := getRootId(test, workspace)
+	nosync_op()
+	test.SyncAllWorkspaces()
+	newRootId := getRootId(test, workspace)
+	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
+	c.vlog("new rootID %s", newRootId.Text())
+
+	return newRootId
+}
+
 func createTestFileNoSync(test *testHelper,
 	workspace string, name string, size int) {
 
@@ -46,14 +59,9 @@ func createTestFileNoSync(test *testHelper,
 func createTestFile(c *ctx, test *testHelper,
 	workspace string, name string, size int) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	createTestFileNoSync(test, workspace, name, size)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Created file %s and new rootID is %s", name, newRootId.String())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		createTestFileNoSync(test, workspace, name, size)
+	})
 }
 
 func removeTestFileNoSync(test *testHelper,
@@ -67,14 +75,9 @@ func removeTestFileNoSync(test *testHelper,
 func removeTestFile(c *ctx, test *testHelper,
 	workspace string, name string) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	removeTestFileNoSync(test, workspace, name)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Removed file %s and new rootID is %s", name, newRootId.String())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		removeTestFileNoSync(test, workspace, name)
+	})
 }
 
 func linkTestFileNoSync(c *ctx, test *testHelper,
@@ -91,15 +94,9 @@ func linkTestFileNoSync(c *ctx, test *testHelper,
 func linkTestFile(c *ctx, test *testHelper,
 	workspace string, src string, dst string) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	linkTestFileNoSync(c, test, workspace, src, dst)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	c.vlog("Created link %s -> %s and new rootID is %s", src, dst,
-		newRootId.String())
-
-	return newRootId
+	return synced_op(c, test, workspace, func() {
+		linkTestFileNoSync(c, test, workspace, src, dst)
+	})
 }
 
 func setXattrTestFileNoSync(test *testHelper, workspace string,
@@ -137,15 +134,26 @@ func setXattrTestFile(c *ctx, test *testHelper,
 	workspace string, testfile string, attr string,
 	data []byte) quantumfs.ObjectKey {
 
-	oldRootId := getRootId(test, workspace)
-	setXattrTestFileNoSync(test, workspace, testfile, attr, data)
-	test.SyncAllWorkspaces()
-	newRootId := getRootId(test, workspace)
-	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	test.Log("Set xattr %s on %s and new rootID is %s", attr, testfile,
-		newRootId.Text())
+	return synced_op(c, test, workspace, func() {
+		setXattrTestFileNoSync(test, workspace, testfile, attr, data)
+	})
+}
 
-	return newRootId
+func delXattrTestFileNoSync(c *ctx, test *testHelper,
+	workspace string, testfile string, attr string) {
+
+	testFilename := workspace + "/" + testfile
+	c.vlog("Before removing xattr %s on %s", attr, testfile)
+	err := syscall.Removexattr(testFilename, attr)
+	test.AssertNoErr(err)
+}
+
+func delXattrTestFile(c *ctx, test *testHelper,
+	workspace string, testfile string, attr string) quantumfs.ObjectKey {
+
+	return synced_op(c, test, workspace, func() {
+		delXattrTestFileNoSync(c, test, workspace, testfile, attr)
+	})
 }
 
 func markImmutable(ctx *ctx, workspace string) {
@@ -856,5 +864,26 @@ func TestRefreshXattrsRemove(t *testing.T) {
 
 		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 		verifyNoXattr(test, workspace, testfile, attr)
+	})
+}
+
+func TestRefreshXattrsAddition(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+
+		testfile := "test"
+		attr := "user.data"
+		content := []byte("extendedattributedata")
+
+		createTestFileNoSync(test, workspace, testfile, 1000)
+		newRootId1 := setXattrTestFile(ctx, test, workspace, testfile,
+			attr, content)
+		verifyXattr(test, workspace, testfile, attr, content)
+		newRootId2 := delXattrTestFile(ctx, test, workspace, testfile, attr)
+		verifyNoXattr(test, workspace, testfile, attr)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+		verifyXattr(test, workspace, testfile, attr, content)
 	})
 }
