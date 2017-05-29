@@ -51,7 +51,7 @@ func main() {
 		fmt.Println("         - enable <workspace> the write permission")
 		fmt.Println("  setWorkspaceImmutable <workspace>")
 		fmt.Println("         - make <workspace> irreversibly immutable")
-		fmt.Println("  refresh <workspace> <remote>")
+		fmt.Println("  refresh <workspace> <remoteWorkspace>")
 		os.Exit(exitBadCmd)
 	}
 
@@ -158,14 +158,14 @@ func refresh() {
 		os.Exit(exitBadArgs)
 	}
 	workspace := flag.Arg(1)
-	remote := flag.Arg(2)
+	remoteWorkspace := flag.Arg(2)
 
 	api, err := quantumfs.NewApi()
 	if err != nil {
 		fmt.Println("Failed to find API:", err)
 		os.Exit(exitApiNotFound)
 	}
-	if err := api.Refresh(workspace, remote); err != nil {
+	if err := api.Refresh(workspace, remoteWorkspace); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
