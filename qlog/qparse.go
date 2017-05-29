@@ -777,9 +777,15 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 			return nil, err
 		}
 
-		stringPastEnd := *idx + uint64(strLen)
-		substr := data[*idx:stringPastEnd]
-		*idx += uint64(strLen)
+		substr := make([]byte, 0)
+		if *idx < uint64(len(data)) {
+			substr = data[*idx:]
+
+			if strLen < uint16(len(substr)) {
+				substr = substr[:strLen]
+			}
+		}
+		*idx += uint64(len(substr))
 
 		if byteType == TypeString {
 			return string(substr), nil
