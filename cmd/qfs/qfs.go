@@ -59,7 +59,7 @@ func main() {
 
 	if flag.NArg() == 0 || displayHelp {
 		printUsage()
-		os.Exit(exitBadCmd)
+		os.Exit(exitOk)
 	}
 
 	cmd := flag.Arg(0)
