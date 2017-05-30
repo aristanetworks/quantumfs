@@ -1721,6 +1721,8 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
 	dir.updateSize_(c)
+
+	c.qfs.noteChildCreated(dir.inodeNum(), name)
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
