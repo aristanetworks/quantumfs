@@ -561,16 +561,6 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	return newRootId
 }
 
-// This function allows the test to modify the internal state of the
-// WorkspaceRoot object to make sure it is in sync with wsdb
-func (wsr *WorkspaceRoot) overwritePublishedRootId(c *ctx,
-	newRootId quantumfs.ObjectKey) {
-
-	defer c.FuncIn("WorkspaceRoot::overwritePublishedRootId", "%s",
-		newRootId.Text()).Out()
-	wsr.publishedRootId = newRootId
-}
-
 func (wsr *WorkspaceRoot) publish(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 

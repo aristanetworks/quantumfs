@@ -22,6 +22,15 @@ func getRootId(test *testHelper, workspace string) quantumfs.ObjectKey {
 		wsWorkspaceName)
 }
 
+// This function allows the test to modify the internal state of the
+// WorkspaceRoot object to make sure it is in sync with wsdb
+func overwritePublishedRootId(c *ctx, wsr *WorkspaceRoot,
+	newRootId quantumfs.ObjectKey) {
+
+	defer c.FuncIn("overwritePublishedRootId", "%s", newRootId.Text()).Out()
+	wsr.publishedRootId = newRootId
+}
+
 func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
@@ -37,7 +46,7 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	wsr, cleanup := test.getWorkspaceRoot(workspace)
 	defer cleanup()
 	test.Assert(wsr != nil, "workspace root does not exist")
-	wsr.overwritePublishedRootId(ctx, dst)
+	overwritePublishedRootId(ctx, wsr, dst)
 }
 
 func synced_op(c *ctx, test *testHelper, workspace string,
