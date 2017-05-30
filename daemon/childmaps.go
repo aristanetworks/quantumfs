@@ -181,6 +181,10 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	result := cmap.delRecord(inodeId, name)
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
+		if !cmap.wsr.hardlinkExists(c, link.linkId) {
+			c.vlog("hardlink does not exist")
+			return nil
+		}
 		if cmap.wsr.hardlinkDec(link.linkId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
@@ -329,3 +333,24 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
 }
+
+/* TODO
+func (cmap *ChildMap) reload(c *ctx, baseLayerId quantumfs.ObjectKey) {
+	cmap.records.reload(c, baseLayerId)
+}
+
+func (rd *recordsOnDemand) reload(c *ctx, newBaseLayerId quantumfs.ObjectKey) {
+	defer c.funcIn("recordsOnDemand::reload").Out()
+
+	// update our state
+	rd.base = newBaseLayerId
+	rd.cache = make(map[string]quantumfs.DirectoryRecord)
+	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
+
+	// re-set our map of indices into directory entries
+	rd.nameToEntryIdx = make(map[string]uint32)
+	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
+		// don't need to do anything while we iterate
+	})
+}
+*/

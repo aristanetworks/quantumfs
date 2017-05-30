@@ -333,12 +333,18 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		"Unexpected success creating non-existing intermediate"+
 			" Inode")
 
+	// Stat the file before creating it to ensure that the negative entry is in
+	// the kernel's cache. Then after we insert the file if we haven't properly
+	// notified the kernel of the new entry the second stat will fail the test.
+	var stat syscall.Stat_t
+	err = syscall.Stat(workspaceDst+"/test/a/file", &stat)
+	test.AssertErr(err)
+
 	// Duplicate the file in the given path
 	err = api.InsertInode(dst+"/test/a/file", keyF, PermissionA, uid, gid)
 	test.Assert(err == nil,
 		"Error duplicating a file to target workspace: %v", err)
 
-	var stat syscall.Stat_t
 	err = syscall.Stat(workspaceDst+"/test/a/file", &stat)
 	test.Assert(err == nil, "Error get status of a file: %v", err)
 
