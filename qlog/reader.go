@@ -93,17 +93,12 @@ func (read *Reader) ReadMore() []LogOutput {
 	}
 
 	rtn := make([]LogOutput, 0)
-
 	pastEndIdx := freshHeader.CircBuf.PastEndIdx
-	readLen := wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize)
-
-	// read all the data in one go to reduce number of reads
-	data := read.wrapRead(read.lastPastEndIdx, readLen)
-	pastDataIdx := int64(len(data))
+	rtnPastEndIdx := pastEndIdx
+	remaining := wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize)
 
 	for {
-		readLen, logOutput, ready := read.readLogAt(data,
-			uint64(pastDataIdx))
+		readLen, logOutput, ready := read.readLogAt(pastEndIdx)
 		if readLen == 0 {
 			fmt.Printf("ERROR: Read zero length - escaping\n")
 			break
@@ -114,51 +109,37 @@ func (read *Reader) ReadMore() []LogOutput {
 			rtn = make([]LogOutput, 0)
 		}
 
-		if int64(readLen) > pastDataIdx {
+		if readLen > remaining {
 			errorLog := newLog(LogQlog, QlogReqId, 0,
 				"ERROR: Packet over-read error", nil)
 			rtn = append([]LogOutput{errorLog}, rtn...)
 			break
 		}
 
-		pastDataIdx -= int64(readLen)
+		remaining -= readLen
+		wrapMinusEquals(&pastEndIdx, readLen, read.circBufSize)
 
 		if ready {
 			rtn = append([]LogOutput{logOutput}, rtn...)
 		} else {
-			pastEndIdx = read.lastPastEndIdx
-			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),
-				read.circBufSize)
+			rtnPastEndIdx = pastEndIdx
 		}
 
-		if pastDataIdx <= 0 {
+		if remaining == 0 {
 			break
 		}
 	}
-	read.lastPastEndIdx = pastEndIdx
+	read.lastPastEndIdx = rtnPastEndIdx
 
 	return rtn
 }
 
-func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,
-	bool) {
-
-	if len(data) < 2 {
-		fmt.Println("Partial packet - not enough data to even read size")
-		return 0, LogOutput{}, false
-	}
-
+func (read *Reader) readLogAt(pastEndIdx uint64) (uint64, LogOutput, bool) {
 	var packetLen uint16
-	readBack(&pastEndIdx, data, packetLen, &packetLen)
+	read.readBack(&pastEndIdx, packetLen, &packetLen)
 
 	packetReady := ((packetLen & uint16(entryCompleteBit)) != 0)
 	packetLen &= ^(uint16(entryCompleteBit))
-
-	if uint64(len(data)) < pastEndIdx || pastEndIdx < uint64(packetLen) {
-		fmt.Printf("Not enough data to read packet %d %d\n", len(data),
-			packetLen)
-		return 0, LogOutput{}, false
-	}
 
 	if !packetReady {
 		// packet not ready yet
@@ -166,7 +147,7 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput
 	}
 
 	// now read the data
-	packetData := data[pastEndIdx-uint64(packetLen) : pastEndIdx]
+	packetData := read.wrapRead(pastEndIdx-uint64(packetLen), uint64(packetLen))
 	return 2 + uint64(packetLen), read.dataToLog(packetData), true
 }
 
@@ -230,6 +211,21 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 
 	return newLog(logSubsystem, reqId, timestamp,
 		mapStr+"\n", args)
+}
+
+func (read *Reader) readBack(pastIdx *uint64, outputType interface{},
+	output interface{}) {
+
+	dataLen := uint64(reflect.TypeOf(outputType).Size())
+
+	wrapMinusEquals(pastIdx, dataLen, read.circBufSize)
+	rawData := read.wrapRead(*pastIdx, dataLen)
+
+	buf := bytes.NewReader(rawData)
+	err := binary.Read(buf, binary.LittleEndian, output)
+	if err != nil {
+		panic("Unable to binary read from data")
+	}
 }
 
 func (read *Reader) wrapRead(idx uint64, num uint64) []byte {
