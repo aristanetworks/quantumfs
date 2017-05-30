@@ -166,7 +166,7 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput
 	}
 
 	// now read the data
-	packetData := data[pastEndIdx-uint64(packetLen):pastEndIdx]
+	packetData := data[pastEndIdx-uint64(packetLen) : pastEndIdx]
 	return 2 + uint64(packetLen), read.dataToLog(packetData), true
 }
 
