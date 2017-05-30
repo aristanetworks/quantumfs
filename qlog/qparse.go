@@ -812,6 +812,14 @@ func wrapRead(idx uint64, num uint64, data []byte) []byte {
 	return rtn
 }
 
+func wrapPlusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
+	*lhs += rhs
+
+	if *lhs > bufLen {
+		*lhs -= bufLen
+	}
+}
+
 func wrapMinus(lhs uint64, rhs uint64, bufLen uint64) uint64 {
 	wrapMinusEquals(&lhs, rhs, bufLen)
 	return lhs
@@ -1072,6 +1080,9 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	printStatus bool) []LogOutput {
 
 	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
+if true && false{
+	return nil
+}
 
 	// Go through the logs and fix any missing timestamps. Use the last entry's,
 	// and de-pointer-ify them.
