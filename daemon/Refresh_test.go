@@ -530,7 +530,7 @@ func TestRefreshCachedDeletedEntry(t *testing.T) {
 	})
 }
 
-func TestRefreshDeleteRootFile(t *testing.T) {
+func TestRefreshDeleteWorkspaceRootFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
