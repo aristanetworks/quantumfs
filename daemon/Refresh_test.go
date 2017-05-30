@@ -33,11 +33,17 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 		wsNamespaceName, wsWorkspaceName, src, dst)
 	test.AssertNoErr(err)
+
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
+	test.Assert(wsr != nil, "workspace root does not exist")
+	wsr.publishedRootId = dst
 }
 
 func synced_op(c *ctx, test *testHelper, workspace string,
 	nosync_op func()) quantumfs.ObjectKey {
 
+	test.SyncAllWorkspaces()
 	oldRootId := getRootId(test, workspace)
 	nosync_op()
 	test.SyncAllWorkspaces()
