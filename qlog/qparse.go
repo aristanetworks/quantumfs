@@ -777,7 +777,7 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 			return nil, err
 		}
 
-		substr := make([]byte, 0)
+		var substr []byte
 		if *idx < uint64(len(data)) {
 			substr = data[*idx:]
 
