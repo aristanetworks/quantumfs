@@ -1080,9 +1080,6 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	printStatus bool) []LogOutput {
 
 	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
-if true && false{
-	return nil
-}
 
 	// Go through the logs and fix any missing timestamps. Use the last entry's,
 	// and de-pointer-ify them.

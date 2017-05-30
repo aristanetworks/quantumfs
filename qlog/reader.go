@@ -124,10 +124,7 @@ func (read *Reader) ReadMore() []LogOutput {
 		pastDataIdx -= int64(readLen)
 
 		if ready {
-if false {
-		//	rtn = append([]LogOutput{logOutput}, rtn...)
-		fmt.Printf("%s", logOutput.ToString())
-}
+			rtn = append([]LogOutput{logOutput}, rtn...)
 		} else {
 			pastEndIdx = read.lastPastEndIdx
 			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),
