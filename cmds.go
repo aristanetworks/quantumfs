@@ -178,7 +178,7 @@ func findApiPath() (string, error) {
 // 2. The api file at the root of the sole mounted QuantumFS instance. If more than
 //    one instance is mounted none of them will be used.
 // 3. Searching upwards in the directory tree for the api file
-func NewApi() (*Api, error) {
+func NewApi() (Api, error) {
 	path, err := findApiPath()
 	if err != nil {
 		return nil, err
@@ -186,8 +186,8 @@ func NewApi() (*Api, error) {
 	return NewApiWithPath(path)
 }
 
-func NewApiWithPath(path string) (*Api, error) {
-	api := Api{}
+func NewApiWithPath(path string) (Api, error) {
+	api := apiImpl{}
 
 	fd, err := os.OpenFile(path, os.O_RDWR|syscall.O_DIRECT, 0)
 	api.fd = fd
@@ -198,11 +198,70 @@ func NewApiWithPath(path string) (*Api, error) {
 	return &api, nil
 }
 
-type Api struct {
+type Api interface {
+	Close()
+
+	// Branch the src workspace into a new workspace called dst
+	Branch(src string, dst string) error
+
+	// A two way merge is equivalent to a three way merge where the base is
+	// the null (empty) workspace
+	Merge(remote string, local string) error
+
+	// Local takes precedence if remote and local have a conflict and matching
+	// modification times. It is also the workspace who is Advanced to the
+	// resulting ID.
+	Merge3Way(base string, remote string, local string) error
+
+	// Get the list of accessed file from workspaceroot
+	GetAccessed(wsr string) (map[string]bool, error)
+
+	// Clear the list of accessed files in workspaceroot
+	ClearAccessed(wsr string) error
+
+	// Sync all the active workspaces
+	SyncAll() error
+
+	// Duplicate an object with a given key and path
+	InsertInode(dst string, key string, permissions uint32, uid uint32,
+		gid uint32) error
+
+	// Enable the chosen workspace mutable
+	//
+	// dst is the path relative to the filesystem root, ie. user/joe/myws
+	EnableRootWrite(dst string) error
+
+	// Make the chosen workspace irreversibly immutable
+	//
+	// workspacepath is the path relative to the filesystem root,
+	// ie. user/joe/myws
+	SetWorkspaceImmutable(workspacepath string) error
+
+	// Delete the given workspace.
+	//
+	// workspacepath is the path relative to the filesystem root,
+	// ie. user/joe/myws
+	DeleteWorkspace(workspacepath string) error
+
+	// Store a block in the datastore with the given key.
+	//
+	// The namespace this block is uploaded into the datastore is separate from
+	// the other objects uploaded by QuantumFS.
+	SetBlock(key []byte, data []byte) error
+
+	// Retriece a block in the datastore stored using SetBlock() using the given
+	// key.
+	GetBlock(key []byte) ([]byte, error)
+
+	// For testing only, may be removed in the future
+	Refresh(workspace string, remoteWorkspace string) error
+}
+
+type apiImpl struct {
 	fd *os.File
 }
 
-func (api *Api) Close() {
+func (api *apiImpl) Close() {
 	api.fd.Close()
 }
 
@@ -242,6 +301,10 @@ const (
 	CmdEnableRootWrite       = 10
 	CmdSetWorkspaceImmutable = 11
 	CmdMergeWorkspaces       = 12
+
+	// The following commands might be removed in the future versions so we
+	// do not allocate a known id for them
+	CmdRefreshWorkspace = 10001 + iota
 )
 
 // The various error codes
@@ -282,6 +345,12 @@ type MergeRequest struct {
 	BaseWorkspace   string
 	RemoteWorkspace string
 	LocalWorkspace  string
+}
+
+type RefreshRequest struct {
+	CommandCommon
+	Workspace       string
+	RemoteWorkspace string
 }
 
 type AccessedRequest struct {
@@ -333,7 +402,7 @@ type SetWorkspaceImmutableRequest struct {
 	WorkspacePath string
 }
 
-func (api *Api) sendCmd(buf []byte) ([]byte, error) {
+func (api *apiImpl) sendCmd(buf []byte) ([]byte, error) {
 	err := writeAll(api.fd, buf)
 	if err != nil {
 		return nil, err
@@ -355,8 +424,35 @@ func (api *Api) sendCmd(buf []byte) ([]byte, error) {
 	return bytes.TrimRight(result, "\u0000"), nil
 }
 
-// branch the src workspace into a new workspace called dst.
-func (api *Api) Branch(src string, dst string) error {
+func (api *apiImpl) processCmd(cmd interface{}, res interface{}) error {
+	cmdBuf, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	buf, err := api.sendCmd(cmdBuf)
+	if err != nil {
+		return err
+	}
+
+	if res == nil {
+		var errorResponse ErrorResponse
+		err = json.Unmarshal(buf, &errorResponse)
+		if err != nil {
+			return fmt.Errorf("%s. buffer: %q", err.Error(), buf)
+		}
+		if errorResponse.ErrorCode != ErrorOK {
+			return fmt.Errorf("qfs command Error:%s",
+				errorResponse.Message)
+		}
+	} else {
+		// The client must check res.errorResponse.ErrorCode
+		return json.Unmarshal(buf, res)
+	}
+	return nil
+}
+
+func (api *apiImpl) Branch(src string, dst string) error {
 	if !isWorkspaceNameValid(src) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", src)
 	}
@@ -370,39 +466,14 @@ func (api *Api) Branch(src string, dst string) error {
 		Src:           src,
 		Dst:           dst,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return fmt.Errorf("%s. buffer: %q", err.Error(), buf)
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-func (api *Api) Merge(remote string, local string) error {
-	// A two way merge is equivalent to a three way merge where the base is
-	// the null (empty) workspace
-
+func (api *apiImpl) Merge(remote string, local string) error {
 	return api.Merge3Way(NullWorkspaceName, remote, local)
 }
 
-// Local takes precedence if remote and local have a conflict and matching
-// modification times. It is also the workspace who is Advanced to the resulting ID.
-func (api *Api) Merge3Way(base string, remote string, local string) error {
+func (api *apiImpl) Merge3Way(base string, remote string, local string) error {
 	if !isWorkspaceNameValid(base) {
 		return fmt.Errorf("\"%s\" (as base) must be an empty string or "+
 			"contain precisely two \"/\"\n", base)
@@ -423,31 +494,23 @@ func (api *Api) Merge3Way(base string, remote string, local string) error {
 		RemoteWorkspace: remote,
 		LocalWorkspace:  local,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-// Get the list of accessed file from workspaceroot
-func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
+func (api *apiImpl) Refresh(workspace string, remoteWorkspace string) error {
+	if !isWorkspaceNameValid(workspace) {
+		return fmt.Errorf("\"%s\" must be an empty string or "+
+			"contain precisely two \"/\"\n", workspace)
+	}
+	cmd := RefreshRequest{
+		CommandCommon:   CommandCommon{CommandId: CmdRefreshWorkspace},
+		Workspace:       workspace,
+		RemoteWorkspace: remoteWorkspace,
+	}
+	return api.processCmd(cmd, nil)
+}
+
+func (api *apiImpl) GetAccessed(wsr string) (map[string]bool, error) {
 	if !isWorkspaceNameValid(wsr) {
 		return nil, fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
 			wsr)
@@ -458,37 +521,21 @@ func (api *Api) GetAccessed(wsr string) (map[string]bool, error) {
 		WorkspaceRoot: wsr,
 	}
 
-	cmdBuf, err := json.Marshal(cmd)
+	var accesslistResponse AccessListResponse
+	err := api.processCmd(cmd, &accesslistResponse)
 	if err != nil {
 		return nil, err
 	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return nil, err
-	}
+	errorResponse := accesslistResponse.ErrorResponse
 	if errorResponse.ErrorCode != ErrorOK {
 		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-
-	var accesslistResponse AccessListResponse
-	err = json.Unmarshal(buf, &accesslistResponse)
-	if err != nil {
-		return nil, err
 	}
 
 	printAccessList(accesslistResponse.AccessList)
 	return accesslistResponse.AccessList, nil
 }
 
-// clear the list of accessed files in workspaceroot
-func (api *Api) ClearAccessed(wsr string) error {
+func (api *apiImpl) ClearAccessed(wsr string) error {
 	if !isWorkspaceNameValid(wsr) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
@@ -497,30 +544,10 @@ func (api *Api) ClearAccessed(wsr string) error {
 		CommandCommon: CommandCommon{CommandId: CmdClearAccessed},
 		WorkspaceRoot: wsr,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-// Sync all the active workspaces
-func (api *Api) SyncAll() error {
+func (api *apiImpl) SyncAll() error {
 	cmd := SyncAllRequest{
 		CommandCommon: CommandCommon{CommandId: CmdSyncAll},
 	}
@@ -537,8 +564,7 @@ func (api *Api) SyncAll() error {
 	return nil
 }
 
-// duplicate an object with a given key and path
-func (api *Api) InsertInode(dst string, key string, permissions uint32,
+func (api *apiImpl) InsertInode(dst string, key string, permissions uint32,
 	uid uint32, gid uint32) error {
 
 	if !isWorkspacePathValid(dst) {
@@ -558,32 +584,10 @@ func (api *Api) InsertInode(dst string, key string, permissions uint32,
 		Gid:           gid,
 		Permissions:   permissions,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-// Enable the chosen workspace mutable
-//
-// dst is the path relative to the filesystem root, ie. user/joe/myws
-func (api *Api) EnableRootWrite(dst string) error {
+func (api *apiImpl) EnableRootWrite(dst string) error {
 	if !isWorkspaceNameValid(dst) {
 		return fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", dst)
 	}
@@ -592,32 +596,10 @@ func (api *Api) EnableRootWrite(dst string) error {
 		CommandCommon: CommandCommon{CommandId: CmdEnableRootWrite},
 		Workspace:     dst,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-// Make the chosen workspace irreversibly immutable
-//
-// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
-func (api *Api) SetWorkspaceImmutable(workspacepath string) error {
+func (api *apiImpl) SetWorkspaceImmutable(workspacepath string) error {
 	if !isWorkspacePathValid(workspacepath) {
 		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
 			workspacepath)
@@ -627,32 +609,10 @@ func (api *Api) SetWorkspaceImmutable(workspacepath string) error {
 		CommandCommon: CommandCommon{CommandId: CmdSetWorkspaceImmutable},
 		WorkspacePath: workspacepath,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-// Delete the given workspace.
-//
-// workspacepath is the path relative to the filesystem root, ie. user/joe/myws
-func (api *Api) DeleteWorkspace(workspacepath string) error {
+func (api *apiImpl) DeleteWorkspace(workspacepath string) error {
 	if !isWorkspacePathValid(workspacepath) {
 		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
 			workspacepath)
@@ -662,79 +622,25 @@ func (api *Api) DeleteWorkspace(workspacepath string) error {
 		CommandCommon: CommandCommon{CommandId: CmdDeleteWorkspace},
 		WorkspacePath: workspacepath,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error: %s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-func (api *Api) SetBlock(key []byte, data []byte) error {
-
+func (api *apiImpl) SetBlock(key []byte, data []byte) error {
 	cmd := SetBlockRequest{
 		CommandCommon: CommandCommon{CommandId: CmdSetBlock},
 		Key:           key,
 		Data:          data,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return err
-	}
-
-	var errorResponse ErrorResponse
-	err = json.Unmarshal(buf, &errorResponse)
-	if err != nil {
-		return err
-	}
-	if errorResponse.ErrorCode != ErrorOK {
-		return fmt.Errorf("qfs command Error:%s", errorResponse.Message)
-	}
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
-// Note that, because we report the size of Api as 1024, we can't read more than
-// 1024 bytes of data... so blocks that you try to Get have a low size limit.
-// See BUG185832
-func (api *Api) GetBlock(key []byte) ([]byte, error) {
-
+func (api *apiImpl) GetBlock(key []byte) ([]byte, error) {
 	cmd := GetBlockRequest{
 		CommandCommon: CommandCommon{CommandId: CmdGetBlock},
 		Key:           key,
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	buf, err := api.sendCmd(cmdBuf)
-	if err != nil {
-		return nil, err
-	}
-
 	var getBlockResponse GetBlockResponse
-	err = json.Unmarshal(buf, &getBlockResponse)
+	err := api.processCmd(cmd, &getBlockResponse)
 	if err != nil {
 		return nil, err
 	}
