@@ -309,6 +309,13 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 	return false, quantumfs.DirectRecord{}
 }
 
+func (wsr *WorkspaceRoot) hardlinkExists(c *ctx, linkId HardlinkId) bool {
+	defer wsr.linkLock.Lock().Unlock()
+
+	_, exists := wsr.hardlinks[linkId]
+	return exists
+}
+
 func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 	linkId HardlinkId) (record quantumfs.DirectoryRecord, inodeId InodeId) {
 
@@ -318,7 +325,8 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 
 	link, exists := wsr.hardlinks[linkId]
 	if !exists {
-		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", linkId))
+		c.vlog("Hardlink id %d does not exist.", link.nlink)
+		return nil, quantumfs.InodeIdInvalid
 	}
 
 	if link.nlink > 1 {
@@ -468,6 +476,18 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
 		entry.nlink = hardlink.Nlinks()
 		wsr.hardlinks[id] = entry
+
+		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
+		if inode == nil {
+			return
+		}
+		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
+			entry.record.ID().Text(), hardlink.Record().ID().Text())
+		inode.(*File).handleTypeChange(c, hardlink.Record())
+
+		status := c.qfs.invalidateInode(entry.inodeId)
+		utils.Assert(status == fuse.OK,
+			"invalidating %d failed with %d", entry.inodeId, status)
 	}
 }
 
@@ -509,6 +529,8 @@ func (wsr *WorkspaceRoot) refresh(c *ctx, rootId quantumfs.ObjectKey) {
 		buffer := c.dataStore.Get(&c.Ctx, rootId)
 		workspaceRoot := buffer.AsWorkspaceRoot()
 
+		wsr.refreshHardlinks(c, workspaceRoot.HardlinkEntry())
+
 		var addedUninstantiated, removedUninstantiated []InodeId
 		func() {
 			defer wsr.LockTree().Unlock()
@@ -518,8 +540,6 @@ func (wsr *WorkspaceRoot) refresh(c *ctx, rootId quantumfs.ObjectKey) {
 
 		c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
-
-		wsr.refreshHardlinks(c, workspaceRoot.HardlinkEntry())
 
 		wsr.rootId = rootId
 	}
