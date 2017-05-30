@@ -36,7 +36,7 @@ type TestHelper struct {
 	qfs            *QuantumFs
 	qfsWait        sync.WaitGroup
 	fuseConnection int
-	api            *quantumfs.Api
+	api            quantumfs.Api
 }
 
 func abortFuse(th *TestHelper) {
@@ -136,7 +136,7 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 
 	config := QuantumFsConfig{
 		CachePath:        th.TempDir + "/ramfs",
-		CacheSize:        1 * 1024 * 1024,
+		CacheSize:        64 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
 		DirtyFlushDelay:  30 * time.Second,
@@ -222,7 +222,7 @@ func (th *TestHelper) RestartQuantumFs() error {
 	return nil
 }
 
-func (th *TestHelper) getApi() *quantumfs.Api {
+func (th *TestHelper) getApi() quantumfs.Api {
 	if th.api != nil {
 		return th.api
 	}
@@ -240,7 +240,7 @@ func (th *TestHelper) putApi() {
 	th.api = nil
 }
 
-func (th *TestHelper) getUniqueApi(fdPath string) *quantumfs.Api {
+func (th *TestHelper) getUniqueApi(fdPath string) quantumfs.Api {
 	api, err := quantumfs.NewApiWithPath(fdPath)
 	th.Assert(err == nil, "Error getting unique api: %v", err)
 	return api

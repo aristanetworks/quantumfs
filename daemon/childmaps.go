@@ -103,7 +103,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	entry = convertRecord(cmap.wsr, entry)
 	if entry == nil {
-		panic(fmt.Sprintf("Nil DirectoryEntryIf set attempt: %d", inodeId))
+		panic(fmt.Sprintf("Nil DirectoryEntry for inode %d", inodeId))
 	}
 
 	inodeId = cmap.loadInodeId(c, entry, inodeId)
@@ -160,6 +160,10 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	cmap.records.delRecord(name, inodeId)
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
+		if !cmap.wsr.hardlinkExists(c, link.linkId) {
+			c.vlog("hardlink does not exist")
+			return nil
+		}
 		if cmap.wsr.hardlinkDec(link.linkId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
@@ -249,15 +253,19 @@ func (cmap *ChildMap) recordCopies(c *ctx) []quantumfs.DirectoryRecord {
 func (cmap *ChildMap) recordCopy(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("ChildMap::recordCopy", "inode %d", inodeId).Out()
+
 	// check if there's an entry first
 	recordName, exists := cmap.records.firstName(inodeId)
 	if !exists {
+		c.vlog("Inode not a child")
 		return nil
 	}
 
 	// Check if the dirty cache already has an entry
 	record, exists := cmap.records.getCached(recordName)
 	if exists {
+		c.vlog("Found dirty record")
 		return record
 	}
 
@@ -310,6 +318,10 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	cmap.records.setRecord(newLink, childId)
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
+}
+
+func (cmap *ChildMap) reload(c *ctx, baseLayerId quantumfs.ObjectKey) {
+	cmap.records.reload(c, baseLayerId)
 }
 
 func (cmap *ChildMap) publish(c *ctx) quantumfs.ObjectKey {
@@ -383,8 +395,11 @@ func (rd *recordsOnDemand) mapInodeId(name string, inodeId InodeId) {
 func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 	name string) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("recordsOnDemand::fetchFromBase", "name %s", name).Out()
+
 	nameOffset, exists := rd.nameToEntryIdx[name]
 	if !exists {
+		c.vlog("Name doesn't exist")
 		return nil
 	}
 	offset := int(nameOffset)
@@ -411,8 +426,10 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 				entry.SetID(newerKey)
 			}
 
+			c.vlog("Returning entry")
 			return entry
 		} else {
+			c.vlog("Walking to next block")
 			offset -= baseLayer.NumEntries()
 
 			// go to the next page
@@ -424,6 +441,7 @@ func (rd *recordsOnDemand) fetchFromBase(c *ctx,
 		}
 	}
 
+	c.vlog("Name not found")
 	return nil
 }
 
@@ -594,6 +612,21 @@ func (rd *recordsOnDemand) countEntryCapacity(c *ctx) int {
 	return entryCapacity
 }
 
+func (rd *recordsOnDemand) reload(c *ctx, newBaseLayerId quantumfs.ObjectKey) {
+	defer c.funcIn("recordsOnDemand::reload").Out()
+
+	// update our state
+	rd.base = newBaseLayerId
+	rd.cache = make(map[string]quantumfs.DirectoryRecord)
+	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
+
+	// re-set our map of indices into directory entries
+	rd.nameToEntryIdx = make(map[string]uint32)
+	rd.iterateOverRecords(c, true, func(record quantumfs.DirectoryRecord) {
+		// don't need to do anything while we iterate
+	})
+}
+
 func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	defer c.funcIn("recordsOnDemand::publish").Out()
@@ -627,17 +660,7 @@ func (rd *recordsOnDemand) publish(c *ctx) quantumfs.ObjectKey {
 
 	baseLayer.SetNumEntries(entryIdx)
 	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
-
-	// update our state
-	rd.base = newBaseLayerId
-	rd.cache = make(map[string]quantumfs.DirectoryRecord)
-	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
-
-	// re-set our map of indices into directory entries
-	rd.nameToEntryIdx = make(map[string]uint32)
-	rd.iterateOverRecords(c, true, func(record quantumfs.DirectoryRecord) {
-		// don't need to do anything while we iterate
-	})
+	rd.reload(c, newBaseLayerId)
 
 	return newBaseLayerId
 }
@@ -660,6 +683,8 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 }
 
 func getBaseLayer(c *ctx, key quantumfs.ObjectKey) quantumfs.DirectoryEntry {
+	defer c.funcIn("getBaseLayer").Out()
+
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		panic(fmt.Sprintf("No baseLayer object for %s", key.Text()))
