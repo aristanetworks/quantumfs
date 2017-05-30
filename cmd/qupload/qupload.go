@@ -122,29 +122,6 @@ are included since an exclude file is not specified.
 
 The exclude file specifies paths that must be excluded from upload.
 It is possible to selectively include certain paths from excluded directories.
-The exclude file should be formatted based on following rules:
-
-One path per line
-Comments and empty lines are allowed. A comment is any line that starts with "#"
-Order of the paths in the file is important
-Path must be relative to the base directory specified
-Absolute paths are not allowed
-Exclude paths must not be "/" suffixed
-Paths to be included are prefixed with "+"
-The parent and grand-parents of paths to be included must be included already
-
-Example:
-
-dir1
-+dir1/subdir1
-+dir1/subdir1/file1
-+dir1/subdir3
-+dir1/subdir4
-+dir1/subdir3/subsubdir4/
-
-In the above example, anything under directory "dir1" are excluded except
-dir1/subdir1/file1, dir1/subdir4 and dir1/subdir3/subsubdir4 and its contents.
-Note dir1/subdir3 and dir1/subdir4 contents are not included
 
 3) qupload -datastore ether.cql -datastoreconf etherconf
            -workspaceDB ether.cql -workspaceDBconf etherconf
@@ -152,6 +129,51 @@ Note dir1/subdir3 and dir1/subdir4 contents are not included
            -referencews build/eos-trunk/11223300
 Above command will create a new workspace build/eos-trunk/11223344
 with the same contents as by cloning  build/eos-trunk/11223300.
+
+The exclude file should be formatted based on following rules:
+
+ - One path per line.
+ - Comments and empty lines are allowed. A comment is any line that starts with "#".
+ - Path must be under the base directory specified.
+ - Absolute paths are not allowed.
+ - Exclude path must not be "/" suffixed.
+ - Path to be included is prefixed with "+".
+ - The order of exclude and include paths in the file does not matter.
+ - Use ordering that makes the file more readable.
+ - All excludes are processed first and then includes are processed.
+
+A path is considered to be included if it meets following criteria:
+ - if the path is not covered by any exclude directives (implict inclusion)
+ - if the path has been explicitly included
+
+Consider a base directory called "/rootdir". Some examples of exclude files
+are listed below. All paths used in the examples are under the base
+directory "rootdir". In other words, the absolute path for dir1 is
+"/rootdir/dir1".
+
+ Example-1:
+
+ # exclude dir1 and all its contents
+ dir1
+ # include only dir1 (not its contents)
+ +dir1
+ # include dir1/subdir1 (not its contents)
+ +dir1/subdir1
+ # include dir1/subdir1/file1
+ +dir1/subdir1/file1
+ # include dir1/subdir4 (not its contents)
+ +dir1/subdir4
+ # include contents of dir1/subdir3/subsubdir1
+ +dir1/subdir3/subsubdir3/
+
+ Example-2:
+
+ # exclude dir2/subdir2
+ # implicitly includes dir2 and all other content in dir2
+ dir2/subdir2
+ # include selective content dir2/subdir2/file2
+ # inside excluded content (dir2/subdir2)
+ +dir2/subdir2/file2
 
 `, version)
 	qFlags.PrintDefaults()

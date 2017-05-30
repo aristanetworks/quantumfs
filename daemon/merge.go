@@ -108,22 +108,6 @@ func mergeLink(c *ctx, baseExists bool, remote linkEntry, local linkEntry,
 	return rtn, localId
 }
 
-func typesMatch(a quantumfs.ObjectType, b quantumfs.ObjectType) bool {
-	// consolidate file types into one
-	if a == quantumfs.ObjectTypeSmallFile ||
-		a == quantumfs.ObjectTypeMediumFile ||
-		a == quantumfs.ObjectTypeLargeFile ||
-		a == quantumfs.ObjectTypeVeryLargeFile {
-
-		return (b == quantumfs.ObjectTypeSmallFile ||
-			b == quantumfs.ObjectTypeMediumFile ||
-			b == quantumfs.ObjectTypeLargeFile ||
-			b == quantumfs.ObjectTypeVeryLargeFile)
-	}
-
-	return a == b
-}
-
 func loadRecords(c *ctx,
 	key quantumfs.ObjectKey) (map[string]quantumfs.DirectoryRecord, error) {
 
@@ -241,11 +225,9 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
 
 	// Merge differently depending on if the type is preserved
-	localTypeChanged := base == nil || !typesMatch(local.Type(),
-		base.Type())
-	remoteTypeChanged := base == nil || !typesMatch(remote.Type(),
-		base.Type())
-	bothSameType := typesMatch(local.Type(), remote.Type())
+	localTypeChanged := base == nil || !local.Type().Matches(base.Type())
+	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
+	bothSameType := local.Type().Matches(remote.Type())
 
 	var mergedKey quantumfs.ObjectKey
 	updatedKey := false

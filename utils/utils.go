@@ -5,6 +5,7 @@ package utils
 
 import "bytes"
 import "fmt"
+import "io"
 import "syscall"
 
 // FileSize returns the size of a file
@@ -74,4 +75,16 @@ func Assert(condition bool, format string, args ...interface{}) {
 		msg := fmt.Sprintf(format, args...)
 		panic(msg)
 	}
+}
+
+type JSONwriter interface {
+	WriteJSON(w io.Writer) error
+}
+
+func GetDebugString(obj JSONwriter, name string) (string, error) {
+	bs := bytes.NewBufferString(name + ": ")
+	if err := obj.WriteJSON(bs); err != nil {
+		return "", err
+	}
+	return bs.String(), nil
 }

@@ -90,6 +90,22 @@ type File struct {
 	unlinkLock   utils.DeferableRwMutex
 }
 
+func (fi *File) handleTypeChange(c *ctx, remoteRecord *quantumfs.DirectRecord) {
+	defer c.FuncIn("File::handleTypeChange", "%s: %d",
+		remoteRecord.Filename(), remoteRecord.Type()).Out()
+	switch remoteRecord.Type() {
+	case quantumfs.ObjectTypeSmallFile:
+		fi.accessor = newSmallAccessor(c, 0, remoteRecord.ID())
+		fi.accessor.reload(c, remoteRecord.ID())
+	case quantumfs.ObjectTypeMediumFile:
+		fi.accessor = newMediumAccessor(c, remoteRecord.ID())
+	case quantumfs.ObjectTypeLargeFile:
+		fi.accessor = newLargeAccessor(c, remoteRecord.ID())
+	case quantumfs.ObjectTypeVeryLargeFile:
+		fi.accessor = newVeryLargeAccessor(c, remoteRecord.ID())
+	}
+}
+
 func (fi *File) dirtyChild(c *ctx, child InodeId) {
 	c.FuncIn("FuncIn::dirtyChild", "inode %d", child).Out()
 	if child != fi.inodeNum() {
@@ -473,10 +489,10 @@ func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
-	defer c.funcIn("File::setChildXAttr").Out()
+	defer c.funcIn("File::removeChildXAttr").Out()
 
 	if !fi.isOrphaned() {
-		c.elog("Invalid setChildXAttr on File")
+		c.elog("Invalid removeChildXAttr on File")
 		return fuse.EIO
 	}
 
@@ -590,6 +606,9 @@ type blockAccessor interface {
 
 	// Write file's metadata to the datastore and provide the key
 	sync(c *ctx) quantumfs.ObjectKey
+
+	// Reload the content of the file from datastore
+	reload(c *ctx, key quantumfs.ObjectKey)
 
 	// Truncate to lessen length *only*, error otherwise
 	truncate(c *ctx, newLength uint64) error
