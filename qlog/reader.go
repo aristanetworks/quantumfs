@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // reader is a shared memory log parser for the qlog quantumfs subsystem
@@ -107,7 +107,7 @@ func (read *Reader) ReadMore() []LogOutput {
 		}
 
 		if !ready {
-			// throw away the logs we've seen so far 'cause of this hole
+			// throw away the logs we've seen so far because of this hole
 			rtn = make([]LogOutput, 0)
 		}
 
