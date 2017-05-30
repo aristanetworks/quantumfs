@@ -5,9 +5,12 @@ package daemon
 
 // Test some special properties of workspacelisting type
 
-import "syscall"
-import "testing"
-import "github.com/aristanetworks/quantumfs"
+import (
+	"syscall"
+	"testing"
+
+	"github.com/aristanetworks/quantumfs"
+)
 
 func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 	name string, space string, mustBeInstantiated bool,

@@ -3,16 +3,18 @@
 
 package daemon
 
-import "bytes"
-import "io"
-import "testing"
-import "syscall"
-import "os"
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func getRootId(test *testHelper, workspace string) quantumfs.ObjectKey {
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=

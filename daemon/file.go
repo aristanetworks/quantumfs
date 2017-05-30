@@ -5,14 +5,15 @@ package daemon
 
 // This file holds the File type, which represents regular files
 
-import "bytes"
-import "errors"
-import "sync"
+import (
+	"bytes"
+	"errors"
+	"sync"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 const FMODE_EXEC = 0x20 // From Linux
 
