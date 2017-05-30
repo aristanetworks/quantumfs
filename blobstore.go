@@ -76,7 +76,7 @@ func (b *cqlBlobStore) Insert(c ether.Ctx, key string, value []byte,
 			TimeToLive, metadata)
 	}
 
-	defer c.FuncIn("cql::Insert", "key: %s TTL:%d", key, ttl).Out()
+	defer c.FuncIn("cql::Insert", "key: %s TTL:%s", key, ttl).Out()
 	queryStr := fmt.Sprintf(`INSERT
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
