@@ -19,6 +19,7 @@ type ChildMap struct {
 
 	// Use childrenRecords() to access this
 	childrenRecords_ map[InodeId][]quantumfs.DirectoryRecord
+	prevChildRecords map[InodeId][]quantumfs.DirectoryRecord
 
 	// This is false if the baseLayer metadata object is up to date with all
 	// changes. It is true if there are changes in this object which have not
@@ -69,6 +70,7 @@ func (cmap *ChildMap) dirty() {
 func (cmap *ChildMap) baseLayerIs(key quantumfs.ObjectKey) {
 	cmap.baseLayer = key
 	cmap.dirty_ = false
+	cmap.prevChildRecords = cmap.childrenRecords_
 	cmap.childrenRecords_ = nil
 }
 
@@ -78,6 +80,82 @@ func (cmap *ChildMap) childrenRecords(c *ctx) map[InodeId][]quantumfs.DirectoryR
 			cmap.baseLayer.Text())
 		cmap.childrenRecords_ = make(map[InodeId][]quantumfs.DirectoryRecord)
 		cmap.loadAllChildren(c)
+
+		// Confirm all the records match what we had last time
+		for id, oldRecordList := range cmap.prevChildRecords {
+			newRecordList, exists := cmap.childrenRecords_[id]
+
+			if !exists {
+				c.elog("Newly decoded children missing inode %d", id)
+				continue
+			}
+
+			if len(oldRecordList) != len(newRecordList) {
+				c.elog("%d: record list lengths differ %d/%d", id,
+					len(oldRecordList), len(newRecordList))
+				continue
+			}
+
+			if len(oldRecordList) != 1 {
+				c.wlog("%d: Not checking multiple records", id)
+				continue
+			}
+
+			oldRecord := oldRecordList[0]
+			newRecord := newRecordList[0]
+
+			if oldRecord.Filename() != newRecord.Filename() {
+				c.elog("%d Filename differs %s/%s", id,
+					oldRecord.Filename(), newRecord.Filename())
+			}
+
+			if !oldRecord.ID().IsEqualTo(newRecord.ID()) {
+				c.elog("%d ID differs %s/%s", id,
+					oldRecord.ID().Text(), newRecord.ID().Text())
+			}
+
+			if oldRecord.Type() != newRecord.Type() {
+				c.elog("%d Type differs %s/%s", id,
+					oldRecord.Type(), newRecord.Type())
+			}
+
+			if oldRecord.Permissions() != newRecord.Permissions() {
+				c.elog("%d Permissions differs %s/%s", id,
+					oldRecord.Permissions(), newRecord.Permissions())
+			}
+
+			if oldRecord.Owner() != newRecord.Owner() {
+				c.elog("%d Owner differs %s/%s", id,
+					oldRecord.Owner(), newRecord.Owner())
+			}
+
+			if oldRecord.Group() != newRecord.Group() {
+				c.elog("%d Group differs %s/%s", id,
+					oldRecord.Group(), newRecord.Group())
+			}
+
+			if oldRecord.Size() != newRecord.Size() {
+				c.elog("%d Size differs %s/%s", id,
+					oldRecord.Size(), newRecord.Size())
+			}
+
+			if !oldRecord.ExtendedAttributes().IsEqualTo(newRecord.ExtendedAttributes()) {
+				c.elog("%d ExtendedAttributes differs %s/%s", id,
+					oldRecord.ExtendedAttributes().Text(),
+					newRecord.ExtendedAttributes().Text())
+			}
+
+			if oldRecord.ContentTime() != newRecord.ContentTime() {
+				c.elog("%d ContentTime differs %s/%s", id,
+					oldRecord.ContentTime(), newRecord.ContentTime())
+			}
+
+			if oldRecord.ModificationTime() != newRecord.ModificationTime() {
+				c.elog("%d ModificationTime differs %s/%s", id,
+					oldRecord.ModificationTime(), newRecord.ModificationTime())
+			}
+		}
+
 	}
 	return cmap.childrenRecords_
 }
