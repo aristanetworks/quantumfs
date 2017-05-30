@@ -119,6 +119,16 @@ func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
+func (fi *SmallFile) reload(c *ctx, key quantumfs.ObjectKey) {
+	defer c.funcIn("SmallFile::reload").Out()
+	fi.key = key
+	fi.buf = c.dataStore.Get(&c.Ctx, fi.key)
+	if fi.buf == nil {
+		panic(key.Text())
+	}
+	fi.size = fi.buf.Size()
+}
+
 func (fi *SmallFile) getType() quantumfs.ObjectType {
 	return quantumfs.ObjectTypeSmallFile
 }
