@@ -6,11 +6,13 @@
 
 package qlog
 
-import "bytes"
-import "fmt"
-import "os"
-import "time"
-import "unsafe"
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"time"
+	"unsafe"
+)
 
 type LogStrTrim struct {
 	Text         string

@@ -5,12 +5,14 @@ package daemon
 
 // Test various QuantumFS and FUSE configuration knobs
 
-import "fmt"
-import "io/ioutil"
-import "strings"
-import "testing"
+import (
+	"fmt"
+	"io/ioutil"
+	"strings"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 // Confirm the bid configuration knobs have been set correctly.
 func TestBdiKnobs(t *testing.T) {

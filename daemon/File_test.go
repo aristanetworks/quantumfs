@@ -5,17 +5,19 @@ package daemon
 
 // Test the various operations on files such as creation, read and write
 
-import "bytes"
-import "fmt"
-import "io"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestFileCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {

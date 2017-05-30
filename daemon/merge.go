@@ -3,9 +3,11 @@
 
 package daemon
 
-import "fmt"
+import (
+	"fmt"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[HardlinkId]linkEntry,

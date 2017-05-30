@@ -5,11 +5,13 @@ package daemon
 
 // Test the basic namespace listing functionality
 
-import "io/ioutil"
-import "syscall"
-import "testing"
+import (
+	"io/ioutil"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 func TestTypespaceListing(t *testing.T) {
 	runTest(t, func(test *testHelper) {

@@ -4,18 +4,20 @@
 // tests of qfs chroot tool
 package main
 
-import "fmt"
-import "io/ioutil"
-import "os"
-import "os/exec"
-import "runtime"
-import "strings"
-import "syscall"
-import "testing"
-import "time"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 var commandsInUsrBin = []string{
 	umount,

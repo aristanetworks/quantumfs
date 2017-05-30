@@ -4,16 +4,18 @@
 // qparse is the shared memory log parser for the qlog quantumfs subsystem
 package main
 
-import "flag"
-import "fmt"
-import "io/ioutil"
-import "os"
-import "sort"
-import "strconv"
-import "strings"
-import "time"
+import (
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 var version string
 
