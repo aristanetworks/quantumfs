@@ -5,12 +5,14 @@
 
 #include <atomic>
 #include <map>
+#include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 
 extern "C" {
 	// We need a unique identifier to give out for each Api instance.
 	// The map is from identifiers to Apis
+	static pthread_mutex_t mapLock = PTHREAD_MUTEX_INITIALIZER;
 	static std::map<uint32_t, qfsclient::Api*> s_apiHandles;
 	static std::atomic<uint32_t> s_freeHandle;
 
@@ -32,7 +34,11 @@ extern "C" {
 		}
 
 		uint32_t handle = s_freeHandle++;
+
+		pthread_mutex_lock(&mapLock);
 		s_apiHandles[handle] = api;
+		pthread_mutex_unlock(&mapLock);
+
 		*apiHandleOut = handle;
 
 		return "";
@@ -48,43 +54,67 @@ extern "C" {
 		}
 
 		uint32_t handle = s_freeHandle++;
+
+		pthread_mutex_lock(&mapLock);
 		s_apiHandles[handle] = api;
+		pthread_mutex_unlock(&mapLock);
+
 		*apiHandleOut = handle;
 
 		return "";
 	}
 
-	const char * cReleaseApi(uint32_t apiHandle) {
+	qfsclient::Api* findApi(uint32_t apiHandle) {
+		pthread_mutex_lock(&mapLock);
 		auto search = s_apiHandles.find(apiHandle);
 		if (search == s_apiHandles.end()) {
+			pthread_mutex_unlock(&mapLock);
+			return NULL;
+		}
+		pthread_mutex_unlock(&mapLock);
+
+		return search->second;
+	}
+
+	const char * cReleaseApi(uint32_t apiHandle) {
+		auto api = findApi(apiHandle);
+		if (!api) {
 			return "Api doesn't exist.";
 		}
 
-		qfsclient::ReleaseApi(search->second);
+		qfsclient::ReleaseApi(api);
+
+		pthread_mutex_lock(&mapLock);
+		auto search = s_apiHandles.find(apiHandle);
+		if (search == s_apiHandles.end()) {
+			pthread_mutex_unlock(&mapLock);
+			return "Api doesn't exist.";
+		}
 		s_apiHandles.erase(search);
+		pthread_mutex_unlock(&mapLock);
 
 		return "";
 	}
 
 	const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot) {
-		auto search = s_apiHandles.find(apiHandle);
-		if (search == s_apiHandles.end()) {
+		auto api = findApi(apiHandle);
+		if (!api) {
 			return "Api doesn't exist.";
 		}
 
-		qfsclient::Error err = search->second->GetAccessed(workspaceRoot);
+		qfsclient::Error err = api->GetAccessed(workspaceRoot);
 		return errStr(err);
 	}
 
 	const char * cInsertInode(uint32_t apiHandle, const char *dest,
 		const char *key, uint32_t permissions, uint32_t uid, uint32_t gid) {
 
-		auto search = s_apiHandles.find(apiHandle);
-		if (search == s_apiHandles.end()) {
+		auto api = findApi(apiHandle);
+		if (!api) {
 			return "Api doesn't exist.";
 		}
 
-		qfsclient::Error err = search->second->InsertInode(dest, key,
+		qfsclient::Error err = api->InsertInode(dest, key,
 			permissions, uid, gid);
 		return errStr(err);
 	}
@@ -92,20 +122,20 @@ extern "C" {
 	const char * cBranch(uint32_t apiHandle, const char *source,
 		const char *dest) {
 
-		auto search = s_apiHandles.find(apiHandle);
-		if (search == s_apiHandles.end()) {
+		auto api = findApi(apiHandle);
+		if (!api) {
 			return "Api doesn't exist.";
 		}
 
-		qfsclient::Error err = search->second->Branch(source, dest);
+		qfsclient::Error err = api->Branch(source, dest);
 		return errStr(err);
 	}
 
 	const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 		uint32_t len) {
 
-		auto search = s_apiHandles.find(apiHandle);
-		if (search == s_apiHandles.end()) {
+		auto api = findApi(apiHandle);
+		if (!api) {
 			return "Api doesn't exist.";
 		}
 
@@ -115,7 +145,7 @@ extern "C" {
 
 		std::vector<uint8_t> inputData(data, data + len);
 
-		qfsclient::Error err = search->second->SetBlock(inputKey, inputData);
+		qfsclient::Error err = api->SetBlock(inputKey, inputData);
 
 		return errStr(err);
 	}
@@ -123,8 +153,8 @@ extern "C" {
 	const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
 		uint32_t *lenOut) {
 
-		auto search = s_apiHandles.find(apiHandle);
-		if (search == s_apiHandles.end()) {
+		auto api = findApi(apiHandle);
+		if (!api) {
 			return "Api doesn't exist.";
 		}
 
@@ -133,7 +163,7 @@ extern "C" {
 			convertedKey + strlen(key));
 
 		std::vector<uint8_t> data;
-		qfsclient::Error err = search->second->GetBlock(inputKey, &data);
+		qfsclient::Error err = api->GetBlock(inputKey, &data);
 
 		const char *rtn = errStr(err);
 		if (strcmp(rtn, "") != 0) {
