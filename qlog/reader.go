@@ -9,6 +9,7 @@ package qlog
 import "bytes"
 import "fmt"
 import "os"
+import "time"
 import "unsafe"
 
 type LogStrTrim struct {
@@ -103,10 +104,22 @@ func (read *Reader) ReadHeader() *MmapHeader {
 	return ExtractHeader(headerData)
 }
 
-func (read *Reader) ReadMore(fxn func (LogOutput)){
+func (read *Reader) ProcessLogs(fxn func(LogOutput)) {
+	// Run indefinitely
+	for {
+		newLogs := read.readMore()
+		for _, v := range newLogs {
+			fxn(v)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func (read *Reader) readMore() []LogOutput {
 	freshHeader := read.ReadHeader()
 	if freshHeader.CircBuf.PastEndIdx == read.lastPastEndIdx {
-		return
+		return nil
 	}
 
 	rtn := make([]LogOutput, 0)
@@ -153,9 +166,7 @@ func (read *Reader) ReadMore(fxn func (LogOutput)){
 	}
 	read.lastPastEndIdx = pastEndIdx
 
-	for _, v := range rtn {
-		fxn(v)
-	}
+	return rtn
 }
 
 func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,
