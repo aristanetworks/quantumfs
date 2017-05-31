@@ -49,7 +49,8 @@ func printUsage() {
 	fmt.Println("         - enable <workspace> the write permission")
 	fmt.Println("  setWorkspaceImmutable <workspace>")
 	fmt.Println("         - make <workspace> irreversibly immutable")
-	fmt.Println("  refresh <workspace> <remoteWorkspace>")
+	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
+	fmt.Println("  refresh <workspace>")
 }
 
 func main() {
@@ -88,6 +89,8 @@ func main() {
 		setWorkspaceImmutable()
 	case "refresh":
 		refresh()
+	case "advanceWSDB":
+		advanceWSDB()
 	}
 }
 
@@ -159,20 +162,39 @@ func clearAccessed() {
 		os.Exit(exitBadArgs)
 	}
 }
+
 func refresh() {
-	if flag.NArg() != 3 {
+	if flag.NArg() != 2 {
 		fmt.Println("Too few arguments for refresh command")
 		os.Exit(exitBadArgs)
 	}
 	workspace := flag.Arg(1)
-	remoteWorkspace := flag.Arg(2)
 
 	api, err := quantumfs.NewApi()
 	if err != nil {
 		fmt.Println("Failed to find API:", err)
 		os.Exit(exitApiNotFound)
 	}
-	if err := api.Refresh(workspace, remoteWorkspace); err != nil {
+	if err := api.Refresh(workspace); err != nil {
+		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func advanceWSDB() {
+	if flag.NArg() != 3 {
+		fmt.Println("Too few arguments for advanceWSDB command")
+		os.Exit(exitBadArgs)
+	}
+	workspace := flag.Arg(1)
+	referenceWorkspace := flag.Arg(2)
+
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
+	if err := api.AdvanceWSDB(workspace, referenceWorkspace); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}
