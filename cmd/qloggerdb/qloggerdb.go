@@ -8,7 +8,6 @@ package main
 import "flag"
 import "fmt"
 import "os"
-import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -25,12 +24,7 @@ func main() {
 	}
 	reader := qlog.NewReader(os.Args[1])
 
-	// Run indefinitely
-	for {
-		reader.ReadMore(func(v qlog.LogOutput) {
-			fmt.Printf(v.ToString())
-		})
-
-		time.Sleep(10 * time.Millisecond)
-	}
+	reader.ProcessLogs(func(v qlog.LogOutput) {
+		fmt.Printf(v.ToString())
+	})
 }
