@@ -473,24 +473,3 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
 }
-
-/* TODO
-func (cmap *ChildMap) reload(c *ctx, baseLayerId quantumfs.ObjectKey) {
-	cmap.records.reload(c, baseLayerId)
-}
-
-func (rd *recordsOnDemand) reload(c *ctx, newBaseLayerId quantumfs.ObjectKey) {
-	defer c.funcIn("recordsOnDemand::reload").Out()
-
-	// update our state
-	rd.base = newBaseLayerId
-	rd.cache = make(map[string]quantumfs.DirectoryRecord)
-	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
-
-	// re-set our map of indices into directory entries
-	rd.nameToEntryIdx = make(map[string]uint32)
-	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
-		// don't need to do anything while we iterate
-	})
-}
-*/

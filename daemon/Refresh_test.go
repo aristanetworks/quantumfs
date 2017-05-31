@@ -876,7 +876,6 @@ func TestRefreshType_H2H_S2VL(t *testing.T) {
 }
 
 func TestRefreshXattrsRemove(t *testing.T) {
-	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
 		workspace := test.NewWorkspace()
@@ -898,7 +897,6 @@ func TestRefreshXattrsRemove(t *testing.T) {
 }
 
 func TestRefreshXattrsAddition(t *testing.T) {
-	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
 		workspace := test.NewWorkspace()
