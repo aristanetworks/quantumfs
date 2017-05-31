@@ -88,10 +88,10 @@ func (read *Reader) ReadHeader() *MmapHeader {
 	return ExtractHeader(headerData)
 }
 
-func (read *Reader) ReadMore() []LogOutput {
+func (read *Reader) ReadMore(fxn func (LogOutput)){
 	freshHeader := read.ReadHeader()
 	if freshHeader.CircBuf.PastEndIdx == read.lastPastEndIdx {
-		return nil
+		return
 	}
 
 	rtn := make([]LogOutput, 0)
@@ -133,7 +133,9 @@ func (read *Reader) ReadMore() []LogOutput {
 	}
 	read.lastPastEndIdx = rtnPastEndIdx
 
-	return rtn
+	for _, v := range rtn {
+		fxn(v)
+	}
 }
 
 func (read *Reader) readLogAt(pastEndIdx uint64) (uint64, LogOutput, bool) {
