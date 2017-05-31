@@ -313,6 +313,7 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 		if result != fuse.OK {
 			panic("XXX handle deletion failure")
 		}
+		c.qfs.noteDeletedInode(dir.id, childId, childname)
 	}
 }
 
