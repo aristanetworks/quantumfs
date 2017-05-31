@@ -4,6 +4,7 @@
 package cql
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"time"
@@ -61,9 +62,9 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 }
 
 // Insert is the CQL implementation of blobstore.Insert()
-func (b *cqlBlobStore) Insert(c ether.Ctx, key string, value []byte,
+func (b *cqlBlobStore) Insert(c ether.Ctx, key []byte, value []byte,
 	metadata map[string]string) error {
-
+	keyHex := hex.EncodeToString(key)
 	if metadata == nil {
 		return blobstore.NewError(blobstore.ErrBadArguments,
 			"metadata is nil")
@@ -76,7 +77,7 @@ func (b *cqlBlobStore) Insert(c ether.Ctx, key string, value []byte,
 			TimeToLive, metadata)
 	}
 
-	defer c.FuncIn("cql::Insert", "key: %s TTL:%s", key, ttl).Out()
+	defer c.FuncIn("cql::Insert", "key: %s TTL:%s", keyHex, ttl).Out()
 	queryStr := fmt.Sprintf(`INSERT
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
@@ -97,8 +98,9 @@ USING TTL %s`, b.keyspace, ttl)
 }
 
 // Get is the CQL implementation of blobstore.Get()
-func (b *cqlBlobStore) Get(c ether.Ctx, key string) ([]byte, map[string]string, error) {
-	defer c.FuncIn("cql::Get", "key: %s", key).Out()
+func (b *cqlBlobStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, error) {
+	keyHex := hex.EncodeToString(key)
+	defer c.FuncIn("cql::Get", "key: %s", keyHex).Out()
 
 	// Session.Query() does not return error
 	var value []byte
@@ -127,15 +129,17 @@ WHERE key = ?`, b.keyspace)
 }
 
 // Delete is the CQL implementation of blobstore.Delete()
-func (b *cqlBlobStore) Delete(c ether.Ctx, key string) error {
-	defer c.FuncIn("cql::Delete", "key: %s", key).Out()
+func (b *cqlBlobStore) Delete(c ether.Ctx, key []byte) error {
+	keyHex := hex.EncodeToString(key)
+	defer c.FuncIn("cql::Delete", "key: %s", keyHex).Out()
 	return blobstore.NewError(blobstore.ErrOperationFailed,
 		"Delete operation is not implemented")
 }
 
 // Metadata is the CQL implementation of blobstore.Metadata()
-func (b *cqlBlobStore) Metadata(c ether.Ctx, key string) (map[string]string, error) {
-	defer c.FuncIn("cql::Metadata", "key: %s", key).Out()
+func (b *cqlBlobStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error) {
+	keyHex := hex.EncodeToString(key)
+	defer c.FuncIn("cql::Metadata", "key: %s", keyHex).Out()
 	var ttl int
 	queryStr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
@@ -164,8 +168,9 @@ WHERE key = ?`, b.keyspace)
 }
 
 // Update is the CQL implementation of blobstore.Update()
-func (b *cqlBlobStore) Update(c ether.Ctx, key string, metadata map[string]string) error {
-	defer c.FuncIn("cql::Update", "key: %s", key).Out()
+func (b *cqlBlobStore) Update(c ether.Ctx, key []byte, metadata map[string]string) error {
+	keyHex := hex.EncodeToString(key)
+	defer c.FuncIn("cql::Update", "key: %s", keyHex).Out()
 	return blobstore.NewError(blobstore.ErrOperationFailed,
 		"Update operation is not implemented")
 }

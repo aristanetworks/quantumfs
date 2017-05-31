@@ -61,7 +61,7 @@ func SetupTestSchema(confFile string) error {
 	}
 
 	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.blobstore"+
-		"( key text PRIMARY KEY, value blob )", cfg.Cluster.KeySpace)
+		"( key blob PRIMARY KEY, value blob )", cfg.Cluster.KeySpace)
 	query = session.Query(queryStr)
 	err = execWithRetry(query)
 	if err != nil {

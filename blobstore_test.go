@@ -73,12 +73,12 @@ func (s *storeTests) TestInsert() {
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
 USING TTL %s`, s.bls.keyspace, "0")
-	keyVal := []interface{}{testKey, []byte(testValue)}
+	keyVal := []interface{}{[]byte(testKey), []byte(testValue)}
 	mocksession.On("Query", qstr, keyVal).Return(mockquery)
 
 	mockquery.On("Exec").Return(nil)
 	mocksession.On("Close").Return()
-	err := s.bls.Insert(unitTestEtherCtx, testKey, []byte(testValue),
+	err := s.bls.Insert(unitTestEtherCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 
 	s.Require().NoError(err, "Insert returned an error")
@@ -90,7 +90,7 @@ func (s *storeTests) TestInsertFailure() {
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
 USING TTL %s`, s.bls.keyspace, "0")
-	keyVal := []interface{}{testKey, []byte(testValue)}
+	keyVal := []interface{}{[]byte(testKey), []byte(testValue)}
 
 	mockquery := &MockQuery{}
 	mocksession.On("Query", qstr, keyVal).Return(mockquery)
@@ -98,7 +98,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 	errVal := errors.New("Some random error")
 	mockquery.On("Exec").Return(errVal)
 
-	err := s.bls.Insert(unitTestEtherCtx, testKey, []byte(testValue),
+	err := s.bls.Insert(unitTestEtherCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().Error(err, "Insert returned incorrect ErrorCode")
 
@@ -111,7 +111,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 func (s *storeTests) TestGetNoErr() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
-	key := []interface{}{testKey}
+	key := []interface{}{[]byte(testKey)}
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
@@ -120,7 +120,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(nil)
 
-	_, metadata, err := s.bls.Get(unitTestEtherCtx, testKey)
+	_, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -133,14 +133,14 @@ func (s *storeTests) TestGetFailureNoKey() {
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{unknownKey}
+	key := []interface{}{[]byte(unknownKey)}
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
-	value, metadata, err := s.bls.Get(unitTestEtherCtx, unknownKey)
+	value, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Get returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -155,14 +155,14 @@ func (s *storeTests) TestGetFailureGeneric() {
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{unknownKey}
+	key := []interface{}{[]byte(unknownKey)}
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
 
 	// Verify return value for a non existent key
-	value, metadata, err := s.bls.Get(unitTestEtherCtx, unknownKey)
+	value, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Get returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -175,7 +175,7 @@ WHERE key = ?`, s.bls.keyspace)
 func (s *storeTests) TestGetNonZeroTTL() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
-	key := []interface{}{testKey}
+	key := []interface{}{[]byte(testKey)}
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
@@ -190,7 +190,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(readMockTTL)
 
-	_, metadata, err := s.bls.Get(unitTestEtherCtx, testKey)
+	_, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -202,7 +202,7 @@ WHERE key = ?`, s.bls.keyspace)
 func (s *storeTests) TestMetadataOK() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
-	key := []interface{}{testKey}
+	key := []interface{}{[]byte(testKey)}
 	qstr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
@@ -216,7 +216,7 @@ WHERE key = ?`, s.bls.keyspace)
 	}
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(readMockTTL)
 
-	metadata, err := s.bls.Metadata(unitTestEtherCtx, testKey)
+	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(testKey))
 	s.Require().NoError(err, "Metadata returned an error")
 	s.Require().NotNil(metadata, "Metadata returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -231,13 +231,13 @@ func (s *storeTests) TestMetadataFailNoKey() {
 	qstr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{unknownKey}
+	key := []interface{}{[]byte(unknownKey)}
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
-	metadata, err := s.bls.Metadata(unitTestEtherCtx, unknownKey)
+	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
@@ -252,12 +252,12 @@ func (s *storeTests) TestMetadataFailGeneric() {
 	qstr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{unknownKey}
+	key := []interface{}{[]byte(unknownKey)}
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
 
-	metadata, err := s.bls.Metadata(unitTestEtherCtx, unknownKey)
+	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*blobstore.Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))

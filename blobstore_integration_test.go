@@ -50,7 +50,7 @@ func (s *storeIntegrationTests) SetupTest() {
 }
 
 func (s *storeIntegrationTests) TestInsert() {
-	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().NoError(err, "Insert returned an error")
 }
@@ -64,7 +64,7 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 		Wg.Go(func() error {
 
 			return s.bls.Insert(integTestEtherCtx,
-				testKey+strconv.Itoa(countl), []byte(testValue),
+				[]byte(testKey+strconv.Itoa(countl)), []byte(testValue),
 				map[string]string{TimeToLive: "0"})
 		})
 	}
@@ -74,18 +74,18 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 	// Check
 	for count := 0; count < 2; count++ {
 		value, _, err := s.bls.Get(integTestEtherCtx,
-			testKey+strconv.Itoa(count))
+			[]byte(testKey+strconv.Itoa(count)))
 		s.Require().NoError(err, "Insert returned an error")
 		s.Require().Equal(testValue, string(value), "Get returned in correct value")
 	}
 }
 
 func (s *storeIntegrationTests) TestGet() {
-	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	value, metadata, err := s.bls.Get(integTestEtherCtx, testKey)
+	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
@@ -96,7 +96,7 @@ func (s *storeIntegrationTests) TestGet() {
 }
 
 func (s *storeIntegrationTests) TestGetUnknownKey() {
-	value, metadata, err := s.bls.Get(integTestEtherCtx, unknownKey)
+	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(unknownKey))
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 	s.Require().Error(err, "Get returned incorrect error")
@@ -106,11 +106,11 @@ func (s *storeIntegrationTests) TestGetUnknownKey() {
 }
 
 func (s *storeIntegrationTests) TestGetNonZeroTTL() {
-	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "1234"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	value, metadata, err := s.bls.Get(integTestEtherCtx, testKey)
+	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
@@ -128,11 +128,11 @@ func (s *storeIntegrationTests) TestGetNonZeroTTL() {
 }
 
 func (s *storeIntegrationTests) TestMetadataOK() {
-	err := s.bls.Insert(integTestEtherCtx, testKey, []byte(testValue),
+	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "1234"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	metadata, err := s.bls.Metadata(integTestEtherCtx, testKey)
+	metadata, err := s.bls.Metadata(integTestEtherCtx, []byte(testKey))
 	s.Require().NoError(err, "Metadata returned an error")
 	s.Require().NotNil(metadata, "Metadata returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -149,7 +149,7 @@ func (s *storeIntegrationTests) TestMetadataOK() {
 }
 
 func (s *storeIntegrationTests) TestMetadataUnknownKey() {
-	metadata, err := s.bls.Metadata(integTestEtherCtx, unknownKey)
+	metadata, err := s.bls.Metadata(integTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata didn't return error")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 	verr, ok := err.(*blobstore.Error)
