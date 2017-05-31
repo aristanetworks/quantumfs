@@ -88,7 +88,7 @@ func (read *Reader) ReadHeader() *MmapHeader {
 	return ExtractHeader(headerData)
 }
 
-func (read *Reader) ReadMore(fxn func (LogOutput)){
+func (read *Reader) ReadMore(fxn func(LogOutput)) {
 	freshHeader := read.ReadHeader()
 	if freshHeader.CircBuf.PastEndIdx == read.lastPastEndIdx {
 		return
