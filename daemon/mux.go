@@ -845,13 +845,15 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 
 // Needs treelock for read as well as the instantiationLock exclusively.
 func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
-	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d", inodeNum).Out()
+	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d",
+		inode.inodeNum()).Out()
 
 	inodeChildren := make([]InodeId, 0)
 	initial := true
 	for {
 		inodeChildren = inodeChildren[:0]
+		inodeNum := inode.inodeNum()
+		c.vlog("Evaluating inode %d for uninstantiation", inodeNum)
 		lookupCount, exists := qfs.lookupCount(inodeNum)
 		if lookupCount != 0 {
 			c.vlog("No forget called on inode %d yet", inodeNum)
