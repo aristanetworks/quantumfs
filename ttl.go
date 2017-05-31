@@ -24,8 +24,8 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		return nil
 	}
 
-	ks := key.String()
-	metadata, err := cqlds.Metadata(ToECtx(c), ks)
+	kv := key.Value()
+	metadata, err := cqlds.Metadata(ToECtx(c), kv)
 	if err != nil {
 		return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 	}
@@ -47,14 +47,14 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		return nil
 	}
 
-	buf, _, err := cqlds.Get(ToECtx(c), ks)
+	buf, _, err := cqlds.Get(ToECtx(c), kv)
 	if err != nil {
 		return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 	}
 
 	newmetadata := make(map[string]string)
 	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", newTTL)
-	err = cqlds.Insert(ToECtx(c), ks, buf, newmetadata)
+	err = cqlds.Insert(ToECtx(c), kv, buf, newmetadata)
 	if err != nil {
 		return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 	}
