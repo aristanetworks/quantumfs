@@ -476,6 +476,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdRefreshWorkspace:
 		c.vlog("Received refresh request")
 		responseSize = api.refreshWorkspace(c, buf)
+	case quantumfs.CmdAdvanceWSDB:
+		c.vlog("Received advanceWSDB request")
+		responseSize = api.advanceWSDB(c, buf)
 	}
 
 	c.vlog("done writing to file")
@@ -587,7 +590,34 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
 	}
-	c.vlog("Refreshing %s to %s", cmd.Workspace, cmd.RemoteWorkspace)
+	c.vlog("Refreshing workspace %s", cmd.Workspace)
+
+	workspace := strings.Split(cmd.Workspace, "/")
+	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
+		workspace[1], workspace[2])
+	defer cleanup()
+	if !ok {
+		c.vlog("Workspace not found: %s", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"Workspace %s does not exist or is not active",
+			cmd.Workspace)
+	}
+	wsr.refresh(c)
+
+	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
+}
+
+func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
+	defer c.funcIn("ApiHandle::advanceWSDB").Out()
+
+	var cmd quantumfs.AdvanceWSDBRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		c.vlog("Error unmarshaling JSON: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
+	}
+	c.vlog("Advancing wsdb of %s to that of %s", cmd.Workspace,
+		cmd.ReferenceWorkspace)
 
 	workspace := strings.Split(cmd.Workspace, "/")
 	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
@@ -600,18 +630,26 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 			cmd.Workspace)
 	}
 
-	remote := strings.Split(cmd.RemoteWorkspace, "/")
-	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
-		remote[2])
+	ref := strings.Split(cmd.ReferenceWorkspace, "/")
+	refRootId, err := c.workspaceDB.Workspace(&c.Ctx, ref[0], ref[1], ref[2])
 
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
 			"Workspace %s does not exist or is not active",
-			cmd.RemoteWorkspace)
+			cmd.ReferenceWorkspace)
 	}
-	wsr.refresh(c, remoteRootId)
 
-	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
+	rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, workspace[0],
+		workspace[1], workspace[2], wsr.publishedRootId, refRootId)
+
+	if err != nil {
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"Workspace %s is already at %s",
+			cmd.Workspace, rootId.Text())
+	}
+
+	return api.queueErrorResponse(quantumfs.ErrorOK,
+		"AdvanceWSDB Succeeded")
 }
 
 func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
