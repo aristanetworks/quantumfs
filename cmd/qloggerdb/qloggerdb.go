@@ -27,7 +27,7 @@ func main() {
 
 	// Run indefinitely
 	for {
-		reader.ReadMore(func (v qlog.LogOutput) {
+		reader.ReadMore(func(v qlog.LogOutput) {
 			fmt.Printf(v.ToString())
 		})
 
