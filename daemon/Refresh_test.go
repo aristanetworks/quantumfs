@@ -33,11 +33,17 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 		wsNamespaceName, wsWorkspaceName, src, dst)
 	test.AssertNoErr(err)
+
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
+	test.Assert(wsr != nil, "workspace root does not exist")
+	wsr.publishedRootId = dst
 }
 
 func synced_op(c *ctx, test *testHelper, workspace string,
 	nosync_op func()) quantumfs.ObjectKey {
 
+	test.SyncAllWorkspaces()
 	oldRootId := getRootId(test, workspace)
 	nosync_op()
 	test.SyncAllWorkspaces()
@@ -527,6 +533,29 @@ func TestRefreshCachedDeletedEntry(t *testing.T) {
 		test.AssertNoErr(err)
 		_, err = os.Stat(fullfilename)
 		test.AssertNoErr(err)
+	})
+}
+
+func TestRefreshDeleteWorkspaceRootFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId1 := removeTestFile(ctx, test, workspace, name)
+		newRootId2 := createTestFile(ctx, test, workspace, name, 1000)
+
+		f, err := os.OpenFile(workspace+"/"+name, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		err = f.Close()
+		test.AssertNoErr(err)
+
+		_, err = os.OpenFile(workspace+"/"+name, os.O_RDONLY, 0777)
+		test.AssertErr(err)
 	})
 }
 
