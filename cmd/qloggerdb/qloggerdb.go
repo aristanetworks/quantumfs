@@ -24,7 +24,7 @@ func main() {
 	}
 	reader := qlog.NewReader(os.Args[1])
 
-	reader.ProcessLogs(func(v qlog.LogOutput) {
+	reader.ProcessLogs(true, func(v qlog.LogOutput) {
 		fmt.Printf(v.ToString())
 	})
 }

@@ -104,31 +104,50 @@ func (read *Reader) ReadHeader() *MmapHeader {
 	return ExtractHeader(headerData)
 }
 
-func (read *Reader) ProcessLogs(fxn func(LogOutput)) {
-	// Run indefinitely
-	for {
-		newLogs := read.readMore()
+// if tail is false, the qlog should not be actively changing. Since we don't copy
+// the data to work on separately, you can get undefined behavior / logs.
+func (read *Reader) ProcessLogs(tail bool, fxn func(LogOutput)) {
+	if !tail {
+		freshHeader := read.ReadHeader()
+		readFrom := freshHeader.CircBuf.PastEndIdx
+		wrapPlusEquals(&readFrom, 1, read.circBufSize)
+
+		newLogs, _ := read.parse(readFrom,
+			freshHeader.CircBuf.PastEndIdx)
+
 		for _, v := range newLogs {
 			fxn(v)
+		}
+		return
+	}
+
+	// Run indefinitely
+	for {
+		freshHeader := read.ReadHeader()
+		if freshHeader.CircBuf.PastEndIdx != read.lastPastEndIdx {
+			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
+				freshHeader.CircBuf.PastEndIdx)
+
+			read.lastPastEndIdx = newPastEndIdx
+			for _, v := range newLogs {
+				fxn(v)
+			}
 		}
 
 		time.Sleep(10 * time.Millisecond)
 	}
 }
 
-func (read *Reader) readMore() []LogOutput {
-	freshHeader := read.ReadHeader()
-	if freshHeader.CircBuf.PastEndIdx == read.lastPastEndIdx {
-		return nil
-	}
+func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
+	haveReadTo uint64) {
 
 	rtn := make([]LogOutput, 0)
 
-	pastEndIdx := freshHeader.CircBuf.PastEndIdx
-	readLen := wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize)
+	pastEndIdx := readTo
+	readLen := wrapMinus(readTo, readFrom, read.circBufSize)
 
 	// read all the data in one go to reduce number of reads
-	data := read.wrapRead(read.lastPastEndIdx, readLen)
+	data := read.wrapRead(readFrom, readLen)
 	pastDataIdx := int64(len(data))
 
 	for {
@@ -155,7 +174,7 @@ func (read *Reader) readMore() []LogOutput {
 		if ready {
 			rtn = append([]LogOutput{logOutput}, rtn...)
 		} else {
-			pastEndIdx = read.lastPastEndIdx
+			pastEndIdx = readFrom
 			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),
 				read.circBufSize)
 		}
@@ -164,9 +183,8 @@ func (read *Reader) readMore() []LogOutput {
 			break
 		}
 	}
-	read.lastPastEndIdx = pastEndIdx
 
-	return rtn
+	return rtn, pastEndIdx
 }
 
 func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,
