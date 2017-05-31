@@ -6,10 +6,16 @@
 
 package qlog
 
+import "bytes"
 import "fmt"
 import "os"
-import "strings"
 import "unsafe"
+
+type LogStrTrim struct {
+	Text         string
+	LogSubsystem uint8
+	LogLevel     uint8
+}
 
 type Reader struct {
 	file *os.File
@@ -19,7 +25,7 @@ type Reader struct {
 
 	lastPastEndIdx uint64
 
-	strMap         []LogStr
+	strMap         []LogStrTrim
 	strMapLastRead uint64
 }
 
@@ -51,7 +57,7 @@ func (read *Reader) readDataBlock(pos uint64, len uint64, outbuf []byte) {
 func (read *Reader) RefreshStrMap() {
 	fileOffset := read.headerSize + read.circBufSize
 	if read.strMap == nil {
-		read.strMap = make([]LogStr, 0)
+		read.strMap = make([]LogStrTrim, 0)
 	}
 
 	buf := make([]byte, LogStrSize)
@@ -69,7 +75,19 @@ func (read *Reader) RefreshStrMap() {
 			break
 		}
 
-		read.strMap = append(read.strMap, *mapEntry)
+		// trim and convert to a string to take the CPU hit early and once
+		mapBytes := mapEntry.Text[:]
+		firstNullTerm := bytes.IndexByte(mapBytes, '\x00')
+		if firstNullTerm != -1 {
+			mapBytes = mapBytes[:firstNullTerm]
+		}
+
+		var mapStr LogStrTrim
+		mapStr.LogSubsystem = mapEntry.LogSubsystem
+		mapStr.LogLevel = mapEntry.LogLevel
+		mapStr.Text = string(mapBytes) + "\n"
+
+		read.strMap = append(read.strMap, mapStr)
 		read.strMapLastRead += LogStrSize
 	}
 }
@@ -216,15 +234,7 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 	mapEntry := read.strMap[strMapId]
 	logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
 
-	// Finally, print with the front attached like normal
-	mapStr := string(mapEntry.Text[:])
-	firstNullTerm := strings.Index(mapStr, "\x00")
-	if firstNullTerm != -1 {
-		mapStr = mapStr[:firstNullTerm]
-	}
-
-	return newLog(logSubsystem, reqId, timestamp,
-		mapStr+"\n", args)
+	return newLog(logSubsystem, reqId, timestamp, mapEntry.Text, args)
 }
 
 func (read *Reader) wrapRead(idx uint64, num uint64) []byte {
