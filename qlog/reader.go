@@ -8,7 +8,6 @@ package qlog
 
 import "fmt"
 import "os"
-import "reflect"
 import "strings"
 import "time"
 import "unsafe"
@@ -118,7 +117,6 @@ func (read *Reader) readMore() []LogOutput {
 		readLen, logOutput, ready := read.readLogAt(data,
 			uint64(pastDataIdx))
 		if readLen == 0 {
-			fmt.Printf("ERROR: Read zero length - escaping\n")
 			break
 		}
 
@@ -156,7 +154,7 @@ func (read *Reader) readMore() []LogOutput {
 func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,
 	bool) {
 
-	if len(data) < 2 {
+	if wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize) < 2 {
 		fmt.Println("Partial packet - not enough data to even read size")
 		return 0, LogOutput{}, false
 	}
@@ -167,9 +165,10 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput
 	packetReady := ((packetLen & uint16(entryCompleteBit)) != 0)
 	packetLen &= ^(uint16(entryCompleteBit))
 
-	if uint64(len(data)) < pastEndIdx || pastEndIdx < uint64(packetLen) {
-		fmt.Printf("Not enough data to read packet %d %d\n", len(data),
-			packetLen)
+	if uint64(len(data)) < pastEndIdx || pastEndIdx < uint64(packetLen) ||
+		packetLen == 0 {
+
+		// Not enough data to read packet
 		return 0, LogOutput{}, false
 	}
 
@@ -184,23 +183,19 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput
 }
 
 func (read *Reader) dataToLog(packetData []byte) LogOutput {
-	numRead := uint64(0)
 	var numFields uint16
 	var strMapId uint16
 	var reqId uint64
 	var timestamp int64
 
-	var err error
-	if err = readPacket(&numRead, packetData,
-		reflect.ValueOf(&numFields)); err != nil {
-	} else if err = readPacket(&numRead, packetData,
-		reflect.ValueOf(&strMapId)); err != nil {
-	} else if err = readPacket(&numRead, packetData,
-		reflect.ValueOf(&reqId)); err != nil {
-	} else if err = readPacket(&numRead, packetData,
-		reflect.ValueOf(&timestamp)); err != nil {
-	}
+	numFields = *(*uint16)(unsafe.Pointer(&packetData[0]))
+	strMapId = *(*uint16)(unsafe.Pointer(&packetData[2]))
+	reqId = *(*uint64)(unsafe.Pointer(&packetData[4]))
+	timestamp = *(*int64)(unsafe.Pointer(&packetData[12]))
 
+	numRead := uint64(20)
+
+	var err error
 	args := make([]interface{}, numFields)
 	for i := uint16(0); i < numFields; i++ {
 		if err != nil {

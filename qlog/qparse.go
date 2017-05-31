@@ -23,6 +23,7 @@ import "unsafe"
 // consts
 const defaultParseThreads = 30
 const defaultChunkSize = 4
+const clippedMsg = "Packet has been clipped."
 
 type LogOutput struct {
 	Subsystem LogSubsystem
@@ -688,11 +689,12 @@ func grabMemory(filepath string) []byte {
 }
 
 func parseArg(idx *uint64, data []byte) (interface{}, error) {
-	var byteType uint16
-	err := readPacket(idx, data, reflect.ValueOf(&byteType))
-	if err != nil {
-		return nil, err
+	if len(data[*idx:]) < 2 {
+		return nil, errors.New(clippedMsg)
 	}
+	var byteType uint16
+	byteType = *(*uint16)(unsafe.Pointer(&data[*idx]))
+	*idx += 2
 
 	handledWrite := true
 	var rtn reflect.Value
@@ -752,6 +754,7 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 		handledWrite = false
 	}
 
+	var err error
 	if handledWrite {
 		err = readPacket(idx, data, rtn)
 		if err != nil {
@@ -771,11 +774,12 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 	}
 
 	if byteType == TypeString || byteType == TypeByteArray {
-		var strLen uint16
-		err = readPacket(idx, data, reflect.ValueOf(&strLen))
-		if err != nil {
-			return nil, err
+		if len(data[*idx:]) < 2 {
+			return nil, errors.New(clippedMsg)
 		}
+		var strLen uint16
+		strLen = *(*uint16)(unsafe.Pointer(&data[*idx]))
+		*idx += 2
 
 		var substr []byte
 		if *idx < uint64(len(data)) {
@@ -857,7 +861,7 @@ func readPacket(idx *uint64, data []byte, output reflect.Value) error {
 	dataLen := uint64(output.Elem().Type().Size())
 
 	if dataLen+*idx > uint64(len(data)) {
-		return errors.New(fmt.Sprintf("Packet has been clipped. (%d %d %d)",
+		return errors.New(fmt.Sprintf(clippedMsg+" (%d %d %d)",
 			dataLen, *idx, len(data)))
 	}
 
