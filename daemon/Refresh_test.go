@@ -306,6 +306,7 @@ func TestRefreshHardlinkAddition2(t *testing.T) {
 }
 
 func TestRefreshHardlinkRemoval(t *testing.T) {
+	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
