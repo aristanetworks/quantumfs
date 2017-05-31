@@ -27,10 +27,9 @@ func main() {
 
 	// Run indefinitely
 	for {
-		newLogs := reader.ReadMore()
-		for _, v := range newLogs {
+		reader.ReadMore(func (v qlog.LogOutput) {
 			fmt.Printf(v.ToString())
-		}
+		})
 
 		time.Sleep(10 * time.Millisecond)
 	}
