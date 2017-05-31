@@ -16,10 +16,10 @@ import "github.com/hanwen/go-fuse/fuse"
 // WorkspaceDB instead of passed in from the parent.
 type WorkspaceRoot struct {
 	Directory
-	typespace string
-	namespace string
-	workspace string
-	rootId    quantumfs.ObjectKey
+	typespace       string
+	namespace       string
+	workspace       string
+	publishedRootId quantumfs.ObjectKey
 
 	listLock   sync.Mutex
 	accessList map[string]bool
@@ -85,7 +85,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.typespace = typespace
 	wsr.namespace = namespace
 	wsr.workspace = workspace
-	wsr.rootId = rootId
+	wsr.publishedRootId = rootId
 	wsr.accessList = make(map[string]bool)
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
@@ -511,38 +511,44 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 	}
 }
 
-func (wsr *WorkspaceRoot) refresh(c *ctx, rootId quantumfs.ObjectKey) {
+func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
+	defer c.funcIn("WorkspaceRoot::refreshTo").Out()
+
+	c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",
+		wsr.typespace, wsr.namespace, wsr.workspace,
+		wsr.publishedRootId.String(), rootId.String())
+
+	func() {
+		defer c.qfs.mutabilityLock.Lock().Unlock()
+		utils.Assert(c.qfs.workspaceMutability[wsr.workspace] !=
+			workspaceMutable,
+			"Cannot handle mutable workspaces yet")
+	}()
+
+	buffer := c.dataStore.Get(&c.Ctx, rootId)
+	workspaceRoot := buffer.AsWorkspaceRoot()
+
+	wsr.refreshHardlinks(c, workspaceRoot.HardlinkEntry())
+
+	var addedUninstantiated, removedUninstantiated []InodeId
+	func() {
+		defer wsr.LockTree().Unlock()
+		addedUninstantiated, removedUninstantiated =
+			wsr.refresh_DOWN(c, workspaceRoot.BaseLayer())
+	}()
+
+	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
+	c.qfs.removeUninstantiated(c, removedUninstantiated)
+}
+
+func (wsr *WorkspaceRoot) refresh(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
-	if !rootId.IsEqualTo(wsr.rootId) {
-		c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",
-			wsr.typespace, wsr.namespace, wsr.workspace,
-			wsr.rootId.String(), rootId.String())
-
-		func() {
-			defer c.qfs.mutabilityLock.Lock().Unlock()
-			utils.Assert(c.qfs.workspaceMutability[wsr.workspace] !=
-				workspaceMutable,
-				"Cannot handle mutable workspaces yet")
-		}()
-
-		buffer := c.dataStore.Get(&c.Ctx, rootId)
-		workspaceRoot := buffer.AsWorkspaceRoot()
-
-		wsr.refreshHardlinks(c, workspaceRoot.HardlinkEntry())
-
-		var addedUninstantiated, removedUninstantiated []InodeId
-		func() {
-			defer wsr.LockTree().Unlock()
-			addedUninstantiated, removedUninstantiated =
-				wsr.refresh_DOWN(c, workspaceRoot.BaseLayer())
-		}()
-
-		c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
-		c.qfs.removeUninstantiated(c, removedUninstantiated)
-
-		wsr.rootId = rootId
-	}
+	publishedRootId, err := c.workspaceDB.Workspace(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
+	wsr.refreshTo(c, publishedRootId)
+	wsr.publishedRootId = publishedRootId
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
@@ -577,9 +583,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
 
 	// Update workspace rootId
-	if !newRootId.IsEqualTo(wsr.rootId) {
+	if !newRootId.IsEqualTo(wsr.publishedRootId) {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace, wsr.rootId, newRootId)
+			wsr.namespace, wsr.workspace, wsr.publishedRootId, newRootId)
 
 		if err != nil {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
@@ -587,7 +593,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 
 			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
 				rootId.Text(), newRootId.Text(),
-				wsr.rootId.Text(), err.Error())
+				wsr.publishedRootId.Text(), err.Error())
 			c.wlog("Another quantumfs instance is writing to %s, %s",
 				workspacePath,
 				"your changes will be lost. "+
@@ -602,9 +608,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			return
 		}
 
-		c.dlog("Advanced rootId %s -> %s", wsr.rootId.Text(),
+		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.Text(),
 			rootId.Text())
-		wsr.rootId = rootId
+		wsr.publishedRootId = rootId
 	}
 }
 
@@ -744,7 +750,7 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 
 	wsr.Directory.flush(c)
 	wsr.publish(c)
-	return wsr.rootId
+	return wsr.publishedRootId
 }
 
 func (wsr *WorkspaceRoot) directChildInodes(c *ctx) []InodeId {
