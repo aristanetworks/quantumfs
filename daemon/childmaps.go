@@ -5,6 +5,7 @@ package daemon
 
 import "fmt"
 import "github.com/aristanetworks/quantumfs"
+import "github.com/aristanetworks/quantumfs/utils"
 import "github.com/hanwen/go-fuse/fuse"
 
 // Handles map coordination and partial map pairing (for hardlinks) since now the
@@ -186,6 +187,8 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 		panic(fmt.Sprintf("Nil DirectoryEntry for inode %d", inodeId))
 	}
 
+	utils.Assert(inodeId != quantumfs.InodeIdInvalid,
+		"Inode for loaded child %s is zero", entry.Filename())
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
