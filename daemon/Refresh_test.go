@@ -326,6 +326,7 @@ func TestRefreshHardlinkRemoval(t *testing.T) {
 }
 
 func TestRefreshNlinkDrop(t *testing.T) {
+	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -473,6 +474,7 @@ func TestRefreshUninstantiated(t *testing.T) {
 }
 
 func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
+	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 
 		workspace := test.NewWorkspace()
