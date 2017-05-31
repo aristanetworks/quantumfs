@@ -6,8 +6,8 @@
 
 package qlog
 
-import "encoding/binary"
 import "bytes"
+import "encoding/binary"
 import "fmt"
 import "os"
 import "reflect"
