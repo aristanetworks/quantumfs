@@ -489,8 +489,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 			return nil
 		}
 
-		ks := key.String()
-		metadata, err := cqlds.Metadata(walkutils.ToECtx(c), ks)
+		metadata, err := cqlds.Metadata(walkutils.ToECtx(c), key.Value())
 		if err != nil {
 			return fmt.Errorf("path:%v key %v: %v", path, key.Text(), err)
 		}
@@ -638,9 +637,8 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 			buf := simplebuffer.New(nil, key)
 			if err := cds.Get(nil, key, buf); err != nil {
 
-				ks := key.String()
 				metadata, err := cqlds.Metadata(
-					walkutils.ToECtx(c), ks)
+					walkutils.ToECtx(c), key.Value())
 				if err != nil {
 					return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
 				}
