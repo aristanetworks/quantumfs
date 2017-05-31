@@ -254,7 +254,8 @@ type Api interface {
 	GetBlock(key []byte) ([]byte, error)
 
 	// For testing only, may be removed in the future
-	Refresh(workspace string, remoteWorkspace string) error
+	AdvanceWSDB(workspace string, refWorkspace string) error
+	Refresh(workspace string) error
 }
 
 type apiImpl struct {
@@ -305,6 +306,7 @@ const (
 	// The following commands might be removed in the future versions so we
 	// do not allocate a known id for them
 	CmdRefreshWorkspace = 10001 + iota
+	CmdAdvanceWSDB
 )
 
 // The various error codes
@@ -349,8 +351,13 @@ type MergeRequest struct {
 
 type RefreshRequest struct {
 	CommandCommon
-	Workspace       string
-	RemoteWorkspace string
+	Workspace string
+}
+
+type AdvanceWSDBRequest struct {
+	CommandCommon
+	Workspace          string
+	ReferenceWorkspace string
 }
 
 type AccessedRequest struct {
@@ -497,15 +504,32 @@ func (api *apiImpl) Merge3Way(base string, remote string, local string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *apiImpl) Refresh(workspace string, remoteWorkspace string) error {
+func (api *apiImpl) AdvanceWSDB(workspace string, refWorkspace string) error {
+	if !isWorkspaceNameValid(workspace) {
+		return fmt.Errorf("\"%s\" must be an empty string or "+
+			"contain precisely two \"/\"\n", workspace)
+	}
+
+	if !isWorkspaceNameValid(refWorkspace) {
+		return fmt.Errorf("\"%s\" must be an empty string or "+
+			"contain precisely two \"/\"\n", refWorkspace)
+	}
+	cmd := AdvanceWSDBRequest{
+		CommandCommon:      CommandCommon{CommandId: CmdAdvanceWSDB},
+		Workspace:          workspace,
+		ReferenceWorkspace: refWorkspace,
+	}
+	return api.processCmd(cmd, nil)
+}
+
+func (api *apiImpl) Refresh(workspace string) error {
 	if !isWorkspaceNameValid(workspace) {
 		return fmt.Errorf("\"%s\" must be an empty string or "+
 			"contain precisely two \"/\"\n", workspace)
 	}
 	cmd := RefreshRequest{
-		CommandCommon:   CommandCommon{CommandId: CmdRefreshWorkspace},
-		Workspace:       workspace,
-		RemoteWorkspace: remoteWorkspace,
+		CommandCommon: CommandCommon{CommandId: CmdRefreshWorkspace},
+		Workspace:     workspace,
 	}
 	return api.processCmd(cmd, nil)
 }
