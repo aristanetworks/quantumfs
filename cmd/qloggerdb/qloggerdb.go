@@ -10,6 +10,7 @@ import "fmt"
 import "os"
 
 import "github.com/aristanetworks/quantumfs/qlog"
+import "github.com/aristanetworks/quantumfs/loggerdb"
 
 func init() {
 	flag.Usage = func() {
@@ -24,7 +25,10 @@ func main() {
 	}
 	reader := qlog.NewReader(os.Args[1])
 
+	db := qloggerdb.NewMemdb()
+	logger := qloggerdb.NewLoggerDb(db)
+
 	reader.ProcessLogs(true, func(v qlog.LogOutput) {
-		fmt.Printf(v.ToString())
+		logger.ProcessLog(v)
 	})
 }
