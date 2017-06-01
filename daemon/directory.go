@@ -193,7 +193,7 @@ func (dir *Directory) delChild_(c *ctx,
 	// If this is a file we need to reparent it to itself
 	record := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.deleteChild(c, name)
+		return dir.children.deleteChild(c, name, true)
 	}()
 
 	dir.self.markAccessed(c, name, false)
@@ -1245,7 +1245,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	dir.children.deleteChild(c, name)
+	dir.children.deleteChild(c, name, true)
 }
 
 // Needs to hold childRecordLock
