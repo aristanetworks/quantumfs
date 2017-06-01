@@ -583,7 +583,7 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 
 	fmt.Printf("Search path: %v\n", searchPath)
 	for _, key := range keyList {
-		fmt.Println(key)
+		fmt.Println(key.Text())
 	}
 	return nil
 }
