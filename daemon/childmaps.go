@@ -73,7 +73,9 @@ func (cmap *ChildMap) baseLayerIs(key quantumfs.ObjectKey) {
 	cmap.childrenRecords_ = nil
 }
 
-func (cmap *ChildMap) childrenRecords(c *ctx) map[InodeId][]quantumfs.DirectoryRecord {
+func (cmap *ChildMap) childrenRecords(
+	c *ctx) map[InodeId][]quantumfs.DirectoryRecord {
+
 	if cmap.childrenRecords_ == nil {
 		c.vlog("child record was nil, reloading from %s",
 			cmap.baseLayer.Text())
@@ -125,7 +127,9 @@ func (cmap *ChildMap) delRecord(c *ctx, inodeId InodeId,
 	return nil
 }
 
-func (cmap *ChildMap) firstRecord(c *ctx, inodeId InodeId) quantumfs.DirectoryRecord {
+func (cmap *ChildMap) firstRecord(c *ctx,
+	inodeId InodeId) quantumfs.DirectoryRecord {
+
 	list, exists := cmap.childrenRecords(c)[inodeId]
 	if !exists {
 		return nil
