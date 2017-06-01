@@ -220,10 +220,9 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
-	kv := key.Value()
 	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Get",
 		"key %s", key.Text()).Out()
-
+	kv := key.Value()
 	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), kv)
 	if err != nil {
 		return err
