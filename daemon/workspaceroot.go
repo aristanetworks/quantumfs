@@ -511,8 +511,8 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 	}
 }
 
-func (wsr *WorkspaceRoot) refresh(c *ctx, rootId quantumfs.ObjectKey) {
-	defer c.funcIn("WorkspaceRoot::refresh").Out()
+func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
+	defer c.funcIn("WorkspaceRoot::refreshTo").Out()
 
 	c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",
 		wsr.typespace, wsr.namespace, wsr.workspace,
@@ -539,6 +539,16 @@ func (wsr *WorkspaceRoot) refresh(c *ctx, rootId quantumfs.ObjectKey) {
 
 	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
 	c.qfs.removeUninstantiated(c, removedUninstantiated)
+}
+
+func (wsr *WorkspaceRoot) refresh(c *ctx) {
+	defer c.funcIn("WorkspaceRoot::refresh").Out()
+
+	publishedRootId, err := c.workspaceDB.Workspace(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
+	wsr.refreshTo(c, publishedRootId)
+	wsr.publishedRootId = publishedRootId
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
