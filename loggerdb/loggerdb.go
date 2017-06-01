@@ -7,7 +7,6 @@ import "container/list"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-
 const requestEndAfterNs = 3000000000
 
 type DbInterface interface {
@@ -17,13 +16,13 @@ type DbInterface interface {
 }
 
 type logTrack struct {
-	logs		qlog.LogStack
-	listElement	*list.Element
+	logs        qlog.LogStack
+	listElement *list.Element
 }
 
 type trackerKey struct {
-	reqId		uint64
-	lastLogTime	int64
+	reqId       uint64
+	lastLogTime int64
 }
 
 type statExtractor interface {
@@ -31,20 +30,20 @@ type statExtractor interface {
 }
 
 type LoggerDb struct {
-	logsByRequest	map[uint64]logTrack
+	logsByRequest map[uint64]logTrack
 
 	// track the oldest untouched requests so we can push them to the stat
 	// extractors after the resting period (so we're confident there are no
 	// more logs coming for each request)
-	requestSequence	list.List
+	requestSequence list.List
 
-	statExtractors	[]statExtractor
+	statExtractors []statExtractor
 }
 
 func NewLoggerDb(db DbInterface) *LoggerDb {
-	rtn := LoggerDb {
-		logsByRequest:	make(map[uint64]logTrack),
-		statExtractors:	make([]statExtractor, 0),
+	rtn := LoggerDb{
+		logsByRequest:  make(map[uint64]logTrack),
+		statExtractors: make([]statExtractor, 0),
 	}
 
 	// sample extractor
@@ -61,9 +60,9 @@ func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
 		logger.requestSequence.MoveToBack(tracker.listElement)
 	} else {
 		tracker.logs = make([]qlog.LogOutput, 0)
-		newElem := logger.requestSequence.PushBack(trackerKey {
-			reqId:		v.ReqId,
-			lastLogTime:	v.T,
+		newElem := logger.requestSequence.PushBack(trackerKey{
+			reqId:       v.ReqId,
+			lastLogTime: v.T,
 		})
 		tracker.listElement = newElem
 	}
@@ -85,7 +84,7 @@ func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
 		}
 
 		request := requestElem.Value.(trackerKey)
-		if v.T - request.lastLogTime > requestEndAfterNs {
+		if v.T-request.lastLogTime > requestEndAfterNs {
 			logger.requestSequence.Remove(requestElem)
 			reqLogs := logger.logsByRequest[request.reqId]
 			delete(logger.logsByRequest, request.reqId)
