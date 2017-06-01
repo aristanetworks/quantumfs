@@ -703,7 +703,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
 	defer wsr.childRecordLock.Lock().Unlock()
-	for _, entry := range wsr.children.recordCopies(c) {
+	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
 		}
@@ -753,10 +753,10 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	return wsr.publishedRootId
 }
 
-func (wsr *WorkspaceRoot) directChildInodes(c *ctx) []InodeId {
+func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	defer wsr.Lock().Unlock()
 
-	directChildren := wsr.Directory.directChildInodes(c)
+	directChildren := wsr.Directory.directChildInodes()
 
 	for inodeNum, _ := range wsr.inodeToLink {
 		directChildren = append(directChildren, inodeNum)

@@ -93,7 +93,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).Out()
 
-	children := dir.directChildInodes(c)
+	children := dir.directChildInodes()
 	for _, child := range children {
 		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
 			inode.Sync_DOWN(c)
@@ -198,11 +198,12 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
 	defer c.FuncIn("Directory::destroyChild_DOWN", "inode %d", inodeId).Out()
 	if localRecord.Type() == quantumfs.ObjectTypeDirectory {
 		subdir := inode.(*Directory)
-		subdir.children.iterateOverInMemoryRecords(c,
-			func(childname string, childId InodeId) {
-				subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
-					childId)
-			})
+		subdir.children.foreachChild(c, func(childname string,
+			childId InodeId) {
+
+			subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
+				childId)
+		})
 	}
 	c.qfs.noteDeletedInode(dir.id, inodeId, localRecord.Filename())
 }
@@ -335,9 +336,7 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 
 	defer dir.childRecordLock.Lock().Unlock()
 
-	dir.children.iterateOverInMemoryRecords(c, func(childname string,
-		childId InodeId) {
-
+	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		if _, exists := remoteEntries[childname]; !exists {
 			dir.handleDeletedInMemoryRecord_DOWN(c, childname, childId)
 			deletedInodeIds = append(deletedInodeIds, childId)
@@ -346,6 +345,8 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 
 	})
+	/* TODO
 	dir.children.reload(c, baseLayerId)
+	*/
 	return uninstantiated, deletedInodeIds
 }
