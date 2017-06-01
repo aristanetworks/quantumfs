@@ -5,18 +5,17 @@
 
 package qloggerdb
 
-
 type dataSeries struct {
 	seriesNs []uint64
 }
 
 type Memdb struct {
-	data	map[string]dataSeries
+	data map[string]dataSeries
 }
 
 func NewMemdb() *Memdb {
-	return &Memdb {
-		data:	make(map[string]dataSeries, 0),
+	return &Memdb{
+		data: make(map[string]dataSeries, 0),
 	}
 }
 

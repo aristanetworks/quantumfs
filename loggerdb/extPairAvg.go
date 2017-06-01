@@ -10,17 +10,16 @@ import "fmt"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
-
 type extPairAvg struct {
-	db		DbInterface
-	fmtStart	string
-	fmtStop		string
+	db       DbInterface
+	fmtStart string
+	fmtStop  string
 }
 
 func newExtPairAvg(db DbInterface, start string, stop string) *extPairAvg {
-	return &extPairAvg {
-		fmtStart:	start,
-		fmtStop:	stop,
+	return &extPairAvg{
+		fmtStart: start,
+		fmtStop:  stop,
 	}
 }
 
