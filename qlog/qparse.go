@@ -1,7 +1,8 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// qparse is the shared memory log parser for the qlog quantumfs subsystem
+// qparse is a shared memory log parser for the qlog quantumfs subsystem.
+// It is used for parsing a qlog file completely in a single pass
 package qlog
 
 import "bytes"
@@ -11,7 +12,6 @@ import "errors"
 import "fmt"
 import "io"
 import "io/ioutil"
-import "math"
 import "os"
 import "reflect"
 import "sort"
@@ -23,6 +23,7 @@ import "unsafe"
 // consts
 const defaultParseThreads = 30
 const defaultChunkSize = 4
+const clippedMsg = "Packet has been clipped."
 
 type LogOutput struct {
 	Subsystem LogSubsystem
@@ -493,7 +494,6 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
 
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
-
 	FormatLogs(logs, tabSpaces, statusBar, fn)
 }
 
@@ -524,7 +524,7 @@ func PacketStats(filepath string, statusBar bool, fn writeFn) {
 		// clear the completion bit
 		packetLen &= ^(uint16(entryCompleteBit))
 
-		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
 		readCount += uint64(packetLen) + 2
 
 		if statusBar {
@@ -602,16 +602,22 @@ func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
 	}
 }
 
-func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
-	strMapRtn []LogStr) {
-
-	data := grabMemory(filepath)
+func ExtractHeader(data []byte) *MmapHeader {
 	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
 
 	if header.Version != QlogVersion {
 		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
 			header.Version, QlogVersion))
 	}
+
+	return header
+}
+
+func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
+	strMapRtn []LogStr) {
+
+	data := grabMemory(filepath)
+	header := ExtractHeader(data)
 
 	mmapHeaderSize := uint64(unsafe.Sizeof(MmapHeader{}))
 
@@ -683,11 +689,12 @@ func grabMemory(filepath string) []byte {
 }
 
 func parseArg(idx *uint64, data []byte) (interface{}, error) {
-	var byteType uint16
-	err := readPacket(idx, data, reflect.ValueOf(&byteType))
-	if err != nil {
-		return nil, err
+	if len(data[*idx:]) < 2 {
+		return nil, errors.New(clippedMsg)
 	}
+	var byteType uint16
+	byteType = *(*uint16)(unsafe.Pointer(&data[*idx]))
+	*idx += 2
 
 	handledWrite := true
 	var rtn reflect.Value
@@ -747,6 +754,7 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 		handledWrite = false
 	}
 
+	var err error
 	if handledWrite {
 		err = readPacket(idx, data, rtn)
 		if err != nil {
@@ -766,34 +774,29 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 	}
 
 	if byteType == TypeString || byteType == TypeByteArray {
+		if len(data[*idx:]) < 2 {
+			return nil, errors.New(clippedMsg)
+		}
 		var strLen uint16
-		err = readPacket(idx, data, reflect.ValueOf(&strLen))
-		if err != nil {
-			return nil, err
+		strLen = *(*uint16)(unsafe.Pointer(&data[*idx]))
+		*idx += 2
+
+		var substr []byte
+		if *idx < uint64(len(data)) {
+			substr = data[*idx:]
+
+			if strLen < uint16(len(substr)) {
+				substr = substr[:strLen]
+			}
 		}
-
-		var rtnRaw [math.MaxUint16]byte
-
-		// check to see if the string is all there
-		stringData := data
-
-		stringPastEnd := *idx + uint64(strLen)
-		if uint64(len(data)) >= stringPastEnd {
-			stringData = data[:stringPastEnd]
-		}
-		strLen = uint16(uint64(len(stringData)) - *idx)
-
-		err = readPacket(idx, stringData, reflect.ValueOf(&rtnRaw))
-		if err != nil {
-			return nil, err
-		}
+		*idx += uint64(len(substr))
 
 		if byteType == TypeString {
-			return string(rtnRaw[:strLen]), nil
+			return string(substr), nil
 		}
 
 		// Otherwise, return []byte if type is TypeByteArray
-		return rtnRaw[:strLen], nil
+		return substr, nil
 	}
 
 	return nil, errors.New(fmt.Sprintf("Unsupported field type %d\n", byteType))
@@ -813,7 +816,20 @@ func wrapRead(idx uint64, num uint64, data []byte) []byte {
 	return rtn
 }
 
-func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen int) {
+func wrapPlusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
+	*lhs += rhs
+
+	if *lhs > bufLen {
+		*lhs -= bufLen
+	}
+}
+
+func wrapMinus(lhs uint64, rhs uint64, bufLen uint64) uint64 {
+	wrapMinusEquals(&lhs, rhs, bufLen)
+	return lhs
+}
+
+func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
 	if *lhs < rhs {
 		*lhs += uint64(bufLen)
 	}
@@ -829,7 +845,7 @@ func readBack(pastIdx *uint64, data []byte, outputType interface{},
 
 	dataLen := uint64(reflect.TypeOf(outputType).Size())
 
-	wrapMinusEquals(pastIdx, dataLen, len(data))
+	wrapMinusEquals(pastIdx, dataLen, uint64(len(data)))
 	rawData := wrapRead(*pastIdx, dataLen, data)
 
 	buf := bytes.NewReader(rawData)
@@ -844,28 +860,8 @@ func readPacket(idx *uint64, data []byte, output reflect.Value) error {
 
 	dataLen := uint64(output.Elem().Type().Size())
 
-	// If this is a string, then consume the rest of data provided
-	if byteArray, ok := output.Interface().(*[math.MaxUint16]byte); ok {
-		dataLen = uint64(len(data)) - *idx
-		// Because binary.Read is dumb and can't read less than the given
-		// array without EOFing *and* needs a fixed array, we have to do this
-		var singleArray [1]byte
-		for i := uint64(0); i < dataLen; i++ {
-			buf := bytes.NewReader(data[*idx+i : *idx+i+1])
-			err := binary.Read(buf, binary.LittleEndian, &singleArray)
-			if err != nil {
-				return err
-			}
-			(*byteArray)[i] = singleArray[0]
-		}
-
-		*idx += dataLen
-
-		return nil
-	}
-
 	if dataLen+*idx > uint64(len(data)) {
-		return errors.New(fmt.Sprintf("Packet has been clipped. (%d %d %d)",
+		return errors.New(fmt.Sprintf(clippedMsg+" (%d %d %d)",
 			dataLen, *idx, len(data)))
 	}
 
@@ -971,7 +967,7 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 		}
 
 		// Grab the string and output
-		if int(strMapId) > len(strMap) {
+		if int(strMapId) >= len(strMap) {
 			*out = newLog(LogQlog, QlogReqId, 0,
 				"Not enough entries in "+
 					"string map (%d %d)\n",
@@ -1039,7 +1035,7 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 		packetLen &= ^(uint16(entryCompleteBit))
 
 		// Prepare the pastEndIdx and readCount variables to allow us to skip
-		wrapMinusEquals(&pastEndIdx, uint64(packetLen), len(data))
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
 		readCount += uint64(packetLen) + 2
 
 		// Update a status bar if needed

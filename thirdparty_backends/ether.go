@@ -178,7 +178,7 @@ type EtherBlobStoreTranslator struct {
 //  a) key exists and current TTL < refreshTTLTimeSecs
 //  b) key doesn't exist
 func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
-	keyExist bool, key string, metadata map[string]string,
+	keyExist bool, key []byte, metadata map[string]string,
 	buf []byte) error {
 
 	setTTL := defaultTTLValueSecs
@@ -222,15 +222,14 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 
 	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Get",
 		"key %s", key.Text()).Out()
-
-	ks := key.String()
-	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), ks)
+	kv := key.Value()
+	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), kv)
 	if err != nil {
 		return err
 	}
 
 	if ebt.ApplyTTLPolicy {
-		err = refreshTTL(c, ebt.Blobstore, true, ks, metadata, data)
+		err = refreshTTL(c, ebt.Blobstore, true, kv, metadata, data)
 		if err != nil {
 			return err
 		}
@@ -246,18 +245,20 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
-	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Set",
-		"key %s", key.Text()).Out()
+	kv := key.Value()
+	ks := key.Text()
 
-	ks := key.String()
-	metadata, err := ebt.Blobstore.Metadata((*dsApiCtx)(c), ks)
+	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Set",
+		"key %s", ks).Out()
+
+	metadata, err := ebt.Blobstore.Metadata((*dsApiCtx)(c), kv)
 
 	switch {
 	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
-		return refreshTTL(c, ebt.Blobstore, false, ks, nil, buf.Get())
+		return refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get())
 
 	case err == nil:
-		return refreshTTL(c, ebt.Blobstore, true, ks, metadata, buf.Get())
+		return refreshTTL(c, ebt.Blobstore, true, kv, metadata, buf.Get())
 
 	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
 		// if metadata error other than ErrKeyNotFound then fail
