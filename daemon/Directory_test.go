@@ -1368,11 +1368,15 @@ func TestStickyDirPerms(t *testing.T) {
 	})
 }
 
-func TestDeleteOpenDir1(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+func deleteOpenDirTestGen(runAsRoot bool) func(*testHelper) {
+	return func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testdir"
 		fullname := workspace + "/" + name
+
+		if !runAsRoot {
+			defer test.SetUidGid(99, -1, nil).Revert()
+		}
 
 		err := syscall.Mkdir(fullname, 0777)
 		test.AssertNoErr(err)
@@ -1400,7 +1404,16 @@ func TestDeleteOpenDir1(t *testing.T) {
 
 		err = os.Chdir(wd)
 		test.AssertNoErr(err)
-	})
+	}
+}
+
+func TestDeleteOpenDir0(t *testing.T) {
+	t.Skip() // XXX BUG203361
+	runTest(t, deleteOpenDirTestGen(false))
+}
+
+func TestDeleteOpenDir1(t *testing.T) {
+	runTest(t, deleteOpenDirTestGen(true))
 }
 
 func TestDeleteOpenDir2(t *testing.T) {
