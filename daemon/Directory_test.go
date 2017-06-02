@@ -1367,3 +1367,73 @@ func TestStickyDirPerms(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func TestDeleteOpenDir1(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testdir"
+		fullname := workspace + "/" + name
+
+		err := syscall.Mkdir(fullname, 0777)
+		test.AssertNoErr(err)
+
+		wd, err := os.Getwd()
+		test.AssertNoErr(err)
+
+		err = os.Chdir(fullname)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(fullname)
+		test.AssertNoErr(err)
+
+		const ATCWD = -0x64
+		f, err := syscall.Openat(ATCWD, ".",
+			syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NONBLOCK, 0)
+		test.AssertNoErr(err)
+
+		buf := make([]byte, 1000)
+		_, err = syscall.Getdents(f, buf)
+		test.Assert(err == syscall.ENOENT, "Wrong error %v", err)
+
+		err = syscall.Close(f)
+		test.AssertNoErr(err)
+
+		err = os.Chdir(wd)
+		test.AssertNoErr(err)
+	})
+}
+
+func TestDeleteOpenDir2(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testdir"
+
+		fullname := workspace + "/" + name
+
+		err := syscall.Mkdir(fullname, 0777)
+		test.AssertNoErr(err)
+		err = syscall.Mknod(fullname+"/file", syscall.S_IFREG, 0)
+		test.Assert(err == nil, "Unable to create test file: %v", err)
+
+		f, err := os.Open(fullname)
+		test.AssertNoErr(err)
+
+		list, err := f.Readdir(-1)
+		test.AssertNoErr(err)
+		test.Assert(len(list) == 1, "list %v has wrong size", list)
+
+		err = syscall.Unlink(fullname + "/file")
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(fullname)
+		test.AssertNoErr(err)
+
+		_, err = f.Seek(0, 0)
+		test.AssertNoErr(err)
+		list, err = f.Readdir(-1)
+		test.Assert(len(list) == 0, "list %v has wrong size", list)
+
+		err = f.Close()
+		test.AssertNoErr(err)
+	})
+}
