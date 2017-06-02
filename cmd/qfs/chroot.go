@@ -18,7 +18,6 @@ import "syscall"
 import "time"
 
 import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/kardianos/osext"
 
 const (
 	sudo       = "/usr/bin/sudo"
@@ -44,7 +43,7 @@ var qfs string
 var persistent bool = true
 
 func init() {
-	if qfspath, err := osext.Executable(); err != nil {
+	if qfspath, err := os.Executable(); err != nil {
 		fmt.Println("Unable to locate qfs directory")
 		qfs = "./qfs"
 	} else {
