@@ -4,6 +4,7 @@
 package qloggerdb
 
 import "container/list"
+import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -11,10 +12,10 @@ const requestEndAfterNs = 3000000000
 
 type field struct {
 	name string
-	data uint64
+	data time.Duration
 }
 
-func newField(name_ string, data_ uint64) field {
+func newField(name_ string, data_ time.Duration) field {
 	return field{
 		name: name_,
 		data: data_,
@@ -36,7 +37,7 @@ func newTag(name_ string, data_ string) tag {
 type DbInterface interface {
 	Store(tags []tag, fields []field)
 
-	Fetch(withTags []tag, field string, lastN int) []uint64
+	Fetch(withTags []tag, field string, lastN int) []time.Duration
 }
 
 type logTrack struct {

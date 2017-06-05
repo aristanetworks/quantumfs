@@ -5,6 +5,8 @@
 
 package qloggerdb
 
+import "time"
+
 type dataSeries struct {
 	tags   []tag
 	fields []field
@@ -27,8 +29,8 @@ func (db *Memdb) Store(tags_ []tag, fields_ []field) {
 	})
 }
 
-func (db *Memdb) Fetch(withTags []tag, field string, lastN int) []uint64 {
-	rtn := make([]uint64, 0)
+func (db *Memdb) Fetch(withTags []tag, field string, lastN int) []time.Duration {
+	rtn := make([]time.Duration, 0)
 	for _, i := range db.data {
 		// check if the data has all the tags we need
 		outputData := true
