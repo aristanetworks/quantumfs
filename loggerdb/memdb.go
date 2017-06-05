@@ -6,8 +6,8 @@
 package qloggerdb
 
 type dataSeries struct {
-	tags	[]tag
-	fields	[]field
+	tags   []tag
+	fields []field
 }
 
 type Memdb struct {
@@ -16,7 +16,7 @@ type Memdb struct {
 
 func NewMemdb() *Memdb {
 	return &Memdb{
-		data:	make([]dataSeries, 0),
+		data: make([]dataSeries, 0),
 	}
 }
 
