@@ -5,6 +5,7 @@ package qloggerdb
 
 import "fmt"
 import "container/list"
+import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -37,7 +38,7 @@ func newTag(name_ string, data_ string) tag {
 type DbInterface interface {
 	Store(tags []tag, fields []field)
 
-	Fetch(withTags []tag, field string, lastN int) []uint64
+	Fetch(withTags []tag, field string, lastN int) []time.Duration
 }
 
 type logTrack struct {
@@ -50,7 +51,7 @@ type trackerKey struct {
 	lastLogTime int64
 }
 
-type statExtractor interface {
+type StatExtractor interface {
 	ProcessRequest(request qlog.LogStack)
 }
 
@@ -62,18 +63,14 @@ type LoggerDb struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	statExtractors []statExtractor
+	statExtractors []StatExtractor
 }
 
-func NewLoggerDb(db DbInterface) *LoggerDb {
+func NewLoggerDb(db DbInterface, extractors []StatExtractor) *LoggerDb {
 	rtn := LoggerDb{
 		logsByRequest:  make(map[uint64]logTrack),
-		statExtractors: make([]statExtractor, 0),
+		statExtractors: extractors,
 	}
-
-	// sample extractor
-	rtn.statExtractors = append(rtn.statExtractors, newExtPairStats(db,
-		"---In Mux::GetAttr Inode %d\n", "Out-- Mux::GetAttr\n", true))
 
 	return &rtn
 }

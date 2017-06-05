@@ -26,7 +26,13 @@ func main() {
 	reader := qlog.NewReader(os.Args[1])
 
 	db := qloggerdb.NewMemdb()
-	logger := qloggerdb.NewLoggerDb(db)
+	extractors := make([]qloggerdb.StatExtractor, 0)
+
+	// sample extractor
+	extractors = append(extractors, qloggerdb.NewExtPairAvg(db,
+		"---In Mux::GetAttr", "Out-- Mux::GetAttr"))
+
+	logger := qloggerdb.NewLoggerDb(db, extractors)
 
 	reader.ProcessLogs(true, func(v qlog.LogOutput) {
 		logger.ProcessLog(v)
