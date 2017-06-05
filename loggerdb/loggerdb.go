@@ -49,7 +49,7 @@ type trackerKey struct {
 	lastLogTime int64
 }
 
-type statExtractor interface {
+type StatExtractor interface {
 	ProcessRequest(request qlog.LogStack)
 }
 
@@ -61,18 +61,14 @@ type LoggerDb struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	statExtractors []statExtractor
+	statExtractors []StatExtractor
 }
 
-func NewLoggerDb(db DbInterface) *LoggerDb {
+func NewLoggerDb(db DbInterface, extractors []StatExtractor) *LoggerDb {
 	rtn := LoggerDb{
 		logsByRequest:  make(map[uint64]logTrack),
-		statExtractors: make([]statExtractor, 0),
+		statExtractors: extractors,
 	}
-
-	// sample extractor
-	rtn.statExtractors = append(rtn.statExtractors, newExtPairAvg(db,
-		"---In Mux::GetAttr", "Out-- Mux::GetAttr"))
 
 	return &rtn
 }

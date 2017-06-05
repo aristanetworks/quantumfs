@@ -16,7 +16,7 @@ type extPairAvg struct {
 	fmtStop  string
 }
 
-func newExtPairAvg(db DbInterface, start string, stop string) *extPairAvg {
+func NewExtPairAvg(db DbInterface, start string, stop string) *extPairAvg {
 	return &extPairAvg{
 		fmtStart: start,
 		fmtStop:  stop,
