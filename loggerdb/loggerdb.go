@@ -9,10 +9,34 @@ import "github.com/aristanetworks/quantumfs/qlog"
 
 const requestEndAfterNs = 3000000000
 
-type DbInterface interface {
-	Store(tag string, timeNs uint64)
+type field struct {
+	name string
+	data uint64
+}
 
-	Fetch(tag string, lastN int) []uint64
+func newField(name_ string, data_ uint64) field {
+	return field{
+		name:	name_,
+		data:	data_,
+	}
+}
+
+type tag struct {
+	name string
+	data string
+}
+
+func newTag(name_ string, data_ string) tag {
+	return tag{
+		name:	name_,
+		data:	data_,
+	}
+}
+
+type DbInterface interface {
+	Store(tags []tag, fields []field)
+
+	Fetch(withTags []tag, field string, lastN int) []uint64
 }
 
 type logTrack struct {
