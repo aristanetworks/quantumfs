@@ -6,40 +6,58 @@
 package qloggerdb
 
 type dataSeries struct {
-	seriesNs []uint64
+	tags	[]tag
+	fields	[]field
 }
 
 type Memdb struct {
-	data map[string]dataSeries
+	data []dataSeries
 }
 
 func NewMemdb() *Memdb {
 	return &Memdb{
-		data: make(map[string]dataSeries, 0),
+		data:	make([]dataSeries, 0),
 	}
 }
 
-func (db *Memdb) Store(tag string, timeNs uint64) {
-	var entry dataSeries
-	if oldEntry, exists := db.data[tag]; exists {
-		entry = oldEntry
-	} else {
-		entry.seriesNs = make([]uint64, 0)
-	}
-
-	entry.seriesNs = append(entry.seriesNs, timeNs)
-	db.data[tag] = entry
+func (db *Memdb) Store(tags_ []tag, fields_ []field) {
+	db.data = append(db.data, dataSeries{
+		tags:   tags_,
+		fields: fields_,
+	})
 }
 
-func (db *Memdb) Fetch(tag string, lastN int) (seriesNs []uint64) {
-	if series, exists := db.data[tag]; exists {
-		rtn := series.seriesNs
-		if len(rtn) > lastN {
-			return rtn[len(rtn)-lastN:]
+func (db *Memdb) Fetch(withTags []tag, field string, lastN int) []uint64 {
+	rtn := make([]uint64, 0)
+	for _, i := range db.data {
+		// check if the data has all the tags we need
+		outputData := true
+		for _, needTag := range withTags {
+			foundTag := false
+			for _, haveTag := range i.tags {
+				if haveTag == needTag {
+					foundTag = true
+					break
+				}
+			}
+
+			// missing a tag, so we don't have about this data point
+			if !foundTag {
+				outputData = false
+				break
+			}
 		}
 
-		return rtn
+		if outputData {
+			// add the field, if it exists
+			for _, hasField := range i.fields {
+				if hasField.name == field {
+					rtn = append(rtn, hasField.data)
+					break
+				}
+			}
+		}
 	}
 
-	return nil
+	return rtn
 }
