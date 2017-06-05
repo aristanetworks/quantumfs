@@ -381,7 +381,6 @@ func (dir *Directory) publish_(c *ctx) {
 
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records(c))
-	dir.children.baseLayerIs(dir.baseLayerId)
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.Text(),
 		dir.baseLayerId.Text())
