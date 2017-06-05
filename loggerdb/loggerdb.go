@@ -5,7 +5,6 @@ package qloggerdb
 
 import "fmt"
 import "container/list"
-import "time"
 
 import "github.com/aristanetworks/quantumfs/qlog"
 
@@ -38,7 +37,7 @@ func newTag(name_ string, data_ string) tag {
 type DbInterface interface {
 	Store(tags []tag, fields []field)
 
-	Fetch(withTags []tag, field string, lastN int) []time.Duration
+	Fetch(withTags []tag, field string, lastN int) []uint64
 }
 
 type logTrack struct {
