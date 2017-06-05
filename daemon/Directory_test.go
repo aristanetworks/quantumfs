@@ -1389,6 +1389,11 @@ func deleteOpenDirTestGen(runAsRoot bool) func(*testHelper) {
 		err = os.Chdir(fullname)
 		test.AssertNoErr(err)
 
+		defer func() {
+			err = os.Chdir(wd)
+			test.AssertNoErr(err)
+		}()
+
 		err = syscall.Rmdir(fullname)
 		test.AssertNoErr(err)
 
@@ -1402,9 +1407,6 @@ func deleteOpenDirTestGen(runAsRoot bool) func(*testHelper) {
 		test.Assert(err == syscall.ENOENT, "Wrong error %v", err)
 
 		err = syscall.Close(f)
-		test.AssertNoErr(err)
-
-		err = os.Chdir(wd)
 		test.AssertNoErr(err)
 	}
 }
