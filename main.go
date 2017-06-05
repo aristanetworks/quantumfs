@@ -30,6 +30,7 @@ const heartBeatInterval = 1 * time.Minute
 const successPrefix = "Success:"
 const eventPrefix = "Event:  "
 const startPrefix = "Start:  "
+const backOffDuration = 30 * time.Minute
 
 const (
 	logInfo  = iota
@@ -112,6 +113,10 @@ func main() {
 func walkFullWSDBLoop(c *Ctx) {
 	for {
 		c.iteration++
+
+		atomic.StoreUint32(&c.numSuccess, 0)
+		atomic.StoreUint32(&c.numError, 0)
+
 		startTimeOuter := time.Now()
 		c.vlog("Iteration[%v] started at %v", c.iteration, startTimeOuter)
 
@@ -125,6 +130,9 @@ func walkFullWSDBLoop(c *Ctx) {
 		dur := time.Since(startTimeOuter)
 		c.vlog("Iteration[%v] ended at %v took %v", c.iteration, time.Now(), dur)
 		WriteWalkerIteration(c, dur, c.numSuccess, c.numError)
+
+		// If an error happened, back off and then continue
+		backOff(c)
 	}
 }
 
@@ -168,10 +176,6 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 		c.elog("Not able to get list of Typespaces")
 		return err
 	}
-
-	atomic.StoreUint32(&c.numSuccess, 0)
-	atomic.StoreUint32(&c.numError, 0)
-
 	for _, ts := range tsl {
 		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
@@ -285,4 +289,11 @@ func heartBeat(c *Ctx, timer <-chan time.Time) {
 			WriteWalkerHeartBeat(c)
 		}
 	}
+}
+
+func backOff(c *Ctx) {
+	if c.numError == 0 {
+		return
+	}
+	time.Sleep(backOffDuration)
 }
