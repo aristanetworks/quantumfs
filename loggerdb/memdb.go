@@ -5,7 +5,6 @@
 
 package qloggerdb
 
-
 type dataSeries struct {
 	tags   []tag
 	fields []field
