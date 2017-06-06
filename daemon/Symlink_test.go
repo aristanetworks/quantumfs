@@ -6,11 +6,13 @@ package daemon
 // Test the various operations on symlinks, only contains: CreateSymlink and
 // extended attributes related operations: set, get, list, remove
 
-import "bytes"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 // create a source file and link it to a symlink file
 func createSymlink(workspace string, test *testHelper) string {

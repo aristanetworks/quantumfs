@@ -3,12 +3,14 @@
 
 package aggregatedatastore
 
-import "sync/atomic"
-import "testing"
+import (
+	"sync/atomic"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 type testHelper struct {
 	testutils.TestHelper

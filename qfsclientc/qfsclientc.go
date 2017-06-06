@@ -25,10 +25,12 @@ const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
 */
 import "C"
 
-import "errors"
-import "unsafe"
+import (
+	"errors"
+	"unsafe"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 type QfsClientApi struct {
 	handle uint32

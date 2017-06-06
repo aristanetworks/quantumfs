@@ -3,13 +3,15 @@
 
 package daemon
 
-import "fmt"
-import "sync"
-import "time"
+import (
+	"fmt"
+	"sync"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // WorkspaceRoot acts similarly to a directory except only a single object ID is used
 // instead of one for each layer and that ID is directly requested from the

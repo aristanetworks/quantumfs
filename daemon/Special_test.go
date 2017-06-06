@@ -5,8 +5,10 @@ package daemon
 
 // Test the various operations on special files, primarily creation
 
-import "syscall"
-import "testing"
+import (
+	"syscall"
+	"testing"
+)
 
 func specialCreate(test *testHelper, filetype uint32) {
 	workspace := test.NewWorkspace()
