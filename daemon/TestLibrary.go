@@ -5,24 +5,25 @@ package daemon
 
 // Test library for daemon package
 
-import "fmt"
-import "io/ioutil"
-import "math/rand"
-import "os"
-import "runtime"
-import "runtime/debug"
-import "strings"
-import "strconv"
-import "sync"
-import "time"
+import (
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
-
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 const fusectlPath = "/sys/fs/fuse/"
 

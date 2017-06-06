@@ -5,17 +5,19 @@ package daemon
 
 // Test the various operations on directories, such as creation and traversing
 
-import "bytes"
-import "fmt"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {

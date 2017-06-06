@@ -3,11 +3,13 @@
 
 package daemon
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func makeWorkspaceRootIdAdvance(test *testHelper,
 	workspace string) quantumfs.ObjectKey {

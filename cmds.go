@@ -3,14 +3,16 @@
 
 package quantumfs
 
-import "bufio"
-import "bytes"
-import "fmt"
-import "encoding/json"
-import "os"
-import "strconv"
-import "strings"
-import "syscall"
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
+)
 
 // This file contains all the functions which are used by qfs (and other
 // applications) to perform special quantumfs operations. Primarily this is done by

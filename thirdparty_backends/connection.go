@@ -3,9 +3,11 @@
 
 package thirdparty_backends
 
-import "fmt"
+import (
+	"fmt"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 // Select the datastore with the given name and construct it with the given
 // configuration string.

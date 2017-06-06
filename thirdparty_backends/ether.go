@@ -9,20 +9,22 @@ package thirdparty_backends
 // change "!skip_backends" in first line with "ignore"
 // You will need to do the same in daemon/Ether_test.go as well.
 
-import "bytes"
-import "encoding/json"
-import "fmt"
-import "os"
-import "strconv"
-import "time"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"time"
 
-import "github.com/aristanetworks/ether"
-import "github.com/aristanetworks/ether/blobstore"
-import "github.com/aristanetworks/ether/cql"
-import "github.com/aristanetworks/ether/filesystem"
-import "github.com/aristanetworks/ether/qubit/wsdb"
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/ether/cql"
+	"github.com/aristanetworks/ether/filesystem"
+	"github.com/aristanetworks/ether/qubit/wsdb"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 func init() {
 	registerDatastore("ether.filesystem", newEtherFilesystemStore)

@@ -5,9 +5,11 @@ package daemon
 
 // Test parsing supplementary groups
 
-import "os"
-import "syscall"
-import "testing"
+import (
+	"os"
+	"syscall"
+	"testing"
+)
 
 func TestGroupParsing(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {

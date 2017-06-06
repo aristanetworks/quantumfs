@@ -3,14 +3,16 @@
 
 package qfsclientc
 
-import "bytes"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/daemon"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func WaitForApi(test *testHelper) {
 	test.WaitFor("Api inode to be seen by kernel", func() bool {

@@ -3,12 +3,14 @@
 
 package qwr
 
-import "fmt"
-import "strings"
-import "sync/atomic"
+import (
+	"fmt"
+	"strings"
+	"sync/atomic"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func WriteXAttrs(qctx *quantumfs.Ctx, path string,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
