@@ -1372,7 +1372,7 @@ func TestStickyDirPerms(t *testing.T) {
 
 // This function generates a test that cannot run in parallel as it
 // changes the current working directory of the process
-func deleteOpenDirTestGen(runAsRoot bool) func(*testHelper) {
+func deleteCWDTestGen(runAsRoot bool) func(*testHelper) {
 	return func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testdir"
@@ -1413,13 +1413,13 @@ func deleteOpenDirTestGen(runAsRoot bool) func(*testHelper) {
 	}
 }
 
-func TestDeleteOpenDirUnprivilegedUser(t *testing.T) {
+func TestDeleteCWDUnprivilegedUser(t *testing.T) {
 	t.Skip() // XXX BUG203361
-	runExpensiveTest(t, deleteOpenDirTestGen(false))
+	runExpensiveTest(t, deleteCWDTestGen(false))
 }
 
-func TestDeleteOpenDirRootUser(t *testing.T) {
-	runExpensiveTest(t, deleteOpenDirTestGen(true))
+func TestDeleteCWDRootUser(t *testing.T) {
+	runExpensiveTest(t, deleteCWDTestGen(true))
 }
 
 func TestDeleteOpenDirWithChild(t *testing.T) {
