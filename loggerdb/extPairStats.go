@@ -14,9 +14,9 @@ import "github.com/aristanetworks/quantumfs/qlog"
 const statPeriodSec = 5
 
 type extPairStats struct {
-	db       DbInterface
-	fmtStart string
-	fmtStop  string
+	db        DbInterface
+	fmtStart  string
+	fmtStop   string
 	sameScope bool
 
 	stats    basicStats
@@ -29,11 +29,11 @@ func NewExtPairStats(db_ DbInterface, start string, stop string,
 	matchingIndent bool) *extPairStats {
 
 	return &extPairStats{
-		db:       db_,
-		fmtStart: start,
-		fmtStop:  stop,
+		db:        db_,
+		fmtStart:  start,
+		fmtStop:   stop,
 		sameScope: matchingIndent,
-		statFrom: time.Now(),
+		statFrom:  time.Now(),
 	}
 }
 
