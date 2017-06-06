@@ -4,9 +4,12 @@
 
 ppid=$1
 rootContainer=$ROOTDIRNAME
-mountPath=/sys/fs/fuse/connections
 
-mount | grep -q fusectl || sudo mount -t fusectl none $mountPath
+mountPath=`mount | awk '/fusectl/ {print $3}'`
+if [ -z "$mountPath" ]; then
+        mountPath=/sys/fs/fuse/connections
+        sudo mount -t fusectl none $mountPath
+fi
 
 # On an idle system, the go-test should take no longer than
 # 3 minutes. Otherwise, it is hanging.
