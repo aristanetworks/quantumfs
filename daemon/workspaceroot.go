@@ -696,11 +696,11 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
-	wsr.fillWorkspaceAttrReal(&out.Attr)
+	wsr.fillWorkspaceAttrReal(c, &out.Attr)
 	return fuse.OK
 }
 
-func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(attr *fuse.Attr) {
+func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
 	defer wsr.childRecordLock.Lock().Unlock()
 	for _, entry := range wsr.children.records() {
