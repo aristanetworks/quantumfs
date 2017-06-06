@@ -19,6 +19,7 @@ func (inode *InodeCommon) setOrphanChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn, out *fuse.AttrOut,
 	updateMtime bool) fuse.Status {
 
+	defer c.funcIn("InodeCommon::setOrphanChildAttr").Out()
 	defer inode.unlinkLock.Lock().Unlock()
 
 	if inode.unlinkRecord == nil {
@@ -88,6 +89,7 @@ func (inode *InodeCommon) getExtendedAttribute(c *ctx, attr string) ([]byte, boo
 func (inode *InodeCommon) getOrphanChildXAttrSize(c *ctx, inodeNum InodeId,
 	attr string) (size int, result fuse.Status) {
 
+	defer c.funcIn("InodeCommon::getOrphanChildXAttrSize").Out()
 	value, ok := inode.getExtendedAttribute(c, attr)
 	if !ok {
 		// No such attribute
@@ -100,6 +102,7 @@ func (inode *InodeCommon) getOrphanChildXAttrSize(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) getOrphanChildXAttrData(c *ctx, inodeNum InodeId,
 	attr string) (data []byte, result fuse.Status) {
 
+	defer c.funcIn("InodeCommon::getOrphanChildXAttrData").Out()
 	value, ok := inode.getExtendedAttribute(c, attr)
 	if !ok {
 		// No such attribute
@@ -112,6 +115,7 @@ func (inode *InodeCommon) getOrphanChildXAttrData(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) listOrphanChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
+	defer c.funcIn("InodeCommon::listOrphanChildXAttr").Out()
 	defer inode.unlinkLock.Lock().Unlock()
 
 	inode.parseExtendedAttributes_(c)
@@ -133,6 +137,7 @@ func (inode *InodeCommon) listOrphanChildXAttr(c *ctx,
 func (inode *InodeCommon) setOrphanChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	data []byte) fuse.Status {
 
+	defer c.funcIn("InodeCommon::setOrphanChildXAttr").Out()
 	defer inode.unlinkLock.Lock().Unlock()
 
 	inode.parseExtendedAttributes_(c)
@@ -145,6 +150,7 @@ func (inode *InodeCommon) setOrphanChildXAttr(c *ctx, inodeNum InodeId, attr str
 func (inode *InodeCommon) removeOrphanChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
+	defer c.funcIn("InodeCommon::removeOrphanChildXAttr").Out()
 	defer inode.unlinkLock.Lock().Unlock()
 
 	inode.parseExtendedAttributes_(c)
@@ -161,6 +167,7 @@ func (inode *InodeCommon) removeOrphanChildXAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
+	defer c.funcIn("InodeCommon::getOrphanChildRecordCopy").Out()
 	defer inode.unlinkLock.Lock().Unlock()
 
 	if inode.unlinkRecord == nil {

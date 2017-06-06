@@ -7,7 +7,6 @@ package daemon
 // domain sockets
 
 import (
-	"errors"
 	"fmt"
 	"syscall"
 
@@ -215,13 +214,6 @@ func (special *Special) instantiateChild(c *ctx,
 
 	c.elog("Invalid instantiateChild on Special")
 	return nil, nil
-}
-
-func (special *Special) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
-
-	c.elog("Unsupported record fetch on Special")
-	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
