@@ -753,7 +753,7 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	return wsr.publishedRootId
 }
 
-func (wsr *WorkspaceRoot) directChildInodes(c *ctx) []InodeId {
+func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	defer wsr.Lock().Unlock()
 
 	directChildren := wsr.Directory.directChildInodes()
