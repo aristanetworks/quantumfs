@@ -426,7 +426,8 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	defer c.funcIn("Directory::setChildAttr").Out()
 
 	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.setOrphanChildAttr(c, inodeNum, newType, attr, out, updateMtime)
+		return dir.setOrphanChildAttr(c, inodeNum, newType, attr, out,
+			updateMtime)
 	}
 
 	result := func() fuse.Status {
