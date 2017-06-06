@@ -3,9 +3,11 @@
 
 package qwr
 
-import "os"
+import (
+	"os"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 func symlinkFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {

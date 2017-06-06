@@ -3,9 +3,12 @@
 
 package daemon
 
-import "fmt"
-import "github.com/aristanetworks/quantumfs"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"fmt"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.

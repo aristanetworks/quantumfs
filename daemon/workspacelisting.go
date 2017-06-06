@@ -6,14 +6,16 @@ package daemon
 // The code which handles listing available workspaces as the first three levels of
 // the directory hierarchy.
 
-import "errors"
-import "sync"
-import "syscall"
-import "time"
+import (
+	"errors"
+	"sync"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{

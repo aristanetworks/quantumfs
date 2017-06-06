@@ -3,10 +3,12 @@
 
 package qwr
 
-import "fmt"
-import "sync/atomic"
+import (
+	"fmt"
+	"sync/atomic"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 func WriteWorkspaceRoot(qctx *quantumfs.Ctx, rootDirKey quantumfs.ObjectKey,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {

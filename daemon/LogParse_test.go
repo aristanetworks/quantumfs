@@ -5,19 +5,21 @@ package daemon
 
 // Test to ensure Qparse works as desired
 
-import "bytes"
-import "fmt"
-import "io/ioutil"
-import "math"
-import "os"
-import "sort"
-import "strings"
-import "sync"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"math"
+	"os"
+	"sort"
+	"strings"
+	"sync"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func trimToStr(test *testHelper, logs []string, boundary string) []string {
 	boundaryCount := 0

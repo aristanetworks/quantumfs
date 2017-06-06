@@ -5,8 +5,10 @@ package qlog
 
 // Test the logging subsystem performance
 
-import "testing"
-import "sync"
+import (
+	"sync"
+	"testing"
+)
 
 func DoBench(qlog *Qlog, n int, wg *sync.WaitGroup) {
 
