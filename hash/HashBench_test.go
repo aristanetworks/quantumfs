@@ -3,9 +3,11 @@
 
 package hash
 
-import "crypto/md5"
-import "crypto/sha1"
-import "testing"
+import (
+	"crypto/md5"
+	"crypto/sha1"
+	"testing"
+)
 
 func genData(length int) []byte {
 	rtn := make([]byte, length)

@@ -3,20 +3,21 @@
 
 package walker
 
-import "errors"
-import "fmt"
-import "path/filepath"
-import "runtime"
-import "runtime/debug"
+import (
+	"errors"
+	"fmt"
+	"path/filepath"
+	"runtime"
+	"runtime/debug"
 
-import "golang.org/x/net/context"
-import "golang.org/x/sync/errgroup"
-
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
-import "github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
+	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
+	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
+)
 
 // SkipDir is used as a return value from WalkFunc to indicate that
 // the directory named in the call is to be skipped. It is not returned

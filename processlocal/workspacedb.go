@@ -3,11 +3,13 @@
 
 package processlocal
 
-import "fmt"
-import "sync"
+import (
+	"fmt"
+	"sync"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 type workspaceMap map[string]map[string]map[string]interface{}
 

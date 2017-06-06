@@ -3,17 +3,19 @@
 
 package daemon
 
-import "bufio"
-import "fmt"
-import "os"
-import "strconv"
-import "strings"
-import "syscall"
-import "time"
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 const R_OK = 4
 const W_OK = 2

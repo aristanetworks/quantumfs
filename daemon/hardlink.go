@@ -3,10 +3,12 @@
 
 package daemon
 
-import "encoding/binary"
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 type HardlinkId uint64
 
