@@ -6,8 +6,6 @@ package daemon
 // This file holds the Symlink type, which represents symlinks
 
 import (
-	"errors"
-
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
@@ -203,13 +201,6 @@ func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 	c.elog("Invalid instantiateChild on Symlink")
 	return nil, nil
-}
-
-func (link *Symlink) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
-
-	c.elog("Unsupported record fetch on Symlink")
-	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
 }
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
