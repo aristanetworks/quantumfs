@@ -25,7 +25,7 @@ type extPairStats struct {
 
 // Set matchingIndent to true if start and stop should only be recognized when they
 // are seen at the same function scope
-func newExtPairStats(db_ DbInterface, start string, stop string,
+func NewExtPairStats(db_ DbInterface, start string, stop string,
 	matchingIndent bool) *extPairStats {
 
 	return &extPairStats{

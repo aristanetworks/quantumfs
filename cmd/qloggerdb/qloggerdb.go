@@ -29,8 +29,8 @@ func main() {
 	extractors := make([]qloggerdb.StatExtractor, 0)
 
 	// sample extractor
-	extractors = append(extractors, qloggerdb.NewExtPairAvg(db,
-		"---In Mux::GetAttr", "Out-- Mux::GetAttr"))
+	extractors = append(extractors, qloggerdb.NewExtPairStats(db,
+		"---In Mux::GetAttr", "Out-- Mux::GetAttr", true))
 
 	logger := qloggerdb.NewLoggerDb(db, extractors)
 

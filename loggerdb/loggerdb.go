@@ -3,7 +3,6 @@
 
 package qloggerdb
 
-import "fmt"
 import "container/list"
 
 import "github.com/aristanetworks/quantumfs/qlog"
