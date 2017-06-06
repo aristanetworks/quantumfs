@@ -64,31 +64,27 @@ func (cmap *ChildMap) baseLayerIs(c *ctx, baseLayerId quantumfs.ObjectKey) {
 	cmap.loadAllChildren(c, baseLayerId)
 }
 
-func (cmap *ChildMap) childrenRecords(
-	c *ctx) map[InodeId][]quantumfs.DirectoryRecord {
-
+func (cmap *ChildMap) childrenRecords() map[InodeId][]quantumfs.DirectoryRecord {
 	return cmap.childrenRecords_
 }
 
-func (cmap *ChildMap) setRecord(c *ctx, inodeId InodeId,
-	record quantumfs.DirectoryRecord) {
-
+func (cmap *ChildMap) setRecord(inodeId InodeId, record quantumfs.DirectoryRecord) {
 	// To prevent overwriting one map, but not the other, ensure we clear first
-	cmap.delRecord(c, inodeId, record.Filename())
+	cmap.delRecord(inodeId, record.Filename())
 
-	list, exists := cmap.childrenRecords(c)[inodeId]
+	list, exists := cmap.childrenRecords()[inodeId]
 	if !exists {
 		list = make([]quantumfs.DirectoryRecord, 0)
 	}
 
 	list = append(list, record)
-	cmap.childrenRecords(c)[inodeId] = list
+	cmap.childrenRecords()[inodeId] = list
 }
 
-func (cmap *ChildMap) delRecord(c *ctx, inodeId InodeId,
+func (cmap *ChildMap) delRecord(inodeId InodeId,
 	name string) quantumfs.DirectoryRecord {
 
-	list, exists := cmap.childrenRecords(c)[inodeId]
+	list, exists := cmap.childrenRecords()[inodeId]
 	if !exists {
 		return nil
 	}
@@ -97,9 +93,9 @@ func (cmap *ChildMap) delRecord(c *ctx, inodeId InodeId,
 		if v.Filename() == name {
 			list = append(list[:i], list[i+1:]...)
 			if len(list) > 0 {
-				cmap.childrenRecords(c)[inodeId] = list
+				cmap.childrenRecords()[inodeId] = list
 			} else {
-				delete(cmap.childrenRecords(c), inodeId)
+				delete(cmap.childrenRecords(), inodeId)
 			}
 			return v
 		}
@@ -108,10 +104,8 @@ func (cmap *ChildMap) delRecord(c *ctx, inodeId InodeId,
 	return nil
 }
 
-func (cmap *ChildMap) firstRecord(c *ctx,
-	inodeId InodeId) quantumfs.DirectoryRecord {
-
-	list, exists := cmap.childrenRecords(c)[inodeId]
+func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecord {
+	list, exists := cmap.childrenRecords()[inodeId]
 	if !exists {
 		return nil
 	}
@@ -128,7 +122,7 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("ChildMap::getRecord", "%d %s", inodeId, name).Out()
 
-	list, exists := cmap.childrenRecords(c)[inodeId]
+	list, exists := cmap.childrenRecords()[inodeId]
 	if !exists {
 		return nil
 	}
@@ -177,7 +171,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
-	cmap.setRecord(c, inodeId, entry)
+	cmap.setRecord(inodeId, entry)
 
 	return inodeId
 }
@@ -223,7 +217,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	}
 	delete(cmap.children, name)
 
-	result := cmap.delRecord(c, inodeId, name)
+	result := cmap.delRecord(inodeId, name)
 
 	if link, isHardlink := record.(*Hardlink); isHardlink {
 		if !cmap.wsr.hardlinkExists(c, link.linkId) {
@@ -268,7 +262,7 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	if needCleanup {
 		// we have to cleanup before we move, to allow the case where we
 		// rename a hardlink to an existing one with the same inode
-		cmap.delRecord(c, cleanupInodeId, newName)
+		cmap.delRecord(cleanupInodeId, newName)
 		delete(cmap.children, newName)
 	}
 
@@ -292,9 +286,9 @@ func (cmap *ChildMap) inodeNum(name string) InodeId {
 	return quantumfs.InodeIdInvalid
 }
 
-func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
-	rtn := make([]InodeId, 0, len(cmap.childrenRecords(c)))
-	for id, record := range cmap.childrenRecords(c) {
+func (cmap *ChildMap) directInodes() []InodeId {
+	rtn := make([]InodeId, 0, len(cmap.childrenRecords()))
+	for id, record := range cmap.childrenRecords() {
 		if _, isHardlink := record[0].(*Hardlink); isHardlink {
 			continue
 		}
@@ -304,17 +298,17 @@ func (cmap *ChildMap) directInodes(c *ctx) []InodeId {
 	return rtn
 }
 
-func (cmap *ChildMap) records(c *ctx) []quantumfs.DirectoryRecord {
-	rtn := make([]quantumfs.DirectoryRecord, 0, len(cmap.childrenRecords(c)))
-	for _, i := range cmap.childrenRecords(c) {
+func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
+	rtn := make([]quantumfs.DirectoryRecord, 0, len(cmap.childrenRecords()))
+	for _, i := range cmap.childrenRecords() {
 		rtn = append(rtn, i...)
 	}
 
 	return rtn
 }
 
-func (cmap *ChildMap) record(c *ctx, inodeNum InodeId) quantumfs.DirectoryRecord {
-	return cmap.firstRecord(c, inodeNum)
+func (cmap *ChildMap) record(inodeNum InodeId) quantumfs.DirectoryRecord {
+	return cmap.firstRecord(inodeNum)
 }
 
 func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecord {
@@ -340,7 +334,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 
 	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
 
-	child := cmap.firstRecord(c, childId)
+	child := cmap.firstRecord(childId)
 	if child == nil {
 		c.elog("No child record for inode id %d in childmap", childId)
 		return nil, fuse.ENOENT
@@ -374,7 +368,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	c.vlog("Converting into a hardlink")
 	newLink := cmap.wsr.newHardlink(c, childId, child)
 
-	cmap.setRecord(c, childId, newLink)
+	cmap.setRecord(childId, newLink)
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
 }
