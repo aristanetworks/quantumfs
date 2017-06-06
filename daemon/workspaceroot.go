@@ -259,8 +259,6 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx, linkId HardlinkId) InodeId 
 	if !exists {
 		// It should be possible, via races, that someone could check
 		// on a link which has *just* been deleted
-		c.dlog("Hardlink %d not found in WorkspaceRoot::getHardlinkInodeId",
-			linkId)
 		return quantumfs.InodeIdInvalid
 	}
 
