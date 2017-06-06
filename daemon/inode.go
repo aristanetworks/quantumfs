@@ -202,6 +202,10 @@ type InodeCommon struct {
 
 	// This element is protected by the DirtyQueueLock
 	dirtyElement__ *list.Element
+
+	unlinkRecord quantumfs.DirectoryRecord
+	unlinkXAttr  map[string][]byte
+	unlinkLock   utils.DeferableRwMutex
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the

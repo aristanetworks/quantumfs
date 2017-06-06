@@ -7,7 +7,6 @@ package daemon
 
 import (
 	"errors"
-	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -199,49 +198,6 @@ func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
 	c.elog("Invalid syncChild on Symlink")
-}
-
-func (link *Symlink) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
-
-	c.elog("Invalid setChildAttr on Symlink")
-	return fuse.ENOSYS
-}
-
-func (link *Symlink) getChildXAttrSize(c *ctx, inodeNum InodeId,
-	attr string) (size int, result fuse.Status) {
-
-	c.elog("Invalid getChildXAttrSize on Symlink")
-	return 0, fuse.ENODATA
-}
-
-func (link *Symlink) getChildXAttrData(c *ctx, inodeNum InodeId,
-	attr string) (data []byte, result fuse.Status) {
-
-	c.elog("Invalid getChildXAttrData on Symlink")
-	return nil, fuse.ENODATA
-}
-
-func (link *Symlink) listChildXAttr(c *ctx,
-	inodeNum InodeId) (attributes []byte, result fuse.Status) {
-
-	c.elog("Invalid listChildXAttr on Symlink")
-	return []byte{}, fuse.OK
-}
-
-func (link *Symlink) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
-	data []byte) fuse.Status {
-
-	c.elog("Invalid setChildXAttr on Symlink")
-	return fuse.Status(syscall.ENOSPC)
-}
-
-func (link *Symlink) removeChildXAttr(c *ctx, inodeNum InodeId,
-	attr string) fuse.Status {
-
-	c.elog("Invalid removeChildXAttr on Symlink")
-	return fuse.ENODATA
 }
 
 func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
