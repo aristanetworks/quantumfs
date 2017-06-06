@@ -210,49 +210,6 @@ func (special *Special) syncChild(c *ctx, inodeNum InodeId,
 	c.elog("Invalid syncChild on Special")
 }
 
-func (special *Special) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
-
-	c.elog("Invalid setChildAttr on Special")
-	return fuse.ENOSYS
-}
-
-func (special *Special) getChildXAttrSize(c *ctx, inodeNum InodeId,
-	attr string) (size int, result fuse.Status) {
-
-	c.elog("Invalid getChildXAttrSize on Special")
-	return 0, fuse.ENODATA
-}
-
-func (special *Special) getChildXAttrData(c *ctx, inodeNum InodeId,
-	attr string) (data []byte, result fuse.Status) {
-
-	c.elog("Invalid getChildXAttrData on Special")
-	return nil, fuse.ENODATA
-}
-
-func (special *Special) listChildXAttr(c *ctx,
-	inodeNum InodeId) (attributes []byte, result fuse.Status) {
-
-	c.elog("Invalid listChildXAttr on Special")
-	return []byte{}, fuse.OK
-}
-
-func (special *Special) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
-	data []byte) fuse.Status {
-
-	c.elog("Invalid setChildXAttr on Special")
-	return fuse.Status(syscall.ENOSPC)
-}
-
-func (special *Special) removeChildXAttr(c *ctx, inodeNum InodeId,
-	attr string) fuse.Status {
-
-	c.elog("Invalid removeChildXAttr on Special")
-	return fuse.ENODATA
-}
-
 func (special *Special) instantiateChild(c *ctx,
 	inodeNum InodeId) (Inode, []InodeId) {
 
