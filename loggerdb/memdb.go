@@ -6,8 +6,8 @@
 package qloggerdb
 
 type dataSeries struct {
-	tags	[]tag
-	fields	[]field
+	tags   []tag
+	fields []field
 }
 
 type Memdb struct {

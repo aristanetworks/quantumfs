@@ -16,8 +16,8 @@ type field struct {
 
 func newField(name_ string, data_ uint64) field {
 	return field{
-		name:	name_,
-		data:	data_,
+		name: name_,
+		data: data_,
 	}
 }
 
@@ -28,8 +28,8 @@ type tag struct {
 
 func newTag(name_ string, data_ string) tag {
 	return tag{
-		name:	name_,
-		data:	data_,
+		name: name_,
+		data: data_,
 	}
 }
 
