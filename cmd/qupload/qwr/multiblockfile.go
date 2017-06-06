@@ -3,10 +3,12 @@
 
 package qwr
 
-import "os"
-import "sync/atomic"
+import (
+	"os"
+	"sync/atomic"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 func mbFileBlocksWriter(qctx *quantumfs.Ctx, file *os.File,
 	readSize uint64,

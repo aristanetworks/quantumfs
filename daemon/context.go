@@ -3,9 +3,11 @@
 
 package daemon
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // The ctx type needs to be threaded through all the objects and calls of the
 // system. It provides access to the configuration, the quantumfs mux and request

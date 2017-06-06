@@ -5,11 +5,13 @@
 // quantumfs subsystem.
 package main
 
-import "flag"
-import "fmt"
-import "os"
+import (
+	"flag"
+	"fmt"
+	"os"
 
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 func init() {
 	flag.Usage = func() {

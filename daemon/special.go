@@ -6,13 +6,15 @@ package daemon
 // This file holds the special type, which represents devices files, fifos and unix
 // domain sockets
 
-import "errors"
-import "fmt"
-import "syscall"
+import (
+	"errors"
+	"fmt"
+	"syscall"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,

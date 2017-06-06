@@ -5,13 +5,16 @@ package daemon
 
 // Test some special properties of workspaceroot type
 
-import "bytes"
-import "os"
-import "syscall"
-import "strings"
-import "testing"
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+import (
+	"bytes"
+	"os"
+	"strings"
+	"syscall"
+	"testing"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestWorkspaceRootApiAccess(t *testing.T) {
 	runTest(t, func(test *testHelper) {

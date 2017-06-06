@@ -3,13 +3,15 @@
 
 package processlocal
 
-import "flag"
-import "os"
-import "testing"
+import (
+	"flag"
+	"os"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func runTest(t *testing.T, test systemlocalTest) {
 	t.Parallel()
