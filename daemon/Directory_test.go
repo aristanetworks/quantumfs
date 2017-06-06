@@ -1423,11 +1423,14 @@ func TestDeleteCWDRootUser(t *testing.T) {
 }
 
 func TestDeleteOpenDirWithChild(t *testing.T) {
+	t.Skip() // XXX BUG203361
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testdir"
 
 		fullname := workspace + "/" + name
+
+		defer test.SetUidGid(99, -1, nil).Revert()
 
 		err := syscall.Mkdir(fullname, 0777)
 		test.AssertNoErr(err)
@@ -1452,7 +1455,15 @@ func TestDeleteOpenDirWithChild(t *testing.T) {
 		list, err = f.Readdir(-1)
 		test.Assert(len(list) == 0, "list %v has wrong size", list)
 
+		const ATCWD = -0x64
+		f2, err := syscall.Openat(int(f.Fd()), ".",
+			syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NONBLOCK, 0)
+		test.AssertNoErr(err)
+
 		err = f.Close()
+		test.AssertNoErr(err)
+
+		err = syscall.Close(f2)
 		test.AssertNoErr(err)
 	})
 }
