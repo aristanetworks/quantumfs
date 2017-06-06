@@ -5,7 +5,7 @@
 ppid=$1
 rootContainer=$ROOTDIRNAME
 
-mountPath=`mount | awk '/fusectl/ {print $3}'`
+mountPath=`mount | awk '/ fusectl / {print $3}'`
 if [ -z "$mountPath" ]; then
         mountPath=/sys/fs/fuse/connections
         sudo mount -t fusectl none $mountPath
