@@ -3,9 +3,11 @@
 
 package quantumfs
 
-import "encoding/hex"
-import "strings"
-import "testing"
+import (
+	"encoding/hex"
+	"strings"
+	"testing"
+)
 
 func TestDirectoryRecordSort(t *testing.T) {
 	runTest(t, func(test *testHelper) {

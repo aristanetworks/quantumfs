@@ -5,14 +5,16 @@ package daemon
 
 // The basic Inode and FileHandle structures
 
-import "container/list"
-import "fmt"
-import "sync"
-import "sync/atomic"
+import (
+	"container/list"
+	"fmt"
+	"sync"
+	"sync/atomic"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 type InodeId uint64
 

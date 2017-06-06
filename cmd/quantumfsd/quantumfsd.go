@@ -4,21 +4,22 @@
 // quantumfsd is the central daemon of the filesystem
 package main
 
-import "flag"
-import "fmt"
-import "net/http"
-import _ "net/http/pprof"
-import "os"
-import "runtime"
-import "runtime/debug"
-import "time"
+import (
+	"flag"
+	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/daemon"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
-
-import "github.com/hanwen/go-fuse/fuse"
-import "code.cloudfoundry.org/bytefmt"
+	"code.cloudfoundry.org/bytefmt"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (

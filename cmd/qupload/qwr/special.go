@@ -3,11 +3,13 @@
 
 package qwr
 
-import "encoding/binary"
-import "os"
-import "syscall"
+import (
+	"encoding/binary"
+	"os"
+	"syscall"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 func specialFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {

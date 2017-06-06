@@ -7,9 +7,11 @@ package daemon
 // _null/null, creating any type of file or directory under this path is enforced
 // to be prohibited.
 
-import "os"
-import "syscall"
-import "testing"
+import (
+	"os"
+	"syscall"
+	"testing"
+)
 
 func TestNullWorkspaceDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
