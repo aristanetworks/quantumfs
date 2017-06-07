@@ -694,6 +694,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return fuse.ReadResult(nil), fuse.EIO
 	}
 
+	fi.self.markSelfAccessed(c, quantumfs.PathRead)
 	c.vlog("Returning %d bytes", readCount)
 
 	return fuse.ReadResultData(buf[:readCount]), fuse.OK
@@ -728,6 +729,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	attr.Size = uint64(fi.accessor.fileLength(c))
 	fi.parentSetChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
+	fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 
 	return writeCount, fuse.OK
 }
