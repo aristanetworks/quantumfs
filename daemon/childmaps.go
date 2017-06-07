@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -14,7 +15,6 @@ import (
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
 	wsr *WorkspaceRoot
-	dir *Directory
 
 	// can be many to one
 	children map[string]InodeId
@@ -23,23 +23,55 @@ type ChildMap struct {
 	childrenRecords_ map[InodeId][]quantumfs.DirectoryRecord
 }
 
-func newChildMap(numEntries int, wsr_ *WorkspaceRoot, owner *Directory) *ChildMap {
-	return &ChildMap{
-		wsr:      wsr_,
-		dir:      owner,
-		children: make(map[string]InodeId, numEntries),
-		childrenRecords_: make(map[InodeId][]quantumfs.DirectoryRecord,
-			numEntries),
+func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
+	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
+
+	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.Text()).Out()
+
+	cmap := &ChildMap{
+		wsr:              wsr_,
+		children:         make(map[string]InodeId),
+		childrenRecords_: make(map[InodeId][]quantumfs.DirectoryRecord),
 	}
+
+	uninstantiated := cmap.loadAllChildren(c, baseLayerId)
+
+	return cmap, uninstantiated
+}
+
+func (cmap *ChildMap) loadAllChildren(c *ctx,
+	baseLayerId quantumfs.ObjectKey) []InodeId {
+
+	defer c.funcIn("ChildMap::loadAllChildren").Out()
+
+	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
+
+	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+		inodeNum, exists := cmap.children[record.Filename()]
+		if !exists {
+			inodeNum = quantumfs.InodeIdInvalid
+		}
+		c.vlog("Loading child with id %d", inodeNum)
+		childInodeNum := cmap.loadChild(c, record, inodeNum)
+		c.vlog("loaded child %d", childInodeNum)
+		uninstantiated = append(uninstantiated, childInodeNum)
+	})
+
+	return uninstantiated
+}
+
+func (cmap *ChildMap) baseLayerIs(c *ctx, baseLayerId quantumfs.ObjectKey) {
+	defer c.funcIn("ChildMap::baseLayerIs").Out()
+
+	cmap.childrenRecords_ = make(map[InodeId][]quantumfs.DirectoryRecord)
+	cmap.loadAllChildren(c, baseLayerId)
 }
 
 func (cmap *ChildMap) childrenRecords() map[InodeId][]quantumfs.DirectoryRecord {
 	return cmap.childrenRecords_
 }
 
-func (cmap *ChildMap) setRecord(inodeId InodeId,
-	record quantumfs.DirectoryRecord) {
-
+func (cmap *ChildMap) setRecord(inodeId InodeId, record quantumfs.DirectoryRecord) {
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(inodeId, record.Filename())
 
@@ -137,6 +169,8 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 		panic(fmt.Sprintf("Nil DirectoryEntry for inode %d", inodeId))
 	}
 
+	utils.Assert(inodeId != quantumfs.InodeIdInvalid,
+		"Inode for loaded child %s is zero", entry.Filename())
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
@@ -341,24 +375,3 @@ func (cmap *ChildMap) makeHardlink(c *ctx,
 	linkCopy := *newLink
 	return &linkCopy, fuse.OK
 }
-
-/* TODO
-func (cmap *ChildMap) reload(c *ctx, baseLayerId quantumfs.ObjectKey) {
-	cmap.records.reload(c, baseLayerId)
-}
-
-func (rd *recordsOnDemand) reload(c *ctx, newBaseLayerId quantumfs.ObjectKey) {
-	defer c.funcIn("recordsOnDemand::reload").Out()
-
-	// update our state
-	rd.base = newBaseLayerId
-	rd.cache = make(map[string]quantumfs.DirectoryRecord)
-	rd.cacheKey = make(map[InodeId]quantumfs.ObjectKey)
-
-	// re-set our map of indices into directory entries
-	rd.nameToEntryIdx = make(map[string]uint32)
-	rd.iterateOverRecords(c, func(record quantumfs.DirectoryRecord) {
-		// don't need to do anything while we iterate
-	})
-}
-*/

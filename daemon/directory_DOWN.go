@@ -348,8 +348,6 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 
 	})
-	/* TODO
-	dir.children.reload(c, baseLayerId)
-	*/
+	dir.children.baseLayerIs(c, baseLayerId)
 	return uninstantiated, deletedInodeIds
 }
