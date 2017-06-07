@@ -102,7 +102,10 @@ type Inode interface {
 	name() string
 	setName(name string)
 
-	accessed() bool
+	// Returns true if the inode had previously been marked accessed for the
+	// passed-in read/update operation. This also stores the union of read/update
+	// operations for future reference.
+	accessedFor(op quantumfs.PathFlags) bool
 	markAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	markSelfAccessed(c *ctx, op quantumfs.PathFlags)
 
@@ -472,13 +475,18 @@ func (inode *InodeCommon) setName(name string) {
 	inode.name_ = name
 }
 
-func (inode *InodeCommon) accessed() bool {
-	old := atomic.SwapUint32(&(inode.accessed_), 1)
+func (inode *InodeCommon) accessedFor(op quantumfs.PathFlags) bool {
+	for {
+		old := atomic.LoadUint32(&(inode.accessed_))
+		new := old | uint32(op)
 
-	if old == 1 {
-		return true
-	} else {
-		return false
+		if old == new {
+			return true
+		}
+
+		if atomic.CompareAndSwapUint32(&(inode.accessed_), old, new) {
+			return false
+		}
 	}
 }
 
@@ -531,12 +539,12 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 		return
 	}
 
-	/* TODO
-	ac := inode.accessed()
-	if !created && ac {
+	if inode.accessedFor(op) {
+		// This inode has already been marked accessed for these operations
+		// so we can short circuit here.
 		return
 	}
-	*/
+
 	inode.self.markAccessed(c, "", op)
 }
 
