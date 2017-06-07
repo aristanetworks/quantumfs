@@ -729,18 +729,3 @@ func isKeyValid(key string) bool {
 	}
 	return true
 }
-
-func printAccessList(list map[string]bool) {
-	fmt.Println("------ Created Files ------")
-	for key, val := range list {
-		if val {
-			fmt.Println(key)
-		}
-	}
-	fmt.Println("------ Accessed Files ------")
-	for key, val := range list {
-		if !val {
-			fmt.Println(key)
-		}
-	}
-}
