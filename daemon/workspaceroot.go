@@ -24,7 +24,7 @@ type WorkspaceRoot struct {
 	publishedRootId quantumfs.ObjectKey
 
 	listLock   sync.Mutex
-	accessList map[string]bool
+	accessList quantumfs.PathAccessList
 
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
@@ -88,7 +88,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.namespace = namespace
 	wsr.workspace = workspace
 	wsr.publishedRootId = rootId
-	wsr.accessList = make(map[string]bool)
+	wsr.accessList = quantumfs.PathAccessList{}
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
@@ -715,15 +715,12 @@ func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	attr.Mode = 0777 | fuse.S_IFDIR
 }
 
-func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
-	defer c.FuncIn("WorkspaceRoot::markAccessed", "path %s created %t", path,
-		created).Out()
+func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
+	defer c.FuncIn("WorkspaceRoot::markAccessed",
+		"path %s CRUD %x", path, op).Out()
 
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
-	if wsr.accessList == nil {
-		wsr.accessList = make(map[string]bool)
-	}
 	path = "/" + path
 	previouslyCreated, exists := wsr.accessList[path]
 	if !exists || (!previouslyCreated && created) {
@@ -731,11 +728,11 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, created bool) {
 	}
 }
 
-func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, created bool) {
+func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 	c.vlog("WorkspaceRoot::markSelfAccessed doing nothing")
 }
 
-func (wsr *WorkspaceRoot) getList() map[string]bool {
+func (wsr *WorkspaceRoot) getList() quantumfs.PathAccessList {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	return wsr.accessList
@@ -744,7 +741,7 @@ func (wsr *WorkspaceRoot) getList() map[string]bool {
 func (wsr *WorkspaceRoot) clearList() {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
-	wsr.accessList = make(map[string]bool)
+	wsr.accessList = quantumfs.PathAccessList{}
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {

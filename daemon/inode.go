@@ -103,8 +103,8 @@ type Inode interface {
 	setName(name string)
 
 	accessed() bool
-	markAccessed(c *ctx, path string, created bool)
-	markSelfAccessed(c *ctx, created bool)
+	markAccessed(c *ctx, path string, op quantumfs.PathFlags)
+	markSelfAccessed(c *ctx, op quantumfs.PathFlags)
 
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
@@ -123,7 +123,7 @@ type Inode interface {
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
 
-	parentMarkAccessed(c *ctx, path string, created bool)
+	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	parentSyncChild(c *ctx, childId InodeId,
 		publishFn func() quantumfs.ObjectKey)
 	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
@@ -224,12 +224,14 @@ func (inode *InodeCommon) parent_(c *ctx) Inode {
 	return parent
 }
 
-func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string, created bool) {
-	defer c.FuncIn("InodeCommon::parentMarkAccessed", "path %s created %t", path,
-		created).Out()
+func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
+	op quantumfs.PathFlags) {
+
+	defer c.FuncIn("InodeCommon::parentMarkAccessed", "path %s CRUD %x", path,
+		op).Out()
 	defer inode.parentLock.RLock().RUnlock()
 
-	inode.parent_(c).markAccessed(c, path, created)
+	inode.parent_(c).markAccessed(c, path, op)
 }
 
 func (inode *InodeCommon) parentSyncChild(c *ctx, childId InodeId,
@@ -502,9 +504,10 @@ func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 	return inode.lock.RLock()
 }
 
-func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
-	defer c.FuncIn("InodeCommon::markAccessed", "path %s created %t", path,
-		created).Out()
+func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
+
+	defer c.FuncIn("InodeCommon::markAccessed", "path %s CRUD %x", path,
+		op).Out()
 	if inode.isWorkspaceRoot() {
 		panic("Workspaceroot didn't call .self")
 	}
@@ -518,16 +521,16 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, created bool) {
 	} else {
 		path = inode.name() + "/" + path
 	}
-	inode.parentMarkAccessed(c, path, created)
+	inode.parentMarkAccessed(c, path, op)
 }
 
-func (inode *InodeCommon) markSelfAccessed(c *ctx, created bool) {
-	defer c.FuncIn("InodeCommon::markSelfAccessed", "created %t", created).Out()
+func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
+	defer c.FuncIn("InodeCommon::markSelfAccessed", "CRUD %x", op).Out()
 	ac := inode.accessed()
 	if !created && ac {
 		return
 	}
-	inode.self.markAccessed(c, "", created)
+	inode.self.markAccessed(c, "", op)
 }
 
 func (inode *InodeCommon) isWorkspaceRoot() bool {

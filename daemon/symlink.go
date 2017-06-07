@@ -136,7 +136,7 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	defer c.funcIn("Symlink::Readlink").Out()
 
-	link.self.markSelfAccessed(c, false)
+	link.self.markSelfAccessed(c, quantumfs.PathRead)
 	data := c.dataStore.Get(&c.Ctx, link.key)
 	if data == nil {
 		return nil, fuse.EIO
