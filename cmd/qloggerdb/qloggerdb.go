@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/loggerdb"
 )
@@ -27,7 +28,7 @@ func main() {
 	}
 	reader := qlog.NewReader(os.Args[1])
 
-	db := qloggerdb.NewMemdb()
+	db := processlocal.NewMemdb()
 	extractors := make([]qloggerdb.StatExtractor, 0)
 
 	// sample extractor
