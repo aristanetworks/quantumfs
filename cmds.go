@@ -207,7 +207,8 @@ func NewApiWithPath(path string) (Api, error) {
 //
 // Note that any files/directories which are created and subsequently deleted will
 // not show up in this list. Similarly, any files/directories which are deleted and
-// then created will show up as neither.
+// then created will show up as neither, but are instead considered to have been
+// truncated and therefore updated.
 type PathAccessList struct {
 	Paths map[string]PathFlags
 }
