@@ -3,12 +3,14 @@
 
 package qfsclientc
 
-import "flag"
-import "os"
-import "testing"
+import (
+	"flag"
+	"os"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/daemon"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func TestMain(m *testing.M) {
 	flag.Parse()

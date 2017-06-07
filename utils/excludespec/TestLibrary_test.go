@@ -3,18 +3,20 @@
 
 package excludespec
 
-import "bytes"
-import "fmt"
-import "io/ioutil"
-import "os"
-import "path/filepath"
-import "reflect"
-import "sort"
-import "strconv"
-import "strings"
-import "testing"
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
+	"strconv"
+	"strings"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 type testHelper struct {
 	testutils.TestHelper

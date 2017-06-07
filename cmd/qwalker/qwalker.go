@@ -3,8 +3,10 @@
 
 package main
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/walker"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/walker"
+)
 
 func main() {
 

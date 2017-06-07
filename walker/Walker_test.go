@@ -3,15 +3,17 @@
 
 package walker
 
-import "fmt"
-import "io/ioutil"
-import "os"
-import "strings"
-import "strconv"
-import "testing"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
+)
 
 // The steps followed are the same in all the tests:
 //  1. Mount a QFS instance a create files/links/dirs in it.
