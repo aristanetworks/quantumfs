@@ -526,6 +526,11 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFla
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 	defer c.FuncIn("InodeCommon::markSelfAccessed", "CRUD %x", op).Out()
+	if inode.isOrphaned() {
+		c.vlog("Orphaned, not marking")
+		return
+	}
+
 	/* TODO
 	ac := inode.accessed()
 	if !created && ac {
