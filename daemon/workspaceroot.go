@@ -88,7 +88,8 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.namespace = namespace
 	wsr.workspace = workspace
 	wsr.publishedRootId = rootId
-	wsr.accessList = quantumfs.PathAccessList{}
+	wsr.accessList = quantumfs.NewPathAccessList()
+
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
@@ -776,7 +777,7 @@ func (wsr *WorkspaceRoot) getList() quantumfs.PathAccessList {
 func (wsr *WorkspaceRoot) clearList() {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
-	wsr.accessList = quantumfs.PathAccessList{}
+	wsr.accessList = quantumfs.NewPathAccessList()
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
