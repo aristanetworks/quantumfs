@@ -210,6 +210,12 @@ type PathAccessList struct {
 	Paths map[string]PathFlags
 }
 
+func NewPathAccessList() PathAccessList {
+	return PathAccessList{
+		Paths: make(map[string]PathFlags),
+	}
+}
+
 const (
 	PathIsDir   = (1 << 0)
 	PathCreated = (1 << 1)
