@@ -3,13 +3,15 @@
 
 package daemon
 
-import "fmt"
-import "sync"
-import "time"
+import (
+	"fmt"
+	"sync"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // WorkspaceRoot acts similarly to a directory except only a single object ID is used
 // instead of one for each layer and that ID is directly requested from the
@@ -475,6 +477,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
 		entry.nlink = hardlink.Nlinks()
+		entry.record = hardlink.Record()
 		wsr.hardlinks[id] = entry
 
 		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
@@ -703,7 +706,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
 	defer wsr.childRecordLock.Lock().Unlock()
-	for _, entry := range wsr.children.recordCopies(c) {
+	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
 		}
@@ -753,10 +756,10 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 	return wsr.publishedRootId
 }
 
-func (wsr *WorkspaceRoot) directChildInodes(c *ctx) []InodeId {
+func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	defer wsr.Lock().Unlock()
 
-	directChildren := wsr.Directory.directChildInodes(c)
+	directChildren := wsr.Directory.directChildInodes()
 
 	for inodeNum, _ := range wsr.inodeToLink {
 		directChildren = append(directChildren, inodeNum)

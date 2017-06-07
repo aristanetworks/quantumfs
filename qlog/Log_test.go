@@ -5,11 +5,13 @@ package qlog
 
 // Test the logging subsystem
 
-import "io/ioutil"
-import "reflect"
-import "strconv"
-import "strings"
-import "testing"
+import (
+	"io/ioutil"
+	"reflect"
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestLogSet(t *testing.T) {
 	qlog := NewQlogTiny()

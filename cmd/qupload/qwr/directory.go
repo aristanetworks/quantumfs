@@ -3,14 +3,16 @@
 
 package qwr
 
-import "fmt"
-import "os"
-import "sync/atomic"
-import "syscall"
-import "time"
+import (
+	"fmt"
+	"os"
+	"sync/atomic"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,

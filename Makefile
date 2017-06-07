@@ -49,7 +49,7 @@ $(COMMANDS): cleanup encoding/metadata.capnp.go
 $(PKGS_TO_TEST): cleanup encoding/metadata.capnp.go
 	sudo -E go test -gcflags '-e' github.com/aristanetworks/$@
 
-quploadRPM:
+quploadRPM: $(COMMANDS)
 	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-upload --no-depends \
 		--license='Arista Proprietary' \
 		--vendor='Arista Networks' \
@@ -58,7 +58,7 @@ quploadRPM:
 		--version $(version) \
 		./qupload=/usr/bin/qupload
 
-qfsRPM:
+qfsRPM: $(COMMANDS)
 	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
 		--license='Arista Proprietary' \
 		--vendor='Arista Networks' \

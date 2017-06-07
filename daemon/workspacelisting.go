@@ -6,14 +6,16 @@ package daemon
 // The code which handles listing available workspaces as the first three levels of
 // the directory hierarchy.
 
-import "errors"
-import "sync"
-import "syscall"
-import "time"
+import (
+	"errors"
+	"sync"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
@@ -265,7 +267,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) directChildInodes(c *ctx) []InodeId {
+func (tsl *TypespaceList) directChildInodes() []InodeId {
 	defer tsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(tsl.typespacesById))
@@ -587,7 +589,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) directChildInodes(c *ctx) []InodeId {
+func (nsl *NamespaceList) directChildInodes() []InodeId {
 	defer nsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(nsl.namespacesById))
@@ -907,7 +909,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) directChildInodes(c *ctx) []InodeId {
+func (wsl *WorkspaceList) directChildInodes() []InodeId {
 	defer wsl.Lock().Unlock()
 
 	rtn := make([]InodeId, 0, len(wsl.workspacesById))
