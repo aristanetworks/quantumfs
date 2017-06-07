@@ -219,11 +219,11 @@ func NewPathAccessList() PathAccessList {
 }
 
 const (
-	PathIsDir   = (1 << 0)
-	PathCreated = (1 << 1)
-	PathRead    = (1 << 2)
-	PathUpdated = (1 << 3)
-	PathDeleted = (1 << 4)
+	PathCreated = (1 << 0)
+	PathRead    = (1 << 1)
+	PathUpdated = (1 << 2)
+	PathDeleted = (1 << 3)
+	PathIsDir   = (1 << 4)
 )
 
 type PathFlags uint
