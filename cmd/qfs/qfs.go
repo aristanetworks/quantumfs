@@ -145,8 +145,8 @@ func getAccessed() {
 	}
 
 	for path, flags := range pathList.Paths {
-		fmt.Println("%s: directory-%t Created-%t Read-%t Updated-%t "+
-			"Deleted-%t", path,
+		fmt.Printf("%s: directory-%t Created-%t Read-%t Updated-%t "+
+			"Deleted-%t\n", path,
 			utils.BitFlagsSet(uint(flags), quantumfs.PathIsDir),
 			utils.BitFlagsSet(uint(flags), quantumfs.PathCreated),
 			utils.BitFlagsSet(uint(flags), quantumfs.PathRead),
