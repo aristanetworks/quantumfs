@@ -167,7 +167,11 @@ func (dir *Directory) delChild_(c *ctx,
 		return dir.children.deleteChild(c, name, true)
 	}()
 
-	dir.self.markAccessed(c, name, quantumfs.PathDeleted)
+	pathFlags := quantumfs.PathFlags(quantumfs.PathDeleted)
+	if record != nil && record.Type() == quantumfs.ObjectTypeDirectory {
+		pathFlags |= quantumfs.PathIsDir
+	}
+	dir.self.markAccessed(c, name, pathFlags)
 
 	dir.updateSize_(c)
 
