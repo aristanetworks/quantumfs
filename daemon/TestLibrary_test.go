@@ -355,14 +355,14 @@ func (th *testHelper) getWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
 	return wsr, cleanup
 }
 
-func (th *testHelper) getAccessList(workspace string) map[string]bool {
+func (th *testHelper) getAccessList(workspace string) quantumfs.PathAccessList {
 	wsr, cleanup := th.getWorkspaceRoot(workspace)
 	defer cleanup()
 	return wsr.getList()
 }
 
-func (th *testHelper) assertAccessList(testlist map[string]bool,
-	wsrlist map[string]bool, message string) {
+func (th *testHelper) assertAccessList(testlist quantumfs.PathAccessList,
+	wsrlist quantumfs.PathAccessList, message string) {
 
 	eq := reflect.DeepEqual(testlist, wsrlist)
 	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
