@@ -308,8 +308,6 @@ func TestRefreshHardlinkAddition2(t *testing.T) {
 }
 
 func TestRefreshHardlinkRemoval(t *testing.T) {
-	// This test requires the children of a directory to be reloaded
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -330,8 +328,6 @@ func TestRefreshHardlinkRemoval(t *testing.T) {
 }
 
 func TestRefreshNlinkDrop(t *testing.T) {
-	// This test requires the children of a directory to be reloaded
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -523,6 +519,39 @@ func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 
 		removeTestFile(test, workspace, name)
 		removeTestFile(test, workspace, linkfile)
+	})
+}
+
+func TestRefreshChangeTypeHardlinkToDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		linkfile := "linkFile"
+
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		utils.MkdirAll(workspace+"/"+linkfile, 0777)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err := syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(workspace + "/" + linkfile)
+		test.AssertNoErr(err)
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId2 := linkTestFile(test, workspace, name, linkfile)
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		createTestFileNoSync(test, workspace, name+"/subfile", 1000)
+		removeTestFileNoSync(test, workspace, name+"/subfile")
+		err = syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(workspace + "/" + linkfile)
+		test.AssertNoErr(err)
 	})
 }
 

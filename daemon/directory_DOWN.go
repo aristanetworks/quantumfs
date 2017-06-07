@@ -237,7 +237,7 @@ func (dir *Directory) handleInstantiatedInodeChange_DOWN(c *ctx, inode Inode,
 
 func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	localRecord quantumfs.DirectoryRecord,
-	remoteRecord *quantumfs.DirectRecord) {
+	remoteRecord *quantumfs.DirectRecord) (uninstantiated []InodeId) {
 
 	defer c.funcIn("Directory::handleDirectoryEntryUpdate_DOWN").Out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
@@ -245,6 +245,26 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	c.wlog("entry %s with inodeid %d goes %s -> %s",
 		remoteRecord.Filename(), inodeId,
 		localRecord.ID().Text(), remoteRecord.ID().Text())
+
+	if localRecord.Type() != remoteRecord.Type() &&
+		localRecord.Type() == quantumfs.ObjectTypeHardlink {
+
+		c.wlog("not using inode %d as it was used for hardlinks",
+			inodeId)
+		dir.handleDeletedInMemoryRecord_DOWN(c, localRecord.Filename(),
+			inodeId)
+
+		inodeId = dir.children.loadChild(c, remoteRecord,
+			quantumfs.InodeIdInvalid)
+
+		status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
+		utils.Assert(status == fuse.OK,
+			"marking %s created failed with %d", remoteRecord.Filename(),
+			status)
+
+		uninstantiated = append(uninstantiated, inodeId)
+		return
+	}
 
 	newInodeId := dir.children.loadChild(c, remoteRecord, inodeId)
 	if newInodeId != inodeId {
@@ -268,6 +288,7 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	status := c.qfs.invalidateInode(inodeId)
 	utils.Assert(status == fuse.OK,
 		"invalidating %d failed with %d", inodeId, status)
+	return
 }
 
 func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
@@ -293,7 +314,9 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 
 		c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
 	} else if !remoteRecord.ID().IsEqualTo(localRecord.ID()) {
-		dir.handleDirectoryEntryUpdate_DOWN(c, localRecord, remoteRecord)
+		uninstantiated = append(uninstantiated,
+			dir.handleDirectoryEntryUpdate_DOWN(c, localRecord,
+				remoteRecord)...)
 	}
 	return uninstantiated
 }
@@ -304,7 +327,9 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 	defer c.FuncIn("Directory::handleDeletedInMemoryRecord_DOWN", "%s",
 		childname).Out()
 
-	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
+	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil ||
+		child.isOrphaned() {
+
 		dir.children.deleteChild(c, childname, false)
 	} else {
 		result := child.deleteSelf(c, child,
