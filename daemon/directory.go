@@ -1017,14 +1017,11 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 					quantumfs.InodeIdInvalid, err
 			}
 
-			dir.self.markAccessed(c, oldName, quantumfs.PathDeleted)
-
 			if oldName == newName {
-				// Nothing more to be done other than marking the
-				// file accessed above.
 				return quantumfs.InodeIdInvalid,
 					quantumfs.InodeIdInvalid, fuse.OK
 			}
+			dir.self.markAccessed(c, oldName, quantumfs.PathDeleted)
 
 			oldInodeId_ := dir.children.inodeNum(oldName)
 			oldRemoved_ := dir.children.renameChild(c, oldName, newName)
