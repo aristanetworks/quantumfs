@@ -4,11 +4,13 @@
 // A utility which computes the constant keys for the various empty block types
 package main
 
-import "encoding/hex"
-import "fmt"
+import (
+	"encoding/hex"
+	"fmt"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/hash"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/hash"
+)
 
 func main() {
 	computeEmptyBlock()

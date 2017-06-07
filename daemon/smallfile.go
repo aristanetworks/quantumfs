@@ -5,9 +5,12 @@ package daemon
 
 // This contains small file types and methods
 
-import "github.com/aristanetworks/quantumfs"
-import "errors"
-import "math"
+import (
+	"errors"
+	"math"
+
+	"github.com/aristanetworks/quantumfs"
+)
 
 type SmallFile struct {
 	key  quantumfs.ObjectKey

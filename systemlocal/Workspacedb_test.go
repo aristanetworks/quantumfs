@@ -5,10 +5,12 @@ package systemlocal
 
 // Test the systemlocal workspaceDB
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestDBInit(t *testing.T) {
 	runTest(t, func(test *testHelper) {

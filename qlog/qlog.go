@@ -5,14 +5,16 @@ package qlog
 
 // This file contains all quantumfs logging support
 
-import "fmt"
-import "errors"
-import "unsafe"
-import "strconv"
-import "strings"
-import "os"
-import "time"
-import "math"
+import (
+	"errors"
+	"fmt"
+	"math"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+	"unsafe"
+)
 
 type LogSubsystem uint8
 
