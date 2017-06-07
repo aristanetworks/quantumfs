@@ -220,6 +220,10 @@ const (
 
 type PathFlags uint
 
+func (v PathFlags) Primitive() interface{} {
+	return uint(v)
+}
+
 type Api interface {
 	Close()
 
