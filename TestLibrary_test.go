@@ -3,9 +3,11 @@
 
 package quantumfs
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 type testHelper struct {
 	testutils.TestHelper

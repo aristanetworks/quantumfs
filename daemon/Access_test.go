@@ -4,13 +4,16 @@
 package daemon
 
 // Test that Access works in a variety of scenarios
-import "os"
-import "runtime"
-import "syscall"
-import "testing"
 
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+import (
+	"os"
+	"runtime"
+	"syscall"
+	"testing"
+
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func permTest(test *testHelper, filename string, modeCheck uint32,
 	shouldPass bool) {

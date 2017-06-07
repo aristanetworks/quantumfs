@@ -52,15 +52,17 @@ directory "rootdir". In other words, the absolute path for dir1 is
 */
 package excludespec
 
-import "bufio"
-import "bytes"
-import "fmt"
-import "io/ioutil"
-import "os"
-import "path/filepath"
-import "regexp"
-import "sort"
-import "strings"
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+)
 
 const excludeTopDir = "/"
 
