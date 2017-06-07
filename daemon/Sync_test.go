@@ -6,20 +6,22 @@ package daemon
 // Test Inode syncing to ensure it happens correctly and only happens when it
 // supposed to.
 
-import "bufio"
-import "bytes"
-import "io"
-import "io/ioutil"
-import "os"
-import "strings"
-import "strconv"
-import "sync/atomic"
-import "syscall"
-import "testing"
+import (
+	"bufio"
+	"bytes"
+	"io"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 // This test dataStore counts the number of sets, useful for determining when
 // quantumfs is syncing

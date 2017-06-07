@@ -5,17 +5,19 @@ package daemon
 
 // Test that inodes can be Forgotten and re-accessed
 
-import "bytes"
-import "io/ioutil"
-import "os"
-import "strconv"
-import "syscall"
-import "testing"
-import "time"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func TestForgetOnDirectory(t *testing.T) {
 	runTest(t, func(test *testHelper) {

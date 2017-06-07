@@ -5,17 +5,19 @@ package daemon
 
 // Test that different parts of Hardlink support are working
 
-import "bytes"
-import "fmt"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func TestHardlinkReload(t *testing.T) {
 	runTest(t, func(test *testHelper) {

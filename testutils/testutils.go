@@ -5,23 +5,25 @@
 // useful helpers.
 package testutils
 
-import "bytes"
-import "errors"
-import "fmt"
-import "io"
-import "os"
-import "runtime"
-import "runtime/debug"
-import "runtime/pprof"
-import "sort"
-import "strings"
-import "sync"
-import "syscall"
-import "testing"
-import "time"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"runtime/pprof"
+	"sort"
+	"strings"
+	"sync"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 type TestArg interface {
 	Execute(test QuantumFsTest)

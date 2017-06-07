@@ -5,14 +5,16 @@ package daemon
 
 // The basic Inode and FileHandle structures
 
-import "container/list"
-import "fmt"
-import "sync"
-import "sync/atomic"
+import (
+	"container/list"
+	"fmt"
+	"sync"
+	"sync/atomic"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 type InodeId uint64
 
@@ -173,7 +175,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	directChildInodes(c *ctx) []InodeId
+	directChildInodes() []InodeId
 }
 
 type InodeCommon struct {
@@ -358,7 +360,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.recordCopy(c, inode.id)
+	record := parent.children.record(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return

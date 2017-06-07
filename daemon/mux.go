@@ -8,21 +8,23 @@ package daemon
 // go-fuse creates a goroutine for every request. The code here simply takes these
 // requests and forwards them to the correct Inode.
 
-import "reflect"
-import "container/list"
-import "fmt"
-import "io/ioutil"
-import "math"
-import "runtime/debug"
-import "syscall"
-import "sync"
-import "sync/atomic"
-import "time"
+import (
+	"container/list"
+	"fmt"
+	"io/ioutil"
+	"math"
+	"reflect"
+	"runtime/debug"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 const flushSanityTimeout = time.Minute
 
@@ -860,14 +862,18 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 			break
 		}
 
-		if dirtyElement := inode.dirtyElement_(); dirtyElement != nil {
-			c.vlog("Inode %d dirty, not uninstantiating yet",
-				inodeNum)
-			func() {
-				defer qfs.dirtyQueueLock.Lock().Unlock()
-				dirtyNode := dirtyElement.Value.(*dirtyInode)
+		shouldBreak := func() bool {
+			defer qfs.dirtyQueueLock.Lock().Unlock()
+			if de := inode.dirtyElement_(); de != nil {
+				c.vlog("Inode %d dirty, not uninstantiating yet",
+					inodeNum)
+				dirtyNode := de.Value.(*dirtyInode)
 				dirtyNode.shouldUninstantiate = true
-			}()
+				return true
+			}
+			return false
+		}()
+		if shouldBreak {
 			break
 		}
 
@@ -882,7 +888,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		initial = false
 
 		if dir, isDir := inode.(inodeHolder); isDir {
-			children := dir.directChildInodes(c)
+			children := dir.directChildInodes()
 
 			for _, i := range children {
 				// To be fully unloaded, the child must have lookup

@@ -4,18 +4,21 @@
 package daemon
 
 // This file contains all the interaction with the quantumfs API file.
-import "encoding/json"
-import "errors"
-import "fmt"
-import "strings"
-import "sync"
-import "sync/atomic"
-import "syscall"
-import "time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func NewApiInode(treeLock *sync.RWMutex, parent InodeId) Inode {
 	api := ApiInode{
