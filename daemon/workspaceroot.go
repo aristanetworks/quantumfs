@@ -719,13 +719,47 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 	defer c.FuncIn("WorkspaceRoot::markAccessed",
 		"path %s CRUD %x", path, op).Out()
 
+	utils.Assert(!utils.BitFlagsSet(uint(op),
+		quantumfs.PathCreated|quantumfs.PathDeleted),
+		"Cannot create and delete simulatneously")
+
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	path = "/" + path
-	previouslyCreated, exists := wsr.accessList[path]
-	if !exists || (!previouslyCreated && created) {
-		wsr.accessList[path] = created
+	pathFlags, exists := wsr.accessList.Paths[path]
+	if !exists {
+		c.vlog("Creating new entry")
+		wsr.accessList.Paths[path] = op
+		return
+
 	}
+
+	c.vlog("Updating existing entry: %x", pathFlags)
+
+	pathFlags |= op & (quantumfs.PathRead | quantumfs.PathUpdated)
+
+	if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathCreated) &&
+		utils.BitFlagsSet(uint(op), quantumfs.PathDeleted) {
+
+		// Entries which were created and are then subsequently
+		// deleted are removed from the accessed list under the
+		// assumption they are temporary files and of no interest.
+		c.vlog("Nullifying entry")
+		delete(wsr.accessList.Paths, path)
+		return
+	} else if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathDeleted) &&
+		utils.BitFlagsSet(uint(op), quantumfs.PathCreated) {
+
+		// Entries which are deleted then recreated are recorded as being
+		// neither deleted nor created. This simplifies the case where some
+		// program unlinked and then created/moved a file into place.
+		c.vlog("Removing deleted on create")
+		pathFlags = pathFlags &^ quantumfs.PathDeleted
+	} else {
+		// Here we only have a delete or create and simply record them.
+		pathFlags |= op & (quantumfs.PathCreated | quantumfs.PathDeleted)
+	}
+	wsr.accessList.Paths[path] = pathFlags
 }
 
 func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
