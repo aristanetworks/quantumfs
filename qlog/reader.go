@@ -105,6 +105,7 @@ func (read *Reader) ReadHeader() *MmapHeader {
 }
 
 type LogProcessMode int
+
 const (
 	TailOnly LogProcessMode = iota
 	ReadOnly
