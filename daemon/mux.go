@@ -1070,7 +1070,7 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 
 }
 
-func sanitizeFuseStatus(err fuse.Status) fuse.Status {
+func sanitizeFuseNotificationResult(err fuse.Status) fuse.Status {
 	if err == fuse.ENOENT {
 		// The kernel did not know about the inode already
 		return fuse.OK
@@ -1079,18 +1079,20 @@ func sanitizeFuseStatus(err fuse.Status) fuse.Status {
 }
 
 func (qfs *QuantumFs) invalidateInode(inodeId InodeId) fuse.Status {
-	return sanitizeFuseStatus(qfs.server.InodeNotify(uint64(inodeId), 0, -1))
+	return sanitizeFuseNotificationResult(
+		qfs.server.InodeNotify(uint64(inodeId), 0, -1))
 }
 
 func (qfs *QuantumFs) noteDeletedInode(parentId InodeId, childId InodeId,
 	name string) fuse.Status {
 
-	return sanitizeFuseStatus(qfs.server.DeleteNotify(uint64(parentId),
-		uint64(childId), name))
+	return sanitizeFuseNotificationResult(
+		qfs.server.DeleteNotify(uint64(parentId), uint64(childId), name))
 }
 
 func (qfs *QuantumFs) noteChildCreated(parentId InodeId, name string) fuse.Status {
-	return sanitizeFuseStatus(qfs.server.EntryNotify(uint64(parentId), name))
+	return sanitizeFuseNotificationResult(
+		qfs.server.EntryNotify(uint64(parentId), name))
 }
 
 func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
