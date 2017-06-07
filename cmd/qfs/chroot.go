@@ -6,19 +6,20 @@ package main
 // chroot runs a shell in the current workspace tree, in which
 // the current workspace root becomes the filesystem root
 
-import "fmt"
-import "io/ioutil"
-import "os"
-import "os/exec"
-import "os/user"
-import "path/filepath"
-import "strconv"
-import "strings"
-import "syscall"
-import "time"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/kardianos/osext"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 const (
 	sudo       = "/usr/bin/sudo"
@@ -44,7 +45,7 @@ var qfs string
 var persistent bool = true
 
 func init() {
-	if qfspath, err := osext.Executable(); err != nil {
+	if qfspath, err := os.Executable(); err != nil {
 		fmt.Println("Unable to locate qfs directory")
 		qfs = "./qfs"
 	} else {

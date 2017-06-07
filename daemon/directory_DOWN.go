@@ -5,9 +5,11 @@ package daemon
 
 // This is _DOWN counterpart to directory.go
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
@@ -303,11 +305,12 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 		childname).Out()
 
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
-		dir.children.deleteChild(c, childname)
+		dir.children.deleteChild(c, childname, false)
 	} else {
 		result := child.deleteSelf(c, child,
 			func() (quantumfs.DirectoryRecord, fuse.Status) {
-				delRecord := dir.children.deleteChild(c, childname)
+				delRecord := dir.children.deleteChild(c, childname,
+					false)
 				return delRecord, fuse.OK
 			})
 		if result != fuse.OK {

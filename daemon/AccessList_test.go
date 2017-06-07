@@ -4,13 +4,16 @@
 package daemon
 
 // Test that workspaceroot maintains a list of accessed files
-import "fmt"
-import "os"
-import "syscall"
-import "reflect"
-import "testing"
 
-import "github.com/aristanetworks/quantumfs/utils"
+import (
+	"fmt"
+	"os"
+	"reflect"
+	"syscall"
+	"testing"
+
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestAccessListFileCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {

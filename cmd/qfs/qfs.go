@@ -5,12 +5,14 @@
 // special operations not available through normal POSIX interfaces.
 package main
 
-import "flag"
-import "fmt"
-import "os"
-import "strconv"
+import (
+	"flag"
+	"fmt"
+	"os"
+	"strconv"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 var version string
 
