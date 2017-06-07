@@ -73,6 +73,49 @@ func TestAccessListFileCreateDelete(t *testing.T) {
 	})
 }
 
+func TestAccessListFileTruncate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 0666)
+		test.Assert(err == nil, "Create file error:%v", err)
+		syscall.Close(fd)
+
+		accessList := quantumfs.NewPathAccessList()
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		path = workspace + filename
+		test.AssertNoErr(os.Truncate(path, 0))
+		accessList.Paths[filename] = quantumfs.PathUpdated
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
+func TestAccessListFileFtruncate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 0666)
+		test.Assert(err == nil, "Create file error:%v", err)
+		syscall.Close(fd)
+
+		accessList := quantumfs.NewPathAccessList()
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		path = workspace + filename
+		fd, err = syscall.Open(path, syscall.O_RDWR, 0000)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Ftruncate(fd, 0))
+		syscall.Close(fd)
+		accessList.Paths[filename] = quantumfs.PathUpdated
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
 func TestAccessListDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := quantumfs.NewPathAccessList()
