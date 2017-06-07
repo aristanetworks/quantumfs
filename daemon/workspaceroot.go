@@ -753,10 +753,12 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 		utils.BitFlagsSet(uint(op), quantumfs.PathCreated) {
 
 		// Entries which are deleted then recreated are recorded as being
-		// neither deleted nor created. This simplifies the case where some
-		// program unlinked and then created/moved a file into place.
+		// neither deleted nor created, but instead truncated (updated). This
+		// simplifies the case where some program unlinked and then
+		// created/moved a file into place.
 		c.vlog("Removing deleted on create")
 		pathFlags = pathFlags &^ quantumfs.PathDeleted
+		pathFlags = quantumfs.PathUpdated
 	} else {
 		// Here we only have a delete or create and simply record them.
 		pathFlags |= op & (quantumfs.PathCreated | quantumfs.PathDeleted)
