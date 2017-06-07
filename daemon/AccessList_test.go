@@ -12,12 +12,13 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func TestAccessListFileCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -40,7 +41,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + filename
@@ -52,7 +53,7 @@ func TestAccessListFileOpen(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path = workspace + filename
 		file, err = os.Open(path)
 		test.Assert(err == nil, "Open file error%v", err)
@@ -73,7 +74,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		test.Assert(err == nil, "Create file error:%v", err)
 		syscall.Close(fd)
 
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + filename
@@ -84,7 +85,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path = workspace + filename
 		err = os.Remove(path)
 		test.Assert(err == nil,
@@ -98,7 +99,7 @@ func TestAccessListFileDelete(t *testing.T) {
 
 func TestAccessListDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		workspace := test.NewWorkspace()
 		dirname := "/test"
 		path := workspace + dirname
@@ -119,7 +120,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		err := syscall.Mkdir(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
 
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + dirname
@@ -130,7 +131,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path = workspace + dirname
 		err = syscall.Rmdir(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
@@ -143,7 +144,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 
 func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		workspace := test.NewWorkspace()
 		dir1 := "/dir1"
 		dir2 := "/dir2"
@@ -167,7 +168,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		err := utils.MkdirAll(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
 
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
 		path = absbworkspace + dir1
@@ -179,7 +180,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path = workspace + dir1
 		err = os.RemoveAll(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
@@ -217,7 +218,7 @@ func TestAccessListMvChild(t *testing.T) {
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		path1 := absbworkspace + dirname1 + filename1
 		path2 := absbworkspace + dirname2 + filename3
 		err = os.Rename(path1, path2)
@@ -230,7 +231,7 @@ func TestAccessListMvChild(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path1 = workspace + dirname1 + filename1
 		path2 = workspace + dirname2 + filename3
 		err = os.Rename(path1, path2)
@@ -262,7 +263,7 @@ func TestAccessListRename(t *testing.T) {
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = os.Rename(path1, path2)
@@ -274,7 +275,7 @@ func TestAccessListRename(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = os.Rename(path1, path2)
@@ -305,7 +306,7 @@ func TestAccessListHardLink(t *testing.T) {
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = syscall.Link(path1, path2)
@@ -318,7 +319,7 @@ func TestAccessListHardLink(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = syscall.Link(path1, path2)
@@ -348,7 +349,7 @@ func TestAccessListSymlink(t *testing.T) {
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		path1 := absbworkspace + dirname + filename1
 		path2 := absbworkspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
@@ -359,7 +360,7 @@ func TestAccessListSymlink(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
 		err = syscall.Symlink(path1, path2)
@@ -435,7 +436,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		path2 = absbworkspace + dirname + filename2
 		path1, err = os.Readlink(path2)
 		test.Assert(err == nil, "Read symlink error:%v", err)
@@ -445,7 +446,7 @@ func TestAccessListReadSymlink(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path2 = workspace + dirname + filename2
 		path1, err = os.Readlink(path2)
 		test.Assert(err == nil, "Read symlink error:%v", err)
@@ -470,7 +471,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 
 		bworkspace := test.branchWorkspace(workspace)
 		absbworkspace := test.AbsPath(bworkspace)
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		path = absbworkspace + filename
 		err = os.Remove(path)
 		test.Assert(err == nil, "Remove file error:%v", err)
@@ -481,7 +482,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
 
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		path = workspace + filename
 		err = os.Remove(path)
 		test.Assert(err == nil, "Remove file error:%v", err)
@@ -496,7 +497,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 
 func TestAccessListClear(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		accessList := make(map[string]bool)
+		accessList := quantumfs.PathAccessList{}
 		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -511,7 +512,7 @@ func TestAccessListClear(t *testing.T) {
 		wsr, cleanup := test.getWorkspaceRoot(workspace)
 		defer cleanup()
 		wsr.clearList()
-		accessList = make(map[string]bool)
+		accessList = quantumfs.PathAccessList{}
 		wsrlist = test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error maps not clear")
