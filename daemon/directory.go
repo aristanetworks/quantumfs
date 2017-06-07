@@ -626,7 +626,11 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
 	newEntity.dirty(c)
-	newEntity.markSelfAccessed(c, quantumfs.PathCreated)
+	pathFlags := quantumfs.PathFlags(quantumfs.PathCreated)
+	if type_ == quantumfs.ObjectTypeDirectory {
+		pathFlags |= quantumfs.PathIsDir
+	}
+	newEntity.markSelfAccessed(c, pathFlags)
 
 	return newEntity
 }
