@@ -200,6 +200,26 @@ func NewApiWithPath(path string) (Api, error) {
 	return &api, nil
 }
 
+// A description of the files which were accessed within a particular workspace on a
+// single instance.
+//
+// Note that any files/directories which are created and subsequently deleted will
+// not show up in this list. Similarly, any files/directories which are deleted and
+// then created will show up as neither.
+type PathAccessList struct {
+	Paths map[string]PathFlags
+}
+
+const (
+	PathIsDir   = (1 << 0)
+	PathCreated = (1 << 1)
+	PathRead    = (1 << 2)
+	PathUpdated = (1 << 3)
+	PathDeleted = (1 << 4)
+)
+
+type PathFlags uint
+
 type Api interface {
 	Close()
 
@@ -216,7 +236,7 @@ type Api interface {
 	Merge3Way(base string, remote string, local string) error
 
 	// Get the list of accessed file from workspaceroot
-	GetAccessed(wsr string) (map[string]bool, error)
+	GetAccessed(wsr string) (PathAccessList, error)
 
 	// Clear the list of accessed files in workspaceroot
 	ClearAccessed(wsr string) error
@@ -335,7 +355,7 @@ type ErrorResponse struct {
 
 type AccessListResponse struct {
 	ErrorResponse
-	AccessList map[string]bool
+	PathList PathAccessList
 }
 
 type BranchRequest struct {
@@ -536,10 +556,10 @@ func (api *apiImpl) Refresh(workspace string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *apiImpl) GetAccessed(wsr string) (map[string]bool, error) {
+func (api *apiImpl) GetAccessed(wsr string) (PathAccessList, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return nil, fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
-			wsr)
+		return PathAccessList{},
+			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -550,15 +570,15 @@ func (api *apiImpl) GetAccessed(wsr string) (map[string]bool, error) {
 	var accesslistResponse AccessListResponse
 	err := api.processCmd(cmd, &accesslistResponse)
 	if err != nil {
-		return nil, err
+		return PathAccessList{}, err
 	}
 	errorResponse := accesslistResponse.ErrorResponse
 	if errorResponse.ErrorCode != ErrorOK {
-		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+		return PathAccessList{},
+			fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
-	printAccessList(accesslistResponse.AccessList)
-	return accesslistResponse.AccessList, nil
+	return accesslistResponse.PathList, nil
 }
 
 func (api *apiImpl) ClearAccessed(wsr string) error {

@@ -198,7 +198,7 @@ func (dir *Directory) delChild_(c *ctx,
 		return dir.children.deleteChild(c, name)
 	}()
 
-	dir.self.markAccessed(c, name, false)
+	dir.self.markAccessed(c, name, quantumfs.PathDeleted)
 
 	dir.updateSize_(c)
 
@@ -560,7 +560,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("Directory::getChildSnapshot").Out()
 
-	dir.self.markSelfAccessed(c, false)
+	dir.self.markSelfAccessed(c, quantumfs.PathRead|quantumfs.PathIsDir)
 
 	defer dir.RLock().RUnlock()
 
@@ -660,7 +660,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
 
 	newEntity.dirty(c)
-	newEntity.markSelfAccessed(c, true)
+	newEntity.markSelfAccessed(c, quantumfs.PathCreated)
 
 	return newEntity
 }
@@ -1047,7 +1047,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 					quantumfs.InodeIdInvalid, err
 			}
 
-			dir.self.markAccessed(c, oldName, false)
+			dir.self.markAccessed(c, oldName, quantumfs.PathDeleted)
 
 			if oldName == newName {
 				// Nothing more to be done other than marking the
@@ -1065,7 +1065,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		}
 
 		// update the inode name
-		dir.self.markAccessed(c, newName, true)
+		dir.self.markAccessed(c, newName, quantumfs.PathCreated)
 		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
 			child.setName(newName)
 		}
@@ -1193,8 +1193,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 					childInode.setName(newName)
 				}
 			}
-			dir.self.markAccessed(c, oldName, false)
-			dst.self.markAccessed(c, newName, true)
+			dir.self.markAccessed(c, oldName, quantumfs.PathDeleted)
+			dst.self.markAccessed(c, newName, quantumfs.PathCreated)
 
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
