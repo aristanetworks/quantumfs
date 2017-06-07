@@ -3,10 +3,12 @@
 
 package utils
 
-import "bytes"
-import "fmt"
-import "io"
-import "syscall"
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"syscall"
+)
 
 // FileSize returns the size of a file
 func FileSize(filename string) (int64, error) {

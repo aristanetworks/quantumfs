@@ -3,22 +3,24 @@
 
 package daemon
 
-import "bytes"
-import "flag"
-import "fmt"
-import "io"
-import "io/ioutil"
-import "os"
-import "reflect"
-import "strings"
-import "sync/atomic"
-import "syscall"
-import "testing"
-import "time"
+import (
+	"bytes"
+	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"reflect"
+	"strings"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func TestMain(m *testing.M) {
 	flag.Parse()

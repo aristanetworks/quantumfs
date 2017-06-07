@@ -3,14 +3,16 @@
 
 package daemon
 
-import "container/list"
+import (
+	"container/list"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/encoding"
-import "github.com/aristanetworks/quantumfs/hash"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
-import capn "github.com/glycerine/go-capnproto"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/encoding"
+	"github.com/aristanetworks/quantumfs/hash"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+	capn "github.com/glycerine/go-capnproto"
+)
 
 var zeros []byte
 

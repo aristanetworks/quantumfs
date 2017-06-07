@@ -5,9 +5,11 @@ package daemon
 
 // This is _DOWN counterpart to directory.go
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
@@ -93,7 +95,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).Out()
 
-	children := dir.directChildInodes(c)
+	children := dir.directChildInodes()
 	for _, child := range children {
 		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
 			inode.Sync_DOWN(c)
@@ -198,11 +200,12 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
 	defer c.FuncIn("Directory::destroyChild_DOWN", "inode %d", inodeId).Out()
 	if localRecord.Type() == quantumfs.ObjectTypeDirectory {
 		subdir := inode.(*Directory)
-		subdir.children.iterateOverInMemoryRecords(c,
-			func(childname string, childId InodeId) {
-				subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
-					childId)
-			})
+		subdir.children.foreachChild(c, func(childname string,
+			childId InodeId) {
+
+			subdir.handleDeletedInMemoryRecord_DOWN(c, childname,
+				childId)
+		})
 	}
 	c.qfs.noteDeletedInode(dir.id, inodeId, localRecord.Filename())
 }
@@ -302,11 +305,12 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 		childname).Out()
 
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
-		dir.children.deleteChild(c, childname)
+		dir.children.deleteChild(c, childname, false)
 	} else {
 		result := child.deleteSelf(c, child,
 			func() (quantumfs.DirectoryRecord, fuse.Status) {
-				delRecord := dir.children.deleteChild(c, childname)
+				delRecord := dir.children.deleteChild(c, childname,
+					false)
 				return delRecord, fuse.OK
 			})
 		if result != fuse.OK {
@@ -335,9 +339,7 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 
 	defer dir.childRecordLock.Lock().Unlock()
 
-	dir.children.iterateOverInMemoryRecords(c, func(childname string,
-		childId InodeId) {
-
+	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		if _, exists := remoteEntries[childname]; !exists {
 			dir.handleDeletedInMemoryRecord_DOWN(c, childname, childId)
 			deletedInodeIds = append(deletedInodeIds, childId)
@@ -346,6 +348,6 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 
 	})
-	dir.children.reload(c, baseLayerId)
+	dir.children.baseLayerIs(c, baseLayerId)
 	return uninstantiated, deletedInodeIds
 }

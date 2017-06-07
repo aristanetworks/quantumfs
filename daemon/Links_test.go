@@ -5,15 +5,17 @@ package daemon
 
 // Test operations on hardlinks and symlinks
 
-import "bytes"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -64,12 +66,12 @@ func TestHardlink(t *testing.T) {
 		parentInode := test.getInode(workspace)
 		parentDir := parentInode.(*WorkspaceRoot).Directory
 		defer parentDir.childRecordLock.Lock().Unlock()
-		test.Assert(parentDir.children.recordCopy(&test.qfs.c,
-			file1InodeNum).Type() == quantumfs.ObjectTypeHardlink,
+		test.Assert(parentDir.children.record(file1InodeNum).Type() ==
+			quantumfs.ObjectTypeHardlink,
 			"file1 not replaced with hardlink %d %v", file1InodeNum,
-			parentDir.children.records)
-		test.Assert(parentDir.children.recordCopy(&test.qfs.c,
-			file2InodeNum).Type() == quantumfs.ObjectTypeHardlink,
+			parentDir.children.childrenRecords)
+		test.Assert(parentDir.children.record(file2InodeNum).Type() ==
+			quantumfs.ObjectTypeHardlink,
 			"file2 not created as hardlink")
 	})
 }

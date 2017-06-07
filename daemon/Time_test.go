@@ -6,12 +6,14 @@ package daemon
 // Test various instances of actions which should modify (or not) the ctime and
 // mtime.
 
-import "fmt"
-import "os"
-import "syscall"
-import "testing"
+import (
+	"fmt"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func getTimes(path string) (mtime int64, ctime int64) {
 	var stat syscall.Stat_t

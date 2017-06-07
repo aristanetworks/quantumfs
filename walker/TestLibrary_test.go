@@ -3,19 +3,21 @@
 
 package walker
 
-import "flag"
-import "io/ioutil"
-import "os"
-import "path/filepath"
-import "reflect"
-import "strings"
-import "testing"
-import "time"
+import (
+	"flag"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/daemon"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test walkerTest) {
