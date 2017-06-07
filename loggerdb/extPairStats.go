@@ -6,10 +6,12 @@
 
 package qloggerdb
 
-import "fmt"
-import "time"
+import (
+	"fmt"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 const statPeriodSec = 5
 
