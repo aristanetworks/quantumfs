@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 var version string
@@ -137,9 +138,20 @@ func getAccessed() {
 		os.Exit(exitApiNotFound)
 	}
 
-	if _, err := api.GetAccessed(workspaceName); err != nil {
+	pathList, err := api.GetAccessed(workspaceName)
+	if err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
+	}
+
+	for path, flags := range pathList.Paths {
+		fmt.Println("%s: directory-%t Created-%t Read-%t Updated-%t "+
+			"Deleted-%t", path,
+			utils.BitFlagsSet(uint(flags), quantumfs.PathIsDir),
+			utils.BitFlagsSet(uint(flags), quantumfs.PathCreated),
+			utils.BitFlagsSet(uint(flags), quantumfs.PathRead),
+			utils.BitFlagsSet(uint(flags), quantumfs.PathUpdated),
+			utils.BitFlagsSet(uint(flags), quantumfs.PathDeleted))
 	}
 }
 
