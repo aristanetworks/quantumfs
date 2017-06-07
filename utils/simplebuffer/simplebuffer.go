@@ -6,11 +6,14 @@ package simplebuffer
 // This file contains a buffer for use in testing, walker, and uploader.
 // Some interface functions are only briefly implemented with a dummy return value.
 
-import "fmt"
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/encoding"
-import "github.com/aristanetworks/quantumfs/hash"
-import capn "github.com/glycerine/go-capnproto"
+import (
+	"fmt"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/encoding"
+	"github.com/aristanetworks/quantumfs/hash"
+	capn "github.com/glycerine/go-capnproto"
+)
 
 // Buffer only contains data and key to meet the requirements of Set() and
 // Get() in datastore. This can be used in tests and tools which need to

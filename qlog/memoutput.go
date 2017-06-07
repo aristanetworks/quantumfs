@@ -4,17 +4,20 @@
 package qlog
 
 // This file contains all quantumfs logging shared memory support
-import "errors"
-import "fmt"
-import "math"
-import "os"
-import "reflect"
-import "runtime/debug"
-import "strings"
-import "sync"
-import "sync/atomic"
-import "syscall"
-import "unsafe"
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"os"
+	"reflect"
+	"runtime/debug"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"unsafe"
+)
 
 // We need a static array sized upper bound on our memory. Increase this as needed.
 const DefaultMmapSize = (360000 * 24) + mmapStrMapSize + unsafe.Sizeof(MmapHeader{})

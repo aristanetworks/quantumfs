@@ -6,10 +6,12 @@ package processlocal
 // Unit test to ensure when you delete a workspace that the empty typespace and
 // namespace are also deleted.
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func createWorkspaces(ctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB) {
 	workspaces := [...][3]string{

@@ -8,21 +8,23 @@ package daemon
 // go-fuse creates a goroutine for every request. The code here simply takes these
 // requests and forwards them to the correct Inode.
 
-import "reflect"
-import "container/list"
-import "fmt"
-import "io/ioutil"
-import "math"
-import "runtime/debug"
-import "syscall"
-import "sync"
-import "sync/atomic"
-import "time"
+import (
+	"container/list"
+	"fmt"
+	"io/ioutil"
+	"math"
+	"reflect"
+	"runtime/debug"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 const flushSanityTimeout = time.Minute
 
