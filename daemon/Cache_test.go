@@ -5,11 +5,13 @@ package daemon
 
 // Test the internal datastore cache
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 type testDataStore struct {
 	datastore  quantumfs.DataStore

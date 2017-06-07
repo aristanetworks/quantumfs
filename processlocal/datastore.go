@@ -3,15 +3,17 @@
 
 package processlocal
 
-import "bytes"
-import "crypto/md5"
-import "encoding/hex"
-import "fmt"
-import "sync"
+import (
+	"bytes"
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
+	"sync"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/hash"
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/hash"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 func NewDataStore(conf string) quantumfs.DataStore {
 	store := &dataStore{

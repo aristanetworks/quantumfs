@@ -7,21 +7,22 @@
 // uploaded by this tool can be accessed using any QFS instance.
 package main
 
-import "errors"
-import "flag"
-import "fmt"
-import "os"
-import "path/filepath"
-import "strings"
-import "time"
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-import "golang.org/x/net/context"
-
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/qlog"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
-import exs "github.com/aristanetworks/quantumfs/utils/excludespec"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
+	exs "github.com/aristanetworks/quantumfs/utils/excludespec"
+	"golang.org/x/net/context"
+)
 
 // Various exit reasons returned to the shell as exit code
 const (

@@ -3,15 +3,16 @@
 
 package systemlocal
 
-import "bytes"
-import "fmt"
-import "strings"
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"strings"
+	"time"
 
-import "github.com/boltdb/bolt"
-
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/boltdb/bolt"
+)
 
 var typespacesBucket []byte
 var stateTypespacesBucket []byte
