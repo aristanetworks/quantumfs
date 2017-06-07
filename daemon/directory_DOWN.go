@@ -303,11 +303,12 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 		childname).Out()
 
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
-		dir.children.deleteChild(c, childname)
+		dir.children.deleteChild(c, childname, false)
 	} else {
 		result := child.deleteSelf(c, child,
 			func() (quantumfs.DirectoryRecord, fuse.Status) {
-				delRecord := dir.children.deleteChild(c, childname)
+				delRecord := dir.children.deleteChild(c, childname,
+					false)
 				return delRecord, fuse.OK
 			})
 		if result != fuse.OK {
@@ -345,8 +346,6 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 
 	})
-	/* TODO
-	dir.children.reload(c, baseLayerId)
-	*/
+	dir.children.baseLayerIs(c, baseLayerId)
 	return uninstantiated, deletedInodeIds
 }

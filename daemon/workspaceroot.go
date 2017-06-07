@@ -477,6 +477,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
 		entry.nlink = hardlink.Nlinks()
+		entry.record = hardlink.Record()
 		wsr.hardlinks[id] = entry
 
 		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
