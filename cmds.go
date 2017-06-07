@@ -201,7 +201,9 @@ func NewApiWithPath(path string) (Api, error) {
 }
 
 // A description of the files which were accessed within a particular workspace on a
-// single instance.
+// single instance. For directories "Read" means readdir, accessing children within
+// it or accessing the attributes of a file are not sufficient. Directories can never
+// be updated.
 //
 // Note that any files/directories which are created and subsequently deleted will
 // not show up in this list. Similarly, any files/directories which are deleted and
