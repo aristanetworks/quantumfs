@@ -3,11 +3,15 @@
 
 // memdb is a stand in memory-based database for use in testing qloggerdb
 
-package qloggerdb
+package processlocal
+
+import (
+	"github.com/aristanetworks/quantumfs/loggerdb"
+)
 
 type dataSeries struct {
-	tags   []tag
-	fields []field
+	tags   []qloggerdb.Tag
+	fields []qloggerdb.Field
 }
 
 type Memdb struct {
@@ -20,14 +24,14 @@ func NewMemdb() *Memdb {
 	}
 }
 
-func (db *Memdb) Store(tags_ []tag, fields_ []field) {
+func (db *Memdb) Store(tags_ []qloggerdb.Tag, fields_ []qloggerdb.Field) {
 	db.data = append(db.data, dataSeries{
 		tags:   tags_,
 		fields: fields_,
 	})
 }
 
-func (db *Memdb) Fetch(withTags []tag, field string, lastN int) []uint64 {
+func (db *Memdb) Fetch(withTags []qloggerdb.Tag, field string, lastN int) []uint64 {
 	rtn := make([]uint64, 0)
 	for _, i := range db.data {
 		// check if the data has all the tags we need
@@ -51,8 +55,8 @@ func (db *Memdb) Fetch(withTags []tag, field string, lastN int) []uint64 {
 		if outputData {
 			// add the field, if it exists
 			for _, hasField := range i.fields {
-				if hasField.name == field {
-					rtn = append(rtn, hasField.data)
+				if hasField.Name == field {
+					rtn = append(rtn, hasField.Data)
 					break
 				}
 			}
