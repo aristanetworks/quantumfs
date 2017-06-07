@@ -7,11 +7,13 @@ package daemon
 
 // Smoke tests for the Ether datastores
 
-import "testing"
-import "time"
+import (
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/thirdparty_backends"
+	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
+)
 
 func (th *testHelper) etherFilesystemConfig() QuantumFsConfig {
 	mountPath := th.TempDir + "/mnt"

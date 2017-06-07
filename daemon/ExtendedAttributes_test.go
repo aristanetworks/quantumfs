@@ -5,16 +5,18 @@ package daemon
 
 // Test the various operations on extended attributes
 
-import "bytes"
-import "fmt"
-import "os"
-import "strings"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"strings"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestExtendedAttrReadWrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {

@@ -3,16 +3,18 @@
 
 package daemon
 
-import "bytes"
-import "errors"
-import "fmt"
-import "syscall"
-import "sync"
-import "time"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"sync"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
 // coming from a DirRecord and not passed in from create_.
