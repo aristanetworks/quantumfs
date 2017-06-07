@@ -4,12 +4,14 @@
 // qparse is the shared memory log parser for the qlog quantumfs subsystem
 package qlog
 
-import "crypto/md5"
-import "encoding/binary"
-import "fmt"
-import "math"
-import "runtime"
-import "strconv"
+import (
+	"crypto/md5"
+	"encoding/binary"
+	"fmt"
+	"math"
+	"runtime"
+	"strconv"
+)
 
 var wildcardStr string
 

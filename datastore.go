@@ -4,16 +4,18 @@
 // The datastore interface
 package quantumfs
 
-import "encoding/base64"
-import "encoding/binary"
-import "encoding/hex"
-import "fmt"
-import "sort"
-import "time"
+import (
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"sort"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/encoding"
-import "github.com/aristanetworks/quantumfs/utils"
-import capn "github.com/glycerine/go-capnproto"
+	"github.com/aristanetworks/quantumfs/encoding"
+	"github.com/aristanetworks/quantumfs/utils"
+	capn "github.com/glycerine/go-capnproto"
+)
 
 // 160 bit hash, must match hash.HashSize
 const HashSize = 20
