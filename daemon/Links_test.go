@@ -5,15 +5,17 @@ package daemon
 
 // Test operations on hardlinks and symlinks
 
-import "bytes"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {

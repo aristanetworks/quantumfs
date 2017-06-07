@@ -3,10 +3,13 @@
 
 package daemon
 
-import "fmt"
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"fmt"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
@@ -187,7 +190,7 @@ func (cmap *ChildMap) foreachChild(c *ctx, fxn func(name string, inodeId InodeId
 }
 
 func (cmap *ChildMap) deleteChild(c *ctx,
-	name string) (needsReparent quantumfs.DirectoryRecord) {
+	name string, fixHardlinks bool) (needsReparent quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
 
@@ -204,7 +207,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	}
 
 	// This may be a hardlink that is due to be converted.
-	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
+	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
 		newRecord, inodeId := cmap.wsr.removeHardlink(c,
 			hardlink.linkId)
 
@@ -219,7 +222,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 
 	result := cmap.delRecord(inodeId, name)
 
-	if link, isHardlink := record.(*Hardlink); isHardlink {
+	if link, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
 		if !cmap.wsr.hardlinkExists(c, link.linkId) {
 			c.vlog("hardlink does not exist")
 			return nil

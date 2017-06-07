@@ -3,16 +3,18 @@
 
 package daemon
 
-import "bytes"
-import "errors"
-import "fmt"
-import "syscall"
-import "sync"
-import "time"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"sync"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
 // coming from a DirRecord and not passed in from create_.
@@ -162,7 +164,7 @@ func (dir *Directory) delChild_(c *ctx,
 	// If this is a file we need to reparent it to itself
 	record := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.deleteChild(c, name)
+		return dir.children.deleteChild(c, name, true)
 	}()
 
 	dir.self.markAccessed(c, name, false)
@@ -1214,7 +1216,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	dir.children.deleteChild(c, name)
+	dir.children.deleteChild(c, name, true)
 }
 
 // Needs to hold childRecordLock

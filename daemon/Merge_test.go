@@ -5,9 +5,11 @@ package daemon
 
 // Test workspace merging
 
-import "os"
-import "syscall"
-import "testing"
+import (
+	"os"
+	"syscall"
+	"testing"
+)
 
 type mergeTestCheck func(merged string)
 type mergeTestSetup func(branchA string, branchB string) mergeTestCheck

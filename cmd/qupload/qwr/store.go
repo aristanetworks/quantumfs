@@ -3,9 +3,11 @@
 
 package qwr
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/hash"
-import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/hash"
+	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
+)
 
 func writeBlock(qctx *quantumfs.Ctx, data []byte, keyType quantumfs.KeyType,
 	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {

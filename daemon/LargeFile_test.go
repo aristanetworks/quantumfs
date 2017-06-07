@@ -5,14 +5,16 @@ package daemon
 
 // Test the small/medium/large file transitions and large file operations
 
-import "bytes"
-import "io/ioutil"
-import "os"
-import "testing"
-import "syscall"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func TestLargeFileRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
