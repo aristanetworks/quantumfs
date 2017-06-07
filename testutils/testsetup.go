@@ -3,13 +3,15 @@
 
 package testutils
 
-import "fmt"
-import "io/ioutil"
-import "os"
-import "strconv"
-import "strings"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
 
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 var rootDir string
 

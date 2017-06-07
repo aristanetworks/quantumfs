@@ -5,8 +5,11 @@ package daemon
 
 // This contains the generic multi-block file types and methods
 
-import "github.com/aristanetworks/quantumfs"
-import "errors"
+import (
+	"errors"
+
+	"github.com/aristanetworks/quantumfs"
+)
 
 // These variables are always correct. Where the datastore value length disagrees,
 // this structure is correct.

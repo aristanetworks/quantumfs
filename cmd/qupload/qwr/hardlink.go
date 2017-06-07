@@ -3,13 +3,15 @@
 
 package qwr
 
-import "encoding/binary"
-import "os"
-import "sync/atomic"
-import "syscall"
+import (
+	"encoding/binary"
+	"os"
+	"sync/atomic"
+	"syscall"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 type HardLinkID uint64
 

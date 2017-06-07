@@ -5,15 +5,17 @@ package daemon
 
 // Test the very large file transitions
 
-import "bytes"
-import "io"
-import "io/ioutil"
-import "os"
-import "strconv"
-import "testing"
+import (
+	"bytes"
+	"io"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func runConvertFrom(test *testHelper, fromFileSize uint64) {
 	workspace := test.NewWorkspace()
