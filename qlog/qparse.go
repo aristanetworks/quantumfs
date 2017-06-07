@@ -5,20 +5,22 @@
 // It is used for parsing a qlog file completely in a single pass
 package qlog
 
-import "bytes"
-import "encoding/binary"
-import "encoding/gob"
-import "errors"
-import "fmt"
-import "io"
-import "io/ioutil"
-import "os"
-import "reflect"
-import "sort"
-import "strings"
-import "sync"
-import "time"
-import "unsafe"
+import (
+	"bytes"
+	"encoding/binary"
+	"encoding/gob"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"reflect"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+	"unsafe"
+)
 
 // consts
 const defaultParseThreads = 30

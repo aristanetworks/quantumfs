@@ -5,18 +5,20 @@ package daemon
 
 // Test the various Api calls
 
-import "bytes"
-import "fmt"
-import "os"
-import "runtime"
-import "syscall"
-import "sync"
-import "sync/atomic"
-import "testing"
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestWorkspaceBranching(t *testing.T) {
 	runTest(t, func(test *testHelper) {

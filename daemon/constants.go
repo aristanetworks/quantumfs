@@ -5,8 +5,10 @@ package daemon
 
 // Various constants used throughout quantumfsd
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // Mapping between datastore object types and the FUSE filetype
 // Returns 0 if there is no valid FUSE filetype
