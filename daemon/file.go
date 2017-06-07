@@ -117,8 +117,6 @@ func (fi *File) dirtyChild(c *ctx, child InodeId) {
 func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
 	defer c.funcIn("File::Access").Out()
-
-	fi.markSelfAccessed(c, false)
 	return hasAccessPermission(c, fi, mask, uid, gid)
 }
 
@@ -154,7 +152,6 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	if err != fuse.OK {
 		return err
 	}
-	fi.self.markSelfAccessed(c, false)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())

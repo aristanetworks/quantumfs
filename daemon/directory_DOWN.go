@@ -63,8 +63,6 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		return err
 	}
 
-	srcInode.markSelfAccessed(c, false)
-
 	newRecord.SetFilename(newName)
 
 	// We cannot lock earlier because the parent of srcInode may be us
