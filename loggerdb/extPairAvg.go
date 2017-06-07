@@ -6,9 +6,11 @@
 
 package qloggerdb
 
-import "fmt"
+import (
+	"fmt"
 
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 type extPairAvg struct {
 	db       DbInterface

@@ -3,9 +3,11 @@
 
 package qloggerdb
 
-import "container/list"
+import (
+	"container/list"
 
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlog"
+)
 
 const requestEndAfterNs = 3000000000
 
