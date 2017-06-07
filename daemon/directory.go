@@ -457,7 +457,6 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 
 	defer c.funcIn("Directory::Access").Out()
 
-	dir.markSelfAccessed(c, false)
 	return hasAccessPermission(c, dir, mask, uid, gid)
 }
 
@@ -495,7 +494,6 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		}
 
 		c.vlog("Directory::Lookup found inode %d", inodeNum)
-		dir.self.markAccessed(c, name, false)
 		c.qfs.increaseLookupCount(inodeNum)
 
 		out.NodeId = uint64(inodeNum)
@@ -547,7 +545,6 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	if err != fuse.OK {
 		return err
 	}
-	dir.self.markSelfAccessed(c, false)
 
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
@@ -1650,7 +1647,6 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
 	_, instantiated = c.qfs.lookupCount(inodeNum)
 	child = c.qfs.inode(c, inodeNum)
-	child.markSelfAccessed(c, false)
 	// Activate the lookupCount entry of currently instantiated inodes
 	if !instantiated {
 		c.qfs.increaseLookupCountWithNum(inodeNum, 0)
