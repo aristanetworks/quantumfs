@@ -6,11 +6,13 @@ package daemon
 // Test that workspaceroot maintains a list of accessed files
 
 import (
+	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -110,6 +112,26 @@ func TestAccessListFileFtruncate(t *testing.T) {
 		test.AssertNoErr(syscall.Ftruncate(fd, 0))
 		syscall.Close(fd)
 		accessList.Paths[filename] = quantumfs.PathUpdated
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
+func TestAccessListFileReadWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		err := testutils.PrintToFile(path, string(GenData(10*1024)))
+		test.AssertNoErr(err)
+
+		_, err = ioutil.ReadFile(path)
+		test.AssertNoErr(err)
+
+		accessList := quantumfs.NewPathAccessList()
+		accessList.Paths[filename] = quantumfs.PathUpdated |
+			quantumfs.PathRead | quantumfs.PathCreated
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
