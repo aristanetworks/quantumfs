@@ -289,6 +289,22 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 
 	fpath := filepath.Join(path, dr.Filename())
 
+	// DirectoryRecord.ExtendedAttributes() does not return ZeroKey
+	// when there are no EAs. Sometimes it returns fakeZeroKey and
+	// sometime quantumfs.EmptyKey.
+	fakeZeroKey := quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
+		[quantumfs.ObjectKeyLength - 1]byte{})
+
+	// Walk the ExtendedAttribute for that DirectoryRecord.
+	extKey := dr.ExtendedAttributes()
+	if !(extKey.IsEqualTo(fakeZeroKey) ||
+		extKey.IsEqualTo(quantumfs.EmptyBlockKey)) {
+		err := writeToChan(c, keyChan, fpath, extKey, uint64(1024))
+		if err != nil {
+			return err
+		}
+	}
+
 	switch dr.Type() {
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
