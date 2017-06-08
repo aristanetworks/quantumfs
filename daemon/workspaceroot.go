@@ -753,14 +753,14 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 		utils.BitFlagsSet(uint(op), quantumfs.PathCreated) {
 
 		if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathIsDir) {
-			// Directories which are deleted and then recreated are not recorded
-			// as either created or deleted. However, if it was read,
-			// that is maintained.
+			// Directories which are deleted and then recreated are not
+			// recorded as either created or deleted. However, if it was
+			// read, that is maintained.
 			if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathRead) {
 				c.vlog("Keeping delete->create directory as read")
 				pathFlags = pathFlags &^ quantumfs.PathDeleted
 			} else {
-				c.vlog("Unmarking directory with create after delete")
+				c.vlog("Unmarking directory with delete->create")
 				delete(wsr.accessList.Paths, path)
 				return
 			}
