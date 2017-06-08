@@ -195,6 +195,26 @@ func TestAccessListDirectoryCreateDelete(t *testing.T) {
 	})
 }
 
+func TestAccessListDirectoryRead(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirname := "/test"
+		path := workspace + dirname
+		err := syscall.Mkdir(path, 0666)
+		test.Assert(err == nil, "Create directory error:%v", err)
+
+		accessList := quantumfs.NewPathAccessList()
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		path = workspace + dirname
+		_, err = ioutil.ReadDir(path)
+		test.AssertNoErr(err)
+		accessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathRead
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
 func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := quantumfs.NewPathAccessList()
