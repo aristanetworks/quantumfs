@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -115,15 +116,18 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	th.SetDataStore(tds)
 
 	// Read all files in this workspace.
-	readFile := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	readFile := func(path string, info os.FileInfo, inerr error) error {
+		if inerr != nil {
 			return nil
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
 			return nil
 		}
-
+		data := make([]byte, 100)
+		if _, err := syscall.Listxattr(path, data); err != nil {
+			return err
+		}
 		if _, err := ioutil.ReadFile(path); err != nil {
 			return err
 		}
@@ -193,6 +197,11 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 
 		if path == workspace+"/api" || info.IsDir() {
 			return nil
+		}
+
+		data := make([]byte, 100)
+		if _, err := syscall.Listxattr(path, data); err != nil {
+			return err
 		}
 
 		if _, err := ioutil.ReadFile(path); err != nil {
