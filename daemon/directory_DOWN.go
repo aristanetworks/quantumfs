@@ -314,9 +314,8 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 
 		c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
 	} else if !remoteRecord.ID().IsEqualTo(localRecord.ID()) {
-		uninstantiated = append(uninstantiated,
-			dir.handleDirectoryEntryUpdate_DOWN(c, localRecord,
-				remoteRecord)...)
+		uninstantiated = dir.handleDirectoryEntryUpdate_DOWN(c, localRecord,
+			remoteRecord)
 	}
 	return uninstantiated
 }
