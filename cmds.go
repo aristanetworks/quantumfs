@@ -200,15 +200,36 @@ func NewApiWithPath(path string) (Api, error) {
 	return &api, nil
 }
 
-// A description of the files which were accessed within a particular workspace on a
-// single instance. For directories "Read" means readdir, accessing children within
-// it or accessing the attributes of a file are not sufficient. Directories can never
-// be updated.
+// A description of the files and directories which were accessed within a particular
+// workspace on a single instance.
 //
-// Note that any files/directories which are created and subsequently deleted will
-// not show up in this list. Similarly, any files/directories which are deleted and
-// then created will show up as neither, but are instead considered to have been
-// truncated and therefore updated.
+// - readdir() marks a directory as read
+// - read() marks a file as read
+// - write() marks a file as updated
+// - truncation() marks a file as updated
+// - mkdir() marks a directory as created
+// - rmdir() marks a directory as deleted
+// - creat() or mknod() marks a file as created
+// - unlink() marks a file as unlinked
+// - No operations mark a directory as updated
+//
+// Creation and deletion have additional special semantics in that they
+// are collapsible. Specifically:
+//
+// - Files which are created and then deleted are removed from the listing
+//   under the assumption they are temporary files and of no interest.
+// - Files which are deleted and then created are recorded as being
+//   truncated. That is, neither created nor deleted, but updated.
+// - Directories which are created and then deleted are removed from the
+//   listing under the assumption they are temporary and of no interest.
+// - Directories which are deleted and then created are listed as being
+//   neither created nor deleted. If the directory had previously been
+//   read it is included in the list with that flag, otherwise it is
+//   removed from the list.
+//
+// Simply accessing the attributes of a file or directory does not add it to the
+// accessed list. Similarly, accessing the attribute of a file does not mark the
+// containing directory as read.
 type PathAccessList struct {
 	Paths map[string]PathFlags
 }
