@@ -573,6 +573,33 @@ func TestAccessListOverwriteRemovalDirectoryWithRead(t *testing.T) {
 	})
 }
 
+func TestAccessListInsertInode(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := "/test"
+		path := workspace + filename
+		fd, err := syscall.Creat(path, 0666)
+		test.Assert(err == nil, "Create file error:%v", err)
+		syscall.Close(fd)
+
+		key := getExtendedKeyHelper(test, path, "file")
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		filename = filename + "clone"
+		path = workspace + filename
+
+		api := test.getApi()
+		err = api.InsertInode(test.RelPath(path), key, 0777, 0, 0)
+		test.AssertNoErr(err)
+
+		accessList := quantumfs.NewPathAccessList()
+		accessList.Paths[filename] = quantumfs.PathCreated
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
 func TestAccessListClear(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := quantumfs.NewPathAccessList()
