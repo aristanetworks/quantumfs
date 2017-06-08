@@ -502,7 +502,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 	})
 }
 
-func TestAccessListOverwriteRemoval(t *testing.T) {
+func TestAccessListOverwriteRemovalFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		filename := "/test"
@@ -521,6 +521,26 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		// truncated.
 		accessList.Paths[filename] = quantumfs.PathUpdated
 		syscall.Close(fd)
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
+func TestAccessListOverwriteRemovalDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirname := "/test"
+		path := workspace + dirname
+		test.AssertNoErr(os.Mkdir(path, 0777))
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		accessList := quantumfs.NewPathAccessList()
+		path = workspace + dirname
+		test.AssertNoErr(os.Remove(path))
+		test.AssertNoErr(os.Mkdir(path, 0777))
+		// Deleted and then created directories are counted as not having
+		// been neither deleted nor created.
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
