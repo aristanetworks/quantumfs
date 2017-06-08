@@ -549,6 +549,30 @@ func TestAccessListOverwriteRemovalDirectory(t *testing.T) {
 	})
 }
 
+func TestAccessListOverwriteRemovalDirectoryWithRead(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirname := "/test"
+		path := workspace + dirname
+		test.AssertNoErr(os.Mkdir(path, 0777))
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		accessList := quantumfs.NewPathAccessList()
+		path = workspace + dirname
+		_, err := ioutil.ReadDir(path)
+		test.AssertNoErr(err)
+		test.AssertNoErr(os.Remove(path))
+		test.AssertNoErr(os.Mkdir(path, 0777))
+		// Deleted and then created directories are counted as having been
+		// neither deleted nor created, however, if it had been read, the
+		// Read flag must persist.
+		accessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathRead
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
 func TestAccessListClear(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		accessList := quantumfs.NewPathAccessList()
