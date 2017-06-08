@@ -145,13 +145,25 @@ func getAccessed() {
 	}
 
 	for path, flags := range pathList.Paths {
-		fmt.Printf("%s: directory-%t Created-%t Read-%t Updated-%t "+
-			"Deleted-%t\n", path,
-			utils.BitFlagsSet(uint(flags), quantumfs.PathIsDir),
-			utils.BitFlagsSet(uint(flags), quantumfs.PathCreated),
-			utils.BitFlagsSet(uint(flags), quantumfs.PathRead),
-			utils.BitFlagsSet(uint(flags), quantumfs.PathUpdated),
-			utils.BitFlagsSet(uint(flags), quantumfs.PathDeleted))
+		created := "-"
+		if utils.BitFlagsSet(uint(flags), quantumfs.PathCreated) {
+			created = "C"
+		}
+		read := "-"
+		if utils.BitFlagsSet(uint(flags), quantumfs.PathRead) {
+			read = "R"
+		}
+		updated := "-"
+		if utils.BitFlagsSet(uint(flags), quantumfs.PathUpdated) {
+			updated = "U"
+		}
+		deleted := "-"
+		if utils.BitFlagsSet(uint(flags), quantumfs.PathDeleted) {
+			deleted = "D"
+		}
+		fmt.Printf("%s: directory-%t %s%s%s%s%s\n", path,
+			utils.BitFlagsSet(uint(flags), quantumfs.PathIsDir), created,
+			read, updated, deleted)
 	}
 }
 
