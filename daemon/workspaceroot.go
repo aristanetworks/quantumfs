@@ -752,18 +752,23 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 	} else if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathDeleted) &&
 		utils.BitFlagsSet(uint(op), quantumfs.PathCreated) {
 
-		// Files which are deleted then recreated are recorded as being
-		// neither deleted nor created, but instead truncated (updated). This
-		// simplifies the case where some program unlinked and then
-		// created/moved a file into place.
-		//
-		// Directories which are deleted and then recreated are not recorded
-		// at all.
 		if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathIsDir) {
-			c.vlog("Unmarking directory with create after delete")
-			delete(wsr.accessList.Paths, path)
-			return
+			// Directories which are deleted and then recreated are not recorded
+			// as either created or deleted. However, if it was read,
+			// that is maintained.
+			if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathRead) {
+				c.vlog("Keeping delete->create directory as read")
+				pathFlags = pathFlags &^ quantumfs.PathDeleted
+			} else {
+				c.vlog("Unmarking directory with create after delete")
+				delete(wsr.accessList.Paths, path)
+				return
+			}
 		} else {
+			// Files which are deleted then recreated are recorded as
+			// being neither deleted nor created, but instead truncated
+			// (updated). This simplifies the case where some program
+			// unlinked and then created/moved a file into place.
 			c.vlog("Removing deleted from recreated file")
 			pathFlags = pathFlags &^ quantumfs.PathDeleted
 			pathFlags = quantumfs.PathUpdated
