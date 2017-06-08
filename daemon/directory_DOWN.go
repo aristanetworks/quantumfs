@@ -312,7 +312,7 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 		} else {
 			u := dir.handleDirectoryEntryRecreate_DOWN(c, localRecord,
 				remoteRecord)
-			uninstantiated = append(uninstantiated, u)
+			uninstantiated = []InodeId{u}
 		}
 	}
 	return uninstantiated
