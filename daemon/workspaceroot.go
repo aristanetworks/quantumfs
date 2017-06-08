@@ -723,7 +723,7 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 
 	utils.Assert(!utils.BitFlagsSet(uint(op),
 		quantumfs.PathCreated|quantumfs.PathDeleted),
-		"Cannot create and delete simulatneously")
+		"Cannot create and delete simultaneously")
 
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()

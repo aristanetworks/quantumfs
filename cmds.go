@@ -206,7 +206,7 @@ func NewApiWithPath(path string) (Api, error) {
 // - readdir() marks a directory as read
 // - read() marks a file as read
 // - write() marks a file as updated
-// - truncation() marks a file as updated
+// - truncation marks a file as updated
 // - mkdir() marks a directory as created
 // - rmdir() marks a directory as deleted
 // - creat() or mknod() marks a file as created

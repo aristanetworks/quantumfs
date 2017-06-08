@@ -513,7 +513,6 @@ func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
-
 	defer c.FuncIn("InodeCommon::markAccessed", "path %s CRUD %x", path,
 		op).Out()
 	if inode.isWorkspaceRoot() {
