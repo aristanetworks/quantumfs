@@ -517,7 +517,7 @@ func TestAccessListOverwriteRemoval(t *testing.T) {
 		err = os.Remove(path)
 		test.Assert(err == nil, "Remove file error:%v", err)
 		fd, err = syscall.Creat(path, 0666)
-		// Deleted and then created files are counted as not having been
+		// Deleted and then created files are counted as having been
 		// truncated.
 		accessList.Paths[filename] = quantumfs.PathUpdated
 		syscall.Close(fd)
