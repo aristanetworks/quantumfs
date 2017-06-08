@@ -11,34 +11,34 @@ import (
 
 const requestEndAfterNs = 3000000000
 
-type field struct {
-	name string
-	data uint64
+type Field struct {
+	Name string
+	Data uint64
 }
 
-func newField(name_ string, data_ uint64) field {
-	return field{
-		name: name_,
-		data: data_,
+func newField(name_ string, data_ uint64) Field {
+	return Field{
+		Name: name_,
+		Data: data_,
 	}
 }
 
-type tag struct {
-	name string
-	data string
+type Tag struct {
+	Name string
+	Data string
 }
 
-func newTag(name_ string, data_ string) tag {
-	return tag{
-		name: name_,
-		data: data_,
+func newTag(name_ string, data_ string) Tag {
+	return Tag{
+		Name: name_,
+		Data: data_,
 	}
 }
 
 type DbInterface interface {
-	Store(tags []tag, fields []field)
+	Store(tags []Tag, fields []Field)
 
-	Fetch(withTags []tag, field string, lastN int) []uint64
+	Fetch(withTags []Tag, field string, lastN int) []uint64
 }
 
 type logTrack struct {
