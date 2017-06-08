@@ -30,12 +30,12 @@ func NewExtPairStats(db_ DbInterface, start string, stop string,
 	matchingIndent bool, statPeriodSec_ float64) *extPairStats {
 
 	return &extPairStats{
-		db:        db_,
-		fmtStart:  start,
-		fmtStop:   stop,
-		sameScope: matchingIndent,
+		db:            db_,
+		fmtStart:      start,
+		fmtStop:       stop,
+		sameScope:     matchingIndent,
 		statPeriodSec: statPeriodSec_,
-		statFrom:  time.Now(),
+		statFrom:      time.Now(),
 	}
 }
 
