@@ -45,8 +45,8 @@ func (db *Memdb) Fetch(withTags []qloggerdb.Tag, field string, lastN int) []uint
 		outputData := true
 		for _, needTag := range withTags {
 			// missing a tag, so we don't care about this data point
-			if tagData, exists := entry.tags[needTag.Name]; (!exists ||
-				tagData != needTag.Data) {
+			if tagData, exists := entry.tags[needTag.Name]; !exists ||
+				tagData != needTag.Data {
 
 				outputData = false
 				break

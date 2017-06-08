@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aristanetworks/quantumfs/loggerdb"
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/loggerdb"
 )
 
 func init() {
