@@ -541,8 +541,8 @@ func TestAccessListOverwriteRemovalDirectory(t *testing.T) {
 		path = workspace + dirname
 		test.AssertNoErr(os.Remove(path))
 		test.AssertNoErr(os.Mkdir(path, 0777))
-		// Deleted and then created directories are counted as not having
-		// been neither deleted nor created.
+		// Deleted and then created directories are counted as having been
+		// neither deleted nor created.
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
