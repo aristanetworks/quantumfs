@@ -229,7 +229,8 @@ func NewApiWithPath(path string) (Api, error) {
 //
 // Simply accessing the attributes of a file or directory does not add it to the
 // accessed list. Similarly, accessing the attribute of a file does not mark the
-// containing directory as read.
+// containing directory as read. Opening a file or directory also does not mark it as
+// read.
 type PathAccessList struct {
 	Paths map[string]PathFlags
 }
