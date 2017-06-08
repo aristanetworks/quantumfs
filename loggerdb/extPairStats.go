@@ -13,13 +13,12 @@ import (
 	"github.com/aristanetworks/quantumfs/qlog"
 )
 
-const statPeriodSec = 5
-
 type extPairStats struct {
-	db        DbInterface
-	fmtStart  string
-	fmtStop   string
-	sameScope bool
+	db            DbInterface
+	fmtStart      string
+	fmtStop       string
+	sameScope     bool
+	statPeriodSec float64
 
 	stats    basicStats
 	statFrom time.Time
@@ -28,13 +27,14 @@ type extPairStats struct {
 // Set matchingIndent to true if start and stop should only be recognized when they
 // are seen at the same function scope
 func NewExtPairStats(db_ DbInterface, start string, stop string,
-	matchingIndent bool) *extPairStats {
+	matchingIndent bool, statPeriodSec_ float64) *extPairStats {
 
 	return &extPairStats{
 		db:        db_,
 		fmtStart:  start,
 		fmtStop:   stop,
 		sameScope: matchingIndent,
+		statPeriodSec: statPeriodSec_,
 		statFrom:  time.Now(),
 	}
 }
@@ -69,13 +69,13 @@ func (ext *extPairStats) ExtractStatFrom(request qlog.LogStack, idx int) {
 
 func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
 	// Check if the stats need to be finalized and reset
-	if time.Since(ext.statFrom).Seconds() > statPeriodSec {
+	if time.Since(ext.statFrom).Seconds() > ext.statPeriodSec {
 		if ext.stats.Count() > 0 {
-			tags := make([]tag, 0)
+			tags := make([]Tag, 0)
 			tags = append(tags, newTag("fmtStart", ext.fmtStart))
 			tags = append(tags, newTag("fmtStop", ext.fmtStop))
 
-			fields := make([]field, 0)
+			fields := make([]Field, 0)
 			fields = append(fields, newField("average",
 				ext.stats.Average()))
 			fields = append(fields, newField("samples",

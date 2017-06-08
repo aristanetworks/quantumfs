@@ -121,7 +121,7 @@ func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
 	}
 }
 
-// A data aggregator that outputs basic statistics such as average and percentiles.
+// A data aggregator that outputs basic statistics such as the average
 // Intended to be used by data extractors.
 type basicStats struct {
 	sum   uint64
