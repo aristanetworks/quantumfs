@@ -161,7 +161,7 @@ func getAccessed() {
 		if utils.BitFlagsSet(uint(flags), quantumfs.PathDeleted) {
 			deleted = "D"
 		}
-		fmt.Printf("%s: directory-%t %s%s%s%s%s\n", path,
+		fmt.Printf("%s: directory-%t %s%s%s%s\n", path,
 			utils.BitFlagsSet(uint(flags), quantumfs.PathIsDir), created,
 			read, updated, deleted)
 	}
