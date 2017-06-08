@@ -167,7 +167,8 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		path = workspace + dirname
 		err = syscall.Rmdir(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
-		accessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathDeleted
+		accessList.Paths[dirname] = quantumfs.PathIsDir |
+			quantumfs.PathDeleted
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
@@ -427,7 +428,8 @@ func TestAccessListHardLinkCreateDelete(t *testing.T) {
 
 		// Files created and then deleted should be removed from the list.
 		accessList := quantumfs.NewPathAccessList()
-		accessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathCreated
+		accessList.Paths[dirname] = quantumfs.PathIsDir |
+			quantumfs.PathCreated
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
