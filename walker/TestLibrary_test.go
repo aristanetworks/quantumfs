@@ -124,11 +124,6 @@ func (th *testHelper) readWalkCompare(workspace string) {
 		if path == workspace+"/api" || info.IsDir() {
 			return nil
 		}
-		data := make([]byte, 100)
-		if _, err := syscall.Listxattr(path, data); err != nil {
-			return err
-		}
-		// TODO: GetxAttr also
 
 		var stat syscall.Stat_t
 		if err := syscall.Stat(path, &stat); err != nil {
@@ -138,6 +133,12 @@ func (th *testHelper) readWalkCompare(workspace string) {
 		if (stat.Mode & syscall.S_IFREG) == 0 {
 			return nil
 		}
+
+		data := make([]byte, 100)
+		if _, err := syscall.Listxattr(path, data); err != nil {
+			return err
+		}
+		// TODO: GetxAttr also
 
 		if _, err := ioutil.ReadFile(path); err != nil {
 			return err
@@ -210,12 +211,6 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 			return nil
 		}
 
-		data := make([]byte, 100)
-		if _, err := syscall.Listxattr(path, data); err != nil {
-			return err
-		}
-		// TODO: GetxAttr also
-
 		var stat syscall.Stat_t
 		if err := syscall.Stat(path, &stat); err != nil {
 			return err
@@ -224,6 +219,12 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 		if (stat.Mode & syscall.S_IFREG) == 0 {
 			return nil
 		}
+
+		data := make([]byte, 100)
+		if _, err := syscall.Listxattr(path, data); err != nil {
+			return err
+		}
+		// TODO: GetxAttr also
 
 		if _, err := ioutil.ReadFile(path); err != nil {
 			return err
