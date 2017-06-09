@@ -1183,13 +1183,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 				}
 			}
 
-			// This is the same entry just moved, so we can use the same
-			// record for both the old and new paths.
-			dir.self.markAccessed(c, oldName,
-				markType(newEntry.Type(), quantumfs.PathDeleted))
-			dst.self.markAccessed(c, newName,
-				markType(newEntry.Type(), quantumfs.PathCreated))
-
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
 
@@ -1218,6 +1211,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 				// Remove entry in old directory
 				dir.deleteEntry_(c, oldName)
 			}()
+
+			// This is the same entry just moved, so we can use the same
+			// record for both the old and new paths.
+			dir.self.markAccessed(c, oldName,
+				markType(newEntry.Type(), quantumfs.PathDeleted))
+			dst.self.markAccessed(c, newName,
+				markType(newEntry.Type(), quantumfs.PathCreated))
 
 			// Set entry in new directory. If the renamed inode is
 			// uninstantiated, we swizzle the parent here.
