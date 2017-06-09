@@ -195,7 +195,7 @@ func (inode *InodeCommon) setChildAttr(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::setChildAttr").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Invalid setChildAttr on InodeCommon")
 		return fuse.EIO
 	}
@@ -207,7 +207,7 @@ func (inode *InodeCommon) getChildXAttrSize(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::getChildXAttrSize").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Invalid getChildXAttrSize on InodeCommon")
 		return 0, fuse.EIO
 	}
@@ -219,7 +219,7 @@ func (inode *InodeCommon) getChildXAttrData(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::getChildXAttrData").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Invalid getChildXAttrData on InodeCommon")
 		return nil, fuse.EIO
 	}
@@ -231,7 +231,7 @@ func (inode *InodeCommon) listChildXAttr(c *ctx,
 
 	defer c.funcIn("InodeCommon::listChildXAttr").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Invalid listChildXAttr on InodeCommon")
 		return nil, fuse.EIO
 	}
@@ -243,7 +243,7 @@ func (inode *InodeCommon) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	defer c.funcIn("InodeCommon::setChildXAttr").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Invalid setChildXAttr on InodeCommon")
 		return fuse.EIO
 	}
@@ -255,7 +255,7 @@ func (inode *InodeCommon) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::removeChildXAttr").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Invalid removeChildXAttr on InodeCommon")
 		return fuse.EIO
 	}
@@ -267,7 +267,7 @@ func (inode *InodeCommon) getChildRecordCopy(c *ctx,
 
 	defer c.funcIn("InodeCommon::getChildRecordCopy").Out()
 
-	if !inode.isOrphaned() {
+	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Unsupported record fetch on file")
 		return &quantumfs.DirectRecord{},
 			errors.New("Unsupported record fetch")
