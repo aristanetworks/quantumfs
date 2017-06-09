@@ -1414,7 +1414,6 @@ func deleteCWDTestGen(runAsRoot bool) func(*testHelper) {
 }
 
 func TestDeleteCWDUnprivilegedUser(t *testing.T) {
-	t.Skip() // XXX BUG203361
 	runExpensiveTest(t, deleteCWDTestGen(false))
 }
 
@@ -1423,7 +1422,6 @@ func TestDeleteCWDRootUser(t *testing.T) {
 }
 
 func TestDeleteOpenDirWithChild(t *testing.T) {
-	t.Skip() // XXX BUG203361
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testdir"
