@@ -867,6 +867,124 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 	})
 }
 
+func TestDirectoryRenameDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := workspace + "/dir2"
+
+		test.AssertNoErr(os.Mkdir(dir1, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(os.Mkdir(dir2, 0777))
+
+		test.AssertNoErr(syscall.Rename(dir1, dir2))
+
+		_, err := os.Stat(dir1)
+		test.AssertErr(err)
+		_, err = os.Stat(dir2)
+		test.AssertNoErr(err)
+		_, err = os.Stat(dir2 + "/file1")
+		test.AssertNoErr(err)
+	})
+}
+
+func TestDirectoryRenameDirOntoFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(os.Mkdir(dir1, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		err := syscall.Rename(dir1, file2)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTDIR,
+			"Directory cannot be renamed onto file")
+	})
+}
+
+func TestDirectoryRenameFileOntoDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		file1 := workspace + "/file1"
+		dir2 := workspace + "/dir2"
+		file2 := dir2 + "/file2"
+
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(os.Mkdir(dir2, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		err := syscall.Rename(file1, dir2)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.EISDIR,
+			"File cannot be renamed onto directory")
+	})
+}
+
+func TestDirectoryMvChildDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		otherdir := workspace + "/otherdir"
+		test.AssertNoErr(os.Mkdir(otherdir, 0777))
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := otherdir + "/dir2"
+
+		test.AssertNoErr(os.Mkdir(dir1, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(os.Mkdir(dir2, 0777))
+
+		test.AssertNoErr(syscall.Rename(dir1, dir2))
+
+		_, err := os.Stat(dir1)
+		test.AssertErr(err)
+		_, err = os.Stat(dir2)
+		test.AssertNoErr(err)
+		_, err = os.Stat(dir2 + "/file1")
+		test.AssertNoErr(err)
+	})
+}
+
+func TestDirectoryMvChildDirOntoFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		otherdir := workspace + "/otherdir"
+		test.AssertNoErr(os.Mkdir(otherdir, 0777))
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		file2 := otherdir + "/file2"
+
+		test.AssertNoErr(os.Mkdir(dir1, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		err := syscall.Rename(dir1, file2)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTDIR,
+			"Directory cannot be renamed onto file")
+	})
+}
+
+func TestDirectoryMvChildFileOntoDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		otherdir := workspace + "/otherdir"
+		test.AssertNoErr(os.Mkdir(otherdir, 0777))
+		file1 := workspace + "/file1"
+		dir2 := otherdir + "/dir2"
+		file2 := dir2 + "/file2"
+
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(os.Mkdir(dir2, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		err := syscall.Rename(file1, dir2)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.EISDIR,
+			"File cannot be renamed onto directory")
+	})
+}
+
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
