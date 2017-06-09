@@ -1031,19 +1031,20 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 				markType(record.Type(), quantumfs.PathCreated))
 
 			oldInodeId_ := dir.children.inodeNum(oldName)
-			oldRemoved_ := dir.children.renameChild(c, oldName, newName)
-			return oldInodeId_, oldRemoved_, fuse.OK
+			oldRemovedId_, oldRemovedRecord_ :=
+				dir.children.renameChild(c, oldName, newName)
+
+			if oldRemovedRecord_ != nil {
+				dir.self.markAccessed(c, newName,
+					markType(oldRemovedRecord_.Type(),
+						quantumfs.PathDeleted))
+			}
+
+			return oldInodeId_, oldRemovedId_, fuse.OK
 		}()
 		if oldName == newName || err != fuse.OK {
 			return err
 		}
-
-		func() {
-			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, newName)
-			dir.self.markAccessed(c, newName,
-				markType(record.Type(), quantumfs.PathCreated))
-		}()
 
 		// update the inode name
 		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
