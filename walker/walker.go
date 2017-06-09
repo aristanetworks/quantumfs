@@ -283,27 +283,14 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-// DirectoryRecord.ExtendedAttributes() does not return ZeroKey
-// when there are no EAs. Sometimes it returns fakeZeroKey and
-// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
-var fakeZeroKey = quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
-	[quantumfs.ObjectKeyLength - 1]byte{})
-
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	dr *quantumfs.DirectRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	fpath := filepath.Join(path, dr.Filename())
 
-	// Walk the ExtendedAttribute for that DirectoryRecord.
-	extKey := dr.ExtendedAttributes()
-	if !(extKey.IsEqualTo(fakeZeroKey)) ||
-		!(extKey.IsEqualTo(quantumfs.EmptyBlockKey)) {
-
-		err := writeToChan(c, keyChan, fpath, extKey, uint64(1024))
-		if err != nil {
-			return err
-		}
+	if err := handleExtendedAttributes(c, fpath, ds, dr, keyChan); err != nil {
+		return err
 	}
 
 	switch dr.Type() {
@@ -325,6 +312,45 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	default:
 		return writeToChan(c, keyChan, fpath, dr.ID(), dr.Size())
 	}
+}
+
+// DirectoryRecord.ExtendedAttributes() does not return EmptyBlockKey
+// when there are no EAs. Sometimes it returns fakeZeroKey and
+// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
+var fakeZeroKey = quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
+	[quantumfs.ObjectKeyLength - 1]byte{})
+
+func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
+	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
+
+	extKey := dr.ExtendedAttributes()
+	if extKey.IsEqualTo(fakeZeroKey) ||
+		extKey.IsEqualTo(quantumfs.EmptyBlockKey) {
+		return nil
+	}
+
+	buf := simplebuffer.New(nil, extKey)
+	if err := ds.Get(c.Qctx, extKey, buf); err != nil {
+		return err
+	}
+	simplebuffer.AssertNonZeroBuf(buf,
+		"Attributes List buffer %s", extKey.Text())
+
+	err := writeToChan(c, keyChan, fpath, extKey, uint64(buf.Size()))
+	if err != nil {
+		return err
+	}
+
+	attributeList := buf.AsExtendedAttributes()
+
+	for i := 0; i < attributeList.NumAttributes(); i++ {
+		_, key := attributeList.Attribute(i)
+		err := writeToChan(c, keyChan, fpath, key, uint64(1024))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
@@ -364,10 +390,6 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
-		return true
-	}
-
-	if key.IsEqualTo(fakeZeroKey) {
 		return true
 	}
 

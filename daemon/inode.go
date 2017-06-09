@@ -83,6 +83,8 @@ type Inode interface {
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
+	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
+
 	getChildXAttrSize(c *ctx, inodeNum InodeId,
 		attr string) (size int, result fuse.Status)
 
@@ -203,6 +205,10 @@ type InodeCommon struct {
 
 	// This element is protected by the DirtyQueueLock
 	dirtyElement__ *list.Element
+
+	unlinkRecord quantumfs.DirectoryRecord
+	unlinkXAttr  map[string][]byte
+	unlinkLock   utils.DeferableRwMutex
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -566,9 +572,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 		return err
 	}
 
-	if file, isFile := toDelete.(*File); isFile {
-		file.setChildRecord(c, toOrphan)
-	}
+	toDelete.setChildRecord(c, toOrphan)
 	// orphan ourselves
 	inode.parentId = toDelete.inodeNum()
 	c.vlog("Orphaned inode %d", toDelete.inodeNum())
