@@ -12,7 +12,6 @@ import (
 	"strconv"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/utils"
 )
 
 var version string
@@ -146,24 +145,23 @@ func getAccessed() {
 
 	for path, flags := range pathList.Paths {
 		created := "-"
-		if utils.BitFlagsSet(uint(flags), quantumfs.PathCreated) {
+		if flags.Created() {
 			created = "C"
 		}
 		read := "-"
-		if utils.BitFlagsSet(uint(flags), quantumfs.PathRead) {
+		if flags.Read() {
 			read = "R"
 		}
 		updated := "-"
-		if utils.BitFlagsSet(uint(flags), quantumfs.PathUpdated) {
+		if flags.Updated() {
 			updated = "U"
 		}
 		deleted := "-"
-		if utils.BitFlagsSet(uint(flags), quantumfs.PathDeleted) {
+		if flags.Deleted() {
 			deleted = "D"
 		}
-		fmt.Printf("%s: directory-%t %s%s%s%s\n", path,
-			utils.BitFlagsSet(uint(flags), quantumfs.PathIsDir), created,
-			read, updated, deleted)
+		fmt.Printf("%s: directory-%t %s%s%s%s\n", path, flags.IsDir(),
+			created, read, updated, deleted)
 	}
 }
 
