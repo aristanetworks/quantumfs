@@ -35,10 +35,8 @@ func newTag(name_ string, data_ string) Tag {
 	}
 }
 
-type DbInterface interface {
+type TimeSeriesDB interface {
 	Store(tags []Tag, fields []Field)
-
-	Fetch(withTags []Tag, field string, lastN int) []uint64
 }
 
 type logTrack struct {
@@ -66,7 +64,7 @@ type LoggerDb struct {
 	statExtractors []StatExtractor
 }
 
-func NewLoggerDb(db DbInterface, extractors []StatExtractor) *LoggerDb {
+func NewLoggerDb(db TimeSeriesDB, extractors []StatExtractor) *LoggerDb {
 	rtn := LoggerDb{
 		logsByRequest:  make(map[uint64]logTrack),
 		statExtractors: extractors,
