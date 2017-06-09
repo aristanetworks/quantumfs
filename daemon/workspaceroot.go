@@ -477,6 +477,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
 		entry.nlink = hardlink.Nlinks()
+		entry.record = hardlink.Record()
 		wsr.hardlinks[id] = entry
 
 		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
@@ -509,6 +510,11 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 			c.vlog("Removing stale hardlink id %d, inode %d, nlink %d",
 				hardlinkId, entry.inodeId, entry.nlink)
 			wsr.removeHardlink_(hardlinkId, entry.inodeId)
+			if inode := c.qfs.inodeNoInstantiate(c,
+				entry.inodeId); inode != nil {
+
+				inode.orphan(c)
+			}
 		}
 	}
 }

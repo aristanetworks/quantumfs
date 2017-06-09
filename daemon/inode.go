@@ -121,6 +121,7 @@ type Inode interface {
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
 	isOrphaned_() bool
+	orphan(c *ctx)
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
@@ -413,6 +414,15 @@ func (inode *InodeCommon) isOrphaned() bool {
 	defer inode.parentLock.RLock().RUnlock()
 
 	return inode.isOrphaned_()
+}
+
+func (inode *InodeCommon) orphan(c *ctx) {
+	defer c.funcIn("InodeCommon::orphan").Out()
+	defer inode.parentLock.RLock().RUnlock()
+
+	inode.id = inode.parentId
+	// XXX once r/837 lands, also do:
+	// inode.setChildRecord(c, entry.record)
 }
 
 // parentLock must be RLocked

@@ -382,6 +382,56 @@ func TestRefreshNlinkBump(t *testing.T) {
 	})
 }
 
+func TestRefreshNlink3To2(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		createTestFile(test, workspace, name, 1000)
+		newRootId1 := linkTestFile(test, workspace, name, "link1")
+		newRootId2 := linkTestFile(test, workspace, name, "link2")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		// Create and delete a temporary file to make sure a new rootId
+		// is published
+		createTestFileNoSync(test, workspace, name+".tmp", 1000)
+		newRootId3 := removeTestFile(test, workspace, name+".tmp")
+
+		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+		removeTestFile(test, workspace, "link1")
+		removeTestFile(test, workspace, name)
+	})
+}
+
+func TestRefreshNlink2To3(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		createTestFile(test, workspace, name, 1000)
+		linkTestFile(test, workspace, name, "link1")
+		newRootId1 := linkTestFile(test, workspace, name, "link2")
+		newRootId2 := removeTestFile(test, workspace, "link2")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		// Create and delete a temporary file to make sure a new rootId
+		// is published
+		createTestFileNoSync(test, workspace, name+".tmp", 1000)
+		newRootId3 := removeTestFile(test, workspace, name+".tmp")
+
+		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+		removeTestFile(test, workspace, "link2")
+		removeTestFile(test, workspace, "link1")
+		removeTestFile(test, workspace, name)
+	})
+}
+
 func assertFileIsOfSize(test *testHelper, fullname string, size int64) {
 	var stat syscall.Stat_t
 
@@ -496,6 +546,39 @@ func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 
 		removeTestFile(test, workspace, name)
 		removeTestFile(test, workspace, linkfile)
+	})
+}
+
+func TestRefreshChangeTypeHardlinkToDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		linkfile := "linkFile"
+
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		utils.MkdirAll(workspace+"/"+linkfile, 0777)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err := syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(workspace + "/" + linkfile)
+		test.AssertNoErr(err)
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId2 := linkTestFile(test, workspace, name, linkfile)
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		createTestFileNoSync(test, workspace, name+"/subfile", 1000)
+		removeTestFileNoSync(test, workspace, name+"/subfile")
+		err = syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(workspace + "/" + linkfile)
+		test.AssertNoErr(err)
 	})
 }
 
@@ -633,52 +716,54 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func readFirstNBytes(test *testHelper, name string, n int) string {
-	file, err := os.Open(name)
+func verifyContentStartsWith(test *testHelper, file *os.File, expected string) {
+	content := make([]byte, len(expected))
+	_, err := file.Seek(0, os.SEEK_SET)
 	test.AssertNoErr(err)
-	newContent := make([]byte, n)
-	_, err = io.ReadFull(file, newContent)
+	_, err = io.ReadFull(file, content)
 	test.AssertNoErr(err)
-	err = file.Close()
-	test.AssertNoErr(err)
-	return string(newContent)
+	test.Assert(string(content) == expected,
+		fmt.Sprintf("content mismatch _%s_", content))
 }
 
-func contentTest(ctx *ctx, test *testHelper,
-	content string,
-	create1 func(string, string) error,
-	create2 func(string) error) {
+type createFunc func(name string, content string) error
 
+func contentTest(ctx *ctx, test *testHelper, c1 createFunc, c2 createFunc) {
 	workspace := test.NewWorkspace()
+	content1 := "original content"
+	content2 := "CONTENT2"
 	utils.MkdirAll(workspace+"/subdir", 0777)
 	name := "subdir/testFile"
 	fullname := workspace + "/" + name
 
-	err := create1(fullname, content)
+	err := c1(fullname, content1)
 	test.AssertNoErr(err)
 	test.SyncAllWorkspaces()
 	newRootId1 := getRootId(test, workspace)
 
-	err = create2(fullname)
+	err = c2(fullname, content2)
 	test.AssertNoErr(err)
 	test.SyncAllWorkspaces()
 	newRootId2 := getRootId(test, workspace)
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
 	test.AssertNoErr(err)
-	readFirstNBytes(test, fullname, len(content))
+	verifyContentStartsWith(test, file, content2)
 
 	refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 
 	newRootId3 := getRootId(test, workspace)
 	test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
 
+	verifyContentStartsWith(test, file, content1)
 	err = file.Close()
 	test.AssertNoErr(err)
 
-	newContent := readFirstNBytes(test, fullname, len(content))
-	test.Assert(content == newContent,
-		fmt.Sprintf("content mismatch %d", len(newContent)))
+	file, err = os.Open(fullname)
+	test.AssertNoErr(err)
+	verifyContentStartsWith(test, file, content1)
+	err = file.Close()
+	test.AssertNoErr(err)
 	removeTestFile(test, workspace, name)
 }
 
@@ -694,7 +779,7 @@ func createSparseFile(name string, size int64) error {
 	return os.Truncate(name, size)
 }
 
-func createHardlinkWithContent(name string, content string) error {
+func createHardlink(name string, content string) error {
 	fd, err := syscall.Creat(name, syscall.O_CREAT)
 	if err != nil {
 		return err
@@ -710,7 +795,7 @@ func createHardlinkWithContent(name string, content string) error {
 	return syscall.Link(name, name+"_link")
 }
 
-func createSmallFileWithContent(name string, content string) error {
+func createSmallFile(name string, content string) error {
 	fd, err := syscall.Creat(name, 0124)
 	if err != nil {
 		return err
@@ -722,163 +807,124 @@ func createSmallFileWithContent(name string, content string) error {
 	return testutils.OverWriteFile(name, content)
 }
 
-func createSmallFile(name string) error {
-	return createSmallFileWithContent(name, "small file content")
-}
-
-func createMediumFile(name string) error {
+func createMediumFile(name string, content string) error {
 	size := int64(quantumfs.MaxMediumFileSize()) -
 		int64(quantumfs.MaxBlockSize)
-	return createSparseFile(name, size)
-}
-
-func createMediumFileWithContent(name string, content string) error {
-	err := createMediumFile(name)
+	err := createSparseFile(name, size)
 	if err != nil {
 		return err
 	}
 	return testutils.OverWriteFile(name, content)
 }
 
-func createLargeFile(name string) error {
+func createLargeFile(name string, content string) error {
 	size := int64(quantumfs.MaxMediumFileSize()) +
 		int64(quantumfs.MaxBlockSize)
-	return createSparseFile(name, size)
-}
-
-func createLargeFileWithContent(name string, content string) error {
-	err := createLargeFile(name)
+	err := createSparseFile(name, size)
 	if err != nil {
 		return err
 	}
 	return testutils.OverWriteFile(name, content)
 }
 
-func createVeryLargeFile(name string) error {
+func createVeryLargeFile(name string, content string) error {
 	size := int64(quantumfs.MaxLargeFileSize()) +
 		int64(quantumfs.MaxBlockSize)
-	return createSparseFile(name, size)
-}
-
-func createVeryLargeFileWithContent(name string, content string) error {
-	err := createVeryLargeFile(name)
+	err := createSparseFile(name, size)
 	if err != nil {
 		return err
 	}
 	return testutils.OverWriteFile(name, content)
 }
 
-func contentCheckTestGen(c1 func(string, string) error,
-	c2 func(string) error) func(*testHelper) {
-
+func contentCheckTestGen(c1 createFunc, c2 createFunc) func(*testHelper) {
 	return func(test *testHelper) {
 		ctx := test.TestCtx()
-		contentTest(ctx, test, "original content", c1, c2)
+		contentTest(ctx, test, c1, c2)
 	}
 }
 
 func TestRefreshType_S2S(t *testing.T) {
-	runTest(t, contentCheckTestGen(createSmallFileWithContent,
-		createSmallFile))
+	runTest(t, contentCheckTestGen(createSmallFile, createSmallFile))
 }
 
 func TestRefreshType_M2S(t *testing.T) {
-	runTest(t, contentCheckTestGen(createSmallFileWithContent,
-		createMediumFile))
+	runTest(t, contentCheckTestGen(createSmallFile, createMediumFile))
 }
 
 func TestRefreshType_L2S(t *testing.T) {
-	runTest(t, contentCheckTestGen(createSmallFileWithContent,
-		createLargeFile))
+	runTest(t, contentCheckTestGen(createSmallFile, createLargeFile))
 }
 
 func TestRefreshType_VL2S(t *testing.T) {
-	runTest(t, contentCheckTestGen(createSmallFileWithContent,
-		createVeryLargeFile))
+	runTest(t, contentCheckTestGen(createSmallFile, createVeryLargeFile))
 }
 
 func TestRefreshType_S2M(t *testing.T) {
-	runTest(t, contentCheckTestGen(createMediumFileWithContent,
-		createSmallFile))
+	runTest(t, contentCheckTestGen(createMediumFile, createSmallFile))
 }
 
 func TestRefreshType_M2M(t *testing.T) {
-	runTest(t, contentCheckTestGen(createMediumFileWithContent,
-		createMediumFile))
+	runTest(t, contentCheckTestGen(createMediumFile, createMediumFile))
 }
 
 func TestRefreshType_L2M(t *testing.T) {
-	runTest(t, contentCheckTestGen(createMediumFileWithContent,
-		createLargeFile))
+	runTest(t, contentCheckTestGen(createMediumFile, createLargeFile))
 }
 
 func TestRefreshType_VL2M(t *testing.T) {
-	runTest(t, contentCheckTestGen(createMediumFileWithContent,
-		createVeryLargeFile))
+	runTest(t, contentCheckTestGen(createMediumFile, createVeryLargeFile))
 }
 
 func TestRefreshType_S2L(t *testing.T) {
-	runTest(t, contentCheckTestGen(createLargeFileWithContent,
-		createSmallFile))
+	runTest(t, contentCheckTestGen(createLargeFile, createSmallFile))
 }
 
 func TestRefreshType_M2L(t *testing.T) {
-	runTest(t, contentCheckTestGen(createLargeFileWithContent,
-		createMediumFile))
+	runTest(t, contentCheckTestGen(createLargeFile, createMediumFile))
 }
 
 func TestRefreshType_L2L(t *testing.T) {
-	runTest(t, contentCheckTestGen(createLargeFileWithContent,
-		createLargeFile))
+	runTest(t, contentCheckTestGen(createLargeFile, createLargeFile))
 }
 
 func TestRefreshType_VL2L(t *testing.T) {
-	runTest(t, contentCheckTestGen(createLargeFileWithContent,
-		createVeryLargeFile))
+	runTest(t, contentCheckTestGen(createLargeFile, createVeryLargeFile))
 }
 
 func TestRefreshType_S2VL(t *testing.T) {
-	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
-		createSmallFile))
+	runTest(t, contentCheckTestGen(createVeryLargeFile, createSmallFile))
 }
 
 func TestRefreshType_M2VL(t *testing.T) {
-	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
-		createMediumFile))
+	runTest(t, contentCheckTestGen(createVeryLargeFile, createMediumFile))
 }
 
 func TestRefreshType_L2VL(t *testing.T) {
-	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
-		createLargeFile))
+	runTest(t, contentCheckTestGen(createVeryLargeFile, createLargeFile))
 }
 
 func TestRefreshType_VL2VL(t *testing.T) {
-	runTest(t, contentCheckTestGen(createVeryLargeFileWithContent,
-		createVeryLargeFile))
+	runTest(t, contentCheckTestGen(createVeryLargeFile, createVeryLargeFile))
 }
 
 func TestRefreshType_H2H_S2S(t *testing.T) {
-	runTest(t, contentCheckTestGen(createHardlinkWithContent,
-		createSmallFile))
+	runTest(t, contentCheckTestGen(createHardlink, createSmallFile))
 }
 
 func TestRefreshType_H2H_S2M(t *testing.T) {
-	runTest(t, contentCheckTestGen(createHardlinkWithContent,
-		createMediumFile))
+	runTest(t, contentCheckTestGen(createHardlink, createMediumFile))
 }
 
 func TestRefreshType_H2H_S2L(t *testing.T) {
-	runTest(t, contentCheckTestGen(createHardlinkWithContent,
-		createLargeFile))
+	runTest(t, contentCheckTestGen(createHardlink, createLargeFile))
 }
 
 func TestRefreshType_H2H_S2VL(t *testing.T) {
-	runTest(t, contentCheckTestGen(createHardlinkWithContent,
-		createVeryLargeFile))
+	runTest(t, contentCheckTestGen(createHardlink, createVeryLargeFile))
 }
 
 func TestRefreshXattrsRemove(t *testing.T) {
-	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
 		workspace := test.NewWorkspace()
@@ -900,7 +946,6 @@ func TestRefreshXattrsRemove(t *testing.T) {
 }
 
 func TestRefreshXattrsAddition(t *testing.T) {
-	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
 		workspace := test.NewWorkspace()
