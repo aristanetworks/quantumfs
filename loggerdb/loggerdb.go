@@ -5,6 +5,8 @@ package qloggerdb
 
 import (
 	"container/list"
+	"sync"
+	"time"
 
 	"github.com/aristanetworks/quantumfs/qlog"
 )
@@ -62,18 +64,85 @@ type LoggerDb struct {
 	requestSequence list.List
 
 	statExtractors []StatExtractor
+
+	queueMutex	sync.Mutex
+	queueLogs	[]qlog.LogOutput
 }
 
 func NewLoggerDb(db TimeSeriesDB, extractors []StatExtractor) *LoggerDb {
 	rtn := LoggerDb{
 		logsByRequest:  make(map[uint64]logTrack),
 		statExtractors: extractors,
+		queueLogs:	make([]qlog.LogOutput, 0),
 	}
+
+	go rtn.ProcessThread()
 
 	return &rtn
 }
 
+func (logger *LoggerDb) ProcessThread() {
+	for {
+		logs := func () []qlog.LogOutput {
+			logger.queueMutex.Lock()
+			defer logger.queueMutex.Unlock()
+
+			// nothing to do
+			if len(logger.queueLogs) == 0 {
+				return []qlog.LogOutput{}
+			}
+
+			// Take a small performance hit in creating a new array,
+			// but gain a much quicker mutex unlock
+			rtn := logger.queueLogs
+			logger.queueLogs = make([]qlog.LogOutput, 0)
+			return rtn
+		} ()
+
+		var latestLog int64
+		for _, log := range logs {
+			logger.processLog(log)
+
+			if log.T > latestLog {
+				latestLog = log.T
+			}
+		}
+
+		// now check if any requests are old and ready to go to extractors
+		for {
+			requestElem := logger.requestSequence.Front()
+
+			if requestElem == nil {
+				break
+			}
+
+			request := requestElem.Value.(trackerKey)
+			if latestLog-request.lastLogTime > requestEndAfterNs {
+				logger.requestSequence.Remove(requestElem)
+				reqLogs := logger.logsByRequest[request.reqId]
+				delete(logger.logsByRequest, request.reqId)
+
+				for _, e := range logger.statExtractors {
+					e.ProcessRequest(reqLogs.logs)
+				}
+			} else {
+				// No more requests ready to extract stats
+				break
+			}
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
+	logger.queueMutex.Lock()
+	defer logger.queueMutex.Unlock()
+
+	logger.queueLogs = append(logger.queueLogs, v)
+}
+
+func (logger *LoggerDb) processLog(v qlog.LogOutput) {
 	var tracker logTrack
 	if tracker_, exists := logger.logsByRequest[v.ReqId]; exists {
 		tracker = tracker_
@@ -93,29 +162,6 @@ func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
 	trackerElem := tracker.listElement.Value.(trackerKey)
 	if v.T > trackerElem.lastLogTime {
 		trackerElem.lastLogTime = v.T
-	}
-
-	// now check if any requests are old and ready to go to the extractors
-	for {
-		requestElem := logger.requestSequence.Front()
-
-		if requestElem == nil {
-			break
-		}
-
-		request := requestElem.Value.(trackerKey)
-		if v.T-request.lastLogTime > requestEndAfterNs {
-			logger.requestSequence.Remove(requestElem)
-			reqLogs := logger.logsByRequest[request.reqId]
-			delete(logger.logsByRequest, request.reqId)
-
-			for _, e := range logger.statExtractors {
-				e.ProcessRequest(reqLogs.logs)
-			}
-		} else {
-			// No more requests ready to extract stats
-			break
-		}
 	}
 }
 
