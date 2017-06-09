@@ -1025,20 +1025,28 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 				return quantumfs.InodeIdInvalid,
 					quantumfs.InodeIdInvalid, fuse.OK
 			}
-			dir.self.markAccessed(c, oldName,
-				markType(record.Type(), quantumfs.PathDeleted))
-			dir.self.markAccessed(c, newName,
-				markType(record.Type(), quantumfs.PathCreated))
-
 			oldInodeId_ := dir.children.inodeNum(oldName)
 			oldRemovedId_, oldRemovedRecord_ :=
 				dir.children.renameChild(c, oldName, newName)
 
+			// If this rename replaces a previously existing path, then
+			// we need to mark it deleted. Since we've put something into
+			// place the delete then create will tend to balance out into
+			// "updated" for files and "nothing" for directories.
 			if oldRemovedRecord_ != nil {
 				dir.self.markAccessed(c, newName,
 					markType(oldRemovedRecord_.Type(),
 						quantumfs.PathDeleted))
 			}
+
+			// Conceptually we remove any entry in the way before we move
+			// the source file in its place, so update the accessed list
+			// mark in that order to ensure mark logic produces the
+			// correct result.
+			dir.self.markAccessed(c, oldName,
+				markType(record.Type(), quantumfs.PathDeleted))
+			dir.self.markAccessed(c, newName,
+				markType(record.Type(), quantumfs.PathCreated))
 
 			return oldInodeId_, oldRemovedId_, fuse.OK
 		}()
