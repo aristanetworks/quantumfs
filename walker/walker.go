@@ -283,17 +283,17 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
+// DirectoryRecord.ExtendedAttributes() does not return ZeroKey
+// when there are no EAs. Sometimes it returns fakeZeroKey and
+// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
+var fakeZeroKey = quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
+	[quantumfs.ObjectKeyLength - 1]byte{})
+
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	dr *quantumfs.DirectRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	fpath := filepath.Join(path, dr.Filename())
-
-	// DirectoryRecord.ExtendedAttributes() does not return ZeroKey
-	// when there are no EAs. Sometimes it returns fakeZeroKey and
-	// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
-	fakeZeroKey := quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
-		[quantumfs.ObjectKeyLength - 1]byte{})
 
 	// Walk the ExtendedAttribute for that DirectoryRecord.
 	extKey := dr.ExtendedAttributes()
@@ -364,6 +364,10 @@ func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
 func SkipKey(c *Ctx, key quantumfs.ObjectKey) bool {
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
+		return true
+	}
+
+	if key.IsEqualTo(fakeZeroKey) {
 		return true
 	}
 
