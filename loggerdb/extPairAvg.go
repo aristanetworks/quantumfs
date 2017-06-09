@@ -13,12 +13,12 @@ import (
 )
 
 type extPairAvg struct {
-	db       DbInterface
+	db       TimeSeriesDB
 	fmtStart string
 	fmtStop  string
 }
 
-func NewExtPairAvg(db DbInterface, start string, stop string) *extPairAvg {
+func NewExtPairAvg(db TimeSeriesDB, start string, stop string) *extPairAvg {
 	return &extPairAvg{
 		fmtStart: start,
 		fmtStop:  stop,
