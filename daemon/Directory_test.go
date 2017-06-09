@@ -889,6 +889,25 @@ func TestDirectoryRenameDir(t *testing.T) {
 	})
 }
 
+func TestDirectoryRenameDirNotEmpty(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := workspace + "/dir2"
+		file2 := dir1 + "/file2"
+
+		test.AssertNoErr(os.Mkdir(dir1, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(os.Mkdir(dir2, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		err := syscall.Rename(dir1, dir2)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTEMPTY,
+			"Non-empty directory shouldn't be destination in rename")
+	})
+}
+
 func TestDirectoryRenameDirOntoFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -944,6 +963,27 @@ func TestDirectoryMvChildDir(t *testing.T) {
 		test.AssertNoErr(err)
 		_, err = os.Stat(dir2 + "/file1")
 		test.AssertNoErr(err)
+	})
+}
+
+func TestDirectoryMvChildDirNotEmpty(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		otherdir := workspace + "/otherdir"
+		test.AssertNoErr(os.Mkdir(otherdir, 0777))
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := otherdir + "/dir2"
+		file2 := dir2 + "/file2"
+
+		test.AssertNoErr(os.Mkdir(dir1, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(os.Mkdir(dir2, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		err := syscall.Rename(dir1, dir2)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTEMPTY,
+			"Non-empty directory shouldn't be destination in rename")
 	})
 }
 
