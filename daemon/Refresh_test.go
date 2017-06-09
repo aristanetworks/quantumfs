@@ -726,7 +726,7 @@ func verifyContentStartsWith(test *testHelper, file *os.File, expected string) {
 		fmt.Sprintf("content mismatch _%s_", content))
 }
 
-type createFunc func(string, string) error
+type createFunc func(name string, content string) error
 
 func contentTest(ctx *ctx, test *testHelper, c1 createFunc, c2 createFunc) {
 	workspace := test.NewWorkspace()
