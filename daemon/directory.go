@@ -168,8 +168,8 @@ func (dir *Directory) delChild_(c *ctx,
 	}()
 
 	pathFlags := quantumfs.PathFlags(quantumfs.PathDeleted)
-	if record != nil && record.Type() == quantumfs.ObjectTypeDirectory {
-		pathFlags |= quantumfs.PathIsDir
+	if record != nil {
+		pathFlags = markType(record.Type(), pathFlags)
 	}
 	dir.self.markAccessed(c, name, pathFlags)
 
@@ -1025,7 +1025,8 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 				return quantumfs.InodeIdInvalid,
 					quantumfs.InodeIdInvalid, fuse.OK
 			}
-			dir.self.markAccessed(c, oldName, quantumfs.PathDeleted)
+			dir.self.markAccessed(c, oldName,
+				markType(record.Type(), quantumfs.PathDeleted))
 
 			oldInodeId_ := dir.children.inodeNum(oldName)
 			oldRemoved_ := dir.children.renameChild(c, oldName, newName)
@@ -1035,8 +1036,14 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			return err
 		}
 
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.children.recordByName(c, newName)
+			dir.self.markAccessed(c, newName,
+				markType(record.Type(), quantumfs.PathCreated))
+		}()
+
 		// update the inode name
-		dir.self.markAccessed(c, newName, quantumfs.PathCreated)
 		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
 			child.setName(newName)
 		}
@@ -1164,11 +1171,24 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 					childInode.setName(newName)
 				}
 			}
-			dir.self.markAccessed(c, oldName, quantumfs.PathDeleted)
-			dst.self.markAccessed(c, newName, quantumfs.PathCreated)
+
+			// This is the same entry just moved, so we can use the same
+			// record for both the old and new paths.
+			dir.self.markAccessed(c, oldName,
+				markType(newEntry.Type(), quantumfs.PathDeleted))
+			dst.self.markAccessed(c, newName,
+				markType(newEntry.Type(), quantumfs.PathCreated))
 
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
+
+				deletedRecord := dst.children.recordByName(c,
+					newName)
+				if deletedRecord != nil {
+					dst.self.markAccessed(c, newName,
+						markType(deletedRecord.Type(),
+							quantumfs.PathDeleted))
+				}
 
 				// Delete the target InodeId, before (possibly)
 				// overwriting it.
@@ -1696,11 +1716,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	c.qfs.noteChildCreated(dir.inodeNum(), name)
 
-	pathFlags := quantumfs.PathFlags(quantumfs.PathCreated)
-	if type_ == quantumfs.ObjectTypeDirectory {
-		pathFlags |= quantumfs.PathIsDir
-	}
-	dir.self.markAccessed(c, name, pathFlags)
+	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
