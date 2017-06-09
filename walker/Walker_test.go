@@ -476,16 +476,14 @@ func TestExtendedAttributesWalk(t *testing.T) {
 		data := daemon.GenData(50)
 		workspace := test.NewWorkspace()
 
-		// Write File 1
+		// Write File
 		filename := workspace + "/file"
 		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
 		// Set attr for the file
-		attrData := "user.11112222"
-		attrDataData := []byte("1111222233334444")
-		err = syscall.Setxattr(filename, attrData, attrDataData, 0)
+		err = syscall.Setxattr(filename, xattrName, xattrData, 0)
 		test.Assert(err == nil, "Error setting data XAttr: %v", err)
 
 		test.readWalkCompare(workspace)
