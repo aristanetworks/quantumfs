@@ -118,7 +118,7 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	// Read all files in this workspace.
 	readFile := func(path string, info os.FileInfo, inerr error) error {
 		if inerr != nil {
-			return nil
+			return inerr
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
