@@ -308,8 +308,6 @@ func TestRefreshHardlinkAddition2(t *testing.T) {
 }
 
 func TestRefreshHardlinkRemoval(t *testing.T) {
-	// This test requires the children of a directory to be reloaded
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -330,8 +328,6 @@ func TestRefreshHardlinkRemoval(t *testing.T) {
 }
 
 func TestRefreshNlinkDrop(t *testing.T) {
-	// This test requires the children of a directory to be reloaded
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -386,7 +382,7 @@ func TestRefreshNlinkBump(t *testing.T) {
 	})
 }
 
-func TestRefreshNlink2To3(t *testing.T) {
+func TestRefreshNlink3To2(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -405,6 +401,34 @@ func TestRefreshNlink2To3(t *testing.T) {
 		newRootId3 := removeTestFile(test, workspace, name+".tmp")
 
 		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+		removeTestFile(test, workspace, "link1")
+		removeTestFile(test, workspace, name)
+	})
+}
+
+func TestRefreshNlink2To3(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		ctx := test.TestCtx()
+
+		createTestFile(test, workspace, name, 1000)
+		linkTestFile(test, workspace, name, "link1")
+		newRootId1 := linkTestFile(test, workspace, name, "link2")
+		newRootId2 := removeTestFile(test, workspace, "link2")
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		// Create and delete a temporary file to make sure a new rootId
+		// is published
+		createTestFileNoSync(test, workspace, name+".tmp", 1000)
+		newRootId3 := removeTestFile(test, workspace, name+".tmp")
+
+		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+		removeTestFile(test, workspace, "link2")
+		removeTestFile(test, workspace, "link1")
+		removeTestFile(test, workspace, name)
 	})
 }
 
@@ -501,7 +525,6 @@ func TestRefreshUninstantiated(t *testing.T) {
 }
 
 func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
-	t.Skip() // TODO
 	runTest(t, func(test *testHelper) {
 
 		workspace := test.NewWorkspace()
@@ -523,6 +546,39 @@ func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 
 		removeTestFile(test, workspace, name)
 		removeTestFile(test, workspace, linkfile)
+	})
+}
+
+func TestRefreshChangeTypeHardlinkToDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		linkfile := "linkFile"
+
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+name, 0777)
+		utils.MkdirAll(workspace+"/"+linkfile, 0777)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err := syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(workspace + "/" + linkfile)
+		test.AssertNoErr(err)
+		createTestFileNoSync(test, workspace, name, 1000)
+		newRootId2 := linkTestFile(test, workspace, name, linkfile)
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		createTestFileNoSync(test, workspace, name+"/subfile", 1000)
+		removeTestFileNoSync(test, workspace, name+"/subfile")
+		err = syscall.Rmdir(workspace + "/" + name)
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(workspace + "/" + linkfile)
+		test.AssertNoErr(err)
 	})
 }
 
