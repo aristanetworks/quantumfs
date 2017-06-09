@@ -1027,6 +1027,8 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			}
 			dir.self.markAccessed(c, oldName,
 				markType(record.Type(), quantumfs.PathDeleted))
+			dir.self.markAccessed(c, newName,
+				markType(record.Type(), quantumfs.PathCreated))
 
 			oldInodeId_ := dir.children.inodeNum(oldName)
 			oldRemoved_ := dir.children.renameChild(c, oldName, newName)
