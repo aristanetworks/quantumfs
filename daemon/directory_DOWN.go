@@ -326,9 +326,7 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 	defer c.FuncIn("Directory::handleDeletedInMemoryRecord_DOWN", "%s",
 		childname).Out()
 
-	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil ||
-		child.isOrphaned() {
-
+	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
 		dir.children.deleteChild(c, childname, false)
 	} else {
 		result := child.deleteSelf(c, child,
