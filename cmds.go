@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 // This file contains all the functions which are used by qfs (and other
@@ -251,8 +253,28 @@ const (
 
 type PathFlags uint
 
-func (v PathFlags) Primitive() interface{} {
-	return uint(v)
+func (pf PathFlags) Primitive() interface{} {
+	return uint(pf)
+}
+
+func (pf PathFlags) Created() bool {
+	return utils.BitFlagsSet(uint(pf), PathCreated)
+}
+
+func (pf PathFlags) Read() bool {
+	return utils.BitFlagsSet(uint(pf), PathRead)
+}
+
+func (pf PathFlags) Updated() bool {
+	return utils.BitFlagsSet(uint(pf), PathUpdated)
+}
+
+func (pf PathFlags) Deleted() bool {
+	return utils.BitFlagsSet(uint(pf), PathDeleted)
+}
+
+func (pf PathFlags) IsDir() bool {
+	return utils.BitFlagsSet(uint(pf), PathIsDir)
 }
 
 type Api interface {
