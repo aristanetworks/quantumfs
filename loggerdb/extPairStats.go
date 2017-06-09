@@ -14,7 +14,7 @@ import (
 )
 
 type extPairStats struct {
-	db            DbInterface
+	db            TimeSeriesDB
 	fmtStart      string
 	fmtStop       string
 	sameScope     bool
@@ -26,7 +26,7 @@ type extPairStats struct {
 
 // Set matchingIndent to true if start and stop should only be recognized when they
 // are seen at the same function scope
-func NewExtPairStats(db_ DbInterface, start string, stop string,
+func NewExtPairStats(db_ TimeSeriesDB, start string, stop string,
 	matchingIndent bool, statPeriodSec_ float64) *extPairStats {
 
 	return &extPairStats{
