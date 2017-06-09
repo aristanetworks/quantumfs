@@ -38,7 +38,7 @@ func main() {
 
 	logger := qloggerdb.NewLoggerDb(db, extractors)
 
-	reader.ProcessLogs(true, func(v qlog.LogOutput) {
+	reader.ProcessLogs(qlog.ReadThenTail, func(v qlog.LogOutput) {
 		logger.ProcessLog(v)
 	})
 }
