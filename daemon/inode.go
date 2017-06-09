@@ -121,7 +121,7 @@ type Inode interface {
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
 	isOrphaned_() bool
-	orphan(c *ctx)
+	orphan(c *ctx, record quantumfs.DirectoryRecord)
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
@@ -416,13 +416,12 @@ func (inode *InodeCommon) isOrphaned() bool {
 	return inode.isOrphaned_()
 }
 
-func (inode *InodeCommon) orphan(c *ctx) {
-	defer c.funcIn("InodeCommon::orphan").Out()
-	defer inode.parentLock.RLock().RUnlock()
+func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
+	defer c.FuncIn("InodeCommon::orphan", "inode %d", inode.inodeNum()).Out()
+	defer inode.parentLock.Lock().Unlock()
 
-	inode.id = inode.parentId
-	// XXX once r/837 lands, also do:
-	// inode.setChildRecord(c, entry.record)
+	inode.parentId = inode.id
+	inode.setChildRecord(c, record)
 }
 
 // parentLock must be RLocked
@@ -559,25 +558,17 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 		err fuse.Status)) fuse.Status {
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).Out()
-
 	defer inode.lock.Lock().Unlock()
-
-	// We must perform the deletion with the lockedParent lock
-	defer inode.parentLock.Lock().Unlock()
 
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
-	if toOrphan == nil {
-		// no orphan-ing desired here (hardlink or error)
-		return err
+
+	if toOrphan != nil {
+		// toOrphan can be nil if this is a hardlink or there was an error
+		inode.orphan(c, toOrphan)
 	}
 
-	toDelete.setChildRecord(c, toOrphan)
-	// orphan ourselves
-	inode.parentId = toDelete.inodeNum()
-	c.vlog("Orphaned inode %d", toDelete.inodeNum())
-
-	return fuse.OK
+	return err
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {

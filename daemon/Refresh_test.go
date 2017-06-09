@@ -307,6 +307,30 @@ func TestRefreshHardlinkAddition2(t *testing.T) {
 	runTest(t, refreshHardlinkAdditionTestGen(true))
 }
 
+func TestRefreshOrphanedHardlinkContentCheck(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fullname := workspace + "/testFile"
+		content := "original content"
+
+		ctx := test.TestCtx()
+
+		newRootId1 := createTestFile(test, workspace, "otherfile", 1000)
+		createHardlink(fullname, content)
+		newRootId2 := getRootId(test, workspace)
+
+		file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file, content)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+		verifyContentStartsWith(test, file, content)
+
+		err = file.Close()
+		test.AssertNoErr(err)
+	})
+}
+
 func TestRefreshHardlinkRemoval(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
