@@ -87,7 +87,7 @@ type File struct {
 	accessor blockAccessor
 }
 
-func (fi *File) handleTypeChange(c *ctx, remoteRecord *quantumfs.DirectRecord) {
+func (fi *File) handleTypeChange(c *ctx, remoteRecord quantumfs.DirectRecord) {
 	defer c.FuncIn("File::handleTypeChange", "%s: %d",
 		remoteRecord.Filename(), remoteRecord.Type()).Out()
 	switch remoteRecord.Type() {
