@@ -457,7 +457,6 @@ func TestWalkErr(t *testing.T) {
 }
 
 func TestExtendedAttributesWalk(t *testing.T) {
-
 	runTest(t, func(test *testHelper) {
 
 		data := daemon.GenData(50)
@@ -470,7 +469,7 @@ func TestExtendedAttributesWalk(t *testing.T) {
 			filename, err)
 
 		// Set attr for the file
-		attrData := "11112222"
+		attrData := "user.11112222"
 		attrDataData := []byte("1111222233334444")
 		err = syscall.Setxattr(filename, attrData, attrDataData, 0)
 		test.Assert(err == nil, "Error setting data XAttr: %v", err)
