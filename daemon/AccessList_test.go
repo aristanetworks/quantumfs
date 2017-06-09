@@ -355,9 +355,6 @@ func TestAccessListMvChildDir(t *testing.T) {
 
 		path = workspace + dirname2
 		test.AssertNoErr(syscall.Mkdir(path, 0666))
-		test.Assert(err == nil, "Create directory error:%v", err)
-		path = workspace + dirname2 + leaf2
-		test.AssertNoErr(syscall.Mkdir(path, 0666))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		accessList := quantumfs.NewPathAccessList()
