@@ -248,6 +248,8 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 			dir.handleInstantiatedInodeChange_DOWN(c, inode, inodeId,
 				remoteRecord)
 		} else {
+			// The types of the local and remote matched, but they were
+			// not the same. This can only happen for regular files
 			inode.(*File).handleTypeChange(c, remoteRecord)
 		}
 	} else {
@@ -312,7 +314,7 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 		} else {
 			u := dir.handleDirectoryEntryRecreate_DOWN(c, localRecord,
 				remoteRecord)
-			uninstantiated = append(uninstantiated, u)
+			uninstantiated = []InodeId{u}
 		}
 	}
 	return uninstantiated
