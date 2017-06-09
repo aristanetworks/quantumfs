@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -117,10 +118,19 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	// Read all files in this workspace.
 	readFile := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
+			return nil
+		}
+
+		var stat syscall.Stat_t
+		if err := syscall.Stat(path, &stat); err != nil {
+			return err
+		}
+
+		if (stat.Mode & syscall.S_IFREG) == 0 {
 			return nil
 		}
 
@@ -184,7 +194,7 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 	// Read all files in this workspace.
 	readFile := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 
 		if info.IsDir() && strings.HasSuffix(path, "/dir1") {
@@ -192,6 +202,15 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
+			return nil
+		}
+
+		var stat syscall.Stat_t
+		if err := syscall.Stat(path, &stat); err != nil {
+			return err
+		}
+
+		if (stat.Mode & syscall.S_IFREG) == 0 {
 			return nil
 		}
 
@@ -219,14 +238,19 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		defer mapLock.Lock().Unlock()
-
 		// NOTE: In the TTL walker this path comparison will be
 		// replaced by a TTL comparison.
 		if isDir && strings.HasSuffix(path, "/dir1") {
 			return SkipDir
 		}
 
+		// Skip, since constant and embedded keys will not
+		// show up in regular walk.
+		if SkipKey(c, key) {
+			return nil
+		}
+
+		defer mapLock.Lock().Unlock()
 		walkerMap[key.String()] = 1
 		return nil
 	}
