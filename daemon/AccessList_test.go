@@ -286,7 +286,6 @@ func TestAccessListMvChildFile(t *testing.T) {
 		dirname2 := "/test2"
 		filename1 := "/test1.c"
 		filename2 := "/test2.c"
-		filename3 := "/test3.c"
 		path := workspace + dirname1
 		err := syscall.Mkdir(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
@@ -298,19 +297,15 @@ func TestAccessListMvChildFile(t *testing.T) {
 		path = workspace + dirname2
 		err = syscall.Mkdir(path, 0666)
 		test.Assert(err == nil, "Create directory error:%v", err)
-		path = workspace + dirname2 + filename2
-		fd, err = syscall.Creat(path, 0666)
-		test.Assert(err == nil, "Create file error:%v", err)
-		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		accessList := quantumfs.NewPathAccessList()
 		path1 := workspace + dirname1 + filename1
-		path2 := workspace + dirname2 + filename3
+		path2 := workspace + dirname2 + filename2
 		err = os.Rename(path1, path2)
 		test.Assert(err == nil, "Move file error:%v", err)
 		accessList.Paths[dirname1+filename1] = quantumfs.PathDeleted
-		accessList.Paths[dirname2+filename3] = quantumfs.PathCreated
+		accessList.Paths[dirname2+filename2] = quantumfs.PathCreated
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error two maps different")
@@ -352,7 +347,6 @@ func TestAccessListMvChildDir(t *testing.T) {
 		dirname2 := "/test2"
 		leaf1 := "/leaf1"
 		leaf2 := "/leaf2"
-		leaf3 := "/leaf3"
 		path := workspace + dirname1
 		err := syscall.Mkdir(path, 0777)
 		test.Assert(err == nil, "Create directory error:%v", err)
@@ -368,11 +362,11 @@ func TestAccessListMvChildDir(t *testing.T) {
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		accessList := quantumfs.NewPathAccessList()
 		path1 := workspace + dirname1 + leaf1
-		path2 := workspace + dirname2 + leaf3
+		path2 := workspace + dirname2 + leaf2
 		test.AssertNoErr(os.Rename(path1, path2))
 		accessList.Paths[dirname1+leaf1] = quantumfs.PathIsDir |
 			quantumfs.PathDeleted
-		accessList.Paths[dirname2+leaf3] = quantumfs.PathIsDir |
+		accessList.Paths[dirname2+leaf2] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
