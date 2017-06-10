@@ -48,14 +48,30 @@ type logTrack struct {
 
 type trackerKey struct {
 	reqId       uint64
-	lastLogTime int64
+	lastLogTime time.Time
 }
 
 type StatExtractor interface {
 	ProcessRequest(request qlog.LogStack)
+
+	Publish() ([]Tag, []Field)
+}
+
+type StatExtHook struct {
+	extractor	StatExtractor
+	statPeriod	time.Duration
+	lastOutput	time.Time
+}
+
+func NewStatExtHook(ext StatExtractor, period time.Duration) StatExtHook {
+	return StatExtHook {
+		extractor:	ext,
+		statPeriod:	period,
+	}
 }
 
 type LoggerDb struct {
+	db		TimeSeriesDB
 	logsByRequest map[uint64]logTrack
 
 	// track the oldest untouched requests so we can push them to the stat
@@ -63,17 +79,25 @@ type LoggerDb struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	statExtractors []StatExtractor
+	statExtractors []StatExtHook
 
 	queueMutex	sync.Mutex
 	queueLogs	[]qlog.LogOutput
 }
 
-func NewLoggerDb(db TimeSeriesDB, extractors []StatExtractor) *LoggerDb {
+func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtHook) *LoggerDb {
 	rtn := LoggerDb{
+		db:		db_,
 		logsByRequest:  make(map[uint64]logTrack),
 		statExtractors: extractors,
 		queueLogs:	make([]qlog.LogOutput, 0),
+	}
+
+	// Sync all extractors
+	now := time.Now()
+	for i, v := range rtn.statExtractors {
+		v.lastOutput = now
+		rtn.statExtractors[i] = v
 	}
 
 	go rtn.ProcessThread()
@@ -99,16 +123,12 @@ func (logger *LoggerDb) ProcessThread() {
 			return rtn
 		} ()
 
-		var latestLog int64
 		for _, log := range logs {
 			logger.processLog(log)
-
-			if log.T > latestLog {
-				latestLog = log.T
-			}
 		}
 
-		// now check if any requests are old and ready to go to extractors
+		// Now check if any requests are old and ready to go to extractors
+		now := time.Now()
 		for {
 			requestElem := logger.requestSequence.Front()
 
@@ -117,17 +137,32 @@ func (logger *LoggerDb) ProcessThread() {
 			}
 
 			request := requestElem.Value.(trackerKey)
-			if latestLog-request.lastLogTime > requestEndAfterNs {
+			if now.Sub(request.lastLogTime) > time.Duration(0+
+				requestEndAfterNs) {
+
 				logger.requestSequence.Remove(requestElem)
 				reqLogs := logger.logsByRequest[request.reqId]
 				delete(logger.logsByRequest, request.reqId)
 
 				for _, e := range logger.statExtractors {
-					e.ProcessRequest(reqLogs.logs)
+					e.extractor.ProcessRequest(reqLogs.logs)
 				}
 			} else {
 				// No more requests ready to extract stats
 				break
+			}
+		}
+
+		// Lastly check if any extractors need to Publish
+		for i, extractor := range logger.statExtractors {
+			if now.Sub(extractor.lastOutput) > extractor.statPeriod {
+				tags, fields := extractor.extractor.Publish()
+				if tags != nil && len(tags) > 0 {
+					logger.db.Store(tags, fields)
+				}
+
+				extractor.lastOutput = now
+				logger.statExtractors[i] = extractor
 			}
 		}
 
@@ -151,7 +186,6 @@ func (logger *LoggerDb) processLog(v qlog.LogOutput) {
 		tracker.logs = make([]qlog.LogOutput, 0)
 		newElem := logger.requestSequence.PushBack(trackerKey{
 			reqId:       v.ReqId,
-			lastLogTime: v.T,
 		})
 		tracker.listElement = newElem
 	}
@@ -160,9 +194,8 @@ func (logger *LoggerDb) processLog(v qlog.LogOutput) {
 
 	// Update the record of the last time we saw a log for this request
 	trackerElem := tracker.listElement.Value.(trackerKey)
-	if v.T > trackerElem.lastLogTime {
-		trackerElem.lastLogTime = v.T
-	}
+	trackerElem.lastLogTime = time.Now()
+	tracker.listElement.Value = trackerElem
 }
 
 // A data aggregator that outputs basic statistics such as the average
