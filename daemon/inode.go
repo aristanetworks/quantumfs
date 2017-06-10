@@ -122,6 +122,7 @@ type Inode interface {
 	isOrphaned() bool
 	isOrphaned_() bool
 	orphan(c *ctx, record quantumfs.DirectoryRecord)
+	orphan_(c *ctx, record quantumfs.DirectoryRecord)
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
@@ -417,8 +418,12 @@ func (inode *InodeCommon) isOrphaned() bool {
 }
 
 func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
-	defer c.FuncIn("InodeCommon::orphan", "inode %d", inode.inodeNum()).Out()
 	defer inode.parentLock.Lock().Unlock()
+	inode.orphan_(c, record)
+}
+
+func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
+	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
 	inode.parentId = inode.id
 	inode.setChildRecord(c, record)
@@ -559,13 +564,13 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).Out()
 	defer inode.lock.Lock().Unlock()
-
+	defer inode.parentLock.Lock().Unlock()
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
 
 	if toOrphan != nil {
 		// toOrphan can be nil if this is a hardlink or there was an error
-		inode.orphan(c, toOrphan)
+		inode.orphan_(c, toOrphan)
 	}
 
 	return err
