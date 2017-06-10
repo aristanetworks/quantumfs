@@ -58,20 +58,20 @@ type StatExtractor interface {
 }
 
 type StatExtHook struct {
-	extractor	StatExtractor
-	statPeriod	time.Duration
-	lastOutput	time.Time
+	extractor  StatExtractor
+	statPeriod time.Duration
+	lastOutput time.Time
 }
 
 func NewStatExtHook(ext StatExtractor, period time.Duration) StatExtHook {
-	return StatExtHook {
-		extractor:	ext,
-		statPeriod:	period,
+	return StatExtHook{
+		extractor:  ext,
+		statPeriod: period,
 	}
 }
 
 type LoggerDb struct {
-	db		TimeSeriesDB
+	db            TimeSeriesDB
 	logsByRequest map[uint64]logTrack
 
 	// track the oldest untouched requests so we can push them to the stat
@@ -81,16 +81,16 @@ type LoggerDb struct {
 
 	statExtractors []StatExtHook
 
-	queueMutex	sync.Mutex
-	queueLogs	[]qlog.LogOutput
+	queueMutex sync.Mutex
+	queueLogs  []qlog.LogOutput
 }
 
 func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtHook) *LoggerDb {
 	rtn := LoggerDb{
-		db:		db_,
+		db:             db_,
 		logsByRequest:  make(map[uint64]logTrack),
 		statExtractors: extractors,
-		queueLogs:	make([]qlog.LogOutput, 0),
+		queueLogs:      make([]qlog.LogOutput, 0),
 	}
 
 	// Sync all extractors
@@ -107,7 +107,7 @@ func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtHook) *LoggerDb {
 
 func (logger *LoggerDb) ProcessThread() {
 	for {
-		logs := func () []qlog.LogOutput {
+		logs := func() []qlog.LogOutput {
 			logger.queueMutex.Lock()
 			defer logger.queueMutex.Unlock()
 
@@ -121,7 +121,7 @@ func (logger *LoggerDb) ProcessThread() {
 			rtn := logger.queueLogs
 			logger.queueLogs = make([]qlog.LogOutput, 0)
 			return rtn
-		} ()
+		}()
 
 		for _, log := range logs {
 			logger.processLog(log)
@@ -185,7 +185,7 @@ func (logger *LoggerDb) processLog(v qlog.LogOutput) {
 	} else {
 		tracker.logs = make([]qlog.LogOutput, 0)
 		newElem := logger.requestSequence.PushBack(trackerKey{
-			reqId:       v.ReqId,
+			reqId: v.ReqId,
 		})
 		tracker.listElement = newElem
 	}

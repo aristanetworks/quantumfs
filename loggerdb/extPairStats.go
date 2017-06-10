@@ -13,11 +13,11 @@ import (
 )
 
 type extPairStats struct {
-	fmtStart      string
-	fmtStop       string
-	sameScope     bool
+	fmtStart  string
+	fmtStop   string
+	sameScope bool
 
-	stats    basicStats
+	stats basicStats
 }
 
 // Set matchingIndent to true if start and stop should only be recognized when they
@@ -25,9 +25,9 @@ type extPairStats struct {
 func NewExtPairStats(start string, stop string, matchingIndent bool) *extPairStats {
 
 	return &extPairStats{
-		fmtStart:      start,
-		fmtStop:       stop,
-		sameScope:     matchingIndent,
+		fmtStart:  start,
+		fmtStop:   stop,
+		sameScope: matchingIndent,
 	}
 }
 

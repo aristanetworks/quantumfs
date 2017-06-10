@@ -35,8 +35,8 @@ func main() {
 	// sample extractor
 	extractors = append(extractors, qloggerdb.NewStatExtHook(
 		qloggerdb.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr",
-		qlog.FnExitStr+"Out-- Mux::GetAttr", true),
-		(5 * time.Second)))
+			qlog.FnExitStr+"Out-- Mux::GetAttr", true),
+		(5*time.Second)))
 
 	logger := qloggerdb.NewLoggerDb(db, extractors)
 
