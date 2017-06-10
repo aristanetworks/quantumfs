@@ -118,3 +118,23 @@ func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
 		}
 	}
 }
+
+// A data aggregator that outputs basic statistics such as the average
+// Intended to be used by data extractors.
+type basicStats struct {
+	sum   uint64
+	count uint64
+}
+
+func (bs *basicStats) NewPoint(data uint64) {
+	bs.sum += data
+	bs.count++
+}
+
+func (bs *basicStats) Average() uint64 {
+	return bs.sum / bs.count
+}
+
+func (bs *basicStats) Count() uint64 {
+	return bs.count
+}
