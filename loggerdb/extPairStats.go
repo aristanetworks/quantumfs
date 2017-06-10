@@ -8,34 +8,26 @@ package qloggerdb
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 type extPairStats struct {
-	db            TimeSeriesDB
 	fmtStart      string
 	fmtStop       string
 	sameScope     bool
-	statPeriodSec float64
 
 	stats    basicStats
-	statFrom time.Time
 }
 
 // Set matchingIndent to true if start and stop should only be recognized when they
 // are seen at the same function scope
-func NewExtPairStats(db_ TimeSeriesDB, start string, stop string,
-	matchingIndent bool, statPeriodSec_ float64) *extPairStats {
+func NewExtPairStats(start string, stop string, matchingIndent bool) *extPairStats {
 
 	return &extPairStats{
-		db:            db_,
 		fmtStart:      start,
 		fmtStop:       stop,
 		sameScope:     matchingIndent,
-		statPeriodSec: statPeriodSec_,
-		statFrom:      time.Now(),
 	}
 }
 
@@ -68,29 +60,26 @@ func (ext *extPairStats) ExtractStatFrom(request qlog.LogStack, idx int) {
 }
 
 func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
-	// Check if the stats need to be finalized and reset
-	if time.Since(ext.statFrom).Seconds() > ext.statPeriodSec {
-		if ext.stats.Count() > 0 {
-			tags := make([]Tag, 0)
-			tags = append(tags, newTag("fmtStart", ext.fmtStart))
-			tags = append(tags, newTag("fmtStop", ext.fmtStop))
-
-			fields := make([]Field, 0)
-			fields = append(fields, newField("average",
-				ext.stats.Average()))
-			fields = append(fields, newField("samples",
-				ext.stats.Count()))
-
-			ext.db.Store(tags, fields)
-		}
-
-		ext.stats = basicStats{}
-		ext.statFrom = time.Now()
-	}
-
 	for i, v := range request {
 		if v.Format == ext.fmtStart {
 			ext.ExtractStatFrom(request, i)
 		}
 	}
+}
+
+func (ext *extPairStats) Publish() (tags []Tag, fields []Field) {
+	if ext.stats.Count() > 0 {
+		tags := make([]Tag, 0)
+		tags = append(tags, newTag("fmtStart", ext.fmtStart))
+		tags = append(tags, newTag("fmtStop", ext.fmtStop))
+
+		fields := make([]Field, 0)
+		fields = append(fields, newField("average",
+			ext.stats.Average()))
+		fields = append(fields, newField("samples",
+			ext.stats.Count()))
+	}
+
+	ext.stats = basicStats{}
+	return tags, fields
 }
