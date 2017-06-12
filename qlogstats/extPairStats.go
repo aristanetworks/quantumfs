@@ -4,7 +4,7 @@
 // extPairStats is a stat extractor that extracts the average duration between two
 // log format strings. This would most often be used to time between a fnIn and fnOut
 
-package qloggerdb
+package qlogstats
 
 import (
 	"fmt"
