@@ -18,6 +18,8 @@ func TestBasicInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		apiNoPath, err := GetApi()
 		test.AssertNoErr(err)
+		err = ReleaseApi(apiNoPath)
+		test.AssertNoErr(err)
 
 		api, err := GetApiPath(test.TempDir + "/mnt/api")
 		test.AssertNoErr(err)
@@ -31,9 +33,6 @@ func TestBasicInterface(t *testing.T) {
 		test.AssertNoErr(err)
 		test.Assert(bytes.Equal(testData, readBack),
 			"Data changed between SetBlock and GetBlock")
-
-		err = ReleaseApi(apiNoPath)
-		test.AssertNoErr(err)
 
 		err = ReleaseApi(api)
 		test.AssertNoErr(err)
