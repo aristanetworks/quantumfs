@@ -5,10 +5,10 @@ package qloggerdb
 
 import (
 	"container/list"
-	"sync"
 	"time"
 
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 const requestEndAfterNs = 3000000000
@@ -57,14 +57,16 @@ type StatExtractor interface {
 	Publish() ([]Tag, []Field)
 }
 
-type StatExtHook struct {
+type StatExtractorConfig struct {
 	extractor  StatExtractor
 	statPeriod time.Duration
 	lastOutput time.Time
 }
 
-func NewStatExtHook(ext StatExtractor, period time.Duration) StatExtHook {
-	return StatExtHook{
+func NewStatExtractorConfig(ext StatExtractor,
+	period time.Duration) StatExtractorConfig {
+
+	return StatExtractorConfig{
 		extractor:  ext,
 		statPeriod: period,
 	}
@@ -79,13 +81,13 @@ type LoggerDb struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	statExtractors []StatExtHook
+	statExtractors []StatExtractorConfig
 
-	queueMutex sync.Mutex
+	queueMutex utils.DeferableMutex
 	queueLogs  []qlog.LogOutput
 }
 
-func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtHook) *LoggerDb {
+func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtractorConfig) *LoggerDb {
 	rtn := LoggerDb{
 		db:             db_,
 		logsByRequest:  make(map[uint64]logTrack),
@@ -108,8 +110,7 @@ func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtHook) *LoggerDb {
 func (logger *LoggerDb) ProcessThread() {
 	for {
 		logs := func() []qlog.LogOutput {
-			logger.queueMutex.Lock()
-			defer logger.queueMutex.Unlock()
+			defer logger.queueMutex.Lock().Unlock()
 
 			// nothing to do
 			if len(logger.queueLogs) == 0 {
@@ -171,8 +172,7 @@ func (logger *LoggerDb) ProcessThread() {
 }
 
 func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
-	logger.queueMutex.Lock()
-	defer logger.queueMutex.Unlock()
+	defer logger.queueMutex.Lock().Unlock()
 
 	logger.queueLogs = append(logger.queueLogs, v)
 }
@@ -211,6 +211,10 @@ func (bs *basicStats) NewPoint(data uint64) {
 }
 
 func (bs *basicStats) Average() uint64 {
+	if bs.count == 0 {
+		return 0
+	}
+
 	return bs.sum / bs.count
 }
 
