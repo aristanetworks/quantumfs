@@ -53,10 +53,9 @@ func TestBranchInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		WaitForApi(test)
 
-		api, err := GetApiPath(test.TempDir + "/mnt/api")
-		test.AssertNoErr(err)
+		api := test.getApi()
 
-		err = api.Branch("_/_/_", "test/test/test")
+		err := api.Branch("_/_/_", "test/test/test")
 		test.AssertNoErr(err)
 
 		// Ensure that the branch was created
@@ -84,8 +83,7 @@ func TestInsertInode(t *testing.T) {
 		test.AssertNoErr(err)
 		fileKey := string(attrKey[:attrLen])
 
-		api, err := GetApiPath(test.TempDir + "/mnt/api")
-		test.AssertNoErr(err)
+		api := test.getApi()
 
 		err = api.InsertInode(test.RelPath(workspace)+"/fileCopy", fileKey,
 			0777, uint32(os.Getuid()), uint32(os.Getgid()))
