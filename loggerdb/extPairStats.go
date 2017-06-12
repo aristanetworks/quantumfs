@@ -68,17 +68,14 @@ func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
 }
 
 func (ext *extPairStats) Publish() (tags []Tag, fields []Field) {
-	if ext.stats.Count() > 0 {
-		tags := make([]Tag, 0)
-		tags = append(tags, newTag("fmtStart", ext.fmtStart))
-		tags = append(tags, newTag("fmtStop", ext.fmtStop))
+	tags := make([]Tag, 0)
+	tags = append(tags, newTag("fmtStart", ext.fmtStart))
+	tags = append(tags, newTag("fmtStop", ext.fmtStop))
 
-		fields := make([]Field, 0)
-		fields = append(fields, newField("average",
-			ext.stats.Average()))
-		fields = append(fields, newField("samples",
-			ext.stats.Count()))
-	}
+	fields := make([]Field, 0)
+
+	fields = append(fields, newField("average", ext.stats.Average()))
+	fields = append(fields, newField("samples", ext.stats.Count()))
 
 	ext.stats = basicStats{}
 	return tags, fields
