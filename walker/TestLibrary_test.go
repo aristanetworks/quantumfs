@@ -129,9 +129,8 @@ func (th *testHelper) readWalkCompare(workspace string) {
 		}
 
 		// Stat to see if the path is a non-regular file
-		var err error
 		var stat syscall.Stat_t
-		if err = syscall.Stat(path, &stat); err != nil {
+		if err := syscall.Stat(path, &stat); err != nil {
 			return err
 		}
 		if (stat.Mode & syscall.S_IFREG) == 0 {
@@ -140,8 +139,8 @@ func (th *testHelper) readWalkCompare(workspace string) {
 
 		// Retrieve all the Xattrs for the path.
 		data := make([]byte, 100)
-		sz := 0
-		if sz, err = syscall.Listxattr(path, data); err != nil {
+		sz, err := syscall.Listxattr(path, data)
+		if err != nil {
 			return err
 		}
 		if sz != 0 {
