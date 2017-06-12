@@ -288,7 +288,7 @@ func refreshHardlinkAdditionTestGen(rmLink0 bool, link1 bool,
 		createTestFile(test, workspace, name, 1000)
 
 		content := "content to be verified"
-		err := createSmallFileWithContent(workspace+"/"+name, content)
+		err := createSmallFile(workspace+"/"+name, content)
 		test.AssertNoErr(err)
 
 		if link1 {
@@ -310,10 +310,11 @@ func refreshHardlinkAdditionTestGen(rmLink0 bool, link1 bool,
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
 
-		newContent := readFirstNBytes(test, workspace+"/"+name, len(content))
-		test.Log("Read newContent %s", newContent)
-		test.Assert(content == newContent,
-			fmt.Sprintf("content mismatch %d", len(newContent)))
+		file, err := os.OpenFile(workspace+"/"+name, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file, content)
+		err = file.Close()
+		test.AssertNoErr(err)
 
 		if link1 {
 			removeTestFileNoSync(test, workspace, name+".link1")
