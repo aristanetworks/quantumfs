@@ -14,17 +14,8 @@ import (
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
-func WaitForApi(test *testHelper) {
-	test.WaitFor("Api inode to be seen by kernel", func() bool {
-		_, err := os.Stat(test.TempDir + "/mnt/api")
-		return (err == nil)
-	})
-}
-
 func TestBasicInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		WaitForApi(test)
-
 		apiNoPath, err := GetApi()
 		test.AssertNoErr(err)
 
@@ -51,8 +42,6 @@ func TestBasicInterface(t *testing.T) {
 
 func TestBranchInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		WaitForApi(test)
-
 		api := test.getApi()
 
 		err := api.Branch("_/_/_", "test/test/test")
@@ -69,8 +58,6 @@ func TestBranchInterface(t *testing.T) {
 
 func TestInsertInode(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		WaitForApi(test)
-
 		workspace := test.NewWorkspace()
 
 		filedata := daemon.GenData(2000)
