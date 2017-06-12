@@ -30,10 +30,10 @@ func main() {
 	reader := qlog.NewReader(os.Args[1])
 
 	db := processlocal.NewMemdb()
-	extractors := make([]qlogstats.StatExtHook, 0)
+	extractors := make([]qlogstats.StatExtractorConfig, 0)
 
 	// sample extractor
-	extractors = append(extractors, qlogstats.NewStatExtHook(
+	extractors = append(extractors, qlogstats.NewStatExtractorConfig(
 		qlogstats.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr",
 			qlog.FnExitStr+"Out-- Mux::GetAttr", true),
 		(5*time.Second)))
