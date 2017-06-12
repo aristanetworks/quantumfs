@@ -5,20 +5,22 @@
 // It is used for parsing a qlog file completely in a single pass
 package qlog
 
-import "bytes"
-import "encoding/binary"
-import "encoding/gob"
-import "errors"
-import "fmt"
-import "io"
-import "io/ioutil"
-import "os"
-import "reflect"
-import "sort"
-import "strings"
-import "sync"
-import "time"
-import "unsafe"
+import (
+	"bytes"
+	"encoding/binary"
+	"encoding/gob"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"reflect"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+	"unsafe"
+)
 
 // consts
 const defaultParseThreads = 30
@@ -117,33 +119,33 @@ type PatternData struct {
 	Id        uint64
 }
 
-type logStack []LogOutput
+type LogStack []LogOutput
 
-func newLogStack() logStack {
+func newLogStack() LogStack {
 	return make([]LogOutput, 0)
 }
 
-func (s *logStack) Push(n LogOutput) {
+func (s *LogStack) Push(n LogOutput) {
 	*s = append(*s, n)
 }
 
-func (s *logStack) Pop() {
+func (s *LogStack) Pop() {
 	if len(*s) > 0 {
 		*s = (*s)[:len(*s)-1]
 	}
 }
 
-func (s *logStack) Peek() (LogOutput, error) {
+func (s *LogStack) Peek() (LogOutput, error) {
 	if len(*s) == 0 {
 		return LogOutput{},
-			errors.New("Cannot peek on an empty logStack")
+			errors.New("Cannot peek on an empty LogStack")
 	}
 
 	return (*s)[len(*s)-1], nil
 }
 
 type SequenceTracker struct {
-	stack logStack
+	stack LogStack
 
 	ready       bool
 	seq         []LogOutput

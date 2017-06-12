@@ -6,18 +6,20 @@ package main
 // chroot runs a shell in the current workspace tree, in which
 // the current workspace root becomes the filesystem root
 
-import "fmt"
-import "io/ioutil"
-import "os"
-import "os/exec"
-import "os/user"
-import "path/filepath"
-import "strconv"
-import "strings"
-import "syscall"
-import "time"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 const (
 	sudo       = "/usr/bin/sudo"
@@ -97,6 +99,16 @@ func findWorkspaceRoot() (string, error) {
 	}
 
 	return "", fmt.Errorf("Invalid path for chroot")
+}
+
+// Helper function to find the workspace name from the workspace root
+func findWorkspaceName(wsr string) (string, error) {
+	dirs := strings.Split(wsr, "/")
+	if len(dirs) < 3 {
+		return "", fmt.Errorf("Invalid path for workspace root")
+	}
+
+	return strings.Join(dirs[len(dirs)-3:], "/"), nil
 }
 
 // This function creates dst given the type of src if dst does not exist.
@@ -648,11 +660,17 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		return fmt.Errorf("Set architecture error: %s", err.Error())
 	}
 
+	wsn, err := findWorkspaceName(rootdir)
+	if err != nil {
+		return fmt.Errorf("findWorkspaceName error: %s", err.Error())
+	}
+
 	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
 	shell_cmd = append(shell_cmd, cmd...)
 
 	shell_env := os.Environ()
 	shell_env = append(shell_env, "A4_CHROOT="+rootdir)
+	shell_env = append(shell_env, "QFS_WORKSPACE="+wsn)
 
 	if err := syscall.Exec(shell_cmd[0],
 		shell_cmd, shell_env); err != nil {
@@ -745,6 +763,19 @@ ArgumentProcessingLoop:
 		fmt.Fprintln(os.Stderr,
 			"findWorkspaceRoot Error: ", err.Error())
 		os.Exit(1)
+	}
+
+	wsn, err := findWorkspaceName(rootdir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr,
+			"findWorkspaceName Error: ", err.Error())
+		os.Exit(exitInternalError)
+	}
+
+	if err = os.Setenv("QFS_WORKSPACE", wsn); err != nil {
+		fmt.Fprintln(os.Stderr,
+			"Setenv Error: ", err.Error())
+		os.Exit(exitInternalError)
 	}
 
 	svrName := rootdir + "/chroot"

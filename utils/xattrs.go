@@ -3,8 +3,10 @@
 
 package utils
 
-import "syscall"
-import "unsafe"
+import (
+	"syscall"
+	"unsafe"
+)
 
 // NOTE: syscall.Listxattr follows a symlink
 //  SYSCALL_LLISTXATTR isn't available in the golang's syscall

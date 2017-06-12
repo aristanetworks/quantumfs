@@ -3,23 +3,24 @@
 
 package main
 
-import "errors"
-import "fmt"
-import "os"
-import "io/ioutil"
-import "path/filepath"
-import "strings"
-import "syscall"
-import "time"
+import (
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
-import "golang.org/x/net/context"
-import "golang.org/x/sync/errgroup"
-
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
-import "github.com/aristanetworks/quantumfs/utils"
-import exs "github.com/aristanetworks/quantumfs/utils/excludespec"
-import "github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+	exs "github.com/aristanetworks/quantumfs/utils/excludespec"
+	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
+)
 
 // Design notes about qupload parallelism:
 //

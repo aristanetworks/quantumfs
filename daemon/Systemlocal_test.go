@@ -7,10 +7,13 @@ package daemon
 
 // Smoke tests for the systemlocal WorkspaceDB
 
-import "testing"
+import (
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs/processlocal"
-import "github.com/aristanetworks/quantumfs/systemlocal"
+	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs/systemlocal"
+)
 
 func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 	mountPath := th.tempDir + "/mnt"

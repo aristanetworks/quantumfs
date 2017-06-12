@@ -5,17 +5,19 @@ package daemon
 
 // Test the various operations on directories, such as creation and traversing
 
-import "bytes"
-import "fmt"
-import "io/ioutil"
-import "os"
-import "syscall"
-import "testing"
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 func TestDirectoryCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
@@ -1364,6 +1366,102 @@ func TestStickyDirPerms(t *testing.T) {
 
 		// we should be able to remove it, even though sticky bit is set
 		err = os.Remove(testFile)
+		test.AssertNoErr(err)
+	})
+}
+
+// This function generates a test that cannot run in parallel as it
+// changes the current working directory of the process
+func deleteCWDTestGen(runAsRoot bool) func(*testHelper) {
+	return func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testdir"
+		fullname := workspace + "/" + name
+
+		if !runAsRoot {
+			defer test.SetUidGid(99, -1, nil).Revert()
+		}
+
+		err := syscall.Mkdir(fullname, 0777)
+		test.AssertNoErr(err)
+
+		wd, err := os.Getwd()
+		test.AssertNoErr(err)
+
+		err = os.Chdir(fullname)
+		test.AssertNoErr(err)
+
+		defer func() {
+			err = os.Chdir(wd)
+			test.AssertNoErr(err)
+		}()
+
+		err = syscall.Rmdir(fullname)
+		test.AssertNoErr(err)
+
+		const ATCWD = -0x64
+		f, err := syscall.Openat(ATCWD, ".",
+			syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NONBLOCK, 0)
+		test.AssertNoErr(err)
+
+		buf := make([]byte, 1000)
+		_, err = syscall.Getdents(f, buf)
+		test.Assert(err == syscall.ENOENT, "Wrong error %v", err)
+
+		err = syscall.Close(f)
+		test.AssertNoErr(err)
+	}
+}
+
+func TestDeleteCWDUnprivilegedUser(t *testing.T) {
+	runExpensiveTest(t, deleteCWDTestGen(false))
+}
+
+func TestDeleteCWDRootUser(t *testing.T) {
+	runExpensiveTest(t, deleteCWDTestGen(true))
+}
+
+func TestDeleteOpenDirWithChild(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testdir"
+
+		fullname := workspace + "/" + name
+
+		defer test.SetUidGid(99, -1, nil).Revert()
+
+		err := syscall.Mkdir(fullname, 0777)
+		test.AssertNoErr(err)
+		err = syscall.Mknod(fullname+"/file", syscall.S_IFREG, 0)
+		test.Assert(err == nil, "Unable to create test file: %v", err)
+
+		f, err := os.Open(fullname)
+		test.AssertNoErr(err)
+
+		list, err := f.Readdir(-1)
+		test.AssertNoErr(err)
+		test.Assert(len(list) == 1, "list %v has wrong size", list)
+
+		err = syscall.Unlink(fullname + "/file")
+		test.AssertNoErr(err)
+
+		err = syscall.Rmdir(fullname)
+		test.AssertNoErr(err)
+
+		_, err = f.Seek(0, 0)
+		test.AssertNoErr(err)
+		list, err = f.Readdir(-1)
+		test.Assert(len(list) == 0, "list %v has wrong size", list)
+
+		const ATCWD = -0x64
+		f2, err := syscall.Openat(int(f.Fd()), ".",
+			syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NONBLOCK, 0)
+		test.AssertNoErr(err)
+
+		err = f.Close()
+		test.AssertNoErr(err)
+
+		err = syscall.Close(f2)
 		test.AssertNoErr(err)
 	})
 }

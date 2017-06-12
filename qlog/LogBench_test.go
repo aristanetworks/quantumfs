@@ -5,9 +5,11 @@ package qlog
 
 // Test the logging subsystem performance
 
-import "runtime"
-import "strings"
-import "testing"
+import (
+	"runtime"
+	"strings"
+	"testing"
+)
 
 var a uint32
 var b uint32

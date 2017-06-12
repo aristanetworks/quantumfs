@@ -3,15 +3,18 @@
 
 package walker
 
-import "fmt"
-import "io/ioutil"
-import "os"
-import "strings"
-import "strconv"
-import "testing"
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
+)
 
 // The steps followed are the same in all the tests:
 //  1. Mount a QFS instance a create files/links/dirs in it.
@@ -28,11 +31,25 @@ func TestFileWalk(t *testing.T) {
 		data := daemon.GenData(50)
 		workspace := test.NewWorkspace()
 
-		// Write File 1
+		// Write File
 		filename := workspace + "/file"
 		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
+
+		test.readWalkCompare(workspace)
+	})
+}
+
+func TestSpecialFileWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		// Write Special File
+		filename := workspace + "/file"
+		err := syscall.Mknod(filename,
+			syscall.S_IFCHR|syscall.S_IRWXU, 0x12345678)
+		test.Assert(err == nil, "Error creating node: %v", err)
 
 		test.readWalkCompare(workspace)
 	})

@@ -5,9 +5,11 @@ package daemon
 
 // This is _DOWN counterpart to directory.go
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+import (
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
@@ -205,7 +207,7 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, inode Inode,
 				childId)
 		})
 	}
-	c.qfs.noteDeletedInode(dir.id, inodeId, localRecord.Filename())
+	dir.handleDeletedInMemoryRecord_DOWN(c, localRecord.Filename(), inodeId)
 }
 
 func (dir *Directory) handleInstantiatedInodeChange_DOWN(c *ctx, inode Inode,
@@ -239,25 +241,16 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 
 	defer c.funcIn("Directory::handleDirectoryEntryUpdate_DOWN").Out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
+	dir.children.loadChild(c, remoteRecord, inodeId)
 
-	c.wlog("entry %s with inodeid %d goes %s -> %s",
-		remoteRecord.Filename(), inodeId,
-		localRecord.ID().Text(), remoteRecord.ID().Text())
-
-	newInodeId := dir.children.loadChild(c, remoteRecord, inodeId)
-	if newInodeId != inodeId {
-		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
-			"inode mismatch %d vs. %d", inodeId, newInodeId)
-		c.wlog("leaking inode %d", inodeId)
-	}
 	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
 		if localRecord.Type() == remoteRecord.Type() {
 			dir.handleInstantiatedInodeChange_DOWN(c, inode, inodeId,
 				remoteRecord)
-		} else if localRecord.Type().Matches(remoteRecord.Type()) {
-			inode.(*File).handleTypeChange(c, remoteRecord)
 		} else {
-			dir.destroyChild_DOWN(c, inode, inodeId, localRecord)
+			// The types of the local and remote matched, but they were
+			// not the same. This can only happen for regular files
+			inode.(*File).handleTypeChange(c, remoteRecord)
 		}
 	} else {
 		c.wlog("nothing to do for uninstantiated inode %d", inodeId)
@@ -266,6 +259,26 @@ func (dir *Directory) handleDirectoryEntryUpdate_DOWN(c *ctx,
 	status := c.qfs.invalidateInode(inodeId)
 	utils.Assert(status == fuse.OK,
 		"invalidating %d failed with %d", inodeId, status)
+}
+
+func (dir *Directory) handleDirectoryEntryRecreate_DOWN(c *ctx,
+	localRecord quantumfs.DirectoryRecord,
+	remoteRecord *quantumfs.DirectRecord) InodeId {
+
+	defer c.funcIn("Directory::handleDirectoryEntryRecreate_DOWN").Out()
+	inodeId := dir.children.inodeNum(remoteRecord.Filename())
+
+	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+		dir.destroyChild_DOWN(c, inode, inodeId, localRecord)
+	}
+	inodeId = dir.children.loadChild(c, remoteRecord, quantumfs.InodeIdInvalid)
+
+	status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
+	utils.Assert(status == fuse.OK,
+		"marking %s created failed with %d", remoteRecord.Filename(),
+		status)
+
+	return inodeId
 }
 
 func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
@@ -291,7 +304,18 @@ func (dir *Directory) handleRemoteRecord_DOWN(c *ctx,
 
 		c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
 	} else if !remoteRecord.ID().IsEqualTo(localRecord.ID()) {
-		dir.handleDirectoryEntryUpdate_DOWN(c, localRecord, remoteRecord)
+
+		c.wlog("entry %s goes %s -> %s", remoteRecord.Filename(),
+			localRecord.ID().Text(), remoteRecord.ID().Text())
+
+		if localRecord.Type().Matches(remoteRecord.Type()) {
+			dir.handleDirectoryEntryUpdate_DOWN(c, localRecord,
+				remoteRecord)
+		} else {
+			u := dir.handleDirectoryEntryRecreate_DOWN(c, localRecord,
+				remoteRecord)
+			uninstantiated = []InodeId{u}
+		}
 	}
 	return uninstantiated
 }
@@ -303,11 +327,12 @@ func (dir *Directory) handleDeletedInMemoryRecord_DOWN(c *ctx, childname string,
 		childname).Out()
 
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
-		dir.children.deleteChild(c, childname)
+		dir.children.deleteChild(c, childname, false)
 	} else {
 		result := child.deleteSelf(c, child,
 			func() (quantumfs.DirectoryRecord, fuse.Status) {
-				delRecord := dir.children.deleteChild(c, childname)
+				delRecord := dir.children.deleteChild(c, childname,
+					false)
 				return delRecord, fuse.OK
 			})
 		if result != fuse.OK {
@@ -345,8 +370,6 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 
 	})
-	/* TODO
-	dir.children.reload(c, baseLayerId)
-	*/
+	dir.children.baseLayerIs(c, baseLayerId)
 	return uninstantiated, deletedInodeIds
 }
