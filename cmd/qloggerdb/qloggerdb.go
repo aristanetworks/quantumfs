@@ -11,9 +11,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/qlogstats"
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlogstats"
 )
 
 func init() {
