@@ -1,17 +1,17 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// memdb is a stand in memory-based database for use in testing qloggerdb
+// memdb is a stand in memory-based database for use in testing qlogstats
 
 package processlocal
 
 import (
-	"github.com/aristanetworks/quantumfs/loggerdb"
+	"github.com/aristanetworks/quantumfs/qlogstats"
 )
 
 type dataSeries struct {
 	tags   map[string]string
-	fields []qloggerdb.Field
+	fields []qlogstats.Field
 }
 
 type Memdb struct {
@@ -24,7 +24,7 @@ func NewMemdb() *Memdb {
 	}
 }
 
-func (db *Memdb) Store(tags_ []qloggerdb.Tag, fields_ []qloggerdb.Field) {
+func (db *Memdb) Store(tags_ []qlogstats.Tag, fields_ []qlogstats.Field) {
 	tagMap := make(map[string]string)
 	// Use a set to make Fetch faster, but use maps because Golang has no sets
 	for _, tag := range tags_ {
@@ -37,7 +37,7 @@ func (db *Memdb) Store(tags_ []qloggerdb.Tag, fields_ []qloggerdb.Field) {
 	})
 }
 
-func (db *Memdb) Fetch(withTags []qloggerdb.Tag, field string, lastN int) []uint64 {
+func (db *Memdb) Fetch(withTags []qlogstats.Tag, field string, lastN int) []uint64 {
 	rtn := make([]uint64, 0)
 
 	for _, entry := range db.data {
