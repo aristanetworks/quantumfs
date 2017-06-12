@@ -130,7 +130,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		}
 
 		// Skip WSR
-		if err := handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
+		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
 			if err == SkipDir {
 				return nil
