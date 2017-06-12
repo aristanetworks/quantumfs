@@ -769,13 +769,13 @@ ArgumentProcessingLoop:
 	if err != nil {
 		fmt.Fprintln(os.Stderr,
 			"findWorkspaceName Error: ", err.Error())
-		os.Exit(1)
+		os.Exit(exitInternalError)
 	}
 
 	if err = os.Setenv("QFS_WORKSPACE", wsn); err != nil {
 		fmt.Fprintln(os.Stderr,
 			"Setenv Error: ", err.Error())
-		os.Exit(1)
+		os.Exit(exitInternalError)
 	}
 
 	svrName := rootdir + "/chroot"
