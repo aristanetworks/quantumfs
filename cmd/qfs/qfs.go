@@ -18,10 +18,11 @@ var version string
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (
-	exitOk          = iota
-	exitBadCmd      = iota
-	exitBadArgs     = iota
-	exitApiNotFound = iota
+	exitOk            = iota
+	exitBadCmd        = iota
+	exitBadArgs       = iota
+	exitApiNotFound   = iota
+	exitInternalError = iota
 )
 
 func printUsage() {

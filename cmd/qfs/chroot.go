@@ -101,6 +101,16 @@ func findWorkspaceRoot() (string, error) {
 	return "", fmt.Errorf("Invalid path for chroot")
 }
 
+// Helper function to find the workspace name from the workspace root
+func findWorkspaceName(wsr string) (string, error) {
+	dirs := strings.Split(wsr, "/")
+	if len(dirs) < 3 {
+		return "", fmt.Errorf("Invalid path for workspace root")
+	}
+
+	return strings.Join(dirs[len(dirs)-3:], "/"), nil
+}
+
 // This function creates dst given the type of src if dst does not exist.
 // It returns true if dst exists and is the same type as src, or dst is
 // successfully created, otherwise returns false.
@@ -650,11 +660,17 @@ func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
 		return fmt.Errorf("Set architecture error: %s", err.Error())
 	}
 
+	wsn, err := findWorkspaceName(rootdir)
+	if err != nil {
+		return fmt.Errorf("findWorkspaceName error: %s", err.Error())
+	}
+
 	shell_cmd := []string{sh, "-l", "-c", "\"$@\"", cmd[0]}
 	shell_cmd = append(shell_cmd, cmd...)
 
 	shell_env := os.Environ()
 	shell_env = append(shell_env, "A4_CHROOT="+rootdir)
+	shell_env = append(shell_env, "QFS_WORKSPACE="+wsn)
 
 	if err := syscall.Exec(shell_cmd[0],
 		shell_cmd, shell_env); err != nil {
@@ -747,6 +763,19 @@ ArgumentProcessingLoop:
 		fmt.Fprintln(os.Stderr,
 			"findWorkspaceRoot Error: ", err.Error())
 		os.Exit(1)
+	}
+
+	wsn, err := findWorkspaceName(rootdir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr,
+			"findWorkspaceName Error: ", err.Error())
+		os.Exit(exitInternalError)
+	}
+
+	if err = os.Setenv("QFS_WORKSPACE", wsn); err != nil {
+		fmt.Fprintln(os.Stderr,
+			"Setenv Error: ", err.Error())
+		os.Exit(exitInternalError)
 	}
 
 	svrName := rootdir + "/chroot"
