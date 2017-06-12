@@ -11,9 +11,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/loggerdb"
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/qlogstats"
 )
 
 func init() {
@@ -30,15 +30,15 @@ func main() {
 	reader := qlog.NewReader(os.Args[1])
 
 	db := processlocal.NewMemdb()
-	extractors := make([]qloggerdb.StatExtHook, 0)
+	extractors := make([]qlogstats.StatExtractorConfig, 0)
 
 	// sample extractor
-	extractors = append(extractors, qloggerdb.NewStatExtHook(
-		qloggerdb.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr",
+	extractors = append(extractors, qlogstats.NewStatExtractorConfig(
+		qlogstats.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr",
 			qlog.FnExitStr+"Out-- Mux::GetAttr", true),
 		(5*time.Second)))
 
-	logger := qloggerdb.NewLoggerDb(db, extractors)
+	logger := qlogstats.NewLoggerDb(db, extractors)
 
 	reader.ProcessLogs(qlog.ReadThenTail, func(v qlog.LogOutput) {
 		logger.ProcessLog(v)
