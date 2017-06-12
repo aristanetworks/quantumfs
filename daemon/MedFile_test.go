@@ -5,15 +5,17 @@ package daemon
 
 // Test the small/medium file transitions and medium file operations
 
-import "bytes"
-import "io"
-import "io/ioutil"
-import "os"
-import "testing"
-import "syscall"
+import (
+	"bytes"
+	"io"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
+)
 
 func TestMedBranch(t *testing.T) {
 	runTest(t, func(test *testHelper) {

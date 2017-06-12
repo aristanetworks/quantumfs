@@ -5,14 +5,16 @@ package daemon
 
 // The basic Inode and FileHandle structures
 
-import "container/list"
-import "fmt"
-import "sync"
-import "sync/atomic"
+import (
+	"container/list"
+	"fmt"
+	"sync"
+	"sync/atomic"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 type InodeId uint64
 
@@ -81,6 +83,8 @@ type Inode interface {
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
+	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
+
 	getChildXAttrSize(c *ctx, inodeNum InodeId,
 		attr string) (size int, result fuse.Status)
 
@@ -117,6 +121,7 @@ type Inode interface {
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
 	isOrphaned_() bool
+	orphan(c *ctx)
 	deleteSelf(c *ctx, toDelete Inode,
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
@@ -200,6 +205,10 @@ type InodeCommon struct {
 
 	// This element is protected by the DirtyQueueLock
 	dirtyElement__ *list.Element
+
+	unlinkRecord quantumfs.DirectoryRecord
+	unlinkXAttr  map[string][]byte
+	unlinkLock   utils.DeferableRwMutex
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -407,6 +416,15 @@ func (inode *InodeCommon) isOrphaned() bool {
 	return inode.isOrphaned_()
 }
 
+func (inode *InodeCommon) orphan(c *ctx) {
+	defer c.funcIn("InodeCommon::orphan").Out()
+	defer inode.parentLock.RLock().RUnlock()
+
+	inode.id = inode.parentId
+	// XXX once r/837 lands, also do:
+	// inode.setChildRecord(c, entry.record)
+}
+
 // parentLock must be RLocked
 func (inode *InodeCommon) isOrphaned_() bool {
 	return inode.id == inode.parentId
@@ -554,9 +572,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 		return err
 	}
 
-	if file, isFile := toDelete.(*File); isFile {
-		file.setChildRecord(c, toOrphan)
-	}
+	toDelete.setChildRecord(c, toOrphan)
 	// orphan ourselves
 	inode.parentId = toDelete.inodeNum()
 	c.vlog("Orphaned inode %d", toDelete.inodeNum())

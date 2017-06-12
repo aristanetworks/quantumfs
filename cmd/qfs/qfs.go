@@ -5,21 +5,24 @@
 // special operations not available through normal POSIX interfaces.
 package main
 
-import "flag"
-import "fmt"
-import "os"
-import "strconv"
+import (
+	"flag"
+	"fmt"
+	"os"
+	"strconv"
 
-import "github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs"
+)
 
 var version string
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (
-	exitOk          = iota
-	exitBadCmd      = iota
-	exitBadArgs     = iota
-	exitApiNotFound = iota
+	exitOk            = iota
+	exitBadCmd        = iota
+	exitBadArgs       = iota
+	exitApiNotFound   = iota
+	exitInternalError = iota
 )
 
 func printUsage() {

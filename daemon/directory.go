@@ -3,16 +3,18 @@
 
 package daemon
 
-import "bytes"
-import "errors"
-import "fmt"
-import "syscall"
-import "sync"
-import "time"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"sync"
+	"syscall"
+	"time"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 // If dirRecord is nil, then mode, rdev and dirRecord are invalid, but the key is
 // coming from a DirRecord and not passed in from create_.
@@ -83,39 +85,8 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
-	uninstantiated := make([]InodeId, 0)
-
-	key := baseLayerId
-	for {
-		c.vlog("Fetching baselayer %s", key.Text())
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			panic("No baseLayer object")
-		}
-
-		baseLayer := buffer.AsDirectoryEntry()
-
-		if dir.children == nil {
-			dir.children = newChildMap(baseLayer.NumEntries(), wsr, dir)
-		}
-
-		for i := 0; i < baseLayer.NumEntries(); i++ {
-			childInodeNum := func() InodeId {
-				defer dir.childRecordLock.Lock().Unlock()
-				return dir.children.loadChild(c, baseLayer.Entry(i),
-					quantumfs.InodeIdInvalid)
-			}()
-			c.vlog("initDirectory %d getting child %d", inodeNum,
-				childInodeNum)
-			uninstantiated = append(uninstantiated, childInodeNum)
-		}
-
-		if baseLayer.HasNext() {
-			key = baseLayer.Next()
-		} else {
-			break
-		}
-	}
+	cmap, uninstantiated := newChildMap(c, wsr, dir.baseLayerId)
+	dir.children = cmap
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 
@@ -193,7 +164,7 @@ func (dir *Directory) delChild_(c *ctx,
 	// If this is a file we need to reparent it to itself
 	record := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.deleteChild(c, name)
+		return dir.children.deleteChild(c, name, true)
 	}()
 
 	dir.self.markAccessed(c, name, false)
@@ -422,6 +393,11 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.funcIn("Directory::setChildAttr").Out()
+
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.setOrphanChildAttr(c, inodeNum, newType, attr, out,
+			updateMtime)
+	}
 
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
@@ -771,6 +747,10 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
 
 	defer c.funcIn("Directory::getChildRecordCopy").Out()
+
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.getOrphanChildRecordCopy(c, inodeNum)
+	}
 
 	defer dir.RLock().RUnlock()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -1245,7 +1225,7 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 		return
 	}
 
-	dir.children.deleteChild(c, name)
+	dir.children.deleteChild(c, name, true)
 }
 
 // Needs to hold childRecordLock
@@ -1385,6 +1365,10 @@ func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("Directory::getChildXAttrSize").Out()
 
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.getOrphanChildXAttrSize(c, inodeNum, attr)
+	}
+
 	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
 	if status != fuse.OK {
 		return 0, status
@@ -1398,6 +1382,10 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("Directory::getChildXAttrData").Out()
 
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.getOrphanChildXAttrData(c, inodeNum, attr)
+	}
+
 	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
 	if status != fuse.OK {
 		return []byte{}, status
@@ -1409,6 +1397,10 @@ func (dir *Directory) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
 	defer c.FuncIn("Directory::listChildXAttr", "%d", inodeNum).Out()
+
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.listOrphanChildXAttr(c, inodeNum)
+	}
 
 	defer dir.RLock().RUnlock()
 
@@ -1440,6 +1432,10 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
 		len(data)).Out()
+
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.setOrphanChildXAttr(c, inodeNum, attr, data)
+	}
 
 	defer dir.Lock().Unlock()
 
@@ -1515,6 +1511,10 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	defer c.FuncIn("Directory::removeChildXAttr", "%d, %s", inodeNum, attr).Out()
+
+	if dir.isOrphaned() && dir.id == inodeNum {
+		return dir.removeOrphanChildXAttr(c, inodeNum, attr)
+	}
 
 	defer dir.Lock().Unlock()
 

@@ -5,14 +5,14 @@ package daemon
 
 // This file holds the File type, which represents regular files
 
-import "bytes"
-import "errors"
-import "sync"
+import (
+	"errors"
+	"sync"
 
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils"
-
-import "github.com/hanwen/go-fuse/fuse"
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 const FMODE_EXEC = 0x20 // From Linux
 
@@ -84,10 +84,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	accessor     blockAccessor
-	unlinkRecord quantumfs.DirectoryRecord
-	unlinkXAttr  map[string][]byte
-	unlinkLock   utils.DeferableRwMutex
+	accessor blockAccessor
 }
 
 func (fi *File) handleTypeChange(c *ctx, remoteRecord *quantumfs.DirectRecord) {
@@ -319,226 +316,6 @@ func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 
 func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
-}
-
-// When a file is unlinked its parent forgets about it, so we cannot ask it for our
-// properties. Since the file cannot be accessed from the directory tree any longer
-// we do not need to upload it or any of its content. When being unlinked we'll
-// orphan the File by making it its own parent.
-func (fi *File) setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
-
-	defer c.funcIn("File::setChildAttr").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Invalid setChildAttr on File")
-		return fuse.EIO
-	}
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	if fi.unlinkRecord == nil {
-		panic("setChildAttr on self file before unlinking")
-	}
-
-	modifyEntryWithAttr(c, newType, attr, fi.unlinkRecord, updateMtime)
-
-	if out != nil {
-		fillAttrOutCacheData(c, out)
-		fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
-			c.fuseCtx.Owner, fi.unlinkRecord)
-	}
-
-	return fuse.OK
-}
-
-// Requires unlinkLock
-func (fi *File) parseExtendedAttributes_(c *ctx) {
-	defer c.funcIn("File::parseExtendedAttributes_").Out()
-
-	if fi.unlinkXAttr != nil {
-		return
-	}
-
-	// Download and parse the extended attributes
-	fi.unlinkXAttr = make(map[string][]byte)
-
-	key := fi.unlinkRecord.ExtendedAttributes()
-	if key.IsEqualTo(quantumfs.EmptyBlockKey) {
-		return
-	}
-
-	buffer := c.dataStore.Get(&c.Ctx, key)
-	if buffer == nil {
-		c.elog("Failed to retrieve extended attribute list")
-		return
-	}
-
-	attributes := buffer.AsExtendedAttributes()
-
-	for i := 0; i < attributes.NumAttributes(); i++ {
-		name, attrKey := attributes.Attribute(i)
-
-		c.vlog("Found attribute key: %s", attrKey.Text())
-		buffer := c.dataStore.Get(&c.Ctx, attrKey)
-		if buffer == nil {
-			c.elog("Failed to retrieve attribute datablock")
-			continue
-		}
-
-		fi.unlinkXAttr[name] = buffer.Get()
-	}
-}
-
-func (fi *File) getExtendedAttribute(c *ctx, attr string) ([]byte, bool) {
-	defer c.FuncIn("File::getExtendedAttribute", "Attr: %s", attr).Out()
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	fi.parseExtendedAttributes_(c)
-
-	data, ok := fi.unlinkXAttr[attr]
-	return data, ok
-}
-
-func (fi *File) getChildXAttrSize(c *ctx, inodeNum InodeId,
-	attr string) (size int, result fuse.Status) {
-
-	defer c.funcIn("File::getChildXAttrSize").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Invalid getChildXAttrSize on File")
-		return 0, fuse.EIO
-	}
-
-	value, ok := fi.getExtendedAttribute(c, attr)
-	if !ok {
-		// No such attribute
-		return 0, fuse.ENODATA
-	} else {
-		return len(value), fuse.OK
-	}
-}
-
-func (fi *File) getChildXAttrData(c *ctx, inodeNum InodeId,
-	attr string) (data []byte, result fuse.Status) {
-
-	defer c.funcIn("File::getChildXAttrData").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Invalid getChildXAttrData on File")
-		return nil, fuse.EIO
-	}
-
-	value, ok := fi.getExtendedAttribute(c, attr)
-	if !ok {
-		// No such attribute
-		return nil, fuse.ENODATA
-	} else {
-		return value, fuse.OK
-	}
-}
-
-func (fi *File) listChildXAttr(c *ctx,
-	inodeNum InodeId) (attributes []byte, result fuse.Status) {
-
-	defer c.funcIn("File::listChildXAttr").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Invalid listChildXAttr on File")
-		return nil, fuse.EIO
-	}
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	fi.parseExtendedAttributes_(c)
-
-	var nameBuffer bytes.Buffer
-	for name := range fi.unlinkXAttr {
-		c.vlog("Appending %s", name)
-		nameBuffer.WriteString(name)
-		nameBuffer.WriteByte(0)
-	}
-
-	// don't append our self-defined extended attribute XAttrTypeKey to hide it
-
-	c.vlog("Returning %d bytes", nameBuffer.Len())
-
-	return nameBuffer.Bytes(), fuse.OK
-}
-
-func (fi *File) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
-	data []byte) fuse.Status {
-
-	defer c.funcIn("File::setChildXAttr").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Invalid setChildXAttr on File")
-		return fuse.EIO
-	}
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	fi.parseExtendedAttributes_(c)
-
-	fi.unlinkXAttr[attr] = data
-
-	return fuse.OK
-}
-
-func (fi *File) removeChildXAttr(c *ctx, inodeNum InodeId,
-	attr string) fuse.Status {
-
-	defer c.funcIn("File::removeChildXAttr").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Invalid removeChildXAttr on File")
-		return fuse.EIO
-	}
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	fi.parseExtendedAttributes_(c)
-
-	if _, ok := fi.unlinkXAttr[attr]; !ok {
-		return fuse.ENODATA
-	}
-
-	delete(fi.unlinkXAttr, attr)
-
-	return fuse.OK
-}
-
-func (fi *File) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
-
-	defer c.funcIn("File::getChildRecordCopy").Out()
-
-	if !fi.isOrphaned() {
-		c.elog("Unsupported record fetch on file")
-		return &quantumfs.DirectRecord{},
-			errors.New("Unsupported record fetch")
-	}
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	if fi.unlinkRecord == nil {
-		panic("getChildRecord on self file before unlinking")
-	}
-
-	return fi.unlinkRecord.ShallowCopy(), nil
-}
-
-func (fi *File) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
-	defer c.funcIn("File::setChildRecord").Out()
-
-	defer fi.unlinkLock.Lock().Unlock()
-
-	if fi.unlinkRecord != nil {
-		panic("setChildRecord on self file after unlinking")
-	}
-
-	fi.unlinkRecord = record
 }
 
 func resize(buffer []byte, size int) []byte {

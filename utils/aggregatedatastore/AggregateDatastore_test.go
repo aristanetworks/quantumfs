@@ -3,9 +3,12 @@
 
 package aggregatedatastore
 
-import "testing"
-import "github.com/aristanetworks/quantumfs"
-import "github.com/aristanetworks/quantumfs/utils/simplebuffer"
+import (
+	"testing"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
+)
 
 var requestId uint64
 

@@ -6,11 +6,13 @@
 
 package qlog
 
-import "bytes"
-import "fmt"
-import "os"
-import "time"
-import "unsafe"
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"time"
+	"unsafe"
+)
 
 type LogStrTrim struct {
 	Text         string
@@ -104,31 +106,119 @@ func (read *Reader) ReadHeader() *MmapHeader {
 	return ExtractHeader(headerData)
 }
 
-func (read *Reader) ProcessLogs(fxn func(LogOutput)) {
-	// Run indefinitely
-	for {
-		newLogs := read.readMore()
+type LogProcessMode int
+
+const (
+	TailOnly LogProcessMode = iota
+	ReadOnly
+	ReadThenTail
+)
+
+func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
+	if mode == ReadThenTail || mode == ReadOnly {
+		freshHeader := read.ReadHeader()
+		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.PastEndIdx)
+
+		read.lastPastEndIdx = newIdx
 		for _, v := range newLogs {
 			fxn(v)
+		}
+
+		// we may be done
+		if mode == ReadOnly {
+			return
+		}
+	}
+
+	// Run indefinitely
+	for {
+		freshHeader := read.ReadHeader()
+		if freshHeader.CircBuf.PastEndIdx != read.lastPastEndIdx {
+			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
+				freshHeader.CircBuf.PastEndIdx)
+
+			read.lastPastEndIdx = newPastEndIdx
+			for _, v := range newLogs {
+				fxn(v)
+			}
 		}
 
 		time.Sleep(10 * time.Millisecond)
 	}
 }
 
-func (read *Reader) readMore() []LogOutput {
-	freshHeader := read.ReadHeader()
-	if freshHeader.CircBuf.PastEndIdx == read.lastPastEndIdx {
-		return nil
-	}
+func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
+	haveReadTo uint64) {
 
 	rtn := make([]LogOutput, 0)
 
-	pastEndIdx := freshHeader.CircBuf.PastEndIdx
-	readLen := wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize)
+	distanceToEnd := read.circBufSize - 1
+	lastReadyIdx := pastEndIdx
+	readTo := pastEndIdx
+
+	// to accommodate pastEndIdx moving while we read, we have to read packet
+	// by packet and check the header every time we parse a log
+	for {
+		// Read the packet size from file
+		lengthData := read.wrapRead(readTo-2, 2)
+		packetLen := *(*uint16)(unsafe.Pointer(&lengthData[0]))
+		packetLen &= ^(uint16(entryCompleteBit))
+
+		// If we reach a packet of insufficient length, then we're done
+		if packetLen == 0 {
+			break
+		}
+		// Add in the 2 bytes for the size field
+		packetLen += 2
+
+		// Now read the full packet so we can use readLogAt
+		readFrom := wrapMinus(readTo, uint64(packetLen), read.circBufSize)
+		packetData := read.wrapRead(readFrom, uint64(packetLen))
+		readLen, logOutput, ready := read.readLogAt(packetData,
+			uint64(packetLen))
+		if readLen <= 2 {
+			// hit an unset packet, so we're done
+			break
+		}
+
+		// Place our marker at the beginning of the next packet
+		wrapMinusEquals(&readTo, uint64(packetLen), read.circBufSize)
+
+		// Read the header to see if the log end just passed us as we parsed
+		freshHeader := read.ReadHeader()
+		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.PastEndIdx,
+			read.circBufSize)
+
+		// Distance to the moving end of logs should be decreasing. The
+		// moment that it increases, it has passed us.
+		if newDistanceToEnd > distanceToEnd {
+			break
+		}
+		distanceToEnd = newDistanceToEnd
+
+		if ready {
+			rtn = append([]LogOutput{logOutput}, rtn...)
+		} else {
+			rtn = make([]LogOutput, 0)
+			lastReadyIdx = readTo
+			wrapMinusEquals(&lastReadyIdx, uint64(packetLen),
+				read.circBufSize)
+		}
+	}
+
+	return rtn, lastReadyIdx
+}
+
+func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
+	haveReadTo uint64) {
+
+	rtn := make([]LogOutput, 0)
+
+	pastEndIdx := readTo
+	readLen := wrapMinus(readTo, readFrom, read.circBufSize)
 
 	// read all the data in one go to reduce number of reads
-	data := read.wrapRead(read.lastPastEndIdx, readLen)
+	data := read.wrapRead(readFrom, readLen)
 	pastDataIdx := int64(len(data))
 
 	for {
@@ -155,7 +245,7 @@ func (read *Reader) readMore() []LogOutput {
 		if ready {
 			rtn = append([]LogOutput{logOutput}, rtn...)
 		} else {
-			pastEndIdx = read.lastPastEndIdx
+			pastEndIdx = readFrom
 			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),
 				read.circBufSize)
 		}
@@ -164,15 +254,14 @@ func (read *Reader) readMore() []LogOutput {
 			break
 		}
 	}
-	read.lastPastEndIdx = pastEndIdx
 
-	return rtn
+	return rtn, pastEndIdx
 }
 
 func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,
 	bool) {
 
-	if wrapMinus(pastEndIdx, read.lastPastEndIdx, read.circBufSize) < 2 {
+	if pastEndIdx < 2 {
 		fmt.Println("Partial packet - not enough data to even read size")
 		return 0, LogOutput{}, false
 	}

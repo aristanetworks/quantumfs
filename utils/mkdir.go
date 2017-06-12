@@ -30,8 +30,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package utils
 
-import "os"
-import "syscall"
+import (
+	"os"
+	"syscall"
+)
 
 // MkdirAll creates a directory named path, along with any necessary parents, and
 // returns nil, or else returns an error.

@@ -6,11 +6,13 @@ package daemon
 // Test the various operations on symlinks, only contains: CreateSymlink and
 // extended attributes related operations: set, get, list, remove
 
-import "bytes"
-import "syscall"
-import "testing"
+import (
+	"bytes"
+	"syscall"
+	"testing"
 
-import "github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 // create a source file and link it to a symlink file
 func createSymlink(workspace string, test *testHelper) string {
@@ -163,5 +165,33 @@ func TestSymlinkPermission(t *testing.T) {
 			syscall.S_IRWXO
 		test.Assert(stat.Mode == expectedPermissions,
 			"Symlink has wrong permissions %x", stat.Mode)
+	})
+}
+
+func TestSymlinkOrphanedPermission(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		symlink := createSymlink(workspace, test)
+
+		const O_PATH = 010000000
+		fd, err := syscall.Open(symlink, O_PATH|syscall.O_NOFOLLOW, 0)
+		test.AssertNoErr(err)
+
+		err = syscall.Unlink(symlink)
+		test.AssertNoErr(err)
+
+		var stat syscall.Stat_t
+		err = syscall.Fstat(fd, &stat)
+		test.AssertNoErr(err)
+
+		var expectedPermissions uint32
+		expectedPermissions |= syscall.S_IFLNK
+		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
+			syscall.S_IRWXO
+		test.Assert(stat.Mode == expectedPermissions,
+			"Symlink has wrong permissions %x", stat.Mode)
+
+		err = syscall.Close(fd)
+		test.AssertNoErr(err)
 	})
 }
