@@ -63,3 +63,9 @@ func (th *testHelper) testHelperUpcast(
 		testFn(th)
 	}
 }
+
+func (th *testHelper) getApi() QfsClientApi {
+	api, err := GetApiPath(th.TempDir + "/mnt/api")
+	th.AssertNoErr(err)
+	return api
+}
