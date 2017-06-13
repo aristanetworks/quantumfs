@@ -135,7 +135,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			if err == SkipDir {
 				return nil
 			}
-			return
+			return err
 		}
 		return
 	})
@@ -345,7 +345,16 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 
 	for i := 0; i < attributeList.NumAttributes(); i++ {
 		_, key := attributeList.Attribute(i)
-		err := writeToChan(c, keyChan, fpath, key, uint64(1024))
+
+		buf := simplebuffer.New(nil, key)
+		if err := ds.Get(c.Qctx, key, buf); err != nil {
+			return err
+		}
+		simplebuffer.AssertNonZeroBuf(buf,
+			"Attributes List buffer %s", key.Text())
+
+		err := writeToChan(c, keyChan, fpath, key,
+			uint64(buf.Size()))
 		if err != nil {
 			return err
 		}
