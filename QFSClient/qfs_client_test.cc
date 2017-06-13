@@ -312,7 +312,8 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 	// 2. ReadResponse() returns appropriate JSON when called by GetAccessed()
 	// 3. GetAccessed() does what it's supposed to do in response to the JSON
 	//    it thinks it's read from the API file
-	err = this->api->GetAccessed("test/workspace/root");
+	PathAccessList paths;
+	err = this->api->GetAccessed("test/workspace/root", &paths);
 	ASSERT_EQ(err.code, kSuccess);
 
 	// compare what the API function actually wrote with what we expected
@@ -585,7 +586,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest) {
 TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	std::unordered_map<std::string, bool> accessed_list;
+	PathAccessList accessed_list;
 
 	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
@@ -594,10 +595,10 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 	err = this->api->PrepareAccessedListResponse(&context, &accessed_list);
 	ASSERT_EQ(err.code, kSuccess);
 
-	ASSERT_EQ(accessed_list.size(), 3);
-	ASSERT_TRUE(accessed_list.at("file1"));
-	ASSERT_FALSE(accessed_list.at("file2"));
-	ASSERT_TRUE(accessed_list.at("file3"));
+	ASSERT_EQ(accessed_list.paths.size(), 3);
+	ASSERT_TRUE(accessed_list.paths["file1"]);
+	ASSERT_FALSE(accessed_list.paths["file2"]);
+	ASSERT_TRUE(accessed_list.paths["file3"]);
 }
 
 // Negative test for ApiImpl::PrepareAccessedListResponse() to check that a missing
@@ -605,7 +606,7 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	std::unordered_map<std::string, bool> accessed_list;
+	PathAccessList accessed_list;
 
 	// corrupt AccessList in the JSON that CheckCommonApiResponse will try
 	// to parse
@@ -623,22 +624,6 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 
 	err = this->api->PrepareAccessedListResponse(&context, &accessed_list);
 	ASSERT_EQ(err.code, kMissingJsonObject);
-}
-
-TEST_F(QfsClientApiTest, FormatAccessedListTest) {
-	std::string expected_output = "------ Created Files ------\n"
-	"file3\n"
-	"file1\n"
-	"------ Accessed Files ------\n"
-	"file2\n";
-
-	std::unordered_map<std::string, bool> accessed_list;
-	accessed_list["file1"] = true;
-	accessed_list["file2"] = false;
-	accessed_list["file3"] = true;
-
-	std::string actual_output = this->api->FormatAccessedList(accessed_list);
-	ASSERT_STREQ(actual_output.c_str(), expected_output.c_str());
 }
 
 void QfsClientDeterminePathTest::SetUp() {
