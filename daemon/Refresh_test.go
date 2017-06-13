@@ -275,7 +275,9 @@ func TestRefreshFileRemove(t *testing.T) {
 	})
 }
 
-func refreshHardlinkAdditionTestGen(rmLink bool) func(*testHelper) {
+func refreshHardlinkAdditionTestGen(rmLink0 bool, link1 bool,
+	link2 bool) func(*testHelper) {
+
 	return func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		name := "testFile"
@@ -284,13 +286,43 @@ func refreshHardlinkAdditionTestGen(rmLink bool) func(*testHelper) {
 		ctx := test.TestCtx()
 		oldRootId := createTestFile(test, workspace, "otherfile", 1000)
 		createTestFile(test, workspace, name, 1000)
+
+		content := "content to be verified"
+		err := createSmallFile(workspace+"/"+name, content)
+		test.AssertNoErr(err)
+
+		if link1 {
+			createTestFileNoSync(test, workspace, name+".link1", 1000)
+			linkTestFileNoSync(test, workspace, name+".link1",
+				linkfile+".link1")
+		}
 		newRootId1 := linkTestFile(test, workspace, name, linkfile)
-		if rmLink {
+		if rmLink0 {
 			removeTestFileNoSync(test, workspace, linkfile)
 		}
+		if link2 {
+			createTestFileNoSync(test, workspace, name+".link2", 1000)
+			linkTestFileNoSync(test, workspace, name+".link2",
+				linkfile+".link2")
+		}
+
 		newRootId2 := removeTestFile(test, workspace, name)
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+
+		file, err := os.OpenFile(workspace+"/"+name, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file, content)
+		err = file.Close()
+		test.AssertNoErr(err)
+
+		if link1 {
+			removeTestFileNoSync(test, workspace, name+".link1")
+			removeTestFileNoSync(test, workspace, linkfile+".link1")
+		}
+
+		_, err = os.Stat(workspace + "/" + linkfile + ".link2")
+		test.AssertErr(err)
 
 		removeTestFile(test, workspace, name)
 		newRootId3 := removeTestFile(test, workspace, linkfile)
@@ -300,11 +332,35 @@ func refreshHardlinkAdditionTestGen(rmLink bool) func(*testHelper) {
 }
 
 func TestRefreshHardlinkAddition1(t *testing.T) {
-	runTest(t, refreshHardlinkAdditionTestGen(false))
+	runTest(t, refreshHardlinkAdditionTestGen(false, false, false))
 }
 
 func TestRefreshHardlinkAddition2(t *testing.T) {
-	runTest(t, refreshHardlinkAdditionTestGen(true))
+	runTest(t, refreshHardlinkAdditionTestGen(false, false, true))
+}
+
+func TestRefreshHardlinkAddition3(t *testing.T) {
+	runTest(t, refreshHardlinkAdditionTestGen(false, true, false))
+}
+
+func TestRefreshHardlinkAddition4(t *testing.T) {
+	runTest(t, refreshHardlinkAdditionTestGen(false, true, true))
+}
+
+func TestRefreshHardlinkAddition5(t *testing.T) {
+	runTest(t, refreshHardlinkAdditionTestGen(true, false, false))
+}
+
+func TestRefreshHardlinkAddition6(t *testing.T) {
+	runTest(t, refreshHardlinkAdditionTestGen(true, false, true))
+}
+
+func TestRefreshHardlinkAddition7(t *testing.T) {
+	runTest(t, refreshHardlinkAdditionTestGen(true, true, false))
+}
+
+func TestRefreshHardlinkAddition8(t *testing.T) {
+	runTest(t, refreshHardlinkAdditionTestGen(true, true, true))
 }
 
 func TestRefreshOrphanedHardlinkContentCheck(t *testing.T) {
