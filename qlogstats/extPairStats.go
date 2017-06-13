@@ -17,18 +17,21 @@ type extPairStats struct {
 	fmtStart  string
 	fmtStop   string
 	sameScope bool
+	name      string
 
 	stats basicStats
 }
 
 // Set matchingIndent to true if start and stop should only be recognized when they
 // are seen at the same function scope
-func NewExtPairStats(start string, stop string, matchingIndent bool) *extPairStats {
+func NewExtPairStats(start string, stop string, matchingIndent bool,
+	nametag string) *extPairStats {
 
 	return &extPairStats{
 		fmtStart:  start,
 		fmtStop:   stop,
 		sameScope: matchingIndent,
+		name:      nametag,
 	}
 }
 
@@ -70,8 +73,7 @@ func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
 
 func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Field) {
 	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("fmtStart", ext.fmtStart))
-	tags = append(tags, quantumfs.NewTag("fmtStop", ext.fmtStop))
+	tags = append(tags, quantumfs.NewTag("name", ext.name))
 
 	fields = make([]quantumfs.Field, 0)
 

@@ -45,7 +45,18 @@ func NewStatExtractorConfig(ext StatExtractor,
 	}
 }
 
-type LoggerDb struct {
+func AggregateLogs(filename string, db quantumfs.TimeSeriesDB,
+	extractors []StatExtractorConfig) {
+
+	reader := qlog.NewReader(filename)
+	agg := NewAggregator(db, extractors)
+
+	reader.ProcessLogs(qlog.ReadThenTail, func(v qlog.LogOutput) {
+		agg.ProcessLog(v)
+	})
+}
+
+type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
 
@@ -60,10 +71,10 @@ type LoggerDb struct {
 	queueLogs  []qlog.LogOutput
 }
 
-func NewLoggerDb(db_ quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig) *LoggerDb {
+func NewAggregator(db_ quantumfs.TimeSeriesDB,
+	extractors []StatExtractorConfig) *Aggregator {
 
-	rtn := LoggerDb{
+	rtn := Aggregator{
 		db:             db_,
 		logsByRequest:  make(map[uint64]logTrack),
 		statExtractors: extractors,
@@ -82,31 +93,31 @@ func NewLoggerDb(db_ quantumfs.TimeSeriesDB,
 	return &rtn
 }
 
-func (logger *LoggerDb) ProcessThread() {
+func (agg *Aggregator) ProcessThread() {
 	for {
 		logs := func() []qlog.LogOutput {
-			defer logger.queueMutex.Lock().Unlock()
+			defer agg.queueMutex.Lock().Unlock()
 
 			// nothing to do
-			if len(logger.queueLogs) == 0 {
+			if len(agg.queueLogs) == 0 {
 				return []qlog.LogOutput{}
 			}
 
 			// Take a small performance hit in creating a new array,
 			// but gain a much quicker mutex unlock
-			rtn := logger.queueLogs
-			logger.queueLogs = make([]qlog.LogOutput, 0)
+			rtn := agg.queueLogs
+			agg.queueLogs = make([]qlog.LogOutput, 0)
 			return rtn
 		}()
 
 		for _, log := range logs {
-			logger.processLog(log)
+			agg.processLog(log)
 		}
 
 		// Now check if any requests are old and ready to go to extractors
 		now := time.Now()
 		for {
-			requestElem := logger.requestSequence.Front()
+			requestElem := agg.requestSequence.Front()
 
 			if requestElem == nil {
 				break
@@ -116,11 +127,11 @@ func (logger *LoggerDb) ProcessThread() {
 			if now.Sub(request.lastLogTime) > time.Duration(0+
 				requestEndAfterNs) {
 
-				logger.requestSequence.Remove(requestElem)
-				reqLogs := logger.logsByRequest[request.reqId]
-				delete(logger.logsByRequest, request.reqId)
+				agg.requestSequence.Remove(requestElem)
+				reqLogs := agg.logsByRequest[request.reqId]
+				delete(agg.logsByRequest, request.reqId)
 
-				for _, e := range logger.statExtractors {
+				for _, e := range agg.statExtractors {
 					e.extractor.ProcessRequest(reqLogs.logs)
 				}
 			} else {
@@ -130,15 +141,15 @@ func (logger *LoggerDb) ProcessThread() {
 		}
 
 		// Lastly check if any extractors need to Publish
-		for i, extractor := range logger.statExtractors {
+		for i, extractor := range agg.statExtractors {
 			if now.Sub(extractor.lastOutput) > extractor.statPeriod {
 				tags, fields := extractor.extractor.Publish()
 				if tags != nil && len(tags) > 0 {
-					logger.db.Store(tags, fields)
+					agg.db.Store(tags, fields)
 				}
 
 				extractor.lastOutput = now
-				logger.statExtractors[i] = extractor
+				agg.statExtractors[i] = extractor
 			}
 		}
 
@@ -146,26 +157,26 @@ func (logger *LoggerDb) ProcessThread() {
 	}
 }
 
-func (logger *LoggerDb) ProcessLog(v qlog.LogOutput) {
-	defer logger.queueMutex.Lock().Unlock()
+func (agg *Aggregator) ProcessLog(v qlog.LogOutput) {
+	defer agg.queueMutex.Lock().Unlock()
 
-	logger.queueLogs = append(logger.queueLogs, v)
+	agg.queueLogs = append(agg.queueLogs, v)
 }
 
-func (logger *LoggerDb) processLog(v qlog.LogOutput) {
+func (agg *Aggregator) processLog(v qlog.LogOutput) {
 	var tracker logTrack
-	if tracker_, exists := logger.logsByRequest[v.ReqId]; exists {
+	if tracker_, exists := agg.logsByRequest[v.ReqId]; exists {
 		tracker = tracker_
-		logger.requestSequence.MoveToBack(tracker.listElement)
+		agg.requestSequence.MoveToBack(tracker.listElement)
 	} else {
 		tracker.logs = make([]qlog.LogOutput, 0)
-		newElem := logger.requestSequence.PushBack(trackerKey{
+		newElem := agg.requestSequence.PushBack(trackerKey{
 			reqId: v.ReqId,
 		})
 		tracker.listElement = newElem
 	}
 	tracker.logs = append(tracker.logs, v)
-	logger.logsByRequest[v.ReqId] = tracker
+	agg.logsByRequest[v.ReqId] = tracker
 
 	// Update the record of the last time we saw a log for this request
 	trackerElem := tracker.listElement.Value.(trackerKey)
