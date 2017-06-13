@@ -257,7 +257,7 @@ void QfsClientApiTest::SetUp() {
 		"{'CommandId':2,"
 		"'ErrorCode':0,"
 		"'Message':'success',"
-		"'AccessList':{'file1':true,'file2':false,'file3':true}}";
+		"'PathList':{'file1':true,'file2':false,'file3':true}}";
 	util::requote(&read_command_json);
 	this->read_command.CopyString(read_command_json.c_str());
 }
@@ -611,7 +611,7 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 	// corrupt AccessList in the JSON that CheckCommonApiResponse will try
 	// to parse
 	char *access_list_loc = strstr(reinterpret_cast<char*>(const_cast<byte*>(
-	                                 this->read_command.Data())), kAccessList);
+	                                 this->read_command.Data())), kPathList);
 	ASSERT_TRUE(access_list_loc != NULL);  // fail if no AccessList field
 
 	if (access_list_loc != NULL) {
