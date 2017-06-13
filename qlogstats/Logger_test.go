@@ -1,101 +1,48 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package qloggerdb
+package qlogstats
 
 import (
-	"bytes"
-	"io/ioutil"
-	"os"
-	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
-func WaitForApi(test *testHelper) {
-	test.WaitFor("Api inode to be seen by kernel", func() bool {
-		_, err := os.Stat(test.TempDir + "/mnt/api")
-		return (err == nil)
+func runReader(qlogFile string, extractors []qlogstats.StatExtractorConfig,
+	fxn func (qlog.LogOutput)) processlocal.Memdb {
+
+	reader := qlog.NewReader(qlogFile)
+
+	db := processlocal.NewMemdb()
+
+	logger := qlogstats.NewLoggerDb(db, extractors)
+	reader.ProcessLogs(qlog.ReadOnly, func(v qlog.LogOutput) {
+		logger.ProcessLog(v)
 	})
+
+	return db
 }
 
-func TestBasicInterface(t *testing.T) {
+func TestMatches(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		WaitForApi(test)
+		qlogHandle := test.qfs.c.Ctx.Qlog
 
-		apiNoPath, err := GetApi()
-		test.AssertNoErr(err)
+		// Artificially insert matching logs
+		qlogHandle.Log(LogTest, 12345, 2, qlog.FnEnterStr+"TestMatch")
+		qlogHandle.Log(LogTest, 12346, 3, qlog.FnExitStr+"TestMatch")
 
-		api, err := GetApiPath(test.TempDir + "/mnt/api")
-		test.AssertNoErr(err)
+		// Setup an extractor
+		extractors := make([]qlogstats.StatExtractorConfig, 0)
+		extractors = append(extractors, qlogstats.NewStatExtractorConfig(
+			qlogstats.NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true),
+			(5*time.Second)))
 
-		testKey := "ABABABABABABABABABAB"
-		testData := daemon.GenData(2000)
-		err = api.SetBlock(testKey, testData)
-		test.AssertNoErr(err)
+		// Run the reader
+		memdb, reader := runReader(test.CachePath+"/ramfs/qlog", extractors)
 
-		readBack, err := api.GetBlock(testKey)
-		test.AssertNoErr(err)
-		test.Assert(bytes.Equal(testData, readBack),
-			"Data changed between SetBlock and GetBlock")
 
-		err = ReleaseApi(apiNoPath)
-		test.AssertNoErr(err)
-
-		err = ReleaseApi(api)
-		test.AssertNoErr(err)
-	})
-}
-
-func TestBranchInterface(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		WaitForApi(test)
-
-		api, err := GetApiPath(test.TempDir + "/mnt/api")
-		test.AssertNoErr(err)
-
-		err = api.Branch("_/_/_", "test/test/test")
-		test.AssertNoErr(err)
-
-		// Ensure that the branch was created
-		_, err = os.Stat(test.AbsPath("test/test/test"))
-		test.AssertNoErr(err)
-
-		err = ReleaseApi(api)
-		test.AssertNoErr(err)
-	})
-}
-
-func TestInsertInode(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		WaitForApi(test)
-
-		workspace := test.NewWorkspace()
-
-		filedata := daemon.GenData(2000)
-		filename := workspace + "/file"
-		err := testutils.PrintToFile(filename, string(filedata))
-		test.AssertNoErr(err)
-
-		attrKey := make([]byte, 100)
-		attrLen, err := syscall.Getxattr(filename, "quantumfs.key", attrKey)
-		test.AssertNoErr(err)
-		fileKey := string(attrKey[:attrLen])
-
-		api, err := GetApiPath(test.TempDir + "/mnt/api")
-		test.AssertNoErr(err)
-
-		err = api.InsertInode(test.RelPath(workspace)+"/fileCopy", fileKey,
-			0777, uint32(os.Getuid()), uint32(os.Getgid()))
-		test.AssertNoErr(err)
-
-		readBack, err := ioutil.ReadFile(workspace + "/fileCopy")
-		test.Assert(bytes.Equal(readBack, filedata),
-			"inserted inode data mismatch")
-
-		err = ReleaseApi(api)
-		test.AssertNoErr(err)
 	})
 }
