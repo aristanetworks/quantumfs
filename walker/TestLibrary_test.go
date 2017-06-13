@@ -124,7 +124,194 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 			return inerr
 		}
 
+<<<<<<< HEAD
 		if skipDirTest && info.IsDir() && strings.HasSuffix(path, "/dir1") {
+||||||| merged common ancestors
+		if path == workspace+"/api" || info.IsDir() {
+			return nil
+		}
+
+		// Stat to see if the path is a non-regular file
+		var err error
+		var stat syscall.Stat_t
+		if err = syscall.Stat(path, &stat); err != nil {
+			return err
+		}
+		if (stat.Mode & syscall.S_IFREG) == 0 {
+			return nil
+		}
+
+		// Retrieve all the Xattrs for the path.
+		data := make([]byte, 100)
+		sz := 0
+		if sz, err = syscall.Listxattr(path, data); err != nil {
+			return err
+		}
+		if sz != 0 {
+			_, err = syscall.Getxattr(path, xattrName, data)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Read the data in the file
+		if _, err = ioutil.ReadFile(path); err != nil {
+			return err
+		}
+		return nil
+	}
+	err = filepath.Walk(workspace, readFile)
+	th.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
+
+	// Save the keys intercepted during filePath walk.
+	getMap := tds.GetKeyList()
+	tds.FlushKeyList()
+
+	// Use Walker to walk all the blocks in the workspace.
+	c := &th.TestCtx().Ctx
+	root := strings.Split(th.RelPath(workspace), "/")
+	rootID, err := db.Workspace(c, root[0], root[1], root[2])
+	th.Assert(err == nil, "Error getting rootID for %v: %v",
+		root, err)
+
+	var walkerMap = make(map[string]int)
+	var mapLock utils.DeferableMutex
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		// Skip, since constant and embedded keys will not
+		// show up in regular walk.
+		if SkipKey(c, key) {
+			return nil
+		}
+		defer mapLock.Lock().Unlock()
+		walkerMap[key.String()] = 1
+		return nil
+	}
+
+	err = Walk(c, ds, rootID, wf)
+	th.Assert(err == nil, "Error in walk: %v", err)
+
+	eq := reflect.DeepEqual(getMap, walkerMap)
+	if eq != true {
+		th.printMap("Original Map", getMap)
+		th.printMap("Walker Map", walkerMap)
+	}
+	th.Assert(eq == true, "2 maps are not equal")
+}
+
+func (th *testHelper) readWalkCompareSkip(workspace string) {
+
+	th.SyncAllWorkspaces()
+
+	// Restart QFS
+	err := th.RestartQuantumFs()
+	th.Assert(err == nil, "Error restarting QuantumFs: %v", err)
+	db := th.GetWorkspaceDB()
+	ds := th.GetDataStore()
+	tds := newTestDataStore(th, ds)
+	th.SetDataStore(tds)
+
+	// Read all files in this workspace.
+	readFile := func(path string, info os.FileInfo, inerr error) error {
+		if inerr != nil {
+			return inerr
+		}
+
+		if info.IsDir() && strings.HasSuffix(path, "/dir1") {
+=======
+		if path == workspace+"/api" || info.IsDir() {
+			return nil
+		}
+
+		// Stat to see if the path is a non-regular file
+		var stat syscall.Stat_t
+		if err := syscall.Stat(path, &stat); err != nil {
+			return err
+		}
+		if (stat.Mode & syscall.S_IFREG) == 0 {
+			return nil
+		}
+
+		// Retrieve all the Xattrs for the path.
+		data := make([]byte, 100)
+		sz, err := syscall.Listxattr(path, data)
+		if err != nil {
+			return err
+		}
+		if sz != 0 {
+			_, err = syscall.Getxattr(path, xattrName, data)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Read the data in the file
+		if _, err = ioutil.ReadFile(path); err != nil {
+			return err
+		}
+		return nil
+	}
+	err = filepath.Walk(workspace, readFile)
+	th.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
+
+	// Save the keys intercepted during filePath walk.
+	getMap := tds.GetKeyList()
+	tds.FlushKeyList()
+
+	// Use Walker to walk all the blocks in the workspace.
+	c := &th.TestCtx().Ctx
+	root := strings.Split(th.RelPath(workspace), "/")
+	rootID, err := db.Workspace(c, root[0], root[1], root[2])
+	th.Assert(err == nil, "Error getting rootID for %v: %v",
+		root, err)
+
+	var walkerMap = make(map[string]int)
+	var mapLock utils.DeferableMutex
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		// Skip, since constant and embedded keys will not
+		// show up in regular walk.
+		if SkipKey(c, key) {
+			return nil
+		}
+		defer mapLock.Lock().Unlock()
+		walkerMap[key.String()] = 1
+		return nil
+	}
+
+	err = Walk(c, ds, rootID, wf)
+	th.Assert(err == nil, "Error in walk: %v", err)
+
+	eq := reflect.DeepEqual(getMap, walkerMap)
+	if eq != true {
+		th.printMap("Original Map", getMap)
+		th.printMap("Walker Map", walkerMap)
+	}
+	th.Assert(eq == true, "2 maps are not equal")
+}
+
+func (th *testHelper) readWalkCompareSkip(workspace string) {
+
+	th.SyncAllWorkspaces()
+
+	// Restart QFS
+	err := th.RestartQuantumFs()
+	th.Assert(err == nil, "Error restarting QuantumFs: %v", err)
+	db := th.GetWorkspaceDB()
+	ds := th.GetDataStore()
+	tds := newTestDataStore(th, ds)
+	th.SetDataStore(tds)
+
+	// Read all files in this workspace.
+	readFile := func(path string, info os.FileInfo, inerr error) error {
+		if inerr != nil {
+			return inerr
+		}
+
+		if info.IsDir() && strings.HasSuffix(path, "/dir1") {
+>>>>>>> master
 			return filepath.SkipDir
 		}
 
