@@ -20,6 +20,8 @@ const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 	uint32_t len);
 const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
 	uint32_t *lenOut);
+const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot,
+	void *paths);
 
 */
 import "C"
@@ -113,4 +115,27 @@ func (api *QfsClientApi) GetBlock(key string) ([]byte, error) {
 	}
 
 	return data[:dataLen], nil
+}
+
+// A trampoline to allow the C++ code to set path values instead of writing a C
+// wrapper for std::unordered_map.
+//
+//export setPath
+func setPath(paths unsafe.Pointer, path *C.char, value uint) {
+	pathList := (*quantumfs.PathAccessList)(paths)
+	pathList.Paths[C.GoString(path)] = quantumfs.PathFlags(value)
+}
+
+func (api *QfsClientApi) GetAccessed(
+	workspace string) (quantumfs.PathAccessList, error) {
+
+	paths := quantumfs.NewPathAccessList()
+
+	err := C.GoString(C.cGetAccessed(C.uint32_t(api.handle),
+		C.CString(workspace), unsafe.Pointer(&paths)))
+	if err != "" {
+		return quantumfs.NewPathAccessList(), errors.New(err)
+	}
+
+	return paths, nil
 }
