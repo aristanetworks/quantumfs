@@ -650,16 +650,9 @@ Error ApiImpl::PrepareAccessedListResponse(
 	json_error_t json_error;
 	json_t *response_json = context->GetResponseJsonObject();
 
-	// if we get to this point, there was no error response; the object field
-	// 'AccessList' is a Go JSON mapping of a Go map[string]bool - an
-	// Object whose field names are the string keys in the map and whose values
-	// are bools. A true value in the map means that the value's corresponding
-	// key is the name of a file that has been created, whereas a false
-	// value in the map means that the value's corresponding key is the name
-	// of a file that has been accessed.
-	json_t *accessed_list_json_obj = json_object_get(response_json, kAccessList);
+	json_t *accessed_list_json_obj = json_object_get(response_json, kPathList);
 	if (accessed_list_json_obj == NULL) {
-		return util::getError(kMissingJsonObject, kAccessList);
+		return util::getError(kMissingJsonObject, kPathList);
 	}
 
 	const char *k;
