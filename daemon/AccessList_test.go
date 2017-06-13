@@ -340,6 +340,38 @@ func TestAccessListRenameFile(t *testing.T) {
 	})
 }
 
+func TestAccessListRenameFileWithWrites(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirname := "/test"
+		filename1 := "/test1.c"
+		filename2 := "/test2.c"
+		path := workspace + dirname
+		err := syscall.Mkdir(path, 0666)
+		test.Assert(err == nil, "Create directory error:%v", err)
+		path = workspace + dirname + filename1
+		fd, err := syscall.Creat(path, 0666)
+		test.Assert(err == nil, "Create file error:%v", err)
+		syscall.Close(fd)
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		accessList := quantumfs.NewPathAccessList()
+		path1 := workspace + dirname + filename1
+		path2 := workspace + dirname + filename2
+		test.AssertNoErr(testutils.OverWriteFile(path1, "data1"))
+		err = os.Rename(path1, path2)
+		test.Assert(err == nil, "Move file error:%v", err)
+		test.AssertNoErr(testutils.OverWriteFile(path2, "data2"))
+		accessList.Paths[dirname+filename1] = quantumfs.PathUpdated |
+			quantumfs.PathDeleted
+		accessList.Paths[dirname+filename2] = quantumfs.PathCreated |
+			quantumfs.PathUpdated
+		wsrlist := test.getAccessList(workspace)
+		test.assertAccessList(accessList, wsrlist,
+			"Error two maps different")
+	})
+}
+
 func TestAccessListMvChildFileOverwrite(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
