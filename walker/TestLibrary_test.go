@@ -20,6 +20,9 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
+var xattrName = "user.11112222"
+var xattrData = []byte("1111222233334444")
+
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test walkerTest) {
 	t.Parallel()
@@ -116,25 +119,39 @@ func (th *testHelper) readWalkCompare(workspace string) {
 	th.SetDataStore(tds)
 
 	// Read all files in this workspace.
-	readFile := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	readFile := func(path string, info os.FileInfo, inerr error) error {
+		if inerr != nil {
+			return inerr
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
 			return nil
 		}
 
+		// Stat to see if the path is a non-regular file
 		var stat syscall.Stat_t
 		if err := syscall.Stat(path, &stat); err != nil {
 			return err
 		}
-
 		if (stat.Mode & syscall.S_IFREG) == 0 {
 			return nil
 		}
 
-		if _, err := ioutil.ReadFile(path); err != nil {
+		// Retrieve all the Xattrs for the path.
+		data := make([]byte, 100)
+		sz, err := syscall.Listxattr(path, data)
+		if err != nil {
+			return err
+		}
+		if sz != 0 {
+			_, err = syscall.Getxattr(path, xattrName, data)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Read the data in the file
+		if _, err = ioutil.ReadFile(path); err != nil {
 			return err
 		}
 		return nil
@@ -192,9 +209,9 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 	th.SetDataStore(tds)
 
 	// Read all files in this workspace.
-	readFile := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	readFile := func(path string, info os.FileInfo, inerr error) error {
+		if inerr != nil {
+			return inerr
 		}
 
 		if info.IsDir() && strings.HasSuffix(path, "/dir1") {
@@ -206,12 +223,24 @@ func (th *testHelper) readWalkCompareSkip(workspace string) {
 		}
 
 		var stat syscall.Stat_t
-		if err := syscall.Stat(path, &stat); err != nil {
+		var err error
+		if err = syscall.Stat(path, &stat); err != nil {
 			return err
 		}
-
 		if (stat.Mode & syscall.S_IFREG) == 0 {
 			return nil
+		}
+
+		data := make([]byte, 100)
+		sz := 0
+		if sz, err = syscall.Listxattr(path, data); err != nil {
+			return err
+		}
+		if sz != 0 {
+			_, err = syscall.Getxattr(path, xattrName, data)
+			if err != nil {
+				return err
+			}
 		}
 
 		if _, err := ioutil.ReadFile(path); err != nil {
