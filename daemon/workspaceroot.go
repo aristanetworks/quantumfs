@@ -513,7 +513,7 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 			if inode := c.qfs.inodeNoInstantiate(c,
 				entry.inodeId); inode != nil {
 
-				inode.orphan(c)
+				inode.orphan(c, entry.record)
 			}
 		}
 	}

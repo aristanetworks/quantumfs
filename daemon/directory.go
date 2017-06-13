@@ -811,7 +811,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 		return fuse.ENOENT
 	}
 
-	result := child.deleteSelf(c, child, func() (quantumfs.DirectoryRecord,
+	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
 		defer dir.Lock().Unlock()
@@ -867,7 +867,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		return fuse.ENOENT
 	}
 
-	result := child.deleteSelf(c, child, func() (quantumfs.DirectoryRecord,
+	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
 		defer dir.Lock().Unlock()
