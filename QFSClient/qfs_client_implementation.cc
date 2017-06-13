@@ -456,7 +456,7 @@ Error ApiImpl::SendJson(ApiContext *context) {
 	return util::getError(kSuccess);
 }
 
-Error ApiImpl::GetAccessed(const char *workspace_root) {
+Error ApiImpl::GetAccessed(const char *workspace_root, PathAccessList *paths) {
 	Error err = this->CheckWorkspaceNameValid(workspace_root);
 	if (err.code != kSuccess) {
 		return err;
@@ -481,16 +481,10 @@ Error ApiImpl::GetAccessed(const char *workspace_root) {
 		return err;
 	}
 
-	std::unordered_map<std::string, bool> accessed;
-
-	err = this->PrepareAccessedListResponse(&context, &accessed);
+	err = this->PrepareAccessedListResponse(&context, paths);
 	if (err.code != kSuccess) {
 		return err;
 	}
-
-	// call printAccessList using parsed response
-	std::string formattedAccessedList = this->FormatAccessedList(accessed);
-	printf("%s", formattedAccessedList.c_str());
 
 	return util::getError(kSuccess);
 }
@@ -651,7 +645,7 @@ Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
 
 Error ApiImpl::PrepareAccessedListResponse(
 	const ApiContext *context,
-	std::unordered_map<std::string, bool> *accessed_list) {
+	PathAccessList *accessed_list) {
 
 	json_error_t json_error;
 	json_t *response_json = context->GetResponseJsonObject();
@@ -672,33 +666,13 @@ Error ApiImpl::PrepareAccessedListResponse(
 	json_t *v;
 	json_object_foreach(accessed_list_json_obj, k, v) {
 		// check that v is a bool
-		if (json_is_boolean(v)) {
+		if (json_is_integer(v)) {
 			// add value to map with key from AccessList
-			(*accessed_list)[k] = json_is_true(v);
+			accessed_list->paths[k] = json_integer_value(v);
 		}
 	}
 
 	return util::getError(kSuccess);
-}
-
-std::string ApiImpl::FormatAccessedList(
-	const std::unordered_map<std::string, bool> &accessed) {
-
-	std::string result = "------ Created Files ------\n";
-	for (auto kv : accessed) {
-		if (kv.second) {
-			result += kv.first + "\n";
-		}
-	}
-
-	result += "------ Accessed Files ------\n";
-	for (auto kv : accessed) {
-		if (!kv.second) {
-			result += kv.first + "\n";
-		}
-	}
-
-	return result;
 }
 
 }  // namespace qfsclient

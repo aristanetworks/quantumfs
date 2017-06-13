@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace qfsclient {
 
@@ -82,6 +83,13 @@ struct Error {
 	std::string message;
 };
 
+/// PathAccessList Contains the list of files and directories accessed in the given
+/// workspace on the given instance. See the documentation for
+/// quantumfs.PathAccessList for detailed documentation of this type.
+struct PathAccessList {
+	std::unordered_map<const char*, uint32_t> paths;
+};
+
 /// `Api` provides the public interface to QuantumFS API calls.
 class Api {
  public:
@@ -92,7 +100,8 @@ class Api {
 	/// whose list of accessed files is to be retrieved.
 	///
 	/// @return An `Error` object that indicates success or failure.
-	virtual Error GetAccessed(const char *workspace_root) = 0;
+	virtual Error GetAccessed(const char *workspace_root,
+				PathAccessList *paths) = 0;
 
 	/// Takes an extended key along with other file metadata (permissions,
 	/// UID and GID) and inserts it into the given destination directory.
