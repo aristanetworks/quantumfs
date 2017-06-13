@@ -37,7 +37,7 @@ func TestFileWalk(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -51,7 +51,7 @@ func TestSpecialFileWalk(t *testing.T) {
 			syscall.S_IFCHR|syscall.S_IRWXU, 0x12345678)
 		test.Assert(err == nil, "Error creating node: %v", err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -62,7 +62,7 @@ func TestEmptyWSR(t *testing.T) {
 
 		// Add nothing to workspace
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -76,7 +76,7 @@ func TestDirWalk(t *testing.T) {
 		err := os.MkdirAll(dirname, 0777)
 		test.Assert(err == nil, "Mkdir failed (%s): %s",
 			dirname, err)
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -99,7 +99,7 @@ func TestMaxDirRecordsWalk(t *testing.T) {
 				filename, err)
 			fd.Close()
 		}
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -122,7 +122,7 @@ func TestChainedDirEntriesWalk(t *testing.T) {
 				filename, err)
 			fd.Close()
 		}
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -155,7 +155,7 @@ func TestDirFilesWalk(t *testing.T) {
 		test.Assert(err == nil, "File close failed (%s): %s",
 			filename, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -177,7 +177,7 @@ func TestSoftLink(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -199,7 +199,7 @@ func TestHardLink(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -222,7 +222,7 @@ func TestChainedHardLinkEntries(t *testing.T) {
 			test.Assert(err == nil, "Link failed (%s): %s",
 				link, err)
 		}
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -238,7 +238,7 @@ func TestLargeFileWalk(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -259,7 +259,7 @@ func TestLargeFileLinkWalk(t *testing.T) {
 		err = os.Link(filename, link)
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -305,7 +305,7 @@ func TestMiscWalk(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -351,7 +351,7 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompareSkip(workspace)
+		test.readWalkCompare(workspace, true)
 	})
 }
 
@@ -486,6 +486,6 @@ func TestExtendedAttributesWalk(t *testing.T) {
 		err = syscall.Setxattr(filename, xattrName, xattrData, 0)
 		test.Assert(err == nil, "Error setting data XAttr: %v", err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
