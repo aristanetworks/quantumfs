@@ -7,39 +7,12 @@ import (
 	"container/list"
 	"time"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
 const requestEndAfterNs = 3000000000
-
-type Field struct {
-	Name string
-	Data uint64
-}
-
-func newField(name_ string, data_ uint64) Field {
-	return Field{
-		Name: name_,
-		Data: data_,
-	}
-}
-
-type Tag struct {
-	Name string
-	Data string
-}
-
-func newTag(name_ string, data_ string) Tag {
-	return Tag{
-		Name: name_,
-		Data: data_,
-	}
-}
-
-type TimeSeriesDB interface {
-	Store(tags []Tag, fields []Field)
-}
 
 type logTrack struct {
 	logs        qlog.LogStack
@@ -54,7 +27,7 @@ type trackerKey struct {
 type StatExtractor interface {
 	ProcessRequest(request qlog.LogStack)
 
-	Publish() ([]Tag, []Field)
+	Publish() ([]quantumfs.Tag, []quantumfs.Field)
 }
 
 type StatExtractorConfig struct {
@@ -73,7 +46,7 @@ func NewStatExtractorConfig(ext StatExtractor,
 }
 
 type LoggerDb struct {
-	db            TimeSeriesDB
+	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
 
 	// track the oldest untouched requests so we can push them to the stat
@@ -87,7 +60,9 @@ type LoggerDb struct {
 	queueLogs  []qlog.LogOutput
 }
 
-func NewLoggerDb(db_ TimeSeriesDB, extractors []StatExtractorConfig) *LoggerDb {
+func NewLoggerDb(db_ quantumfs.TimeSeriesDB,
+	extractors []StatExtractorConfig) *LoggerDb {
+
 	rtn := LoggerDb{
 		db:             db_,
 		logsByRequest:  make(map[uint64]logTrack),
