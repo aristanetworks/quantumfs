@@ -422,6 +422,7 @@ func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
 	inode.orphan_(c, record)
 }
 
+// parentLock must be Locked
 func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
