@@ -123,7 +123,7 @@ type Inode interface {
 	isOrphaned_() bool
 	orphan(c *ctx, record quantumfs.DirectoryRecord)
 	orphan_(c *ctx, record quantumfs.DirectoryRecord)
-	deleteSelf(c *ctx, toDelete Inode,
+	deleteSelf(c *ctx,
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
 
@@ -558,11 +558,11 @@ func (inode *InodeCommon) isWorkspaceRoot() bool {
 // Deleting a child may require that we orphan it, and because we *must* lock from
 // a child up to its parent outside of a DOWN function, deletion in the parent
 // must be done after the child's lock has been acquired.
-func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
+func (inode *InodeCommon) deleteSelf(c *ctx,
 	deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 		err fuse.Status)) fuse.Status {
 
-	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).Out()
+	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
 	defer inode.lock.Lock().Unlock()
 	defer inode.parentLock.Lock().Unlock()
 	// After we've locked the child, we can safely go UP and lock our parent
