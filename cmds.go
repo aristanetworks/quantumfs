@@ -213,7 +213,7 @@ func NewApiWithPath(path string) (Api, error) {
 // - rmdir() marks a directory as deleted
 // - creat() or mknod() marks a file as created
 // - unlink() marks a file as unlinked
-// - No operations mark a directory as updated
+// - There are no operations that can mark a directory as updated
 //
 // Creation and deletion have additional special semantics in that they
 // are collapsible. Specifically:
