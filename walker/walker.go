@@ -331,7 +331,9 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 
 	buf := simplebuffer.New(nil, extKey)
 	if err := ds.Get(c.Qctx, extKey, buf); err != nil {
-		return err
+		// TODO(sid): change back to return err
+		fmt.Printf("attrlist block missing %s:%s\n", extKey, fpath)
+		return nil
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
 		"Attributes List buffer %s", extKey.Text())
@@ -348,7 +350,10 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 
 		buf := simplebuffer.New(nil, key)
 		if err := ds.Get(c.Qctx, key, buf); err != nil {
-			return err
+			// TODO(sid): change back to return err
+			fmt.Printf("xattrdata[%d] block missing %s:%s\n",
+				i, extKey, fpath)
+			return nil
 		}
 		simplebuffer.AssertNonZeroBuf(buf,
 			"Attributes List buffer %s", key.Text())
