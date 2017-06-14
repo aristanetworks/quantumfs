@@ -257,7 +257,7 @@ void QfsClientApiTest::SetUp() {
 		"{'CommandId':2,"
 		"'ErrorCode':0,"
 		"'Message':'success',"
-		"'PathList':{'file1':true,'file2':false,'file3':true}}";
+		"'PathList':{'file1':4,'file2':5,'file3':12}}";
 	util::requote(&read_command_json);
 	this->read_command.CopyString(read_command_json.c_str());
 }
@@ -595,10 +595,10 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 	err = this->api->PrepareAccessedListResponse(&context, &accessed_list);
 	ASSERT_EQ(err.code, kSuccess);
 
-	ASSERT_EQ(accessed_list.paths.size(), 3);
-	ASSERT_TRUE(accessed_list.paths["file1"]);
-	ASSERT_FALSE(accessed_list.paths["file2"]);
-	ASSERT_TRUE(accessed_list.paths["file3"]);
+	ASSERT_EQ(3, accessed_list.paths.size());
+	ASSERT_EQ(4, accessed_list.paths.at("file1"));
+	ASSERT_EQ(5, accessed_list.paths.at("file2"));
+	ASSERT_EQ(12, accessed_list.paths.at("file3"));
 }
 
 // Negative test for ApiImpl::PrepareAccessedListResponse() to check that a missing

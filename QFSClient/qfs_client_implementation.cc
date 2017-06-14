@@ -658,10 +658,8 @@ Error ApiImpl::PrepareAccessedListResponse(
 	const char *k;
 	json_t *v;
 	json_object_foreach(accessed_list_json_obj, k, v) {
-		// check that v is a bool
 		if (json_is_integer(v)) {
-			// add value to map with key from AccessList
-			accessed_list->paths[k] = json_integer_value(v);
+			accessed_list->paths[std::string(k)] = json_integer_value(v);
 		}
 	}
 
