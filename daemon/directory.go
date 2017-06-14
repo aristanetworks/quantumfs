@@ -1057,6 +1057,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		// update the inode name
 		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
 			child.setName(newName)
+			child.clearAccessedCache()
 		}
 
 		if oldRemoved != quantumfs.InodeIdInvalid {
@@ -1180,6 +1181,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 				if childInode != nil {
 					childInode.setParent(dst.inodeNum())
 					childInode.setName(newName)
+					childInode.clearAccessedCache()
 				}
 			}
 

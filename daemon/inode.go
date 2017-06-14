@@ -106,6 +106,11 @@ type Inode interface {
 	// passed-in read/update operation. This also stores the union of read/update
 	// operations for future reference.
 	accessedFor(op quantumfs.PathFlags) bool
+
+	// Clear the cached value of accessed. This should be used if the previous
+	// path of the inode has become invalid, perhaps because the inode has been
+	// renamed.
+	clearAccessedCache()
 	markAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	markSelfAccessed(c *ctx, op quantumfs.PathFlags)
 
@@ -490,6 +495,10 @@ func (inode *InodeCommon) accessedFor(op quantumfs.PathFlags) bool {
 	}
 }
 
+func (inode *InodeCommon) clearAccessedCache() {
+	atomic.StoreUint32(&(inode.accessed_), 0)
+}
+
 func (inode *InodeCommon) treeLock() *sync.RWMutex {
 	return inode.treeLock_
 }
@@ -562,6 +571,10 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).Out()
 
 	defer inode.lock.Lock().Unlock()
+
+	// One of this inode's names is going away, reset the accessed cache to
+	// ensure any remaining names are marked correctly.
+	inode.clearAccessedCache()
 
 	// We must perform the deletion with the lockedParent lock
 	defer inode.parentLock.Lock().Unlock()
