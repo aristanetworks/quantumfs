@@ -270,6 +270,11 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 				underlyingTypeOf(dir.wsr, remoteRecord))
 			return false
 		}
+		if localRecord.Type().IsImmutable() {
+			// If this is an immutable type, then dentry must have been
+			// unlinked and recreated
+			return false
+		}
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 

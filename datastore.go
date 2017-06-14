@@ -437,6 +437,11 @@ func (v ObjectType) Matches(o ObjectType) bool {
 	return v == o
 }
 
+// Symlinks and special files are immutable once created
+func (v ObjectType) IsImmutable() bool {
+	return v == ObjectTypeSymlink || v == ObjectTypeSpecial
+}
+
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
 // be owned by some special system accounts or the current user. The translation to
 // UID is done at access time.
