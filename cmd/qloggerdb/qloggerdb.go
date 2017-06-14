@@ -34,7 +34,7 @@ func main() {
 	// sample extractor
 	extractors = append(extractors, qlogstats.NewStatExtractorConfig(
 		qlogstats.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr",
-			qlog.FnExitStr+"Mux::GetAttr", true, "Mux::Open"),
+			qlog.FnExitStr+"Mux::GetAttr", true, "Mux::GetAttr"),
 		(5*time.Second)))
 
 	qlogstats.AggregateLogs(os.Args[1], db, extractors)
