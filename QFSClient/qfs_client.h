@@ -90,7 +90,7 @@ const PathFlags kPathUpdated = (1 << 2);
 const PathFlags kPathDeleted = (1 << 3);
 const PathFlags kPathIsDir   = (1 << 4);
 
-/// PathAccessList Contains the list of files and directories accessed in the given
+/// PathAccessList contains the list of files and directories accessed in the given
 /// workspace on the given instance. See the documentation for
 /// quantumfs.PathAccessList for detailed documentation of this type.
 struct PathAccessList {
