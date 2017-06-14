@@ -596,9 +596,11 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 	ASSERT_EQ(err.code, kSuccess);
 
 	ASSERT_EQ(3, accessed_list.paths.size());
-	ASSERT_EQ(4, accessed_list.paths.at("file1"));
-	ASSERT_EQ(5, accessed_list.paths.at("file2"));
-	ASSERT_EQ(12, accessed_list.paths.at("file3"));
+	ASSERT_EQ(qfsclient::kPathUpdated, accessed_list.paths.at("file1"));
+	ASSERT_EQ(qfsclient::kPathUpdated|qfsclient::kPathCreated,
+		  accessed_list.paths.at("file2"));
+	ASSERT_EQ(qfsclient::kPathUpdated|qfsclient::kPathDeleted,
+		  accessed_list.paths.at("file3"));
 }
 
 // Negative test for ApiImpl::PrepareAccessedListResponse() to check that a missing
