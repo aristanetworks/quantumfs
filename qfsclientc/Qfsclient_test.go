@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
@@ -81,5 +82,24 @@ func TestInsertInode(t *testing.T) {
 
 		err = ReleaseApi(api)
 		test.AssertNoErr(err)
+	})
+}
+
+func TestAccessFileList(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+		test.AssertNoErr(testutils.PrintToFile(filename, "contents"))
+
+		api := test.getApi()
+
+		paths, err := api.GetAccessed(test.RelPath(workspace))
+		test.AssertNoErr(err)
+
+		test.Assert(len(paths.Paths) == 1, "Incorrect number of paths %d",
+			len(paths.Paths))
+		test.Assert(paths.Paths["/file"] == quantumfs.PathCreated|
+			quantumfs.PathUpdated, "Incorrect access mark %x",
+			paths.Paths["/file"])
 	})
 }
