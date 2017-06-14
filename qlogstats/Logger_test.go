@@ -11,7 +11,7 @@ import (
 )
 
 func runReader(qlogFile string, extractors []qlogstats.StatExtractorConfig,
-	fxn func (qlog.LogOutput)) processlocal.Memdb {
+	fxn func(qlog.LogOutput)) processlocal.Memdb {
 
 	reader := qlog.NewReader(qlogFile)
 
@@ -42,7 +42,6 @@ func TestMatches(t *testing.T) {
 
 		// Run the reader
 		memdb, reader := runReader(test.CachePath+"/ramfs/qlog", extractors)
-
 
 	})
 }
