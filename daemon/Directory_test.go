@@ -895,7 +895,7 @@ func TestDirectoryRenameDirNotEmpty(t *testing.T) {
 		dir1 := workspace + "/dir1"
 		file1 := dir1 + "/file1"
 		dir2 := workspace + "/dir2"
-		file2 := dir1 + "/file2"
+		file2 := dir2 + "/file2"
 
 		test.AssertNoErr(os.Mkdir(dir1, 0777))
 		test.AssertNoErr(testutils.PrintToFile(file1, ""))
