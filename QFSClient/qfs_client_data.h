@@ -49,6 +49,7 @@ static const char kWorkspaceRoot[] = "WorkspaceRoot";
 static const char kErrorCode[] = "ErrorCode";
 static const char kMessage[] = "Message";
 static const char kPathList[] = "PathList";
+static const char kPaths[] = "Paths";
 static const char kDstPath[] = "DstPath";
 static const char kKey[] = "Key";
 static const char kData[] = "Data";

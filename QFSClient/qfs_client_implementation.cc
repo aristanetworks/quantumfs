@@ -650,9 +650,14 @@ Error ApiImpl::PrepareAccessedListResponse(
 	json_error_t json_error;
 	json_t *response_json = context->GetResponseJsonObject();
 
-	json_t *accessed_list_json_obj = json_object_get(response_json, kPathList);
-	if (accessed_list_json_obj == NULL) {
+	json_t *path_list_json_obj = json_object_get(response_json, kPathList);
+	if (path_list_json_obj == NULL) {
 		return util::getError(kMissingJsonObject, kPathList);
+	}
+
+	json_t *accessed_list_json_obj = json_object_get(path_list_json_obj, kPaths);
+	if (accessed_list_json_obj == NULL) {
+		return util::getError(kMissingJsonObject, kPaths);
 	}
 
 	const char *k;

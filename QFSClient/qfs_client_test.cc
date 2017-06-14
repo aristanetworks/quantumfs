@@ -257,7 +257,7 @@ void QfsClientApiTest::SetUp() {
 		"{'CommandId':2,"
 		"'ErrorCode':0,"
 		"'Message':'success',"
-		"'PathList':{'file1':4,'file2':5,'file3':12}}";
+		"'PathList':{'Paths':{'file1':4,'file2':5,'file3':12}}}";
 	util::requote(&read_command_json);
 	this->read_command.CopyString(read_command_json.c_str());
 }
