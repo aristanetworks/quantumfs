@@ -1145,6 +1145,23 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		defer child.lock.Unlock()
 
 		result := func() fuse.Status {
+			defer dst.childRecordLock.Lock().Unlock()
+
+			dstRecord := dst.children.recordByName(c, newName)
+			if dstRecord != nil &&
+				dstRecord.Type() == quantumfs.ObjectTypeDirectory &&
+				dstRecord.Size() != 0 {
+
+				// We can not overwrite a non-empty directory
+				return fuse.Status(syscall.ENOTEMPTY)
+			}
+			return fuse.OK
+		}()
+		if result != fuse.OK {
+			return result
+		}
+
+		result = func() fuse.Status {
 			// we need to unlock the parent early
 			defer parent.lock.Unlock()
 
