@@ -577,7 +577,9 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	return err
 }
 
-func reload(c *ctx, inode Inode, remoteRecord quantumfs.DirectRecord) {
+func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
+	remoteRecord quantumfs.DirectRecord) {
+
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()
 
@@ -587,7 +589,7 @@ func reload(c *ctx, inode Inode, remoteRecord quantumfs.DirectRecord) {
 	case quantumfs.ObjectTypeDirectory:
 		subdir := inode.(*Directory)
 		uninstantiated, removedUninstantiated :=
-			subdir.refresh_DOWN(c, remoteRecord.ID())
+			subdir.refresh_DOWN(c, hrc, remoteRecord.ID())
 		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
 	case quantumfs.ObjectTypeSmallFile:
