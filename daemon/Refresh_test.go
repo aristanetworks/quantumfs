@@ -363,6 +363,41 @@ func TestRefreshHardlinkAddition8(t *testing.T) {
 	runTest(t, refreshHardlinkAdditionTestGen(true, true, true))
 }
 
+func TestRefreshOrphanedHardlinkContentCheck(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fullname := workspace + "/testFile"
+		content := "original content"
+		appendContent := " appended."
+
+		ctx := test.TestCtx()
+
+		newRootId1 := createTestFile(test, workspace, "otherfile", 1000)
+		createHardlink(fullname, content)
+		newRootId2 := getRootId(test, workspace)
+
+		file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file, content)
+		assertOpenFileIsOfSize(test, int(file.Fd()), int64(len(content)))
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		verifyContentStartsWith(test, file, content)
+		assertNoFile(test, fullname)
+		assertOpenFileIsOfSize(test, int(file.Fd()), int64(len(content)))
+		_, err = file.Write([]byte(appendContent))
+		test.AssertNoErr(err)
+		assertNoFile(test, fullname)
+		assertOpenFileIsOfSize(test, int(file.Fd()),
+			int64(len(content)+len(appendContent)))
+		verifyContentStartsWith(test, file, content+appendContent)
+
+		err = file.Close()
+		test.AssertNoErr(err)
+	})
+}
+
 func TestRefreshHardlinkRemoval(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -495,6 +530,13 @@ func assertFileIsOfSize(test *testHelper, fullname string, size int64) {
 	test.AssertNoErr(err)
 	test.Assert(stat.Size == size,
 		"Incorrect file size. Expected: %d", stat.Size)
+}
+
+func assertNoFile(test *testHelper, fullname string) {
+	var stat syscall.Stat_t
+	err := syscall.Stat(fullname, &stat)
+	test.AssertErr(err)
+	test.Assert(err == syscall.ENOENT, "Expected ENOENT, got %s", err.Error())
 }
 
 func assertOpenFileIsOfSize(test *testHelper, fd int, size int64) {
