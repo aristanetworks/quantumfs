@@ -21,7 +21,7 @@ const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
 	uint32_t *lenOut);
 const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot,
-	void *paths);
+	uint64_t pathId);
 
 */
 import "C"
@@ -31,6 +31,7 @@ import (
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type QfsClientApi struct {
@@ -121,18 +122,37 @@ func (api *QfsClientApi) GetBlock(key string) ([]byte, error) {
 // wrapper for std::unordered_map.
 //
 //export setPath
-func setPath(paths unsafe.Pointer, path *C.char, value uint) {
-	pathList := (*quantumfs.PathAccessList)(paths)
+func setPath(pathId uint64, path *C.char, value uint) {
+	defer tmpListLock.Lock().Unlock()
+	pathList := tmpListMap[pathId]
 	pathList.Paths[C.GoString(path)] = quantumfs.PathFlags(value)
+}
+
+var tmpListLock utils.DeferableMutex
+var tmpListMap map[uint64]*quantumfs.PathAccessList
+
+func init() {
+	tmpListMap = map[uint64]*quantumfs.PathAccessList{}
 }
 
 func (api *QfsClientApi) GetAccessed(
 	workspace string) (quantumfs.PathAccessList, error) {
 
 	paths := quantumfs.NewPathAccessList()
+	pathId := uint64(uintptr(unsafe.Pointer(&paths)))
+
+	func() {
+		defer tmpListLock.Lock().Unlock()
+		tmpListMap[pathId] = &paths
+	}()
 
 	err := C.GoString(C.cGetAccessed(C.uint32_t(api.handle),
-		C.CString(workspace), unsafe.Pointer(&paths)))
+		C.CString(workspace), C.uint64_t(pathId)))
+
+	func() {
+		defer tmpListLock.Lock().Unlock()
+		delete(tmpListMap, pathId)
+	}()
 	if err != "" {
 		return quantumfs.NewPathAccessList(), errors.New(err)
 	}
