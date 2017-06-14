@@ -9,6 +9,7 @@ package qlogstats
 import (
 	"fmt"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 )
 
@@ -16,18 +17,21 @@ type extPairStats struct {
 	fmtStart  string
 	fmtStop   string
 	sameScope bool
+	name      string
 
 	stats basicStats
 }
 
 // Set matchingIndent to true if start and stop should only be recognized when they
 // are seen at the same function scope
-func NewExtPairStats(start string, stop string, matchingIndent bool) *extPairStats {
+func NewExtPairStats(start string, stop string, matchingIndent bool,
+	nametag string) *extPairStats {
 
 	return &extPairStats{
 		fmtStart:  start,
 		fmtStop:   stop,
 		sameScope: matchingIndent,
+		name:      nametag,
 	}
 }
 
@@ -67,15 +71,14 @@ func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
 	}
 }
 
-func (ext *extPairStats) Publish() (tags []Tag, fields []Field) {
-	tags = make([]Tag, 0)
-	tags = append(tags, newTag("fmtStart", ext.fmtStart))
-	tags = append(tags, newTag("fmtStop", ext.fmtStop))
+func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Field) {
+	tags = make([]quantumfs.Tag, 0)
+	tags = append(tags, quantumfs.NewTag("name", ext.name))
 
-	fields = make([]Field, 0)
+	fields = make([]quantumfs.Field, 0)
 
-	fields = append(fields, newField("average", ext.stats.Average()))
-	fields = append(fields, newField("samples", ext.stats.Count()))
+	fields = append(fields, quantumfs.NewField("average", ext.stats.Average()))
+	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
 	ext.stats = basicStats{}
 	return tags, fields
