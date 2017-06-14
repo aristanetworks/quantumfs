@@ -99,7 +99,7 @@ extern "C" {
 	}
 
 	const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot,
-		void *paths) {
+		uint64_t pathId) {
 
 		auto api = findApi(apiHandle);
 		if (!api) {
@@ -116,7 +116,7 @@ extern "C" {
 		for(auto i = accessed_list.paths.begin();
 		    i != accessed_list.paths.end();
 		    ++i) {
-			setPath(paths, const_cast<char *>(i->first.c_str()),
+			setPath(pathId, const_cast<char *>(i->first.c_str()),
 				i->second);
 		}
 
