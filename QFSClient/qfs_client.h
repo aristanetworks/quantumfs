@@ -83,11 +83,18 @@ struct Error {
 	std::string message;
 };
 
+typedef uint32_t PathFlags;
+const PathFlags kPathCreated = (1 << 0);
+const PathFlags kPathRead    = (1 << 1);
+const PathFlags kPathUpdated = (1 << 2);
+const PathFlags kPathDeleted = (1 << 3);
+const PathFlags kPathIsDir   = (1 << 4);
+
 /// PathAccessList Contains the list of files and directories accessed in the given
 /// workspace on the given instance. See the documentation for
 /// quantumfs.PathAccessList for detailed documentation of this type.
 struct PathAccessList {
-	std::unordered_map<std::string, uint32_t> paths;
+	std::unordered_map<std::string, PathFlags> paths;
 };
 
 /// `Api` provides the public interface to QuantumFS API calls.
