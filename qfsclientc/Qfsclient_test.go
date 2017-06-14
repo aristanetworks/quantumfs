@@ -101,5 +101,6 @@ func TestAccessFileList(t *testing.T) {
 		test.Assert(paths.Paths["/file"] == quantumfs.PathCreated|
 			quantumfs.PathUpdated, "Incorrect access mark %x",
 			paths.Paths["/file"])
+		test.AssertNoErr(ReleaseApi(api))
 	})
 }
