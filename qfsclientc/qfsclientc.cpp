@@ -116,7 +116,8 @@ extern "C" {
 		for(auto i = accessed_list.paths.begin();
 		    i != accessed_list.paths.end();
 		    ++i) {
-			setPath(paths, const_cast<char *>(i->first), i->second);
+			setPath(paths, const_cast<char *>(i->first.c_str()),
+				i->second);
 		}
 
 		return "";

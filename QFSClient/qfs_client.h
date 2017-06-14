@@ -87,7 +87,7 @@ struct Error {
 /// workspace on the given instance. See the documentation for
 /// quantumfs.PathAccessList for detailed documentation of this type.
 struct PathAccessList {
-	std::unordered_map<const char*, uint32_t> paths;
+	std::unordered_map<std::string, uint32_t> paths;
 };
 
 /// `Api` provides the public interface to QuantumFS API calls.
