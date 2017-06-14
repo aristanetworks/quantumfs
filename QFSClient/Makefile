@@ -14,7 +14,7 @@ ifndef ROOTDIRNAME
 endif
 
 TARGET      := $(d)/libqfsclient.so
-TEST_TARGET := $(d)/qfsclient_test
+TEST_TARGET := $(d)/qfs_client_test
 
 SRCS      := $(d)/qfs_client_implementation.cc $(d)/qfs_client_util.cc
 OBJS      := $(SRCS:.cc=.o)
