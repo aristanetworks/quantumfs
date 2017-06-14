@@ -69,6 +69,8 @@ const (
 	LogWorkspaceDb
 	LogTest
 	LogQlog
+	LogQuark
+	LogSpin
 	LogTool
 	logSubsystemMax = LogTool
 )
@@ -110,6 +112,10 @@ func (enum LogSubsystem) String() string {
 		return "Test"
 	case LogQlog:
 		return "Qlog"
+	case LogQuark:
+		return "Quark"
+	case LogSpin:
+		return "Spin"
 	case LogTool:
 		return "Tool"
 	}
@@ -128,6 +134,10 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 		return LogTest, nil
 	case "qlog":
 		return LogQlog, nil
+	case "quark":
+		return LogQuark, nil
+	case "spin":
+		return LogSpin, nil
 	case "tool":
 		return LogTool, nil
 	}
