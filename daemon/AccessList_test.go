@@ -182,7 +182,8 @@ func TestAccessListDirectoryRead(t *testing.T) {
 		path = workspace + dirname
 		_, err := ioutil.ReadDir(path)
 		test.AssertNoErr(err)
-		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathRead
+		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir |
+			quantumfs.PathRead
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
@@ -195,7 +196,8 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 		dir2 := "/dir2"
 		path := workspace + dir1 + dir2
 		test.AssertNoErr(utils.MkdirAll(path, 0666))
-		expectedAccessList.Paths[dir1] = quantumfs.PathIsDir | quantumfs.PathCreated
+		expectedAccessList.Paths[dir1] = quantumfs.PathIsDir |
+			quantumfs.PathCreated
 		expectedAccessList.Paths[dir1+dir2] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
@@ -215,7 +217,8 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		path = workspace + dir1
 		test.AssertNoErr(os.Remove(workspace + dir1 + dir2))
 		test.AssertNoErr(os.Remove(workspace + dir1))
-		expectedAccessList.Paths[dir1] = quantumfs.PathIsDir | quantumfs.PathDeleted
+		expectedAccessList.Paths[dir1] = quantumfs.PathIsDir |
+			quantumfs.PathDeleted
 		expectedAccessList.Paths[dir1+dir2] = quantumfs.PathIsDir |
 			quantumfs.PathDeleted
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
@@ -555,8 +558,8 @@ func TestAccessSpecialFiles(t *testing.T) {
 		expectedAccessList.Paths["/test2"] = quantumfs.PathCreated
 
 		path = workspace + "/test3"
-		test.AssertNoErr(syscall.Mknod(path, syscall.S_IFSOCK|syscall.S_IRWXU,
-			0x12345678))
+		test.AssertNoErr(syscall.Mknod(path,
+			syscall.S_IFSOCK|syscall.S_IRWXU, 0x12345678))
 
 		expectedAccessList.Paths["/test3"] = quantumfs.PathCreated
 
@@ -628,7 +631,8 @@ func TestAccessListOverwriteRemovalDirectoryWithRead(t *testing.T) {
 		// Deleted and then created directories are counted as having been
 		// neither deleted nor created, however, if it had been read, the
 		// Read flag must persist.
-		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathRead
+		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir |
+			quantumfs.PathRead
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
