@@ -228,36 +228,36 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 	removedInodeId *InodeId) {
 
 	defer c.FuncIn("Directory::handleChild_DOWN", "%s", childname).Out()
-	createRemote := remoteRecord != nil
+	existsOnRemote := remoteRecord != nil
 	localRecord := dir.children.recordByName(c, childname)
-	inodeToReuse := func() Inode {
-		if !createRemote {
-			return nil
+	canReuseInode := func() bool {
+		if !existsOnRemote {
+			return false
 		}
 		if localRecord == nil {
 			c.vlog("%s does not exist locally.", childname)
-			return nil
+			return false
 		}
 		if !localRecord.Type().Matches(remoteRecord.Type()) {
 			// XXX handle typechanges from / to hardlinks
-			return nil
+			return false
 		}
 		if !underlyingTypesMatch(dir.wsr, localRecord, remoteRecord) {
 			c.vlog("%s had a major type change %d -> %d",
 				childname, underlyingTypeOf(dir.wsr, localRecord),
 				underlyingTypeOf(dir.wsr, remoteRecord))
-			return nil
+			return false
 		}
-		return c.qfs.inodeNoInstantiate(c, childId)
+		return true
 	}()
-	if inodeToReuse == nil && localRecord != nil {
+	if !canReuseInode && localRecord != nil {
 		dir.unlinkChild_DOWN(c, childname, childId)
 		removedInodeId = &childId
 	}
-	if !createRemote {
+	if !existsOnRemote {
 		return
 	}
-	if inodeToReuse == nil {
+	if !canReuseInode {
 		inodeId := dir.children.loadChild(c, remoteRecord,
 			quantumfs.InodeIdInvalid)
 		status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
@@ -275,10 +275,12 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 		localRecord.Type(), localRecord.ID().Text(),
 		remoteRecord.Type(), remoteRecord.ID().Text())
 
-	reload(c, inodeToReuse, *remoteRecord)
-	status := c.qfs.invalidateInode(inodeToReuse.inodeNum())
+	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
+		reload(c, inode, *remoteRecord)
+	}
+	status := c.qfs.invalidateInode(childId)
 	utils.Assert(status == fuse.OK,
-		"invalidating %d failed with %d", inodeToReuse.inodeNum(), status)
+		"invalidating %d failed with %d", childId, status)
 
 	return
 }
