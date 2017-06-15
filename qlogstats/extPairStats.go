@@ -63,6 +63,14 @@ func (ext *extPairStats) ExtractStatFrom(request qlog.LogStack, idx int) {
 		ext.fmtStop)
 }
 
+func (ext *extPairStats) TriggerStrings() []string {
+	rtn := make([]string, 0)
+
+	rtn = append(rtn, ext.fmtStart)
+	rtn = append(rtn, ext.fmtStop)
+	return rtn
+}
+
 func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
 	for i, v := range request {
 		if v.Format == ext.fmtStart {
