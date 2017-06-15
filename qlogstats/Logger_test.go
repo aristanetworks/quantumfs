@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 func runReader(qlogFile string,
@@ -54,7 +54,7 @@ func TestMatches(t *testing.T) {
 		// Run the reader
 		memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
 
-		test.WaitFor("statistic to register", func () bool {
+		test.WaitFor("statistic to register", func() bool {
 			if len(memdb.Data) == 0 {
 				return false
 			}
