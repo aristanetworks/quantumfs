@@ -65,7 +65,7 @@ type Aggregator struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	statExtractors []StatExtractorConfig
+	statExtractors  []StatExtractorConfig
 	RequestEndAfter time.Duration
 
 	queueMutex utils.DeferableMutex
@@ -76,11 +76,11 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	extractors []StatExtractorConfig) *Aggregator {
 
 	rtn := Aggregator{
-		db:             db_,
-		logsByRequest:  make(map[uint64]logTrack),
-		statExtractors: extractors,
+		db:              db_,
+		logsByRequest:   make(map[uint64]logTrack),
+		statExtractors:  extractors,
 		RequestEndAfter: time.Second * 30,
-		queueLogs:      make([]qlog.LogOutput, 0),
+		queueLogs:       make([]qlog.LogOutput, 0),
 	}
 
 	// Sync all extractors
