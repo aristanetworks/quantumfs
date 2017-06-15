@@ -489,3 +489,27 @@ func TestExtendedAttributesWalk(t *testing.T) {
 		test.readWalkCompare(workspace, false)
 	})
 }
+
+func TestExtendedAttributesiAddRemoveWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(50)
+		workspace := test.NewWorkspace()
+
+		// Write File
+		filename := workspace + "/file"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		// Set attr for the file
+		err = syscall.Setxattr(filename, xattrName, xattrData, 0)
+		test.Assert(err == nil, "Error setting data XAttr: %v", err)
+
+		// Remove attr for the file
+		err = syscall.Removexattr(filename, xattrName)
+		test.Assert(err == nil, "Error removing data XAttr: %v", err)
+
+		test.readWalkCompare(workspace, false)
+	})
+}
