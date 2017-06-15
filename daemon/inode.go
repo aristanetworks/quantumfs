@@ -598,7 +598,7 @@ func reload(c *ctx, inode Inode, remoteRecord quantumfs.DirectRecord) {
 		fallthrough
 	case quantumfs.ObjectTypeVeryLargeFile:
 		regFile := inode.(*File)
-		regFile.handleTypeChange(c, remoteRecord)
+		regFile.handleAccessorTypeChange(c, remoteRecord)
 	}
 }
 

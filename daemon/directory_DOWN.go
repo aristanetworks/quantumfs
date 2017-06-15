@@ -194,8 +194,8 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	return dir.children.makeHardlink(c, toLink.inodeNum())
 }
 
-func (dir *Directory) destroyChild_DOWN(c *ctx, childname string, childId InodeId) {
-	defer c.FuncIn("Directory::destroyChild_DOWN", "%s", childname).Out()
+func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId) {
+	defer c.FuncIn("Directory::unlinkChild_DOWN", "%s", childname).Out()
 
 	localRecord := dir.children.recordByName(c, childname)
 	inode := c.qfs.inodeNoInstantiate(c, childId)
@@ -204,7 +204,7 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, childname string, childId InodeI
 		subdir.children.foreachChild(c, func(childname string,
 			childId InodeId) {
 
-			subdir.destroyChild_DOWN(c, childname, childId)
+			subdir.unlinkChild_DOWN(c, childname, childId)
 		})
 	}
 	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
@@ -219,16 +219,15 @@ func (dir *Directory) destroyChild_DOWN(c *ctx, childname string, childId InodeI
 		if result != fuse.OK {
 			panic("XXX handle deletion failure")
 		}
-		c.qfs.noteDeletedInode(dir.id, childId, childname)
 	}
+	c.qfs.noteDeletedInode(dir.id, childId, childname)
 }
 
 func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRecord,
-	childname string, childId InodeId) (u *InodeId, d *InodeId) {
+	childname string, childId InodeId) (newInodeId *InodeId,
+	removedInodeId *InodeId) {
 
 	defer c.FuncIn("Directory::handleChild_DOWN", "%s", childname).Out()
-	u = nil
-	d = nil
 	createRemote := remoteRecord != nil
 	delLocal := !createRemote
 
@@ -241,11 +240,11 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 		// XXX handle typechanges from / to hardlinks
 		delLocal = true
 	}
-	if !delLocal && !BaseTypesMatch(dir.wsr, localRecord, remoteRecord) {
+	if !delLocal && !underlyingTypesMatch(dir.wsr, localRecord, remoteRecord) {
 		c.vlog("%s had a major type change %d(%d) -> %d(%d)",
 			childname,
-			GetBaseType(dir.wsr, localRecord), localRecord.Type(),
-			GetBaseType(dir.wsr, remoteRecord), remoteRecord.Type())
+			underlyingTypeOf(dir.wsr, localRecord), localRecord.Type(),
+			underlyingTypeOf(dir.wsr, remoteRecord), remoteRecord.Type())
 		delLocal = true
 	}
 	inode := c.qfs.inodeNoInstantiate(c, childId)
@@ -254,8 +253,8 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 		delLocal = true
 	}
 	if delLocal && localRecord != nil {
-		dir.destroyChild_DOWN(c, childname, childId)
-		d = &childId
+		dir.unlinkChild_DOWN(c, childname, childId)
+		removedInodeId = &childId
 	}
 	if !createRemote {
 		return
@@ -267,7 +266,7 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 		utils.Assert(status == fuse.OK,
 			"marking %s created failed with %d", remoteRecord.Filename(),
 			status)
-		u = &inodeId
+		newInodeId = &inodeId
 		return
 	}
 	if remoteRecord.ID().IsEqualTo(localRecord.ID()) {
@@ -303,25 +302,30 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 
 	defer dir.childRecordLock.Lock().Unlock()
 
+	// go through all local entries and refresh them to correctly
+	// represent remote
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		remoteRecord := remoteEntries[childname]
-		u, d := dir.handleChild_DOWN(c, remoteRecord, childname, childId)
-		if u != nil {
-			uninstantiated = append(uninstantiated, *u)
+		newInodeId, removedInodeId := dir.handleChild_DOWN(c, remoteRecord,
+			childname, childId)
+		if newInodeId != nil {
+			uninstantiated = append(uninstantiated, *newInodeId)
 		}
-		if d != nil {
-			deletedInodeIds = append(deletedInodeIds, *d)
+		if removedInodeId != nil {
+			deletedInodeIds = append(deletedInodeIds, *removedInodeId)
 		}
 		delete(remoteEntries, childname)
 	})
 
+	// now go through all remote entries that did not exist in the
+	// local workspace
 	for childname, record := range remoteEntries {
-		u, d := dir.handleChild_DOWN(c, record, childname,
-			quantumfs.InodeIdInvalid)
-		if u != nil {
-			uninstantiated = append(uninstantiated, *u)
+		newInodeId, removedInodeId := dir.handleChild_DOWN(c, record,
+			childname, quantumfs.InodeIdInvalid)
+		if newInodeId != nil {
+			uninstantiated = append(uninstantiated, *newInodeId)
 		}
-		utils.Assert(d == nil, "inode deletion not expected")
+		utils.Assert(removedInodeId == nil, "inode deletion not expected")
 	}
 
 	dir.children.baseLayerIs(c, baseLayerId)
