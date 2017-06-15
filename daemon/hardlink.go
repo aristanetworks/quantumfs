@@ -207,13 +207,13 @@ func (link *Hardlink) ShallowCopy() quantumfs.DirectoryRecord {
 	}
 
 	// Note that this is a DirectRecord shallow copy type
-	newEntry := quantumfs.NewDirectoryRecord()
+	var newEntry quantumfs.ThinRecord
 
 	newEntry.SetID(realRecord.ID())
 	newEntry.SetType(realRecord.Type())
 	newEntry.SetSize(realRecord.Size())
 
-	newEntry.SetNlinks(link.Nlinks())
+	newEntry.Nlinks_ = link.Nlinks()
 	newEntry.SetFilename(link.Filename())
 	newEntry.SetPermissions(link.Permissions())
 	newEntry.SetOwner(link.Owner())
@@ -222,7 +222,7 @@ func (link *Hardlink) ShallowCopy() quantumfs.DirectoryRecord {
 	newEntry.SetContentTime(link.ContentTime())
 	newEntry.SetModificationTime(link.ModificationTime())
 
-	return newEntry
+	return &newEntry
 }
 
 func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
