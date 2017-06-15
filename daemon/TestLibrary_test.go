@@ -358,7 +358,8 @@ func (th *testHelper) getWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
 func (th *testHelper) getAccessList(workspace string) *quantumfs.PathAccessList {
 	wsr, cleanup := th.getWorkspaceRoot(workspace)
 	defer cleanup()
-	return wsr.getList()
+	accessed := wsr.getList()
+	return &accessed
 }
 
 func (th *testHelper) assertAccessList(testlist quantumfs.PathAccessList,
@@ -368,6 +369,13 @@ func (th *testHelper) assertAccessList(testlist quantumfs.PathAccessList,
 	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
 	message = message + msg
 	th.Assert(eq, message)
+}
+
+func (th *testHelper) assertWorkspaceAccessList(testlist quantumfs.PathAccessList,
+	workspaceName string) {
+
+	gotAccessList := th.getAccessList(workspaceName)
+	th.assertAccessList(testlist, gotAccessList, "Error maps not clear")
 }
 
 func (th *testHelper) checkSparse(fileA string, fileB string, offset int,
