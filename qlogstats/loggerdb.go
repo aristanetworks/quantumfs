@@ -23,6 +23,8 @@ type trackerKey struct {
 }
 
 type StatExtractor interface {
+	TriggerStrings() []string
+
 	ProcessRequest(request qlog.LogStack)
 
 	Publish() ([]quantumfs.Tag, []quantumfs.Field)
@@ -56,6 +58,8 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	return agg
 }
 
+type extractorIdx int
+
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
@@ -66,6 +70,7 @@ type Aggregator struct {
 	requestSequence list.List
 
 	statExtractors  []StatExtractorConfig
+	statTriggers    map[string][]extractorIdx
 	RequestEndAfter time.Duration
 
 	queueMutex utils.DeferableMutex
@@ -79,15 +84,27 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:              db_,
 		logsByRequest:   make(map[uint64]logTrack),
 		statExtractors:  extractors,
+		statTriggers:    make(map[string][]extractorIdx),
 		RequestEndAfter: time.Second * 30,
 		queueLogs:       make([]qlog.LogOutput, 0),
 	}
 
-	// Sync all extractors
+	// Sync all extractors and setup their triggers
 	now := time.Now()
 	for i, v := range rtn.statExtractors {
 		v.lastOutput = now
 		rtn.statExtractors[i] = v
+
+		triggers := v.extractor.TriggerStrings()
+		for _, trigger := range triggers {
+			newTriggers, exists := rtn.statTriggers[trigger]
+			if !exists {
+				newTriggers = make([]extractorIdx, 0)
+			}
+
+			newTriggers = append(newTriggers, extractorIdx(i))
+			rtn.statTriggers[trigger] = newTriggers
+		}
 	}
 
 	go rtn.ProcessThread()
@@ -133,9 +150,7 @@ func (agg *Aggregator) ProcessThread() {
 				reqLogs := agg.logsByRequest[request.reqId]
 				delete(agg.logsByRequest, request.reqId)
 
-				for _, e := range agg.statExtractors {
-					e.extractor.ProcessRequest(reqLogs.logs)
-				}
+				agg.FilterRequest(reqLogs.logs)
 			} else {
 				// No more requests ready to extract stats
 				break
@@ -156,6 +171,32 @@ func (agg *Aggregator) ProcessThread() {
 		}
 
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// Use the trigger map to determine if any parts of this request need to go out
+func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
+	filteredRequests := make(map[extractorIdx][]qlog.LogOutput)
+
+	for _, log := range logs {
+		// Find if any extractors have registered for this log
+		if extractors, exists := agg.statTriggers[log.Format]; exists {
+			for _, triggered := range extractors {
+				// This extractor wants this log, so append it
+				filtered, hasLogs := filteredRequests[triggered]
+				if !hasLogs {
+					filtered = make([]qlog.LogOutput, 0)
+				}
+
+				filtered = append(filtered, log)
+				filteredRequests[triggered] = filtered
+			}
+		}
+	}
+
+	// Send the filtered logs out
+	for extractor, toSend := range filteredRequests {
+		agg.statExtractors[extractor].extractor.ProcessRequest(toSend)
 	}
 }
 
