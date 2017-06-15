@@ -365,7 +365,7 @@ func (th *testHelper) getAccessList(workspace string) *quantumfs.PathAccessList 
 func (th *testHelper) assertAccessList(testlist quantumfs.PathAccessList,
 	wsrlist *quantumfs.PathAccessList, message string) {
 
-	eq := reflect.DeepEqual(testlist, wsrlist)
+	eq := reflect.DeepEqual(&testlist, wsrlist)
 	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
 	message = message + msg
 	th.Assert(eq, message)
@@ -375,7 +375,7 @@ func (th *testHelper) assertWorkspaceAccessList(testlist quantumfs.PathAccessLis
 	workspaceName string) {
 
 	gotAccessList := th.getAccessList(workspaceName)
-	th.assertAccessList(testlist, gotAccessList, "Error maps not clear")
+	th.assertAccessList(testlist, gotAccessList, "Error two maps differ")
 }
 
 func (th *testHelper) checkSparse(fileA string, fileB string, offset int,
