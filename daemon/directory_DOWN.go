@@ -229,37 +229,35 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 
 	defer c.FuncIn("Directory::handleChild_DOWN", "%s", childname).Out()
 	createRemote := remoteRecord != nil
-	delLocal := !createRemote
-
 	localRecord := dir.children.recordByName(c, childname)
-	if localRecord == nil {
-		c.vlog("%s does not exist locally.", childname)
-		delLocal = true
-	}
-	if !delLocal && !localRecord.Type().Matches(remoteRecord.Type()) {
-		// XXX handle typechanges from / to hardlinks
-		delLocal = true
-	}
-	if !delLocal && !underlyingTypesMatch(dir.wsr, localRecord, remoteRecord) {
-		c.vlog("%s had a major type change %d(%d) -> %d(%d)",
-			childname,
-			underlyingTypeOf(dir.wsr, localRecord), localRecord.Type(),
-			underlyingTypeOf(dir.wsr, remoteRecord), remoteRecord.Type())
-		delLocal = true
-	}
-	inode := c.qfs.inodeNoInstantiate(c, childId)
-	if !delLocal && inode == nil {
-		c.vlog("%s not instantiated", childname)
-		delLocal = true
-	}
-	if delLocal && localRecord != nil {
+	inodeToReuse := func() Inode {
+		if !createRemote {
+			return nil
+		}
+		if localRecord == nil {
+			c.vlog("%s does not exist locally.", childname)
+			return nil
+		}
+		if !localRecord.Type().Matches(remoteRecord.Type()) {
+			// XXX handle typechanges from / to hardlinks
+			return nil
+		}
+		if !underlyingTypesMatch(dir.wsr, localRecord, remoteRecord) {
+			c.vlog("%s had a major type change %d -> %d",
+				childname, underlyingTypeOf(dir.wsr, localRecord),
+				underlyingTypeOf(dir.wsr, remoteRecord))
+			return nil
+		}
+		return c.qfs.inodeNoInstantiate(c, childId)
+	}()
+	if inodeToReuse == nil && localRecord != nil {
 		dir.unlinkChild_DOWN(c, childname, childId)
 		removedInodeId = &childId
 	}
 	if !createRemote {
 		return
 	}
-	if delLocal {
+	if inodeToReuse == nil {
 		inodeId := dir.children.loadChild(c, remoteRecord,
 			quantumfs.InodeIdInvalid)
 		status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
@@ -277,10 +275,10 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 		localRecord.Type(), localRecord.ID().Text(),
 		remoteRecord.Type(), remoteRecord.ID().Text())
 
-	reload(c, inode, *remoteRecord)
-	status := c.qfs.invalidateInode(inode.inodeNum())
+	reload(c, inodeToReuse, *remoteRecord)
+	status := c.qfs.invalidateInode(inodeToReuse.inodeNum())
 	utils.Assert(status == fuse.OK,
-		"invalidating %d failed with %d", inode.inodeNum(), status)
+		"invalidating %d failed with %d", inodeToReuse.inodeNum(), status)
 
 	return
 }
