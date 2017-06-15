@@ -32,10 +32,17 @@ func TestMatches(t *testing.T) {
 		qlogHandle.Log_(time.Unix(0, 30000), qlog.LogTest, 12345, 3,
 			qlog.FnExitStr+"TestMatch")
 
+		// The average of 10,000 and 30,000 should be 20,000
+		qlogHandle.Log_(time.Unix(0, 50000), qlog.LogTest, 12346, 3,
+			qlog.FnEnterStr+"TestMatch")
+		qlogHandle.Log_(time.Unix(0, 80000), qlog.LogTest, 12346, 3,
+			qlog.FnExitStr+"TestMatch")
+
 		// Add in some close, but not actually matching logs
 		qlogHandle.Log(qlog.LogTest, 12345, 2, qlog.FnEnterStr+"TestMatchZ")
 		qlogHandle.Log(qlog.LogTest, 12345, 3, qlog.FnExitStr+"TestMtch")
 		qlogHandle.Log(qlog.LogTest, 12345, 3, "TestMatch")
+		qlogHandle.Log(qlog.LogTest, 12347, 3, qlog.FnExitStr+"TestMatch")
 
 		// Setup an extractor
 		extractors := make([]StatExtractorConfig, 0)
@@ -70,10 +77,10 @@ func TestMatches(t *testing.T) {
 			// Data should be present now
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average" {
-					test.Assert(v.Data == 10000,
+					test.Assert(v.Data == 20000,
 						"incorrect delta %d", v.Data)
 				} else if v.Name == "samples" {
-					test.Assert(v.Data == 1,
+					test.Assert(v.Data == 2,
 						"incorrect samples %d", v.Data)
 				}
 			}
