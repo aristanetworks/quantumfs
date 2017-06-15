@@ -239,7 +239,7 @@ type PathAccessList struct {
 
 func NewPathAccessList() PathAccessList {
 	return PathAccessList{
-		Paths: make(map[string]PathFlags),
+		Paths: map[string]PathFlags{},
 	}
 }
 
@@ -293,7 +293,7 @@ type Api interface {
 	Merge3Way(base string, remote string, local string) error
 
 	// Get the list of accessed file from workspaceroot
-	GetAccessed(wsr string) (PathAccessList, error)
+	GetAccessed(wsr string) (*PathAccessList, error)
 
 	// Clear the list of accessed files in workspaceroot
 	ClearAccessed(wsr string) error
@@ -613,9 +613,9 @@ func (api *apiImpl) Refresh(workspace string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *apiImpl) GetAccessed(wsr string) (PathAccessList, error) {
+func (api *apiImpl) GetAccessed(wsr string) (*PathAccessList, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return PathAccessList{},
+		return nil,
 			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
@@ -627,15 +627,15 @@ func (api *apiImpl) GetAccessed(wsr string) (PathAccessList, error) {
 	var accesslistResponse AccessListResponse
 	err := api.processCmd(cmd, &accesslistResponse)
 	if err != nil {
-		return PathAccessList{}, err
+		return nil, err
 	}
 	errorResponse := accesslistResponse.ErrorResponse
 	if errorResponse.ErrorCode != ErrorOK {
-		return PathAccessList{},
+		return nil,
 			fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
-	return accesslistResponse.PathList, nil
+	return &accesslistResponse.PathList, nil
 }
 
 func (api *apiImpl) ClearAccessed(wsr string) error {
