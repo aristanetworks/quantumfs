@@ -82,7 +82,7 @@ func ReleaseApi(api QfsClientApi) error {
 // wrapper for std::unordered_map.
 //
 //export setPath
-func setPath(pathId uint64, path *C.char, value uint) {
+func setPath(pathId uint64, path *C.char, value uint32) {
 	defer tmpListLock.Lock().Unlock()
 	pathList := tmpListMap[pathId]
 	pathList.Paths[C.GoString(path)] = quantumfs.PathFlags(value)

@@ -113,7 +113,7 @@ extern "C" {
 			return errStr(err);
 		}
 
-		for(auto i = accessed_list.paths.begin();
+		for (auto i = accessed_list.paths.begin();
 		    i != accessed_list.paths.end();
 		    ++i) {
 			setPath(pathId, const_cast<char *>(i->first.c_str()),
