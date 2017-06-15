@@ -81,7 +81,7 @@ func generateFiles(test *testHelper, size int, workspace,
 	return accessList, expectedSize
 }
 
-func mapKeySizeSum(paths quantumfs.PathAccessList) int {
+func mapKeySizeSum(paths *quantumfs.PathAccessList) int {
 	size := 0
 	for key, _ := range paths.Paths {
 		size += len(key)
