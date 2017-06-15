@@ -26,9 +26,7 @@ func TestAccessListFileCreate(t *testing.T) {
 		test.Assert(err == nil, "Create file error:%v", err)
 		expectedAccessList.Paths[filename] = quantumfs.PathCreated
 		syscall.Close(fd)
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -47,9 +45,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		err = os.Remove(path)
 		test.Assert(err == nil, "Remove file error:%v", err)
 		expectedAccessList.Paths[filename] = quantumfs.PathDeleted
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -69,9 +65,7 @@ func TestAccessListFileCreateDelete(t *testing.T) {
 		err = os.Remove(path)
 		test.Assert(err == nil,
 			"Remove file error:%v", err)
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -89,9 +83,7 @@ func TestAccessListFileTruncate(t *testing.T) {
 		path = workspace + filename
 		test.AssertNoErr(os.Truncate(path, 0))
 		expectedAccessList.Paths[filename] = quantumfs.PathUpdated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -112,9 +104,7 @@ func TestAccessListFileFtruncate(t *testing.T) {
 		test.AssertNoErr(syscall.Ftruncate(fd, 0))
 		syscall.Close(fd)
 		expectedAccessList.Paths[filename] = quantumfs.PathUpdated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -132,9 +122,7 @@ func TestAccessListFileReadWrite(t *testing.T) {
 		expectedAccessList := quantumfs.NewPathAccessList()
 		expectedAccessList.Paths[filename] = quantumfs.PathUpdated |
 			quantumfs.PathRead | quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -148,9 +136,7 @@ func TestAccessListDirectoryCreate(t *testing.T) {
 		test.Assert(err == nil, "Create directory error:%v", err)
 		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -169,9 +155,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		test.Assert(err == nil, "Delete directory error:%v", err)
 		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir |
 			quantumfs.PathDeleted
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -190,9 +174,7 @@ func TestAccessListDirectoryCreateDelete(t *testing.T) {
 		path = workspace + dirname
 		err = syscall.Rmdir(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -210,9 +192,7 @@ func TestAccessListDirectoryRead(t *testing.T) {
 		_, err = ioutil.ReadDir(path)
 		test.AssertNoErr(err)
 		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathRead
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -228,9 +208,7 @@ func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 		expectedAccessList.Paths[dir1] = quantumfs.PathIsDir | quantumfs.PathCreated
 		expectedAccessList.Paths[dir1+dir2] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -251,9 +229,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		expectedAccessList.Paths[dir1] = quantumfs.PathIsDir | quantumfs.PathDeleted
 		expectedAccessList.Paths[dir1+dir2] = quantumfs.PathIsDir |
 			quantumfs.PathDeleted
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -273,9 +249,7 @@ func TestAccessListRecursiveDirectoryCreateDelete(t *testing.T) {
 		path = workspace + dir1
 		err = os.RemoveAll(path)
 		test.Assert(err == nil, "Delete directory error:%v", err)
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -306,9 +280,7 @@ func TestAccessListMvChildFile(t *testing.T) {
 		test.Assert(err == nil, "Move file error:%v", err)
 		expectedAccessList.Paths[dirname1+filename1] = quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname2+filename2] = quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -334,9 +306,7 @@ func TestAccessListRenameFile(t *testing.T) {
 		test.Assert(err == nil, "Move file error:%v", err)
 		expectedAccessList.Paths[dirname+filename1] = quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname+filename2] = quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -366,9 +336,7 @@ func TestAccessListRenameFileWithWrites(t *testing.T) {
 			quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname+filename2] = quantumfs.PathCreated |
 			quantumfs.PathUpdated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -403,9 +371,7 @@ func TestAccessListMvChildFileOverwrite(t *testing.T) {
 		test.Assert(err == nil, "Move file error:%v", err)
 		expectedAccessList.Paths[dirname1+filename1] = quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname2+filename2] = quantumfs.PathUpdated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -434,9 +400,7 @@ func TestAccessListRenameFileOverwrite(t *testing.T) {
 		test.AssertNoErr(os.Rename(path1, path2))
 		expectedAccessList.Paths[dirname+filename1] = quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname+filename2] = quantumfs.PathUpdated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -465,9 +429,7 @@ func TestAccessListMvChildDir(t *testing.T) {
 			quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname2+leaf2] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -491,9 +453,7 @@ func TestAccessListRenameDir(t *testing.T) {
 			quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname+leaf2] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -518,9 +478,7 @@ func TestAccessListHardLinkCreate(t *testing.T) {
 		err = syscall.Link(path1, path2)
 		test.Assert(err == nil, "Create hard link error:%v", err)
 		expectedAccessList.Paths[dirname+filename2] = quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -551,9 +509,7 @@ func TestAccessListHardLinkDelete(t *testing.T) {
 		test.AssertNoErr(os.Remove(path2))
 		expectedAccessList.Paths[dirname+filename1] = quantumfs.PathDeleted
 		expectedAccessList.Paths[dirname+filename2] = quantumfs.PathDeleted
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -582,9 +538,7 @@ func TestAccessListHardLinkCreateDelete(t *testing.T) {
 		expectedAccessList := quantumfs.NewPathAccessList()
 		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -612,9 +566,7 @@ func TestAccessListSymlink(t *testing.T) {
 		test.AssertNoErr(err)
 		expectedAccessList.Paths[dirname+filename2] = quantumfs.PathCreated |
 			quantumfs.PathRead
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -650,9 +602,7 @@ func TestAccessSpecialFiles(t *testing.T) {
 
 		expectedAccessList.Paths["/test4"] = quantumfs.PathCreated
 
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps are different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -675,9 +625,7 @@ func TestAccessListOverwriteRemovalFile(t *testing.T) {
 		// truncated.
 		expectedAccessList.Paths[filename] = quantumfs.PathUpdated
 		syscall.Close(fd)
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -695,9 +643,7 @@ func TestAccessListOverwriteRemovalDirectory(t *testing.T) {
 		test.AssertNoErr(os.Mkdir(path, 0777))
 		// Deleted and then created directories are counted as having been
 		// neither deleted nor created.
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -719,9 +665,7 @@ func TestAccessListOverwriteRemovalDirectoryWithRead(t *testing.T) {
 		// neither deleted nor created, however, if it had been read, the
 		// Read flag must persist.
 		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir | quantumfs.PathRead
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -746,9 +690,7 @@ func TestAccessListInsertInode(t *testing.T) {
 
 		expectedAccessList := quantumfs.NewPathAccessList()
 		expectedAccessList.Paths[filename] = quantumfs.PathCreated
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
 
@@ -762,15 +704,11 @@ func TestAccessListClear(t *testing.T) {
 		test.Assert(err == nil, "Create file error:%v", err)
 		expectedAccessList.Paths[filename] = quantumfs.PathCreated
 		syscall.Close(fd)
-		gotAccessList := test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error two maps different")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 
 		api := test.getApi()
 		test.AssertNoErr(api.ClearAccessed(test.RelPath(workspace)))
 		expectedAccessList = quantumfs.NewPathAccessList()
-		gotAccessList = test.getAccessList(workspace)
-		test.assertAccessList(expectedAccessList, gotAccessList,
-			"Error maps not clear")
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
