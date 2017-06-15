@@ -12,8 +12,6 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-const requestEndAfterNs = 3000000000
-
 type logTrack struct {
 	logs        qlog.LogStack
 	listElement *list.Element
@@ -45,15 +43,17 @@ func NewStatExtractorConfig(ext StatExtractor,
 	}
 }
 
-func AggregateLogs(filename string, db quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig) {
+func AggregateLogs(mode qlog.LogProcessMode, filename string,
+	db quantumfs.TimeSeriesDB, extractors []StatExtractorConfig) *Aggregator {
 
 	reader := qlog.NewReader(filename)
 	agg := NewAggregator(db, extractors)
 
-	reader.ProcessLogs(qlog.ReadThenTail, func(v qlog.LogOutput) {
+	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
 		agg.ProcessLog(v)
 	})
+
+	return agg
 }
 
 type Aggregator struct {
@@ -66,6 +66,7 @@ type Aggregator struct {
 	requestSequence list.List
 
 	statExtractors []StatExtractorConfig
+	RequestEndAfter time.Duration
 
 	queueMutex utils.DeferableMutex
 	queueLogs  []qlog.LogOutput
@@ -78,6 +79,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:             db_,
 		logsByRequest:  make(map[uint64]logTrack),
 		statExtractors: extractors,
+		RequestEndAfter: time.Second * 30,
 		queueLogs:      make([]qlog.LogOutput, 0),
 	}
 
@@ -125,7 +127,7 @@ func (agg *Aggregator) ProcessThread() {
 
 			request := requestElem.Value.(trackerKey)
 			if now.Sub(request.lastLogTime) > time.Duration(0+
-				requestEndAfterNs) {
+				agg.RequestEndAfter) {
 
 				agg.requestSequence.Remove(requestElem)
 				reqLogs := agg.logsByRequest[request.reqId]

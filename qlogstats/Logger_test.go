@@ -15,7 +15,9 @@ func runReader(qlogFile string,
 	extractors []StatExtractorConfig) *processlocal.Memdb {
 
 	db := processlocal.NewMemdb()
-	AggregateLogs(qlogFile, db, extractors)
+	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors)
+
+	agg.RequestEndAfter = time.Millisecond * 100
 
 	return db
 }
@@ -25,21 +27,58 @@ func TestMatches(t *testing.T) {
 		qlogHandle := test.Logger
 
 		// Artificially insert matching logs
-		qlogHandle.Log(qlog.LogTest, 12345, 2, qlog.FnEnterStr+"TestMatch")
-		qlogHandle.Log(qlog.LogTest, 12346, 3, qlog.FnExitStr+"TestMatch")
+		qlogHandle.Log_(time.Unix(0, 20000), qlog.LogTest, 12345, 2,
+			qlog.FnEnterStr+"TestMatch")
+		qlogHandle.Log_(time.Unix(0, 30000), qlog.LogTest, 12345, 3,
+			qlog.FnExitStr+"TestMatch")
+
+		// Add in some close, but not actually matching logs
+		qlogHandle.Log(qlog.LogTest, 12345, 2, qlog.FnEnterStr+"TestMatchZ")
+		qlogHandle.Log(qlog.LogTest, 12345, 3, qlog.FnExitStr+"TestMtch")
+		qlogHandle.Log(qlog.LogTest, 12345, 3, "TestMatch")
 
 		// Setup an extractor
 		extractors := make([]StatExtractorConfig, 0)
 		extractors = append(extractors, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(5*time.Second)))
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
+				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			(300*time.Millisecond)))
 
 		// Run the reader
 		memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
 
 		test.WaitFor("statistic to register", func () bool {
+			if len(memdb.Data) == 0 {
+				return false
+			}
 
+			if len(memdb.Data[0].Fields) == 0 {
+				return false
+			}
+
+			test.Assert(len(memdb.Data[0].Fields) == 2,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
+			// Check if we're too early
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "samples" && v.Data == 0 {
+					return false
+				}
+			}
+
+			// Data should be present now
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "average" {
+					test.Assert(v.Data == 10000,
+						"incorrect delta %d", v.Data)
+				} else if v.Name == "samples" {
+					test.Assert(v.Data == 1,
+						"incorrect samples %d", v.Data)
+				}
+			}
+
+			return true
 		})
 	})
 }

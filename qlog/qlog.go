@@ -297,6 +297,11 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
 	t := time.Now()
+	q.Log_(t, idx, reqId, level, format, args...)
+}
+
+func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
+	format string, args ...interface{}) {
 
 	// Put into the shared circular buffer, UnixNano will work until year 2262
 	unixNano := t.UnixNano()
