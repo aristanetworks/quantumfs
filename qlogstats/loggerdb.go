@@ -229,6 +229,7 @@ func (agg *Aggregator) processLog(v qlog.LogOutput) {
 }
 
 type byIncreasing []uint64
+
 func (a byIncreasing) Len() int           { return len(a) }
 func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
@@ -270,10 +271,10 @@ func (bs *basicStats) Percentiles() map[string]uint64 {
 
 	lastIdx := float32(len(points) - 1)
 
-	rtn["50pct"] = points[int(lastIdx * 0.50)]
-	rtn["90pct"] = points[int(lastIdx * 0.90)]
-	rtn["95pct"] = points[int(lastIdx * 0.95)]
-	rtn["99pct"] = points[int(lastIdx * 0.99)]
+	rtn["50pct"] = points[int(lastIdx*0.50)]
+	rtn["90pct"] = points[int(lastIdx*0.90)]
+	rtn["95pct"] = points[int(lastIdx*0.95)]
+	rtn["99pct"] = points[int(lastIdx*0.99)]
 
 	return rtn
 }
