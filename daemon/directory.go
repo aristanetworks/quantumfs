@@ -188,7 +188,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
 
 	// Ensure we're working with a shallow copy for objectTypeToFileType
-	entry = entry.ShallowCopy()
+	entry = entry.AsImmutableDirectoryRecord()
 
 	attr.Ino = uint64(inodeNum)
 
@@ -757,7 +757,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 
 	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
-		return record.ShallowCopy(), nil
+		return record.AsImmutableDirectoryRecord(), nil
 	}
 
 	return &quantumfs.DirectRecord{},
@@ -825,7 +825,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordCopy = record.ShallowCopy()
+			recordCopy = record.AsImmutableDirectoryRecord()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
@@ -882,7 +882,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 			// Use a shallow copy of record to ensure the right type for
 			// objectTypeToFileType
-			record = record.ShallowCopy()
+			record = record.AsImmutableDirectoryRecord()
 
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {

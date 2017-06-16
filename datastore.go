@@ -864,10 +864,9 @@ type DirectoryRecord interface {
 
 	EncodeExtendedKey() []byte
 
-	// returns a direct record copy, regardless of underlying class, causing
+	// Returns a direct record copy, regardless of underlying class, causing
 	// all future changes to the copy to be unreflected in the original.
-	// Mainly used for reads
-	ShallowCopy() DirectoryRecord
+	AsImmutableDirectoryRecord() DirectoryRecord
 
 	// returns a real copy, which can result in future changes changing the
 	// original depending on the underlying class.
@@ -999,7 +998,7 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
 }
 
-func (record *DirectRecord) ShallowCopy() DirectoryRecord {
+func (record *DirectRecord) AsImmutableDirectoryRecord() DirectoryRecord {
 	var newEntry ThinRecord
 	RecordCopy(record, &newEntry)
 	newEntry.Nlinks_ = record.Nlinks()
@@ -1469,7 +1468,7 @@ func (th *ThinRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(th.ID(), th.Type(), th.Size())
 }
 
-func (th *ThinRecord) ShallowCopy() DirectoryRecord {
+func (th *ThinRecord) AsImmutableDirectoryRecord() DirectoryRecord {
 	return th.Clone()
 }
 

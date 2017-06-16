@@ -174,7 +174,7 @@ func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
 		panic("getChildRecord on self file before unlinking")
 	}
 
-	return inode.unlinkRecord.ShallowCopy(), nil
+	return inode.unlinkRecord.AsImmutableDirectoryRecord(), nil
 }
 
 func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
