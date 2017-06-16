@@ -26,8 +26,7 @@ func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
 	cfg StatExtractorConfig, check func(*processlocal.Memdb)) {
 
 	// Setup an extractor
-	extractors := make([]StatExtractorConfig, 0)
-	extractors = append(extractors, cfg)
+	extractors := []StatExtractorConfig{cfg}
 
 	// Run the reader
 	memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
