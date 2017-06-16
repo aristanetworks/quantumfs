@@ -258,6 +258,7 @@ func (dir *Directory) handleChild_DOWN(c *ctx, remoteRecord *quantumfs.DirectRec
 		return
 	}
 	if !canReuseInode {
+		// We have to allocate a new inode for this record
 		inodeId := dir.children.loadChild(c, remoteRecord,
 			quantumfs.InodeIdInvalid)
 		status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
@@ -328,6 +329,8 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		utils.Assert(removedInodeId == nil, "inode deletion not expected")
 	}
 
+	// reload all children, whether instantiated or not,
+	// based on the new base layer id
 	dir.children.baseLayerIs(c, baseLayerId)
 	return uninstantiated, deletedInodeIds
 }
