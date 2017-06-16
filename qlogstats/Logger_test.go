@@ -89,3 +89,75 @@ func TestMatches(t *testing.T) {
 		})
 	})
 }
+
+func TestPercentiles(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		qlogHandle := test.Logger
+
+		// Artificially insert matching with sensible percentiles
+		base := int64(200000)
+		for i := int64(0); i <= 100; i++ {
+			qlogHandle.Log_(time.Unix(0, base), qlog.LogTest,
+				uint64(base), 2, qlog.FnEnterStr+"TestMatch")
+			qlogHandle.Log_(time.Unix(0, base+i), qlog.LogTest,
+				uint64(base), 2, qlog.FnExitStr+"TestMatch")
+			base += int64(i)
+		}
+
+		// Setup an extractor
+		extractors := make([]StatExtractorConfig, 0)
+		extractors = append(extractors, NewStatExtractorConfig(
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
+				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			(300*time.Millisecond)))
+
+		// Run the reader
+		memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
+
+		test.WaitFor("statistic to register", func() bool {
+			if len(memdb.Data) == 0 {
+				return false
+			}
+
+			if len(memdb.Data[0].Fields) == 0 {
+				return false
+			}
+
+			test.Assert(len(memdb.Data[0].Fields) == 6,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
+			// Check if we're too early
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "samples" && v.Data == 0 {
+					return false
+				}
+			}
+
+			// Data should be present now
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "average" {
+					test.Assert(v.Data == 50,
+						"incorrect delta %d", v.Data)
+				} else if v.Name == "samples" {
+					test.Assert(v.Data == 101,
+						"incorrect samples %d", v.Data)
+				} else if v.Name == "50pct" {
+					test.Assert(v.Data == 50,
+						"50th percentile is %d", v.Data)
+				} else if v.Name == "90pct" {
+					test.Assert(v.Data == 90,
+						"90th percentile is %d", v.Data)
+				} else if v.Name == "95pct" {
+					test.Assert(v.Data == 95,
+						"95th percentile is %d", v.Data)
+				} else if v.Name == "99pct" {
+					test.Assert(v.Data == 99,
+						"99th percentile is %d", v.Data)
+				}
+			}
+
+			return true
+		})
+	})
+}
