@@ -233,12 +233,12 @@ func NewApiWithPath(path string) (Api, error) {
 // accessed list. Similarly, accessing the attribute of a file does not mark the
 // containing directory as read. Opening a file or directory also does not mark it as
 // read.
-type PathAccessList struct {
+type PathsAccessed struct {
 	Paths map[string]PathFlags
 }
 
-func NewPathAccessList() PathAccessList {
-	return PathAccessList{
+func NewPathsAccessed() PathsAccessed {
+	return PathsAccessed{
 		Paths: map[string]PathFlags{},
 	}
 }
@@ -293,7 +293,7 @@ type Api interface {
 	Merge3Way(base string, remote string, local string) error
 
 	// Get the list of accessed file from workspaceroot
-	GetAccessed(wsr string) (*PathAccessList, error)
+	GetAccessed(wsr string) (*PathsAccessed, error)
 
 	// Clear the list of accessed files in workspaceroot
 	ClearAccessed(wsr string) error
@@ -412,7 +412,7 @@ type ErrorResponse struct {
 
 type AccessListResponse struct {
 	ErrorResponse
-	PathList PathAccessList
+	PathList PathsAccessed
 }
 
 type BranchRequest struct {
@@ -613,7 +613,7 @@ func (api *apiImpl) Refresh(workspace string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *apiImpl) GetAccessed(wsr string) (*PathAccessList, error) {
+func (api *apiImpl) GetAccessed(wsr string) (*PathsAccessed, error) {
 	if !isWorkspaceNameValid(wsr) {
 		return nil,
 			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)

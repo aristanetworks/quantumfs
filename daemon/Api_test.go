@@ -57,9 +57,9 @@ func TestWorkspaceBranching(t *testing.T) {
 }
 
 func generateFiles(test *testHelper, size int, workspace,
-	filename string) (quantumfs.PathAccessList, int) {
+	filename string) (quantumfs.PathsAccessed, int) {
 
-	accessList := quantumfs.NewPathAccessList()
+	accessList := quantumfs.NewPathsAccessed()
 	expectedSize := 0
 	for i := 0; i < size; i++ {
 		filename := fmt.Sprintf("/%s%d", filename, i)
@@ -81,7 +81,7 @@ func generateFiles(test *testHelper, size int, workspace,
 	return accessList, expectedSize
 }
 
-func mapKeySizeSum(paths *quantumfs.PathAccessList) int {
+func mapKeySizeSum(paths *quantumfs.PathsAccessed) int {
 	size := 0
 	for key, _ := range paths.Paths {
 		size += len(key)
@@ -105,7 +105,7 @@ func TestApiAccessListEmpty(t *testing.T) {
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
 
-		accessList := quantumfs.NewPathAccessList()
+		accessList := quantumfs.NewPathsAccessed()
 		test.assertAccessList(accessList, responselist,
 			"Error two maps different")
 	})
@@ -237,7 +237,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 
 func TestApiClearAccessList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		accessList := quantumfs.NewPathAccessList()
+		accessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -255,7 +255,7 @@ func TestApiClearAccessList(t *testing.T) {
 		err = api.ClearAccessed(relpath)
 		test.Assert(err == nil,
 			"Error clearing accessList with api")
-		accessList = quantumfs.NewPathAccessList()
+		accessList = quantumfs.NewPathsAccessed()
 		wsrlist = test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error maps not clear")

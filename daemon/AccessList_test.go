@@ -18,7 +18,7 @@ import (
 
 func TestAccessListFileCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -39,7 +39,7 @@ func TestAccessListFileDelete(t *testing.T) {
 		test.AssertNoErr(err)
 		syscall.Close(fd)
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		path = workspace + filename
 		test.AssertNoErr(os.Remove(path))
@@ -58,7 +58,7 @@ func TestAccessListFileCreateDelete(t *testing.T) {
 		syscall.Close(fd)
 
 		// Files which are created and then deleted are removed from the list
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 
 		path = workspace + filename
 		test.AssertNoErr(os.Remove(path))
@@ -75,7 +75,7 @@ func TestAccessListFileTruncate(t *testing.T) {
 		test.AssertNoErr(err)
 		syscall.Close(fd)
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		path = workspace + filename
 		test.AssertNoErr(os.Truncate(path, 0))
@@ -93,7 +93,7 @@ func TestAccessListFileFtruncate(t *testing.T) {
 		test.AssertNoErr(err)
 		syscall.Close(fd)
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		path = workspace + filename
 		fd, err = syscall.Open(path, syscall.O_RDWR, 0000)
@@ -116,7 +116,7 @@ func TestAccessListFileReadWrite(t *testing.T) {
 		_, err = ioutil.ReadFile(path)
 		test.AssertNoErr(err)
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		expectedAccessList.Paths[filename] = quantumfs.PathUpdated |
 			quantumfs.PathRead | quantumfs.PathCreated
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
@@ -125,7 +125,7 @@ func TestAccessListFileReadWrite(t *testing.T) {
 
 func TestAccessListDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 		dirname := "/test"
 		path := workspace + dirname
@@ -143,7 +143,7 @@ func TestAccessListDirectoryDelete(t *testing.T) {
 		path := workspace + dirname
 		test.AssertNoErr(syscall.Mkdir(path, 0666))
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		path = workspace + dirname
 		test.AssertNoErr(syscall.Rmdir(path))
@@ -162,7 +162,7 @@ func TestAccessListDirectoryCreateDelete(t *testing.T) {
 
 		// Directories which are created and then deleted are removed from
 		// the list.
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 
 		path = workspace + dirname
 		test.AssertNoErr(syscall.Rmdir(path))
@@ -177,7 +177,7 @@ func TestAccessListDirectoryRead(t *testing.T) {
 		path := workspace + dirname
 		test.AssertNoErr(syscall.Mkdir(path, 0666))
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		path = workspace + dirname
 		_, err := ioutil.ReadDir(path)
@@ -190,7 +190,7 @@ func TestAccessListDirectoryRead(t *testing.T) {
 
 func TestAccessListRecursiveDirectoryCreate(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 		dir1 := "/dir1"
 		dir2 := "/dir2"
@@ -212,7 +212,7 @@ func TestAccessListRecursiveDirectoryDelete(t *testing.T) {
 		path := workspace + dir1 + dir2
 		test.AssertNoErr(utils.MkdirAll(path, 0666))
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		path = workspace + dir1
 		test.AssertNoErr(os.Remove(workspace + dir1 + dir2))
@@ -235,7 +235,7 @@ func TestAccessListRecursiveDirectoryCreateDelete(t *testing.T) {
 
 		// Directories created and then deleted should be removed from the
 		// list.
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 
 		path = workspace + dir1
 		test.AssertNoErr(os.RemoveAll(path))
@@ -261,7 +261,7 @@ func TestAccessListMvChildFile(t *testing.T) {
 		test.AssertNoErr(syscall.Mkdir(path, 0666))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname1 + filename1
 		path2 := workspace + dirname2 + filename2
 		test.AssertNoErr(os.Rename(path1, path2))
@@ -285,7 +285,7 @@ func TestAccessListRenameFile(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname + filename1
 		path2 := workspace + dirname + filename2
 		test.AssertNoErr(os.Rename(path1, path2))
@@ -309,7 +309,7 @@ func TestAccessListRenameFileWithWrites(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname + filename1
 		path2 := workspace + dirname + filename2
 		test.AssertNoErr(testutils.OverWriteFile(path1, "data1"))
@@ -346,7 +346,7 @@ func TestAccessListMvChildFileOverwrite(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname1 + filename1
 		path2 := workspace + dirname2 + filename2
 		test.AssertNoErr(os.Rename(path1, path2))
@@ -374,7 +374,7 @@ func TestAccessListRenameFileOverwrite(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname + filename1
 		path2 := workspace + dirname + filename2
 		test.AssertNoErr(os.Rename(path1, path2))
@@ -400,7 +400,7 @@ func TestAccessListMvChildDir(t *testing.T) {
 		test.AssertNoErr(syscall.Mkdir(path, 0666))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname1 + leaf1
 		path2 := workspace + dirname2 + leaf2
 		test.AssertNoErr(os.Rename(path1, path2))
@@ -424,7 +424,7 @@ func TestAccessListRenameDir(t *testing.T) {
 		test.AssertNoErr(syscall.Mkdir(path, 0777))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname + leaf1
 		path2 := workspace + dirname + leaf2
 		test.AssertNoErr(os.Rename(path1, path2))
@@ -450,7 +450,7 @@ func TestAccessListHardLinkCreate(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname + filename1
 		path2 := workspace + dirname + filename2
 		test.AssertNoErr(syscall.Link(path1, path2))
@@ -476,7 +476,7 @@ func TestAccessListHardLinkDelete(t *testing.T) {
 		test.AssertNoErr(syscall.Link(path1, path2))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 
 		path1 = workspace + dirname + filename1
 		path2 = workspace + dirname + filename2
@@ -508,7 +508,7 @@ func TestAccessListHardLinkCreateDelete(t *testing.T) {
 		test.AssertNoErr(os.Remove(path2))
 
 		// Files created and then deleted should be removed from the list.
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		expectedAccessList.Paths[dirname] = quantumfs.PathIsDir |
 			quantumfs.PathCreated
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
@@ -529,7 +529,7 @@ func TestAccessListSymlink(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path1 := workspace + dirname + filename1
 		path2 := workspace + dirname + filename2
 		test.AssertNoErr(syscall.Symlink(path1, path2))
@@ -543,7 +543,7 @@ func TestAccessListSymlink(t *testing.T) {
 
 func TestAccessSpecialFiles(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 
 		path := workspace + "/test1"
@@ -583,7 +583,7 @@ func TestAccessListOverwriteRemovalFile(t *testing.T) {
 		syscall.Close(fd)
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path = workspace + filename
 		test.AssertNoErr(os.Remove(path))
 		fd, err = syscall.Creat(path, 0666)
@@ -604,7 +604,7 @@ func TestAccessListOverwriteRemovalDirectory(t *testing.T) {
 		test.AssertNoErr(os.Mkdir(path, 0777))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path = workspace + dirname
 		test.AssertNoErr(os.Remove(path))
 		test.AssertNoErr(os.Mkdir(path, 0777))
@@ -622,7 +622,7 @@ func TestAccessListOverwriteRemovalDirectoryWithRead(t *testing.T) {
 		test.AssertNoErr(os.Mkdir(path, 0777))
 
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		path = workspace + dirname
 		_, err := ioutil.ReadDir(path)
 		test.AssertNoErr(err)
@@ -656,7 +656,7 @@ func TestAccessListInsertInode(t *testing.T) {
 		err = api.InsertInode(test.RelPath(path), key, 0777, 0, 0)
 		test.AssertNoErr(err)
 
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		expectedAccessList.Paths[filename] = quantumfs.PathCreated
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
@@ -664,7 +664,7 @@ func TestAccessListInsertInode(t *testing.T) {
 
 func TestAccessListClear(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		expectedAccessList := quantumfs.NewPathAccessList()
+		expectedAccessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
@@ -676,7 +676,7 @@ func TestAccessListClear(t *testing.T) {
 
 		api := test.getApi()
 		test.AssertNoErr(api.ClearAccessed(test.RelPath(workspace)))
-		expectedAccessList = quantumfs.NewPathAccessList()
+		expectedAccessList = quantumfs.NewPathsAccessed()
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
