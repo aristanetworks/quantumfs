@@ -197,20 +197,20 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId) {
 	defer c.FuncIn("Directory::unlinkChild_DOWN", "%s", childname).Out()
 
-	localRecord := dir.children.recordByName(c, childname)
 	inode := c.qfs.inodeNoInstantiate(c, childId)
-	if inode != nil && localRecord.Type() == quantumfs.ObjectTypeDirectory {
-		subdir := inode.(*Directory)
-		subdir.children.foreachChild(c, func(childname string,
-			childId InodeId) {
-
-			subdir.unlinkChild_DOWN(c, childname, childId)
-		})
-	}
-	if child := c.qfs.inodeNoInstantiate(c, childId); child == nil {
+	if inode == nil {
 		dir.children.deleteChild(c, childname, false)
 	} else {
-		result := child.deleteSelf(c,
+		localRecord := dir.children.recordByName(c, childname)
+		if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+			subdir := inode.(*Directory)
+			subdir.children.foreachChild(c, func(childname string,
+				childId InodeId) {
+
+				subdir.unlinkChild_DOWN(c, childname, childId)
+			})
+		}
+		result := inode.deleteSelf(c,
 			func() (quantumfs.DirectoryRecord, fuse.Status) {
 				delRecord := dir.children.deleteChild(c, childname,
 					false)
