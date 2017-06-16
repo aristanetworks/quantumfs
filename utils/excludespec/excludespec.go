@@ -3,12 +3,29 @@
 
 /*
 Package excludespec provides APIs for loading a specification file that
-describes which files or directories are excluded and/or included. The spec
-file must follow rules outlined below:
+describes which files or directories are excluded and/or included.
+*/
+package excludespec
+
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+)
+
+const excludeTopDir = "/"
+
+const HelpText = `
+Exclude spec file should be formatted as follows
 
  - One path per line.
  - Comments and empty lines are allowed. A comment is any line that starts with "#".
- - Path must be under the base directory specified.
  - Absolute paths are not allowed.
  - Exclude path must not be "/" suffixed.
  - Path to be included is prefixed with "+".
@@ -48,23 +65,7 @@ directory "rootdir". In other words, the absolute path for dir1 is
  # include selective content dir2/subdir2/file2
  # inside excluded content (dir2/subdir2)
  +dir2/subdir2/file2
-
-*/
-package excludespec
-
-import (
-	"bufio"
-	"bytes"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
-)
-
-const excludeTopDir = "/"
+`
 
 var empty struct{}
 
@@ -130,6 +131,9 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 		// parsing (syntax checks). It retains special characters
 		// like "+". Hence its neither a path nor a line.
 		word, err = parseExcludeLine(base, line)
+		if err == errIgnorePath {
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
 				filename, lineno, err)
@@ -180,11 +184,6 @@ func parseExcludeLine(base string, line string) (string, error) {
 		// behavior of slash suffix to avoid confusion, slash suffixes
 		// for exclude directives are prohibited.
 		return "", fmt.Errorf("exclude path has / suffix")
-	}
-	// check to ensure the path entry in exclude file is valid
-	_, serr := os.Lstat(filepath.Join(base, strings.TrimPrefix(line, "+")))
-	if serr != nil {
-		return "", serr
 	}
 	return parts[0], nil
 }
