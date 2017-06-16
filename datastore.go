@@ -866,11 +866,39 @@ type DirectoryRecord interface {
 
 	// Returns a direct record copy, regardless of underlying class, causing
 	// all future changes to the copy to be unreflected in the original.
-	AsImmutableDirectoryRecord() DirectoryRecord
+	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
 
 	// returns a real copy, which can result in future changes changing the
 	// original depending on the underlying class.
 	Clone() DirectoryRecord
+}
+
+// Just like DirectoryRecord, but without any mutators
+type ImmutableDirectoryRecord interface {
+	Filename() string
+
+	ID() ObjectKey
+
+	Type() ObjectType
+
+	Permissions() uint32
+
+	Owner() UID
+
+	Group() GID
+
+	Size() uint64
+
+	ExtendedAttributes() ObjectKey
+
+	ContentTime() Time
+
+	ModificationTime() Time
+
+	Record() DirectRecord
+	Nlinks() uint32
+
+	EncodeExtendedKey() []byte
 }
 
 func NewDirectoryRecord() *DirectRecord {
@@ -998,7 +1026,7 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
 }
 
-func (record *DirectRecord) AsImmutableDirectoryRecord() DirectoryRecord {
+func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
 	var newEntry ThinRecord
 	RecordCopy(record, &newEntry)
 	newEntry.Nlinks_ = record.Nlinks()
@@ -1468,7 +1496,7 @@ func (th *ThinRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(th.ID(), th.Type(), th.Size())
 }
 
-func (th *ThinRecord) AsImmutableDirectoryRecord() DirectoryRecord {
+func (th *ThinRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
 	return th.Clone()
 }
 

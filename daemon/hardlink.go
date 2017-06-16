@@ -198,7 +198,7 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 		realRecord.Size())
 }
 
-func (link *Hardlink) AsImmutableDirectoryRecord() quantumfs.DirectoryRecord {
+func (link *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryRecord {
 	valid, realRecord := link.wsr.getHardlink(link.linkId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid

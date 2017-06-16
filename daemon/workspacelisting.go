@@ -363,7 +363,7 @@ func (tsl *TypespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on TypespaceList")
 	return &quantumfs.DirectRecord{},
@@ -669,7 +669,7 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on NamespaceList")
 	return &quantumfs.DirectRecord{},
@@ -992,7 +992,7 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on WorkspaceList")
 	return &quantumfs.DirectRecord{},
