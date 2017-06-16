@@ -11,16 +11,16 @@ import (
 )
 
 type extPointStats struct {
-	format  string
-	name      string
+	format string
+	name   string
 
 	stats basicStats
 }
 
 func NewExtPointStats(format_ string, nametag string) *extPointStats {
 	return &extPointStats{
-		format:    format_,
-		name:      nametag,
+		format: format_,
+		name:   nametag,
 	}
 }
 
