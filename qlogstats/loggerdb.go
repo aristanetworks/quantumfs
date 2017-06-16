@@ -71,7 +71,7 @@ type Aggregator struct {
 
 	statExtractors  []StatExtractorConfig
 	statTriggers    map[string][]extractorIdx
-	RequestEndAfter time.Duration
+	requestEndAfter time.Duration
 
 	queueMutex utils.DeferableMutex
 	queueLogs  []qlog.LogOutput
@@ -85,7 +85,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		logsByRequest:   make(map[uint64]logTrack),
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
-		RequestEndAfter: time.Second * 30,
+		requestEndAfter: time.Second * 30,
 		queueLogs:       make([]qlog.LogOutput, 0),
 	}
 
@@ -144,7 +144,7 @@ func (agg *Aggregator) ProcessThread() {
 
 			request := requestElem.Value.(trackerKey)
 			if now.Sub(request.lastLogTime) > time.Duration(0+
-				agg.RequestEndAfter) {
+				agg.requestEndAfter) {
 
 				agg.requestSequence.Remove(requestElem)
 				reqLogs := agg.logsByRequest[request.reqId]
