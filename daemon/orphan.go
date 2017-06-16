@@ -165,7 +165,7 @@ func (inode *InodeCommon) removeOrphanChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::getOrphanChildRecordCopy").Out()
 	defer inode.unlinkLock.Lock().Unlock()
@@ -263,7 +263,7 @@ func (inode *InodeCommon) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::getChildRecordCopy").Out()
 

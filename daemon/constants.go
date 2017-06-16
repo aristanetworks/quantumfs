@@ -31,7 +31,7 @@ func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 		return fuse.S_IFLNK
 
 	case quantumfs.ObjectTypeHardlink:
-		c.elog("Hardlink must be translated into the underlying type")
+		panic("Hardlink must be translated into the underlying type")
 		return 0
 
 	case quantumfs.ObjectTypeSpecial:
