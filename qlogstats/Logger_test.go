@@ -63,7 +63,7 @@ func TestMatches(t *testing.T) {
 				return false
 			}
 
-			test.Assert(len(memdb.Data[0].Fields) == 2,
+			test.Assert(len(memdb.Data[0].Fields) == 6,
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
