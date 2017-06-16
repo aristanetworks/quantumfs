@@ -47,11 +47,13 @@ func TestMatches(t *testing.T) {
 		qlogHandle.Log(qlog.LogTest, 12347, 3, qlog.FnExitStr+"TestMatch")
 
 		// Setup an extractor
-		extractors := make([]StatExtractorConfig, 0)
-		extractors = append(extractors, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
-			(300*time.Millisecond)))
+		extractors := []StatExtractorConfig{
+			NewStatExtractorConfig(
+				NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
+					qlog.FnExitStr+"TestMatch\n", true,
+					"TestMatch"),
+				300*time.Millisecond),
+		}
 
 		// Run the reader
 		memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
@@ -108,11 +110,13 @@ func TestPercentiles(t *testing.T) {
 		}
 
 		// Setup an extractor
-		extractors := make([]StatExtractorConfig, 0)
-		extractors = append(extractors, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
-			(300*time.Millisecond)))
+		extractors := []StatExtractorConfig{
+			NewStatExtractorConfig(
+				NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
+					qlog.FnExitStr+"TestMatch\n", true,
+					"TestMatch"),
+				300*time.Millisecond),
+		}
 
 		// Run the reader
 		memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
