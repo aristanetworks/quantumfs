@@ -82,10 +82,20 @@ func TestSyntax_MultipleWordsInOneLine(t *testing.T) {
 	})
 }
 
-func TestSyntax_FileNotExist(t *testing.T) {
+func TestSyntax_ExcludePathNotExist(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		excludeFileContent := "fileNotExist"
-		testSyntaxErr(test, excludeFileContent)
+		testSyntaxNoErr(test, excludeFileContent)
+	})
+}
+
+func TestSyntax_IncludePathNotExist(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		excludeFileContent := `
+dir1
++dir99
+`
+		testSyntaxNoErr(test, excludeFileContent)
 	})
 }
 
@@ -309,6 +319,38 @@ file1
 file2
 dir1/subdir11a
 +dir1/subdir11a
++dir1/subdir11a/content111b
++file1
+`
+		expected := pathInfo{
+			"/":                          2,
+			"file1":                      0,
+			"dir1":                       1,
+			"dir1/subdir11a":             1,
+			"dir1/subdir11a/content111b": 0,
+		}
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
+
+// any missing paths should be ignored and not cause any bad sideeffects
+func TestExcludeSomeIncludeSomeMissingPaths(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir1/subdir11a/content111a",
+			"dir1/subdir11a/content111b",
+			"file1",
+			"file2",
+		}
+		content := `
+file1
+file2
+file3
+dir1/subdir11a
++dir1/subdir11a
++dir99
 +dir1/subdir11a/content111b
 +file1
 `
@@ -635,6 +677,9 @@ func TestScenario1Spec(t *testing.T) {
 		}
 
 		content := `
+# missing exclude path
+dir98
+
 # exclude everything under dir1/subdir11a
 # except dir1/subdir11a/.file1 and dir1/subdir11a/.file2
 dir1/subdir11a
@@ -649,6 +694,9 @@ dir2
 
 # exclude file1
 file1
+
+#missing include path
++dir99
 `
 		expected := pathInfo{
 			"/": 4,
