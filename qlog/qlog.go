@@ -300,6 +300,7 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	q.Log_(t, idx, reqId, level, format, args...)
 }
 
+// Should only be used by tests
 func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	format string, args ...interface{}) {
 
