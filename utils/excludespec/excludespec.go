@@ -26,6 +26,7 @@ Exclude spec file should be formatted as follows
 
  - One path per line.
  - Comments and empty lines are allowed. A comment is any line that starts with "#".
+ - Path may or may not exist. Path must be relative to the base directory.
  - Absolute paths are not allowed.
  - Exclude path must not be "/" suffixed.
  - Path to be included is prefixed with "+".
@@ -165,6 +166,8 @@ func isIncludePath(word string) bool {
 	return strings.HasPrefix(word, "+")
 }
 
+var errIgnorePath = fmt.Errorf("ignore this path")
+
 func parseExcludeLine(base string, line string) (string, error) {
 	parts := strings.Split(line, " ")
 	// rules
@@ -184,6 +187,15 @@ func parseExcludeLine(base string, line string) (string, error) {
 		// behavior of slash suffix to avoid confusion, slash suffixes
 		// for exclude directives are prohibited.
 		return "", fmt.Errorf("exclude path has / suffix")
+	}
+
+	// ignore the path on any stat error
+	// if path is not ignored then computation of recordcount
+	// gets impacted. In other words, only valid paths are setup
+	// in the regexp checker
+	_, serr := os.Lstat(filepath.Join(base, strings.TrimPrefix(line, "+")))
+	if serr != nil {
+		return "", errIgnorePath
 	}
 	return parts[0], nil
 }
