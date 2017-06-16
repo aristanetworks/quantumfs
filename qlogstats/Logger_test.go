@@ -96,7 +96,8 @@ func TestPercentiles(t *testing.T) {
 
 		// Artificially insert matching with sensible percentiles
 		base := int64(200000)
-		for i := int64(0); i <= 100; i++ {
+		// Reverse the order to ensure we test that sorting is working
+		for i := int64(100); i >= 0; i-- {
 			qlogHandle.Log_(time.Unix(0, base), qlog.LogTest,
 				uint64(base), 2, qlog.FnEnterStr+"TestMatch")
 			qlogHandle.Log_(time.Unix(0, base+i), qlog.LogTest,
