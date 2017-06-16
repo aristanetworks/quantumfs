@@ -41,10 +41,6 @@ func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
 			return false
 		}
 
-		test.Assert(len(memdb.Data[0].Fields) == 6,
-			"%d fields produced from one matching log",
-			len(memdb.Data[0].Fields))
-
 		// Check if we're too early
 		for _, v := range memdb.Data[0].Fields {
 			if v.Name == "samples" && v.Data == 0 {
@@ -84,6 +80,10 @@ func TestMatches(t *testing.T) {
 		qlogHandle.Log(qlog.LogTest, 12347, 3, qlog.FnExitStr+"TestMatch")
 
 		checker := func(memdb *processlocal.Memdb) {
+			test.Assert(len(memdb.Data[0].Fields) == 6,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average" {
 					test.Assert(v.Data == 20000,
@@ -118,6 +118,10 @@ func TestPercentiles(t *testing.T) {
 		}
 
 		checker := func(memdb *processlocal.Memdb) {
+			test.Assert(len(memdb.Data[0].Fields) == 6,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average" {
 					test.Assert(v.Data == 50,
@@ -144,6 +148,35 @@ func TestPercentiles(t *testing.T) {
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
 			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
 				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			(300*time.Millisecond)), checker)
+	})
+}
+
+func TestPointCount(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		qlogHandle := test.Logger
+
+		// Reverse the order to ensure we test that sorting is working
+		for i := int64(0); i < 123; i++ {
+			qlogHandle.Log_(time.Unix(0, i), qlog.LogTest,
+				uint64(i), 2, "TestLog")
+		}
+
+		checker := func(memdb *processlocal.Memdb) {
+			test.Assert(len(memdb.Data[0].Fields) == 1,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "samples" {
+					test.Assert(v.Data == 123,
+						"incorrect samples %d", v.Data)
+				}
+			}
+		}
+
+		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+			NewExtPointStats("TestLog\n", "TestLog Name Tag"),
 			(300*time.Millisecond)), checker)
 	})
 }
