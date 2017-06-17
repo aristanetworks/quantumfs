@@ -347,9 +347,11 @@ func TestExcludeSomeIncludeSomeMissingPaths(t *testing.T) {
 		content := `
 file1
 file2
+# missing exclude path
 file3
 dir1/subdir11a
 +dir1/subdir11a
+# missing include path
 +dir99
 +dir1/subdir11a/content111b
 +file1
