@@ -577,6 +577,31 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	return err
 }
 
+func reload(c *ctx, inode Inode, remoteRecord quantumfs.DirectRecord) {
+	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
+		remoteRecord.Type()).Out()
+
+	switch remoteRecord.Type() {
+	default:
+		panic("not implemented yet")
+	case quantumfs.ObjectTypeDirectory:
+		subdir := inode.(*Directory)
+		uninstantiated, removedUninstantiated :=
+			subdir.refresh_DOWN(c, remoteRecord.ID())
+		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
+		c.qfs.removeUninstantiated(c, removedUninstantiated)
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeMediumFile:
+		fallthrough
+	case quantumfs.ObjectTypeLargeFile:
+		fallthrough
+	case quantumfs.ObjectTypeVeryLargeFile:
+		regFile := inode.(*File)
+		regFile.handleAccessorTypeChange(c, remoteRecord)
+	}
+}
+
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {
 	// Always lock the higher number inode first
 	if a.inodeNum() > b.inodeNum() {
