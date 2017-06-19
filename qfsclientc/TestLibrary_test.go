@@ -45,6 +45,7 @@ func runTestCommon(t *testing.T, test qfsclientTest) {
 	defer th.EndTest()
 
 	th.StartDefaultQuantumFs()
+	th.waitForApi()
 
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
@@ -62,4 +63,17 @@ func (th *testHelper) testHelperUpcast(
 	return func(test testutils.TestArg) {
 		testFn(th)
 	}
+}
+
+func (th *testHelper) waitForApi() {
+	th.WaitFor("Api inode to be seen by kernel", func() bool {
+		_, err := os.Stat(th.TempDir + "/mnt/api")
+		return (err == nil)
+	})
+}
+
+func (th *testHelper) getApi() QfsClientApi {
+	api, err := GetApiPath(th.TempDir + "/mnt/api")
+	th.AssertNoErr(err)
+	return api
 }
