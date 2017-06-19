@@ -213,7 +213,7 @@ func NewApiWithPath(path string) (Api, error) {
 // - rmdir() marks a directory as deleted
 // - creat() or mknod() marks a file as created
 // - unlink() marks a file as unlinked
-// - No operations mark a directory as updated
+// - There are no operations that can mark a directory as updated
 //
 // Creation and deletion have additional special semantics in that they
 // are collapsible. Specifically:
@@ -233,13 +233,13 @@ func NewApiWithPath(path string) (Api, error) {
 // accessed list. Similarly, accessing the attribute of a file does not mark the
 // containing directory as read. Opening a file or directory also does not mark it as
 // read.
-type PathAccessList struct {
+type PathsAccessed struct {
 	Paths map[string]PathFlags
 }
 
-func NewPathAccessList() PathAccessList {
-	return PathAccessList{
-		Paths: make(map[string]PathFlags),
+func NewPathsAccessed() PathsAccessed {
+	return PathsAccessed{
+		Paths: map[string]PathFlags{},
 	}
 }
 
@@ -293,7 +293,7 @@ type Api interface {
 	Merge3Way(base string, remote string, local string) error
 
 	// Get the list of accessed file from workspaceroot
-	GetAccessed(wsr string) (PathAccessList, error)
+	GetAccessed(wsr string) (*PathsAccessed, error)
 
 	// Clear the list of accessed files in workspaceroot
 	ClearAccessed(wsr string) error
@@ -412,7 +412,7 @@ type ErrorResponse struct {
 
 type AccessListResponse struct {
 	ErrorResponse
-	PathList PathAccessList
+	PathList PathsAccessed
 }
 
 type BranchRequest struct {
@@ -613,9 +613,9 @@ func (api *apiImpl) Refresh(workspace string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *apiImpl) GetAccessed(wsr string) (PathAccessList, error) {
+func (api *apiImpl) GetAccessed(wsr string) (*PathsAccessed, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return PathAccessList{},
+		return nil,
 			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
@@ -627,15 +627,15 @@ func (api *apiImpl) GetAccessed(wsr string) (PathAccessList, error) {
 	var accesslistResponse AccessListResponse
 	err := api.processCmd(cmd, &accesslistResponse)
 	if err != nil {
-		return PathAccessList{}, err
+		return nil, err
 	}
 	errorResponse := accesslistResponse.ErrorResponse
 	if errorResponse.ErrorCode != ErrorOK {
-		return PathAccessList{},
+		return nil,
 			fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
-	return accesslistResponse.PathList, nil
+	return &accesslistResponse.PathList, nil
 }
 
 func (api *apiImpl) ClearAccessed(wsr string) error {
