@@ -374,3 +374,23 @@ func kernelCacheNegativeEntry(c *ctx, out *fuse.EntryOut) fuse.Status {
 	out.NodeId = 0
 	return fuse.OK
 }
+
+func underlyingTypeOf(wsr *WorkspaceRoot,
+	record quantumfs.DirectoryRecord) quantumfs.ObjectType {
+
+	if record.Type() != quantumfs.ObjectTypeHardlink {
+		return record.Type()
+	}
+	linkId := decodeHardlinkKey(record.ID())
+	valid, hardlinkRecord := wsr.getHardlink(linkId)
+	utils.Assert(valid, "hardlink %d not found", linkId)
+	utils.Assert(hardlinkRecord.Type() != quantumfs.ObjectTypeHardlink,
+		"The underlying type cannot be hardlink")
+	return hardlinkRecord.Type()
+}
+
+func underlyingTypesMatch(wsr *WorkspaceRoot, r1 quantumfs.DirectoryRecord,
+	r2 quantumfs.DirectoryRecord) bool {
+
+	return underlyingTypeOf(wsr, r1).Matches(underlyingTypeOf(wsr, r2))
+}
