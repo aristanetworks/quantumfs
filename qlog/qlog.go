@@ -69,6 +69,8 @@ const (
 	LogWorkspaceDb
 	LogTest
 	LogQlog
+	LogQuark
+	LogSpin
 	LogTool
 	logSubsystemMax = LogTool
 )
@@ -110,6 +112,10 @@ func (enum LogSubsystem) String() string {
 		return "Test"
 	case LogQlog:
 		return "Qlog"
+	case LogQuark:
+		return "Quark"
+	case LogSpin:
+		return "Spin"
 	case LogTool:
 		return "Tool"
 	}
@@ -128,6 +134,10 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 		return LogTest, nil
 	case "qlog":
 		return LogQlog, nil
+	case "quark":
+		return LogQuark, nil
+	case "spin":
+		return LogSpin, nil
 	case "tool":
 		return LogTool, nil
 	}
@@ -287,6 +297,12 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
 	t := time.Now()
+	q.Log_(t, idx, reqId, level, format, args...)
+}
+
+// Should only be used by tests
+func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
+	format string, args ...interface{}) {
 
 	// Put into the shared circular buffer, UnixNano will work until year 2262
 	unixNano := t.UnixNano()

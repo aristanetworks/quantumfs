@@ -355,19 +355,27 @@ func (th *testHelper) getWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
 	return wsr, cleanup
 }
 
-func (th *testHelper) getAccessList(workspace string) quantumfs.PathAccessList {
+func (th *testHelper) getAccessList(workspace string) *quantumfs.PathsAccessed {
 	wsr, cleanup := th.getWorkspaceRoot(workspace)
 	defer cleanup()
-	return wsr.getList()
+	accessed := wsr.getList()
+	return &accessed
 }
 
-func (th *testHelper) assertAccessList(testlist quantumfs.PathAccessList,
-	wsrlist quantumfs.PathAccessList, message string) {
+func (th *testHelper) assertAccessList(testlist quantumfs.PathsAccessed,
+	wsrlist *quantumfs.PathsAccessed, message string) {
 
-	eq := reflect.DeepEqual(testlist, wsrlist)
+	eq := reflect.DeepEqual(&testlist, wsrlist)
 	msg := fmt.Sprintf("\ntestlist:%v\n, wsrlist:%v\n", testlist, wsrlist)
 	message = message + msg
 	th.Assert(eq, message)
+}
+
+func (th *testHelper) assertWorkspaceAccessList(testlist quantumfs.PathsAccessed,
+	workspaceName string) {
+
+	gotAccessList := th.getAccessList(workspaceName)
+	th.assertAccessList(testlist, gotAccessList, "Error two maps differ")
 }
 
 func (th *testHelper) checkSparse(fileA string, fileB string, offset int,

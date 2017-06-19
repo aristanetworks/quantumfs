@@ -135,7 +135,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			if err == SkipDir {
 				return nil
 			}
-			return
+			return err
 		}
 		return
 	})
@@ -289,11 +289,11 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 
 	fpath := filepath.Join(path, dr.Filename())
 
+	if err := handleExtendedAttributes(c, fpath, ds, dr, keyChan); err != nil {
+		return err
+	}
+
 	switch dr.Type() {
-	case quantumfs.ObjectTypeSmallFile:
-		fallthrough
-	case quantumfs.ObjectTypeSymlink:
-		return writeToChan(c, keyChan, fpath, dr.ID(), dr.Size())
 	case quantumfs.ObjectTypeMediumFile:
 		fallthrough
 	case quantumfs.ObjectTypeLargeFile:
@@ -305,9 +305,65 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	case quantumfs.ObjectTypeDirectory:
 		return handleDirectoryEntry(c, fpath,
 			ds, dr.ID(), wf, keyChan)
+		// The default case handles the following as well:
+		// quantumfs.ObjectTypeSpecial:
+		// quantumfs.ObjectTypeSmallFile:
+		// quantumfs.ObjectTypeSymlink:
 	default:
+		return writeToChan(c, keyChan, fpath, dr.ID(), dr.Size())
+	}
+}
+
+// DirectoryRecord.ExtendedAttributes() does not return EmptyBlockKey
+// when there are no EAs. Sometimes it returns fakeZeroKey and
+// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
+var fakeZeroKey = quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
+	[quantumfs.ObjectKeyLength - 1]byte{})
+
+func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
+	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
+
+	extKey := dr.ExtendedAttributes()
+	if extKey.IsEqualTo(fakeZeroKey) ||
+		extKey.IsEqualTo(quantumfs.EmptyBlockKey) {
+		return nil
 	}
 
+	buf := simplebuffer.New(nil, extKey)
+	if err := ds.Get(c.Qctx, extKey, buf); err != nil {
+		// TODO(sid): change back to return err
+		fmt.Printf("attrlist block missing %s:%s\n", extKey, fpath)
+		return nil
+	}
+	simplebuffer.AssertNonZeroBuf(buf,
+		"Attributes List buffer %s", extKey.Text())
+
+	err := writeToChan(c, keyChan, fpath, extKey, uint64(buf.Size()))
+	if err != nil {
+		return err
+	}
+
+	attributeList := buf.AsExtendedAttributes()
+
+	for i := 0; i < attributeList.NumAttributes(); i++ {
+		_, key := attributeList.Attribute(i)
+
+		buf := simplebuffer.New(nil, key)
+		if err := ds.Get(c.Qctx, key, buf); err != nil {
+			// TODO(sid): change back to return err
+			fmt.Printf("xattrdata[%d] block missing %s:%s\n",
+				i, extKey, fpath)
+			return nil
+		}
+		simplebuffer.AssertNonZeroBuf(buf,
+			"Attributes List buffer %s", key.Text())
+
+		err := writeToChan(c, keyChan, fpath, key,
+			uint64(buf.Size()))
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
