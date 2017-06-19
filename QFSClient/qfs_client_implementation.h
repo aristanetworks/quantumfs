@@ -68,7 +68,7 @@ class ApiImpl: public Api {
 	void Close();
 
 	// implemented API functions
-	virtual Error GetAccessed(const char *workspace_root, PathAccessList *paths);
+	virtual Error GetAccessed(const char *workspace_root, PathsAccessed *paths);
 
 	virtual Error InsertInode(const char *destination,
 				  const char *key,
@@ -153,7 +153,7 @@ class ApiImpl: public Api {
 	// an Error struct to indicate success or otherwise
 	Error PrepareAccessedListResponse(
 		const ApiContext *context,
-		PathAccessList *accessed_list);
+		PathsAccessed *accessed_list);
 
 	friend class QfsClientTest;
 	FRIEND_TEST(QfsClientTest, SendCommandTest);

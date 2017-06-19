@@ -106,7 +106,7 @@ extern "C" {
 			return "Api doesn't exist.";
 		}
 
-		qfsclient::PathAccessList accessed_list;
+		qfsclient::PathsAccessed accessed_list;
 
 		qfsclient::Error err = api->GetAccessed(workspaceRoot, &accessed_list);
 		if (err.code != 0) {

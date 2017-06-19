@@ -456,7 +456,7 @@ Error ApiImpl::SendJson(ApiContext *context) {
 	return util::getError(kSuccess);
 }
 
-Error ApiImpl::GetAccessed(const char *workspace_root, PathAccessList *paths) {
+Error ApiImpl::GetAccessed(const char *workspace_root, PathsAccessed *paths) {
 	Error err = this->CheckWorkspaceNameValid(workspace_root);
 	if (err.code != kSuccess) {
 		return err;
@@ -645,7 +645,7 @@ Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
 
 Error ApiImpl::PrepareAccessedListResponse(
 	const ApiContext *context,
-	PathAccessList *accessed_list) {
+	PathsAccessed *accessed_list) {
 
 	json_error_t json_error;
 	json_t *response_json = context->GetResponseJsonObject();

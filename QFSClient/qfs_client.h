@@ -93,7 +93,7 @@ const PathFlags kPathIsDir   = (1 << 4);
 /// PathAccessList contains the list of files and directories accessed in the given
 /// workspace on the given instance. See the documentation for
 /// quantumfs.PathAccessList for detailed documentation of this type.
-struct PathAccessList {
+struct PathsAccessed {
 	std::unordered_map<std::string, PathFlags> paths;
 };
 
@@ -108,7 +108,7 @@ class Api {
 	///
 	/// @return An `Error` object that indicates success or failure.
 	virtual Error GetAccessed(const char *workspace_root,
-				PathAccessList *paths) = 0;
+				PathsAccessed *paths) = 0;
 
 	/// Takes an extended key along with other file metadata (permissions,
 	/// UID and GID) and inserts it into the given destination directory.
