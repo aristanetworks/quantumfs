@@ -138,9 +138,31 @@ func getAccessed() {
 		os.Exit(exitApiNotFound)
 	}
 
-	if _, err := api.GetAccessed(workspaceName); err != nil {
+	pathList, err := api.GetAccessed(workspaceName)
+	if err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
+	}
+
+	for path, flags := range pathList.Paths {
+		created := "-"
+		if flags.Created() {
+			created = "C"
+		}
+		read := "-"
+		if flags.Read() {
+			read = "R"
+		}
+		updated := "-"
+		if flags.Updated() {
+			updated = "U"
+		}
+		deleted := "-"
+		if flags.Deleted() {
+			deleted = "D"
+		}
+		fmt.Printf("%s: directory-%t %s%s%s%s\n", path, flags.IsDir(),
+			created, read, updated, deleted)
 	}
 }
 
