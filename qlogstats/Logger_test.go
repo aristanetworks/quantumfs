@@ -155,7 +155,6 @@ func TestPointCount(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		qlogHandle := test.Logger
 
-		// Reverse the order to ensure we test that sorting is working
 		for i := int64(0); i < 123; i++ {
 			qlogHandle.Log_(time.Unix(0, i), qlog.LogTest,
 				uint64(i), 2, "TestLog")
