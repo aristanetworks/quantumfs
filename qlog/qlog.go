@@ -297,6 +297,12 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
 	t := time.Now()
+	q.Log_(t, idx, reqId, level, format, args...)
+}
+
+// Should only be used by tests
+func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
+	format string, args ...interface{}) {
 
 	// Put into the shared circular buffer, UnixNano will work until year 2262
 	unixNano := t.UnixNano()
@@ -307,4 +313,46 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	if q.getLogLevel(idx, level) {
 		q.Write(formatString(idx, reqId, t, format), args...)
 	}
+}
+
+type Qlogger struct {
+	RequestId uint64
+	qlog      *Qlog
+	subsystem LogSubsystem
+}
+
+func newQlogger(subsystem string) *Qlogger {
+	sub, err := getSubsystem(subsystem) // TODO: register this instead
+	if err != nil {
+		panic(fmt.Sprintf("invalid subsystem %s", subsystem))
+	}
+	return &Qlogger{
+		RequestId: 0,
+		qlog:      NewQlogTiny(), // TODO: parameterize
+		subsystem: sub,
+	}
+}
+
+func (q *Qlogger) wrapQlog(level uint8, format string, args ...interface{}) {
+	q.qlog.Log(q.subsystem, q.RequestId, level, format, args...)
+}
+
+// Log an Error message
+func (q *Qlogger) Elog(format string, args ...interface{}) {
+	q.wrapQlog(0, format, args...)
+}
+
+// Log a Warning message
+func (q *Qlogger) Wlog(format string, args ...interface{}) {
+	q.wrapQlog(1, format, args...)
+}
+
+// Log a Debug message
+func (q *Qlogger) Dlog(format string, args ...interface{}) {
+	q.wrapQlog(2, format, args...)
+}
+
+// Log a Verbose tracing message
+func (q *Qlogger) Vlog(format string, args ...interface{}) {
+	q.wrapQlog(3, format, args...)
 }
