@@ -622,6 +622,35 @@ func TestRefreshUninstantiated(t *testing.T) {
 	})
 }
 
+func TestRefreshUninstantiatedInodeId(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		subdir := "subdir"
+		filename := "testfile"
+		fulldirame := workspace + "/" + subdir
+		fullfilename := fulldirame + "/" + filename
+
+		utils.MkdirAll(fulldirame, 0777)
+		newRootId1 := createTestFile(test, workspace, subdir+"/"+filename, 0)
+		// remount to make sure the corresponding inode is uninstantiated
+		test.remountFilesystem()
+		newRootId2 := createTestFile(test, workspace, subdir+"/otherfile", 0)
+
+		var stat syscall.Stat_t
+		err := syscall.Stat(fullfilename, &stat)
+		test.AssertNoErr(err)
+		inodeId := stat.Ino
+
+		ctx := test.TestCtx()
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		err = syscall.Stat(fullfilename, &stat)
+		test.AssertNoErr(err)
+		test.Assert(inodeId == stat.Ino, "inode mismatch %d vs %d",
+			inodeId, stat.Ino)
+	})
+}
+
 func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
