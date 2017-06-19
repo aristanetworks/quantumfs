@@ -89,16 +89,16 @@ func setPath(pathId uint64, path *C.char, value uint32) {
 }
 
 var tmpListLock utils.DeferableMutex
-var tmpListMap map[uint64]*quantumfs.PathAccessList
+var tmpListMap map[uint64]*quantumfs.PathsAccessed
 
 func init() {
-	tmpListMap = map[uint64]*quantumfs.PathAccessList{}
+	tmpListMap = map[uint64]*quantumfs.PathsAccessed{}
 }
 
 func (api *QfsClientApi) GetAccessed(
-	workspace string) (quantumfs.PathAccessList, error) {
+	workspace string) (quantumfs.PathsAccessed, error) {
 
-	paths := quantumfs.NewPathAccessList()
+	paths := quantumfs.NewPathsAccessed()
 	pathId := uint64(uintptr(unsafe.Pointer(&paths)))
 
 	func() {
@@ -114,7 +114,7 @@ func (api *QfsClientApi) GetAccessed(
 		delete(tmpListMap, pathId)
 	}()
 	if err != "" {
-		return quantumfs.NewPathAccessList(), errors.New(err)
+		return quantumfs.NewPathsAccessed(), errors.New(err)
 	}
 
 	return paths, nil

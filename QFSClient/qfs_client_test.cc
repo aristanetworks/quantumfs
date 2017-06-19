@@ -312,7 +312,7 @@ TEST_F(QfsClientApiTest, GetAccessedTest) {
 	// 2. ReadResponse() returns appropriate JSON when called by GetAccessed()
 	// 3. GetAccessed() does what it's supposed to do in response to the JSON
 	//    it thinks it's read from the API file
-	PathAccessList paths;
+	PathsAccessed paths;
 	err = this->api->GetAccessed("test/workspace/root", &paths);
 	ASSERT_EQ(err.code, kSuccess);
 
@@ -586,7 +586,7 @@ TEST_F(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest) {
 TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	PathAccessList accessed_list;
+	PathsAccessed accessed_list;
 
 	ApiContext context;
 	Error err = this->api->CheckCommonApiResponse(this->read_command, &context);
@@ -608,7 +608,7 @@ TEST_F(QfsClientApiTest, PrepareAccessedListResponseTest) {
 TEST_F(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	PathAccessList accessed_list;
+	PathsAccessed accessed_list;
 
 	// corrupt AccessList in the JSON that CheckCommonApiResponse will try
 	// to parse
