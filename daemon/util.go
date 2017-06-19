@@ -375,6 +375,18 @@ func kernelCacheNegativeEntry(c *ctx, out *fuse.EntryOut) fuse.Status {
 	return fuse.OK
 }
 
+// Amend the pathFlags with quantumfs.PathIsDir if the type is
+// quantumfs.ObjectTypeDirectory, otherwise pass pathFlags through untouched.
+func markType(type_ quantumfs.ObjectType,
+	pathFlags quantumfs.PathFlags) quantumfs.PathFlags {
+
+	if type_ == quantumfs.ObjectTypeDirectory {
+		pathFlags |= quantumfs.PathIsDir
+	}
+
+	return pathFlags
+}
+
 func underlyingTypeOf(wsr *WorkspaceRoot,
 	record quantumfs.DirectoryRecord) quantumfs.ObjectType {
 
