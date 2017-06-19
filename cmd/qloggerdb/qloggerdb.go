@@ -37,5 +37,5 @@ func main() {
 			qlog.FnExitStr+"Mux::GetAttr", true, "Mux::GetAttr"),
 		(5*time.Second)))
 
-	qlogstats.AggregateLogs(os.Args[1], db, extractors)
+	qlogstats.AggregateLogs(qlog.ReadThenTail, os.Args[1], db, extractors)
 }
