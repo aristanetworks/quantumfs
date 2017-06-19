@@ -83,6 +83,8 @@ type Inode interface {
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
+	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
+
 	getChildXAttrSize(c *ctx, inodeNum InodeId,
 		attr string) (size int, result fuse.Status)
 
@@ -127,7 +129,9 @@ type Inode interface {
 	// the inodeNum or by an already open file handle.
 	isOrphaned() bool
 	isOrphaned_() bool
-	deleteSelf(c *ctx, toDelete Inode,
+	orphan(c *ctx, record quantumfs.DirectoryRecord)
+	orphan_(c *ctx, record quantumfs.DirectoryRecord)
+	deleteSelf(c *ctx,
 		deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 			err fuse.Status)) fuse.Status
 
@@ -210,6 +214,10 @@ type InodeCommon struct {
 
 	// This element is protected by the DirtyQueueLock
 	dirtyElement__ *list.Element
+
+	unlinkRecord quantumfs.DirectoryRecord
+	unlinkXAttr  map[string][]byte
+	unlinkLock   utils.DeferableRwMutex
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -419,6 +427,19 @@ func (inode *InodeCommon) isOrphaned() bool {
 	return inode.isOrphaned_()
 }
 
+func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
+	defer inode.parentLock.Lock().Unlock()
+	inode.orphan_(c, record)
+}
+
+// parentLock must be Locked
+func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
+	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
+
+	inode.parentId = inode.id
+	inode.setChildRecord(c, record)
+}
+
 // parentLock must be RLocked
 func (inode *InodeCommon) isOrphaned_() bool {
 	return inode.id == inode.parentId
@@ -564,12 +585,11 @@ func (inode *InodeCommon) isWorkspaceRoot() bool {
 // Deleting a child may require that we orphan it, and because we *must* lock from
 // a child up to its parent outside of a DOWN function, deletion in the parent
 // must be done after the child's lock has been acquired.
-func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
+func (inode *InodeCommon) deleteSelf(c *ctx,
 	deleteFromParent func() (toOrphan quantumfs.DirectoryRecord,
 		err fuse.Status)) fuse.Status {
 
-	defer c.FuncIn("InodeCommon::deleteSelf", "%d", toDelete.inodeNum()).Out()
-
+	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
 	defer inode.lock.Lock().Unlock()
 
 	// One of this inode's names is going away, reset the accessed cache to
@@ -578,22 +598,40 @@ func (inode *InodeCommon) deleteSelf(c *ctx, toDelete Inode,
 
 	// We must perform the deletion with the lockedParent lock
 	defer inode.parentLock.Lock().Unlock()
-
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
-	if toOrphan == nil {
-		// no orphan-ing desired here (hardlink or error)
-		return err
+
+	if toOrphan != nil {
+		// toOrphan can be nil if this is a hardlink or there was an error
+		inode.orphan_(c, toOrphan)
 	}
 
-	if file, isFile := toDelete.(*File); isFile {
-		file.setChildRecord(c, toOrphan)
-	}
-	// orphan ourselves
-	inode.parentId = toDelete.inodeNum()
-	c.vlog("Orphaned inode %d", toDelete.inodeNum())
+	return err
+}
 
-	return fuse.OK
+func reload(c *ctx, inode Inode, remoteRecord quantumfs.DirectRecord) {
+	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
+		remoteRecord.Type()).Out()
+
+	switch remoteRecord.Type() {
+	default:
+		panic("not implemented yet")
+	case quantumfs.ObjectTypeDirectory:
+		subdir := inode.(*Directory)
+		uninstantiated, removedUninstantiated :=
+			subdir.refresh_DOWN(c, remoteRecord.ID())
+		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
+		c.qfs.removeUninstantiated(c, removedUninstantiated)
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeMediumFile:
+		fallthrough
+	case quantumfs.ObjectTypeLargeFile:
+		fallthrough
+	case quantumfs.ObjectTypeVeryLargeFile:
+		regFile := inode.(*File)
+		regFile.handleAccessorTypeChange(c, remoteRecord)
+	}
 }
 
 func getLockOrder(a Inode, b Inode) (lockFirst Inode, lockLast Inode) {

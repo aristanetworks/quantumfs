@@ -487,7 +487,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		}
 		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
 			entry.record.ID().Text(), hardlink.Record().ID().Text())
-		inode.(*File).handleTypeChange(c, hardlink.Record())
+		reload(c, inode, *hardlink.Record())
 
 		status := c.qfs.invalidateInode(entry.inodeId)
 		utils.Assert(status == fuse.OK,
@@ -511,6 +511,11 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 			c.vlog("Removing stale hardlink id %d, inode %d, nlink %d",
 				hardlinkId, entry.inodeId, entry.nlink)
 			wsr.removeHardlink_(hardlinkId, entry.inodeId)
+			if inode := c.qfs.inodeNoInstantiate(c,
+				entry.inodeId); inode != nil {
+
+				inode.orphan(c, entry.record)
+			}
 		}
 	}
 }
