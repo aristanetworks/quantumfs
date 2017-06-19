@@ -23,6 +23,8 @@ type trackerKey struct {
 }
 
 type StatExtractor interface {
+	// This is the list of strings that the extractor will be triggered on and
+	// receive. Strings must match format exactly, with a trailing "\n"
 	TriggerStrings() []string
 
 	ProcessRequest(request qlog.LogStack)
