@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -30,13 +31,27 @@ func TestFileWalk(t *testing.T) {
 		data := daemon.GenData(50)
 		workspace := test.NewWorkspace()
 
-		// Write File 1
+		// Write File
 		filename := workspace + "/file"
 		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
+	})
+}
+
+func TestSpecialFileWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		// Write Special File
+		filename := workspace + "/file"
+		err := syscall.Mknod(filename,
+			syscall.S_IFCHR|syscall.S_IRWXU, 0x12345678)
+		test.Assert(err == nil, "Error creating node: %v", err)
+
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -47,7 +62,7 @@ func TestEmptyWSR(t *testing.T) {
 
 		// Add nothing to workspace
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -61,7 +76,7 @@ func TestDirWalk(t *testing.T) {
 		err := os.MkdirAll(dirname, 0777)
 		test.Assert(err == nil, "Mkdir failed (%s): %s",
 			dirname, err)
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -84,7 +99,7 @@ func TestMaxDirRecordsWalk(t *testing.T) {
 				filename, err)
 			fd.Close()
 		}
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -107,7 +122,7 @@ func TestChainedDirEntriesWalk(t *testing.T) {
 				filename, err)
 			fd.Close()
 		}
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -140,7 +155,7 @@ func TestDirFilesWalk(t *testing.T) {
 		test.Assert(err == nil, "File close failed (%s): %s",
 			filename, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -162,7 +177,7 @@ func TestSoftLink(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -184,7 +199,7 @@ func TestHardLink(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -207,7 +222,7 @@ func TestChainedHardLinkEntries(t *testing.T) {
 			test.Assert(err == nil, "Link failed (%s): %s",
 				link, err)
 		}
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -223,7 +238,7 @@ func TestLargeFileWalk(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -244,7 +259,7 @@ func TestLargeFileLinkWalk(t *testing.T) {
 		err = os.Link(filename, link)
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -290,7 +305,7 @@ func TestMiscWalk(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompare(workspace)
+		test.readWalkCompare(workspace, false)
 	})
 }
 
@@ -336,7 +351,7 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
-		test.readWalkCompareSkip(workspace)
+		test.readWalkCompare(workspace, true)
 	})
 }
 
@@ -452,5 +467,49 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
+	})
+}
+
+func TestExtendedAttributesWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(50)
+		workspace := test.NewWorkspace()
+
+		// Write File
+		filename := workspace + "/file"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		// Set attr for the file
+		err = syscall.Setxattr(filename, xattrName, xattrData, 0)
+		test.Assert(err == nil, "Error setting data XAttr: %v", err)
+
+		test.readWalkCompare(workspace, false)
+	})
+}
+
+func TestExtendedAttributesiAddRemoveWalk(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(50)
+		workspace := test.NewWorkspace()
+
+		// Write File
+		filename := workspace + "/file"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		// Set attr for the file
+		err = syscall.Setxattr(filename, xattrName, xattrData, 0)
+		test.Assert(err == nil, "Error setting data XAttr: %v", err)
+
+		// Remove attr for the file
+		err = syscall.Removexattr(filename, xattrName)
+		test.Assert(err == nil, "Error removing data XAttr: %v", err)
+
+		test.readWalkCompare(workspace, false)
 	})
 }

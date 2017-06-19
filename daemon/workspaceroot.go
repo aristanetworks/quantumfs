@@ -24,7 +24,7 @@ type WorkspaceRoot struct {
 	publishedRootId quantumfs.ObjectKey
 
 	listLock   sync.Mutex
-	accessList quantumfs.PathAccessList
+	accessList quantumfs.PathsAccessed
 
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
@@ -88,7 +88,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.namespace = namespace
 	wsr.workspace = workspace
 	wsr.publishedRootId = rootId
-	wsr.accessList = quantumfs.NewPathAccessList()
+	wsr.accessList = quantumfs.NewPathsAccessed()
 
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
@@ -487,7 +487,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		}
 		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
 			entry.record.ID().Text(), hardlink.Record().ID().Text())
-		inode.(*File).handleTypeChange(c, hardlink.Record())
+		reload(c, inode, *hardlink.Record())
 
 		status := c.qfs.invalidateInode(entry.inodeId)
 		utils.Assert(status == fuse.OK,
@@ -511,6 +511,11 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry
 			c.vlog("Removing stale hardlink id %d, inode %d, nlink %d",
 				hardlinkId, entry.inodeId, entry.nlink)
 			wsr.removeHardlink_(hardlinkId, entry.inodeId)
+			if inode := c.qfs.inodeNoInstantiate(c,
+				entry.inodeId); inode != nil {
+
+				inode.orphan(c, entry.record)
+			}
 		}
 	}
 }
@@ -784,7 +789,7 @@ func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 	c.vlog("WorkspaceRoot::markSelfAccessed doing nothing")
 }
 
-func (wsr *WorkspaceRoot) getList() quantumfs.PathAccessList {
+func (wsr *WorkspaceRoot) getList() quantumfs.PathsAccessed {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
 	return wsr.accessList
@@ -793,7 +798,7 @@ func (wsr *WorkspaceRoot) getList() quantumfs.PathAccessList {
 func (wsr *WorkspaceRoot) clearList() {
 	wsr.listLock.Lock()
 	defer wsr.listLock.Unlock()
-	wsr.accessList = quantumfs.NewPathAccessList()
+	wsr.accessList = quantumfs.NewPathsAccessed()
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
