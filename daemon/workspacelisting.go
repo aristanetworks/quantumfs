@@ -64,14 +64,13 @@ func (tsl *TypespaceList) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) markSelfAccessed(c *ctx, created bool) {
-	defer c.FuncIn("TypespaceList::markSelfAccessed", "created %t",
-		created).Out()
-	tsl.markAccessed(c, "", created)
+func (tsl *TypespaceList) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
+	defer c.FuncIn("TypespaceList::markSelfAccessed", "CRUD %x", op).Out()
+	tsl.markAccessed(c, "", op)
 	return
 }
 
-func (tsl *TypespaceList) markAccessed(c *ctx, path string, created bool) {
+func (tsl *TypespaceList) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
 	c.elog("Invalid markAccessed on TypespaceList")
 	return
 }
@@ -814,14 +813,13 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 	return newWorkspaceList(c, nsl.typespaceName, name, "", nsl, inodeNum)
 }
 
-func (nsl *NamespaceList) markSelfAccessed(c *ctx, created bool) {
-	defer c.FuncIn("NamespaceList::markSelfAccessed", "created %t",
-		created).Out()
-	nsl.markAccessed(c, "", created)
+func (nsl *NamespaceList) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
+	defer c.FuncIn("NamespaceList::markSelfAccessed", "CRUD %x", op).Out()
+	nsl.markAccessed(c, "", op)
 	return
 }
 
-func (nsl *NamespaceList) markAccessed(c *ctx, path string, created bool) {
+func (nsl *NamespaceList) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
 	c.elog("Invalid markAccessed on NamespaceList")
 	return
 }
@@ -1138,14 +1136,13 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 		wsl.workspacesById[inodeNum], wsl, inodeNum)
 }
 
-func (wsl *WorkspaceList) markSelfAccessed(c *ctx, created bool) {
-	defer c.FuncIn("WorkspaceList::markSelfAccessed", "created %t",
-		created).Out()
-	wsl.markAccessed(c, "", created)
+func (wsl *WorkspaceList) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
+	defer c.FuncIn("WorkspaceList::markSelfAccessed", "CRUD %x", op).Out()
+	wsl.markAccessed(c, "", op)
 	return
 }
 
-func (wsl *WorkspaceList) markAccessed(c *ctx, path string, created bool) {
+func (wsl *WorkspaceList) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
 	c.elog("Invalid markAccessed on WorkspaceList")
 	return
 }
