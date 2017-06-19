@@ -1123,28 +1123,32 @@ func GenTestRefreshType_MediumAndLarge2HardlinkToSmall(
 		content2 := "CONTENT2"
 		content3 := "the third"
 
+		// Exactly one of the two legs of the hardlink will reside
+		// in workspaceroot
 		name := "testFile"
+		linkname := name
 		if !workspaceRootHardlinks {
 			utils.MkdirAll(workspace+"/subdir", 0777)
-			name = "subdir/testFile"
+			name = "subdir/" + name
+		} else {
+			utils.MkdirAll(workspace+"/linkdir", 0777)
+			linkname = "linkdir/" + linkname
 		}
-
 		fullname := workspace + "/" + name
+		fulllinkname := workspace + "/" + linkname
 
-		err := createHardlink(fullname, content1)
+		fd, err := syscall.Creat(fullname, syscall.O_CREAT)
 		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(testutils.OverWriteFile(fullname, content1))
+		test.AssertNoErr(syscall.Link(fullname, fulllinkname))
 		test.SyncAllWorkspaces()
 		newRootId1 := getRootId(test, workspace)
 
-		err = syscall.Unlink(fullname)
-		test.AssertNoErr(err)
-		err = syscall.Unlink(fullname + "_link")
-		test.AssertNoErr(err)
-		err = createMediumFile(fullname, content2)
-		test.AssertNoErr(err)
-		err = createLargeFile(fullname+"_link", content3)
-		test.AssertNoErr(err)
-
+		test.AssertNoErr(syscall.Unlink(fullname))
+		test.AssertNoErr(syscall.Unlink(fulllinkname))
+		test.AssertNoErr(createMediumFile(fullname, content2))
+		test.AssertNoErr(createLargeFile(fulllinkname, content3))
 		test.SyncAllWorkspaces()
 		newRootId2 := getRootId(test, workspace)
 
@@ -1152,31 +1156,30 @@ func GenTestRefreshType_MediumAndLarge2HardlinkToSmall(
 		test.AssertNoErr(err)
 		verifyContentStartsWith(test, file1, content2)
 
-		file2, err := os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		file2, err := os.OpenFile(fulllinkname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
 		verifyContentStartsWith(test, file2, content3)
 
 		refreshTestNoRemount(ctx, test, workspace, newRootId2,
 			newRootId1)
 
-		// exactly one of the two files should inherit the content to
-		// be able to reuse their file handle, the other one is now
-		// orphaned and will have its old content
-		nmatches := doesContentStartWith(test, file1, content1)
+		// file1 was the source of the link() syscall, so it must
+		// have the new content
+		verifyContentStartsWith(test, file1, content1)
 		test.AssertNoErr(file1.Close())
-		nmatches += doesContentStartWith(test, file2, content1)
+
+		// file2 is now orphaned and must have its old content
+		verifyContentStartsWith(test, file2, content3)
 		test.AssertNoErr(file2.Close())
-		test.Assert(nmatches == 1, "Hit %d matches. Expected one.",
-			nmatches)
 
 		// but after grabbing a new file handle, both should
 		// have valid content
 		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
-		file2, err = os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		file2, err = os.OpenFile(fulllinkname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
 
-		nmatches = doesContentStartWith(test, file1, content1)
+		nmatches := doesContentStartWith(test, file1, content1)
 		test.AssertNoErr(file1.Close())
 		nmatches += doesContentStartWith(test, file2, content1)
 		test.AssertNoErr(file2.Close())
@@ -1184,7 +1187,7 @@ func GenTestRefreshType_MediumAndLarge2HardlinkToSmall(
 			nmatches)
 
 		removeTestFileNoSync(test, workspace, name)
-		removeTestFileNoSync(test, workspace, name+"_link")
+		removeTestFileNoSync(test, workspace, linkname)
 	}
 }
 
