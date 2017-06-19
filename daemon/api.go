@@ -390,7 +390,7 @@ func (api *ApiHandle) queueErrorResponse(code uint32, format string,
 	return len(bytes)
 }
 
-func makeAccessListResponse(list quantumfs.PathAccessList) []byte {
+func makeAccessListResponse(list quantumfs.PathsAccessed) []byte {
 	response := quantumfs.AccessListResponse{
 		ErrorResponse: quantumfs.ErrorResponse{
 			CommandCommon: quantumfs.CommandCommon{
@@ -410,7 +410,7 @@ func makeAccessListResponse(list quantumfs.PathAccessList) []byte {
 }
 
 func (api *ApiHandle) queueAccesslistResponse(
-	pathList quantumfs.PathAccessList) int {
+	pathList quantumfs.PathsAccessed) int {
 
 	bytes := makeAccessListResponse(pathList)
 	api.responses <- fuse.ReadResultData(bytes)

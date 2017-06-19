@@ -222,7 +222,10 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 
 	result := cmap.delRecord(inodeId, name)
 
-	if link, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
+	if link, isHardlink := record.(*Hardlink); isHardlink {
+		if !fixHardlinks {
+			return nil
+		}
 		if !cmap.wsr.hardlinkExists(c, link.linkId) {
 			c.vlog("hardlink does not exist")
 			return nil
