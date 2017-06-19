@@ -193,7 +193,7 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 	}
 }
 
-func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
+func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeId,
 	record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
@@ -217,6 +217,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
 	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+	newEntry.record.SetFilename(fingerprint)
 
 	wsr.hardlinks[newId] = newEntry
 	wsr.inodeToLink[inodeId] = newId
@@ -534,8 +535,14 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	}
 }
 
+type HardlinkLoadRecord struct {
+	parent       *Directory
+	remoteRecord *quantumfs.DirectRecord
+}
+
 type HardlinkRefreshCtx struct {
 	claimedLinks map[HardlinkId]InodeId
+	loadRecords  []HardlinkLoadRecord
 }
 
 func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
@@ -592,6 +599,7 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 
 	var hrc HardlinkRefreshCtx
 	hrc.claimedLinks = make(map[HardlinkId]InodeId, 0)
+	hrc.loadRecords = make([]HardlinkLoadRecord, 0)
 
 	wsr.refreshHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
 
@@ -601,6 +609,15 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 		addedUninstantiated, removedUninstantiated =
 			wsr.refresh_DOWN(c, &hrc, workspaceRoot.BaseLayer())
 	}()
+
+	for _, loadRecord := range hrc.loadRecords {
+		func() {
+			defer wsr.LockTree().Unlock()
+			defer loadRecord.parent.childRecordLock.Lock().Unlock()
+			loadRecord.parent.loadNewChild_DOWN(c,
+				loadRecord.remoteRecord)
+		}()
+	}
 
 	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
 	c.qfs.removeUninstantiated(c, removedUninstantiated)

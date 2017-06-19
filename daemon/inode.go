@@ -116,6 +116,9 @@ type Inode interface {
 	markAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	markSelfAccessed(c *ctx, op quantumfs.PathFlags)
 
+	absPath(c *ctx, path string) string
+	absPath_(c *ctx, path string) string
+
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
@@ -540,6 +543,31 @@ func (inode *InodeCommon) Lock() utils.NeedWriteUnlock {
 
 func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 	return inode.lock.RLock()
+}
+
+// the inode parentLock must be locked
+func (inode *InodeCommon) absPath_(c *ctx, path string) string {
+	defer c.FuncIn("InodeCommon::absPath_", "path %s", path).Out()
+
+	if path == "" {
+		path = inode.name()
+	} else {
+		path = inode.name() + "/" + path
+	}
+	return inode.parent_(c).absPath(c, path)
+}
+
+func (inode *InodeCommon) absPath(c *ctx, path string) string {
+	defer c.FuncIn("InodeCommon::absPath", "path %s", path).Out()
+	if inode.isWorkspaceRoot() {
+		return "/" + path
+	}
+	if inode.isOrphaned() {
+		panic("Orphaned file")
+	}
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.absPath_(c, path)
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {

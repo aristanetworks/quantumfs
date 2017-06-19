@@ -210,7 +210,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
 	default:
-		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
+		c.elog("Unhandled filetype %x in fillAttrWithDirectoryRecord",
 			fileType)
 		fallthrough
 	case fuse.S_IFREG,
