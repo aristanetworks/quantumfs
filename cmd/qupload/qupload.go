@@ -132,51 +132,8 @@ Above command will create a new workspace build/eos-trunk/11223344
 with the same contents as by cloning  build/eos-trunk/11223300.
 
 The exclude file should be formatted based on following rules:
-
- - One path per line.
- - Comments and empty lines are allowed. A comment is any line that starts with "#".
- - Path must be under the base directory specified.
- - Absolute paths are not allowed.
- - Exclude path must not be "/" suffixed.
- - Path to be included is prefixed with "+".
- - The order of exclude and include paths in the file does not matter.
- - Use ordering that makes the file more readable.
- - All excludes are processed first and then includes are processed.
-
-A path is considered to be included if it meets following criteria:
- - if the path is not covered by any exclude directives (implict inclusion)
- - if the path has been explicitly included
-
-Consider a base directory called "/rootdir". Some examples of exclude files
-are listed below. All paths used in the examples are under the base
-directory "rootdir". In other words, the absolute path for dir1 is
-"/rootdir/dir1".
-
- Example-1:
-
- # exclude dir1 and all its contents
- dir1
- # include only dir1 (not its contents)
- +dir1
- # include dir1/subdir1 (not its contents)
- +dir1/subdir1
- # include dir1/subdir1/file1
- +dir1/subdir1/file1
- # include dir1/subdir4 (not its contents)
- +dir1/subdir4
- # include contents of dir1/subdir3/subsubdir1
- +dir1/subdir3/subsubdir3/
-
- Example-2:
-
- # exclude dir2/subdir2
- # implicitly includes dir2 and all other content in dir2
- dir2/subdir2
- # include selective content dir2/subdir2/file2
- # inside excluded content (dir2/subdir2)
- +dir2/subdir2/file2
-
-`, version)
+%s
+`, version, exs.HelpText)
 	qFlags.PrintDefaults()
 }
 
