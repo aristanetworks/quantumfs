@@ -486,7 +486,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		}
 		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
 			entry.record.ID().Text(), hardlink.Record().ID().Text())
-		inode.(*File).handleTypeChange(c, hardlink.Record())
+		reload(c, inode, *hardlink.Record())
 
 		status := c.qfs.invalidateInode(entry.inodeId)
 		utils.Assert(status == fuse.OK,
