@@ -38,7 +38,7 @@ func (ext *extPairStats) ExtractStatFrom(request []indentedLog, idx int) {
 	for i := idx; i < len(request); i++ {
 		if request[i].log.Format == ext.fmtStop &&
 			((!ext.sameScope) || (ext.sameScope &&
-			request[idx].indent == request[i].indent)) {
+				request[idx].indent == request[i].indent)) {
 
 			// found a match
 			delta := request[i].log.T - request[idx].log.T

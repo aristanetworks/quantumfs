@@ -14,8 +14,8 @@ import (
 )
 
 type indentedLog struct {
-	log	qlog.LogOutput
-	indent	int
+	log    qlog.LogOutput
+	indent int
 }
 
 type logTrack struct {
@@ -207,7 +207,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 				}
 
 				filtered = append(filtered, indentedLog{
-					log:	curlog,
+					log:    curlog,
 					indent: indentCount,
 				})
 				filteredRequests[triggered] = filtered
