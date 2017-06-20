@@ -206,23 +206,19 @@ func (link *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryR
 			link.linkId))
 	}
 
-	// Note that this is a DirectRecord shallow copy type
-	var newEntry quantumfs.ThinRecord
-
-	newEntry.SetID(realRecord.ID())
-	newEntry.SetType(realRecord.Type())
-	newEntry.SetSize(realRecord.Size())
-
-	newEntry.Nlinks_ = link.Nlinks()
-	newEntry.SetFilename(link.Filename())
-	newEntry.SetPermissions(link.Permissions())
-	newEntry.SetOwner(link.Owner())
-	newEntry.SetGroup(link.Group())
-	newEntry.SetExtendedAttributes(link.ExtendedAttributes())
-	newEntry.SetContentTime(link.ContentTime())
-	newEntry.SetModificationTime(link.ModificationTime())
-
-	return &newEntry
+	return quantumfs.NewImmutableRecord(
+		link.Filename(),
+		realRecord.ID(),
+		realRecord.Type(),
+		link.Permissions(),
+		link.Owner(),
+		link.Group(),
+		realRecord.Size(),
+		link.ExtendedAttributes(),
+		link.ContentTime(),
+		link.ModificationTime(),
+		link.Nlinks(),
+	)
 }
 
 func (link *Hardlink) Clone() quantumfs.DirectoryRecord {

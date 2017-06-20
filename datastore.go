@@ -1029,32 +1029,36 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 }
 
 func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
-	var newEntry ThinRecord
-	RecordCopy(record, &newEntry)
-	newEntry.Nlinks_ = record.Nlinks()
-
-	return &newEntry
+	return &ThinRecord{
+		filename:    record.Filename(),
+		id:          record.ID(),
+		filetype:    record.Type(),
+		permissions: record.Permissions(),
+		owner:       record.Owner(),
+		group:       record.Group(),
+		size:        record.Size(),
+		xattr:       record.ExtendedAttributes(),
+		ctime:       record.ContentTime(),
+		mtime:       record.ModificationTime(),
+		nlinks:      record.Nlinks(),
+	}
 }
 
 func (record *DirectRecord) Clone() DirectoryRecord {
 	newEntry := NewDirectoryRecord()
-	RecordCopy(record, newEntry)
+	newEntry.SetFilename(record.Filename())
+	newEntry.SetID(record.ID())
+	newEntry.SetType(record.Type())
+	newEntry.SetPermissions(record.Permissions())
+	newEntry.SetOwner(record.Owner())
+	newEntry.SetGroup(record.Group())
+	newEntry.SetSize(record.Size())
+	newEntry.SetExtendedAttributes(record.ExtendedAttributes())
+	newEntry.SetContentTime(record.ContentTime())
+	newEntry.SetModificationTime(record.ModificationTime())
 	newEntry.SetNlinks(record.Nlinks())
 
 	return newEntry
-}
-
-func RecordCopy(src DirectoryRecord, dst DirectoryRecord) {
-	dst.SetFilename(src.Filename())
-	dst.SetID(src.ID())
-	dst.SetType(src.Type())
-	dst.SetPermissions(src.Permissions())
-	dst.SetOwner(src.Owner())
-	dst.SetGroup(src.Group())
-	dst.SetSize(src.Size())
-	dst.SetExtendedAttributes(src.ExtendedAttributes())
-	dst.SetContentTime(src.ContentTime())
-	dst.SetModificationTime(src.ModificationTime())
 }
 
 func EncodeExtendedKey(key ObjectKey, type_ ObjectType,
@@ -1392,6 +1396,25 @@ func init() {
 	EmptyWorkspaceKey = emptyWorkspaceKey
 }
 
+func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
+	permissions uint32, owner UID, group GID, size uint64, xattr ObjectKey,
+	ctime Time, mtime Time, nlinks uint32) ImmutableDirectoryRecord {
+
+	return &ThinRecord{
+		filename:    filename,
+		id:          id,
+		filetype:    filetype,
+		permissions: permissions,
+		owner:       owner,
+		group:       group,
+		size:        size,
+		xattr:       xattr,
+		ctime:       ctime,
+		mtime:       mtime,
+		nlinks:      nlinks,
+	}
+}
+
 type ThinRecord struct {
 	filename    string
 	id          ObjectKey
@@ -1403,7 +1426,7 @@ type ThinRecord struct {
 	xattr       ObjectKey
 	ctime       Time
 	mtime       Time
-	Nlinks_     uint32
+	nlinks      uint32
 }
 
 func (th *ThinRecord) Filename() string {
@@ -1491,7 +1514,7 @@ func (th *ThinRecord) Record() DirectRecord {
 }
 
 func (th *ThinRecord) Nlinks() uint32 {
-	return th.Nlinks_
+	return th.nlinks
 }
 
 func (th *ThinRecord) EncodeExtendedKey() []byte {
@@ -1500,12 +1523,4 @@ func (th *ThinRecord) EncodeExtendedKey() []byte {
 
 func (th *ThinRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
 	return th
-}
-
-func (th *ThinRecord) Clone() DirectoryRecord {
-	var newEntry ThinRecord
-	RecordCopy(th, &newEntry)
-	newEntry.Nlinks_ = th.Nlinks()
-
-	return &newEntry
 }
