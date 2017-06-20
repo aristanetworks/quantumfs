@@ -5,14 +5,13 @@ package qlogstats
 
 import (
 	"container/list"
+	"sort"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 )
-
-const requestEndAfterNs = 3000000000
 
 type logTrack struct {
 	logs        qlog.LogStack
@@ -25,6 +24,10 @@ type trackerKey struct {
 }
 
 type StatExtractor interface {
+	// This is the list of strings that the extractor will be triggered on and
+	// receive. Strings must match format exactly, with a trailing "\n"
+	TriggerStrings() []string
+
 	ProcessRequest(request qlog.LogStack)
 
 	Publish() ([]quantumfs.Tag, []quantumfs.Field)
@@ -45,16 +48,20 @@ func NewStatExtractorConfig(ext StatExtractor,
 	}
 }
 
-func AggregateLogs(filename string, db quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig) {
+func AggregateLogs(mode qlog.LogProcessMode, filename string,
+	db quantumfs.TimeSeriesDB, extractors []StatExtractorConfig) *Aggregator {
 
 	reader := qlog.NewReader(filename)
 	agg := NewAggregator(db, extractors)
 
-	reader.ProcessLogs(qlog.ReadThenTail, func(v qlog.LogOutput) {
+	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
 		agg.ProcessLog(v)
 	})
+
+	return agg
 }
+
+type extractorIdx int
 
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
@@ -65,7 +72,9 @@ type Aggregator struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	statExtractors []StatExtractorConfig
+	statExtractors  []StatExtractorConfig
+	statTriggers    map[string][]extractorIdx
+	requestEndAfter time.Duration
 
 	queueMutex utils.DeferableMutex
 	queueLogs  []qlog.LogOutput
@@ -75,17 +84,30 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	extractors []StatExtractorConfig) *Aggregator {
 
 	rtn := Aggregator{
-		db:             db_,
-		logsByRequest:  make(map[uint64]logTrack),
-		statExtractors: extractors,
-		queueLogs:      make([]qlog.LogOutput, 0),
+		db:              db_,
+		logsByRequest:   make(map[uint64]logTrack),
+		statExtractors:  extractors,
+		statTriggers:    make(map[string][]extractorIdx),
+		requestEndAfter: time.Second * 30,
+		queueLogs:       make([]qlog.LogOutput, 0),
 	}
 
-	// Sync all extractors
+	// Sync all extractors and setup their triggers
 	now := time.Now()
 	for i, v := range rtn.statExtractors {
 		v.lastOutput = now
 		rtn.statExtractors[i] = v
+
+		triggers := v.extractor.TriggerStrings()
+		for _, trigger := range triggers {
+			newTriggers, exists := rtn.statTriggers[trigger]
+			if !exists {
+				newTriggers = make([]extractorIdx, 0)
+			}
+
+			newTriggers = append(newTriggers, extractorIdx(i))
+			rtn.statTriggers[trigger] = newTriggers
+		}
 	}
 
 	go rtn.ProcessThread()
@@ -125,15 +147,13 @@ func (agg *Aggregator) ProcessThread() {
 
 			request := requestElem.Value.(trackerKey)
 			if now.Sub(request.lastLogTime) > time.Duration(0+
-				requestEndAfterNs) {
+				agg.requestEndAfter) {
 
 				agg.requestSequence.Remove(requestElem)
 				reqLogs := agg.logsByRequest[request.reqId]
 				delete(agg.logsByRequest, request.reqId)
 
-				for _, e := range agg.statExtractors {
-					e.extractor.ProcessRequest(reqLogs.logs)
-				}
+				agg.FilterRequest(reqLogs.logs)
 			} else {
 				// No more requests ready to extract stats
 				break
@@ -154,6 +174,37 @@ func (agg *Aggregator) ProcessThread() {
 		}
 
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// Use the trigger map to determine if any parts of this request need to go out
+func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
+	// This is a map that contains, for each extractor that cares about a given
+	// log in logs, only the filtered logs that that extractor has said it wants
+	filteredRequests := make(map[extractorIdx][]qlog.LogOutput)
+
+	for _, log := range logs {
+		// Find if any extractors have registered for this log.
+
+		// The statTriggers map is a map that uses a log format string for
+		// the key. The value is a list of extractors who want the log
+		if extractors, exists := agg.statTriggers[log.Format]; exists {
+			for _, triggered := range extractors {
+				// This extractor wants this log, so append it
+				filtered, hasLogs := filteredRequests[triggered]
+				if !hasLogs {
+					filtered = make([]qlog.LogOutput, 0)
+				}
+
+				filtered = append(filtered, log)
+				filteredRequests[triggered] = filtered
+			}
+		}
+	}
+
+	// Send the filtered logs out
+	for extractor, toSend := range filteredRequests {
+		agg.statExtractors[extractor].extractor.ProcessRequest(toSend)
 	}
 }
 
@@ -184,26 +235,53 @@ func (agg *Aggregator) processLog(v qlog.LogOutput) {
 	tracker.listElement.Value = trackerElem
 }
 
+type byIncreasing []uint64
+
+func (a byIncreasing) Len() int           { return len(a) }
+func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
+
 // A data aggregator that outputs basic statistics such as the average
 // Intended to be used by data extractors.
 type basicStats struct {
-	sum   uint64
-	count uint64
+	sum    uint64
+	points []uint64
 }
 
 func (bs *basicStats) NewPoint(data uint64) {
 	bs.sum += data
-	bs.count++
+	bs.points = append(bs.points, data)
 }
 
 func (bs *basicStats) Average() uint64 {
-	if bs.count == 0 {
+	if len(bs.points) == 0 {
 		return 0
 	}
 
-	return bs.sum / bs.count
+	return bs.sum / uint64(len(bs.points))
 }
 
 func (bs *basicStats) Count() uint64 {
-	return bs.count
+	return uint64(len(bs.points))
+}
+
+func (bs *basicStats) Percentiles() map[string]uint64 {
+	rtn := make(map[string]uint64)
+	points := bs.points
+
+	if len(points) == 0 {
+		points = append(points, 0)
+	}
+
+	// sort the points
+	sort.Sort(byIncreasing(points))
+
+	lastIdx := float32(len(points) - 1)
+
+	rtn["50pct"] = points[int(lastIdx*0.50)]
+	rtn["90pct"] = points[int(lastIdx*0.90)]
+	rtn["95pct"] = points[int(lastIdx*0.95)]
+	rtn["99pct"] = points[int(lastIdx*0.99)]
+
+	return rtn
 }

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 // This file contains all the functions which are used by qfs (and other
@@ -200,6 +202,81 @@ func NewApiWithPath(path string) (Api, error) {
 	return &api, nil
 }
 
+// A description of the files and directories which were accessed within a particular
+// workspace on a single instance.
+//
+// - readdir() marks a directory as read
+// - read() marks a file as read
+// - write() marks a file as updated
+// - truncation marks a file as updated
+// - mkdir() marks a directory as created
+// - rmdir() marks a directory as deleted
+// - creat() or mknod() marks a file as created
+// - unlink() marks a file as unlinked
+// - There are no operations that can mark a directory as updated
+//
+// Creation and deletion have additional special semantics in that they
+// are collapsible. Specifically:
+//
+// - Files which are created and then deleted are removed from the listing
+//   under the assumption they are temporary files and of no interest.
+// - Files which are deleted and then created are recorded as being
+//   truncated. That is, neither created nor deleted, but updated.
+// - Directories which are created and then deleted are removed from the
+//   listing under the assumption they are temporary and of no interest.
+// - Directories which are deleted and then created are listed as being
+//   neither created nor deleted. If the directory had previously been
+//   read it is included in the list with that flag, otherwise it is
+//   removed from the list.
+//
+// Simply accessing the attributes of a file or directory does not add it to the
+// accessed list. Similarly, accessing the attribute of a file does not mark the
+// containing directory as read. Opening a file or directory also does not mark it as
+// read.
+type PathsAccessed struct {
+	Paths map[string]PathFlags
+}
+
+func NewPathsAccessed() PathsAccessed {
+	return PathsAccessed{
+		Paths: map[string]PathFlags{},
+	}
+}
+
+const (
+	PathCreated = (1 << 0)
+	PathRead    = (1 << 1)
+	PathUpdated = (1 << 2)
+	PathDeleted = (1 << 3)
+	PathIsDir   = (1 << 4)
+)
+
+type PathFlags uint
+
+func (pf PathFlags) Primitive() interface{} {
+	return uint(pf)
+}
+
+func (pf PathFlags) Created() bool {
+	return utils.BitFlagsSet(uint(pf), PathCreated)
+}
+
+func (pf PathFlags) Read() bool {
+	return utils.BitFlagsSet(uint(pf), PathRead)
+}
+
+func (pf PathFlags) Updated() bool {
+	return utils.BitFlagsSet(uint(pf), PathUpdated)
+}
+
+func (pf PathFlags) Deleted() bool {
+	return utils.BitFlagsSet(uint(pf), PathDeleted)
+}
+
+func (pf PathFlags) IsDir() bool {
+	return utils.BitFlagsSet(uint(pf), PathIsDir)
+}
+
 type Api interface {
 	Close()
 
@@ -216,7 +293,7 @@ type Api interface {
 	Merge3Way(base string, remote string, local string) error
 
 	// Get the list of accessed file from workspaceroot
-	GetAccessed(wsr string) (map[string]bool, error)
+	GetAccessed(wsr string) (*PathsAccessed, error)
 
 	// Clear the list of accessed files in workspaceroot
 	ClearAccessed(wsr string) error
@@ -335,7 +412,7 @@ type ErrorResponse struct {
 
 type AccessListResponse struct {
 	ErrorResponse
-	AccessList map[string]bool
+	PathList PathsAccessed
 }
 
 type BranchRequest struct {
@@ -536,10 +613,10 @@ func (api *apiImpl) Refresh(workspace string) error {
 	return api.processCmd(cmd, nil)
 }
 
-func (api *apiImpl) GetAccessed(wsr string) (map[string]bool, error) {
+func (api *apiImpl) GetAccessed(wsr string) (*PathsAccessed, error) {
 	if !isWorkspaceNameValid(wsr) {
-		return nil, fmt.Errorf("\"%s\" must contain precisely two \"/\"\n",
-			wsr)
+		return nil,
+			fmt.Errorf("\"%s\" must contain precisely two \"/\"\n", wsr)
 	}
 
 	cmd := AccessedRequest{
@@ -554,11 +631,11 @@ func (api *apiImpl) GetAccessed(wsr string) (map[string]bool, error) {
 	}
 	errorResponse := accesslistResponse.ErrorResponse
 	if errorResponse.ErrorCode != ErrorOK {
-		return nil, fmt.Errorf("qfs command Error:%s", errorResponse.Message)
+		return nil,
+			fmt.Errorf("qfs command Error:%s", errorResponse.Message)
 	}
 
-	printAccessList(accesslistResponse.AccessList)
-	return accesslistResponse.AccessList, nil
+	return &accesslistResponse.PathList, nil
 }
 
 func (api *apiImpl) ClearAccessed(wsr string) error {
@@ -698,19 +775,4 @@ func isKeyValid(key string) bool {
 		return false
 	}
 	return true
-}
-
-func printAccessList(list map[string]bool) {
-	fmt.Println("------ Created Files ------")
-	for key, val := range list {
-		if val {
-			fmt.Println(key)
-		}
-	}
-	fmt.Println("------ Accessed Files ------")
-	for key, val := range list {
-		if !val {
-			fmt.Println(key)
-		}
-	}
 }
