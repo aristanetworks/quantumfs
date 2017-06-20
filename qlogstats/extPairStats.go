@@ -88,6 +88,10 @@ func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Fie
 	fields = append(fields, quantumfs.NewField("average", ext.stats.Average()))
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
+	for name, data := range ext.stats.Percentiles() {
+		fields = append(fields, quantumfs.NewField(name, data))
+	}
+
 	ext.stats = basicStats{}
 	return tags, fields
 }
