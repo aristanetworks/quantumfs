@@ -3,4 +3,4 @@
 \._*
 .DS_Store
 *.so
-qfsclient_test
+qfs_client_test
