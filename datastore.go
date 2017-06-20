@@ -895,7 +895,6 @@ type ImmutableDirectoryRecord interface {
 
 	ModificationTime() Time
 
-	Record() DirectRecord
 	Nlinks() uint32
 
 	EncodeExtendedKey() []byte
@@ -1507,10 +1506,6 @@ func (ir *ImmutableRecord) ModificationTime() Time {
 
 func (ir *ImmutableRecord) SetModificationTime(v Time) {
 	ir.mtime = v
-}
-
-func (ir *ImmutableRecord) Record() DirectRecord {
-	panic("DirectRecord requested from ImmutableRecord")
 }
 
 func (ir *ImmutableRecord) Nlinks() uint32 {
