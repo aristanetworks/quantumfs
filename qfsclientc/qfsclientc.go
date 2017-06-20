@@ -13,7 +13,8 @@ package qfsclientc
 const char * cGetApi(uint32_t *apiHandleOut);
 const char * cGetApiPath(const char *path, uint32_t *apiHandleOut);
 const char * cReleaseApi(uint32_t apiHandle);
-const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot);
+const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot,
+	uint64_t pathId);
 const char * cInsertInode(uint32_t apiHandle, const char *dest, const char *key,
 	uint32_t permissions, uint32_t uid, uint32_t gid);
 const char * cBranch(uint32_t apiHandle, const char *source, const char *dest);
@@ -30,6 +31,7 @@ import (
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type QfsClientApi struct {
@@ -76,11 +78,46 @@ func ReleaseApi(api QfsClientApi) error {
 	return checkError(err)
 }
 
-func (api *QfsClientApi) GetAccessed(workspaceRoot string) error {
-	err := C.GoString(C.cGetAccessed(C.uint32_t(api.handle),
-		C.CString(workspaceRoot)))
+// A trampoline to allow the C++ code to set path values instead of writing a C
+// wrapper for std::unordered_map.
+//
+//export setPath
+func setPath(pathId uint64, path *C.char, value uint32) {
+	defer tmpListLock.Lock().Unlock()
+	pathList := tmpListMap[pathId]
+	pathList.Paths[C.GoString(path)] = quantumfs.PathFlags(value)
+}
 
-	return checkError(err)
+var tmpListLock utils.DeferableMutex
+var tmpListMap map[uint64]*quantumfs.PathsAccessed
+
+func init() {
+	tmpListMap = map[uint64]*quantumfs.PathsAccessed{}
+}
+
+func (api *QfsClientApi) GetAccessed(
+	workspace string) (quantumfs.PathsAccessed, error) {
+
+	paths := quantumfs.NewPathsAccessed()
+	pathId := uint64(uintptr(unsafe.Pointer(&paths)))
+
+	func() {
+		defer tmpListLock.Lock().Unlock()
+		tmpListMap[pathId] = &paths
+	}()
+
+	err := C.GoString(C.cGetAccessed(C.uint32_t(api.handle),
+		C.CString(workspace), C.uint64_t(pathId)))
+
+	func() {
+		defer tmpListLock.Lock().Unlock()
+		delete(tmpListMap, pathId)
+	}()
+	if err != "" {
+		return quantumfs.NewPathsAccessed(), errors.New(err)
+	}
+
+	return paths, nil
 }
 
 func (api *QfsClientApi) InsertInode(dest string, key string, permissions uint32,

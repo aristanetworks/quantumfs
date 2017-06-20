@@ -57,9 +57,9 @@ func TestWorkspaceBranching(t *testing.T) {
 }
 
 func generateFiles(test *testHelper, size int, workspace,
-	filename string) (map[string]bool, int) {
+	filename string) (quantumfs.PathsAccessed, int) {
 
-	accessList := make(map[string]bool)
+	accessList := quantumfs.NewPathsAccessed()
 	expectedSize := 0
 	for i := 0; i < size; i++ {
 		filename := fmt.Sprintf("/%s%d", filename, i)
@@ -68,12 +68,12 @@ func generateFiles(test *testHelper, size int, workspace,
 		fd, err := syscall.Creat(path, 0666)
 		test.Assert(err == nil, "Create file error: %v at %s",
 			err, filename)
-		accessList[filename] = true
+		accessList.Paths[filename] = quantumfs.PathCreated
 		syscall.Close(fd)
 	}
 
-	test.Assert(len(accessList) == size, "Fail creating correct "+
-		"accesslist with size of %d", len(accessList))
+	test.Assert(len(accessList.Paths) == size, "Fail creating correct "+
+		"accesslist with size of %d", len(accessList.Paths))
 
 	wsrlist := test.getAccessList(workspace)
 	test.assertAccessList(accessList, wsrlist, "Error two maps different")
@@ -81,9 +81,9 @@ func generateFiles(test *testHelper, size int, workspace,
 	return accessList, expectedSize
 }
 
-func mapKeySizeSum(list map[string]bool) int {
+func mapKeySizeSum(paths *quantumfs.PathsAccessed) int {
 	size := 0
-	for key, _ := range list {
+	for key, _ := range paths.Paths {
 		size += len(key)
 	}
 
@@ -105,7 +105,7 @@ func TestApiAccessListEmpty(t *testing.T) {
 			"Error getting unequal sizes %d != %d",
 			mapKeySizeSum(responselist), expectedSize)
 
-		accessList := make(map[string]bool)
+		accessList := quantumfs.NewPathsAccessed()
 		test.assertAccessList(accessList, responselist,
 			"Error two maps different")
 	})
@@ -237,13 +237,13 @@ func TestApiAccessListConcurrent(t *testing.T) {
 
 func TestApiClearAccessList(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		accessList := make(map[string]bool)
+		accessList := quantumfs.NewPathsAccessed()
 		workspace := test.NewWorkspace()
 		filename := "/test"
 		path := workspace + filename
 		fd, err := syscall.Creat(path, 0666)
 		test.Assert(err == nil, "Create file error:%v", err)
-		accessList[filename] = true
+		accessList.Paths[filename] = quantumfs.PathCreated
 		syscall.Close(fd)
 		wsrlist := test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
@@ -255,7 +255,7 @@ func TestApiClearAccessList(t *testing.T) {
 		err = api.ClearAccessed(relpath)
 		test.Assert(err == nil,
 			"Error clearing accessList with api")
-		accessList = make(map[string]bool)
+		accessList = quantumfs.NewPathsAccessed()
 		wsrlist = test.getAccessList(workspace)
 		test.assertAccessList(accessList, wsrlist,
 			"Error maps not clear")
