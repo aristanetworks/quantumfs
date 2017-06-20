@@ -3,7 +3,7 @@
 
 package daemon
 
-// Test things which do not belong in other test files
+// Test cases which do not belong in other test files
 
 import (
 	"fmt"
