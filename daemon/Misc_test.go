@@ -21,12 +21,14 @@ func TestUnknownInodeId(t *testing.T) {
 
 		// We need to create enough files that we can read
 		// some from the directory without reading the entire
-		// directory. Then we can delete the file filename and
-		// continue reading. This will result in the Inode for
-		// the filename being returned to the kernel from
-		// which the subsequent open call will cause an inode
-		// number entirely unknown to QuantmFS to be used in
-		// QuantumFs.Open().
+		// directory. Then we can cause a directory snapshot
+		// to be taken, delete the file filename and then
+		// continue reading. This will result in the inodeId
+		// for the filename being returned to the kernel after
+		// that ID is not longer valid. This entry will be
+		// cached in the kernel and the subsequent open call
+		// will cause an inode number entirely unknown to
+		// QuantmFS to be used in QuantumFs.Open().
 		for i := 0; i < 300; i++ {
 			file := fmt.Sprintf("%s/filler-%d", workspace, i)
 			test.AssertNoErr(testutils.PrintToFile(file, "contents"))
