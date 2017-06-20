@@ -28,7 +28,7 @@ func TestUnknownInodeId(t *testing.T) {
 		// that ID is not longer valid. This entry will be
 		// cached in the kernel and the subsequent open call
 		// will cause an inode number entirely unknown to
-		// QuantmFS to be used in QuantumFs.Open().
+		// QuantumFS to be used in QuantumFs.Open().
 		for i := 0; i < 300; i++ {
 			file := fmt.Sprintf("%s/filler-%d", workspace, i)
 			test.AssertNoErr(testutils.PrintToFile(file, "contents"))
@@ -41,10 +41,10 @@ func TestUnknownInodeId(t *testing.T) {
 		defer dir.Close()
 		_, err = dir.Readdir(10)
 		test.AssertNoErr(err)
+
 		test.AssertNoErr(syscall.Unlink(filename))
 
 		test.SyncAllWorkspaces()
-
 		test.qfs.Forget(uint64(inodeNum), 1)
 
 		_, err = dir.Readdir(0)
