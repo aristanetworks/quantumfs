@@ -472,7 +472,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		}
 
 		c.vlog("Directory::Lookup found inode %d", inodeNum)
-		c.qfs.increaseLookupCount(inodeNum)
+		c.qfs.increaseLookupCount(c, inodeNum)
 
 		out.NodeId = uint64(inodeNum)
 		fillEntryOutCacheData(c, out)
@@ -628,7 +628,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	dir.addChild_(c, inodeNum, entry)
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
-	c.qfs.increaseLookupCount(inodeNum)
+	c.qfs.increaseLookupCount(c, inodeNum)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1713,7 +1713,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	child = c.qfs.inode(c, inodeNum)
 	// Activate the lookupCount entry of currently instantiated inodes
 	if !instantiated {
-		c.qfs.increaseLookupCountWithNum(inodeNum, 0)
+		c.qfs.increaseLookupCountWithNum(c, inodeNum, 0)
 	}
 
 	if record.Type() != entryType {
@@ -1864,7 +1864,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
-		c.qfs.increaseLookupCount(InodeId(child.attr.Ino))
+		c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
 		fillEntryOutCacheData(c, details)
 		details.Attr = child.attr
 
