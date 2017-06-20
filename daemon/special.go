@@ -69,8 +69,6 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
 	defer c.funcIn("Special::Access").Out()
-
-	special.self.markSelfAccessed(c, false)
 	return hasAccessPermission(c, special, mask, uid, gid)
 }
 

@@ -63,6 +63,14 @@ func (ext *extPairStats) ExtractStatFrom(request qlog.LogStack, idx int) {
 		ext.fmtStop)
 }
 
+func (ext *extPairStats) TriggerStrings() []string {
+	rtn := make([]string, 0)
+
+	rtn = append(rtn, ext.fmtStart)
+	rtn = append(rtn, ext.fmtStop)
+	return rtn
+}
+
 func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
 	for i, v := range request {
 		if v.Format == ext.fmtStart {
@@ -79,6 +87,10 @@ func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Fie
 
 	fields = append(fields, quantumfs.NewField("average", ext.stats.Average()))
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+
+	for name, data := range ext.stats.Percentiles() {
+		fields = append(fields, quantumfs.NewField(name, data))
+	}
 
 	ext.stats = basicStats{}
 	return tags, fields

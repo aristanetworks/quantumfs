@@ -1,7 +1,7 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package qfsclientc
+package qlogstats
 
 import (
 	"flag"
@@ -22,12 +22,12 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 
-func runTest(t *testing.T, test qfsclientTest) {
+func runTest(t *testing.T, test qlogstatsTest) {
 	t.Parallel()
 	runTestCommon(t, test)
 }
 
-func runTestCommon(t *testing.T, test qfsclientTest) {
+func runTestCommon(t *testing.T, test qlogstatsTest) {
 	// the stack depth of test name for all callers of runTestCommon
 	// is 2. Since the stack looks as follows:
 	// 2 <testname>
@@ -45,7 +45,6 @@ func runTestCommon(t *testing.T, test qfsclientTest) {
 	defer th.EndTest()
 
 	th.StartDefaultQuantumFs()
-	th.waitForApi()
 
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
@@ -55,7 +54,7 @@ type testHelper struct {
 	config daemon.QuantumFsConfig
 }
 
-type qfsclientTest func(test *testHelper)
+type qlogstatsTest func(test *testHelper)
 
 func (th *testHelper) testHelperUpcast(
 	testFn func(test *testHelper)) testutils.QuantumFsTest {
@@ -63,17 +62,4 @@ func (th *testHelper) testHelperUpcast(
 	return func(test testutils.TestArg) {
 		testFn(th)
 	}
-}
-
-func (th *testHelper) waitForApi() {
-	th.WaitFor("Api inode to be seen by kernel", func() bool {
-		_, err := os.Stat(th.TempDir + "/mnt/api")
-		return (err == nil)
-	})
-}
-
-func (th *testHelper) getApi() QfsClientApi {
-	api, err := GetApiPath(th.TempDir + "/mnt/api")
-	th.AssertNoErr(err)
-	return api
 }
