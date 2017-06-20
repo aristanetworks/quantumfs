@@ -537,7 +537,8 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
 	defer wsr.linkLock.Lock().Unlock()
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
-		hrc.claimedLinks[HardlinkId(hardlink.HardlinkID())] = wsr.inodeNum()
+		hrc.claimedLinks[HardlinkId(hardlink.HardlinkID())] =
+			quantumfs.InodeIdInvalid
 		wsr.handleRemoteHardlink(c, hrc, hardlink)
 	})
 }
@@ -558,7 +559,7 @@ func (wsr *WorkspaceRoot) removeStaleHardlinks(c *ctx,
 				inode.orphan(c, entry.record)
 			}
 			wsr.removeHardlink_(hardlinkId, entry.inodeId)
-		} else if inodeId != wsr.inodeNum() {
+		} else if inodeId != quantumfs.InodeIdInvalid {
 			wsr.removeHardlink_(hardlinkId, entry.inodeId)
 		}
 	}
