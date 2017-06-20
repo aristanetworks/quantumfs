@@ -1499,7 +1499,7 @@ func (th *ThinRecord) EncodeExtendedKey() []byte {
 }
 
 func (th *ThinRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
-	return th.Clone()
+	return th
 }
 
 func (th *ThinRecord) Clone() DirectoryRecord {
