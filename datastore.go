@@ -876,29 +876,17 @@ type DirectoryRecord interface {
 // Just like DirectoryRecord, but without any mutators
 type ImmutableDirectoryRecord interface {
 	Filename() string
-
 	ID() ObjectKey
-
 	Type() ObjectType
-
 	Permissions() uint32
-
 	Owner() UID
-
 	Group() GID
-
 	Size() uint64
-
 	ExtendedAttributes() ObjectKey
-
 	ContentTime() Time
-
 	ModificationTime() Time
-
 	Nlinks() uint32
-
 	EncodeExtendedKey() []byte
-
 	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
 }
 
