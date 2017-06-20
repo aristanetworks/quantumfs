@@ -198,7 +198,10 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 		realRecord.Size())
 }
 
-func (link *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryRecord {
+func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryRecord {
+	// Sorry, this seems to be the only way to get the signature under 85
+	// characters per line and appease gofmt.
+	link := l
 	valid, realRecord := link.wsr.getHardlink(link.linkId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid

@@ -226,7 +226,9 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func specialOverrideAttr(entry quantumfs.ImmutableDirectoryRecord, attr *fuse.Attr) uint32 {
+func specialOverrideAttr(entry quantumfs.ImmutableDirectoryRecord,
+	attr *fuse.Attr) uint32 {
+
 	attr.Size = 0
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()

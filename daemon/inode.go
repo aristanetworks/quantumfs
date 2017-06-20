@@ -77,8 +77,8 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord,
-		error)
+	getChildRecordCopy(c *ctx,
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
