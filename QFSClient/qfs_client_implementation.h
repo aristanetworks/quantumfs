@@ -68,7 +68,7 @@ class ApiImpl: public Api {
 	void Close();
 
 	// implemented API functions
-	virtual Error GetAccessed(const char *workspace_root);
+	virtual Error GetAccessed(const char *workspace_root, PathsAccessed *paths);
 
 	virtual Error InsertInode(const char *destination,
 				  const char *key,
@@ -153,12 +153,7 @@ class ApiImpl: public Api {
 	// an Error struct to indicate success or otherwise
 	Error PrepareAccessedListResponse(
 		const ApiContext *context,
-		std::unordered_map<std::string, bool> *accessed_list);
-
-	// Convert the response to the GetAccessed() API call for a string to be
-	// pretty-printed to stdout
-	std::string FormatAccessedList(
-		const std::unordered_map<std::string, bool> &accessed);
+		PathsAccessed *accessed_list);
 
 	friend class QfsClientTest;
 	FRIEND_TEST(QfsClientTest, SendCommandTest);
@@ -177,7 +172,6 @@ class ApiImpl: public Api {
 	FRIEND_TEST(QfsClientApiTest, CheckCommonApiMissingJsonObjectTest);
 	FRIEND_TEST(QfsClientApiTest, PrepareAccessedListResponseTest);
 	FRIEND_TEST(QfsClientApiTest, PrepareAccessedListResponseNoAccessListTest);
-	FRIEND_TEST(QfsClientApiTest, FormatAccessedListTest);
 	FRIEND_TEST(QfsClientApiTest, SendJsonTest);
 	FRIEND_TEST(QfsClientApiTest, SendJsonTestJsonTooBig);
 

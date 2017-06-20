@@ -24,6 +24,8 @@ type trackerKey struct {
 }
 
 type StatExtractor interface {
+	// This is the list of strings that the extractor will be triggered on and
+	// receive. Strings must match format exactly, with a trailing "\n"
 	TriggerStrings() []string
 
 	ProcessRequest(request qlog.LogStack)
@@ -177,10 +179,15 @@ func (agg *Aggregator) ProcessThread() {
 
 // Use the trigger map to determine if any parts of this request need to go out
 func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
+	// This is a map that contains, for each extractor that cares about a given
+	// log in logs, only the filtered logs that that extractor has said it wants
 	filteredRequests := make(map[extractorIdx][]qlog.LogOutput)
 
 	for _, log := range logs {
-		// Find if any extractors have registered for this log
+		// Find if any extractors have registered for this log.
+
+		// The statTriggers map is a map that uses a log format string for
+		// the key. The value is a list of extractors who want the log
 		if extractors, exists := agg.statTriggers[log.Format]; exists {
 			for _, triggered := range extractors {
 				// This extractor wants this log, so append it
