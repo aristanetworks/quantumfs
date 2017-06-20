@@ -187,9 +187,14 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 }
 
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	owner fuse.Owner, entry quantumfs.ImmutableDirectoryRecord) {
+	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
+
+	// Ensure we have a flattened DirectoryRecord to ensure the type is the
+	// underlying type for Hardlinks. This is required in order for
+	// objectTypeToFileType() to have access to the correct type to report.
+	entry := entry_.AsImmutableDirectoryRecord()
 
 	attr.Ino = uint64(inodeNum)
 
