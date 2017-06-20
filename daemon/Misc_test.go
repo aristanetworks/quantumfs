@@ -25,7 +25,7 @@ func TestUnknownInodeId(t *testing.T) {
 		// to be taken, delete the file filename and then
 		// continue reading. This will result in the inodeId
 		// for the filename being returned to the kernel after
-		// that ID is not longer valid. This entry will be
+		// that ID is no longer valid. This entry will be
 		// cached in the kernel and the subsequent open call
 		// will cause an inode number entirely unknown to
 		// QuantumFS to be used in QuantumFs.Open().
