@@ -199,7 +199,6 @@ func TestIndentation(t *testing.T) {
 		qlogHandle.Log_(time.Unix(0, 20400), qlog.LogTest, 12345, 2,
 			qlog.FnExitStr+"Other Function")
 
-
 		qlogHandle.Log_(time.Unix(0, 20000+durationReal), qlog.LogTest,
 			12345, 3, qlog.FnExitStr+"TestMatch")
 
@@ -225,4 +224,3 @@ func TestIndentation(t *testing.T) {
 			(300*time.Millisecond)), checker)
 	})
 }
-
