@@ -81,8 +81,9 @@ func TestMatches(t *testing.T) {
 			// Data should be present now
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average" {
-					test.Assert(v.Data == 20000,
-						"incorrect delta %d", v.Data)
+					test.Assert(v.Data == uint64(duration1+
+						duration2)/2, "incorrect delta %d",
+						v.Data)
 				} else if v.Name == "samples" {
 					test.Assert(v.Data == 2,
 						"incorrect samples %d", v.Data)
