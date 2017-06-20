@@ -1029,7 +1029,7 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 }
 
 func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
-	return &ThinRecord{
+	return &ImmutableRecord{
 		filename:    record.Filename(),
 		id:          record.ID(),
 		filetype:    record.Type(),
@@ -1400,7 +1400,7 @@ func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
 	permissions uint32, owner UID, group GID, size uint64, xattr ObjectKey,
 	ctime Time, mtime Time, nlinks uint32) ImmutableDirectoryRecord {
 
-	return &ThinRecord{
+	return &ImmutableRecord{
 		filename:    filename,
 		id:          id,
 		filetype:    filetype,
@@ -1415,7 +1415,7 @@ func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
 	}
 }
 
-type ThinRecord struct {
+type ImmutableRecord struct {
 	filename    string
 	id          ObjectKey
 	filetype    ObjectType
@@ -1429,98 +1429,98 @@ type ThinRecord struct {
 	nlinks      uint32
 }
 
-func (th *ThinRecord) Filename() string {
-	return th.filename
+func (ir *ImmutableRecord) Filename() string {
+	return ir.filename
 }
 
-func (th *ThinRecord) SetFilename(v string) {
-	th.filename = v
+func (ir *ImmutableRecord) SetFilename(v string) {
+	ir.filename = v
 }
 
-func (th *ThinRecord) ID() ObjectKey {
-	return th.id
+func (ir *ImmutableRecord) ID() ObjectKey {
+	return ir.id
 }
 
-func (th *ThinRecord) SetID(v ObjectKey) {
-	th.id = v
+func (ir *ImmutableRecord) SetID(v ObjectKey) {
+	ir.id = v
 }
 
-func (th *ThinRecord) Type() ObjectType {
-	return th.filetype
+func (ir *ImmutableRecord) Type() ObjectType {
+	return ir.filetype
 }
 
-func (th *ThinRecord) SetType(v ObjectType) {
-	th.filetype = v
+func (ir *ImmutableRecord) SetType(v ObjectType) {
+	ir.filetype = v
 }
 
-func (th *ThinRecord) Permissions() uint32 {
-	return th.permissions
+func (ir *ImmutableRecord) Permissions() uint32 {
+	return ir.permissions
 }
 
-func (th *ThinRecord) SetPermissions(v uint32) {
-	th.permissions = v
+func (ir *ImmutableRecord) SetPermissions(v uint32) {
+	ir.permissions = v
 }
 
-func (th *ThinRecord) Owner() UID {
-	return th.owner
+func (ir *ImmutableRecord) Owner() UID {
+	return ir.owner
 }
 
-func (th *ThinRecord) SetOwner(v UID) {
-	th.owner = v
+func (ir *ImmutableRecord) SetOwner(v UID) {
+	ir.owner = v
 }
 
-func (th *ThinRecord) Group() GID {
-	return th.group
+func (ir *ImmutableRecord) Group() GID {
+	return ir.group
 }
 
-func (th *ThinRecord) SetGroup(v GID) {
-	th.group = v
+func (ir *ImmutableRecord) SetGroup(v GID) {
+	ir.group = v
 }
 
-func (th *ThinRecord) Size() uint64 {
-	return th.size
+func (ir *ImmutableRecord) Size() uint64 {
+	return ir.size
 }
 
-func (th *ThinRecord) SetSize(v uint64) {
-	th.size = v
+func (ir *ImmutableRecord) SetSize(v uint64) {
+	ir.size = v
 }
 
-func (th *ThinRecord) ExtendedAttributes() ObjectKey {
-	return th.xattr
+func (ir *ImmutableRecord) ExtendedAttributes() ObjectKey {
+	return ir.xattr
 }
 
-func (th *ThinRecord) SetExtendedAttributes(v ObjectKey) {
-	th.xattr = v
+func (ir *ImmutableRecord) SetExtendedAttributes(v ObjectKey) {
+	ir.xattr = v
 }
 
-func (th *ThinRecord) ContentTime() Time {
-	return th.ctime
+func (ir *ImmutableRecord) ContentTime() Time {
+	return ir.ctime
 }
 
-func (th *ThinRecord) SetContentTime(v Time) {
-	th.ctime = v
+func (ir *ImmutableRecord) SetContentTime(v Time) {
+	ir.ctime = v
 }
 
-func (th *ThinRecord) ModificationTime() Time {
-	return th.mtime
+func (ir *ImmutableRecord) ModificationTime() Time {
+	return ir.mtime
 }
 
-func (th *ThinRecord) SetModificationTime(v Time) {
-	th.mtime = v
+func (ir *ImmutableRecord) SetModificationTime(v Time) {
+	ir.mtime = v
 }
 
-func (th *ThinRecord) Record() DirectRecord {
-	panic("DirectRecord requested from ThinRecord")
+func (ir *ImmutableRecord) Record() DirectRecord {
+	panic("DirectRecord requested from ImmutableRecord")
 }
 
-func (th *ThinRecord) Nlinks() uint32 {
-	return th.nlinks
+func (ir *ImmutableRecord) Nlinks() uint32 {
+	return ir.nlinks
 }
 
-func (th *ThinRecord) EncodeExtendedKey() []byte {
-	return EncodeExtendedKey(th.ID(), th.Type(), th.Size())
+func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
+	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
 }
 
-func (th *ThinRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
-	return th
+func (ir *ImmutableRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
+	return ir
 }
