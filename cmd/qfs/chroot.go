@@ -188,10 +188,8 @@ func setupBindMounts(rootdir string) error {
 	return nil
 }
 
-func switchUserMode() error {
-	lognameStr := os.Getenv("SUDO_USER")
-
-	logUser, err := user.Lookup(lognameStr)
+func switchUser(username string) error {
+	logUser, err := user.Lookup(username)
 	if err != nil {
 		return err
 	}
@@ -224,11 +222,11 @@ func switchUserMode() error {
 		return err
 	}
 
-	if err = os.Setenv("USER", lognameStr); err != nil {
+	if err = os.Setenv("USER", username); err != nil {
 		return err
 	}
 
-	if err = os.Setenv("USERNAME", lognameStr); err != nil {
+	if err = os.Setenv("USERNAME", username); err != nil {
 		return err
 	}
 
@@ -329,7 +327,9 @@ func copyDirStayOnFs(src string, dst string) error {
 	})
 }
 
-func nonPersistentChroot(rootdir string, workingdir string, cmd []string) error {
+func nonPersistentChroot(username string, rootdir string, workingdir string,
+	cmd []string) error {
+
 	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())
@@ -499,8 +499,8 @@ func nonPersistentChroot(rootdir string, workingdir string, cmd []string) error 
 	}
 
 	// Switch to non-root user
-	if err := switchUserMode(); err != nil {
-		return fmt.Errorf("Switching usermode error: %s", err.Error())
+	if err := switchUser(username); err != nil {
+		return fmt.Errorf("Switching user error: %s", err.Error())
 	}
 
 	if err := setArchitecture(archStr); err != nil {
@@ -546,25 +546,27 @@ func chroot() {
 		return
 	}
 
-	if len(os.Args) < 5 {
+	if len(os.Args) < 6 {
 		fmt.Fprintln(os.Stderr, "Not enough arguments.")
 		os.Exit(exitBadArgs)
 	}
 
+	username := os.Args[2]
+
 	var wsr string
-	if absdir, err := filepath.Abs(os.Args[2]); err != nil {
+	if absdir, err := filepath.Abs(os.Args[3]); err != nil {
 		fmt.Fprintf(os.Stderr, "Error converting <wsr> path %s to absolute "+
-			"path: %s\n", os.Args[2], err.Error())
+			"path: %s\n", os.Args[3], err.Error())
 		os.Exit(exitBadArgs)
 	} else {
 		wsr = absdir
 	}
 
-	dir := os.Args[3]
+	dir := os.Args[4]
 
 	cmd := make([]string, 0)
 
-	cmd = append(cmd, os.Args[4:]...)
+	cmd = append(cmd, os.Args[5:]...)
 
 	if !isLegitimateWorkspaceRoot(wsr) {
 		fmt.Fprintf(os.Stderr,
@@ -573,7 +575,7 @@ func chroot() {
 		os.Exit(exitBadArgs)
 	}
 
-	if err := nonPersistentChroot(wsr, dir, cmd); err != nil {
+	if err := nonPersistentChroot(username, wsr, dir, cmd); err != nil {
 		fmt.Fprintf(os.Stderr, "error chrooting: %s", err.Error())
 		os.Exit(exitInternalError)
 	}
