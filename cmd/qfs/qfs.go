@@ -35,8 +35,9 @@ func printUsage() {
 	fmt.Println("         - create a new workspaceN which is a copy of" +
 		" workspaceO")
 	fmt.Println("           as of this point in time")
-	fmt.Println("  chroot <wsr> <dir> <cmd>")
+	fmt.Println("  chroot <username> <wsr> <dir> <cmd>")
 	fmt.Println("         - Run shell chrooted into the specified workspace")
+	fmt.Println("           username - Username to use inside chroot")
 	fmt.Println("           wsr - Path to workspace root")
 	fmt.Println("           dir - Path to change to within the chroot")
 	fmt.Println("           cmd - Command to run after chrooting, may")
