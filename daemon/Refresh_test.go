@@ -164,6 +164,37 @@ func delXattrTestFile(test *testHelper,
 	})
 }
 
+func createTestSymlinkNoSync(test *testHelper, workspace string, name string,
+	symname string) {
+
+	err := syscall.Symlink(workspace+"/"+name, workspace+"/"+symname)
+	test.AssertNoErr(err)
+}
+
+func createTestSymlink(test *testHelper,
+	workspace string, name string, symname string) quantumfs.ObjectKey {
+
+	return synced_op(test, workspace, func() {
+		createTestSymlinkNoSync(test, workspace, name, symname)
+	})
+}
+
+func createTestSpecialFileNoSync(test *testHelper, workspace string, name string,
+	dev int) {
+
+	err := syscall.Mknod(workspace+"/"+name, syscall.S_IFBLK|syscall.S_IRWXU,
+		dev)
+	test.AssertNoErr(err)
+}
+
+func createTestSpecialFile(test *testHelper,
+	workspace string, name string, dev int) quantumfs.ObjectKey {
+
+	return synced_op(test, workspace, func() {
+		createTestSpecialFileNoSync(test, workspace, name, dev)
+	})
+}
+
 func markImmutable(ctx *ctx, workspace string) {
 	defer ctx.qfs.mutabilityLock.Lock().Unlock()
 	ctx.qfs.workspaceMutability[workspace] = workspaceImmutable
@@ -843,14 +874,22 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func verifyContentStartsWith(test *testHelper, file *os.File, expected string) {
+// Returns 1 if the content matches, 0 otherwise
+func doesContentStartWith(test *testHelper, file *os.File, expected string) int {
 	content := make([]byte, len(expected))
 	_, err := file.Seek(0, os.SEEK_SET)
 	test.AssertNoErr(err)
 	_, err = io.ReadFull(file, content)
 	test.AssertNoErr(err)
-	test.Assert(string(content) == expected,
-		fmt.Sprintf("content mismatch _%s_", content))
+	if string(content) == expected {
+		return 1
+	} else {
+		return 0
+	}
+}
+func verifyContentStartsWith(test *testHelper, file *os.File, expected string) {
+	test.Assert(doesContentStartWith(test, file, expected) == 1,
+		fmt.Sprintf("content mismatch"))
 }
 
 type createFunc func(name string, content string) error
@@ -920,6 +959,20 @@ func createHardlink(name string, content string) error {
 		return err
 	}
 	return syscall.Link(name, name+"_link")
+}
+
+func purgeHardlinkThenCreate(create createFunc) createFunc {
+	return func(name string, content string) error {
+		err := syscall.Unlink(name)
+		if err != nil {
+			return err
+		}
+		err = syscall.Unlink(name + "_link")
+		if err != nil {
+			return err
+		}
+		return create(name, content)
+	}
 }
 
 func createSmallFile(name string, content string) error {
@@ -1051,6 +1104,185 @@ func TestRefreshType_H2H_S2VL(t *testing.T) {
 	runTest(t, contentCheckTestGen(createHardlink, createVeryLargeFile))
 }
 
+func TestRefreshType_H_S2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createSmallFile, createHardlink))
+}
+
+func TestRefreshType_S2H_S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createHardlink,
+		purgeHardlinkThenCreate(createSmallFile)))
+}
+
+func GenTestRefreshType_MediumAndLarge2HardlinkToSmall(
+	workspaceRootHardlinks bool) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+		content3 := "the third"
+
+		name := "testFile"
+		if !workspaceRootHardlinks {
+			utils.MkdirAll(workspace+"/subdir", 0777)
+			name = "subdir/testFile"
+		}
+
+		fullname := workspace + "/" + name
+
+		err := createHardlink(fullname, content1)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err = syscall.Unlink(fullname)
+		test.AssertNoErr(err)
+		err = syscall.Unlink(fullname + "_link")
+		test.AssertNoErr(err)
+		err = createMediumFile(fullname, content2)
+		test.AssertNoErr(err)
+		err = createLargeFile(fullname+"_link", content3)
+		test.AssertNoErr(err)
+
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file1, content2)
+
+		file2, err := os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file2, content3)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2,
+			newRootId1)
+
+		// exactly one of the two files should inherit the content to
+		// be able to reuse their file handle, the other one is now
+		// orphaned and will have its old content
+		nmatches := doesContentStartWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content1)
+		test.AssertNoErr(file2.Close())
+		test.Assert(nmatches == 1, "Hit %d matches. Expected one.",
+			nmatches)
+
+		// but after grabbing a new file handle, both should
+		// have valid content
+		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err = os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		nmatches = doesContentStartWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content1)
+		test.AssertNoErr(file2.Close())
+		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
+			nmatches)
+
+		removeTestFileNoSync(test, workspace, name)
+		removeTestFileNoSync(test, workspace, name+"_link")
+	}
+}
+
+func TestRefreshType_MediumAndLarge2HardlinkToSmallWorkspaceRoot(t *testing.T) {
+	runTest(t, GenTestRefreshType_MediumAndLarge2HardlinkToSmall(true))
+}
+
+func TestRefreshType_MediumAndLarge2HardlinkToSmallSubdir(t *testing.T) {
+	runTest(t, GenTestRefreshType_MediumAndLarge2HardlinkToSmall(false))
+}
+
+func GenTestRefreshType_HardlinkToSmall2MediumAndLarge(
+	workspaceRootHardlinks bool) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+		content3 := "the third"
+
+		name := "testFile"
+		if !workspaceRootHardlinks {
+			utils.MkdirAll(workspace+"/subdir", 0777)
+			name = "subdir/testFile"
+		}
+
+		fullname := workspace + "/" + name
+
+		err := createMediumFile(fullname, content1)
+		test.AssertNoErr(err)
+		err = createLargeFile(fullname+"_link", content2)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err = syscall.Unlink(fullname)
+		test.AssertNoErr(err)
+		err = syscall.Unlink(fullname + "_link")
+		test.AssertNoErr(err)
+		err = createHardlink(fullname, content3)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file1, content3)
+
+		file2, err := os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file2, content3)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2,
+			newRootId1)
+
+		// The hardlink inode is claimed by one of the two files,
+		// therefore, both of them will be pointing at the same
+		// content, either content1 or content2
+		nmatches := doesContentStartWith(test, file1, content1)
+		nmatches += doesContentStartWith(test, file2, content1)
+		test.Assert(nmatches == 0 || nmatches == 2,
+			"Hit %d matches. Expected 0 or 2.", nmatches)
+
+		nmatches += doesContentStartWith(test, file1, content2)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content2)
+		test.AssertNoErr(file2.Close())
+		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
+			nmatches)
+
+		// but after grabbing a new file handle, both should have
+		// valid content
+		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err = os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		nmatches = doesContentStartWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content2)
+		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
+			nmatches)
+		test.AssertNoErr(file2.Close())
+
+		removeTestFileNoSync(test, workspace, name)
+		removeTestFileNoSync(test, workspace, name+"_link")
+	}
+}
+
+func TestRefreshType_HardlinkToSmall2MediumAndLargeWorkspaceRoot(t *testing.T) {
+	runTest(t, GenTestRefreshType_HardlinkToSmall2MediumAndLarge(true))
+}
+
+func TestRefreshType_HardlinkToSmall2MediumAndLargeSubdir(t *testing.T) {
+	runTest(t, GenTestRefreshType_HardlinkToSmall2MediumAndLarge(false))
+}
+
 func TestRefreshXattrsRemove(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ctx := test.TestCtx()
@@ -1090,5 +1322,222 @@ func TestRefreshXattrsAddition(t *testing.T) {
 
 		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 		verifyXattr(test, workspace, testfile, attr, content)
+	})
+}
+
+func TestRefreshSymlinkRemovalOrphaned(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile := "testfile"
+		fullname := workspace + "/" + testfile
+		ctx := test.TestCtx()
+
+		newRootId1 := createTestFile(test, workspace, testfile, 1000)
+		newRootId2 := createTestSymlink(test, workspace, testfile,
+			testfile+"_symlink")
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertFileIsOfSize(test, fullname+"_symlink", 1000)
+
+		const O_PATH = 010000000
+		fd, err := syscall.Open(fullname+"_symlink",
+			O_PATH|syscall.O_NOFOLLOW, 0)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertNoFile(test, fullname+"_symlink")
+
+		var stat syscall.Stat_t
+		err = syscall.Fstat(fd, &stat)
+		test.AssertNoErr(err)
+
+		var expectedPermissions uint32
+		expectedPermissions |= syscall.S_IFLNK
+		expectedPermissions |= syscall.S_IRWXU | syscall.S_IRWXG |
+			syscall.S_IRWXO
+		test.Assert(stat.Mode == expectedPermissions,
+			"Symlink has wrong permissions %x", stat.Mode)
+
+		err = syscall.Close(fd)
+		test.AssertNoErr(err)
+	})
+}
+
+func TestRefreshSymlinkAddition(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile := "testfile"
+		fullname := workspace + "/" + testfile
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, testfile, 1000)
+		newRootId1 := createTestSymlink(test, workspace, testfile,
+			testfile+"_symlink")
+		newRootId2 := removeTestFile(test, workspace, testfile+"_symlink")
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertNoFile(test, fullname+"_symlink")
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertFileIsOfSize(test, fullname+"_symlink", 1000)
+	})
+}
+
+func TestRefreshType_smallfile2symlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile := "testfile"
+		fullname := workspace + "/" + testfile
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, testfile, 1000)
+		newRootId1 := createTestSymlink(test, workspace, testfile,
+			testfile+"_symlink")
+		removeTestFileNoSync(test, workspace, testfile+"_symlink")
+		newRootId2 := createTestFile(test, workspace, testfile+"_symlink",
+			2000)
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertFileIsOfSize(test, fullname+"_symlink", 2000)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertFileIsOfSize(test, fullname+"_symlink", 1000)
+		removeTestFileNoSync(test, workspace, testfile)
+		removeTestFileNoSync(test, workspace, testfile+"_symlink")
+	})
+}
+
+func TestRefreshType_symlink2smallfile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile := "testfile"
+		fullname := workspace + "/" + testfile
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, testfile, 1000)
+		newRootId1 := createTestFile(test, workspace, testfile+"_symlink",
+			2000)
+		removeTestFileNoSync(test, workspace, testfile+"_symlink")
+		newRootId2 := createTestSymlink(test, workspace, testfile,
+			testfile+"_symlink")
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertFileIsOfSize(test, fullname+"_symlink", 1000)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		assertFileIsOfSize(test, fullname, 1000)
+		assertFileIsOfSize(test, fullname+"_symlink", 2000)
+		removeTestFileNoSync(test, workspace, testfile)
+		removeTestFileNoSync(test, workspace, testfile+"_symlink")
+	})
+}
+
+func TestRefreshType_H2H_unchanged_symlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile := "testfile"
+		fullname := workspace + "/" + testfile
+		content1 := "original content"
+		content2 := "CONTENT2"
+		ctx := test.TestCtx()
+
+		createTestFileNoSync(test, workspace, testfile, 1000)
+		createTestSymlinkNoSync(test, workspace, testfile,
+			testfile+"_symlink")
+		createHardlink(fullname+"_symlink", content1)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		testutils.OverWriteFile(fullname+"_symlink", content2)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file, content2)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		verifyContentStartsWith(test, file, content1)
+
+		err = file.Close()
+		test.AssertNoErr(err)
+	})
+}
+
+func TestRefreshType_symlink2symlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile1 := "testfile1"
+		testfile2 := "testfile2"
+		symfile := "symfile"
+		fullname := workspace + "/" + symfile
+		content1 := "original content"
+		content2 := "CONTENT2"
+		ctx := test.TestCtx()
+
+		createSmallFile(workspace+"/"+testfile1, content1)
+		createSmallFile(workspace+"/"+testfile2, content2)
+		newRootId1 := createTestSymlink(test, workspace, testfile1, symfile)
+
+		removeTestFileNoSync(test, workspace, symfile)
+		newRootId2 := createTestSymlink(test, workspace, testfile2, symfile)
+
+		assertFileIsOfSize(test, fullname, int64(len(content2)))
+		file, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file, content2)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		assertFileIsOfSize(test, fullname, int64(len(content1)))
+
+		// Open() has followed the symlink already, so it must read the
+		// content of testfile2
+		assertOpenFileIsOfSize(test, int(file.Fd()), int64(len(content2)))
+		verifyContentStartsWith(test, file, content2)
+		err = file.Close()
+		test.AssertNoErr(err)
+
+		removeTestFileNoSync(test, workspace, testfile1)
+		removeTestFileNoSync(test, workspace, testfile2)
+		removeTestFileNoSync(test, workspace, symfile)
+	})
+}
+
+func assertDeviceIs(test *testHelper, fullname string, device int) {
+	var stat syscall.Stat_t
+	err := syscall.Stat(fullname, &stat)
+	test.AssertNoErr(err)
+	test.Assert(stat.Rdev == uint64(device),
+		"Expected device %x got %x", device, stat.Rdev)
+}
+
+func TestRefreshType_special2special(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testfile := "testfile"
+		fullname := workspace + "/" + testfile
+		ctx := test.TestCtx()
+
+		newRootId1 := createTestSpecialFile(test, workspace, testfile,
+			0xdead)
+		assertDeviceIs(test, fullname, 0xdead)
+		removeTestFileNoSync(test, workspace, testfile)
+
+		newRootId2 := createTestSpecialFile(test, workspace, testfile,
+			0xbeef)
+		assertDeviceIs(test, fullname, 0xbeef)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+		assertDeviceIs(test, fullname, 0xdead)
+		removeTestFileNoSync(test, workspace, testfile)
 	})
 }

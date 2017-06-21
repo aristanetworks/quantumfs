@@ -425,16 +425,21 @@ func (v ObjectType) Primitive() interface{} {
 	return uint8(v)
 }
 
-func (v ObjectType) isRegular() bool {
+func (v ObjectType) IsRegularFile() bool {
 	return v == ObjectTypeSmallFile || v == ObjectTypeMediumFile ||
 		v == ObjectTypeLargeFile || v == ObjectTypeVeryLargeFile
 }
 
 func (v ObjectType) Matches(o ObjectType) bool {
-	if v.isRegular() {
-		return o.isRegular()
+	if v.IsRegularFile() {
+		return o.IsRegularFile()
 	}
 	return v == o
+}
+
+// Symlinks and special files are immutable once created
+func (v ObjectType) IsImmutable() bool {
+	return v == ObjectTypeSymlink || v == ObjectTypeSpecial
 }
 
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
