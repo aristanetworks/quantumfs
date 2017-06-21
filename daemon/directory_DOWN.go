@@ -63,8 +63,6 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		return err
 	}
 
-	srcInode.markSelfAccessed(c, false)
-
 	newRecord.SetFilename(newName)
 
 	// We cannot lock earlier because the parent of srcInode may be us
@@ -75,12 +73,13 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		return dir.children.loadChild(c, newRecord, quantumfs.InodeIdInvalid)
 	}()
 
-	dir.self.markAccessed(c, newName, true)
+	dir.self.markAccessed(c, newName,
+		markType(newRecord.Type(), quantumfs.PathCreated))
 
 	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 	out.NodeId = uint64(inodeNum)
-	c.qfs.increaseLookupCount(inodeNum)
+	c.qfs.increaseLookupCount(c, inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		newRecord)

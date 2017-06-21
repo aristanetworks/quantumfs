@@ -115,8 +115,6 @@ func (fi *File) dirtyChild(c *ctx, child InodeId) {
 func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
 	defer c.funcIn("File::Access").Out()
-
-	fi.markSelfAccessed(c, false)
 	return hasAccessPermission(c, fi, mask, uid, gid)
 }
 
@@ -152,7 +150,6 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	if err != fuse.OK {
 		return err
 	}
-	fi.self.markSelfAccessed(c, false)
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
@@ -198,6 +195,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 			if attr.Size == 0 {
 				fi.accessor.truncate(c, 0)
+				fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 				return fuse.OK
 			}
 			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
@@ -215,6 +213,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			}
 
 			fi.self.dirty(c)
+			fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 		}
 
 		return fuse.OK
@@ -475,6 +474,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 		return fuse.ReadResult(nil), fuse.EIO
 	}
 
+	fi.self.markSelfAccessed(c, quantumfs.PathRead)
 	c.vlog("Returning %d bytes", readCount)
 
 	return fuse.ReadResultData(buf[:readCount]), fuse.OK
@@ -509,6 +509,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	attr.Size = uint64(fi.accessor.fileLength(c))
 	fi.parentSetChildAttr(c, fi.id, nil, &attr, nil, true)
 	fi.dirty(c)
+	fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 
 	return writeCount, fuse.OK
 }
