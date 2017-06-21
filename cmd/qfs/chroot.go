@@ -173,14 +173,11 @@ func setArchitecture(arch string) error {
 	return nil
 }
 
-func setupBindMounts(rootdir string) error {
+func setupBindMounts(rootdir string, quantumFsMount string) error {
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
-		"/tmp/ArosTest.SimulatedDut"}
+		"/tmp/ArosTest.SimulatedDut", quantumFsMount}
 	homes := homedirs()
 	paths = append(paths, homes...)
-
-	quantumfsMount := quantumfs.FindQuantumfsMountPath()
-	paths = append(paths, quantumfsMount)
 
 	for i := 0; i < len(paths); i++ {
 		src := paths[i]
@@ -376,6 +373,8 @@ func nonPersistentChroot(rootdir string, workingdir string, cmd []string) error 
 		return fmt.Errorf("Stating / error: %s", err.Error())
 	}
 
+	quantumFsMount := quantumfs.FindQuantumFsMountPath()
+
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
 		// pivot_root will only work when root directory is a mountpoint
 		if err := syscall.Mount(rootdir, rootdir, "",
@@ -420,7 +419,7 @@ func nonPersistentChroot(rootdir string, workingdir string, cmd []string) error 
 				err.Error())
 		}
 
-		if err := setupBindMounts(rootdir); err != nil {
+		if err := setupBindMounts(rootdir, quantumFsMount); err != nil {
 			return err
 		}
 
