@@ -179,8 +179,7 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	if mountOptions.Options == nil {
 		mountOptions.Options = []string{}
 	}
-	mountOptions.Options = append(mountOptions.Options, "suid")
-	mountOptions.Options = append(mountOptions.Options, "dev")
+	mountOptions.Options = append(mountOptions.Options, "suid", "dev")
 
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
 	if err != nil {
