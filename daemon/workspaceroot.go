@@ -312,6 +312,38 @@ func (wsr *WorkspaceRoot) getHardlink(linkId HardlinkId) (valid bool,
 	return false, quantumfs.DirectRecord{}
 }
 
+func (wsr *WorkspaceRoot) getInodeIdNoInstantiate(c *ctx,
+	linkId HardlinkId) InodeId {
+
+	defer c.FuncIn("WorkspaceRoot::getInodeIdNoInstantiate", "linkId %d",
+		linkId).Out()
+	defer wsr.linkLock.Lock().Unlock()
+
+	hardlink, exists := wsr.hardlinks[linkId]
+	if !exists {
+		return quantumfs.InodeIdInvalid
+	}
+	return hardlink.inodeId
+}
+
+func (wsr *WorkspaceRoot) updateHardlinkInodeId(c *ctx, linkId HardlinkId,
+	inodeId InodeId) {
+
+	defer c.FuncIn("WorkspaceRoot::updateHardlinkInodeId", "%d: %d",
+		linkId, inodeId).Out()
+	defer wsr.linkLock.Lock().Unlock()
+
+	hardlink, exists := wsr.hardlinks[linkId]
+	utils.Assert(exists, "Hardlink id %d does not exist.", linkId)
+
+	utils.Assert(hardlink.inodeId == quantumfs.InodeIdInvalid,
+		"Hardlink id %d already has associated inodeid %d",
+		linkId, hardlink.inodeId)
+	hardlink.inodeId = inodeId
+	wsr.hardlinks[linkId] = hardlink
+	wsr.inodeToLink[inodeId] = linkId
+}
+
 func (wsr *WorkspaceRoot) hardlinkExists(c *ctx, linkId HardlinkId) bool {
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -461,7 +493,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 }
 
 func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
-	hardlink *quantumfs.HardlinkRecord) {
+	hrc *HardlinkRefreshCtx, hardlink *quantumfs.HardlinkRecord) {
 
 	defer c.funcIn("WorkspaceRoot::handleRemoteHardlink").Out()
 	id := HardlinkId(hardlink.HardlinkID())
@@ -487,7 +519,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		}
 		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
 			entry.record.ID().Text(), hardlink.Record().ID().Text())
-		reload(c, inode, *hardlink.Record())
+		reload(c, hrc, inode, *hardlink.Record())
 
 		status := c.qfs.invalidateInode(entry.inodeId)
 		utils.Assert(status == fuse.OK,
@@ -495,27 +527,41 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	}
 }
 
-func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx, entry quantumfs.HardlinkEntry) {
+type HardlinkRefreshCtx struct {
+	claimedLinks map[HardlinkId]InodeId
+}
+
+func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
+	hrc *HardlinkRefreshCtx, entry quantumfs.HardlinkEntry) {
+
 	defer c.funcIn("WorkspaceRoot::refreshHardlinks").Out()
 	defer wsr.linkLock.Lock().Unlock()
 
-	remoteEntries := make(map[HardlinkId]bool, 0)
-
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
-		remoteEntries[HardlinkId(hardlink.HardlinkID())] = true
-		wsr.handleRemoteHardlink(c, hardlink)
+		hrc.claimedLinks[HardlinkId(hardlink.HardlinkID())] =
+			quantumfs.InodeIdInvalid
+		wsr.handleRemoteHardlink(c, hrc, hardlink)
 	})
+}
+
+func (wsr *WorkspaceRoot) removeStaleHardlinks(c *ctx,
+	hrc *HardlinkRefreshCtx, entry quantumfs.HardlinkEntry) {
+
+	defer c.funcIn("WorkspaceRoot::removeStaleHardlinks").Out()
+	defer wsr.linkLock.Lock().Unlock()
 
 	for hardlinkId, entry := range wsr.hardlinks {
-		if _, exists := remoteEntries[hardlinkId]; !exists {
-			c.vlog("Removing stale hardlink id %d, inode %d, nlink %d",
+		if inodeId, exists := hrc.claimedLinks[hardlinkId]; !exists {
+			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
 				hardlinkId, entry.inodeId, entry.nlink)
-			wsr.removeHardlink_(hardlinkId, entry.inodeId)
 			if inode := c.qfs.inodeNoInstantiate(c,
 				entry.inodeId); inode != nil {
 
 				inode.orphan(c, entry.record)
 			}
+			wsr.removeHardlink_(hardlinkId, entry.inodeId)
+		} else if inodeId != quantumfs.InodeIdInvalid {
+			wsr.removeHardlink_(hardlinkId, entry.inodeId)
 		}
 	}
 }
@@ -537,17 +583,22 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 
-	wsr.refreshHardlinks(c, workspaceRoot.HardlinkEntry())
+	var hrc HardlinkRefreshCtx
+	hrc.claimedLinks = make(map[HardlinkId]InodeId, 0)
+
+	wsr.refreshHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
 
 	var addedUninstantiated, removedUninstantiated []InodeId
 	func() {
 		defer wsr.LockTree().Unlock()
 		addedUninstantiated, removedUninstantiated =
-			wsr.refresh_DOWN(c, workspaceRoot.BaseLayer())
+			wsr.refresh_DOWN(c, &hrc, workspaceRoot.BaseLayer())
 	}()
 
 	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
 	c.qfs.removeUninstantiated(c, removedUninstantiated)
+
+	wsr.removeStaleHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
 }
 
 func (wsr *WorkspaceRoot) refresh(c *ctx) {
