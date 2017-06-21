@@ -10,6 +10,8 @@
 #include <string.h>
 
 extern "C" {
+#include "_cgo_export.h"
+
 	// We need a unique identifier to give out for each Api instance.
 	// The map is from identifiers to Apis
 	static pthread_mutex_t mapLock = PTHREAD_MUTEX_INITIALIZER;
@@ -96,14 +98,29 @@ extern "C" {
 		return "";
 	}
 
-	const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot) {
+	const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot,
+		uint64_t pathId) {
+
 		auto api = findApi(apiHandle);
 		if (!api) {
 			return "Api doesn't exist.";
 		}
 
-		qfsclient::Error err = api->GetAccessed(workspaceRoot);
-		return errStr(err);
+		qfsclient::PathsAccessed accessed_list;
+
+		qfsclient::Error err = api->GetAccessed(workspaceRoot, &accessed_list);
+		if (err.code != 0) {
+			return errStr(err);
+		}
+
+		for (auto i = accessed_list.paths.begin();
+		    i != accessed_list.paths.end();
+		    ++i) {
+			setPath(pathId, const_cast<char *>(i->first.c_str()),
+				i->second);
+		}
+
+		return "";
 	}
 
 	const char * cInsertInode(uint32_t apiHandle, const char *dest,
