@@ -170,6 +170,18 @@ type QuantumFs struct {
 
 func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	qfs.c.dlog("QuantumFs::Serve Initializing server")
+
+	// Set the common set of required options
+	mountOptions.AllowOther = true
+	mountOptions.MaxBackground = 1024
+	mountOptions.MaxWrite = quantumfs.MaxBlockSize
+	mountOptions.FsName = "QuantumFS"
+	if mountOptions.Options == nil {
+		mountOptions.Options = []string{}
+	}
+	mountOptions.Options = append(mountOptions.Options, "suid")
+	mountOptions.Options = append(mountOptions.Options, "dev")
+
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
 	if err != nil {
 		return err
