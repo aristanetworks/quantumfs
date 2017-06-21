@@ -176,9 +176,6 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	mountOptions.MaxBackground = 1024
 	mountOptions.MaxWrite = quantumfs.MaxBlockSize
 	mountOptions.FsName = "QuantumFS"
-	if mountOptions.Options == nil {
-		mountOptions.Options = []string{}
-	}
 	mountOptions.Options = append(mountOptions.Options, "suid", "dev")
 
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
