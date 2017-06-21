@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -505,7 +506,29 @@ func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 
 	child := c.qfs.inode(c, childId)
 	if child != nil {
-		child.parentCheckLinkReparent(c, dir)
+		linkId := child.parentCheckLinkReparent(c, dir)
+		dir.stashChildLinkId(c, childId, linkId)
+	}
+}
+
+func (dir *Directory) childStashedLinkId(c *ctx, childId InodeId) HardlinkId {
+	if buf, status := dir.getChildXAttrData(c, childId,
+		quantumfs.XAttrTypeLinkID); status == fuse.OK {
+
+		if id, err := strconv.ParseUint(string(buf), 16, 64); err != nil {
+			c.elog("Failed to extract hardlinkid from %s, err %s",
+				string(buf), err.Error())
+		} else {
+			return HardlinkId(id)
+		}
+	}
+	return InvalidHardlinkId
+}
+
+func (dir *Directory) stashChildLinkId(c *ctx, childId InodeId, linkId HardlinkId) {
+	if linkId != InvalidHardlinkId {
+		dir.setChildXAttr(c, childId, quantumfs.XAttrTypeLinkID,
+			strconv.AppendUint(nil, uint64(linkId), 16))
 	}
 }
 

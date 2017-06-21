@@ -202,6 +202,9 @@ func generateUniqueHardlinkId(c *ctx,
 	// random numbers for hardlinks that already exist is basically zero
 	for {
 		newId := HardlinkId(rand.Uint64())
+		if newId == InvalidHardlinkId {
+			continue
+		}
 		if _, exists := hardlinks[newId]; exists {
 			c.wlog("HardlinkId generation collision: %d", newId)
 		} else {
@@ -210,8 +213,8 @@ func generateUniqueHardlinkId(c *ctx,
 	}
 }
 
-func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeId,
-	record quantumfs.DirectoryRecord) *Hardlink {
+func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, linkId HardlinkId,
+	inodeId InodeId, record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
 
@@ -226,9 +229,11 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeI
 
 	defer wsr.linkLock.Lock().Unlock()
 
-	newId := generateUniqueHardlinkId(c, wsr.hardlinks)
+	if linkId == InvalidHardlinkId {
+		linkId = generateUniqueHardlinkId(c, wsr.hardlinks)
+		c.vlog("New Hardlink %d created for inodeId %d", linkId, inodeId)
+	}
 
-	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
 	newEntry := newLinkEntry(dirRecord)
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
@@ -239,14 +244,14 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeI
 	// of a set of files into a set of hardlinks.
 	newEntry.record.SetFilename(fingerprint)
 
-	wsr.hardlinks[newId] = newEntry
-	wsr.inodeToLink[inodeId] = newId
+	wsr.hardlinks[linkId] = newEntry
+	wsr.inodeToLink[inodeId] = linkId
 
 	// Don't reparent the inode, the caller must do so while holding the inode's
 	// parent lock
 	wsr.dirty(c)
 
-	return newHardlink(record.Filename(), newId, wsr)
+	return newHardlink(record.Filename(), linkId, wsr)
 }
 
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
