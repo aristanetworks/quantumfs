@@ -509,17 +509,24 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
+		oldRecord := entry.record
+
 		entry.nlink = hardlink.Nlinks()
 		entry.record = hardlink.Record()
 		wsr.hardlinks[id] = entry
 
-		inode := c.qfs.inodeNoInstantiate(c, entry.inodeId)
-		if inode == nil {
-			return
+		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
+			if inode := c.qfs.inodeNoInstantiate(c,
+				entry.inodeId); inode != nil {
+
+				c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
+					oldRecord.ID().Text(),
+					hardlink.Record().ID().Text())
+				utils.Assert(!hardlink.Record().Type().IsImmutable(),
+					"An immutable type cannot be reloaded.")
+				reload(c, hrc, inode, *hardlink.Record())
+			}
 		}
-		c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
-			entry.record.ID().Text(), hardlink.Record().ID().Text())
-		reload(c, hrc, inode, *hardlink.Record())
 
 		status := c.qfs.invalidateInode(entry.inodeId)
 		utils.Assert(status == fuse.OK,
