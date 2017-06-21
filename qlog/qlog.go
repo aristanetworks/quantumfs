@@ -100,46 +100,39 @@ func SpecialReq(reqId uint64) string {
 	}
 }
 
+var logSubsystem = []string{
+	"Daemon",
+	"Datastore",
+	"WorkspaceDb",
+	"Test",
+	"Qlog",
+	"Quark",
+	"Spin",
+	"Tool",
+}
+
+var logSubsystemMap = map[string]LogSubsystem{
+	"daemon": LogDaemon,
+	"datastore": LogDatastore,
+	"workspacedb": LogWorkspaceDb,
+	"test": LogTest,
+	"qlog": LogQlog,
+	"quark": LogQuark,
+	"spin": LogSpin,
+	"tool": LogTool,
+}
+
+
 func (enum LogSubsystem) String() string {
-	switch enum {
-	case LogDaemon:
-		return "Daemon"
-	case LogDatastore:
-		return "Datastore"
-	case LogWorkspaceDb:
-		return "WorkspaceDb"
-	case LogTest:
-		return "Test"
-	case LogQlog:
-		return "Qlog"
-	case LogQuark:
-		return "Quark"
-	case LogSpin:
-		return "Spin"
-	case LogTool:
-		return "Tool"
+	if 0 <= enum && enum <= logSubsystemMax {
+		return logSubsystem[enum]
 	}
 	return ""
 }
 
 func getSubsystem(sys string) (LogSubsystem, error) {
-	switch strings.ToLower(sys) {
-	case "daemon":
-		return LogDaemon, nil
-	case "datastore":
-		return LogDatastore, nil
-	case "workspacedb":
-		return LogWorkspaceDb, nil
-	case "test":
-		return LogTest, nil
-	case "qlog":
-		return LogQlog, nil
-	case "quark":
-		return LogQuark, nil
-	case "spin":
-		return LogSpin, nil
-	case "tool":
-		return LogTool, nil
+	if m, ok := logsubsystemMap[strings.ToLower(sys)] ; ok {
+		return m, nil;
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
