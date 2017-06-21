@@ -196,19 +196,6 @@ func setupBindMounts(rootdir string) error {
 	return nil
 }
 
-func printHelp() {
-	fmt.Println("   qfs chroot -- Run a command or shell in the current")
-	fmt.Println("                 workspace tree. The chroot environment")
-	fmt.Println("                 can be specified to be nonpersistent,")
-	fmt.Println("                 or by default it is persistent.\n")
-	fmt.Println("   qfs chroot")
-	fmt.Println("   qfs chroot --nonpersistent <WSR> <DIR> <CMD>\n")
-	fmt.Println("   Options:")
-	fmt.Println("      --nonpersistent <WSR> <DIR> <CMD>  Change <WSR> as",
-		" the filesystem root,")
-	fmt.Println("        enter working directory <DIR> and run command <CMD>")
-}
-
 func switchUserMode() error {
 	lognameStr := os.Getenv("SUDO_USER")
 
@@ -569,13 +556,12 @@ func chroot() {
 
 	if len(os.Args) < 5 {
 		fmt.Fprintln(os.Stderr, "Not enough arguments.")
-		printHelp()
 		os.Exit(exitBadArgs)
 	}
 
 	var wsr string
 	if absdir, err := filepath.Abs(os.Args[2]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error converting path %s to absolute "+
+		fmt.Fprintf(os.Stderr, "Error converting <wsr> path %s to absolute "+
 			"path: %s\n", os.Args[2], err.Error())
 		os.Exit(exitBadArgs)
 	} else {
@@ -590,9 +576,8 @@ func chroot() {
 
 	if !isLegitimateWorkspaceRoot(wsr) {
 		fmt.Fprintf(os.Stderr,
-			"Invalid workspaceroot: %s, <WSR> must be a"+
+			"Invalid workspaceroot: %s, <wsr> must be a"+
 				" legitimate workspaceroot\n", wsr)
-		printHelp()
 		os.Exit(exitBadArgs)
 	}
 
