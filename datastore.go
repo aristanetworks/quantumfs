@@ -864,8 +864,9 @@ type DirectoryRecord interface {
 
 	EncodeExtendedKey() []byte
 
-	// Returns a direct record copy, regardless of underlying class, causing
-	// all future changes to the copy to be unreflected in the original.
+	// Return an immutable copy. Changes made to this object after calling
+	// AsImmutableDirectoryRecord() will not result in those changes being
+	// reflected in the ImmutableDirectoryRecord.
 	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
 
 	// returns a real copy, which can result in future changes changing the
