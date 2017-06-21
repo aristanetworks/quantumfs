@@ -617,7 +617,12 @@ func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
 
 	switch remoteRecord.Type() {
 	default:
-		panic("not implemented yet")
+		panic(fmt.Sprintf("Reload unsupported on files of type %d",
+			remoteRecord.Type()))
+	case quantumfs.ObjectTypeSpecial:
+		panic("special files cannot be reloaded.")
+	case quantumfs.ObjectTypeSymlink:
+		panic("symlinks cannot be reloaded.")
 	case quantumfs.ObjectTypeDirectory:
 		subdir := inode.(*Directory)
 		uninstantiated, removedUninstantiated :=
