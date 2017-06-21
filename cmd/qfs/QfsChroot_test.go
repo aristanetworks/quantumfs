@@ -63,6 +63,19 @@ func init() {
 	}
 }
 
+// A helper function to run command which gives better error information
+func runCommand(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+
+	if buf, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Error in runCommand: %s\n"+
+			"Command: %s %v\n Output: %s",
+			err.Error(), name, args, string(buf))
+	}
+
+	return nil
+}
+
 // setup a minimal workspace
 func setupWorkspace(t *testing.T) string {
 	dirTest := testutils.SetupTestspace("TestChroot")
@@ -165,18 +178,6 @@ func cleanupWorkspace(workspace string, t *testing.T) {
 	}
 }
 
-func terminateNetnsdServer(rootdir string, t *testing.T) {
-	svrName := rootdir + "/chroot"
-
-	if serverRunning(svrName) {
-		if err := runCommand(sudo, netns, "-k", svrName); err != nil {
-			t.Fatal(err.Error())
-		}
-		// Wait for the chroot to no longer be used
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-
 // Change the UID/GID the test thread to the given values. Use -1 not to change
 // either the UID or GID.
 func setUidGid(uid int, gid int, t *testing.T) {
@@ -226,178 +227,6 @@ func setUidGidToDefault(t *testing.T) {
 	}
 }
 
-func testPersistentChroot(t *testing.T, dirTest string) {
-	var fileTest string
-	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
-		t.Fatalf("Creating test file error: %s", err.Error())
-	} else {
-		fileTest = fd.Name()[len(dirTest):]
-		fd.Close()
-	}
-
-	if err := os.Chdir(dirTest); err != nil {
-		t.Fatalf("Changing to directory %s error: %s", dirTest, err.Error())
-	}
-
-	cmdChroot := exec.Command(testqfs, "chroot")
-
-	stdin, err := cmdChroot.StdinPipe()
-	if err != nil {
-		t.Fatalf("Error getting stdin: %s", err.Error())
-	}
-
-	stderr, err := cmdChroot.StderrPipe()
-	if err != nil {
-		t.Fatalf("Error getting stderr: %s", err.Error())
-	}
-
-	if err := cmdChroot.Start(); err != nil {
-		t.Fatalf("Executing error:%s", err.Error())
-	}
-
-	cmdFileTest := "cd /;cd ..;ls -l " + fileTest
-	if _, err := stdin.Write([]byte(cmdFileTest)); err != nil {
-		t.Fatalf("Error writing command: %s", err.Error())
-	}
-
-	if err := stdin.Close(); err != nil {
-		t.Fatalf("Error closing command writer: %s",
-			err.Error())
-	}
-
-	errInfo, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		t.Fatalf("Error reading standard error: %s", err.Error())
-	}
-
-	if err := cmdChroot.Wait(); err != nil {
-		t.Fatalf("Error waiting chroot command: %s \n"+
-			"Error info: %s", err.Error(), string(errInfo))
-	}
-}
-
-func TestPersistentChroot(t *testing.T) {
-	cleanup := func(t *testing.T, dirTest string) {
-		terminateNetnsdServer(dirTest, t)
-		cleanupWorkspace(dirTest, t)
-	}
-
-	func() {
-		dirTest := setupWorkspace(t)
-
-		defer cleanup(t, dirTest)
-
-		testPersistentChroot(t, dirTest)
-	}()
-
-	func() {
-		dirTest := setupWorkspace(t)
-
-		defer cleanup(t, dirTest)
-
-		setUidGid(99, 99, t)
-		defer setUidGidToDefault(t)
-		testPersistentChroot(t, dirTest)
-	}()
-}
-
-func testNetnsPersistency(t *testing.T, dirTest string) {
-	var fileTest string
-	if fd, err := ioutil.TempFile(dirTest, "ChrootTestFile"); err != nil {
-		t.Fatalf("Creating test file error: %s", err.Error())
-	} else {
-		fileTest = fd.Name()[len(dirTest):]
-		fd.Close()
-	}
-
-	if err := os.Chdir(dirTest); err != nil {
-		t.Fatalf("Changing directory to %s error", dirTest)
-	}
-
-	cmdChroot := exec.Command(testqfs, "chroot")
-
-	stdin, err := cmdChroot.StdinPipe()
-	if err != nil {
-		t.Fatalf("Error getting stdin: %s", err.Error())
-	}
-
-	stderr, err := cmdChroot.StderrPipe()
-	if err != nil {
-		t.Fatalf("Error getting stderr: %s", err.Error())
-	}
-
-	if err := cmdChroot.Start(); err != nil {
-		t.Fatalf("Executing error:%s", err.Error())
-	}
-
-	cmdExit := "exit"
-	if _, err := stdin.Write([]byte(cmdExit)); err != nil {
-		t.Fatalf("Error writing command %s\nError Info: %s",
-			cmdExit, err.Error())
-	}
-
-	if err := stdin.Close(); err != nil {
-		t.Fatalf("Error closing standard input: %s", err.Error())
-	}
-
-	errInfo, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		t.Fatalf("Error reading standard error: %s", err.Error())
-	}
-
-	if err := cmdChroot.Wait(); err != nil {
-		t.Fatalf("Error waiting chroot command: %s \n"+
-			"Error info: %s", err.Error(), string(errInfo))
-	}
-
-	cmdNetnsLogin := exec.Command(netns, dirTest+"/chroot",
-		sh, "-l", "-c", "$@", bash, bash)
-	stdinNetnsLogin, err := cmdNetnsLogin.StdinPipe()
-	if err != nil {
-		t.Fatalf("Error getting stdinNetnsLogin: %s", err.Error())
-	}
-
-	if err := cmdNetnsLogin.Start(); err != nil {
-		t.Fatalf("Error starting netnsLogin command: %s", err.Error())
-	}
-
-	cmdFileTest := "cd /; cd ..; ls -l " + fileTest
-	if _, err := stdinNetnsLogin.Write([]byte(cmdFileTest)); err != nil {
-		t.Fatalf("Error writting command: %s", err.Error())
-	}
-
-	if err := stdinNetnsLogin.Close(); err != nil {
-		t.Fatalf("Error closing standarded input: %s", err.Error())
-	}
-
-	if err := cmdNetnsLogin.Wait(); err != nil {
-		t.Fatalf("Error waiting netnsLogin command: %s", err.Error())
-	}
-}
-
-func TestNetnsPersistency(t *testing.T) {
-	cleanup := func(t *testing.T, dirTest string) {
-		terminateNetnsdServer(dirTest, t)
-		cleanupWorkspace(dirTest, t)
-	}
-
-	func() {
-		dirTest := setupWorkspace(t)
-		defer cleanup(t, dirTest)
-
-		testNetnsPersistency(t, dirTest)
-	}()
-
-	func() {
-		dirTest := setupWorkspace(t)
-		defer cleanup(t, dirTest)
-
-		setUidGid(99, 99, t)
-		defer setUidGidToDefault(t)
-		testNetnsPersistency(t, dirTest)
-	}()
-}
-
 // Here we can define several variants of each of the following arguments
 // <WSR>:
 // AbsWsr: Absolute path of workspaceroot in the filesystem before chroot
@@ -445,9 +274,8 @@ func testNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest):]
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -477,9 +305,8 @@ func testNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest):]
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -515,9 +342,8 @@ func testNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -553,9 +379,8 @@ func testNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -585,9 +410,8 @@ func testNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -617,9 +441,8 @@ func testNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T, rootTest string) {
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -656,9 +479,8 @@ func testNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
@@ -695,9 +517,8 @@ func testNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
-	if err := runCommand(testqfs, "chroot", "--nonpersistent", rootTest,
-		dirTest, "ls", fileTest); err != nil {
-
+	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	if err != nil {
 		t.Fatal(err.Error())
 	}
 }
