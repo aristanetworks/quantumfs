@@ -40,3 +40,20 @@ func registerWorkspaceDB(name string, constructor WorkspaceDBConstructor) {
 
 	workspaceDBs = append(workspaceDBs, db)
 }
+
+type TimeSeriesDBConstructor func(conf string) quantumfs.TimeSeriesDB
+type timeseriesDB struct {
+	Name        string
+	Constructor TimeSeriesDBConstructor
+}
+
+var timeseriesDBs [] timeseriesDB
+
+func registerTimeSeriesDB(name string, constructor TimeSeriesDBConstructor) {
+	db := timeseriesDB{
+		Name:        name,
+		Constructor: constructor,
+	}
+
+	timeseriesDBs = append(timeseriesDBs, db)
+}

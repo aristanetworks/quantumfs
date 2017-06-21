@@ -50,3 +50,22 @@ func ConnectWorkspaceDB(name string,
 
 	return nil, fmt.Errorf("Failed to find workspaceDB '%s'\n", name)
 }
+
+func ConnectTimeSeriesDB(name string,
+	config string) (quantumfs.TimeSeriesDB, error) {
+
+	for _, db := range timeseriesDBs {
+		if db.Name != name {
+			continue
+		}
+
+		tsdb := db.Constructor(config)
+		if tsdb == nil {
+			return nil, fmt.Errorf("TimeSeriesDB connection "+
+				"failed '%s:%s'\n", name, config)
+		}
+		return tsdb, nil
+	}
+
+	return nil, fmt.Errorf("Failed to find timeseriesDB '%s'\n", name)
+}
