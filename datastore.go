@@ -1420,80 +1420,40 @@ func (ir *ImmutableRecord) Filename() string {
 	return ir.filename
 }
 
-func (ir *ImmutableRecord) SetFilename(v string) {
-	ir.filename = v
-}
-
 func (ir *ImmutableRecord) ID() ObjectKey {
 	return ir.id
-}
-
-func (ir *ImmutableRecord) SetID(v ObjectKey) {
-	ir.id = v
 }
 
 func (ir *ImmutableRecord) Type() ObjectType {
 	return ir.filetype
 }
 
-func (ir *ImmutableRecord) SetType(v ObjectType) {
-	ir.filetype = v
-}
-
 func (ir *ImmutableRecord) Permissions() uint32 {
 	return ir.permissions
-}
-
-func (ir *ImmutableRecord) SetPermissions(v uint32) {
-	ir.permissions = v
 }
 
 func (ir *ImmutableRecord) Owner() UID {
 	return ir.owner
 }
 
-func (ir *ImmutableRecord) SetOwner(v UID) {
-	ir.owner = v
-}
-
 func (ir *ImmutableRecord) Group() GID {
 	return ir.group
-}
-
-func (ir *ImmutableRecord) SetGroup(v GID) {
-	ir.group = v
 }
 
 func (ir *ImmutableRecord) Size() uint64 {
 	return ir.size
 }
 
-func (ir *ImmutableRecord) SetSize(v uint64) {
-	ir.size = v
-}
-
 func (ir *ImmutableRecord) ExtendedAttributes() ObjectKey {
 	return ir.xattr
-}
-
-func (ir *ImmutableRecord) SetExtendedAttributes(v ObjectKey) {
-	ir.xattr = v
 }
 
 func (ir *ImmutableRecord) ContentTime() Time {
 	return ir.ctime
 }
 
-func (ir *ImmutableRecord) SetContentTime(v Time) {
-	ir.ctime = v
-}
-
 func (ir *ImmutableRecord) ModificationTime() Time {
 	return ir.mtime
-}
-
-func (ir *ImmutableRecord) SetModificationTime(v Time) {
-	ir.mtime = v
 }
 
 func (ir *ImmutableRecord) Nlinks() uint32 {
