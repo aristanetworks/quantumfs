@@ -55,7 +55,8 @@ func findApiPathEnvironment() string {
 	return path
 }
 
-func findApiPathMount() string {
+// Returns the path where QuantumFS is mounted at or "" on failure.
+func FindQuantumfsMountPath() string {
 	// We are look in /proc/self/mountinfo for a line which indicates that
 	// QuantumFS is mounted. That line looks like:
 	//
@@ -114,13 +115,21 @@ func findApiPathMount() string {
 	}
 
 	// We've found precisely one mount, ensure the file is really the api file.
-	path = fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
-	stat, err := os.Lstat(path)
+	apiPath := fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
+	stat, err := os.Lstat(apiPath)
 	if err != nil || !fileIsApi(stat) {
 		return ""
 	}
 
 	return path
+}
+
+func findApiPathMount() string {
+	mountPath := FindQuantumfsMountPath()
+	if mountPath == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s%c%s", mountPath, os.PathSeparator, ApiPath)
 }
 
 func findApiPathUpwards() (string, error) {
