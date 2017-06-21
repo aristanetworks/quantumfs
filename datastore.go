@@ -155,7 +155,12 @@ const ObjectKeyLength = 1 + HashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
-const XAttrTypeKey = "quantumfs.key"
+const (
+	XAttrTypePrefix = "quantumfs."
+
+	XAttrTypeKey    = XAttrTypePrefix + "key"
+	XAttrTypeLinkID = XAttrTypePrefix + "linkid"
+)
 
 type ObjectKey struct {
 	key encoding.ObjectKey
