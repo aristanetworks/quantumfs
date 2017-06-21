@@ -22,15 +22,8 @@ import (
 
 const (
 	sudo       = "/usr/bin/sudo"
-	mount      = "/usr/bin/mount"
 	umount     = "/usr/bin/umount"
-	netns      = "/usr/bin/netns"
-	netnsd     = "/usr/bin/netnsd"
-	setarch    = "/usr/bin/setarch"
-	cp         = "/usr/bin/cp"
-	chns       = "/usr/bin/chns"
 	sh         = "/usr/bin/sh"
-	bash       = "/usr/bin/bash"
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
 	pivot_root = "/usr/sbin/pivot_root"
@@ -41,7 +34,6 @@ const (
 )
 
 var qfs string
-var persistent bool = true
 
 func init() {
 	if qfspath, err := os.Executable(); err != nil {
