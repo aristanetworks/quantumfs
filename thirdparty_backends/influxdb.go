@@ -13,8 +13,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/influxlib/go"
+	"github.com/aristanetworks/quantumfs"
 )
 
 func init() {
@@ -22,8 +22,8 @@ func init() {
 }
 
 type influxlibAdapter struct {
-	connector	*influxlib.InfluxDBConnection
-	hostname	string
+	connector *influxlib.InfluxDBConnection
+	hostname  string
 }
 
 func newInfluxDB(config string) quantumfs.TimeSeriesDB {
@@ -60,8 +60,8 @@ func newInfluxDB(config string) quantumfs.TimeSeriesDB {
 	}
 
 	return &influxlibAdapter{
-		connector:	dbConn,
-		hostname:	host,
+		connector: dbConn,
+		hostname:  host,
 	}
 }
 
