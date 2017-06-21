@@ -114,7 +114,7 @@ func FindQuantumfsMountPath() string {
 		return ""
 	}
 
-	// We've found precisely one mount, ensure the file is really the api file.
+	// We've found precisely one mount, ensure it contains the api file.
 	apiPath := fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
 	stat, err := os.Lstat(apiPath)
 	if err != nil || !fileIsApi(stat) {
