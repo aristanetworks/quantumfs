@@ -274,7 +274,8 @@ func testNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest):]
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -305,7 +306,8 @@ func testNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest):]
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -342,7 +344,8 @@ func testNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -379,7 +382,8 @@ func testNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest):]
 	rootTest = "." + rootTest
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -410,7 +414,8 @@ func testNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 	fileTest = fileTest[len(rootTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -441,7 +446,8 @@ func testNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T, rootTest string) {
 	fileTest = "." + fileTest[len(dirTest):]
 	dirTest = dirTest[len(rootTest)+1:]
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -479,7 +485,8 @@ func testNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -517,7 +524,8 @@ func testNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T, rootTest string) {
 	dirTest = dirTest[len(rootTest)+1:]
 	rootTest = "." + rootTest
 
-	err := runCommand(testqfs, "chroot", rootTest, dirTest, "ls", fileTest)
+	err := runCommand(testqfs, "chroot", "arastra", rootTest, dirTest, "ls",
+		fileTest)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
