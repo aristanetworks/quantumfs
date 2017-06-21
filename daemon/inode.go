@@ -77,8 +77,8 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
-		error)
+	getChildRecordCopy(c *ctx,
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
@@ -151,7 +151,7 @@ type Inode interface {
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 	parentGetChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.DirectoryRecord, error)
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
@@ -328,7 +328,7 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
 
