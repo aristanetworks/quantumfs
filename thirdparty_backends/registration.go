@@ -47,7 +47,7 @@ type timeseriesDB struct {
 	Constructor TimeSeriesDBConstructor
 }
 
-var timeseriesDBs [] timeseriesDB
+var timeseriesDBs []timeseriesDB
 
 func registerTimeSeriesDB(name string, constructor TimeSeriesDBConstructor) {
 	db := timeseriesDB{
