@@ -112,16 +112,15 @@ var logSubsystem = []string{
 }
 
 var logSubsystemMap = map[string]LogSubsystem{
-	"daemon": LogDaemon,
-	"datastore": LogDatastore,
+	"daemon":      LogDaemon,
+	"datastore":   LogDatastore,
 	"workspacedb": LogWorkspaceDb,
-	"test": LogTest,
-	"qlog": LogQlog,
-	"quark": LogQuark,
-	"spin": LogSpin,
-	"tool": LogTool,
+	"test":        LogTest,
+	"qlog":        LogQlog,
+	"quark":       LogQuark,
+	"spin":        LogSpin,
+	"tool":        LogTool,
 }
-
 
 func (enum LogSubsystem) String() string {
 	if 0 <= enum && enum <= logSubsystemMax {
@@ -131,8 +130,8 @@ func (enum LogSubsystem) String() string {
 }
 
 func getSubsystem(sys string) (LogSubsystem, error) {
-	if m, ok := logsubsystemMap[strings.ToLower(sys)] ; ok {
-		return m, nil;
+	if m, ok := logsubsystemMap[strings.ToLower(sys)]; ok {
+		return m, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
