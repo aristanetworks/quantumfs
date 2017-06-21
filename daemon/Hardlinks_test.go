@@ -255,7 +255,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		wsrInode := test.getInodeNum(workspace)
 		dirInode := test.getInodeNum(dirName)
 		linkInode := test.getInodeNum(linkFile)
-		test.qfs.increaseLookupCount(linkInode)
+		test.qfs.increaseLookupCount(test.newCtx(), linkInode)
 
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
