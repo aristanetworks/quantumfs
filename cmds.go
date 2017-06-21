@@ -56,7 +56,7 @@ func findApiPathEnvironment() string {
 }
 
 // Returns the path where QuantumFS is mounted at or "" on failure.
-func FindQuantumfsMountPath() string {
+func FindQuantumFsMountPath() string {
 	// We are look in /proc/self/mountinfo for a line which indicates that
 	// QuantumFS is mounted. That line looks like:
 	//
@@ -125,7 +125,7 @@ func FindQuantumfsMountPath() string {
 }
 
 func findApiPathMount() string {
-	mountPath := FindQuantumfsMountPath()
+	mountPath := FindQuantumFsMountPath()
 	if mountPath == "" {
 		return ""
 	}
