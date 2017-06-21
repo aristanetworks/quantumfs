@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -174,9 +175,12 @@ func setArchitecture(arch string) error {
 
 func setupBindMounts(rootdir string) error {
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
-		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
+		"/tmp/ArosTest.SimulatedDut"}
 	homes := homedirs()
 	paths = append(paths, homes...)
+
+	quantumfsMount := quantumfs.FindQuantumfsMountPath()
+	paths = append(paths, quantumfsMount)
 
 	for i := 0; i < len(paths); i++ {
 		src := paths[i]
