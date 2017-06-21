@@ -130,7 +130,7 @@ func (enum LogSubsystem) String() string {
 }
 
 func getSubsystem(sys string) (LogSubsystem, error) {
-	if m, ok := logsubsystemMap[strings.ToLower(sys)]; ok {
+	if m, ok := logSubsystemMap[strings.ToLower(sys)]; ok {
 		return m, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
