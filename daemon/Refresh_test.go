@@ -843,14 +843,22 @@ func TestRefreshChangeTypeFileToDir(t *testing.T) {
 	})
 }
 
-func verifyContentStartsWith(test *testHelper, file *os.File, expected string) {
+// Returns 1 if the content matches, 0 otherwise
+func doesContentStartWith(test *testHelper, file *os.File, expected string) int {
 	content := make([]byte, len(expected))
 	_, err := file.Seek(0, os.SEEK_SET)
 	test.AssertNoErr(err)
 	_, err = io.ReadFull(file, content)
 	test.AssertNoErr(err)
-	test.Assert(string(content) == expected,
-		fmt.Sprintf("content mismatch _%s_", content))
+	if string(content) == expected {
+		return 1
+	} else {
+		return 0
+	}
+}
+func verifyContentStartsWith(test *testHelper, file *os.File, expected string) {
+	test.Assert(doesContentStartWith(test, file, expected) == 1,
+		fmt.Sprintf("content mismatch"))
 }
 
 type createFunc func(name string, content string) error
@@ -920,6 +928,20 @@ func createHardlink(name string, content string) error {
 		return err
 	}
 	return syscall.Link(name, name+"_link")
+}
+
+func purgeHardlinkThenCreate(create createFunc) createFunc {
+	return func(name string, content string) error {
+		err := syscall.Unlink(name)
+		if err != nil {
+			return err
+		}
+		err = syscall.Unlink(name + "_link")
+		if err != nil {
+			return err
+		}
+		return create(name, content)
+	}
 }
 
 func createSmallFile(name string, content string) error {
@@ -1049,6 +1071,185 @@ func TestRefreshType_H2H_S2L(t *testing.T) {
 
 func TestRefreshType_H2H_S2VL(t *testing.T) {
 	runTest(t, contentCheckTestGen(createHardlink, createVeryLargeFile))
+}
+
+func TestRefreshType_H_S2S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createSmallFile, createHardlink))
+}
+
+func TestRefreshType_S2H_S(t *testing.T) {
+	runTest(t, contentCheckTestGen(createHardlink,
+		purgeHardlinkThenCreate(createSmallFile)))
+}
+
+func GenTestRefreshType_MediumAndLarge2HardlinkToSmall(
+	workspaceRootHardlinks bool) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+		content3 := "the third"
+
+		name := "testFile"
+		if !workspaceRootHardlinks {
+			utils.MkdirAll(workspace+"/subdir", 0777)
+			name = "subdir/testFile"
+		}
+
+		fullname := workspace + "/" + name
+
+		err := createHardlink(fullname, content1)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err = syscall.Unlink(fullname)
+		test.AssertNoErr(err)
+		err = syscall.Unlink(fullname + "_link")
+		test.AssertNoErr(err)
+		err = createMediumFile(fullname, content2)
+		test.AssertNoErr(err)
+		err = createLargeFile(fullname+"_link", content3)
+		test.AssertNoErr(err)
+
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file1, content2)
+
+		file2, err := os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file2, content3)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2,
+			newRootId1)
+
+		// exactly one of the two files should inherit the content to
+		// be able to reuse their file handle, the other one is now
+		// orphaned and will have its old content
+		nmatches := doesContentStartWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content1)
+		test.AssertNoErr(file2.Close())
+		test.Assert(nmatches == 1, "Hit %d matches. Expected one.",
+			nmatches)
+
+		// but after grabbing a new file handle, both should
+		// have valid content
+		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err = os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		nmatches = doesContentStartWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content1)
+		test.AssertNoErr(file2.Close())
+		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
+			nmatches)
+
+		removeTestFileNoSync(test, workspace, name)
+		removeTestFileNoSync(test, workspace, name+"_link")
+	}
+}
+
+func TestRefreshType_MediumAndLarge2HardlinkToSmallWorkspaceRoot(t *testing.T) {
+	runTest(t, GenTestRefreshType_MediumAndLarge2HardlinkToSmall(true))
+}
+
+func TestRefreshType_MediumAndLarge2HardlinkToSmallSubdir(t *testing.T) {
+	runTest(t, GenTestRefreshType_MediumAndLarge2HardlinkToSmall(false))
+}
+
+func GenTestRefreshType_HardlinkToSmall2MediumAndLarge(
+	workspaceRootHardlinks bool) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+		content3 := "the third"
+
+		name := "testFile"
+		if !workspaceRootHardlinks {
+			utils.MkdirAll(workspace+"/subdir", 0777)
+			name = "subdir/testFile"
+		}
+
+		fullname := workspace + "/" + name
+
+		err := createMediumFile(fullname, content1)
+		test.AssertNoErr(err)
+		err = createLargeFile(fullname+"_link", content2)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		err = syscall.Unlink(fullname)
+		test.AssertNoErr(err)
+		err = syscall.Unlink(fullname + "_link")
+		test.AssertNoErr(err)
+		err = createHardlink(fullname, content3)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file1, content3)
+
+		file2, err := os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		verifyContentStartsWith(test, file2, content3)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2,
+			newRootId1)
+
+		// The hardlink inode is claimed by one of the two files,
+		// therefore, both of them will be pointing at the same
+		// content, either content1 or content2
+		nmatches := doesContentStartWith(test, file1, content1)
+		nmatches += doesContentStartWith(test, file2, content1)
+		test.Assert(nmatches == 0 || nmatches == 2,
+			"Hit %d matches. Expected 0 or 2.", nmatches)
+
+		nmatches += doesContentStartWith(test, file1, content2)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content2)
+		test.AssertNoErr(file2.Close())
+		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
+			nmatches)
+
+		// but after grabbing a new file handle, both should have
+		// valid content
+		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err = os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		nmatches = doesContentStartWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		nmatches += doesContentStartWith(test, file2, content2)
+		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
+			nmatches)
+		test.AssertNoErr(file2.Close())
+
+		removeTestFileNoSync(test, workspace, name)
+		removeTestFileNoSync(test, workspace, name+"_link")
+	}
+}
+
+func TestRefreshType_HardlinkToSmall2MediumAndLargeWorkspaceRoot(t *testing.T) {
+	runTest(t, GenTestRefreshType_HardlinkToSmall2MediumAndLarge(true))
+}
+
+func TestRefreshType_HardlinkToSmall2MediumAndLargeSubdir(t *testing.T) {
+	runTest(t, GenTestRefreshType_HardlinkToSmall2MediumAndLarge(false))
 }
 
 func TestRefreshXattrsRemove(t *testing.T) {
