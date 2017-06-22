@@ -491,14 +491,12 @@ func writeArray(output *[]byte, offset int, format string, data []byte,
 	offset = toBinaryUint16(*output, offset, byteType)
 	offset = toBinaryUint16(*output, offset, uint16(len(data)))
 
-	if cap(*output)-offset >= len(data) {
-		// Fast path
-		for i, v := range data {
-			(*output)[offset+i] = v
-		}
-	} else {
-		// Slow path where where we need to allocate more memory
-		*output = append(*output, data...)
+	if cap(*output)-offset < len(data) {
+		*output = expandBuffer(*output, len(data))
+	}
+
+	for i, v := range data {
+		(*output)[offset+i] = v
 	}
 
 	offset += len(data)
@@ -553,6 +551,15 @@ func toBinaryUint64(buf []byte, offset int, input uint64) int {
 	return offset
 }
 
+func expandBuffer(buf []byte, howMuch int) []byte {
+	if howMuch < 128 {
+		howMuch = cap(buf)
+	}
+	tmp := make([]byte, cap(buf)+howMuch)
+	copy(tmp, buf)
+	return tmp
+}
+
 func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	timestamp int64, format string, args ...interface{}) []byte {
 
@@ -569,12 +576,12 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 
 	for i := 0; i < len(args); i++ {
 		if cap(buf)-offset < 10 {
-			tmp := make([]byte, cap(buf)*2)
-			copy(tmp, buf)
-			buf = tmp
+			buf = expandBuffer(buf, 10)
 		}
 		offset = mem.binaryWrite(args[i], format, &buf, offset)
 	}
+
+	buf = buf[:offset]
 
 	// Make sure length isn't too long, excluding the size bytes
 	if len(buf) > MaxPacketLen {
