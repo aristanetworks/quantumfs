@@ -217,6 +217,10 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeI
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
 	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+	// The hardlink filename will be the fingerprint of the filename
+	// which was the source of the first link operation that created
+	// the hardlink. This field is used to support seamless refreshing
+	// of a set of files into a set of hardlinks.
 	newEntry.record.SetFilename(fingerprint)
 
 	wsr.hardlinks[newId] = newEntry
