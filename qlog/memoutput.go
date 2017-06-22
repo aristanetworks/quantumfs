@@ -391,7 +391,7 @@ const (
 // pointer to the output array instead of returning one to append so that we can
 // take advantage of output having a larger capacity and reducing memmoves
 func (mem *SharedMemory) binaryWrite(data interface{}, format string,
-	output *[]byte) {
+	output *[]byte, offset int) int {
 
 	// Handle primitive aliases first
 	if prim, ok := data.(LogPrimitive); ok {
@@ -403,126 +403,177 @@ func (mem *SharedMemory) binaryWrite(data interface{}, format string,
 
 	switch v := data.(type) {
 	case *int8:
-		*output = append(*output, toBinaryUint16(TypeInt8Pointer)...)
-		*output = append(*output, toBinaryUint8(uint8(*v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt8Pointer)
+		offset = toBinaryUint8(*output, offset, uint8(*v))
 	case int8:
-		*output = append(*output, toBinaryUint16(TypeInt8)...)
-		*output = append(*output, toBinaryUint8(uint8(v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt8)
+		offset = toBinaryUint8(*output, offset, uint8(v))
 	case *uint8:
-		*output = append(*output, toBinaryUint16(TypeUint8Pointer)...)
-		*output = append(*output, toBinaryUint8(*v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint8Pointer)
+		offset = toBinaryUint8(*output, offset, *v)
 	case uint8:
-		*output = append(*output, toBinaryUint16(TypeUint8)...)
-		*output = append(*output, toBinaryUint8(v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint8)
+		offset = toBinaryUint8(*output, offset, v)
 	case *int16:
-		*output = append(*output, toBinaryUint16(TypeInt16Pointer)...)
-		*output = append(*output, toBinaryUint16(uint16(*v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt16Pointer)
+		offset = toBinaryUint16(*output, offset, uint16(*v))
 	case int16:
-		*output = append(*output, toBinaryUint16(TypeInt16)...)
-		*output = append(*output, toBinaryUint16(uint16(v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt16)
+		offset = toBinaryUint16(*output, offset, uint16(v))
 	case *uint16:
-		*output = append(*output, toBinaryUint16(TypeUint16Pointer)...)
-		*output = append(*output, toBinaryUint16(*v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint16Pointer)
+		offset = toBinaryUint16(*output, offset, *v)
 	case uint16:
-		*output = append(*output, toBinaryUint16(TypeUint16)...)
-		*output = append(*output, toBinaryUint16(v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint16)
+		offset = toBinaryUint16(*output, offset, v)
 	case *int32:
-		*output = append(*output, toBinaryUint16(TypeInt32Pointer)...)
-		*output = append(*output, toBinaryUint32(uint32(*v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt32Pointer)
+		offset = toBinaryUint32(*output, offset, uint32(*v))
 	case int32:
-		*output = append(*output, toBinaryUint16(TypeInt32)...)
-		*output = append(*output, toBinaryUint32(uint32(v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt32)
+		offset = toBinaryUint32(*output, offset, uint32(v))
 	case *uint32:
-		*output = append(*output, toBinaryUint16(TypeUint32Pointer)...)
-		*output = append(*output, toBinaryUint32(*v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint32Pointer)
+		offset = toBinaryUint32(*output, offset, *v)
 	case uint32:
-		*output = append(*output, toBinaryUint16(TypeUint32)...)
-		*output = append(*output, toBinaryUint32(v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint32)
+		offset = toBinaryUint32(*output, offset, v)
 	case int:
-		*output = append(*output, toBinaryUint16(TypeInt64)...)
-		*output = append(*output, toBinaryUint64(uint64(v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt64)
+		offset = toBinaryUint64(*output, offset, uint64(v))
 	case uint:
-		*output = append(*output, toBinaryUint16(TypeUint64)...)
-		*output = append(*output, toBinaryUint64(uint64(v))...)
+		offset = toBinaryUint16(*output, offset, TypeUint64)
+		offset = toBinaryUint64(*output, offset, uint64(v))
 	case *int64:
-		*output = append(*output, toBinaryUint16(TypeInt64Pointer)...)
-		*output = append(*output, toBinaryUint64(uint64(*v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt64Pointer)
+		offset = toBinaryUint64(*output, offset, uint64(*v))
 	case int64:
-		*output = append(*output, toBinaryUint16(TypeInt64)...)
-		*output = append(*output, toBinaryUint64(uint64(v))...)
+		offset = toBinaryUint16(*output, offset, TypeInt64)
+		offset = toBinaryUint64(*output, offset, uint64(v))
 	case *uint64:
-		*output = append(*output, toBinaryUint16(TypeUint64Pointer)...)
-		*output = append(*output, toBinaryUint64(*v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint64Pointer)
+		offset = toBinaryUint64(*output, offset, *v)
 	case uint64:
-		*output = append(*output, toBinaryUint16(TypeUint64)...)
-		*output = append(*output, toBinaryUint64(v)...)
+		offset = toBinaryUint16(*output, offset, TypeUint64)
+		offset = toBinaryUint64(*output, offset, v)
 	case string:
-		writeArray(output, format, []byte(v), TypeString)
+		offset = writeArray(output, offset, format, []byte(v), TypeString)
 	case []byte:
-		writeArray(output, format, v, TypeByteArray)
+		offset = writeArray(output, offset, format, v, TypeByteArray)
 	case bool:
-		*output = append(*output, toBinaryUint16(TypeBoolean)...)
+		offset = toBinaryUint16(*output, offset, TypeBoolean)
 		if v {
-			*output = append(*output, toBinaryUint8(1)...)
+			offset = toBinaryUint8(*output, offset, 1)
 		} else {
-			*output = append(*output, toBinaryUint8(0)...)
+			offset = toBinaryUint8(*output, offset, 0)
 		}
 	default:
 		errorPrefix := "ERROR: LogConverter needed for %s:\n%s\n"
 		checkRecursion(errorPrefix, format)
 
 		str := fmt.Sprintf("%v", data)
-		writeArray(output, format, []byte(str), TypeString)
+		offset = writeArray(output, offset, format, []byte(str), TypeString)
 		mem.errOut.Log(LogQlog, QlogReqId, 1, errorPrefix,
 			reflect.ValueOf(data).String(), string(debug.Stack()))
 	}
+
+	return offset
 }
 
-func writeArray(output *[]byte, format string, data []byte, byteType uint16) {
+func writeArray(output *[]byte, offset int, format string, data []byte,
+	byteType uint16) int {
+
 	if len(data) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: "+
 			"%s", format))
 	}
 
-	*output = append(*output, toBinaryUint16(byteType)...)
+	offset = toBinaryUint16(*output, offset, byteType)
+	offset = toBinaryUint16(*output, offset, uint16(len(data)))
 
-	*output = append(*output, toBinaryUint16(uint16(len(data)))...)
+	if cap(*output)-offset >= len(data) {
+		// Fast path
+		for i, v := range data {
+			(*output)[offset+i] = v
+		}
+	} else {
+		// Slow path where where we need to allocate more memory
+		*output = append(*output, data...)
+	}
 
-	*output = append(*output, data...)
+	offset += len(data)
+
+	return offset
 }
 
 // Don't use interfaces where possible because they're slow
-func toBinaryUint8(input uint8) []byte {
-	return (*[1]byte)(unsafe.Pointer(&input))[:]
+func toBinaryUint8(buf []byte, offset int, input uint8) int {
+	buf[offset] = byte((input >> 0) & 0xff)
+	offset++
+	return offset
 }
 
-func toBinaryUint16(input uint16) []byte {
-	return (*[2]byte)(unsafe.Pointer(&input))[:]
+func toBinaryUint16(buf []byte, offset int, input uint16) int {
+	buf[offset] = byte((input >> 0) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 8) & 0xff)
+	offset++
+	return offset
 }
 
-func toBinaryUint32(input uint32) []byte {
-	return (*[4]byte)(unsafe.Pointer(&input))[:]
+func toBinaryUint32(buf []byte, offset int, input uint32) int {
+	buf[offset] = byte((input >> 0) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 8) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 16) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 24) & 0xff)
+	offset++
+	return offset
 }
 
-func toBinaryUint64(input uint64) []byte {
-	return (*[8]byte)(unsafe.Pointer(&input))[:]
+func toBinaryUint64(buf []byte, offset int, input uint64) int {
+	buf[offset] = byte((input >> 0) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 8) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 16) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 24) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 32) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 40) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 48) & 0xff)
+	offset++
+	buf[offset] = byte((input >> 56) & 0xff)
+	offset++
+	return offset
 }
 
 func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	timestamp int64, format string, args ...interface{}) []byte {
 
 	// Ensure we provide a sensible initial capacity
-	buf := make([]byte, 0, 128)
+	buf := make([]byte, 128)
+	offset := 0
 
 	// Two bytes prefix for the total packet length, before the num of args.
 	// Write the log entry header with no prefixes
-	buf = append(buf, toBinaryUint16(uint16(len(args)))...)
-	buf = append(buf, toBinaryUint16(strMapId)...)
-	buf = append(buf, toBinaryUint64(reqId)...)
-	buf = append(buf, toBinaryUint64(uint64(timestamp))...)
+	offset = toBinaryUint16(buf, offset, uint16(len(args)))
+	offset = toBinaryUint16(buf, offset, strMapId)
+	offset = toBinaryUint64(buf, offset, reqId)
+	offset = toBinaryUint64(buf, offset, uint64(timestamp))
 
 	for i := 0; i < len(args); i++ {
-		mem.binaryWrite(args[i], format, &buf)
+		if cap(buf)-offset < 10 {
+			tmp := make([]byte, cap(buf)*2)
+			copy(tmp, buf)
+			buf = tmp
+		}
+		offset = mem.binaryWrite(args[i], format, &buf, offset)
 	}
 
 	// Make sure length isn't too long, excluding the size bytes
