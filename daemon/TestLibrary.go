@@ -169,15 +169,8 @@ func serveSafely(th *TestHelper) {
 	}(th)
 
 	var mountOptions = fuse.MountOptions{
-		AllowOther:    true,
-		MaxBackground: 1024,
-		MaxWrite:      quantumfs.MaxBlockSize,
-		FsName:        "QuantumFS",
-		Name:          th.TestName,
-		Options:       make([]string, 0),
+		Name: th.TestName,
 	}
-	mountOptions.Options = append(mountOptions.Options, "suid")
-	mountOptions.Options = append(mountOptions.Options, "dev")
 
 	// Ensure that, since we're in a test, we only sync when syncAll is called.
 	// Otherwise, we shouldn't ever need to flush.
