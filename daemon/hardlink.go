@@ -198,7 +198,10 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 		realRecord.Size())
 }
 
-func (link *Hardlink) ShallowCopy() quantumfs.DirectoryRecord {
+func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryRecord {
+	// Sorry, this seems to be the only way to get the signature under 85
+	// characters per line and appease gofmt.
+	link := l
 	valid, realRecord := link.wsr.getHardlink(link.linkId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
@@ -206,23 +209,19 @@ func (link *Hardlink) ShallowCopy() quantumfs.DirectoryRecord {
 			link.linkId))
 	}
 
-	// Note that this is a DirectRecord shallow copy type
-	newEntry := quantumfs.NewDirectoryRecord()
-
-	newEntry.SetID(realRecord.ID())
-	newEntry.SetType(realRecord.Type())
-	newEntry.SetSize(realRecord.Size())
-
-	newEntry.SetNlinks(link.Nlinks())
-	newEntry.SetFilename(link.Filename())
-	newEntry.SetPermissions(link.Permissions())
-	newEntry.SetOwner(link.Owner())
-	newEntry.SetGroup(link.Group())
-	newEntry.SetExtendedAttributes(link.ExtendedAttributes())
-	newEntry.SetContentTime(link.ContentTime())
-	newEntry.SetModificationTime(link.ModificationTime())
-
-	return newEntry
+	return quantumfs.NewImmutableRecord(
+		link.Filename(),
+		realRecord.ID(),
+		realRecord.Type(),
+		link.Permissions(),
+		link.Owner(),
+		link.Group(),
+		realRecord.Size(),
+		link.ExtendedAttributes(),
+		link.ContentTime(),
+		link.ModificationTime(),
+		link.Nlinks(),
+	)
 }
 
 func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
