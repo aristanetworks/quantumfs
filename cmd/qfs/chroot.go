@@ -543,7 +543,11 @@ func confirmMatchingArchitecture() {
 	// now and output a helpful error message.
 
 	var uname syscall.Utsname
-	syscall.Uname(&uname)
+	if err := syscall.Uname(&uname); err != nil {
+		// We failed to get the current running architecture. Silently carry
+		// on and hope for the best.
+		return
+	}
 
 	systemArch := ""
 
