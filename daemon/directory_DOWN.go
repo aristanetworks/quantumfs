@@ -187,10 +187,12 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 		return linkCopy, fuse.OK
 	}
 
+	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
+
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.makeHardlink(c, toLink.inodeNum())
+	return dir.children.makeHardlink(c, fingerprint, toLink.inodeNum())
 }
 
 func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
@@ -247,32 +249,49 @@ func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId
 	c.qfs.noteDeletedInode(dir.id, childId, childname)
 }
 
+func (dir *Directory) loadNewChild_DOWN(c *ctx,
+	remoteRecord *quantumfs.DirectRecord) InodeId {
+
+	defer c.FuncIn("Directory::loadNewChild_DOWN", "%d : %s",
+		dir.inodeNum(), remoteRecord.Filename()).Out()
+
+	// Allocate a new inode for regular files or return an already
+	// existing inode for hardlinks to existing inodes
+	inodeId := dir.children.loadChild(c, remoteRecord,
+		quantumfs.InodeIdInvalid)
+	status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
+	utils.Assert(status == fuse.OK,
+		"marking %s created failed with %d", remoteRecord.Filename(),
+		status)
+	return inodeId
+}
+
 func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 	remoteRecord *quantumfs.DirectRecord,
 	childname string, childId InodeId) (newInodeId *InodeId,
 	removedInodeId *InodeId) {
 
 	defer c.FuncIn("Directory::handleChild_DOWN", "%s", childname).Out()
-	existsOnRemote := remoteRecord != nil
 	localRecord := dir.children.recordByName(c, childname)
-	canReuseInode := func() bool {
-		if !existsOnRemote {
-			return false
+
+	canReuseInode, canLoadDentry := func() (bool, bool) {
+		if remoteRecord == nil {
+			return false, false
 		}
 		if localRecord == nil {
 			c.vlog("%s does not exist locally.", childname)
-			return false
+			return false, true
 		}
 		if !underlyingTypesMatch(dir.wsr, localRecord, remoteRecord) {
 			c.vlog("%s had a major type change %d -> %d",
 				childname, underlyingTypeOf(dir.wsr, localRecord),
 				underlyingTypeOf(dir.wsr, remoteRecord))
-			return false
+			return false, true
 		}
 		if localRecord.Type().IsImmutable() {
 			// If this is an immutable type, then dentry must have been
 			// unlinked and recreated
-			return false
+			return false, true
 		}
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
@@ -283,43 +302,53 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 				// this inode, or it has not been stale at all.
 				c.vlog("%s cannot inherit the hardlink inode",
 					childname)
-				return false
+				return false, true
 			}
 		}
 		if remoteRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			localRecord.Type() != quantumfs.ObjectTypeHardlink {
 
 			linkId := decodeHardlinkKey(remoteRecord.ID())
-			inodeId := dir.wsr.getInodeIdNoInstantiate(c, linkId)
-			if inodeId != quantumfs.InodeIdInvalid {
-				c.vlog("link %d already has inode %d associated",
-					linkId, inodeId)
-				// someone (the other leg of the hardlink) has given
-				// this hardlink an inode id already
-				return false
+			valid, hardlinkRecord := dir.wsr.getHardlink(linkId)
+			utils.Assert(valid, "hardlink %d not found", linkId)
+
+			path := dir.absPath(c, localRecord.Filename())
+			if hardlinkRecord.Filename() != getPathFingerPrint(path) {
+				// This dentry has been converted to a hardlink,
+				// postpone loading it to see if an inode already
+				// exists for it
+				c.vlog("Postponing child %s (waiting for %s)",
+					localRecord.Filename(),
+					hardlinkRecord.Filename())
+				loadRecord := HardlinkLoadRecord{
+					parent:       dir,
+					remoteRecord: remoteRecord,
+				}
+				hrc.loadRecords = append(hrc.loadRecords, loadRecord)
+				return false, false
 			}
+			c.vlog("Using inode %d for hardlink %s",
+				childId, hardlinkRecord.Filename())
 		}
-		return true
+		return true, true
 	}()
 	if !canReuseInode && localRecord != nil {
 		dir.unlinkChild_DOWN(c, childname, childId)
 		removedInodeId = &childId
 	}
-	if !existsOnRemote {
+	if !canLoadDentry {
 		return
 	}
 	if !canReuseInode {
-		// We have to allocate a new inode for this record
-		inodeId := dir.children.loadChild(c, remoteRecord,
-			quantumfs.InodeIdInvalid)
-		status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
-		utils.Assert(status == fuse.OK,
-			"marking %s created failed with %d", remoteRecord.Filename(),
-			status)
+		inodeId := dir.loadNewChild_DOWN(c, remoteRecord)
 		newInodeId = &inodeId
 		return
 	}
 	if remoteRecord.ID().IsEqualTo(localRecord.ID()) {
+		c.wlog("No changes to record %s", remoteRecord.Filename())
+		if localRecord.Type() != quantumfs.ObjectTypeHardlink {
+			dir.children.setRecord(childId, remoteRecord)
+		}
 		return
 	}
 
@@ -339,6 +368,7 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 		// In such an event, keep the pair of (localRecord, remoteRecord)
 		// for post-processing and return without reloading the inode.
 	}
+	dir.children.setRecord(childId, remoteRecord)
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
 		reload(c, hrc, inode, *remoteRecord)
 	}
@@ -392,9 +422,5 @@ func (dir *Directory) refresh_DOWN(c *ctx,
 		}
 		utils.Assert(removedInodeId == nil, "inode deletion not expected")
 	}
-
-	// reload all children, whether instantiated or not,
-	// based on the new base layer id
-	dir.children.baseLayerIs(c, baseLayerId)
 	return uninstantiated, deletedInodeIds
 }
