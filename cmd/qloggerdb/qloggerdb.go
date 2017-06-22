@@ -28,14 +28,10 @@ var influxDBDatabase string
 
 func init() {
 	flag.BoolVar(&useInfluxDB, "influxdb", false, "Use InfluxDB")
-	flag.StringVar(&influxDBHostname, "influxHostname", "",
-		"Change InfluxDB hostname from the default")
-	flag.IntVar(&influxDBPort, "influxPort", -1,
-		"Change InfluxDB port from the default")
-	flag.StringVar(&influxDBProtocol, "influxProtocol", "",
-		"Change InfluxDB protocol from the default")
-	flag.StringVar(&influxDBDatabase, "influxDatabase", "",
-		"Change InfluxDB database from the default")
+	flag.StringVar(&influxDBHostname, "influxHostname", "", "InfluxDB hostname")
+	flag.IntVar(&influxDBPort, "influxPort", -1, "InfluxDB port")
+	flag.StringVar(&influxDBProtocol, "influxProtocol", "", "InfluxDB protocol")
+	flag.StringVar(&influxDBDatabase, "influxDatabase", "", "InfluxDB database")
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s <qlogPath>\n\n", os.Args[0])
