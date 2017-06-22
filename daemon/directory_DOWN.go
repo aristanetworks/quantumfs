@@ -252,8 +252,8 @@ func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId
 func (dir *Directory) loadNewChild_DOWN(c *ctx,
 	remoteRecord *quantumfs.DirectRecord) InodeId {
 
-	defer c.FuncIn("Directory::loadNewChild_DOWN", "%s",
-		remoteRecord.Filename()).Out()
+	defer c.FuncIn("Directory::loadNewChild_DOWN", "%d : %s",
+		dir.inodeNum(), remoteRecord.Filename()).Out()
 
 	// Allocate a new inode for regular files or return an already
 	// existing inode for hardlinks to existing inodes
