@@ -554,8 +554,8 @@ func confirmMatchingArchitecture() {
 		systemArch += string(val)
 	}
 
-	if systemArch == "x86_64" && runtime.GOARCH != "amd64" ||
-		systemArch == "i686" && runtime.GOARCH != "i386" {
+	if (systemArch == "x86_64" && runtime.GOARCH != "amd64") ||
+		(systemArch == "i686" && runtime.GOARCH != "i386") {
 
 		fmt.Fprintln(os.Stderr, "qfs executable architecture mismatch!")
 		fmt.Fprintln(os.Stderr, "Use qfs version compiled for your "+
