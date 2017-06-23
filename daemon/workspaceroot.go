@@ -14,7 +14,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func init(){
+func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
@@ -36,9 +36,9 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	linkLock       utils.DeferableRwMutex
-	hardlinks      map[HardlinkId]linkEntry
-	inodeToLink    map[InodeId]HardlinkId
+	linkLock    utils.DeferableRwMutex
+	hardlinks   map[HardlinkId]linkEntry
+	inodeToLink map[InodeId]HardlinkId
 }
 
 type linkEntry struct {
@@ -431,7 +431,7 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 }
 
 func loadHardlinks(c *ctx,
-	entry quantumfs.HardlinkEntry) (map[HardlinkId]linkEntry) {
+	entry quantumfs.HardlinkEntry) map[HardlinkId]linkEntry {
 
 	defer c.funcIn("loadHardlinks").Out()
 
