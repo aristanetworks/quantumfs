@@ -4,11 +4,20 @@
 // Package wsdb is the interface to the Workspace Name database.
 package wsdb
 
-import "fmt"
+import (
+	"encoding/hex"
+	"fmt"
+
+	"github.com/aristanetworks/ether"
+)
 
 // ObjectKey is key used to access object in the cluster-wide
 // object store using Ether's BlobStore API
 type ObjectKey []byte
+
+func (key ObjectKey) String() string {
+	return hex.EncodeToString(key)
+}
 
 // ErrCode is error code from workspace DB APIs
 type ErrCode int
@@ -88,19 +97,19 @@ type WorkspaceDB interface {
 
 	// These methods need to be instant, but not necessarily completely up to
 	// date
-	NumTypespaces() (int, error)
-	TypespaceList() ([]string, error)
-	NumNamespaces(typespace string) (int, error)
-	NamespaceList(typespace string) ([]string, error)
-	NumWorkspaces(typespace string, namespace string) (int, error)
-	WorkspaceList(typespace string, namespace string) ([]string, error)
+	NumTypespaces(c ether.Ctx) (int, error)
+	TypespaceList(c ether.Ctx) ([]string, error)
+	NumNamespaces(c ether.Ctx, typespace string) (int, error)
+	NamespaceList(c ether.Ctx, typespace string) ([]string, error)
+	NumWorkspaces(c ether.Ctx, typespace string, namespace string) (int, error)
+	WorkspaceList(c ether.Ctx, typespace string, namespace string) ([]string, error)
 
 	// These methods need to be up to date
-	TypespaceExists(typespace string) (bool, error)
-	NamespaceExists(typespace string, namespace string) (bool, error)
-	WorkspaceExists(typespace string, namespace string,
+	TypespaceExists(c ether.Ctx, typespace string) (bool, error)
+	NamespaceExists(c ether.Ctx, typespace string, namespace string) (bool, error)
+	WorkspaceExists(c ether.Ctx, typespace string, namespace string,
 		workspace string) (bool, error)
-	Workspace(typespace string, namespace string,
+	Workspace(c ether.Ctx, typespace string, namespace string,
 		workspace string) (ObjectKey, error)
 
 	// These methods need to be atomic, but may retry internally
@@ -111,12 +120,12 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	//  ErrWorkspaceNotFound
-	BranchWorkspace(srcTypespace string, srcNamespace string,
+	BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamespace string,
 		srcWorkspace string, dstTypespace string,
 		dstNamespace string, dstWorkspace string) error
 
 	// DeleteWorkspace deletes the workspace
-	DeleteWorkspace(typespace string, namespace string,
+	DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
 		workspace string) error
 
 	// AdvanceWorkspace changes the workspace rootID. If the
@@ -131,6 +140,6 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceNotFound
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
 	//  	remotely so the local instance is out of date
-	AdvanceWorkspace(typespace string, namespace string, workspace string,
+	AdvanceWorkspace(c ether.Ctx, typespace string, namespace string, workspace string,
 		currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
 }
