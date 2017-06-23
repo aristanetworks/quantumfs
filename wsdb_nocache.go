@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/gocql/gocql"
 )
@@ -46,7 +47,9 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 
 // --- workspace DB API implementation ---
 
-func (nc *noCacheWsdb) NumTypespaces() (int, error) {
+func (nc *noCacheWsdb) NumTypespaces(c ether.Ctx) (int, error) {
+	defer c.FuncIn("noCacheWsdb::NumTypespaces", "").Out()
+
 	count, _, err := nc.fetchDBTypespaces()
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
@@ -55,7 +58,9 @@ func (nc *noCacheWsdb) NumTypespaces() (int, error) {
 	return count, nil
 }
 
-func (nc *noCacheWsdb) TypespaceList() ([]string, error) {
+func (nc *noCacheWsdb) TypespaceList(c ether.Ctx) ([]string, error) {
+	defer c.FuncIn("noCacheWsdb::TypespaceList", "").Out()
+
 	_, list, err := nc.fetchDBTypespaces()
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
@@ -63,7 +68,9 @@ func (nc *noCacheWsdb) TypespaceList() ([]string, error) {
 	}
 	return list, nil
 }
-func (nc *noCacheWsdb) NumNamespaces(typespace string) (int, error) {
+func (nc *noCacheWsdb) NumNamespaces(c ether.Ctx, typespace string) (int, error) {
+	defer c.FuncIn("noCacheWsdb::NumNamespaces", "%s", typespace).Out()
+
 	count, _, err := nc.fetchDBNamespaces(typespace)
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
@@ -73,7 +80,9 @@ func (nc *noCacheWsdb) NumNamespaces(typespace string) (int, error) {
 	return count, nil
 }
 
-func (nc *noCacheWsdb) NamespaceList(typespace string) ([]string, error) {
+func (nc *noCacheWsdb) NamespaceList(c ether.Ctx, typespace string) ([]string, error) {
+	defer c.FuncIn("noCacheWsdb::NamespaceList", "%s", typespace).Out()
+
 	_, list, err := nc.fetchDBNamespaces(typespace)
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
@@ -83,8 +92,10 @@ func (nc *noCacheWsdb) NamespaceList(typespace string) ([]string, error) {
 	return list, nil
 }
 
-func (nc *noCacheWsdb) NumWorkspaces(typespace string,
+func (nc *noCacheWsdb) NumWorkspaces(c ether.Ctx, typespace string,
 	namespace string) (int, error) {
+
+	defer c.FuncIn("noCacheWsdb::NumWorkspaces", "%s/%s", typespace, namespace).Out()
 
 	count, _, err := nc.fetchDBWorkspaces(typespace, namespace)
 	if err != nil {
@@ -95,8 +106,10 @@ func (nc *noCacheWsdb) NumWorkspaces(typespace string,
 	return count, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceList(typespace string,
+func (nc *noCacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 	namespace string) ([]string, error) {
+
+	defer c.FuncIn("noCacheWsdb::WorkspaceList", "%s/%s", typespace, namespace).Out()
 
 	_, list, err := nc.fetchDBWorkspaces(typespace, namespace)
 	if err != nil {
@@ -107,7 +120,9 @@ func (nc *noCacheWsdb) WorkspaceList(typespace string,
 	return list, nil
 }
 
-func (nc *noCacheWsdb) TypespaceExists(typespace string) (bool, error) {
+func (nc *noCacheWsdb) TypespaceExists(c ether.Ctx, typespace string) (bool, error) {
+	defer c.FuncIn("noCacheWsdb::TypespaceExists", "%s", typespace).Out()
+
 	exists, err := nc.wsdbTypespaceExists(typespace)
 	if err != nil {
 		return exists, wsdb.NewError(wsdb.ErrFatal,
@@ -117,8 +132,10 @@ func (nc *noCacheWsdb) TypespaceExists(typespace string) (bool, error) {
 	return exists, nil
 }
 
-func (nc *noCacheWsdb) NamespaceExists(typespace string,
+func (nc *noCacheWsdb) NamespaceExists(c ether.Ctx, typespace string,
 	namespace string) (bool, error) {
+
+	defer c.FuncIn("noCacheWsdb::NamespaceExists", "%s/%s", typespace, namespace).Out()
 
 	exists, err := nc.wsdbNamespaceExists(typespace, namespace)
 	if err != nil {
@@ -130,8 +147,11 @@ func (nc *noCacheWsdb) NamespaceExists(typespace string,
 	return exists, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceExists(typespace string, namespace string,
+func (nc *noCacheWsdb) WorkspaceExists(c ether.Ctx, typespace string, namespace string,
 	workspace string) (bool, error) {
+
+	defer c.FuncIn("noCacheWsdb::WorkspaceExists", "%s/%s/%s", typespace, namespace,
+		workspace).Out()
 
 	_, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
 	if err != nil {
@@ -151,9 +171,12 @@ func isTypespaceLocked(typespace string) bool {
 	return typespace == wsdb.NullSpaceName
 }
 
-func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
+func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string,
 	dstTypespace string, dstNamespace string, dstWorkspace string) error {
+
+	defer c.FuncIn("noCacheWsdb::BranchWorkspace", "%s/%s/%s -> %s/%s/%s)", srcTypespace,
+		srcNamespace, srcWorkspace, dstTypespace, dstNamespace, dstWorkspace).Out()
 
 	if isTypespaceLocked(dstTypespace) {
 		return wsdb.NewError(wsdb.ErrLocked,
@@ -201,8 +224,11 @@ func (nc *noCacheWsdb) BranchWorkspace(srcTypespace string,
 	return nil
 }
 
-func (nc *noCacheWsdb) Workspace(typespace string, namespace string,
+func (nc *noCacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
 	workspace string) (wsdb.ObjectKey, error) {
+
+	defer c.FuncIn("noCacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
+		workspace).Out()
 
 	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
 	if err != nil {
@@ -219,8 +245,11 @@ func (nc *noCacheWsdb) Workspace(typespace string, namespace string,
 	return key, nil
 }
 
-func (nc *noCacheWsdb) DeleteWorkspace(typespace string, namespace string,
+func (nc *noCacheWsdb) DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
 	workspace string) error {
+
+	defer c.FuncIn("noCacheWsdb::DeleteWorkspace", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
 
 	if isTypespaceLocked(typespace) {
 		return wsdb.NewError(wsdb.ErrLocked,
@@ -237,9 +266,12 @@ func (nc *noCacheWsdb) DeleteWorkspace(typespace string, namespace string,
 	return nil
 }
 
-func (nc *noCacheWsdb) AdvanceWorkspace(typespace string,
+func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
+
+	defer c.FuncIn("noCacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s)", typespace,
+		namespace, workspace, currentRootID, newRootID).Out()
 
 	if isTypespaceLocked(typespace) && currentRootID != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrLocked,

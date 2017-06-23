@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/aristanetworks/ether/utils/stats/inmem"
 	"github.com/gocql/gocql"
@@ -23,8 +22,6 @@ type storeTests struct {
 	suite.Suite
 	bls *cqlBlobStore
 }
-
-var unitTestEtherCtx = ether.DefaultCtx
 
 func (s *storeTests) SetupSuite() {
 }

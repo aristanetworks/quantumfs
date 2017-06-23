@@ -5,9 +5,12 @@ package cql
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/aristanetworks/ether"
 )
 
 // Refer to the workspace DB API documentation to see the list
@@ -73,7 +76,7 @@ import (
 */
 
 // arg is registered and interpreted by the consumer of entityCache
-type fetchEntities func(arg interface{}, entityPath ...string) map[string]bool
+type fetchEntities func(c ether.Ctx, arg interface{}, entityPath ...string) map[string]bool
 
 // entityCache maintains global cache state (eg: lock etc)
 type entityCache struct {
@@ -98,14 +101,14 @@ type entityCache struct {
 func newEntityCache(levels int, expiryDuration time.Duration,
 	fetcherArg interface{}, fetcher fetchEntities) *entityCache {
 
-	c := &entityCache{}
-	c.levels = levels
-	c.fetcher = fetcher
-	c.fetcherArg = fetcherArg
-	c.expiryDuration = expiryDuration
+	ec := &entityCache{}
+	ec.levels = levels
+	ec.fetcher = fetcher
+	ec.fetcherArg = fetcherArg
+	ec.expiryDuration = expiryDuration
 
-	c.root = newEntityGroup(nil, "", c)
-	return c
+	ec.root = newEntityGroup(nil, "", ec)
+	return ec
 }
 
 // InsertEntities and DeleteEntities check the parents in
@@ -121,16 +124,18 @@ func newEntityCache(levels int, expiryDuration time.Duration,
 // InsertEntities(namespace, workspace) - Valid
 // InsertEntities() - Invalid
 // InsertEntities(workspace) - Invalid
-func (c *entityCache) InsertEntities(entityPath ...string) {
+func (ec *entityCache) InsertEntities(c ether.Ctx, entityPath ...string) {
+	defer c.FuncIn("entityCache::InsertEntities", "%s",
+		strings.Join(entityPath, "/")).Out()
 
 	if len(entityPath) == 0 {
 		panic("Invalid argument: Specify at least one entity")
 	}
 
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+	ec.rwMutex.Lock()
+	defer ec.rwMutex.Unlock()
 
-	group := c.root
+	group := ec.root
 	for _, entity := range entityPath {
 		group.checkInsertEntity(entity, true)
 		group = group.entities[entity]
@@ -142,16 +147,17 @@ func (c *entityCache) InsertEntities(entityPath ...string) {
 // DeleteEntities(namespace, workspace) - Valid
 // DeleteEntities() - Invalid
 // DeleteEntities(workspace) - Invalid
-func (c *entityCache) DeleteEntities(entityPath ...string) {
+func (ec *entityCache) DeleteEntities(c ether.Ctx, entityPath ...string) {
+	defer c.FuncIn("entityCache::DeleteEntities", "%s", strings.Join(entityPath, "/")).Out()
 
 	if len(entityPath) == 0 {
 		panic("Invalid argument: Specify at least one entity")
 	}
 
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+	ec.rwMutex.Lock()
+	defer ec.rwMutex.Unlock()
 
-	c.checkDeleteEntity(c.root, true, entityPath...)
+	ec.checkDeleteEntity(ec.root, true, entityPath...)
 	return
 }
 
@@ -162,15 +168,16 @@ func (c *entityCache) DeleteEntities(entityPath ...string) {
 // CountEntities() - Valid
 // CountEntities(namespace) - Valid
 // CountEntities(workspace) - Invalid
-func (c *entityCache) CountEntities(entityPath ...string) int {
+func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) int {
+	defer c.FuncIn("entityCache::CountEntities", "%s", strings.Join(entityPath, "/")).Out()
 	var count int
-	c.rwMutex.RLock()
+	ec.rwMutex.RLock()
 	// getEntityCountListGroup releases the read lock and
 	// re-acquires it when refresh is involved. However,
 	// read lock is held upon return from getEntityCountListGroup
-	defer c.rwMutex.RUnlock()
+	defer ec.rwMutex.RUnlock()
 
-	group := c.getEntityCountListGroup(entityPath...)
+	group := ec.getEntityCountListGroup(c, entityPath...)
 	if group != nil {
 		count = group.entityCount
 	}
@@ -179,15 +186,16 @@ func (c *entityCache) CountEntities(entityPath ...string) int {
 }
 
 // same constraints on entityPath argument as CountEntities
-func (c *entityCache) ListEntities(entityPath ...string) []string {
+func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) []string {
+	defer c.FuncIn("entityCache::ListEntities", "%s", strings.Join(entityPath, "/")).Out()
 	var list []string
-	c.rwMutex.RLock()
+	ec.rwMutex.RLock()
 	// getEntityCountListGroup releases the read lock and
 	// re-acquires it when refresh is involved. However,
 	// read lock is held upon return from getEntityCountListGroup
-	defer c.rwMutex.RUnlock()
+	defer ec.rwMutex.RUnlock()
 
-	group := c.getEntityCountListGroup(entityPath...)
+	group := ec.getEntityCountListGroup(c, entityPath...)
 	if group != nil {
 		list = group.getListCopy()
 	}
@@ -197,13 +205,13 @@ func (c *entityCache) ListEntities(entityPath ...string) []string {
 
 // used by unit tests to simulate different conditions
 // same constraints on entityPath argument as CountEntities
-func (c *entityCache) enableCqlRefresh(entityPath ...string) {
+func (ec *entityCache) enableCqlRefresh(entityPath ...string) {
 
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+	ec.rwMutex.Lock()
+	defer ec.rwMutex.Unlock()
 
 	var group *entityGroup
-	if group = c.getLastEntityGroup(c.root, entityPath...); group == nil {
+	if group = ec.getLastEntityGroup(ec.root, entityPath...); group == nil {
 		return
 	}
 
@@ -212,14 +220,14 @@ func (c *entityCache) enableCqlRefresh(entityPath ...string) {
 
 // used by unit tests to simulate different conditions
 // same constraints on entityPath argument as CountEntities
-func (c *entityCache) disableCqlRefresh(maxDelay time.Duration,
+func (ec *entityCache) disableCqlRefresh(maxDelay time.Duration,
 	entityPath ...string) {
 
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+	ec.rwMutex.Lock()
+	defer ec.rwMutex.Unlock()
 
 	var group *entityGroup
-	if group = c.getLastEntityGroup(c.root, entityPath...); group == nil {
+	if group = ec.getLastEntityGroup(ec.root, entityPath...); group == nil {
 		return
 	}
 
@@ -232,7 +240,7 @@ func (c *entityCache) disableCqlRefresh(maxDelay time.Duration,
 // returns the entityGroup for the last entity in entityPath
 // traversal of the entityPath starts in group argument
 // if any entity is absent then traversal stops and nil is returned
-func (c *entityCache) getLastEntityGroup(group *entityGroup,
+func (ec *entityCache) getLastEntityGroup(group *entityGroup,
 	entityPath ...string) *entityGroup {
 
 	for _, entity := range entityPath {
@@ -248,9 +256,9 @@ func (c *entityCache) getLastEntityGroup(group *entityGroup,
 // called under rwMutex in write mode
 // checkDeleteEntity implements cascaded deletes of entity groups
 // first entity in entityPath starts in entityGroup
-// if entityGroup is c.root then entityPath is complete entityPath
+// if entityGroup is ec.root then entityPath is complete entityPath
 // this routine will be invoked with at least one entity in entityPath
-func (c *entityCache) checkDeleteEntity(group *entityGroup, local bool,
+func (ec *entityCache) checkDeleteEntity(group *entityGroup, local bool,
 	entityPath ...string) {
 
 	// Its possible to specify only some leading portion
@@ -259,11 +267,11 @@ func (c *entityCache) checkDeleteEntity(group *entityGroup, local bool,
 	// entityGroups along the complete entity path correctly.
 
 	handlePartialPathDelete := false
-	if len(entityPath) < c.levels {
+	if len(entityPath) < ec.levels {
 		handlePartialPathDelete = true
 	}
 
-	if group = c.getLastEntityGroup(group, entityPath...); group == nil {
+	if group = ec.getLastEntityGroup(group, entityPath...); group == nil {
 		return
 	}
 
@@ -276,7 +284,7 @@ func (c *entityCache) checkDeleteEntity(group *entityGroup, local bool,
 		// navigate and mark all the child entityGroups as
 		// detached if handlePartialPathDelete == true
 		if handlePartialPathDelete == true {
-			c.markChildEntityGroupsDetached(group.entities[entity])
+			ec.markChildEntityGroupsDetached(group.entities[entity])
 			// since we start at the end of entityPath and
 			// we have taken care of all child entityGroups
 			// off of last entity, we don't need to do more
@@ -313,13 +321,13 @@ func (c *entityCache) checkDeleteEntity(group *entityGroup, local bool,
 }
 
 // invoked under rwMutex write lock
-func (c *entityCache) markChildEntityGroupsDetached(group *entityGroup) {
+func (ec *entityCache) markChildEntityGroupsDetached(group *entityGroup) {
 	// we don't need to maintain any concLocalDeletes logs since
 	// the entire group is being deleted
 	if group != nil {
 		group.detached = true
 		for entity := range group.entities {
-			c.markChildEntityGroupsDetached(group.entities[entity])
+			ec.markChildEntityGroupsDetached(group.entities[entity])
 		}
 	}
 }
@@ -329,10 +337,10 @@ func (c *entityCache) markChildEntityGroupsDetached(group *entityGroup) {
 // returns non-nil entityGroup whose list or count can be extracted
 // after doing a refresh if needed.
 // returns nil entityGroup if there are detachments in entityPath
-func (c *entityCache) getEntityCountListGroup(entityPath ...string) *entityGroup {
+func (ec *entityCache) getEntityCountListGroup(c ether.Ctx, entityPath ...string) *entityGroup {
 
 	detachOccured := false
-	group := c.root
+	group := ec.root
 	// this routine can be called without entityPath
 	// eg: root level
 	for i := 0; true; i++ {
@@ -342,14 +350,14 @@ func (c *entityCache) getEntityCountListGroup(entityPath ...string) *entityGroup
 		// refreshed
 		needed := group.refreshNeeded()
 		if needed {
-			c.rwMutex.RUnlock()
+			ec.rwMutex.RUnlock()
 			// fetch data from CQL without locking cache
-			fetchList := c.fetcher(c.fetcherArg, entityPath[:i]...)
+			fetchList := ec.fetcher(c, ec.fetcherArg, entityPath[:i]...)
 			// update the group under write lock unless the fetched
 			// data has been invalidated by a local insert/delete
 			group.refresh(fetchList)
 
-			c.rwMutex.RLock()
+			ec.rwMutex.RLock()
 			// in between the release of write lock in group.refresh()
 			// and acquire of read lock here, there can be many local inserts
 			// or deletes that may happen. Since each local update also
@@ -436,7 +444,7 @@ type entityGroup struct {
 }
 
 func newEntityGroup(parent *entityGroup, parentEntity string,
-	c *entityCache) *entityGroup {
+	ec *entityCache) *entityGroup {
 
 	newGroup := &entityGroup{}
 	newGroup.entities = make(map[string]*entityGroup, 0)
@@ -444,7 +452,7 @@ func newEntityGroup(parent *entityGroup, parentEntity string,
 	newGroup.parent = parent
 	newGroup.parentEntity = parentEntity
 	newGroup.expiresAt = time.Now()
-	newGroup.cache = c
+	newGroup.cache = ec
 	newGroup.detached = false
 	newGroup.concLocalInserts = make(map[string]bool)
 	newGroup.concLocalDeletes = make(map[string]bool)

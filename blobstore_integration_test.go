@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
@@ -29,8 +28,6 @@ func checkSetupIntg(s *storeIntegrationTests) {
 		s.T().Skip("Blobstore was not setup")
 	}
 }
-
-var integTestEtherCtx = ether.DefaultCtx
 
 func (s *storeIntegrationTests) SetupSuite() {
 	confFile, err := EtherConfFile()
@@ -56,8 +53,8 @@ func (s *storeIntegrationTests) TestInsert() {
 }
 
 func (s *storeIntegrationTests) TestInsertParallel() {
-	ctx := context.Background()
-	Wg, _ := errgroup.WithContext(ctx)
+	c := context.Background()
+	Wg, _ := errgroup.WithContext(c)
 
 	for count := 0; count < 2; count++ {
 		countl := count
