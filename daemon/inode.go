@@ -641,8 +641,8 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	return err
 }
 
-func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
-	remoteRecord quantumfs.DirectRecord) {
+func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()
@@ -661,6 +661,12 @@ func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
 			subdir.refresh_DOWN(c, hrc, remoteRecord.ID())
 		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
+	case quantumfs.ObjectTypeHardlink:
+		linkId := decodeHardlinkKey(remoteRecord.ID())
+		valid, hardlinkRecord := wsr.getHardlink(linkId)
+		utils.Assert(valid, "hardlink %d not found", linkId)
+		remoteRecord = &hardlinkRecord
+		fallthrough
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
 	case quantumfs.ObjectTypeMediumFile:

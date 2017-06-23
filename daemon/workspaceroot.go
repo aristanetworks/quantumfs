@@ -541,7 +541,7 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 					hardlink.Record().ID().Text())
 				utils.Assert(!hardlink.Record().Type().IsImmutable(),
 					"An immutable type cannot be reloaded.")
-				reload(c, hrc, inode, *hardlink.Record())
+				reload(c, wsr, hrc, inode, hardlink.Record())
 			}
 		}
 
