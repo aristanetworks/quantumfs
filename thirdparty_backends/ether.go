@@ -24,6 +24,7 @@ import (
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func init() {
@@ -510,6 +511,10 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		typespace, namespace, workspace,
 		currentRootId.Text(),
 		newRootId.Text()).Out()
+
+	utils.Assert(newRootId.IsValid(), "Tried advancing to an invalid rootID. "+
+		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
+		currentRootId.Text(), newRootId.Text())
 
 	key, err := w.wsdb.AdvanceWorkspace((*dsApiCtx)(c), typespace, namespace,
 		workspace, currentRootId.Value(), newRootId.Value())
