@@ -6,11 +6,9 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -20,18 +18,13 @@ import (
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )
 
-var useInfluxDB bool
-var influxDBHostname string
-var influxDBPort int
-var influxDBProtocol string
-var influxDBDatabase string
+var database string
+var databaseConf string
 
 func init() {
-	flag.BoolVar(&useInfluxDB, "influxdb", false, "Use InfluxDB")
-	flag.StringVar(&influxDBHostname, "influxHostname", "", "InfluxDB hostname")
-	flag.IntVar(&influxDBPort, "influxPort", -1, "InfluxDB port")
-	flag.StringVar(&influxDBProtocol, "influxProtocol", "", "InfluxDB protocol")
-	flag.StringVar(&influxDBDatabase, "influxDatabase", "", "InfluxDB database")
+	flag.StringVar(&database, "db", "memdb",
+		"Name of database to use (memdb, influxdb)")
+	flag.StringVar(&databaseConf, "dbConf", "", "Options to pass to database")
 
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s <qlogPath>\n\n", os.Args[0])
@@ -42,31 +35,12 @@ func init() {
 
 func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
 
-	if !useInfluxDB {
+	if database == "memdb" {
 		return processlocal.NewMemdb()
 	}
 
-	tsdbFlags := make(map[string]string)
-	if influxDBHostname != "" {
-		tsdbFlags["hostname"] = influxDBHostname
-	}
-	if influxDBPort >= 0 {
-		tsdbFlags["port"] = strconv.Itoa(influxDBPort)
-	}
-	if influxDBProtocol != "" {
-		tsdbFlags["protocol"] = influxDBProtocol
-	}
-	if influxDBDatabase != "" {
-		tsdbFlags["database"] = influxDBDatabase
-	}
-
-	cfgString, err := json.Marshal(tsdbFlags)
-	if err != nil {
-		panic(err)
-	}
-
 	tsdb, err := thirdparty_backends.ConnectTimeSeriesDB("influxlib",
-		string(cfgString))
+		databaseConf)
 	if err != nil {
 		fmt.Printf("TimeSeriesDB load failed\n")
 		fmt.Printf("Error: %v\n", err)
