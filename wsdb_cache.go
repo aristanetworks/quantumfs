@@ -54,13 +54,13 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 // --- workspace DB API implementation ---
 
 func (cw *cacheWsdb) NumTypespaces(c ether.Ctx) (int, error) {
-	defer c.FuncIn("cacheWsdb::NumTypespaces", "").Out()
+	defer c.FuncInName("cacheWsdb::NumTypespaces").Out()
 
 	return cw.cache.CountEntities(c), nil
 }
 
 func (cw *cacheWsdb) TypespaceList(c ether.Ctx) ([]string, error) {
-	defer c.FuncIn("cacheWsdb::TypespaceList", "").Out()
+	defer c.FuncInName("cacheWsdb::TypespaceList").Out()
 
 	return cw.cache.ListEntities(c), nil
 }
@@ -252,7 +252,9 @@ func wsdbFetcherImpl(c ether.Ctx, arg interface{}, entityPath ...string) map[str
 	return m
 }
 
-func (cw *cacheWsdb) ReportAPIStats() {
+func (cw *cacheWsdb) ReportAPIStats(c ether.Ctx) {
+	defer c.FuncInName("cacheWsdb::ReportAPIStats").Out()
+
 	cw.branchStats.(stats.OpStatReporter).ReportOpStats()
 	cw.advanceStats.(stats.OpStatReporter).ReportOpStats()
 }

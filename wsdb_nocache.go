@@ -10,6 +10,7 @@ package cql
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/aristanetworks/ether"
@@ -36,7 +37,7 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 		keyspace: cfg.Cluster.KeySpace,
 	}
 
-	err = wsdbInst.wsdbKeyPut(wsdb.NullSpaceName, wsdb.NullSpaceName,
+	err = wsdbInst.wsdbKeyPut(ether.DefaultCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, []byte(nil))
 	if err != nil {
 		return nil, err
@@ -48,9 +49,9 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 // --- workspace DB API implementation ---
 
 func (nc *noCacheWsdb) NumTypespaces(c ether.Ctx) (int, error) {
-	defer c.FuncIn("noCacheWsdb::NumTypespaces", "").Out()
+	defer c.FuncInName("noCacheWsdb::NumTypespaces").Out()
 
-	count, _, err := nc.fetchDBTypespaces()
+	count, _, err := nc.fetchDBTypespaces(c)
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
 			"during NumTypespaces: %s", err.Error())
@@ -59,9 +60,9 @@ func (nc *noCacheWsdb) NumTypespaces(c ether.Ctx) (int, error) {
 }
 
 func (nc *noCacheWsdb) TypespaceList(c ether.Ctx) ([]string, error) {
-	defer c.FuncIn("noCacheWsdb::TypespaceList", "").Out()
+	defer c.FuncInName("noCacheWsdb::TypespaceList").Out()
 
-	_, list, err := nc.fetchDBTypespaces()
+	_, list, err := nc.fetchDBTypespaces(c)
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
 			"during TypespaceList: %s", err.Error())
@@ -71,7 +72,7 @@ func (nc *noCacheWsdb) TypespaceList(c ether.Ctx) ([]string, error) {
 func (nc *noCacheWsdb) NumNamespaces(c ether.Ctx, typespace string) (int, error) {
 	defer c.FuncIn("noCacheWsdb::NumNamespaces", "%s", typespace).Out()
 
-	count, _, err := nc.fetchDBNamespaces(typespace)
+	count, _, err := nc.fetchDBNamespaces(c, typespace)
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
 			"during NumNamespaces %s : %s", typespace,
@@ -83,7 +84,7 @@ func (nc *noCacheWsdb) NumNamespaces(c ether.Ctx, typespace string) (int, error)
 func (nc *noCacheWsdb) NamespaceList(c ether.Ctx, typespace string) ([]string, error) {
 	defer c.FuncIn("noCacheWsdb::NamespaceList", "%s", typespace).Out()
 
-	_, list, err := nc.fetchDBNamespaces(typespace)
+	_, list, err := nc.fetchDBNamespaces(c, typespace)
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
 			"during NamespaceList %s: %s", typespace,
@@ -97,7 +98,7 @@ func (nc *noCacheWsdb) NumWorkspaces(c ether.Ctx, typespace string,
 
 	defer c.FuncIn("noCacheWsdb::NumWorkspaces", "%s/%s", typespace, namespace).Out()
 
-	count, _, err := nc.fetchDBWorkspaces(typespace, namespace)
+	count, _, err := nc.fetchDBWorkspaces(c, typespace, namespace)
 	if err != nil {
 		return 0, wsdb.NewError(wsdb.ErrFatal,
 			"during NumWorkspaces %s/%s : %s",
@@ -111,7 +112,7 @@ func (nc *noCacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 
 	defer c.FuncIn("noCacheWsdb::WorkspaceList", "%s/%s", typespace, namespace).Out()
 
-	_, list, err := nc.fetchDBWorkspaces(typespace, namespace)
+	_, list, err := nc.fetchDBWorkspaces(c, typespace, namespace)
 	if err != nil {
 		return list, wsdb.NewError(wsdb.ErrFatal,
 			"during WorkspaceList %s/%s : %s",
@@ -123,7 +124,7 @@ func (nc *noCacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 func (nc *noCacheWsdb) TypespaceExists(c ether.Ctx, typespace string) (bool, error) {
 	defer c.FuncIn("noCacheWsdb::TypespaceExists", "%s", typespace).Out()
 
-	exists, err := nc.wsdbTypespaceExists(typespace)
+	exists, err := nc.wsdbTypespaceExists(c, typespace)
 	if err != nil {
 		return exists, wsdb.NewError(wsdb.ErrFatal,
 			"during TypespaceExists %s : %s", typespace, err.Error())
@@ -137,7 +138,7 @@ func (nc *noCacheWsdb) NamespaceExists(c ether.Ctx, typespace string,
 
 	defer c.FuncIn("noCacheWsdb::NamespaceExists", "%s/%s", typespace, namespace).Out()
 
-	exists, err := nc.wsdbNamespaceExists(typespace, namespace)
+	exists, err := nc.wsdbNamespaceExists(c, typespace, namespace)
 	if err != nil {
 		return exists, wsdb.NewError(wsdb.ErrFatal,
 			"during NamespaceExists %s/%s : %s", typespace,
@@ -153,7 +154,7 @@ func (nc *noCacheWsdb) WorkspaceExists(c ether.Ctx, typespace string, namespace 
 	defer c.FuncIn("noCacheWsdb::WorkspaceExists", "%s/%s/%s", typespace, namespace,
 		workspace).Out()
 
-	_, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
+	_, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
 	if err != nil {
 		return present, wsdb.NewError(wsdb.ErrFatal,
 			"during WorkspaceExists %s/%s/%s : %s",
@@ -183,7 +184,7 @@ func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
 
-	key, present, err := nc.wsdbKeyGet(srcTypespace, srcNamespace,
+	key, present, err := nc.wsdbKeyGet(c, srcTypespace, srcNamespace,
 		srcWorkspace)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
@@ -199,7 +200,7 @@ func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 	}
 
 	// branching to an existing workspace shouldn't be allowed
-	_, present, err = nc.wsdbKeyGet(dstTypespace, dstNamespace, dstWorkspace)
+	_, present, err = nc.wsdbKeyGet(c, dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Get in BranchWorkspace %s/%s/%s : %s",
@@ -213,7 +214,7 @@ func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 			dstTypespace, dstNamespace, dstWorkspace)
 	}
 
-	if err = nc.wsdbKeyPut(dstTypespace, dstNamespace,
+	if err = nc.wsdbKeyPut(c, dstTypespace, dstNamespace,
 		dstWorkspace, key); err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Put in BranchWorkspace %s/%s/%s : %s",
@@ -230,7 +231,7 @@ func (nc *noCacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string
 	defer c.FuncIn("noCacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
 		workspace).Out()
 
-	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
+	key, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
 	if err != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
 			"during Get in Workspace %s/%s/%s : %s",
@@ -256,7 +257,7 @@ func (nc *noCacheWsdb) DeleteWorkspace(c ether.Ctx, typespace string, namespace 
 			"Delete failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
 
-	err := nc.wsdbKeyDel(typespace, namespace, workspace)
+	err := nc.wsdbKeyDel(c, typespace, namespace, workspace)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Del in DeleteWorkspace %s/%s/%s : %s",
@@ -278,7 +279,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
 
-	key, present, err := nc.wsdbKeyGet(typespace, namespace, workspace)
+	key, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
 	if err != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
 			"during Get in AdvanceWorkspace %s/%s/%s : %s",
@@ -297,7 +298,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 			currentRootID, key)
 	}
 
-	if err := nc.wsdbKeyPut(typespace, namespace, workspace,
+	if err := nc.wsdbKeyPut(c, typespace, namespace, workspace,
 		newRootID); err != nil {
 
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
@@ -310,7 +311,9 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 
 // --- helper routines ---
 
-func (nc *noCacheWsdb) wsdbTypespaceExists(typespace string) (bool, error) {
+func (nc *noCacheWsdb) wsdbTypespaceExists(c ether.Ctx, typespace string) (bool, error) {
+	defer c.FuncIn("noCacheWsdb::wsdbTypespaceExists", "%s", typespace).Out()
+
 	qryStr := fmt.Sprintf(`
 SELECT typespace
 FROM %s.workspacedb
@@ -333,7 +336,9 @@ WHERE typespace = ? LIMIT 1`, nc.keyspace)
 
 }
 
-func (nc *noCacheWsdb) fetchDBTypespaces() (int, []string, error) {
+func (nc *noCacheWsdb) fetchDBTypespaces(c ether.Ctx) (int, []string, error) {
+	defer c.FuncInName("noCacheWsdb::fetchDBTypespaces").Out()
+
 	qryStr := fmt.Sprintf(`
 SELECT distinct typespace
 FROM %s.workspacedb`, nc.keyspace)
@@ -354,8 +359,11 @@ FROM %s.workspacedb`, nc.keyspace)
 	return count, typespaceList, nil
 }
 
-func (nc *noCacheWsdb) wsdbNamespaceExists(typespace string,
+func (nc *noCacheWsdb) wsdbNamespaceExists(c ether.Ctx, typespace string,
 	namespace string) (bool, error) {
+
+	defer c.FuncIn("noCacheWsdb::wsdbNamespaceExists", "%s/%s", typespace,
+		namespace).Out()
 
 	qryStr := fmt.Sprintf(`
 SELECT namespace
@@ -376,11 +384,12 @@ WHERE typespace = ? AND namespace = ? LIMIT 1`, nc.keyspace)
 	} else {
 		return true, nil
 	}
-
 }
 
-func (nc *noCacheWsdb) fetchDBNamespaces(
+func (nc *noCacheWsdb) fetchDBNamespaces(c ether.Ctx,
 	typespace string) (int, []string, error) {
+
+	defer c.FuncIn("noCacheWsdb::fetchDBNamespaces", "%s", typespace).Out()
 
 	qryStr := fmt.Sprintf(`
 SELECT namespace
@@ -407,8 +416,11 @@ WHERE typespace = ?`, nc.keyspace)
 	return count, namespaceList, nil
 }
 
-func (nc *noCacheWsdb) fetchDBWorkspaces(typespace string,
+func (nc *noCacheWsdb) fetchDBWorkspaces(c ether.Ctx, typespace string,
 	namespace string) (int, []string, error) {
+
+	defer c.FuncIn("noCacheWsdb::fetchDBWorkspaces", "%s/%s", typespace,
+		namespace).Out()
 
 	qryStr := fmt.Sprintf(`
 SELECT workspace
@@ -433,9 +445,12 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace)
 	return count, workspaceList, nil
 }
 
-func (nc *noCacheWsdb) wsdbKeyGet(typespace string,
-	namespace string,
-	workspace string) (key []byte, present bool, err error) {
+func (nc *noCacheWsdb) wsdbKeyGet(c ether.Ctx, typespace string,
+	namespace string, workspace string) (key []byte, present bool,
+	err error) {
+
+	defer c.FuncIn("noCacheWsdb::wsdbKeyGet", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
 
 	qryStr := fmt.Sprintf(`
 SELECT key
@@ -458,8 +473,11 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
 	}
 }
 
-func (nc *noCacheWsdb) wsdbKeyDel(typespace string,
+func (nc *noCacheWsdb) wsdbKeyDel(c ether.Ctx, typespace string,
 	namespace string, workspace string) error {
+
+	defer c.FuncIn("noCacheWsdb::wsdbKeyDel", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
 
 	qryStr := fmt.Sprintf(`
 DELETE
@@ -471,9 +489,12 @@ WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace)
 
 	return query.Exec()
 }
-func (nc *noCacheWsdb) wsdbKeyPut(typespace string,
+func (nc *noCacheWsdb) wsdbKeyPut(c ether.Ctx, typespace string,
 	namespace string, workspace string,
 	key []byte) error {
+
+	defer c.FuncIn("noCacheWsdb::wsdbKeyPut", "%s/%s/%s key: %s", typespace,
+		namespace, workspace, hex.EncodeToString(key)).Out()
 
 	qryStr := fmt.Sprintf(`
 INSERT INTO %s.workspacedb
