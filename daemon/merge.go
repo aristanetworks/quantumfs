@@ -5,15 +5,9 @@ package daemon
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/aristanetworks/quantumfs"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[HardlinkId]linkEntry,
@@ -56,8 +50,13 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		localLink, localExists := localHardlinks[k]
 
 		if localExists {
-			toSet, setId := mergeLink(c, baseExists, v, localLink, k)
-			localHardlinks[setId] = toSet
+			toSet, getNewId := mergeLink(c, baseExists, v, localLink, k)
+			idToUse := k
+			if getNewId {
+				idToUse = generateNewHardlinkId(c, localHardlinks)
+			}
+
+			localHardlinks[idToUse] = toSet
 		} else {
 			localHardlinks[k] = v
 		}
@@ -82,15 +81,13 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 }
 
 func mergeLink(c *ctx, baseExists bool, remote linkEntry, local linkEntry,
-	localId HardlinkId) (toSet linkEntry, setId HardlinkId) {
+	localId HardlinkId) (toSet linkEntry, generateNewId bool) {
 
 	// If there is no base entry, that means that these hardlinks were
 	// both created independently and aren't related. Separate them by setting
 	// the remote with a new hardlink id
 	if !baseExists {
-		rtnId := rand.Uint64()
-
-		return remote, HardlinkId(rtnId)
+		return remote, true
 	}
 
 	rtn := local
@@ -110,7 +107,7 @@ func mergeLink(c *ctx, baseExists bool, remote linkEntry, local linkEntry,
 			local.record.Filename())
 	}
 
-	return rtn, localId
+	return rtn, false
 }
 
 func loadRecords(c *ctx,

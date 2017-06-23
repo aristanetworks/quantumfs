@@ -197,6 +197,21 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 	}
 }
 
+// We need a reference map of hardlinks to prevent the improbable event of random
+// number collision
+func generateNewHardlinkId(c *ctx, hardlinks map[HardlinkId]linkEntry) HardlinkId {
+	// We assume here that the probability that we'll continually generate new
+	// random numbers for hardlinks that already exist is basically zero
+	for {
+		newId := HardlinkId(rand.Uint64())
+		if _, exists := hardlinks[newId]; exists {
+			c.elog("HardlinkId generation collision: %d", newId)
+		} else {
+			return newId
+		}
+	}
+}
+
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeId,
 	record quantumfs.DirectoryRecord) *Hardlink {
 
@@ -213,8 +228,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeI
 
 	defer wsr.linkLock.Lock().Unlock()
 
-	// Use a random uuid
-	newId := HardlinkId(rand.Uint64())
+	newId := generateNewHardlinkId(c, wsr.hardlinks)
 
 	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
 	newEntry := newLinkEntry(dirRecord)
