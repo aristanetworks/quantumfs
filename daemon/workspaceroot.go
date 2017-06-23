@@ -195,7 +195,9 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 
 // We need a reference map of hardlinks to prevent the improbable event of random
 // number collision
-func generateUniqueHardlinkId(c *ctx, hardlinks map[HardlinkId]linkEntry) HardlinkId {
+func generateUniqueHardlinkId(c *ctx,
+	hardlinks map[HardlinkId]linkEntry) HardlinkId {
+
 	// We assume here that the probability that we'll continually generate new
 	// random numbers for hardlinks that already exist is basically zero
 	for {
