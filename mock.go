@@ -8,6 +8,8 @@
 package cql
 
 import (
+	"reflect"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -312,6 +314,17 @@ var _ Iter = (*MockIter)(nil)
 
 // --- helper mock routines (MANUAL) ---
 
+// a type mismatch between the destination and
+// value or a destination which is not a
+// pointer kind will cause panic here. Such panic
+// is intentional and implies that the mock test
+// case needs to be fixed.
+func assignValToDest(val interface{}, dest interface{}) {
+	destElem := reflect.ValueOf(dest).Elem()
+	refVal := reflect.ValueOf(val)
+	destElem.Set(refVal)
+}
+
 func mockDbTypespaceGet(sess *MockSession, typespace string, err error) {
 
 	query := new(MockQuery)
@@ -395,9 +408,9 @@ func newMockQueryScanByteSlice(err error,
 	return func(dest ...interface{}) error {
 
 		if err == nil {
-			// TODO: use reflect to check and assign
-			s, _ := dest[0].(*[]uint8)
-			*s = val
+			// byte slice pointed by val is copied
+			// into dest[0]
+			assignValToDest(val, dest[0])
 		}
 		return err
 	}
@@ -410,10 +423,7 @@ func newMockQueryScanStrings(err error,
 
 		if err == nil {
 			for i := range vals {
-				// TODO: use reflect to check and assign
-				s, _ := dest[i].(*string)
-				v, _ := vals[i].(string)
-				*s = v
+				assignValToDest(vals[i], dest[i])
 			}
 		}
 		return err
@@ -438,11 +448,9 @@ func newMockIterScan(fetchPause chan bool,
 			}
 			return false
 		}
-		// TODO: use reflect to do type safe assignments
-		for i := range dest {
-			s, _ := dest[i].(*string)
-			r, _ := iter.rows[iter.currentRow][i].(string)
-			*s = r
+		vals := iter.rows[iter.currentRow]
+		for i := range vals {
+			assignValToDest(vals[i], dest[i])
 		}
 		iter.currentRow++
 		return true
