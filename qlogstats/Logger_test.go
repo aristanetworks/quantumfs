@@ -224,3 +224,35 @@ func TestIndentation(t *testing.T) {
 			(300*time.Millisecond)), checker)
 	})
 }
+
+func TestMaximum(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		qlogHandle := test.Logger
+
+		for i := int64(0); i <= 693; i += 7 {
+			qlogHandle.Log_(time.Unix(0, i*1000), qlog.LogTest,
+				uint64(i), 2, qlog.FnEnterStr+"TestLog")
+			qlogHandle.Log_(time.Unix(0, i+(i*1000)), qlog.LogTest,
+				uint64(i), 2, qlog.FnExitStr+"TestLog")
+		}
+
+		checker := func(memdb *processlocal.Memdb) {
+			test.Assert(len(memdb.Data[0].Fields) == 7,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "maximum" {
+				panic("A")
+					test.Assert(v.Data == 693,
+						"incorrect samples %d", v.Data)
+				}
+			}
+		}
+
+		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+			NewExtPairStats(qlog.FnEnterStr+"TestLog\n",
+			qlog.FnExitStr+"TestLog\n", true, "TestLog"),
+			(300*time.Millisecond)), checker)
+	})
+}
