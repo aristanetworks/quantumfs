@@ -21,9 +21,9 @@ import (
 
 var commandsInUsrBin = []string{
 	umount,
-	setarch,
+	"/usr/bin/setarch",
 	sh,
-	bash,
+	"/usr/bin/bash",
 	"/usr/bin/ls",
 }
 
