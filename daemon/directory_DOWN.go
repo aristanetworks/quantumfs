@@ -293,6 +293,12 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 			// unlinked and recreated
 			return false, true
 		}
+		if remoteRecord.Type() == quantumfs.ObjectTypeHardlink &&
+			localRecord.Type() == quantumfs.ObjectTypeHardlink {
+			// If the ids do not match, then all legs have been deleted
+			// and recreated.
+			return remoteRecord.ID().IsEqualTo(localRecord.ID()), true
+		}
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 
