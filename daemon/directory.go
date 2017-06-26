@@ -187,12 +187,14 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 }
 
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	owner fuse.Owner, entry quantumfs.DirectoryRecord) {
+	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
 
-	// Ensure we're working with a shallow copy for objectTypeToFileType
-	entry = entry.ShallowCopy()
+	// Ensure we have a flattened DirectoryRecord to ensure the type is the
+	// underlying type for Hardlinks. This is required in order for
+	// objectTypeToFileType() to have access to the correct type to report.
+	entry := entry_.AsImmutableDirectoryRecord()
 
 	attr.Ino = uint64(inodeNum)
 
@@ -210,7 +212,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
 	default:
-		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
+		c.elog("Unhandled filetype %x in fillAttrWithDirectoryRecord",
 			fileType)
 		fallthrough
 	case fuse.S_IFREG,
@@ -749,7 +751,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 // All modifications to the record must be done whilst holding the parentLock.
 // If a function only wants to read, then it may suffice to grab a "snapshot" of it.
 func (dir *Directory) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("Directory::getChildRecordCopy").Out()
 
@@ -762,7 +764,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 
 	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
-		return record.ShallowCopy(), nil
+		return record.AsImmutableDirectoryRecord(), nil
 	}
 
 	return &quantumfs.DirectRecord{},
@@ -821,7 +823,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var recordCopy quantumfs.DirectoryRecord
+		var recordCopy quantumfs.ImmutableDirectoryRecord
 		err := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 
@@ -830,7 +832,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordCopy = record.ShallowCopy()
+			recordCopy = record.AsImmutableDirectoryRecord()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
@@ -880,14 +882,14 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		var inode InodeId
 		result := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, name)
-			if record == nil {
+			record_ := dir.children.recordByName(c, name)
+			if record_ == nil {
 				return fuse.ENOENT
 			}
 
 			// Use a shallow copy of record to ensure the right type for
 			// objectTypeToFileType
-			record = record.ShallowCopy()
+			record := record_.AsImmutableDirectoryRecord()
 
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {
