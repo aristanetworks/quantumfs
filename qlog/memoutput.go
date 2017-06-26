@@ -598,7 +598,8 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	// Generate the byte array packet
-	data, length := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
+	data, length := mem.generateLogEntry(strId, reqId, timestamp, format,
+		args...)
 
 	partialWrite := false
 	if mem.testMode && len(mem.testDropStr) < len(format) &&
