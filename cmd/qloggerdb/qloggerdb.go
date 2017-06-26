@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
@@ -34,13 +33,7 @@ func init() {
 }
 
 func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
-
-	if database == "memdb" {
-		return processlocal.NewMemdb()
-	}
-
-	tsdb, err := thirdparty_backends.ConnectTimeSeriesDB("influxlib",
-		databaseConf)
+	tsdb, err := thirdparty_backends.ConnectTimeSeriesDB(database, databaseConf)
 	if err != nil {
 		fmt.Printf("TimeSeriesDB load failed\n")
 		fmt.Printf("Error: %v\n", err)
