@@ -564,14 +564,14 @@ func (mem *SharedMemory) generateLogEntry(buf []byte, strMapId uint16, reqId uin
 	buf = buf[:offset]
 
 	// Make sure length isn't too long, excluding the size bytes
-	if len(buf) > MaxPacketLen {
+	if offset > MaxPacketLen {
 		errorPrefix := "Log data exceeds allowable length: %s\n"
 		checkRecursion(errorPrefix, format)
 
 		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
 
 		buf = buf[:MaxPacketLen]
-		offset = MaxPacketLen + 1
+		offset = MaxPacketLen
 	}
 
 	return buf, offset
