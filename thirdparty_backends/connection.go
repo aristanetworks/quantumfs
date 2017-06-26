@@ -22,12 +22,12 @@ func ConnectDatastore(name string,
 		store := datastore.Constructor(config)
 		if store == nil {
 			return nil, fmt.Errorf("Datastore connection "+
-				"failed '%s:%s'\n", name, config)
+				"failed '%s:%s'", name, config)
 		}
 		return store, nil
 	}
 
-	return nil, fmt.Errorf("Failed to find datastore '%s'\n", name)
+	return nil, fmt.Errorf("Failed to find datastore '%s'", name)
 }
 
 // Select the workspaceDB with the given name and construct it with the given
@@ -43,10 +43,29 @@ func ConnectWorkspaceDB(name string,
 		ws := db.Constructor(config)
 		if ws == nil {
 			return nil, fmt.Errorf("WorkspaceDB connection "+
-				"failed '%s:%s'\n", name, config)
+				"failed '%s:%s'", name, config)
 		}
 		return ws, nil
 	}
 
-	return nil, fmt.Errorf("Failed to find workspaceDB '%s'\n", name)
+	return nil, fmt.Errorf("Failed to find workspaceDB '%s'", name)
+}
+
+func ConnectTimeSeriesDB(name string,
+	config string) (quantumfs.TimeSeriesDB, error) {
+
+	for _, db := range timeseriesDBs {
+		if db.Name != name {
+			continue
+		}
+
+		tsdb := db.Constructor(config)
+		if tsdb == nil {
+			return nil, fmt.Errorf("TimeSeriesDB connection "+
+				"failed '%s:%s'", name, config)
+		}
+		return tsdb, nil
+	}
+
+	return nil, fmt.Errorf("Failed to find timeseriesDB '%s'", name)
 }
