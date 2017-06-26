@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,15 +24,8 @@ import (
 
 const (
 	sudo       = "/usr/bin/sudo"
-	mount      = "/usr/bin/mount"
 	umount     = "/usr/bin/umount"
-	netns      = "/usr/bin/netns"
-	netnsd     = "/usr/bin/netnsd"
-	setarch    = "/usr/bin/setarch"
-	cp         = "/usr/bin/cp"
-	chns       = "/usr/bin/chns"
 	sh         = "/usr/bin/sh"
-	bash       = "/usr/bin/bash"
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
 	pivot_root = "/usr/sbin/pivot_root"
@@ -42,7 +36,6 @@ const (
 )
 
 var qfs string
-var persistent bool = true
 
 func init() {
 	if qfspath, err := os.Executable(); err != nil {
@@ -539,7 +532,40 @@ func nonPersistentChroot(rootdir string, workingdir string, cmd []string) error 
 	return nil
 }
 
+func confirmMatchingArchitecture() {
+	// A later call to user.Lookup() will fail if we don't have a correctly
+	// matching qfs executable architecture and system architecture. Detect this
+	// now and output a helpful error message.
+
+	var uname syscall.Utsname
+	if err := syscall.Uname(&uname); err != nil {
+		// We failed to get the current running architecture. Silently carry
+		// on and hope for the best.
+		return
+	}
+
+	systemArch := ""
+
+	for _, val := range uname.Machine {
+		if val == 0 {
+			break
+		}
+		systemArch += string(val)
+	}
+
+	if (systemArch == "x86_64" && runtime.GOARCH != "amd64") ||
+		(systemArch == "i686" && runtime.GOARCH != "i386") {
+
+		fmt.Fprintln(os.Stderr, "qfs executable architecture mismatch!")
+		fmt.Fprintln(os.Stderr, "Use qfs version compiled for your "+
+			"architecture")
+		os.Exit(exitInternalError)
+	}
+}
+
 func chroot() {
+	confirmMatchingArchitecture()
+
 	// If we do not have root privilege, then gain it now
 	if syscall.Geteuid() != 0 {
 		sudo_cmd := []string{sudo}

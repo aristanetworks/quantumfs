@@ -5,6 +5,8 @@ package daemon
 
 import (
 	"bufio"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -200,6 +202,11 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
+}
+
+func getPathFingerPrint(path string) string {
+	md5sum := md5.Sum([]byte(path))
+	return hex.EncodeToString(md5sum[:])
 }
 
 // Determine if the process has a matching group. Normally the primary group is all
