@@ -77,8 +77,8 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
-		error)
+	getChildRecordCopy(c *ctx,
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
@@ -116,6 +116,9 @@ type Inode interface {
 	markAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	markSelfAccessed(c *ctx, op quantumfs.PathFlags)
 
+	absPath(c *ctx, path string) string
+	absPath_(c *ctx, path string) string
+
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
@@ -151,7 +154,7 @@ type Inode interface {
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 	parentGetChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.DirectoryRecord, error)
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
@@ -328,7 +331,7 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
 
@@ -540,6 +543,31 @@ func (inode *InodeCommon) Lock() utils.NeedWriteUnlock {
 
 func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 	return inode.lock.RLock()
+}
+
+// the inode parentLock must be locked
+func (inode *InodeCommon) absPath_(c *ctx, path string) string {
+	defer c.FuncIn("InodeCommon::absPath_", "path %s", path).Out()
+
+	if path == "" {
+		path = inode.name()
+	} else {
+		path = inode.name() + "/" + path
+	}
+	return inode.parent_(c).absPath(c, path)
+}
+
+func (inode *InodeCommon) absPath(c *ctx, path string) string {
+	defer c.FuncIn("InodeCommon::absPath", "path %s", path).Out()
+	if inode.isWorkspaceRoot() {
+		return "/" + path
+	}
+	if inode.isOrphaned() {
+		panic("Orphaned file")
+	}
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.absPath_(c, path)
 }
 
 func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
