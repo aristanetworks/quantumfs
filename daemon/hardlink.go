@@ -12,10 +12,6 @@ import (
 
 type HardlinkId uint64
 
-func (v HardlinkId) Primitive() interface{} {
-	return uint64(v)
-}
-
 // Should implement quantumfs.DirectoryRecord
 type Hardlink struct {
 	name   string
