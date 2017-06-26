@@ -101,9 +101,6 @@ type CircMemLogs struct {
 	header *circBufHeader
 	length uint64
 	buffer []byte
-
-	// Lock this for as short a period as possible
-	writeMutex sync.Mutex
 }
 
 func (circ *CircMemLogs) Size() int {
@@ -123,17 +120,8 @@ func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 }
 
 func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
-
-	// Minimize the size of the critical section, don't use defer
-	circ.writeMutex.Lock()
-
-	dataStart := circ.header.PastEndIdx
-	circ.header.PastEndIdx += uint64(dataLen)
-	circ.header.PastEndIdx %= circ.length
-
-	circ.writeMutex.Unlock()
-
-	return dataStart
+	dataEnd := atomic.AddUint64(&circ.header.PastEndIdx, uint64(dataLen))
+	return (dataEnd - dataLen) % circ.length
 }
 
 // Note: in development code, you should never provide a True partialWrite
