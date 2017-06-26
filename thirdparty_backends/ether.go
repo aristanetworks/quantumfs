@@ -570,3 +570,8 @@ func (dc *dsApiCtx) FuncIn(funcName string, fmtStr string,
 		fmtStr, args...)
 	return (etherFuncOut)(el)
 }
+
+func (dc *dsApiCtx) FuncInName(funcName string) ether.FuncOut {
+	el := (*quantumfs.Ctx)(dc).FuncInName(qlog.LogDatastore, funcName)
+	return (etherFuncOut)(el)
+}
