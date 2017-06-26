@@ -61,7 +61,6 @@ func (inf *influxlibAdapter) Store(measurement string, tags []quantumfs.Tag,
 	}
 
 	tags = append(tags, quantumfs.NewTag("host", host))
-	tags = append(tags, quantumfs.NewTag("version", quantumfs.Version)
 
 	tagMap := make(map[string]string)
 	for _, v := range tags {
