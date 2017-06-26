@@ -16,22 +16,14 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
 const (
 	sudo       = "/usr/bin/sudo"
-	mount      = "/usr/bin/mount"
 	umount     = "/usr/bin/umount"
-	netns      = "/usr/bin/netns"
-	netnsd     = "/usr/bin/netnsd"
-	setarch    = "/usr/bin/setarch"
-	cp         = "/usr/bin/cp"
-	chns       = "/usr/bin/chns"
 	sh         = "/usr/bin/sh"
-	bash       = "/usr/bin/bash"
 	ArtoolsDir = "/usr/share/Artools"
 	oldroot    = "/mnt"
 	pivot_root = "/usr/sbin/pivot_root"
@@ -42,7 +34,6 @@ const (
 )
 
 var qfs string
-var persistent bool = true
 
 func init() {
 	if qfspath, err := os.Executable(); err != nil {
@@ -53,19 +44,6 @@ func init() {
 	}
 }
 
-// A helper function to run command which gives better error information
-func runCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-
-	if buf, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("Error in runCommand: %s\n"+
-			"Command: %s %v\n Output: %s",
-			err.Error(), name, args, string(buf))
-	}
-
-	return nil
-}
-
 // A helper function to test whether a path is a legitimate workspaceroot
 // by checking whether /usr/share/Artools directory is present
 func isLegitimateWorkspaceRoot(wsr string) bool {
@@ -74,31 +52,6 @@ func isLegitimateWorkspaceRoot(wsr string) bool {
 		return true
 	}
 	return false
-}
-
-// This function comes from the implementation of chroot in Artools,
-// but we are going to get rid of the dependency on Artools so it will
-// become deprecated when we can make a quantumfs workspace into a proper
-// workspace with "a4 newtree"
-func findWorkspaceRoot() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	dirs := strings.Split(wd, "/")
-
-	for len(dirs) > 1 {
-		rootdir := strings.Join(dirs, "/")
-
-		if isLegitimateWorkspaceRoot(rootdir) {
-			return rootdir, nil
-		}
-
-		dirs = dirs[0 : len(dirs)-1]
-	}
-
-	return "", fmt.Errorf("Invalid path for chroot")
 }
 
 // Helper function to find the workspace name from the workspace root
@@ -194,7 +147,6 @@ func getArchitecture(rootdir string) (string, error) {
 }
 
 func setArchitecture(arch string) error {
-
 	var flag uintptr
 	if arch == "i686" {
 		flag = 0x0008
@@ -209,34 +161,6 @@ func setArchitecture(arch string) error {
 		return fmt.Errorf("Change Personality error: %d", errno)
 	}
 
-	return nil
-}
-
-// test whether the netns server is already running
-func serverRunning(svrName string) bool {
-	cmdServerRun := exec.Command(netns, "-q", svrName)
-
-	if err := cmdServerRun.Run(); err == nil {
-		return true
-	}
-
-	return false
-}
-
-// login the netns server and open a new login shell, which is not
-// expected to return
-func netnsLogin(rootdir string, svrName string) error {
-	env := os.Environ()
-	env = append(env, "A4_CHROOT="+rootdir)
-
-	args := []string{netns, svrName, sh, "-l", "-c",
-		"\"$@\"", bash, bash}
-	if err := syscall.Exec(netns, args, env); err != nil {
-		fmt.Println("The error is ", err.Error())
-		return fmt.Errorf("netnsLogin Exec error: %s", err.Error())
-	}
-
-	fmt.Println("The error is nil")
 	return nil
 }
 
@@ -262,76 +186,6 @@ func setupBindMounts(rootdir string) error {
 	}
 
 	return nil
-}
-
-func chrootInNsd(rootdir string, svrName string) error {
-	bindmountRoot := fmt.Sprintf("%s %s -n --rbind %s %s;", sudo, mount,
-		rootdir, rootdir)
-
-	dstDev := rootdir + "/dev"
-	makedest("/dev", dstDev)
-
-	mountDev := fmt.Sprintf("%s %s -n -t tmpfs none %s;",
-		sudo, mount, dstDev)
-
-	copyDev := fmt.Sprintf("%s %s -ax /dev/. %s;", sudo, cp, dstDev)
-
-	dstVar := rootdir + "/var/run/netns"
-	if err := utils.MkdirAll(dstVar, 0666); err != nil {
-		return fmt.Errorf("Creating directory %s error: %s",
-			dstVar, err.Error())
-	}
-
-	mountVar := fmt.Sprintf("%s %s -n -t tmpfs tmpfs %s;", sudo, mount, dstVar)
-
-	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
-		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
-	homes := homedirs()
-	paths = append(paths, homes...)
-
-	var bindmountOther string
-	for i := 0; i < len(paths); i++ {
-		src := paths[i]
-		dst := rootdir + paths[i]
-		if !makedest(src, dst) {
-			continue
-		}
-
-		bindmountOther = bindmountOther +
-			fmt.Sprintf("%s %s -n --bind %s %s;", sudo, mount, src, dst)
-	}
-
-	prechrootCmd := bindmountRoot + mountDev + copyDev +
-		mountVar + bindmountOther
-
-	archString, err := getArchitecture(rootdir)
-	if err != nil {
-		return fmt.Errorf("Getting architecture of workspaceroot"+
-			" %s error: %s",
-			rootdir, err.Error())
-	}
-
-	if err := runCommand(setarch, archString, netnsd,
-		"-d", "--no-netns-env", "-f", "m", "--chroot="+rootdir,
-		"--pre-chroot-cmd="+prechrootCmd, svrName); err != nil {
-		return err
-
-	}
-
-	return nil
-}
-
-func printHelp() {
-	fmt.Println("   qfs chroot -- Run a command or shell in the current")
-	fmt.Println("                 workspace tree. The chroot environment")
-	fmt.Println("                 can be specified to be nonpersistent,")
-	fmt.Println("                 or by default it is persistent.\n")
-	fmt.Println("   qfs chroot")
-	fmt.Println("   qfs chroot --nonpersistent <WSR> <DIR> <CMD>\n")
-	fmt.Println("   Options:")
-	fmt.Println("      --nonpersistent <WSR> <DIR> <CMD>  Change <WSR> as",
-		" the filesystem root,")
-	fmt.Println("        enter working directory <DIR> and run command <CMD>")
 }
 
 func switchUserMode() error {
@@ -383,13 +237,6 @@ func switchUserMode() error {
 	}
 
 	return nil
-}
-
-func profileLog(info string) {
-	t := time.Now()
-	timestamp := t.UnixNano()
-
-	fmt.Printf("[%d] %s\n", timestamp, info)
 }
 
 func copyDirStayOnFs(src string, dst string) error {
@@ -482,7 +329,7 @@ func copyDirStayOnFs(src string, dst string) error {
 	})
 }
 
-func chrootOutOfNsd(rootdir string, workingdir string, cmd []string) error {
+func nonPersistentChroot(rootdir string, workingdir string, cmd []string) error {
 	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())
@@ -699,106 +546,35 @@ func chroot() {
 		return
 	}
 
-	args := os.Args[2:]
+	if len(os.Args) < 5 {
+		fmt.Fprintln(os.Stderr, "Not enough arguments.")
+		os.Exit(exitBadArgs)
+	}
 
 	var wsr string
-	var dir string
+	if absdir, err := filepath.Abs(os.Args[2]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error converting <wsr> path %s to absolute "+
+			"path: %s\n", os.Args[2], err.Error())
+		os.Exit(exitBadArgs)
+	} else {
+		wsr = absdir
+	}
+
+	dir := os.Args[3]
+
 	cmd := make([]string, 0)
 
-ArgumentProcessingLoop:
-	for len(args) > 0 {
-		switch args[0] {
-		case "--nonpersistent":
-			persistent = false
-			args = args[1:]
-			if len(args) < 3 {
-				fmt.Fprintln(os.Stderr, "Not enough arguments.")
-				printHelp()
-				os.Exit(1)
-			}
+	cmd = append(cmd, os.Args[4:]...)
 
-			if absdir, err := filepath.Abs(args[0]); err != nil {
-				fmt.Fprintf(os.Stderr, "Error converting path %s"+
-					" to absolute path: %s\n",
-					args[0], err.Error())
-				os.Exit(1)
-			} else {
-				wsr = absdir
-			}
-
-			dir = args[1]
-
-			cmd = append(cmd, args[2:]...)
-			break ArgumentProcessingLoop
-		default:
-			fmt.Fprintln(os.Stderr, "unknown argument:", args[0])
-			printHelp()
-			os.Exit(1)
-
-		}
-
-		args = args[1:]
+	if !isLegitimateWorkspaceRoot(wsr) {
+		fmt.Fprintf(os.Stderr,
+			"Invalid workspaceroot: %s, <wsr> must be a"+
+				" legitimate workspaceroot\n", wsr)
+		os.Exit(exitBadArgs)
 	}
 
-	if !persistent {
-		if !isLegitimateWorkspaceRoot(wsr) {
-			fmt.Fprintf(os.Stderr,
-				"Invalid workspaceroot: %s, <WSR> must be a"+
-					" legitimate workspaceroot\n", wsr)
-			printHelp()
-			os.Exit(1)
-		}
-
-		if err := chrootOutOfNsd(wsr, dir, cmd); err != nil {
-			fmt.Fprintf(os.Stderr, "chrootOutOfNsd error: %s",
-				err.Error())
-			os.Exit(1)
-		}
-
-		return
-	}
-
-	rootdir, err := findWorkspaceRoot()
-	if err != nil {
-		fmt.Fprintln(os.Stderr,
-			"findWorkspaceRoot Error: ", err.Error())
-		os.Exit(1)
-	}
-
-	wsn, err := findWorkspaceName(rootdir)
-	if err != nil {
-		fmt.Fprintln(os.Stderr,
-			"findWorkspaceName Error: ", err.Error())
+	if err := nonPersistentChroot(wsr, dir, cmd); err != nil {
+		fmt.Fprintf(os.Stderr, "error chrooting: %s", err.Error())
 		os.Exit(exitInternalError)
 	}
-
-	if err = os.Setenv("QFS_WORKSPACE", wsn); err != nil {
-		fmt.Fprintln(os.Stderr,
-			"Setenv Error: ", err.Error())
-		os.Exit(exitInternalError)
-	}
-
-	svrName := rootdir + "/chroot"
-	if !serverRunning(svrName) {
-		if err := chrootInNsd(rootdir, svrName); err != nil {
-			fmt.Fprintln(os.Stderr,
-				"chrootInNsd Error:", err.Error())
-			os.Exit(1)
-		}
-	}
-
-	// Switch to non-root user
-	if err := switchUserMode(); err != nil {
-		fmt.Println("Switching usermode error: ", err.Error())
-		os.Exit(1)
-	}
-
-	err = netnsLogin(rootdir, svrName)
-	if err != nil {
-		fmt.Fprintln(os.Stderr,
-			"netnsLogin Error:", err.Error())
-		os.Exit(1)
-	}
-
-	return
 }
