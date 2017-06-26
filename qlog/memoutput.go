@@ -359,12 +359,6 @@ func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 	return strMap.createLogIdx(idx, level, format)
 }
 
-type LogPrimitive interface {
-	// Return the type cast to a primitive, in interface form so that
-	// type asserts will work
-	Primitive() interface{}
-}
-
 const (
 	TypeInt8Pointer   = 1
 	TypeInt8          = 2

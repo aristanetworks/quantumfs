@@ -140,11 +140,6 @@ func KeyTypeToString(keyType KeyType) string {
 // One of the KeyType* values above
 type KeyType uint8
 
-// Convert to primitive type for qlog
-func (v KeyType) Primitive() interface{} {
-	return uint8(v)
-}
-
 // The size of the object ID is determined by a number of bytes sufficient to contain
 // the identification hashes used by all the backing stores (most notably the VCS
 // such as git or Mercurial) and additional space to be used for datastore routing.
@@ -420,11 +415,6 @@ func ObjectType2String(typ ObjectType) string {
 // One of the ObjectType* values
 type ObjectType uint8
 
-// Convert to primitive type for qlog
-func (v ObjectType) Primitive() interface{} {
-	return uint8(v)
-}
-
 func (v ObjectType) IsRegularFile() bool {
 	return v == ObjectTypeSmallFile || v == ObjectTypeMediumFile ||
 		v == ObjectTypeLargeFile || v == ObjectTypeVeryLargeFile
@@ -484,11 +474,6 @@ func ObjectUid(uid uint32, userId uint32) UID {
 // One of the UID* values
 type UID uint16
 
-// Convert to primitive type for qlog
-func (v UID) Primitive() interface{} {
-	return uint8(v)
-}
-
 // Quantumfs doesn't keep precise ownership values. Instead files and directories may
 // be owned by some special system accounts or the current user. The translation to
 // GID is done at access time.
@@ -531,18 +516,8 @@ func ObjectGid(gid uint32, groupId uint32) GID {
 // One of the GID* values
 type GID uint16
 
-// Convert to primitive type for qlog
-func (v GID) Primitive() interface{} {
-	return uint8(v)
-}
-
 // Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
-
-// Convert to primitive type for qlog
-func (t Time) Primitive() interface{} {
-	return uint64(t)
-}
 
 func (t Time) Seconds() uint64 {
 	return uint64(t / 1000000)
