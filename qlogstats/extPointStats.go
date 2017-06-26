@@ -7,7 +7,6 @@ package qlogstats
 
 import (
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 type extPointStats struct {
@@ -31,10 +30,10 @@ func (ext *extPointStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPointStats) ProcessRequest(request qlog.LogStack) {
+func (ext *extPointStats) ProcessRequest(request []indentedLog) {
 	for _, v := range request {
-		if v.Format == ext.format {
-			ext.stats.NewPoint(uint64(v.T))
+		if v.log.Format == ext.format {
+			ext.stats.NewPoint(uint64(v.log.T))
 		}
 	}
 }

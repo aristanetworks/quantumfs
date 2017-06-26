@@ -322,8 +322,8 @@ func (s sortDirRecordsByName) Len() int {
 }
 
 func (s sortDirRecordsByName) Swap(i, j int) {
-	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).ShallowCopy()
-	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).ShallowCopy()
+	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).Clone()
+	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).Clone()
 	s.de.dir.Entries().Set(i, curj.Record().record)
 	s.de.dir.Entries().Set(j, oldi.Record().record)
 }
@@ -869,14 +869,31 @@ type DirectoryRecord interface {
 
 	EncodeExtendedKey() []byte
 
-	// returns a direct record copy, regardless of underlying class, causing
-	// all future changes to the copy to be unreflected in the original.
-	// Mainly used for reads
-	ShallowCopy() DirectoryRecord
+	// Return an immutable copy. Changes made to this object after calling
+	// AsImmutableDirectoryRecord() will not result in those changes being
+	// reflected in the ImmutableDirectoryRecord.
+	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
 
 	// returns a real copy, which can result in future changes changing the
 	// original depending on the underlying class.
 	Clone() DirectoryRecord
+}
+
+// Just like DirectoryRecord, but without any mutators
+type ImmutableDirectoryRecord interface {
+	Filename() string
+	ID() ObjectKey
+	Type() ObjectType
+	Permissions() uint32
+	Owner() UID
+	Group() GID
+	Size() uint64
+	ExtendedAttributes() ObjectKey
+	ContentTime() Time
+	ModificationTime() Time
+	Nlinks() uint32
+	EncodeExtendedKey() []byte
+	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
 }
 
 func NewDirectoryRecord() *DirectRecord {
@@ -1004,9 +1021,24 @@ func (record *DirectRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
 }
 
-func (record *DirectRecord) ShallowCopy() DirectoryRecord {
+func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
+	return &ImmutableRecord{
+		filename:    record.Filename(),
+		id:          record.ID(),
+		filetype:    record.Type(),
+		permissions: record.Permissions(),
+		owner:       record.Owner(),
+		group:       record.Group(),
+		size:        record.Size(),
+		xattr:       record.ExtendedAttributes(),
+		ctime:       record.ContentTime(),
+		mtime:       record.ModificationTime(),
+		nlinks:      record.Nlinks(),
+	}
+}
+
+func (record *DirectRecord) Clone() DirectoryRecord {
 	newEntry := NewDirectoryRecord()
-	newEntry.SetNlinks(record.Nlinks())
 	newEntry.SetFilename(record.Filename())
 	newEntry.SetID(record.ID())
 	newEntry.SetType(record.Type())
@@ -1017,13 +1049,9 @@ func (record *DirectRecord) ShallowCopy() DirectoryRecord {
 	newEntry.SetExtendedAttributes(record.ExtendedAttributes())
 	newEntry.SetContentTime(record.ContentTime())
 	newEntry.SetModificationTime(record.ModificationTime())
+	newEntry.SetNlinks(record.Nlinks())
 
 	return newEntry
-}
-
-func (record *DirectRecord) Clone() DirectoryRecord {
-	// For DirectRecord, ShallowCopy is as good as a clone
-	return record.ShallowCopy()
 }
 
 func EncodeExtendedKey(key ObjectKey, type_ ObjectType,
@@ -1359,4 +1387,89 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
+}
+
+func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
+	permissions uint32, owner UID, group GID, size uint64, xattr ObjectKey,
+	ctime Time, mtime Time, nlinks uint32) ImmutableDirectoryRecord {
+
+	return &ImmutableRecord{
+		filename:    filename,
+		id:          id,
+		filetype:    filetype,
+		permissions: permissions,
+		owner:       owner,
+		group:       group,
+		size:        size,
+		xattr:       xattr,
+		ctime:       ctime,
+		mtime:       mtime,
+		nlinks:      nlinks,
+	}
+}
+
+type ImmutableRecord struct {
+	filename    string
+	id          ObjectKey
+	filetype    ObjectType
+	permissions uint32
+	owner       UID
+	group       GID
+	size        uint64
+	xattr       ObjectKey
+	ctime       Time
+	mtime       Time
+	nlinks      uint32
+}
+
+func (ir *ImmutableRecord) Filename() string {
+	return ir.filename
+}
+
+func (ir *ImmutableRecord) ID() ObjectKey {
+	return ir.id
+}
+
+func (ir *ImmutableRecord) Type() ObjectType {
+	return ir.filetype
+}
+
+func (ir *ImmutableRecord) Permissions() uint32 {
+	return ir.permissions
+}
+
+func (ir *ImmutableRecord) Owner() UID {
+	return ir.owner
+}
+
+func (ir *ImmutableRecord) Group() GID {
+	return ir.group
+}
+
+func (ir *ImmutableRecord) Size() uint64 {
+	return ir.size
+}
+
+func (ir *ImmutableRecord) ExtendedAttributes() ObjectKey {
+	return ir.xattr
+}
+
+func (ir *ImmutableRecord) ContentTime() Time {
+	return ir.ctime
+}
+
+func (ir *ImmutableRecord) ModificationTime() Time {
+	return ir.mtime
+}
+
+func (ir *ImmutableRecord) Nlinks() uint32 {
+	return ir.nlinks
+}
+
+func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
+	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
+}
+
+func (ir *ImmutableRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
+	return ir
 }
