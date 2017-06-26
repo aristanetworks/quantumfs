@@ -13,10 +13,12 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -164,9 +166,9 @@ func setArchitecture(arch string) error {
 	return nil
 }
 
-func setupBindMounts(rootdir string) error {
+func setupBindMounts(rootdir string, quantumFsMount string) error {
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
-		"/tmp/ArosTest.SimulatedDut", "/mnt/quantumfs"}
+		"/tmp/ArosTest.SimulatedDut", quantumFsMount}
 	homes := homedirs()
 	paths = append(paths, homes...)
 
@@ -364,6 +366,8 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 		return fmt.Errorf("Stating / error: %s", err.Error())
 	}
 
+	quantumFsMount := quantumfs.FindQuantumFsMountPath()
+
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
 		// pivot_root will only work when root directory is a mountpoint
 		if err := syscall.Mount(rootdir, rootdir, "",
@@ -408,7 +412,7 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 				err.Error())
 		}
 
-		if err := setupBindMounts(rootdir); err != nil {
+		if err := setupBindMounts(rootdir, quantumFsMount); err != nil {
 			return err
 		}
 
@@ -528,7 +532,40 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 	return nil
 }
 
+func confirmMatchingArchitecture() {
+	// A later call to user.Lookup() will fail if we don't have a correctly
+	// matching qfs executable architecture and system architecture. Detect this
+	// now and output a helpful error message.
+
+	var uname syscall.Utsname
+	if err := syscall.Uname(&uname); err != nil {
+		// We failed to get the current running architecture. Silently carry
+		// on and hope for the best.
+		return
+	}
+
+	systemArch := ""
+
+	for _, val := range uname.Machine {
+		if val == 0 {
+			break
+		}
+		systemArch += string(val)
+	}
+
+	if (systemArch == "x86_64" && runtime.GOARCH != "amd64") ||
+		(systemArch == "i686" && runtime.GOARCH != "i386") {
+
+		fmt.Fprintln(os.Stderr, "qfs executable architecture mismatch!")
+		fmt.Fprintln(os.Stderr, "Use qfs version compiled for your "+
+			"architecture")
+		os.Exit(exitInternalError)
+	}
+}
+
 func chroot() {
+	confirmMatchingArchitecture()
+
 	// If we do not have root privilege, then gain it now
 	if syscall.Geteuid() != 0 {
 		sudo_cmd := []string{sudo}

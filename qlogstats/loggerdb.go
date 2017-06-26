@@ -13,6 +13,11 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
+type indentedLog struct {
+	log    qlog.LogOutput
+	indent int
+}
+
 type logTrack struct {
 	logs        qlog.LogStack
 	listElement *list.Element
@@ -28,7 +33,7 @@ type StatExtractor interface {
 	// receive. Strings must match format exactly, with a trailing "\n"
 	TriggerStrings() []string
 
-	ProcessRequest(request qlog.LogStack)
+	ProcessRequest(request []indentedLog)
 
 	Publish() ([]quantumfs.Tag, []quantumfs.Field)
 }
@@ -181,24 +186,37 @@ func (agg *Aggregator) ProcessThread() {
 func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 	// This is a map that contains, for each extractor that cares about a given
 	// log in logs, only the filtered logs that that extractor has said it wants
-	filteredRequests := make(map[extractorIdx][]qlog.LogOutput)
+	filteredRequests := make(map[extractorIdx][]indentedLog)
 
-	for _, log := range logs {
+	indentCount := 0
+	for _, curlog := range logs {
 		// Find if any extractors have registered for this log.
+
+		if qlog.IsFunctionOut(curlog.Format) {
+			indentCount--
+		}
 
 		// The statTriggers map is a map that uses a log format string for
 		// the key. The value is a list of extractors who want the log
-		if extractors, exists := agg.statTriggers[log.Format]; exists {
+		if extractors, exists := agg.statTriggers[curlog.Format]; exists {
 			for _, triggered := range extractors {
 				// This extractor wants this log, so append it
 				filtered, hasLogs := filteredRequests[triggered]
 				if !hasLogs {
-					filtered = make([]qlog.LogOutput, 0)
+					filtered = make([]indentedLog, 0)
 				}
 
-				filtered = append(filtered, log)
+				filtered = append(filtered, indentedLog{
+					log:    curlog,
+					indent: indentCount,
+				})
 				filteredRequests[triggered] = filtered
 			}
+		}
+
+		// Keep track of what level we're indented
+		if qlog.IsFunctionIn(curlog.Format) {
+			indentCount++
 		}
 	}
 
