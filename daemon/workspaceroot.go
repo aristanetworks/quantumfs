@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -31,10 +32,9 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	linkLock       utils.DeferableRwMutex
-	hardlinks      map[HardlinkId]linkEntry
-	nextHardlinkId HardlinkId
-	inodeToLink    map[InodeId]HardlinkId
+	linkLock    utils.DeferableRwMutex
+	hardlinks   map[HardlinkId]linkEntry
+	inodeToLink map[InodeId]HardlinkId
 }
 
 type linkEntry struct {
@@ -94,7 +94,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
 		defer wsr.linkLock.Lock().Unlock()
-		wsr.hardlinks, wsr.nextHardlinkId = loadHardlinks(c,
+		wsr.hardlinks = loadHardlinks(c,
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]HardlinkId)
 	}()
@@ -193,7 +193,24 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 	}
 }
 
-func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
+// We need a reference map of hardlinks to prevent the improbable event of random
+// number collision
+func generateUniqueHardlinkId(c *ctx,
+	hardlinks map[HardlinkId]linkEntry) HardlinkId {
+
+	// We assume here that the probability that we'll continually generate new
+	// random numbers for hardlinks that already exist is basically zero
+	for {
+		newId := HardlinkId(rand.Uint64())
+		if _, exists := hardlinks[newId]; exists {
+			c.wlog("HardlinkId generation collision: %d", newId)
+		} else {
+			return newId
+		}
+	}
+}
+
+func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeId,
 	record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
@@ -209,14 +226,18 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 
 	defer wsr.linkLock.Lock().Unlock()
 
-	newId := wsr.nextHardlinkId
-	wsr.nextHardlinkId++
+	newId := generateUniqueHardlinkId(c, wsr.hardlinks)
 
 	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
 	newEntry := newLinkEntry(dirRecord)
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
 	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+	// The hardlink filename will be the fingerprint of the filename
+	// which was the source of the first link operation that created
+	// the hardlink. This field is used to support seamless refreshing
+	// of a set of files into a set of hardlinks.
+	newEntry.record.SetFilename(fingerprint)
 
 	wsr.hardlinks[newId] = newEntry
 	wsr.inodeToLink[inodeId] = newId
@@ -408,25 +429,20 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 }
 
 func loadHardlinks(c *ctx,
-	entry quantumfs.HardlinkEntry) (map[HardlinkId]linkEntry, HardlinkId) {
+	entry quantumfs.HardlinkEntry) map[HardlinkId]linkEntry {
 
 	defer c.funcIn("loadHardlinks").Out()
 
 	hardlinks := make(map[HardlinkId]linkEntry)
-	nextHardlinkId := HardlinkId(0)
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
 		newLink.nlink = hardlink.Nlinks()
 		id := HardlinkId(hardlink.HardlinkID())
 		hardlinks[id] = newLink
-
-		if id >= nextHardlinkId {
-			nextHardlinkId = id + 1
-		}
 	})
 
-	return hardlinks, nextHardlinkId
+	return hardlinks
 }
 
 func publishHardlinkMap(c *ctx,
@@ -502,10 +518,6 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		newLink := newLinkEntry(hardlink.Record())
 		newLink.nlink = hardlink.Nlinks()
 		wsr.hardlinks[id] = newLink
-
-		if id >= wsr.nextHardlinkId {
-			wsr.nextHardlinkId = id + 1
-		}
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
@@ -534,8 +546,14 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	}
 }
 
+type HardlinkLoadRecord struct {
+	parent       *Directory
+	remoteRecord *quantumfs.DirectRecord
+}
+
 type HardlinkRefreshCtx struct {
 	claimedLinks map[HardlinkId]InodeId
+	loadRecords  []HardlinkLoadRecord
 }
 
 func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
@@ -592,6 +610,7 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 
 	var hrc HardlinkRefreshCtx
 	hrc.claimedLinks = make(map[HardlinkId]InodeId, 0)
+	hrc.loadRecords = make([]HardlinkLoadRecord, 0)
 
 	wsr.refreshHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
 
@@ -601,6 +620,15 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 		addedUninstantiated, removedUninstantiated =
 			wsr.refresh_DOWN(c, &hrc, workspaceRoot.BaseLayer())
 	}()
+
+	for _, loadRecord := range hrc.loadRecords {
+		func() {
+			defer wsr.LockTree().Unlock()
+			defer loadRecord.parent.childRecordLock.Lock().Unlock()
+			loadRecord.parent.loadNewChild_DOWN(c,
+				loadRecord.remoteRecord)
+		}()
+	}
 
 	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
 	c.qfs.removeUninstantiated(c, removedUninstantiated)
