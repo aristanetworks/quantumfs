@@ -387,6 +387,31 @@ const (
 	TypeBoolean       = 19
 )
 
+type emptyInterface struct {
+	type_ unsafe.Pointer
+	value unsafe.Pointer
+}
+
+func interfaceAsUint8(intf interface{}) uint8 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint8)(ei.value))
+}
+
+func interfaceAsUint16(intf interface{}) uint16 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint16)(ei.value))
+}
+
+func interfaceAsUint32(intf interface{}) uint32 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint32)(ei.value))
+}
+
+func interfaceAsUint64(intf interface{}) uint64 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint64)(ei.value))
+}
+
 // Writes the data, with a type prefix field two bytes long, to output. We pass in a
 // pointer to the output array instead of returning one to append so that we can
 // take advantage of output having a larger capacity and reducing memmoves
@@ -398,34 +423,34 @@ func (mem *SharedMemory) binaryWrite(data interface{}, format string,
 	switch {
 	case dataKind == reflect.Int8:
 		offset = toBinaryUint16(*output, offset, TypeInt8)
-		offset = toBinaryUint8(*output, offset, uint8(data.(int8)))
+		offset = toBinaryUint8(*output, offset, interfaceAsUint8(data))
 	case dataKind == reflect.Uint8:
 		offset = toBinaryUint16(*output, offset, TypeUint8)
-		offset = toBinaryUint8(*output, offset, data.(uint8))
+		offset = toBinaryUint8(*output, offset, interfaceAsUint8(data))
 	case dataKind == reflect.Int16:
 		offset = toBinaryUint16(*output, offset, TypeInt16)
-		offset = toBinaryUint16(*output, offset, uint16(data.(int16)))
+		offset = toBinaryUint16(*output, offset, interfaceAsUint16(data))
 	case dataKind == reflect.Uint16:
 		offset = toBinaryUint16(*output, offset, TypeUint16)
-		offset = toBinaryUint16(*output, offset, data.(uint16))
+		offset = toBinaryUint16(*output, offset, interfaceAsUint16(data))
 	case dataKind == reflect.Int32:
 		offset = toBinaryUint16(*output, offset, TypeInt32)
-		offset = toBinaryUint32(*output, offset, uint32(data.(int32)))
+		offset = toBinaryUint32(*output, offset, interfaceAsUint32(data))
 	case dataKind == reflect.Uint32:
 		offset = toBinaryUint16(*output, offset, TypeUint32)
-		offset = toBinaryUint32(*output, offset, data.(uint32))
+		offset = toBinaryUint32(*output, offset, interfaceAsUint32(data))
 	case dataKind == reflect.Int:
 		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, uint64(data.(int)))
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.Uint:
 		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, uint64(data.(uint)))
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.Int64:
 		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, uint64(data.(int64)))
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.Uint64:
 		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, data.(uint64))
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.String:
 		offset = writeArray(output, offset, format, []byte(data.(string)),
 			TypeString)
