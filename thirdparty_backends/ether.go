@@ -312,7 +312,8 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 
 	// since generic wsdb API sets up _null/null with nil key
 	// TODO(sid): Since qfs does not provide a context here, used
-	// ether.DefaultCtx
+	// ether.DefaultCtx. If the higher layers init the Ctx before
+	// initializing the backends, this can be solved.
 	key, err := eWsdb.wsdb.AdvanceWorkspace(ether.DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, []byte(nil),
