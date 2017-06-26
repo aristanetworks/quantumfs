@@ -31,7 +31,7 @@ const (
 	exitWorkspaceDbInitFail = iota
 )
 
-var version string
+var Version string
 
 var cacheSizeString string
 var cacheTimeNsecs uint
@@ -49,7 +49,7 @@ func init() {
 		defaultMemLogMegabytes  = 500
 	)
 
-	fmt.Printf("QuantumFS version %s\n", version)
+	fmt.Printf("QuantumFS version %s\n", Version)
 
 	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
 		"Default location of the internal cache. Should be on a ramfs or "+

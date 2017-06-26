@@ -49,7 +49,9 @@ func newInfluxDB(config string) quantumfs.TimeSeriesDB {
 	}
 }
 
-func (inf *influxlibAdapter) Store(tags []quantumfs.Tag, fields []quantumfs.Field) {
+func (inf *influxlibAdapter) Store(measurement string, tags []quantumfs.Tag,
+	fields []quantumfs.Field) {
+
 	// InfluxDB automatically adds a timestamp field
 
 	// Lookup the hostname for each Store to allow it to change underneath
@@ -58,7 +60,8 @@ func (inf *influxlibAdapter) Store(tags []quantumfs.Tag, fields []quantumfs.Fiel
 		panic(err)
 	}
 
-	tags = append(tags, quantumfs.NewTag("server", host))
+	tags = append(tags, quantumfs.NewTag("host", host))
+	tags = append(tags, quantumfs.NewTag("version", quantumfs.Version)
 
 	tagMap := make(map[string]string)
 	for _, v := range tags {
@@ -70,7 +73,7 @@ func (inf *influxlibAdapter) Store(tags []quantumfs.Tag, fields []quantumfs.Fiel
 		fieldMap[v.Name] = v.Data
 	}
 
-	err = inf.connector.WritePoint("quantumfs", tagMap, fieldMap)
+	err = inf.connector.WritePoint(measurement, tagMap, fieldMap)
 	if err != nil {
 		panic(err)
 	}

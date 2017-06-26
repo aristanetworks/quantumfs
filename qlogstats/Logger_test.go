@@ -79,7 +79,7 @@ func TestMatches(t *testing.T) {
 		qlogHandle.Log(qlog.LogTest, 12347, 3, qlog.FnExitStr+"TestMatch")
 
 		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 6,
+			test.Assert(len(memdb.Data[0].Fields) == 7,
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
@@ -118,7 +118,7 @@ func TestPercentiles(t *testing.T) {
 		}
 
 		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 6,
+			test.Assert(len(memdb.Data[0].Fields) == 7,
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
@@ -203,7 +203,7 @@ func TestIndentation(t *testing.T) {
 			12345, 3, qlog.FnExitStr+"TestMatch")
 
 		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 6,
+			test.Assert(len(memdb.Data[0].Fields) == 7,
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
