@@ -42,6 +42,10 @@ func (dc *ECtx) FuncIn(funcName string, fmtStr string,
 	return (etherFuncOut)(el)
 }
 
+func (dc *ECtx) FuncInName(funcName string) ether.FuncOut {
+	return dc.FuncIn(funcName, "")
+}
+
 func ToECtx(c *walker.Ctx) *ECtx {
 	return (*ECtx)(c)
 }
