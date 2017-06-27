@@ -512,43 +512,24 @@ func toBinaryUint8(buf []byte, offset int, input uint8) int {
 }
 
 func toBinaryUint16(buf []byte, offset int, input uint16) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 8) & 0xff)
-	offset++
-	return offset
+	for i := 0; i < 2; i++ {
+		buf[offset+i] = byte((input >> uint(i*8)) & 0xff)
+	}
+	return offset + 2
 }
 
 func toBinaryUint32(buf []byte, offset int, input uint32) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 8) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 16) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 24) & 0xff)
-	offset++
-	return offset
+	for i := 0; i < 4; i++ {
+		buf[offset+i] = byte((input >> uint(i*8)) & 0xff)
+	}
+	return offset + 4
 }
 
 func toBinaryUint64(buf []byte, offset int, input uint64) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 8) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 16) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 24) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 32) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 40) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 48) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 56) & 0xff)
-	offset++
-	return offset
+	for i := 0; i < 8; i++ {
+		buf[offset+i] = byte((input >> uint(i*8)) & 0xff)
+	}
+	return offset + 8
 }
 
 func expandBuffer(buf []byte, howMuch int) []byte {
