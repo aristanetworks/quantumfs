@@ -26,7 +26,7 @@ type Reader struct {
 
 	headerSize  uint64
 	circBufSize uint64
-	qfsVersion  string
+	daemonVersion  string
 
 	lastPastEndIdx uint64
 
@@ -49,10 +49,10 @@ func NewReader(qlogFile string) *Reader {
 	header := rtn.ReadHeader()
 	rtn.circBufSize = header.CircBuf.Size
 
-	rtn.qfsVersion = string(header.QfsVersion[:])
-	terminatorIdx := strings.Index(rtn.qfsVersion, "\x00")
+	rtn.daemonVersion = string(header.DaemonVersion[:])
+	terminatorIdx := strings.Index(rtn.daemonVersion, "\x00")
 	if terminatorIdx != -1 {
-		rtn.qfsVersion = rtn.qfsVersion[:terminatorIdx]
+		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
 	}
 
 	rtn.lastPastEndIdx = header.CircBuf.PastEndIdx
@@ -123,8 +123,8 @@ const (
 	ReadThenTail
 )
 
-func (read *Reader) QfsVersion() string {
-	return read.qfsVersion
+func (read *Reader) DaemonVersion() string {
+	return read.daemonVersion
 }
 
 func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {

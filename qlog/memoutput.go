@@ -3,7 +3,7 @@
 
 package qlog
 
-// This file contains all quantumfs logging shared memory support
+// This file contains all logging shared memory support
 
 import (
 	"errors"
@@ -34,7 +34,7 @@ const QlogVersion = 4
 const MaxPacketLen = 32767
 
 type MmapHeader struct {
-	QfsVersion [30]byte
+	DaemonVersion [128]byte
 	Version    uint32
 	StrMapSize uint32
 	CircBuf    circBufHeader
@@ -236,7 +236,7 @@ func newIdStrMap(buf []byte, offset int) IdStrMap {
 }
 
 func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	qfsVersion string, errOut *Qlog) *SharedMemory {
+	daemonVersion string, errOut *Qlog) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -288,13 +288,13 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
 	header.Version = QlogVersion
 
-	versionLen := len(qfsVersion)
-	if versionLen > len(header.QfsVersion) {
-		versionLen = len(header.QfsVersion)
+	versionLen := len(daemonVersion)
+	if versionLen > len(header.DaemonVersion) {
+		versionLen = len(header.DaemonVersion)
 	}
-	copy(header.QfsVersion[:], qfsVersion[:versionLen])
-	if versionLen < len(header.QfsVersion) {
-		header.QfsVersion[versionLen] = '\x00'
+	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
+	if versionLen < len(header.DaemonVersion) {
+		header.DaemonVersion[versionLen] = '\x00'
 	}
 
 	header.StrMapSize = mmapStrMapSize
