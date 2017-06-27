@@ -35,9 +35,9 @@ const MaxPacketLen = 32767
 
 type MmapHeader struct {
 	DaemonVersion [128]byte
-	Version    uint32
-	StrMapSize uint32
-	CircBuf    circBufHeader
+	Version       uint32
+	StrMapSize    uint32
+	CircBuf       circBufHeader
 }
 
 type circBufHeader struct {

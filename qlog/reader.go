@@ -24,9 +24,9 @@ type LogStrTrim struct {
 type Reader struct {
 	file *os.File
 
-	headerSize  uint64
-	circBufSize uint64
-	daemonVersion  string
+	headerSize    uint64
+	circBufSize   uint64
+	daemonVersion string
 
 	lastPastEndIdx uint64
 
