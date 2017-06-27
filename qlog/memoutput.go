@@ -506,29 +506,26 @@ func writeArray(output *[]byte, offset int, format string, data []byte,
 
 // Don't use interfaces where possible because they're slow
 func toBinaryUint8(buf []byte, offset int, input uint8) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	return offset
+	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 1
 }
 
 func toBinaryUint16(buf []byte, offset int, input uint16) int {
-	for i := 0; i < 2; i++ {
-		buf[offset+i] = byte((input >> uint(i*8)) & 0xff)
-	}
+	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
 	return offset + 2
 }
 
 func toBinaryUint32(buf []byte, offset int, input uint32) int {
-	for i := 0; i < 4; i++ {
-		buf[offset+i] = byte((input >> uint(i*8)) & 0xff)
-	}
+	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
 	return offset + 4
 }
 
 func toBinaryUint64(buf []byte, offset int, input uint64) int {
-	for i := 0; i < 8; i++ {
-		buf[offset+i] = byte((input >> uint(i*8)) & 0xff)
-	}
+	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
 	return offset + 8
 }
 
