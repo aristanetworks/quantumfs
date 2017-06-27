@@ -27,13 +27,14 @@ const mmapStrMapSize = 512 * 1024
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const QlogVersion = 3
+const QlogVersion = 4
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
 // so the max packet length is 7 bits long
 const MaxPacketLen = 32767
 
 type MmapHeader struct {
+	QfsVersion [30]byte
 	Version    uint32
 	StrMapSize uint32
 	CircBuf    circBufHeader
@@ -235,7 +236,7 @@ func newIdStrMap(buf []byte, offset int) IdStrMap {
 }
 
 func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	errOut *Qlog) *SharedMemory {
+	qfsVersion string, errOut *Qlog) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -286,6 +287,16 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	rtn.buffer = mmap
 	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
 	header.Version = QlogVersion
+
+	versionLen := len(qfsVersion)
+	if versionLen > len(header.QfsVersion) {
+		versionLen = len(header.QfsVersion)
+	}
+	copy(header.QfsVersion[:], qfsVersion[:versionLen])
+	if versionLen < len(header.QfsVersion) {
+		header.QfsVersion[versionLen] = '\x00'
+	}
+
 	header.StrMapSize = mmapStrMapSize
 	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,
