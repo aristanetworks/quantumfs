@@ -176,7 +176,7 @@ func (agg *Aggregator) ProcessThread() {
 					// add the qfs version tag
 					tags = append(tags,
 						quantumfs.NewTag("version",
-						agg.qfsVersion))
+							agg.qfsVersion))
 
 					agg.db.Store(measurement, tags, fields)
 				}
