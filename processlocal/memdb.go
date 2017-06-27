@@ -18,7 +18,7 @@ type Memdb struct {
 	Data []dataSeries
 }
 
-func NewMemdb() *Memdb {
+func NewMemdb(conf string) quantumfs.TimeSeriesDB {
 	return &Memdb{
 		Data: make([]dataSeries, 0),
 	}
