@@ -572,12 +572,5 @@ func (dc *dsApiCtx) FuncIn(funcName string, fmtStr string,
 }
 
 func (dc *dsApiCtx) FuncInName(funcName string) ether.FuncOut {
-<<<<<<< HEAD
-	return FuncIn(funcName, "")
-||||||| merged common ancestors
-	el := (*quantumfs.Ctx)(dc).FuncInName(qlog.LogDatastore, funcName)
-	return (etherFuncOut)(el)
-=======
 	return dc.FuncIn(funcName, "")
->>>>>>> master
 }
