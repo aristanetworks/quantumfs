@@ -570,3 +570,7 @@ func (dc *dsApiCtx) FuncIn(funcName string, fmtStr string,
 		fmtStr, args...)
 	return (etherFuncOut)(el)
 }
+
+func (dc *dsApiCtx) FuncInName(funcName string) ether.FuncOut {
+	return dc.FuncIn(funcName, "")
+}
