@@ -14,7 +14,7 @@ import (
 func runReader(qlogFile string,
 	extractors []StatExtractorConfig) *processlocal.Memdb {
 
-	db := processlocal.NewMemdb()
+	db := processlocal.NewMemdb("").(*processlocal.Memdb)
 	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors)
 
 	agg.requestEndAfter = time.Millisecond * 100
