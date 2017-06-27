@@ -57,7 +57,7 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	db quantumfs.TimeSeriesDB, extractors []StatExtractorConfig) *Aggregator {
 
 	reader := qlog.NewReader(filename)
-	agg := NewAggregator(db, extractors)
+	agg := NewAggregator(db, extractors, reader.QfsVersion())
 
 	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
 		agg.ProcessLog(v)
@@ -71,6 +71,7 @@ type extractorIdx int
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
+	qfsVersion    string
 
 	// track the oldest untouched requests so we can push them to the stat
 	// extractors after the resting period (so we're confident there are no
@@ -86,11 +87,12 @@ type Aggregator struct {
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig) *Aggregator {
+	extractors []StatExtractorConfig, qfsVersion_ string) *Aggregator {
 
 	rtn := Aggregator{
 		db:              db_,
 		logsByRequest:   make(map[uint64]logTrack),
+		qfsVersion:      qfsVersion_,
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
@@ -171,6 +173,11 @@ func (agg *Aggregator) ProcessThread() {
 				measurement, tags,
 					fields := extractor.extractor.Publish()
 				if tags != nil && len(tags) > 0 {
+					// add the qfs version tag
+					tags = append(tags,
+						quantumfs.NewTag("version",
+						agg.qfsVersion))
+
 					agg.db.Store(measurement, tags, fields)
 				}
 

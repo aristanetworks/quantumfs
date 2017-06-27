@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 	"unsafe"
 )
@@ -25,6 +26,7 @@ type Reader struct {
 
 	headerSize  uint64
 	circBufSize uint64
+	qfsVersion  string
 
 	lastPastEndIdx uint64
 
@@ -46,6 +48,13 @@ func NewReader(qlogFile string) *Reader {
 	rtn.file = file
 	header := rtn.ReadHeader()
 	rtn.circBufSize = header.CircBuf.Size
+
+	rtn.qfsVersion = string(header.QfsVersion[:])
+	terminatorIdx := strings.Index(rtn.qfsVersion, "\x00")
+	if terminatorIdx != -1 {
+		rtn.qfsVersion = rtn.qfsVersion[:terminatorIdx]
+	}
+
 	rtn.lastPastEndIdx = header.CircBuf.PastEndIdx
 	return &rtn
 }
@@ -113,6 +122,10 @@ const (
 	ReadOnly
 	ReadThenTail
 )
+
+func (read *Reader) QfsVersion() string {
+	return read.qfsVersion
+}
 
 func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 	if mode == ReadThenTail || mode == ReadOnly {
