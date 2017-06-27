@@ -63,7 +63,7 @@ func main() {
 		"datastore and workspaceDB config file")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
 	influxServer := walkFlags.String("influxServer", "", "influxdb server's IP")
-	influxPort := walkFlags.Int("influxPort", 0, "influxdb server's port")
+	influxPort := walkFlags.Uint("influxPort", 0, "influxdb server's port")
 	influxDBName := walkFlags.String("influxDBName", "", "database to use in influxdb")
 	numWalkers := walkFlags.Int("numWalkers", maxNumWalkers,
 		"Number of parallel walks in the daemon")
@@ -100,7 +100,7 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	c := getWalkerDaemonContext(*influxServer, *influxPort, *influxDBName,
+	c := getWalkerDaemonContext(*influxServer, uint16(*influxPort), *influxDBName,
 		*config, *logdir, *numWalkers)
 
 	// Start heart beat messaging.

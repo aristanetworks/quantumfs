@@ -35,7 +35,7 @@ type Ctx struct {
 	iteration  uint
 }
 
-func getWalkerDaemonContext(influxServer string, influxPort int,
+func getWalkerDaemonContext(influxServer string, influxPort uint16,
 	influxDBName string, config string, logdir string, numwalkers int) *Ctx {
 
 	// Connect to InfluxDB
