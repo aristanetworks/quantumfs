@@ -57,7 +57,7 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	db quantumfs.TimeSeriesDB, extractors []StatExtractorConfig) *Aggregator {
 
 	reader := qlog.NewReader(filename)
-	agg := NewAggregator(db, extractors, reader.QfsVersion())
+	agg := NewAggregator(db, extractors, reader.DaemonVersion())
 
 	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
 		agg.ProcessLog(v)
