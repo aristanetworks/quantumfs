@@ -124,7 +124,7 @@ func TestPercentiles(t *testing.T) {
 			base += int64(i)
 		}
 
-		checked := make([]bool, 7)
+		checked := make([]bool, 8)
 		checker := func(memdb *processlocal.Memdb) {
 			test.Assert(len(memdb.Data[0].Fields) == 7,
 				"%d fields produced from one matching log",
@@ -159,6 +159,14 @@ func TestPercentiles(t *testing.T) {
 					test.Assert(v.Data == 99,
 						"99th percentile is %d", v.Data)
 					checked[6] = true
+				}
+			}
+
+			for k, v := range memdb.Data[0].Tags {
+				if k == "version" {
+					test.Assert(v == "noVersion",
+						"version field not correct: %s", v)
+					checked[7] = true
 				}
 			}
 		}
