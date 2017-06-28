@@ -35,7 +35,7 @@ type StatExtractor interface {
 
 	ProcessRequest(request []indentedLog)
 
-	Publish() ([]quantumfs.Tag, []quantumfs.Field)
+	Publish() (string, []quantumfs.Tag, []quantumfs.Field)
 }
 
 type StatExtractorConfig struct {
@@ -168,9 +168,10 @@ func (agg *Aggregator) ProcessThread() {
 		// Lastly check if any extractors need to Publish
 		for i, extractor := range agg.statExtractors {
 			if now.Sub(extractor.lastOutput) > extractor.statPeriod {
-				tags, fields := extractor.extractor.Publish()
+				measurement, tags,
+					fields := extractor.extractor.Publish()
 				if tags != nil && len(tags) > 0 {
-					agg.db.Store(tags, fields)
+					agg.db.Store(measurement, tags, fields)
 				}
 
 				extractor.lastOutput = now
@@ -264,11 +265,20 @@ func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 type basicStats struct {
 	sum    uint64
 	points []uint64
+	max    uint64
 }
 
 func (bs *basicStats) NewPoint(data uint64) {
 	bs.sum += data
 	bs.points = append(bs.points, data)
+
+	if data > bs.max {
+		bs.max = data
+	}
+}
+
+func (bs *basicStats) Max() uint64 {
+	return bs.max
 }
 
 func (bs *basicStats) Average() uint64 {
@@ -296,10 +306,10 @@ func (bs *basicStats) Percentiles() map[string]uint64 {
 
 	lastIdx := float32(len(points) - 1)
 
-	rtn["50pct"] = points[int(lastIdx*0.50)]
-	rtn["90pct"] = points[int(lastIdx*0.90)]
-	rtn["95pct"] = points[int(lastIdx*0.95)]
-	rtn["99pct"] = points[int(lastIdx*0.99)]
+	rtn["50pct_ns"] = points[int(lastIdx*0.50)]
+	rtn["90pct_ns"] = points[int(lastIdx*0.90)]
+	rtn["95pct_ns"] = points[int(lastIdx*0.95)]
+	rtn["99pct_ns"] = points[int(lastIdx*0.99)]
 
 	return rtn
 }
