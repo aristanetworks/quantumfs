@@ -71,7 +71,7 @@ type extractorIdx int
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
-	daemonVersion    string
+	daemonVersion string
 
 	// track the oldest untouched requests so we can push them to the stat
 	// extractors after the resting period (so we're confident there are no
