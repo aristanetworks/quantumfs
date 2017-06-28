@@ -29,5 +29,5 @@ func NewTag(name_ string, data_ string) Tag {
 }
 
 type TimeSeriesDB interface {
-	Store(tags []Tag, fields []Field)
+	Store(measurement string, tags []Tag, fields []Field)
 }

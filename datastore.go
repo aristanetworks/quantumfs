@@ -247,6 +247,13 @@ func (key ObjectKey) IsEqualTo(other ObjectKey) bool {
 	return false
 }
 
+func (key ObjectKey) IsValid() bool {
+	if key.Type() == KeyTypeInvalid || len(key.Value()) == 0 {
+		return false
+	}
+	return true
+}
+
 func DecodeSpecialKey(key ObjectKey) (fileType uint32, device uint32, err error) {
 	if key.Type() != KeyTypeEmbedded {
 		return 0, 0, fmt.Errorf("Non-embedded key when decoding " +
