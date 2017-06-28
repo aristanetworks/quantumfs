@@ -126,14 +126,14 @@ func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 }
 
 // Note: in development code, you should never provide a True partialWrite
-func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
+func (circ *CircMemLogs) writeData(data []byte, length int, partialWrite bool) {
 	// For now, if the message is too long then just toss it
-	if uint64(len(data)) > circ.length {
+	if uint64(length) > circ.length {
 		return
 	}
 
 	// We only want to use the lower 2 bytes, but need all 4 to use sync/atomic
-	dataLen := uint32(len(data))
+	dataLen := uint32(length)
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
 	// Append the data field to the packet
 	data = append(data, dataRaw[:]...)
@@ -531,7 +531,7 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 }
 
 func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
-	timestamp int64, format string, args ...interface{}) []byte {
+	timestamp int64, format string, args ...interface{}) ([]byte, int) {
 
 	// Ensure we provide a sensible initial capacity
 	buf := make([]byte, 128)
@@ -554,16 +554,17 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	buf = buf[:offset]
 
 	// Make sure length isn't too long, excluding the size bytes
-	if len(buf) > MaxPacketLen {
+	if offset > MaxPacketLen {
 		errorPrefix := "Log data exceeds allowable length: %s\n"
 		checkRecursion(errorPrefix, format)
 
 		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
 
 		buf = buf[:MaxPacketLen]
+		offset = MaxPacketLen
 	}
 
-	return buf
+	return buf, offset
 }
 
 func (mem *SharedMemory) Sync() int {
@@ -586,7 +587,8 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	// Generate the byte array packet
-	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
+	data, length := mem.generateLogEntry(strId, reqId, timestamp, format,
+		args...)
 
 	partialWrite := false
 	if mem.testMode && len(mem.testDropStr) < len(format) &&
@@ -596,5 +598,5 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 		partialWrite = true
 	}
 
-	mem.circBuf.writeData(data, partialWrite)
+	mem.circBuf.writeData(data, length, partialWrite)
 }
