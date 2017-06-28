@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"reflect"
 	"runtime/debug"
 	"sync"
@@ -62,6 +63,10 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		},
 	}
 
+	randSeed := time.Now().UnixNano()
+	qfs.c.vlog("Random seed: %d", randSeed)
+	rand.Seed(randSeed)
+
 	qfs.c.qfs = qfs
 
 	typespaceList := NewTypespaceList()
@@ -75,9 +80,9 @@ func NewQuantumFsLogs(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	return NewQuantumFs_(config, qlogIn)
 }
 
-func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
+func NewQuantumFs(config QuantumFsConfig, version string) *QuantumFs {
 	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
-		config.MemLogBytes, qlog.PrintToStdout))
+		config.MemLogBytes, version, qlog.PrintToStdout))
 }
 
 type workspaceState int
