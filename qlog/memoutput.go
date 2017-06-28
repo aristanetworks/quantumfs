@@ -370,12 +370,6 @@ func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 	return strMap.createLogIdx(idx, level, format)
 }
 
-type LogPrimitive interface {
-	// Return the type cast to a primitive, in interface form so that
-	// type asserts will work
-	Primitive() interface{}
-}
-
 const (
 	TypeInt8Pointer   = 1
 	TypeInt8          = 2
@@ -398,82 +392,79 @@ const (
 	TypeBoolean       = 19
 )
 
+type emptyInterface struct {
+	type_ unsafe.Pointer
+	value unsafe.Pointer
+}
+
+func interfaceAsUint8(intf interface{}) uint8 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint8)(ei.value))
+}
+
+func interfaceAsUint16(intf interface{}) uint16 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint16)(ei.value))
+}
+
+func interfaceAsUint32(intf interface{}) uint32 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint32)(ei.value))
+}
+
+func interfaceAsUint64(intf interface{}) uint64 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint64)(ei.value))
+}
+
 // Writes the data, with a type prefix field two bytes long, to output. We pass in a
 // pointer to the output array instead of returning one to append so that we can
 // take advantage of output having a larger capacity and reducing memmoves
 func (mem *SharedMemory) binaryWrite(data interface{}, format string,
 	output *[]byte, offset int) int {
 
-	// Handle primitive aliases first
-	if prim, ok := data.(LogPrimitive); ok {
-		// This takes the alias and provides a base class via an interface{}
-		// Without this, type casting will check against the alias instead
-		// of the base type
-		data = prim.Primitive()
-	}
-
-	switch v := data.(type) {
-	case *int8:
-		offset = toBinaryUint16(*output, offset, TypeInt8Pointer)
-		offset = toBinaryUint8(*output, offset, uint8(*v))
-	case int8:
+	dataType := reflect.TypeOf(data)
+	dataKind := dataType.Kind()
+	switch {
+	case dataKind == reflect.Int8:
 		offset = toBinaryUint16(*output, offset, TypeInt8)
-		offset = toBinaryUint8(*output, offset, uint8(v))
-	case *uint8:
-		offset = toBinaryUint16(*output, offset, TypeUint8Pointer)
-		offset = toBinaryUint8(*output, offset, *v)
-	case uint8:
+		offset = toBinaryUint8(*output, offset, interfaceAsUint8(data))
+	case dataKind == reflect.Uint8:
 		offset = toBinaryUint16(*output, offset, TypeUint8)
-		offset = toBinaryUint8(*output, offset, v)
-	case *int16:
-		offset = toBinaryUint16(*output, offset, TypeInt16Pointer)
-		offset = toBinaryUint16(*output, offset, uint16(*v))
-	case int16:
+		offset = toBinaryUint8(*output, offset, interfaceAsUint8(data))
+	case dataKind == reflect.Int16:
 		offset = toBinaryUint16(*output, offset, TypeInt16)
-		offset = toBinaryUint16(*output, offset, uint16(v))
-	case *uint16:
-		offset = toBinaryUint16(*output, offset, TypeUint16Pointer)
-		offset = toBinaryUint16(*output, offset, *v)
-	case uint16:
+		offset = toBinaryUint16(*output, offset, interfaceAsUint16(data))
+	case dataKind == reflect.Uint16:
 		offset = toBinaryUint16(*output, offset, TypeUint16)
-		offset = toBinaryUint16(*output, offset, v)
-	case *int32:
-		offset = toBinaryUint16(*output, offset, TypeInt32Pointer)
-		offset = toBinaryUint32(*output, offset, uint32(*v))
-	case int32:
+		offset = toBinaryUint16(*output, offset, interfaceAsUint16(data))
+	case dataKind == reflect.Int32:
 		offset = toBinaryUint16(*output, offset, TypeInt32)
-		offset = toBinaryUint32(*output, offset, uint32(v))
-	case *uint32:
-		offset = toBinaryUint16(*output, offset, TypeUint32Pointer)
-		offset = toBinaryUint32(*output, offset, *v)
-	case uint32:
+		offset = toBinaryUint32(*output, offset, interfaceAsUint32(data))
+	case dataKind == reflect.Uint32:
 		offset = toBinaryUint16(*output, offset, TypeUint32)
-		offset = toBinaryUint32(*output, offset, v)
-	case int:
+		offset = toBinaryUint32(*output, offset, interfaceAsUint32(data))
+	case dataKind == reflect.Int:
 		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, uint64(v))
-	case uint:
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.Uint:
 		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, uint64(v))
-	case *int64:
-		offset = toBinaryUint16(*output, offset, TypeInt64Pointer)
-		offset = toBinaryUint64(*output, offset, uint64(*v))
-	case int64:
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.Int64:
 		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, uint64(v))
-	case *uint64:
-		offset = toBinaryUint16(*output, offset, TypeUint64Pointer)
-		offset = toBinaryUint64(*output, offset, *v)
-	case uint64:
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.Uint64:
 		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, v)
-	case string:
-		offset = writeArray(output, offset, format, []byte(v), TypeString)
-	case []byte:
-		offset = writeArray(output, offset, format, v, TypeByteArray)
-	case bool:
+		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.String:
+		offset = writeArray(output, offset, format, []byte(data.(string)),
+			TypeString)
+	case dataKind == reflect.Slice && dataType.Elem().Kind() == reflect.Uint8:
+		offset = writeArray(output, offset, format, data.([]uint8),
+			TypeByteArray)
+	case dataKind == reflect.Bool:
 		offset = toBinaryUint16(*output, offset, TypeBoolean)
-		if v {
+		if data.(bool) {
 			offset = toBinaryUint8(*output, offset, 1)
 		} else {
 			offset = toBinaryUint8(*output, offset, 0)
