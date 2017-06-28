@@ -80,9 +80,9 @@ func NewQuantumFsLogs(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	return NewQuantumFs_(config, qlogIn)
 }
 
-func NewQuantumFs(config QuantumFsConfig) *QuantumFs {
+func NewQuantumFs(config QuantumFsConfig, version string) *QuantumFs {
 	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
-		config.MemLogBytes, qlog.PrintToStdout))
+		config.MemLogBytes, version, qlog.PrintToStdout))
 }
 
 type workspaceState int
