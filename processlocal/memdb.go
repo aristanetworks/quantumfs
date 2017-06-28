@@ -10,21 +10,24 @@ import (
 )
 
 type dataSeries struct {
-	Tags   map[string]string
-	Fields []quantumfs.Field
+	Measurement string
+	Tags        map[string]string
+	Fields      []quantumfs.Field
 }
 
 type Memdb struct {
 	Data []dataSeries
 }
 
-func NewMemdb() *Memdb {
+func NewMemdb(conf string) quantumfs.TimeSeriesDB {
 	return &Memdb{
 		Data: make([]dataSeries, 0),
 	}
 }
 
-func (db *Memdb) Store(tags_ []quantumfs.Tag, fields_ []quantumfs.Field) {
+func (db *Memdb) Store(measurement string, tags_ []quantumfs.Tag,
+	fields_ []quantumfs.Field) {
+
 	tagMap := make(map[string]string)
 	// Use a set to make Fetch faster, but use maps because Golang has no sets
 	for _, tag := range tags_ {
@@ -32,8 +35,9 @@ func (db *Memdb) Store(tags_ []quantumfs.Tag, fields_ []quantumfs.Field) {
 	}
 
 	db.Data = append(db.Data, dataSeries{
-		Tags:   tagMap,
-		Fields: fields_,
+		Measurement: measurement,
+		Tags:        tagMap,
+		Fields:      fields_,
 	})
 }
 
