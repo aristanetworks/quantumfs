@@ -46,7 +46,7 @@ $(OBJS): $(DEPS)
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^
 
-gotests:
+gotests: qfsclient
 	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
 		go test github.com/aristanetworks/quantumfs/qfsclientc
 
