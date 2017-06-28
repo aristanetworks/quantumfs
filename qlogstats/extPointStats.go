@@ -38,16 +38,16 @@ func (ext *extPointStats) ProcessRequest(request []indentedLog) {
 	}
 }
 
-func (ext *extPointStats) Publish() (tags []quantumfs.Tag,
+func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
 	fields []quantumfs.Field) {
 
 	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("name", ext.name))
+	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
 	fields = make([]quantumfs.Field, 0)
 
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
 	ext.stats = basicStats{}
-	return tags, fields
+	return "quantumFsPointCount", tags, fields
 }

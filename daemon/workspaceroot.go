@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -31,10 +32,9 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	linkLock       utils.DeferableRwMutex
-	hardlinks      map[HardlinkId]linkEntry
-	nextHardlinkId HardlinkId
-	inodeToLink    map[InodeId]HardlinkId
+	linkLock    utils.DeferableRwMutex
+	hardlinks   map[HardlinkId]linkEntry
+	inodeToLink map[InodeId]HardlinkId
 }
 
 type linkEntry struct {
@@ -94,7 +94,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
 		defer wsr.linkLock.Lock().Unlock()
-		wsr.hardlinks, wsr.nextHardlinkId = loadHardlinks(c,
+		wsr.hardlinks = loadHardlinks(c,
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]HardlinkId)
 	}()
@@ -193,6 +193,23 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 	}
 }
 
+// We need a reference map of hardlinks to prevent the improbable event of random
+// number collision
+func generateUniqueHardlinkId(c *ctx,
+	hardlinks map[HardlinkId]linkEntry) HardlinkId {
+
+	// We assume here that the probability that we'll continually generate new
+	// random numbers for hardlinks that already exist is basically zero
+	for {
+		newId := HardlinkId(rand.Uint64())
+		if _, exists := hardlinks[newId]; exists {
+			c.wlog("HardlinkId generation collision: %d", newId)
+		} else {
+			return newId
+		}
+	}
+}
+
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeId,
 	record quantumfs.DirectoryRecord) *Hardlink {
 
@@ -209,8 +226,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, inodeId InodeI
 
 	defer wsr.linkLock.Lock().Unlock()
 
-	newId := wsr.nextHardlinkId
-	wsr.nextHardlinkId++
+	newId := generateUniqueHardlinkId(c, wsr.hardlinks)
 
 	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
 	newEntry := newLinkEntry(dirRecord)
@@ -413,25 +429,20 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 }
 
 func loadHardlinks(c *ctx,
-	entry quantumfs.HardlinkEntry) (map[HardlinkId]linkEntry, HardlinkId) {
+	entry quantumfs.HardlinkEntry) map[HardlinkId]linkEntry {
 
 	defer c.funcIn("loadHardlinks").Out()
 
 	hardlinks := make(map[HardlinkId]linkEntry)
-	nextHardlinkId := HardlinkId(0)
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
 		newLink.nlink = hardlink.Nlinks()
 		id := HardlinkId(hardlink.HardlinkID())
 		hardlinks[id] = newLink
-
-		if id >= nextHardlinkId {
-			nextHardlinkId = id + 1
-		}
 	})
 
-	return hardlinks, nextHardlinkId
+	return hardlinks
 }
 
 func publishHardlinkMap(c *ctx,
@@ -507,10 +518,6 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		newLink := newLinkEntry(hardlink.Record())
 		newLink.nlink = hardlink.Nlinks()
 		wsr.hardlinks[id] = newLink
-
-		if id >= wsr.nextHardlinkId {
-			wsr.nextHardlinkId = id + 1
-		}
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)

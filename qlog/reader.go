@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 	"unsafe"
 )
@@ -23,8 +24,9 @@ type LogStrTrim struct {
 type Reader struct {
 	file *os.File
 
-	headerSize  uint64
-	circBufSize uint64
+	headerSize    uint64
+	circBufSize   uint64
+	daemonVersion string
 
 	lastPastEndIdx uint64
 
@@ -46,6 +48,13 @@ func NewReader(qlogFile string) *Reader {
 	rtn.file = file
 	header := rtn.ReadHeader()
 	rtn.circBufSize = header.CircBuf.Size
+
+	rtn.daemonVersion = string(header.DaemonVersion[:])
+	terminatorIdx := strings.Index(rtn.daemonVersion, "\x00")
+	if terminatorIdx != -1 {
+		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
+	}
+
 	rtn.lastPastEndIdx = header.CircBuf.PastEndIdx
 	return &rtn
 }
@@ -113,6 +122,10 @@ const (
 	ReadOnly
 	ReadThenTail
 )
+
+func (read *Reader) DaemonVersion() string {
+	return read.daemonVersion
+}
 
 func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 	if mode == ReadThenTail || mode == ReadOnly {
