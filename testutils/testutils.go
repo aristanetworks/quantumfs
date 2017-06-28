@@ -83,7 +83,7 @@ func NewTestHelper(testName string, testRunDir string,
 		StartTime:  time.Now(),
 		CachePath:  cachePath,
 		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-			60*10000*24, NoStdOut),
+			60*10000*24, "noVersion", NoStdOut),
 		TempDir: TestRunDir + "/" + testName,
 		Timeout: 1500 * time.Millisecond,
 	}
