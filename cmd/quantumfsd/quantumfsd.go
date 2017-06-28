@@ -197,7 +197,7 @@ func main() {
 		Name: "QuantumFS",
 	}
 
-	quantumfs := daemon.NewQuantumFs(config, version)
+	quantumfs := daemon.NewQuantumFs(config, "QuantumFs "+version)
 	err := quantumfs.Serve(mountOptions)
 	if err != nil {
 		os.Exit(exitMountFail)
