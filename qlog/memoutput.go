@@ -3,7 +3,7 @@
 
 package qlog
 
-// This file contains all quantumfs logging shared memory support
+// This file contains all logging shared memory support
 
 import (
 	"errors"
@@ -27,16 +27,17 @@ const mmapStrMapSize = 512 * 1024
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const QlogVersion = 3
+const QlogVersion = 4
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
 // so the max packet length is 7 bits long
 const MaxPacketLen = 32767
 
 type MmapHeader struct {
-	Version    uint32
-	StrMapSize uint32
-	CircBuf    circBufHeader
+	DaemonVersion [128]byte
+	Version       uint32
+	StrMapSize    uint32
+	CircBuf       circBufHeader
 }
 
 type circBufHeader struct {
@@ -235,7 +236,7 @@ func newIdStrMap(buf []byte, offset int) IdStrMap {
 }
 
 func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	errOut *Qlog) *SharedMemory {
+	daemonVersion string, errOut *Qlog) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -286,6 +287,16 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	rtn.buffer = mmap
 	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
 	header.Version = QlogVersion
+
+	versionLen := len(daemonVersion)
+	if versionLen > len(header.DaemonVersion) {
+		versionLen = len(header.DaemonVersion)
+	}
+	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
+	if versionLen < len(header.DaemonVersion) {
+		header.DaemonVersion[versionLen] = '\x00'
+	}
+
 	header.StrMapSize = mmapStrMapSize
 	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,

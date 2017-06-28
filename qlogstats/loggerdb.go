@@ -35,7 +35,7 @@ type StatExtractor interface {
 
 	ProcessRequest(request []indentedLog)
 
-	Publish() ([]quantumfs.Tag, []quantumfs.Field)
+	Publish() (string, []quantumfs.Tag, []quantumfs.Field)
 }
 
 type StatExtractorConfig struct {
@@ -57,7 +57,7 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	db quantumfs.TimeSeriesDB, extractors []StatExtractorConfig) *Aggregator {
 
 	reader := qlog.NewReader(filename)
-	agg := NewAggregator(db, extractors)
+	agg := NewAggregator(db, extractors, reader.DaemonVersion())
 
 	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
 		agg.ProcessLog(v)
@@ -71,6 +71,7 @@ type extractorIdx int
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
+	daemonVersion string
 
 	// track the oldest untouched requests so we can push them to the stat
 	// extractors after the resting period (so we're confident there are no
@@ -86,11 +87,12 @@ type Aggregator struct {
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig) *Aggregator {
+	extractors []StatExtractorConfig, daemonVersion_ string) *Aggregator {
 
 	rtn := Aggregator{
 		db:              db_,
 		logsByRequest:   make(map[uint64]logTrack),
+		daemonVersion:   daemonVersion_,
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
@@ -168,9 +170,15 @@ func (agg *Aggregator) ProcessThread() {
 		// Lastly check if any extractors need to Publish
 		for i, extractor := range agg.statExtractors {
 			if now.Sub(extractor.lastOutput) > extractor.statPeriod {
-				tags, fields := extractor.extractor.Publish()
+				measurement, tags,
+					fields := extractor.extractor.Publish()
 				if tags != nil && len(tags) > 0 {
-					agg.db.Store(tags, fields)
+					// add the qfs version tag
+					tags = append(tags,
+						quantumfs.NewTag("version",
+							agg.daemonVersion))
+
+					agg.db.Store(measurement, tags, fields)
 				}
 
 				extractor.lastOutput = now
@@ -264,11 +272,20 @@ func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 type basicStats struct {
 	sum    uint64
 	points []uint64
+	max    uint64
 }
 
 func (bs *basicStats) NewPoint(data uint64) {
 	bs.sum += data
 	bs.points = append(bs.points, data)
+
+	if data > bs.max {
+		bs.max = data
+	}
+}
+
+func (bs *basicStats) Max() uint64 {
+	return bs.max
 }
 
 func (bs *basicStats) Average() uint64 {
@@ -296,10 +313,10 @@ func (bs *basicStats) Percentiles() map[string]uint64 {
 
 	lastIdx := float32(len(points) - 1)
 
-	rtn["50pct"] = points[int(lastIdx*0.50)]
-	rtn["90pct"] = points[int(lastIdx*0.90)]
-	rtn["95pct"] = points[int(lastIdx*0.95)]
-	rtn["99pct"] = points[int(lastIdx*0.99)]
+	rtn["50pct_ns"] = points[int(lastIdx*0.50)]
+	rtn["90pct_ns"] = points[int(lastIdx*0.90)]
+	rtn["95pct_ns"] = points[int(lastIdx*0.95)]
+	rtn["99pct_ns"] = points[int(lastIdx*0.99)]
 
 	return rtn
 }
