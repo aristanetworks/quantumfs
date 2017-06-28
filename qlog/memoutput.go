@@ -359,11 +359,11 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	strMap.buffer[newIdx] = newLog
 
 	// Delay garbage collection of the previous map until all possible current
-	// users are finisheds.
+	// users are finished.
 	go func(mapToClear map[string]uint16) {
 		time.Sleep(1 * time.Second)
 
-		// Waste time to avoid possible optimization which eliminates the
+		// Waste time to avoid possible optimizations which eliminates the
 		// reference to the map.
 		for k, _ := range mapToClear {
 			delete(mapToClear, k)
