@@ -3,7 +3,7 @@
 
 package qlog
 
-// This file contains all quantumfs logging shared memory support
+// This file contains all logging shared memory support
 
 import (
 	"errors"
@@ -27,16 +27,17 @@ const mmapStrMapSize = 512 * 1024
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const QlogVersion = 3
+const QlogVersion = 4
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
 // so the max packet length is 7 bits long
 const MaxPacketLen = 32767
 
 type MmapHeader struct {
-	Version    uint32
-	StrMapSize uint32
-	CircBuf    circBufHeader
+	DaemonVersion [128]byte
+	Version       uint32
+	StrMapSize    uint32
+	CircBuf       circBufHeader
 }
 
 type circBufHeader struct {
@@ -225,7 +226,7 @@ func newIdStrMap(buf []byte, offset int) IdStrMap {
 }
 
 func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	errOut *Qlog) *SharedMemory {
+	daemonVersion string, errOut *Qlog) *SharedMemory {
 
 	if dir == "" || filename == "" {
 		return nil
@@ -276,6 +277,16 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	rtn.buffer = mmap
 	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
 	header.Version = QlogVersion
+
+	versionLen := len(daemonVersion)
+	if versionLen > len(header.DaemonVersion) {
+		versionLen = len(header.DaemonVersion)
+	}
+	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
+	if versionLen < len(header.DaemonVersion) {
+		header.DaemonVersion[versionLen] = '\x00'
+	}
+
 	header.StrMapSize = mmapStrMapSize
 	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,
@@ -487,49 +498,27 @@ func writeArray(output []byte, offset int, format string, data []byte,
 
 // Don't use interfaces where possible because they're slow
 func toBinaryUint8(buf []byte, offset int, input uint8) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	return offset
+	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 1
 }
 
 func toBinaryUint16(buf []byte, offset int, input uint16) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 8) & 0xff)
-	offset++
-	return offset
+	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 2
 }
 
 func toBinaryUint32(buf []byte, offset int, input uint32) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 8) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 16) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 24) & 0xff)
-	offset++
-	return offset
+	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 4
 }
 
 func toBinaryUint64(buf []byte, offset int, input uint64) int {
-	buf[offset] = byte((input >> 0) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 8) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 16) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 24) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 32) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 40) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 48) & 0xff)
-	offset++
-	buf[offset] = byte((input >> 56) & 0xff)
-	offset++
-	return offset
+	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 8
 }
 
 func expandBuffer(buf []byte, howMuch int) []byte {
@@ -595,8 +584,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	// Generate the byte array packet
-	data := make([]byte, 128)
-	data, length := mem.generateLogEntry(data, strId, reqId, timestamp, format,
+	data, length := mem.generateLogEntry(strId, reqId, timestamp, format,
 		args...)
 
 	partialWrite := false
