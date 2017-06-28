@@ -411,89 +411,89 @@ func interfaceAsUint64(intf interface{}) uint64 {
 // pointer to the output array instead of returning one to append so that we can
 // take advantage of output having a larger capacity and reducing memmoves
 func (mem *SharedMemory) binaryWrite(data interface{}, format string,
-	output *[]byte, offset int) int {
+	output []byte, offset int) ([]byte, int) {
 
 	dataType := reflect.TypeOf(data)
 	dataKind := dataType.Kind()
 	switch {
 	case dataKind == reflect.Int8:
-		offset = toBinaryUint16(*output, offset, TypeInt8)
-		offset = toBinaryUint8(*output, offset, interfaceAsUint8(data))
+		offset = toBinaryUint16(output, offset, TypeInt8)
+		offset = toBinaryUint8(output, offset, interfaceAsUint8(data))
 	case dataKind == reflect.Uint8:
-		offset = toBinaryUint16(*output, offset, TypeUint8)
-		offset = toBinaryUint8(*output, offset, interfaceAsUint8(data))
+		offset = toBinaryUint16(output, offset, TypeUint8)
+		offset = toBinaryUint8(output, offset, interfaceAsUint8(data))
 	case dataKind == reflect.Int16:
-		offset = toBinaryUint16(*output, offset, TypeInt16)
-		offset = toBinaryUint16(*output, offset, interfaceAsUint16(data))
+		offset = toBinaryUint16(output, offset, TypeInt16)
+		offset = toBinaryUint16(output, offset, interfaceAsUint16(data))
 	case dataKind == reflect.Uint16:
-		offset = toBinaryUint16(*output, offset, TypeUint16)
-		offset = toBinaryUint16(*output, offset, interfaceAsUint16(data))
+		offset = toBinaryUint16(output, offset, TypeUint16)
+		offset = toBinaryUint16(output, offset, interfaceAsUint16(data))
 	case dataKind == reflect.Int32:
-		offset = toBinaryUint16(*output, offset, TypeInt32)
-		offset = toBinaryUint32(*output, offset, interfaceAsUint32(data))
+		offset = toBinaryUint16(output, offset, TypeInt32)
+		offset = toBinaryUint32(output, offset, interfaceAsUint32(data))
 	case dataKind == reflect.Uint32:
-		offset = toBinaryUint16(*output, offset, TypeUint32)
-		offset = toBinaryUint32(*output, offset, interfaceAsUint32(data))
+		offset = toBinaryUint16(output, offset, TypeUint32)
+		offset = toBinaryUint32(output, offset, interfaceAsUint32(data))
 	case dataKind == reflect.Int:
-		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+		offset = toBinaryUint16(output, offset, TypeInt64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.Uint:
-		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+		offset = toBinaryUint16(output, offset, TypeUint64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.Int64:
-		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+		offset = toBinaryUint16(output, offset, TypeInt64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.Uint64:
-		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, interfaceAsUint64(data))
+		offset = toBinaryUint16(output, offset, TypeUint64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
 	case dataKind == reflect.String:
-		offset = writeArray(output, offset, format, []byte(data.(string)),
-			TypeString)
+		output, offset = writeArray(output, offset, format,
+			[]byte(data.(string)), TypeString)
 	case dataKind == reflect.Slice && dataType.Elem().Kind() == reflect.Uint8:
-		offset = writeArray(output, offset, format, data.([]uint8),
+		output, offset = writeArray(output, offset, format, data.([]uint8),
 			TypeByteArray)
 	case dataKind == reflect.Bool:
-		offset = toBinaryUint16(*output, offset, TypeBoolean)
+		offset = toBinaryUint16(output, offset, TypeBoolean)
 		if data.(bool) {
-			offset = toBinaryUint8(*output, offset, 1)
+			offset = toBinaryUint8(output, offset, 1)
 		} else {
-			offset = toBinaryUint8(*output, offset, 0)
+			offset = toBinaryUint8(output, offset, 0)
 		}
 	default:
-		errorPrefix := "ERROR: LogConverter needed for %s:\n%s\n"
-		checkRecursion(errorPrefix, format)
+		errorPrefix := "ERROR: LogConverter needed for %s at %s: %v"
 
-		str := fmt.Sprintf("%v", data)
-		offset = writeArray(output, offset, format, []byte(str), TypeString)
-		mem.errOut.Log(LogQlog, QlogReqId, 1, errorPrefix,
-			reflect.ValueOf(data).String(), string(debug.Stack()))
+		unknownType := reflect.ValueOf(data).String()
+		str := fmt.Sprintf(errorPrefix, unknownType, string(debug.Stack()),
+			data)
+		output, offset = writeArray(output, offset, errorPrefix+format,
+			[]byte(str), TypeString)
 	}
 
-	return offset
+	return output, offset
 }
 
-func writeArray(output *[]byte, offset int, format string, data []byte,
-	byteType uint16) int {
+func writeArray(output []byte, offset int, format string, data []byte,
+	byteType uint16) ([]byte, int) {
 
 	if len(data) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: "+
 			"%s", format))
 	}
 
-	offset = toBinaryUint16(*output, offset, byteType)
-	offset = toBinaryUint16(*output, offset, uint16(len(data)))
+	offset = toBinaryUint16(output, offset, byteType)
+	offset = toBinaryUint16(output, offset, uint16(len(data)))
 
-	if cap(*output)-offset < len(data) {
-		*output = expandBuffer(*output, len(data))
+	if cap(output)-offset < len(data) {
+		output = expandBuffer(output, len(data))
 	}
 
 	for i, v := range data {
-		(*output)[offset+i] = v
+		output[offset+i] = v
 	}
 
 	offset += len(data)
 
-	return offset
+	return output, offset
 }
 
 // Don't use interfaces where possible because they're slow
@@ -530,11 +530,9 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 	return tmp
 }
 
-func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
+func (mem *SharedMemory) generateLogEntry(buf []byte, strMapId uint16, reqId uint64,
 	timestamp int64, format string, args ...interface{}) ([]byte, int) {
 
-	// Ensure we provide a sensible initial capacity
-	buf := make([]byte, 128)
 	offset := 0
 
 	// Two bytes prefix for the total packet length, before the num of args.
@@ -544,26 +542,25 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	offset = toBinaryUint64(buf, offset, reqId)
 	offset = toBinaryUint64(buf, offset, uint64(timestamp))
 
+	originalOffset := offset
+
 	for i := 0; i < len(args); i++ {
 		if cap(buf)-offset < 10 {
 			buf = expandBuffer(buf, 10)
 		}
-		offset = mem.binaryWrite(args[i], format, &buf, offset)
+		buf, offset = mem.binaryWrite(args[i], format, buf, offset)
 	}
-
-	buf = buf[:offset]
 
 	// Make sure length isn't too long, excluding the size bytes
 	if offset > MaxPacketLen {
-		errorPrefix := "Log data exceeds allowable length: %s\n"
-		checkRecursion(errorPrefix, format)
+		offset = originalOffset
 
-		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
-
-		buf = buf[:MaxPacketLen]
-		offset = MaxPacketLen
+		errorPrefix := "Log data exceeds allowable length at %s: %s"
+		str := fmt.Sprintf(errorPrefix, string(debug.Stack()), format)
+		buf, offset = mem.binaryWrite(str, format, buf, offset)
 	}
 
+	buf = buf[:offset]
 	return buf, offset
 }
 
@@ -587,7 +584,8 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	// Generate the byte array packet
-	data, length := mem.generateLogEntry(strId, reqId, timestamp, format,
+	data := make([]byte, 128)
+	data, length := mem.generateLogEntry(data, strId, reqId, timestamp, format,
 		args...)
 
 	partialWrite := false
