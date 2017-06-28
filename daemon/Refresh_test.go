@@ -1544,3 +1544,81 @@ func TestRefreshType_special2special(t *testing.T) {
 		removeTestFileNoSync(test, workspace, testfile)
 	})
 }
+
+func GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(
+	workspaceRootHardlinks bool) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+
+		// Exactly one of the two legs of the hardlink will reside
+		// in workspaceroot
+		name := "testFile"
+		linkname := name
+		utils.MkdirAll(workspace+"/subdir", 0777)
+		if !workspaceRootHardlinks {
+			name = "subdir/" + name
+		} else {
+			linkname = "subdir/" + linkname
+		}
+		fullname := workspace + "/" + name
+		fulllinkname := workspace + "/" + linkname
+
+		fd, err := syscall.Creat(fullname, syscall.O_CREAT)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(testutils.OverWriteFile(fullname, content1))
+		test.AssertNoErr(syscall.Link(fullname, fulllinkname))
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		test.AssertNoErr(syscall.Unlink(fullname))
+		test.AssertNoErr(syscall.Unlink(fulllinkname))
+		fd, err = syscall.Creat(fulllinkname, syscall.O_CREAT)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(syscall.Link(fulllinkname, fullname))
+		test.AssertNoErr(createLargeFile(fulllinkname, content2))
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err := os.OpenFile(fulllinkname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2,
+			newRootId1)
+
+		// The orphan files must have the old content
+		verifyContentStartsWith(test, file1, content2)
+		test.AssertNoErr(file1.Close())
+		verifyContentStartsWith(test, file2, content2)
+		test.AssertNoErr(file2.Close())
+
+		// Re-opening the files should result in getting the new content
+		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err = os.OpenFile(fulllinkname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		verifyContentStartsWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		verifyContentStartsWith(test, file2, content1)
+		test.AssertNoErr(file2.Close())
+
+		removeTestFileNoSync(test, workspace, name)
+		removeTestFileNoSync(test, workspace, linkname)
+	}
+}
+
+func TestRefresh_Hardlink2HardlinkWithLinkIdChangeSrcWorkspaceroot(t *testing.T) {
+	runTest(t, GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(true))
+}
+
+func TestRefresh_Hardlink2HardlinkWithLinkIdChangeSrcSubdir(t *testing.T) {
+	runTest(t, GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(false))
+}
