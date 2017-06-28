@@ -100,6 +100,7 @@ Readers:
 */
 type CircMemLogs struct {
 	header *circBufHeader
+	length uint64
 	buffer []byte
 
 	// Lock this for as short a period as possible
@@ -107,14 +108,14 @@ type CircMemLogs struct {
 }
 
 func (circ *CircMemLogs) Size() int {
-	return len(circ.buffer) + int(unsafe.Sizeof(MmapHeader{}))
+	return int(circ.length + uint64(unsafe.Sizeof(MmapHeader{})))
 }
 
 // Must only be called on a section of data where nobody else is writing to it
 func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 	numWrite := uint64(len(data))
-	if idx+numWrite > uint64(len(circ.buffer)) {
-		secondNum := (idx + numWrite) - uint64(len(circ.buffer))
+	if idx+numWrite > circ.length {
+		secondNum := (idx + numWrite) - circ.length
 		numWrite -= secondNum
 		copy(circ.buffer[0:secondNum], data[numWrite:])
 	}
@@ -129,7 +130,7 @@ func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 
 	dataStart := circ.header.PastEndIdx
 	circ.header.PastEndIdx += uint64(dataLen)
-	circ.header.PastEndIdx %= uint64(len(circ.buffer))
+	circ.header.PastEndIdx %= circ.length
 
 	circ.writeMutex.Unlock()
 
@@ -139,7 +140,7 @@ func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 // Note: in development code, you should never provide a True partialWrite
 func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 	// For now, if the message is too long then just toss it
-	if len(data) > len(circ.buffer) {
+	if uint64(len(data)) > circ.length {
 		return
 	}
 
@@ -153,7 +154,7 @@ func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 
 	// Now that we know we have space, write in the entry
 	circ.wrapWrite_(dataStart, data)
-	lenStart := (dataStart + uint64(dataLen)) % uint64(len(circ.buffer))
+	lenStart := (dataStart + uint64(dataLen)) % circ.length
 
 	// For testing purposes only: if we need to generate some partially written
 	// packets, then do so by not finishing this one.
@@ -217,6 +218,7 @@ func newCircBuf(mapHeader *circBufHeader,
 
 	rtn := CircMemLogs{
 		header: mapHeader,
+		length: uint64(len(mapBuffer)),
 		buffer: mapBuffer,
 	}
 
