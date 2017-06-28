@@ -13,10 +13,12 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 // We need a static array sized upper bound on our memory. Increase this as needed.
@@ -194,8 +196,29 @@ func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
 }
 
 type IdStrMap struct {
-	data    map[string]uint16
-	mapLock sync.RWMutex
+	// The map from format strings to format index is a read heavy datastructure.
+	// Once the daemon has warmed up it is unlikely a new format will be added.
+	// Therefore we optimize heavily for the read-only case.
+	//
+	// Golang maps are multiple reader safe and consequently we can allow all the
+	// readers access to the same map without a lock. However, we do sometimes
+	// need to add new messages to the map. We handle that by atomically changing
+	// a pointer to point to the most recent map. Read-only accesses will either
+	// get the old map, or the new map with the additional entries, but in either
+	// case the map is only visible after there will be no further writers.
+	//
+	// Now given a map may be fetched and retained for a period, we must also
+	// prevent the garbage collector from reclaiming the map until all possible
+	// readers have completed. We assume no logging operation will take more than
+	// a second and wait that long before removing the final reference to the
+	// previous map.
+	//
+	// This is the pointer to the most recent map and must be loaded using
+	// atomic.LoadPointer().
+	currentMapPtr unsafe.Pointer
+
+	lock utils.DeferableMutex // Protects everything below here
+	ids  map[string]uint16
 
 	buffer  *[mmapStrMapSize / LogStrSize]LogStr
 	freeIdx uint16
@@ -217,7 +240,9 @@ func newCircBuf(mapHeader *circBufHeader,
 
 func newIdStrMap(buf []byte, offset int) IdStrMap {
 	var rtn IdStrMap
-	rtn.data = make(map[string]uint16)
+	ids := make(map[string]uint16)
+	rtn.ids = ids
+	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
 	rtn.freeIdx = 0
 	rtn.buffer = (*[mmapStrMapSize /
 		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
@@ -299,9 +324,8 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 
-	strMap.mapLock.RLock()
-	entry, ok := strMap.data[format]
-	strMap.mapLock.RUnlock()
+	ids := (*map[string]uint16)(strMap.currentMapPtr)
+	entry, ok := (*ids)[format]
 
 	if ok {
 		return entry, true
@@ -313,38 +337,44 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
-	strMap.mapLock.Lock()
-	existingId, ok := strMap.data[format]
-	// The vast majority of the time the string will already exist.
-	// Optimize our locking for this scenario
-	strMap.mapLock.Unlock()
+	defer strMap.lock.Lock().Unlock()
 
-	if ok {
+	if existingId, ok := strMap.ids[format]; ok {
+		// Somebody beat us to adding this format, we have no work to do
 		return existingId, nil
 	}
 
-	// Construct the new log string we *may* use outside of the critical region
-	// because it can be slow to make
 	newLog, err := newLogStr(idx, level, format)
 
-	// we may need to add a new log. lock and check again
-	strMap.mapLock.Lock()
-
-	// Check again to avoid a race condition
-	existingId, ok = strMap.data[format]
-	if ok {
-		strMap.mapLock.Unlock()
-		return existingId, nil
-	}
-
-	// format string still doesn't exist, so create it with the same lock
 	newIdx := strMap.freeIdx
 	strMap.freeIdx++
 
-	strMap.data[format] = newIdx
+	// Copy the old map into the new one and add the additional format entry
+	newMap := make(map[string]uint16, len(strMap.ids)+1)
+	for k, v := range strMap.ids {
+		newMap[k] = v
+	}
+	newMap[format] = newIdx
+
 	strMap.buffer[newIdx] = newLog
 
-	strMap.mapLock.Unlock()
+	// Delay garbage collection of the previous map until all possible current
+	// users are finisheds.
+	go func(mapToClear map[string]uint16) {
+		time.Sleep(1 * time.Second)
+
+		// Waste time to avoid possible optimization which eliminates the
+		// reference to the map.
+		for k, _ := range mapToClear {
+			delete(mapToClear, k)
+		}
+	}(strMap.ids)
+
+	// Now publish the new map, no writing may occur to this map after this
+	// point.
+	strMap.ids = newMap
+	atomic.StorePointer(&strMap.currentMapPtr, unsafe.Pointer(&newMap))
+
 	return newIdx, err
 }
 
