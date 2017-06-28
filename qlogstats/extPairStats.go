@@ -72,13 +72,17 @@ func (ext *extPairStats) ProcessRequest(request []indentedLog) {
 	}
 }
 
-func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Field) {
+func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
+	fields []quantumfs.Field) {
+
 	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("name", ext.name))
+	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
 	fields = make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("average", ext.stats.Average()))
+	fields = append(fields, quantumfs.NewField("average_ns",
+		ext.stats.Average()))
+	fields = append(fields, quantumfs.NewField("maximum_ns", ext.stats.Max()))
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
 	for name, data := range ext.stats.Percentiles() {
@@ -86,5 +90,5 @@ func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Fie
 	}
 
 	ext.stats = basicStats{}
-	return tags, fields
+	return "quantumFsLatency", tags, fields
 }

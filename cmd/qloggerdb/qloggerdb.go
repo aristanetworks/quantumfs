@@ -11,25 +11,47 @@ import (
 	"os"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/processlocal"
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/qlogstats"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )
 
+var database string
+var databaseConf string
+
 func init() {
+	flag.StringVar(&database, "db", "memdb",
+		"Name of database to use (memdb, influxdb)")
+	flag.StringVar(&databaseConf, "dbConf", "", "Options to pass to database")
+
 	flag.Usage = func() {
-		fmt.Printf("Usage: %s <qlogPath>\n", os.Args[0])
+		fmt.Printf("Usage: %s <qlogPath>\n\n", os.Args[0])
+		fmt.Println("Flags:")
+		flag.PrintDefaults()
 	}
 }
 
+func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
+	tsdb, err := thirdparty_backends.ConnectTimeSeriesDB(database, databaseConf)
+	if err != nil {
+		fmt.Printf("TimeSeriesDB load failed\n")
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	return tsdb
+}
+
 func main() {
+	flag.Parse()
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return
 	}
 
-	db := processlocal.NewMemdb()
 	extractors := make([]qlogstats.StatExtractorConfig, 0)
+	db := loadTimeSeriesDB()
 
 	// sample extractor
 	extractors = append(extractors, qlogstats.NewStatExtractorConfig(
