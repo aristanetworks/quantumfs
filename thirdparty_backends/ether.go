@@ -24,6 +24,7 @@ import (
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func init() {
@@ -310,9 +311,13 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	}
 
 	// since generic wsdb API sets up _null/null with nil key
-	key, err := eWsdb.wsdb.AdvanceWorkspace(quantumfs.NullSpaceName,
+	// TODO(sid): Since qfs does not provide a context here, used
+	// ether.DefaultCtx. If the higher layers init the Ctx before
+	// initializing the backends, this can be solved.
+	key, err := eWsdb.wsdb.AdvanceWorkspace(ether.DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		[]byte(nil), quantumfs.EmptyWorkspaceKey.Value())
+		quantumfs.NullSpaceName, []byte(nil),
+		quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
 		// an existing workspaceDB will have currentRootID as
 		// EmptyWorkspaceKey
@@ -330,7 +335,7 @@ func (w *etherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::NumTypespaces").Out()
 
-	count, err := w.wsdb.NumTypespaces()
+	count, err := w.wsdb.NumTypespaces((*wsApiCtx)(c))
 	if err != nil {
 		return 0, convertWsdbError(err)
 	}
@@ -343,7 +348,7 @@ func (w *etherWsdbTranslator) TypespaceList(
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::TypespaceList").Out()
 
-	list, err := w.wsdb.TypespaceList()
+	list, err := w.wsdb.TypespaceList((*wsApiCtx)(c))
 	if err != nil {
 		return nil, convertWsdbError(err)
 	}
@@ -357,7 +362,7 @@ func (w *etherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 		"EtherWsdbTranslator::NumNamespaces",
 		"typespace: %s", typespace).Out()
 
-	count, err := w.wsdb.NumNamespaces(typespace)
+	count, err := w.wsdb.NumNamespaces((*wsApiCtx)(c), typespace)
 	if err != nil {
 		return 0, convertWsdbError(err)
 	}
@@ -371,7 +376,7 @@ func (w *etherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 		"EtherWsdbTranslator::NamespaceList",
 		"typespace: %s", typespace).Out()
 
-	list, err := w.wsdb.NamespaceList(typespace)
+	list, err := w.wsdb.NamespaceList((*wsApiCtx)(c), typespace)
 	if err != nil {
 		return nil, convertWsdbError(err)
 	}
@@ -385,7 +390,7 @@ func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 		"EtherWsdbTranslator::NumWorkspaces",
 		"%s/%s", typespace, namespace).Out()
 
-	count, err := w.wsdb.NumWorkspaces(typespace, namespace)
+	count, err := w.wsdb.NumWorkspaces((*wsApiCtx)(c), typespace, namespace)
 	if err != nil {
 		return 0, convertWsdbError(err)
 	}
@@ -399,7 +404,7 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 		"EtherWsdbTranslator::WorkspaceList",
 		"%s/%s", typespace, namespace).Out()
 
-	list, err := w.wsdb.WorkspaceList(typespace, namespace)
+	list, err := w.wsdb.WorkspaceList((*wsApiCtx)(c), typespace, namespace)
 	if err != nil {
 		return nil, convertWsdbError(err)
 	}
@@ -413,7 +418,7 @@ func (w *etherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
 		"EtherWsdbTranslator::TypespaceExists",
 		"typespace: %s", typespace).Out()
 
-	exists, err := w.wsdb.TypespaceExists(typespace)
+	exists, err := w.wsdb.TypespaceExists((*wsApiCtx)(c), typespace)
 	if err != nil {
 		return exists, convertWsdbError(err)
 	}
@@ -427,7 +432,7 @@ func (w *etherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
 		"EtherWsdbTranslator::NamespaceExists",
 		"%s/%s", typespace, namespace).Out()
 
-	exists, err := w.wsdb.NamespaceExists(typespace, namespace)
+	exists, err := w.wsdb.NamespaceExists((*wsApiCtx)(c), typespace, namespace)
 	if err != nil {
 		return exists, convertWsdbError(err)
 	}
@@ -441,7 +446,7 @@ func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 		"EtherWsdbTranslator::WorkspaceExists",
 		"%s/%s/%s", typespace, namespace, workspace).Out()
 
-	exists, err := w.wsdb.WorkspaceExists(typespace,
+	exists, err := w.wsdb.WorkspaceExists((*wsApiCtx)(c), typespace,
 		namespace, workspace)
 	if err != nil {
 		return exists, convertWsdbError(err)
@@ -456,7 +461,7 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 		"EtherWsdbTranslator::Workspace",
 		"%s/%s/%s", typespace, namespace, workspace).Out()
 
-	key, err := w.wsdb.Workspace(typespace, namespace, workspace)
+	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
 	if err != nil {
 		return quantumfs.ObjectKey{}, convertWsdbError(err)
 	}
@@ -474,7 +479,7 @@ func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 		srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace).Out()
 
-	err := w.wsdb.BranchWorkspace(srcTypespace, srcNamespace,
+	err := w.wsdb.BranchWorkspace((*wsApiCtx)(c), srcTypespace, srcNamespace,
 		srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
 		return convertWsdbError(err)
@@ -489,7 +494,8 @@ func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 		"EtherWsdbTranslator::DeleteWorkspace",
 		"%s/%s/%s", typespace, namespace, workspace).Out()
 
-	err := w.wsdb.DeleteWorkspace(typespace, namespace, workspace)
+	err := w.wsdb.DeleteWorkspace((*wsApiCtx)(c), typespace, namespace,
+		workspace)
 	if err != nil {
 		return convertWsdbError(err)
 	}
@@ -507,8 +513,12 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		currentRootId.Text(),
 		newRootId.Text()).Out()
 
-	key, err := w.wsdb.AdvanceWorkspace(typespace, namespace, workspace,
-		currentRootId.Value(), newRootId.Value())
+	utils.Assert(newRootId.IsValid(), "Tried advancing to an invalid rootID. "+
+		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
+		currentRootId.Text(), newRootId.Text())
+
+	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
+		workspace, currentRootId.Value(), newRootId.Value())
 	if err != nil {
 		return quantumfs.NewObjectKeyFromBytes(key), convertWsdbError(err)
 	}
@@ -559,4 +569,38 @@ func (dc *dsApiCtx) FuncIn(funcName string, fmtStr string,
 	el := (*quantumfs.Ctx)(dc).FuncIn(qlog.LogDatastore, funcName,
 		fmtStr, args...)
 	return (etherFuncOut)(el)
+}
+
+func (dc *dsApiCtx) FuncInName(funcName string) ether.FuncOut {
+	return dc.FuncIn(funcName, "")
+}
+
+type wsApiCtx quantumfs.Ctx
+
+func (wc *wsApiCtx) Elog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wc).Elog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wc *wsApiCtx) Wlog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wc).Wlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wc *wsApiCtx) Dlog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wc).Dlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wc *wsApiCtx) Vlog(fmtStr string, args ...interface{}) {
+	(*quantumfs.Ctx)(wc).Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (wc *wsApiCtx) FuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.FuncOut {
+
+	el := (*quantumfs.Ctx)(wc).FuncIn(qlog.LogWorkspaceDb, funcName,
+		fmtStr, args...)
+	return (etherFuncOut)(el)
+}
+
+func (wc *wsApiCtx) FuncInName(funcName string) ether.FuncOut {
+	return wc.FuncIn(funcName, "")
 }

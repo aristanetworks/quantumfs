@@ -35,11 +35,6 @@ func TestHardlink(t *testing.T) {
 		test.Assert(err == nil, "Error reading linked file: %v", err)
 		test.Assert(bytes.Equal(data, testData), "Data corrupt!")
 
-		// Take note of the nextHardlinkId
-		wsrA, cleanup := test.getWorkspaceRoot(workspace)
-		defer cleanup()
-		nextHardlinkId := wsrA.nextHardlinkId
-
 		// Branch and confirm the hardlink is still there
 		workspace = test.AbsPath(test.branchWorkspace(workspace))
 		file1 = workspace + "/orig_file"
@@ -52,12 +47,6 @@ func TestHardlink(t *testing.T) {
 		defer cleanup()
 		test.Assert(len(wsrB.hardlinks) == 1, "Wsr hardlink link len is %d",
 			len(wsrB.hardlinks))
-
-		wsrC, cleanup := test.getWorkspaceRoot(workspace)
-		defer cleanup()
-		nextHardlinkId_ := wsrC.nextHardlinkId
-		test.Assert(nextHardlinkId == nextHardlinkId_ && nextHardlinkId != 0,
-			"nextHardlinkId unset or not saved/loaded")
 
 		// Ensure that hardlinks are now in place
 		file1InodeNum := test.getInodeNum(file1)
