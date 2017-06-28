@@ -236,7 +236,7 @@ func NewQlog(ramfsPath string) *Qlog {
 		PrintToStdout)
 }
 
-func NewQlogExt(ramfsPath string, sharedMemLen uint64, qfsVersion string,
+func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	outLog func(format string, args ...interface{}) error) *Qlog {
 
 	if sharedMemLen == 0 {
@@ -249,7 +249,7 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, qfsVersion string,
 		Write:     outLog,
 	}
 	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, int(sharedMemLen),
-		qfsVersion, &q)
+		daemonVersion, &q)
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >

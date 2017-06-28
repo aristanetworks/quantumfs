@@ -71,7 +71,7 @@ type extractorIdx int
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
-	qfsVersion    string
+	daemonVersion    string
 
 	// track the oldest untouched requests so we can push them to the stat
 	// extractors after the resting period (so we're confident there are no
@@ -87,12 +87,12 @@ type Aggregator struct {
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig, qfsVersion_ string) *Aggregator {
+	extractors []StatExtractorConfig, daemonVersion_ string) *Aggregator {
 
 	rtn := Aggregator{
 		db:              db_,
 		logsByRequest:   make(map[uint64]logTrack),
-		qfsVersion:      qfsVersion_,
+		daemonVersion:   daemonVersion_,
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
@@ -176,7 +176,7 @@ func (agg *Aggregator) ProcessThread() {
 					// add the qfs version tag
 					tags = append(tags,
 						quantumfs.NewTag("version",
-							agg.qfsVersion))
+							agg.daemonVersion))
 
 					agg.db.Store(measurement, tags, fields)
 				}
