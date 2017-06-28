@@ -262,10 +262,6 @@ const (
 
 type PathFlags uint
 
-func (pf PathFlags) Primitive() interface{} {
-	return uint(pf)
-}
-
 func (pf PathFlags) Created() bool {
 	return utils.BitFlagsSet(uint(pf), PathCreated)
 }
