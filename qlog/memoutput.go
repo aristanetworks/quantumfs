@@ -126,31 +126,6 @@ func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 	return (dataEnd - dataLen) % circ.length
 }
 
-// Don't use interfaces where possible because they're slow
-func (circ *CircMemLogs) toBinaryUint8(offset uint64, input uint8) uint64 {
-	bufPtr := (*uint8)(unsafe.Pointer(&circ.buffer[offset]))
-	*bufPtr = input
-	return offset + 1
-}
-
-func (circ *CircMemLogs) toBinaryUint16(offset uint64, input uint16) uint64 {
-	bufPtr := (*uint16)(unsafe.Pointer(&circ.buffer[offset]))
-	*bufPtr = input
-	return offset + 2
-}
-
-func (circ *CircMemLogs) toBinaryUint32(offset uint64, input uint32) uint64 {
-	bufPtr := (*uint32)(unsafe.Pointer(&circ.buffer[offset]))
-	*bufPtr = input
-	return offset + 4
-}
-
-func (circ *CircMemLogs) toBinaryUint64(offset uint64, input uint64) uint64 {
-	bufPtr := (*uint64)(unsafe.Pointer(&circ.buffer[offset]))
-	*bufPtr = input
-	return offset + 8
-}
-
 // Note: in development code, you should never provide a True partialWrite
 func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	formatId uint16, reqId uint64, timestamp int64, length uint64,
@@ -168,18 +143,43 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 
 	// Write the length field without the completion bit
 	lenOffset := (dataOffset + length) % circ.length
-	length &= ^uint64(entryCompleteBit)
-	circ.toBinaryUint16(lenOffset, uint16(length))
+	flagAndLength := length & ^uint64(entryCompleteBit)
+
+	var offset uint64
+	var buf []byte
+	var fastpath bool
+	if lenOffset > dataOffset {
+		// Fast path, we don't need to wrap around the end of the buffer
+		fastpath = true
+		offset = dataOffset
+		buf = circ.buffer
+	} else {
+		// Slow path, we need to wrap some of the data around the end of the
+		// buffer. This is an uncommon case, so use a staging buffer.
+		fastpath = false
+		buf = make([]byte, packetLength)
+		offset = 0
+	}
+
+	if fastpath {
+		insertUint16(buf, lenOffset, uint16(flagAndLength))
+	} else {
+		insertUint16(buf, offset+length, uint16(flagAndLength))
+	}
 
 	// Write the entry header
-	dataOffset = circ.toBinaryUint16(dataOffset, uint16(len(args)))
-	dataOffset = circ.toBinaryUint16(dataOffset, formatId)
-	dataOffset = circ.toBinaryUint64(dataOffset, reqId)
-	dataOffset = circ.toBinaryUint64(dataOffset, uint64(timestamp))
+	offset = insertUint16(buf, offset, uint16(len(args)))
+	offset = insertUint16(buf, offset, formatId)
+	offset = insertUint64(buf, offset, reqId)
+	offset = insertUint64(buf, offset, uint64(timestamp))
 
 	// Write the entry arguments
 	for i, arg := range args {
-		dataOffset = circ.writeArg(dataOffset, format, arg, argKinds[i])
+		offset = writeArg(buf, offset, format, arg, argKinds[i])
+	}
+
+	if !fastpath {
+		circ.wrapWrite_(dataOffset, buf)
 	}
 
 	// For testing purposes only: if we need to generate some partially written
@@ -190,8 +190,14 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 
 	// Now that the entry is written completely, mark the packet as safe to read,
 	// but use an atomic operation to ensure a compiler and memory barrier
-	atomic.AddUint64(&length, uint64(entryCompleteBit))
-	circ.toBinaryUint16(lenOffset, uint16(length))
+	atomic.AddUint64(&flagAndLength, uint64(entryCompleteBit))
+
+	if fastpath {
+		insertUint16(buf, lenOffset, uint16(flagAndLength))
+	} else {
+		insertUint16(buf, 0+length, uint16(flagAndLength))
+		circ.wrapWrite_(dataOffset, buf)
+	}
 }
 
 const LogStrSize = 64
@@ -487,64 +493,64 @@ func errorPacketTooLong(format string) (msgSize int, msg string) {
 	return len(str), str
 }
 
-func (circ *CircMemLogs) writeArg(offset uint64, format string, arg interface{},
+func writeArg(buf []byte, offset uint64, format string, arg interface{},
 	argKind reflect.Kind) uint64 {
 
 	// The structure and sizes written here must match
 	// SharedMemory.computePacketSize() to ensure the size is computed correctly.
 	switch {
 	case argKind == reflect.Int8:
-		offset = circ.toBinaryUint16(offset, TypeInt8)
-		offset = circ.toBinaryUint8(offset, interfaceAsUint8(arg))
+		offset = insertUint16(buf, offset, TypeInt8)
+		offset = insertUint8(buf, offset, interfaceAsUint8(arg))
 	case argKind == reflect.Uint8:
-		offset = circ.toBinaryUint16(offset, TypeUint8)
-		offset = circ.toBinaryUint8(offset, interfaceAsUint8(arg))
+		offset = insertUint16(buf, offset, TypeUint8)
+		offset = insertUint8(buf, offset, interfaceAsUint8(arg))
 	case argKind == reflect.Bool:
-		offset = circ.toBinaryUint16(offset, TypeBoolean)
+		offset = insertUint16(buf, offset, TypeBoolean)
 		if arg.(bool) {
-			offset = circ.toBinaryUint8(offset, 1)
+			offset = insertUint8(buf, offset, 1)
 		} else {
-			offset = circ.toBinaryUint8(offset, 0)
+			offset = insertUint8(buf, offset, 0)
 		}
 	case argKind == reflect.Int16:
-		offset = circ.toBinaryUint16(offset, TypeInt16)
-		offset = circ.toBinaryUint16(offset, interfaceAsUint16(arg))
+		offset = insertUint16(buf, offset, TypeInt16)
+		offset = insertUint16(buf, offset, interfaceAsUint16(arg))
 	case argKind == reflect.Uint16:
-		offset = circ.toBinaryUint16(offset, TypeUint16)
-		offset = circ.toBinaryUint16(offset, interfaceAsUint16(arg))
+		offset = insertUint16(buf, offset, TypeUint16)
+		offset = insertUint16(buf, offset, interfaceAsUint16(arg))
 	case argKind == reflect.Int32:
-		offset = circ.toBinaryUint16(offset, TypeInt32)
-		offset = circ.toBinaryUint32(offset, interfaceAsUint32(arg))
+		offset = insertUint16(buf, offset, TypeInt32)
+		offset = insertUint32(buf, offset, interfaceAsUint32(arg))
 	case argKind == reflect.Uint32:
-		offset = circ.toBinaryUint16(offset, TypeUint32)
-		offset = circ.toBinaryUint32(offset, interfaceAsUint32(arg))
+		offset = insertUint16(buf, offset, TypeUint32)
+		offset = insertUint32(buf, offset, interfaceAsUint32(arg))
 	case argKind == reflect.Int:
-		offset = circ.toBinaryUint16(offset, TypeInt64)
-		offset = circ.toBinaryUint64(offset, interfaceAsUint64(arg))
+		offset = insertUint16(buf, offset, TypeInt64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
 	case argKind == reflect.Uint:
-		offset = circ.toBinaryUint16(offset, TypeUint64)
-		offset = circ.toBinaryUint64(offset, interfaceAsUint64(arg))
+		offset = insertUint16(buf, offset, TypeUint64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
 	case argKind == reflect.Int64:
-		offset = circ.toBinaryUint16(offset, TypeInt64)
-		offset = circ.toBinaryUint64(offset, interfaceAsUint64(arg))
+		offset = insertUint16(buf, offset, TypeInt64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
 	case argKind == reflect.Uint64:
-		offset = circ.toBinaryUint16(offset, TypeUint64)
-		offset = circ.toBinaryUint64(offset, interfaceAsUint64(arg))
+		offset = insertUint16(buf, offset, TypeUint64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
 	case argKind == reflect.String:
-		offset = circ.writeArray(offset, format, []byte(arg.(string)),
+		offset = writeArray(buf, offset, format, []byte(arg.(string)),
 			TypeString)
 	case argKind == sliceOfBytesKind:
-		offset = circ.writeArray(offset, format, arg.([]uint8),
+		offset = writeArray(buf, offset, format, arg.([]uint8),
 			TypeByteArray)
 	default:
 		_, msg := errorUnknownType(arg)
-		offset = circ.writeArray(offset, format, []byte(msg), TypeString)
+		offset = writeArray(buf, offset, format, []byte(msg), TypeString)
 	}
 
 	return offset
 }
 
-func (circ *CircMemLogs) writeArray(offset uint64, format string, data []byte,
+func writeArray(buf []byte, offset uint64, format string, data []byte,
 	byteType uint16) uint64 {
 
 	if len(data) > math.MaxUint16 {
@@ -552,11 +558,11 @@ func (circ *CircMemLogs) writeArray(offset uint64, format string, data []byte,
 			"%s", format))
 	}
 
-	offset = circ.toBinaryUint16(offset, byteType)
-	offset = circ.toBinaryUint16(offset, uint16(len(data)))
+	offset = insertUint16(buf, offset, byteType)
+	offset = insertUint16(buf, offset, uint16(len(data)))
 
 	for _, v := range data {
-		offset = circ.toBinaryUint8(offset, v)
+		offset = insertUint8(buf, offset, v)
 	}
 
 	return offset
@@ -649,6 +655,31 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 	}
 
 	return uint64(size)
+}
+
+// Don't use interfaces where possible because they're slow
+func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
+	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 1
+}
+
+func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
+	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 2
+}
+
+func insertUint32(buf []byte, offset uint64, input uint32) uint64 {
+	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 4
+}
+
+func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
+	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 8
 }
 
 func (mem *SharedMemory) Sync() int {
