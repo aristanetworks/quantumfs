@@ -190,13 +190,11 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 
 	// Now that the entry is written completely, mark the packet as safe to read,
 	// but use an atomic operation to ensure a compiler and memory barrier
+	atomic.AddUint64(&flagAndLength, uint64(entryCompleteBit))
+
 	if fastpath {
-		lenPtr := (*uint64)(unsafe.Pointer(&circ.buffer[lenOffset]))
-		atomic.AddUint64(lenPtr, uint64(entryCompleteBit))
 		insertUint16(buf, lenOffset, uint16(flagAndLength))
 	} else {
-		flagAndLengthCopy := flagAndLength
-		atomic.AddUint64(&flagAndLengthCopy, uint64(entryCompleteBit))
 		insertUint16(buf, 0+length, uint16(flagAndLength))
 		circ.wrapWrite_(dataOffset, buf)
 	}
