@@ -18,10 +18,6 @@ import (
 
 type LogSubsystem uint8
 
-func (v LogSubsystem) Primitive() interface{} {
-	return uint8(v)
-}
-
 // These should be short to save space, visually different to aid in reading
 const FnEnterStr = "---In "
 const FnExitStr = "Out-- "
