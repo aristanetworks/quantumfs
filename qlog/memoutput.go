@@ -701,7 +701,14 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 		return
 	}
 
-	argumentKinds := make([]reflect.Kind, len(args))
+	// Allocate a small slice on the stack which will cover most cases. Any
+	// situation with a very large number of arguments will allocate from the
+	// heap.
+	argumentKinds := make([]reflect.Kind, 32)
+	if len(args) > 32 {
+		argumentKinds = make([]reflect.Kind, len(args))
+	}
+
 	packetSize := mem.computePacketSize(format, argumentKinds, args...)
 
 	partialWrite := false
