@@ -1461,7 +1461,7 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 			}
 			return quantumfs.ExtendedKeyLength, status
 		}
-		return 0, fuse.EPERM
+		return 0, fuse.ENODATA
 	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
@@ -1522,7 +1522,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 			return getQuantumfsExtendedKey(c, qfs,
 				InodeId(header.NodeId))
 		}
-		return nil, fuse.EPERM
+		return nil, fuse.ENODATA
 	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
