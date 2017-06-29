@@ -511,16 +511,44 @@ func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 	}
 }
 
-func (dir *Directory) childStashedLinkId(c *ctx, childId InodeId) HardlinkId {
+func extractHardlinkId(c *ctx, data []byte) HardlinkId {
+	if id, err := strconv.ParseUint(string(data), 16, 64); err != nil {
+		c.elog("Failed to extract hardlinkid from %s, err %s",
+			string(data), err.Error())
+		return InvalidHardlinkId
+	} else {
+		return HardlinkId(id)
+	}
+}
+
+func (dir *Directory) childStashedLinkIdFromRecord(c *ctx,
+	record quantumfs.DirectoryRecord) HardlinkId {
+
+	attributeList, status := dir.getRecordExtendedAttributes(c, record)
+	if status != fuse.OK {
+		c.vlog("Could not retrieve any attributes")
+		return InvalidHardlinkId
+	}
+	key := attributeList.AttributeByKey(quantumfs.XAttrTypeLinkID)
+	if key == quantumfs.EmptyBlockKey {
+		c.vlog("Nothing stashed")
+		return InvalidHardlinkId
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		c.elog("Failed to retrieve attribute datablock")
+		return InvalidHardlinkId
+	}
+	return extractHardlinkId(c, buffer.Get())
+}
+
+func (dir *Directory) childStashedLinkIdFromInode(c *ctx,
+	childId InodeId) HardlinkId {
+
 	if buf, status := dir.getChildXAttrData(c, childId,
 		quantumfs.XAttrTypeLinkID); status == fuse.OK {
-
-		if id, err := strconv.ParseUint(string(buf), 16, 64); err != nil {
-			c.elog("Failed to extract hardlinkid from %s, err %s",
-				string(buf), err.Error())
-		} else {
-			return HardlinkId(id)
-		}
+		return extractHardlinkId(c, buf)
 	}
 	return InvalidHardlinkId
 }
@@ -1382,6 +1410,25 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	entry.SetID(newKey)
 }
 
+func (dir *Directory) getRecordExtendedAttributes(c *ctx,
+	record quantumfs.DirectoryRecord) (*quantumfs.ExtendedAttributes,
+	fuse.Status) {
+
+	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
+		c.vlog("Directory::getRecordExtendedAttributes returning new object")
+		return nil, fuse.ENOENT
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
+	if buffer == nil {
+		c.dlog("Failed to retrieve attribute list")
+		return nil, fuse.EIO
+	}
+
+	attributeList := buffer.AsExtendedAttributes()
+	return &attributeList, fuse.OK
+}
+
 // Get the extended attributes object. The status is EIO on error or ENOENT if there
 // are no extended attributes for that child.
 func (dir *Directory) getExtendedAttributes_(c *ctx,
@@ -1396,19 +1443,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
-		c.vlog("Directory::getExtendedAttributes_ returning new object")
-		return nil, fuse.ENOENT
-	}
-
-	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
-	if buffer == nil {
-		c.dlog("Failed to retrieve attribute list")
-		return nil, fuse.EIO
-	}
-
-	attributeList := buffer.AsExtendedAttributes()
-	return &attributeList, fuse.OK
+	return dir.getRecordExtendedAttributes(c, record)
 }
 
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
@@ -1428,24 +1463,21 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 		return nil, fuse.EIO
 	}
 
-	for i := 0; i < attributeList.NumAttributes(); i++ {
-		name, key := attributeList.Attribute(i)
-		if name != attr {
-			continue
-		}
-
-		c.vlog("Found attribute key: %s", key.Text())
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			c.elog("Failed to retrieve attribute datablock")
-			return nil, fuse.EIO
-		}
-
-		return buffer, fuse.OK
+	key := attributeList.AttributeByKey(attr)
+	if key == quantumfs.EmptyBlockKey {
+		c.vlog("XAttr name not found")
+		return nil, fuse.ENODATA
 	}
 
-	c.vlog("XAttr name not found")
-	return nil, fuse.ENODATA
+	c.vlog("Found attribute key: %s", key.Text())
+	buffer := c.dataStore.Get(&c.Ctx, key)
+
+	if buffer == nil {
+		c.elog("Failed to retrieve attribute datablock")
+		return nil, fuse.EIO
+	}
+
+	return buffer, fuse.OK
 }
 
 func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,

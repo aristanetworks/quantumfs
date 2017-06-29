@@ -188,7 +188,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	}
 
 	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
-	linkid := dir.childStashedLinkId(c, toLink.inodeNum())
+	linkid := dir.childStashedLinkIdFromInode(c, toLink.inodeNum())
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -305,17 +305,8 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 
-			stashedLinkId := func() HardlinkId {
-				// XXX read the xattr without these hacks.
-				// We do set the record just to be able to grab the
-				// latest xattr for the remote record
-				dir.children.setRecord(childId, remoteRecord)
-				dir.childRecordLock.Unlock()
-				defer dir.childRecordLock.Lock()
-				defer dir.children.setRecord(childId, localRecord)
-				return dir.childStashedLinkId(c, childId)
-			}()
-
+			stashedLinkId := dir.childStashedLinkIdFromRecord(c,
+				remoteRecord)
 			if stashedLinkId == InvalidHardlinkId {
 				c.vlog("No stashed hardlinkId found.")
 				return false, true
