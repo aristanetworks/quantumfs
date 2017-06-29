@@ -500,48 +500,48 @@ func writeArg(buf []byte, offset uint64, format string, arg interface{},
 
 	// The structure and sizes written here must match
 	// SharedMemory.computePacketSize() to ensure the size is computed correctly.
-	switch {
-	case argKind == reflect.Int8:
+	switch argKind {
+	case reflect.Int8:
 		offset = insertUint16(buf, offset, TypeInt8)
 		offset = insertUint8(buf, offset, interfaceAsUint8(arg))
-	case argKind == reflect.Uint8:
+	case reflect.Uint8:
 		offset = insertUint16(buf, offset, TypeUint8)
 		offset = insertUint8(buf, offset, interfaceAsUint8(arg))
-	case argKind == reflect.Bool:
+	case reflect.Bool:
 		offset = insertUint16(buf, offset, TypeBoolean)
 		if arg.(bool) {
 			offset = insertUint8(buf, offset, 1)
 		} else {
 			offset = insertUint8(buf, offset, 0)
 		}
-	case argKind == reflect.Int16:
+	case reflect.Int16:
 		offset = insertUint16(buf, offset, TypeInt16)
 		offset = insertUint16(buf, offset, interfaceAsUint16(arg))
-	case argKind == reflect.Uint16:
+	case reflect.Uint16:
 		offset = insertUint16(buf, offset, TypeUint16)
 		offset = insertUint16(buf, offset, interfaceAsUint16(arg))
-	case argKind == reflect.Int32:
+	case reflect.Int32:
 		offset = insertUint16(buf, offset, TypeInt32)
 		offset = insertUint32(buf, offset, interfaceAsUint32(arg))
-	case argKind == reflect.Uint32:
+	case reflect.Uint32:
 		offset = insertUint16(buf, offset, TypeUint32)
 		offset = insertUint32(buf, offset, interfaceAsUint32(arg))
-	case argKind == reflect.Int:
+	case reflect.Int:
 		offset = insertUint16(buf, offset, TypeInt64)
 		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
-	case argKind == reflect.Uint:
+	case reflect.Uint:
 		offset = insertUint16(buf, offset, TypeUint64)
 		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
-	case argKind == reflect.Int64:
+	case reflect.Int64:
 		offset = insertUint16(buf, offset, TypeInt64)
 		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
-	case argKind == reflect.Uint64:
+	case reflect.Uint64:
 		offset = insertUint16(buf, offset, TypeUint64)
 		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
-	case argKind == reflect.String:
+	case reflect.String:
 		offset = writeArray(buf, offset, format, []byte(arg.(string)),
 			TypeString)
-	case argKind == sliceOfBytesKind:
+	case sliceOfBytesKind:
 		offset = writeArray(buf, offset, format, arg.([]uint8),
 			TypeByteArray)
 	default:
@@ -602,50 +602,56 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 
 		size += 2 // Argument type, ie. TypeInt8
 
-		switch {
-		case argKind == reflect.Int8:
+		switch argKind {
+		case reflect.Int8:
 			fallthrough
-		case argKind == reflect.Uint8:
+		case reflect.Uint8:
 			fallthrough
-		case argKind == reflect.Bool:
+		case reflect.Bool:
 			size += 1
 
-		case argKind == reflect.Int16:
+		case reflect.Int16:
 			fallthrough
-		case argKind == reflect.Uint16:
+		case reflect.Uint16:
 			size += 2
 
-		case argKind == reflect.Int32:
+		case reflect.Int32:
 			fallthrough
-		case argKind == reflect.Uint32:
+		case reflect.Uint32:
 			size += 4
 
-		case argKind == reflect.Int:
+		case reflect.Int:
 			fallthrough
-		case argKind == reflect.Uint:
+		case reflect.Uint:
 			fallthrough
-		case argKind == reflect.Int64:
+		case reflect.Int64:
 			fallthrough
-		case argKind == reflect.Uint64:
+		case reflect.Uint64:
 			size += 8
 
-		case argKind == reflect.String:
+		case reflect.String:
 			size += 2 // Length of string
 			size += len([]byte(arg.(string)))
 
-		case argKind == reflect.Slice && argType.Elem().Kind() == reflect.Uint8:
-			// Store a compound kind because this is a compound type and
-			// we don't want to carry/regenerate the reflect.Type object
-			// for all the arguments in CircMemLogs.writeArg()
-			kinds[i] = sliceOfBytesKind
-
-			size += 2 // Length of slice
-			size += len(arg.([]uint8))
-
 		default:
-			size += 2 // Length of error message
-			l, _ := errorUnknownType(arg)
-			size += l
+			// The if-else form of switch is slower, so avoid it and
+			// check the complex cases within the default case.
+			if argKind == reflect.Slice &&
+				argType.Elem().Kind() == reflect.Uint8 {
+
+				// Store a compound kind because this is a compound type and
+				// we don't want to carry/regenerate the reflect.Type object
+				// for all the arguments in CircMemLogs.writeArg()
+				kinds[i] = sliceOfBytesKind
+
+				size += 2 // Length of slice
+				size += len(arg.([]uint8))
+			} else {
+				// Truly unknown
+				size += 2 // Length of error message
+				l, _ := errorUnknownType(arg)
+				size += l
+			}
 		}
 	}
 
