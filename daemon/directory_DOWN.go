@@ -226,19 +226,18 @@ func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId
 	if inode == nil {
 		dir.children.deleteChild(c, childname, false)
 	} else {
-		localRecord := dir.children.recordByName(c, childname)
-		if localRecord.Type() == quantumfs.ObjectTypeHardlink {
+		switch dir.children.recordByName(c, childname).Type() {
+		case quantumfs.ObjectTypeHardlink:
 			dir.children.deleteChild(c, childname, false)
-		} else {
-			if localRecord.Type() == quantumfs.ObjectTypeDirectory {
-				subdir := inode.(*Directory)
-				subdir.children.foreachChild(c,
-					func(childname string, childId InodeId) {
+		case quantumfs.ObjectTypeDirectory:
+			subdir := inode.(*Directory)
+			subdir.children.foreachChild(c, func(childname string,
+				childId InodeId) {
 
-						subdir.unlinkChild_DOWN(c, childname,
-							childId)
-					})
-			}
+				subdir.unlinkChild_DOWN(c, childname, childId)
+			})
+			fallthrough
+		default:
 			result := inode.deleteSelf(c,
 				func() (quantumfs.DirectoryRecord, fuse.Status) {
 					delRecord := dir.children.deleteChild(c,
