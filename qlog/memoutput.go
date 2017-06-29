@@ -145,15 +145,10 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	lenOffset := (dataOffset + length) % circ.length
 	flagAndLength := length & ^uint64(entryCompleteBit)
 
-	var offset uint64
-	var buf []byte
-	var fastpath bool
-	if lenOffset > dataOffset {
-		// Fast path, we don't need to wrap around the end of the buffer
-		fastpath = true
-		offset = dataOffset
-		buf = circ.buffer
-	} else {
+	offset := dataOffset
+	buf := circ.buffer
+	fastpath := true
+	if lenOffset <= dataOffset {
 		// Slow path, we need to wrap some of the data around the end of the
 		// buffer. This is an uncommon case, so use a staging buffer.
 		fastpath = false
