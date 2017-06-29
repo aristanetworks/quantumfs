@@ -1653,6 +1653,13 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		test.SyncAllWorkspaces()
 		newRootId1 := getRootId(test, workspace)
 
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+
+		inode := test.getInode(fullname)
+		isHardlink, linkId1 := wsr.checkHardlink(inode.inodeNum())
+		test.Assert(isHardlink, "testfile is not a hardlin.")
+
 		test.AssertNoErr(syscall.Unlink(fullname))
 		// Make sure fulllinkname is normalized
 		test.remountFilesystem()
@@ -1663,6 +1670,14 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		test.AssertNoErr(createLargeFile(fulllinkname, content2))
 		test.SyncAllWorkspaces()
 		newRootId2 := getRootId(test, workspace)
+
+		inode = test.getInode(fullname)
+		isHardlink, linkId2 := wsr.checkHardlink(inode.inodeNum())
+		test.Assert(isHardlink, "testfile is not a hardlin.")
+
+		test.Assert(linkId1 == linkId2,
+			"hardlinkId changed after unlink and relink %d vs. %d",
+			linkId1, linkId2)
 
 		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
