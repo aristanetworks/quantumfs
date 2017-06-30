@@ -632,9 +632,10 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 			if argKind == reflect.Slice &&
 				argType.Elem().Kind() == reflect.Uint8 {
 
-				// Store a compound kind because this is a compound type and
-				// we don't want to carry/regenerate the reflect.Type object
-				// for all the arguments in CircMemLogs.writeArg()
+				// Store a compound kind because this is a compound
+				// type and we don't want to carry/regenerate the
+				// reflect.Type object for all the arguments in
+				// CircMemLogs.writeArg()
 				kinds[i] = sliceOfBytesKind
 
 				size += 2 // Length of slice
