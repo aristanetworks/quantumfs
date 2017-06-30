@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker
+COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
