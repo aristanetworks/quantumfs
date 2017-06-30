@@ -11,10 +11,6 @@ ExecStart=/usr/sbin/quantumfsd \
 	  -workspaceDB ether.cql -workspaceDBconf /etc/quantumfsd.conf
 ExecStop=/usr/bin/umount -l /qfs
 ExecStop=/bin/bash -c 'while grep -q QuantumFS /proc/self/mountinfo; do sleep 1; done'
-ExecReload=/usr/bin/umount -l /qfs
-ExecReload=/usr/sbin/quantumfsd \
-	  -datastore ether.cql -datastoreconf /etc/quantumfsd.conf \
-	  -workspaceDB ether.cql -workspaceDBconf /etc/quantumfsd.conf
 User=root
 KillMode=none
 
