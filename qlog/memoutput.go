@@ -534,7 +534,7 @@ func writeArg(buf []byte, offset uint64, format string, arg interface{},
 		offset = writeArray(buf, offset, format, []byte(arg.(string)),
 			TypeString)
 	case sliceOfBytesKind:
-		offset = writeArray(buf, offset, format, arg.([]uint8),
+		offset = writeArray(buf, offset, format, interfaceAsByteSlice(arg),
 			TypeByteArray)
 	default:
 		_, msg := errorUnknownType(arg)
