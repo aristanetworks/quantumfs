@@ -12,6 +12,8 @@ import (
 
 type HardlinkId uint64
 
+const InvalidHardlinkId = 0
+
 // Should implement quantumfs.DirectoryRecord
 type Hardlink struct {
 	name   string

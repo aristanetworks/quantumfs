@@ -188,11 +188,12 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	}
 
 	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
+	linkid := dir.childStashedLinkId(c, toLink.inodeNum())
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.makeHardlink(c, fingerprint, toLink.inodeNum())
+	return dir.children.makeHardlink(c, fingerprint, linkid, toLink.inodeNum())
 }
 
 func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
