@@ -1622,3 +1622,85 @@ func TestRefresh_Hardlink2HardlinkWithLinkIdChangeSrcWorkspaceroot(t *testing.T)
 func TestRefresh_Hardlink2HardlinkWithLinkIdChangeSrcSubdir(t *testing.T) {
 	runTest(t, GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(false))
 }
+
+func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
+	workspaceRootHardlinks bool) func(*testHelper) {
+
+	return func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+
+		// Exactly one of the two legs of the hardlink will reside
+		// in workspaceroot
+		name := "testFile"
+		linkname := name
+		utils.MkdirAll(workspace+"/subdir", 0777)
+		if !workspaceRootHardlinks {
+			name = "subdir/" + name
+		} else {
+			linkname = "subdir/" + linkname
+		}
+		fullname := workspace + "/" + name
+		fulllinkname := workspace + "/" + linkname
+
+		fd, err := syscall.Creat(fullname, syscall.O_CREAT)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(testutils.OverWriteFile(fullname, content1))
+		test.AssertNoErr(syscall.Link(fullname, fulllinkname))
+		test.SyncAllWorkspaces()
+		newRootId1 := getRootId(test, workspace)
+
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+
+		inode := test.getInode(fullname)
+		isHardlink, linkId1 := wsr.checkHardlink(inode.inodeNum())
+		test.Assert(isHardlink, "testfile is not a hardlin.")
+
+		test.AssertNoErr(syscall.Unlink(fullname))
+		// Make sure fulllinkname is normalized
+		test.remountFilesystem()
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(fulllinkname, &stat))
+
+		test.AssertNoErr(syscall.Link(fulllinkname, fullname))
+		test.AssertNoErr(createLargeFile(fulllinkname, content2))
+		test.SyncAllWorkspaces()
+		newRootId2 := getRootId(test, workspace)
+
+		inode = test.getInode(fullname)
+		isHardlink, linkId2 := wsr.checkHardlink(inode.inodeNum())
+		test.Assert(isHardlink, "testfile is not a hardlin.")
+
+		test.Assert(linkId1 == linkId2,
+			"hardlinkId changed after unlink and relink %d vs. %d",
+			linkId1, linkId2)
+
+		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		file2, err := os.OpenFile(fulllinkname, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2,
+			newRootId1)
+
+		verifyContentStartsWith(test, file1, content1)
+		test.AssertNoErr(file1.Close())
+		verifyContentStartsWith(test, file2, content1)
+		test.AssertNoErr(file2.Close())
+
+		removeTestFileNoSync(test, workspace, name)
+		removeTestFileNoSync(test, workspace, linkname)
+	}
+}
+
+func TestRefresh_Hardlink2Hardlink_unlinkAndRelinkSrcWorkspaceroot(t *testing.T) {
+	runTest(t, GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(true))
+}
+
+func TestRefresh_Hardlink2Hardlink_unlinkAndRelinkSrcSubdir(t *testing.T) {
+	runTest(t, GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(false))
+}
