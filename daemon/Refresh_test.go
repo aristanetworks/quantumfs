@@ -1104,10 +1104,6 @@ func TestRefreshType_H2H_S2VL(t *testing.T) {
 	runTest(t, contentCheckTestGen(createHardlink, createVeryLargeFile))
 }
 
-func TestRefreshType_H_S2S(t *testing.T) {
-	runTest(t, contentCheckTestGen(createSmallFile, createHardlink))
-}
-
 func TestRefreshType_S2H_S(t *testing.T) {
 	runTest(t, contentCheckTestGen(createHardlink,
 		purgeHardlinkThenCreate(createSmallFile)))
@@ -1209,72 +1205,85 @@ func GenTestRefreshType_HardlinkToSmall2MediumAndLarge(
 		content2 := "CONTENT2"
 		content3 := "the third"
 
+		// Exactly one of the two legs of the hardlink will reside
+		// in workspaceroot
 		name := "testFile"
+		linkname := name + "_link"
+		utils.MkdirAll(workspace+"/subdir", 0777)
 		if !workspaceRootHardlinks {
-			utils.MkdirAll(workspace+"/subdir", 0777)
-			name = "subdir/testFile"
+			name = "subdir/" + name
+		} else {
+			linkname = "subdir/" + linkname
 		}
-
 		fullname := workspace + "/" + name
+		fulllinkname := workspace + "/" + linkname
 
-		err := createMediumFile(fullname, content1)
+		fd, err := syscall.Creat(fullname, syscall.O_CREAT)
 		test.AssertNoErr(err)
-		err = createLargeFile(fullname+"_link", content2)
-		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(testutils.OverWriteFile(fullname, content1))
+		test.AssertNoErr(syscall.Link(fullname, fulllinkname))
 		test.SyncAllWorkspaces()
 		newRootId1 := getRootId(test, workspace)
 
-		err = syscall.Unlink(fullname)
-		test.AssertNoErr(err)
-		err = syscall.Unlink(fullname + "_link")
-		test.AssertNoErr(err)
-		err = createHardlink(fullname, content3)
-		test.AssertNoErr(err)
+		// we unlink the linkfile and keep the original file,
+		// this means the original file must be chosen as the heir
+		// to the inode
+		test.AssertNoErr(syscall.Unlink(fulllinkname))
+
+		// Make sure fullname is normalized
+		test.remountFilesystem()
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(fullname, &stat))
+
+		test.AssertNoErr(createMediumFile(fullname, content2))
+		test.AssertNoErr(createLargeFile(fulllinkname, content3))
 		test.SyncAllWorkspaces()
 		newRootId2 := getRootId(test, workspace)
 
+		// refresh back so that we can refresh forth
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+		// This test is doing refresh twice and makes the assumption
+		// that refreshing from two regular files to hardlinks is
+		// fully functional and well tested
+		// (See the MediumAndLarge2HardlinkToSmall tests)
+
 		file1, err := os.OpenFile(fullname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
-		verifyContentStartsWith(test, file1, content3)
+		verifyContentStartsWith(test, file1, content1)
 
-		file2, err := os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		file2, err := os.OpenFile(fulllinkname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
-		verifyContentStartsWith(test, file2, content3)
+		verifyContentStartsWith(test, file2, content1)
 
-		refreshTestNoRemount(ctx, test, workspace, newRootId2,
-			newRootId1)
+		refreshTestNoRemount(ctx, test, workspace, newRootId1,
+			newRootId2)
 
-		// The hardlink inode is claimed by one of the two files,
-		// therefore, both of them will be pointing at the same
-		// content, either content1 or content2
-		nmatches := doesContentStartWith(test, file1, content1)
-		nmatches += doesContentStartWith(test, file2, content1)
-		test.Assert(nmatches == 0 || nmatches == 2,
-			"Hit %d matches. Expected 0 or 2.", nmatches)
-
-		nmatches += doesContentStartWith(test, file1, content2)
+		// The hardlink inode must be claimed by file1
+		verifyContentStartsWith(test, file1, content2)
 		test.AssertNoErr(file1.Close())
-		nmatches += doesContentStartWith(test, file2, content2)
+
+		// file2 was using the same inode and will be pointing to
+		// the content of file1 after refresh, i.e. content2
+		verifyContentStartsWith(test, file2, content2)
 		test.AssertNoErr(file2.Close())
-		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
-			nmatches)
 
 		// but after grabbing a new file handle, both should have
 		// valid content
 		file1, err = os.OpenFile(fullname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
-		file2, err = os.OpenFile(fullname+"_link", os.O_RDWR, 0777)
+		file2, err = os.OpenFile(fulllinkname, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
 
-		nmatches = doesContentStartWith(test, file1, content1)
+		nmatches := doesContentStartWith(test, file1, content2)
 		test.AssertNoErr(file1.Close())
-		nmatches += doesContentStartWith(test, file2, content2)
+		nmatches += doesContentStartWith(test, file2, content3)
 		test.Assert(nmatches == 2, "Hit %d matches. Expected two.",
 			nmatches)
 		test.AssertNoErr(file2.Close())
 
 		removeTestFileNoSync(test, workspace, name)
-		removeTestFileNoSync(test, workspace, name+"_link")
+		removeTestFileNoSync(test, workspace, linkname)
 	}
 }
 

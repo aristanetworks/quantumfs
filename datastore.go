@@ -1223,6 +1223,16 @@ func (ea *ExtendedAttributes) Attribute(i int) (name string, id ObjectKey) {
 	return attribute.Name(), overlayObjectKey(attribute.Id())
 }
 
+func (ea *ExtendedAttributes) AttributeByKey(attr string) ObjectKey {
+	for i := 0; i < ea.NumAttributes(); i++ {
+		name, key := ea.Attribute(i)
+		if name == attr {
+			return key
+		}
+	}
+	return EmptyBlockKey
+}
+
 func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {
 	segment := capn.NewBuffer(nil)
 	attribute := encoding.NewRootExtendedAttribute(segment)
