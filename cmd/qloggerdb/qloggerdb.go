@@ -26,7 +26,7 @@ func init() {
 	flag.StringVar(&databaseConf, "dbConf", "", "Options to pass to database")
 
 	flag.Usage = func() {
-		fmt.Printf("Usage: %s <qlogPath>\n\n", os.Args[0])
+		fmt.Printf("Usage: %s [flags] <qlogPath>\n\n", os.Args[0])
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 	}
@@ -50,14 +50,20 @@ func main() {
 		return
 	}
 
+	lastParam := os.Args[len(os.Args)-1]
+	if lastParam[0] == '-' {
+		fmt.Printf("Last parameter must be qlog file.\n")
+		return
+	}
+
 	extractors := make([]qlogstats.StatExtractorConfig, 0)
 	db := loadTimeSeriesDB()
 
 	// sample extractor
 	extractors = append(extractors, qlogstats.NewStatExtractorConfig(
-		qlogstats.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr",
-			qlog.FnExitStr+"Mux::GetAttr", true, "Mux::GetAttr"),
+		qlogstats.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr Inode %d\n",
+			qlog.FnExitStr+"Mux::GetAttr\n", true, "Mux::GetAttr"),
 		(5*time.Second)))
 
-	qlogstats.AggregateLogs(qlog.ReadThenTail, os.Args[1], db, extractors)
+	qlogstats.AggregateLogs(qlog.ReadThenTail, lastParam, db, extractors)
 }
