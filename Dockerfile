@@ -2,9 +2,9 @@ FROM fedora:rawhide
 
 MAINTAINER shayan@arista.com
 
-ENV GOPATH /go
-ENV PATH="$GOPATH/bin:${PATH}"
 ENV USER root
+ENV GOPATH /root/go
+ENV PATH="$GOPATH/bin:${PATH}"
 
 RUN dnf install -y make go \
        git \
@@ -18,6 +18,7 @@ RUN dnf install -y make go \
        jansson-devel \
        openssl-devel \
        capnproto \
+       fuse \
        which
 
 RUN go get github.com/google/cityhash || ls $GOPATH/src/github.com/google/cityhash
