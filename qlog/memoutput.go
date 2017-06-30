@@ -703,7 +703,8 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 		args = make([]interface{}, 1)
 		args[0] = format
 		argumentKinds[0] = reflect.String
-		format = "ERROR: Log data exceeds allowable length: %s"
+		format = "Log data exceeds allowable length: %s"
+		level = 0
 
 		packetSize = mem.computePacketSize(format, argumentKinds, args...)
 	}
