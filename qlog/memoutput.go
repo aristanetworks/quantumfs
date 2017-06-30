@@ -13,10 +13,11 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 // We need a static array sized upper bound on our memory. Increase this as needed.
@@ -100,21 +101,19 @@ Readers:
 */
 type CircMemLogs struct {
 	header *circBufHeader
+	length uint64
 	buffer []byte
-
-	// Lock this for as short a period as possible
-	writeMutex sync.Mutex
 }
 
 func (circ *CircMemLogs) Size() int {
-	return len(circ.buffer) + int(unsafe.Sizeof(MmapHeader{}))
+	return int(circ.length + uint64(unsafe.Sizeof(MmapHeader{})))
 }
 
 // Must only be called on a section of data where nobody else is writing to it
 func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 	numWrite := uint64(len(data))
-	if idx+numWrite > uint64(len(circ.buffer)) {
-		secondNum := (idx + numWrite) - uint64(len(circ.buffer))
+	if idx+numWrite > circ.length {
+		secondNum := (idx + numWrite) - circ.length
 		numWrite -= secondNum
 		copy(circ.buffer[0:secondNum], data[numWrite:])
 	}
@@ -123,28 +122,19 @@ func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 }
 
 func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
-
-	// Minimize the size of the critical section, don't use defer
-	circ.writeMutex.Lock()
-
-	dataStart := circ.header.PastEndIdx
-	circ.header.PastEndIdx += uint64(dataLen)
-	circ.header.PastEndIdx %= uint64(len(circ.buffer))
-
-	circ.writeMutex.Unlock()
-
-	return dataStart
+	dataEnd := atomic.AddUint64(&circ.header.PastEndIdx, uint64(dataLen))
+	return (dataEnd - dataLen) % circ.length
 }
 
 // Note: in development code, you should never provide a True partialWrite
-func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
+func (circ *CircMemLogs) writeData(data []byte, length int, partialWrite bool) {
 	// For now, if the message is too long then just toss it
-	if len(data) > len(circ.buffer) {
+	if uint64(length) > circ.length {
 		return
 	}
 
 	// We only want to use the lower 2 bytes, but need all 4 to use sync/atomic
-	dataLen := uint32(len(data))
+	dataLen := uint32(length)
 	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
 	// Append the data field to the packet
 	data = append(data, dataRaw[:]...)
@@ -153,7 +143,7 @@ func (circ *CircMemLogs) writeData(data []byte, partialWrite bool) {
 
 	// Now that we know we have space, write in the entry
 	circ.wrapWrite_(dataStart, data)
-	lenStart := (dataStart + uint64(dataLen)) % uint64(len(circ.buffer))
+	lenStart := (dataStart + uint64(dataLen)) % circ.length
 
 	// For testing purposes only: if we need to generate some partially written
 	// packets, then do so by not finishing this one.
@@ -205,8 +195,29 @@ func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
 }
 
 type IdStrMap struct {
-	data    map[string]uint16
-	mapLock sync.RWMutex
+	// The map from format strings to format index is a read heavy datastructure.
+	// Once the daemon has warmed up it is unlikely a new format will be added.
+	// Therefore we optimize heavily for the read-only case.
+	//
+	// Golang maps are multiple reader safe and consequently we can allow all the
+	// readers access to the same map without a lock. However, we do sometimes
+	// need to add new messages to the map. We handle that by atomically changing
+	// a pointer to point to the most recent map. Read-only accesses will either
+	// get the old map, or the new map with the additional entries, but in either
+	// case the map is only visible after there will be no further writers.
+	//
+	// Now given a map may be fetched and retained for a period, we must also
+	// prevent the garbage collector from reclaiming the map until all possible
+	// readers have completed. We assume no logging operation will take more than
+	// a second and wait that long before removing the final reference to the
+	// previous map.
+	//
+	// This is the pointer to the most recent map and must be loaded using
+	// atomic.LoadPointer().
+	currentMapPtr unsafe.Pointer
+
+	lock utils.DeferableMutex // Protects everything below here
+	ids  map[string]uint16
 
 	buffer  *[mmapStrMapSize / LogStrSize]LogStr
 	freeIdx uint16
@@ -217,6 +228,7 @@ func newCircBuf(mapHeader *circBufHeader,
 
 	rtn := CircMemLogs{
 		header: mapHeader,
+		length: uint64(len(mapBuffer)),
 		buffer: mapBuffer,
 	}
 
@@ -227,7 +239,9 @@ func newCircBuf(mapHeader *circBufHeader,
 
 func newIdStrMap(buf []byte, offset int) IdStrMap {
 	var rtn IdStrMap
-	rtn.data = make(map[string]uint16)
+	ids := make(map[string]uint16)
+	rtn.ids = ids
+	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
 	rtn.freeIdx = 0
 	rtn.buffer = (*[mmapStrMapSize /
 		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
@@ -309,9 +323,8 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 
-	strMap.mapLock.RLock()
-	entry, ok := strMap.data[format]
-	strMap.mapLock.RUnlock()
+	ids := (*map[string]uint16)(strMap.currentMapPtr)
+	entry, ok := (*ids)[format]
 
 	if ok {
 		return entry, true
@@ -323,38 +336,32 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
-	strMap.mapLock.Lock()
-	existingId, ok := strMap.data[format]
-	// The vast majority of the time the string will already exist.
-	// Optimize our locking for this scenario
-	strMap.mapLock.Unlock()
+	defer strMap.lock.Lock().Unlock()
 
-	if ok {
+	if existingId, ok := strMap.ids[format]; ok {
+		// Somebody beat us to adding this format, we have no work to do
 		return existingId, nil
 	}
 
-	// Construct the new log string we *may* use outside of the critical region
-	// because it can be slow to make
 	newLog, err := newLogStr(idx, level, format)
 
-	// we may need to add a new log. lock and check again
-	strMap.mapLock.Lock()
-
-	// Check again to avoid a race condition
-	existingId, ok = strMap.data[format]
-	if ok {
-		strMap.mapLock.Unlock()
-		return existingId, nil
-	}
-
-	// format string still doesn't exist, so create it with the same lock
 	newIdx := strMap.freeIdx
 	strMap.freeIdx++
 
-	strMap.data[format] = newIdx
+	// Copy the old map into the new one and add the additional format entry
+	newMap := make(map[string]uint16, len(strMap.ids)+1)
+	for k, v := range strMap.ids {
+		newMap[k] = v
+	}
+	newMap[format] = newIdx
+
 	strMap.buffer[newIdx] = newLog
 
-	strMap.mapLock.Unlock()
+	// Now publish the new map, no writing may occur to this map after this
+	// point.
+	strMap.ids = newMap
+	atomic.StorePointer(&strMap.currentMapPtr, unsafe.Pointer(&newMap))
+
 	return newIdx, err
 }
 
@@ -368,12 +375,6 @@ func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 	}
 
 	return strMap.createLogIdx(idx, level, format)
-}
-
-type LogPrimitive interface {
-	// Return the type cast to a primitive, in interface form so that
-	// type asserts will work
-	Primitive() interface{}
 }
 
 const (
@@ -398,121 +399,118 @@ const (
 	TypeBoolean       = 19
 )
 
+type emptyInterface struct {
+	type_ unsafe.Pointer
+	value unsafe.Pointer
+}
+
+func interfaceAsUint8(intf interface{}) uint8 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint8)(ei.value))
+}
+
+func interfaceAsUint16(intf interface{}) uint16 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint16)(ei.value))
+}
+
+func interfaceAsUint32(intf interface{}) uint32 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint32)(ei.value))
+}
+
+func interfaceAsUint64(intf interface{}) uint64 {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return (*(*uint64)(ei.value))
+}
+
 // Writes the data, with a type prefix field two bytes long, to output. We pass in a
 // pointer to the output array instead of returning one to append so that we can
 // take advantage of output having a larger capacity and reducing memmoves
 func (mem *SharedMemory) binaryWrite(data interface{}, format string,
-	output *[]byte, offset int) int {
+	output []byte, offset int) ([]byte, int) {
 
-	// Handle primitive aliases first
-	if prim, ok := data.(LogPrimitive); ok {
-		// This takes the alias and provides a base class via an interface{}
-		// Without this, type casting will check against the alias instead
-		// of the base type
-		data = prim.Primitive()
-	}
-
-	switch v := data.(type) {
-	case *int8:
-		offset = toBinaryUint16(*output, offset, TypeInt8Pointer)
-		offset = toBinaryUint8(*output, offset, uint8(*v))
-	case int8:
-		offset = toBinaryUint16(*output, offset, TypeInt8)
-		offset = toBinaryUint8(*output, offset, uint8(v))
-	case *uint8:
-		offset = toBinaryUint16(*output, offset, TypeUint8Pointer)
-		offset = toBinaryUint8(*output, offset, *v)
-	case uint8:
-		offset = toBinaryUint16(*output, offset, TypeUint8)
-		offset = toBinaryUint8(*output, offset, v)
-	case *int16:
-		offset = toBinaryUint16(*output, offset, TypeInt16Pointer)
-		offset = toBinaryUint16(*output, offset, uint16(*v))
-	case int16:
-		offset = toBinaryUint16(*output, offset, TypeInt16)
-		offset = toBinaryUint16(*output, offset, uint16(v))
-	case *uint16:
-		offset = toBinaryUint16(*output, offset, TypeUint16Pointer)
-		offset = toBinaryUint16(*output, offset, *v)
-	case uint16:
-		offset = toBinaryUint16(*output, offset, TypeUint16)
-		offset = toBinaryUint16(*output, offset, v)
-	case *int32:
-		offset = toBinaryUint16(*output, offset, TypeInt32Pointer)
-		offset = toBinaryUint32(*output, offset, uint32(*v))
-	case int32:
-		offset = toBinaryUint16(*output, offset, TypeInt32)
-		offset = toBinaryUint32(*output, offset, uint32(v))
-	case *uint32:
-		offset = toBinaryUint16(*output, offset, TypeUint32Pointer)
-		offset = toBinaryUint32(*output, offset, *v)
-	case uint32:
-		offset = toBinaryUint16(*output, offset, TypeUint32)
-		offset = toBinaryUint32(*output, offset, v)
-	case int:
-		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, uint64(v))
-	case uint:
-		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, uint64(v))
-	case *int64:
-		offset = toBinaryUint16(*output, offset, TypeInt64Pointer)
-		offset = toBinaryUint64(*output, offset, uint64(*v))
-	case int64:
-		offset = toBinaryUint16(*output, offset, TypeInt64)
-		offset = toBinaryUint64(*output, offset, uint64(v))
-	case *uint64:
-		offset = toBinaryUint16(*output, offset, TypeUint64Pointer)
-		offset = toBinaryUint64(*output, offset, *v)
-	case uint64:
-		offset = toBinaryUint16(*output, offset, TypeUint64)
-		offset = toBinaryUint64(*output, offset, v)
-	case string:
-		offset = writeArray(output, offset, format, []byte(v), TypeString)
-	case []byte:
-		offset = writeArray(output, offset, format, v, TypeByteArray)
-	case bool:
-		offset = toBinaryUint16(*output, offset, TypeBoolean)
-		if v {
-			offset = toBinaryUint8(*output, offset, 1)
+	dataType := reflect.TypeOf(data)
+	dataKind := dataType.Kind()
+	switch {
+	case dataKind == reflect.Int8:
+		offset = toBinaryUint16(output, offset, TypeInt8)
+		offset = toBinaryUint8(output, offset, interfaceAsUint8(data))
+	case dataKind == reflect.Uint8:
+		offset = toBinaryUint16(output, offset, TypeUint8)
+		offset = toBinaryUint8(output, offset, interfaceAsUint8(data))
+	case dataKind == reflect.Int16:
+		offset = toBinaryUint16(output, offset, TypeInt16)
+		offset = toBinaryUint16(output, offset, interfaceAsUint16(data))
+	case dataKind == reflect.Uint16:
+		offset = toBinaryUint16(output, offset, TypeUint16)
+		offset = toBinaryUint16(output, offset, interfaceAsUint16(data))
+	case dataKind == reflect.Int32:
+		offset = toBinaryUint16(output, offset, TypeInt32)
+		offset = toBinaryUint32(output, offset, interfaceAsUint32(data))
+	case dataKind == reflect.Uint32:
+		offset = toBinaryUint16(output, offset, TypeUint32)
+		offset = toBinaryUint32(output, offset, interfaceAsUint32(data))
+	case dataKind == reflect.Int:
+		offset = toBinaryUint16(output, offset, TypeInt64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.Uint:
+		offset = toBinaryUint16(output, offset, TypeUint64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.Int64:
+		offset = toBinaryUint16(output, offset, TypeInt64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.Uint64:
+		offset = toBinaryUint16(output, offset, TypeUint64)
+		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
+	case dataKind == reflect.String:
+		output, offset = writeArray(output, offset, format,
+			[]byte(data.(string)), TypeString)
+	case dataKind == reflect.Slice && dataType.Elem().Kind() == reflect.Uint8:
+		output, offset = writeArray(output, offset, format, data.([]uint8),
+			TypeByteArray)
+	case dataKind == reflect.Bool:
+		offset = toBinaryUint16(output, offset, TypeBoolean)
+		if data.(bool) {
+			offset = toBinaryUint8(output, offset, 1)
 		} else {
-			offset = toBinaryUint8(*output, offset, 0)
+			offset = toBinaryUint8(output, offset, 0)
 		}
 	default:
-		errorPrefix := "ERROR: LogConverter needed for %s:\n%s\n"
-		checkRecursion(errorPrefix, format)
+		errorPrefix := "ERROR: LogConverter needed for %s at %s: %v"
 
-		str := fmt.Sprintf("%v", data)
-		offset = writeArray(output, offset, format, []byte(str), TypeString)
-		mem.errOut.Log(LogQlog, QlogReqId, 1, errorPrefix,
-			reflect.ValueOf(data).String(), string(debug.Stack()))
+		unknownType := reflect.ValueOf(data).String()
+		str := fmt.Sprintf(errorPrefix, unknownType, string(debug.Stack()),
+			data)
+		output, offset = writeArray(output, offset, errorPrefix+format,
+			[]byte(str), TypeString)
 	}
 
-	return offset
+	return output, offset
 }
 
-func writeArray(output *[]byte, offset int, format string, data []byte,
-	byteType uint16) int {
+func writeArray(output []byte, offset int, format string, data []byte,
+	byteType uint16) ([]byte, int) {
 
 	if len(data) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: "+
 			"%s", format))
 	}
 
-	offset = toBinaryUint16(*output, offset, byteType)
-	offset = toBinaryUint16(*output, offset, uint16(len(data)))
+	offset = toBinaryUint16(output, offset, byteType)
+	offset = toBinaryUint16(output, offset, uint16(len(data)))
 
-	if cap(*output)-offset < len(data) {
-		*output = expandBuffer(*output, len(data))
+	if cap(output)-offset < len(data) {
+		output = expandBuffer(output, len(data))
 	}
 
 	for i, v := range data {
-		(*output)[offset+i] = v
+		output[offset+i] = v
 	}
 
 	offset += len(data)
 
-	return offset
+	return output, offset
 }
 
 // Don't use interfaces where possible because they're slow
@@ -549,11 +547,9 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 	return tmp
 }
 
-func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
-	timestamp int64, format string, args ...interface{}) []byte {
+func (mem *SharedMemory) generateLogEntry(buf []byte, strMapId uint16, reqId uint64,
+	timestamp int64, format string, args ...interface{}) ([]byte, int) {
 
-	// Ensure we provide a sensible initial capacity
-	buf := make([]byte, 128)
 	offset := 0
 
 	// Two bytes prefix for the total packet length, before the num of args.
@@ -563,26 +559,26 @@ func (mem *SharedMemory) generateLogEntry(strMapId uint16, reqId uint64,
 	offset = toBinaryUint64(buf, offset, reqId)
 	offset = toBinaryUint64(buf, offset, uint64(timestamp))
 
+	originalOffset := offset
+
 	for i := 0; i < len(args); i++ {
 		if cap(buf)-offset < 10 {
 			buf = expandBuffer(buf, 10)
 		}
-		offset = mem.binaryWrite(args[i], format, &buf, offset)
+		buf, offset = mem.binaryWrite(args[i], format, buf, offset)
+	}
+
+	// Make sure length isn't too long, excluding the size bytes
+	if offset > MaxPacketLen {
+		offset = originalOffset
+
+		errorPrefix := "Log data exceeds allowable length at %s: %s"
+		str := fmt.Sprintf(errorPrefix, string(debug.Stack()), format)
+		buf, offset = mem.binaryWrite(str, format, buf, offset)
 	}
 
 	buf = buf[:offset]
-
-	// Make sure length isn't too long, excluding the size bytes
-	if len(buf) > MaxPacketLen {
-		errorPrefix := "Log data exceeds allowable length: %s\n"
-		checkRecursion(errorPrefix, format)
-
-		mem.errOut.Log(LogQlog, reqId, 1, errorPrefix, format)
-
-		buf = buf[:MaxPacketLen]
-	}
-
-	return buf
+	return buf, offset
 }
 
 func (mem *SharedMemory) Sync() int {
@@ -605,7 +601,9 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	// Generate the byte array packet
-	data := mem.generateLogEntry(strId, reqId, timestamp, format, args...)
+	data := make([]byte, 128)
+	data, length := mem.generateLogEntry(data, strId, reqId, timestamp, format,
+		args...)
 
 	partialWrite := false
 	if mem.testMode && len(mem.testDropStr) < len(format) &&
@@ -615,5 +613,5 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 		partialWrite = true
 	}
 
-	mem.circBuf.writeData(data, partialWrite)
+	mem.circBuf.writeData(data, length, partialWrite)
 }
