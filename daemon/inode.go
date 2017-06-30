@@ -18,10 +18,6 @@ import (
 
 type InodeId uint64
 
-func (v InodeId) Primitive() interface{} {
-	return uint64(v)
-}
-
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -701,10 +697,6 @@ type FileHandle interface {
 }
 
 type FileHandleId uint64
-
-func (v FileHandleId) Primitive() interface{} {
-	return uint64(v)
-}
 
 type FileHandleCommon struct {
 	id        FileHandleId
