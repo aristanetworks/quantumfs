@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -357,18 +356,6 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	newMap[format] = newIdx
 
 	strMap.buffer[newIdx] = newLog
-
-	// Delay garbage collection of the previous map until all possible current
-	// users are finished.
-	go func(mapToClear map[string]uint16) {
-		time.Sleep(1 * time.Second)
-
-		// Waste time to avoid possible optimizations which eliminates the
-		// reference to the map.
-		for k, _ := range mapToClear {
-			delete(mapToClear, k)
-		}
-	}(strMap.ids)
 
 	// Now publish the new map, no writing may occur to this map after this
 	// point.
