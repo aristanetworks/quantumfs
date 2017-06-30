@@ -44,11 +44,15 @@ func TestMaxStringLast_test(t *testing.T) {
 		longStr := string(GenData(math.MaxUint16))
 
 		test.qfs.c.wlog("%s", longStr)
+		test.qfs.c.vlog("Second log to confirm continuity")
 
 		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
 		test.Assert(strings.Contains(testLogs,
 			"Log data exceeds allowable length"),
 			"Over length string doesn't trigger warning")
+		test.Assert(strings.Contains(testLogs,
+			"Second log to confirm continuity"),
+			"Over length string breaks later logs")
 	})
 }
 
