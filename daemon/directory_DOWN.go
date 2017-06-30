@@ -188,7 +188,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	}
 
 	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
-	linkid := dir.childStashedLinkId(c, toLink.inodeNum())
+	linkid := dir.childStashedLinkIdFromInode(c, toLink.inodeNum())
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -198,7 +198,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 
 func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
 	hrc *HardlinkRefreshCtx, localRecord quantumfs.DirectoryRecord,
-	remoteRecord *quantumfs.DirectRecord) *quantumfs.DirectRecord {
+	remoteRecord *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN").Out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
@@ -214,11 +214,9 @@ func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
 		"either local or remote should be hardlinks to be normalized")
 
 	linkId := decodeHardlinkKey(remoteRecord.ID())
-	valid, hardlinkRecord := dir.wsr.getHardlink(linkId)
-	utils.Assert(valid, "hardlink %d not found", linkId)
 	dir.wsr.updateHardlinkInodeId(c, linkId, inodeId)
 	inode.setParent(dir.wsr.inodeNum())
-	return &hardlinkRecord
+	return newHardlink(localRecord.Filename(), linkId, dir.wsr)
 }
 
 func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId) {
@@ -228,23 +226,27 @@ func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId
 	if inode == nil {
 		dir.children.deleteChild(c, childname, false)
 	} else {
-		localRecord := dir.children.recordByName(c, childname)
-		if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+		switch dir.children.recordByName(c, childname).Type() {
+		case quantumfs.ObjectTypeHardlink:
+			dir.children.deleteChild(c, childname, false)
+		case quantumfs.ObjectTypeDirectory:
 			subdir := inode.(*Directory)
 			subdir.children.foreachChild(c, func(childname string,
 				childId InodeId) {
 
 				subdir.unlinkChild_DOWN(c, childname, childId)
 			})
-		}
-		result := inode.deleteSelf(c,
-			func() (quantumfs.DirectoryRecord, fuse.Status) {
-				delRecord := dir.children.deleteChild(c, childname,
-					false)
-				return delRecord, fuse.OK
-			})
-		if result != fuse.OK {
-			panic("XXX handle deletion failure")
+			fallthrough
+		default:
+			result := inode.deleteSelf(c,
+				func() (quantumfs.DirectoryRecord, fuse.Status) {
+					delRecord := dir.children.deleteChild(c,
+						childname, false)
+					return delRecord, fuse.OK
+				})
+			if result != fuse.OK {
+				panic("XXX handle deletion failure")
+			}
 		}
 	}
 	c.qfs.noteDeletedInode(dir.id, childId, childname)
@@ -303,14 +305,21 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 
-			linkId := decodeHardlinkKey(localRecord.ID())
-			if _, exists := hrc.claimedLinks[linkId]; exists {
-				// There are other dentries that might have claimed
-				// this inode, or it has not been stale at all.
-				c.vlog("%s cannot inherit the hardlink inode",
-					childname)
+			stashedLinkId := dir.childStashedLinkIdFromRecord(c,
+				remoteRecord)
+			if stashedLinkId == InvalidHardlinkId {
+				c.vlog("No stashed hardlinkId found.")
 				return false, true
 			}
+			linkId := decodeHardlinkKey(localRecord.ID())
+			if stashedLinkId != linkId {
+				c.vlog("linkId mismatch %d vs. %d",
+					linkId, stashedLinkId)
+				return false, true
+			}
+			_, exists := hrc.claimedLinks[linkId]
+			utils.Assert(!exists, "Someone has claimed my inode")
+			c.vlog("Claiming inode %d from linkId %d", childId, linkId)
 		}
 		if remoteRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			localRecord.Type() != quantumfs.ObjectTypeHardlink {
@@ -367,17 +376,14 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 		"type mismatch %d vs. %d", underlyingTypeOf(dir.wsr, localRecord),
 		underlyingTypeOf(dir.wsr, remoteRecord))
 
+	record := quantumfs.DirectoryRecord(remoteRecord)
 	if !localRecord.Type().Matches(remoteRecord.Type()) {
-		remoteRecord = dir.normalizeHardlinks_DOWN(c, hrc, localRecord,
+		record = dir.normalizeHardlinks_DOWN(c, hrc, localRecord,
 			remoteRecord)
-		// XXX In the future, a nil remoteRecord from normalization function
-		// should signal lack of enough information to process the record.
-		// In such an event, keep the pair of (localRecord, remoteRecord)
-		// for post-processing and return without reloading the inode.
 	}
-	dir.children.setRecord(childId, remoteRecord)
+	dir.children.setRecord(childId, record)
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
-		reload(c, hrc, inode, *remoteRecord)
+		reload(c, dir.wsr, hrc, inode, record)
 	}
 	status := c.qfs.invalidateInode(childId)
 	utils.Assert(status == fuse.OK,
