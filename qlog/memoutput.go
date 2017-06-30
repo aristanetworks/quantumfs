@@ -453,24 +453,29 @@ type emptyInterface struct {
 	value unsafe.Pointer
 }
 
+func interfaceAsByteSlice(intf interface{}) []byte {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return *(*[]byte)(ei.value)
+}
+
 func interfaceAsUint8(intf interface{}) uint8 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint8)(ei.value))
+	return *(*uint8)(ei.value)
 }
 
 func interfaceAsUint16(intf interface{}) uint16 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint16)(ei.value))
+	return *(*uint16)(ei.value)
 }
 
 func interfaceAsUint32(intf interface{}) uint32 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint32)(ei.value))
+	return *(*uint32)(ei.value)
 }
 
 func interfaceAsUint64(intf interface{}) uint64 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint64)(ei.value))
+	return *(*uint64)(ei.value)
 }
 
 func errorUnknownType(arg interface{}) (msgSize int,
@@ -639,7 +644,7 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 				kinds[i] = sliceOfBytesKind
 
 				size += 2 // Length of slice
-				size += len(arg.([]uint8))
+				size += len(interfaceAsByteSlice(arg))
 			} else {
 				// Truly unknown
 				size += 2 // Length of error message
