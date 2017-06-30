@@ -487,12 +487,6 @@ func errorUnknownType(arg interface{}) (msgSize int,
 	return len(str), str
 }
 
-func errorPacketTooLong(format string) (msgSize int, msg string) {
-	str := fmt.Sprintf("ERROR: Log data exceeds allowable length: %s", format)
-
-	return len(str), str
-}
-
 func writeArg(buf []byte, offset uint64, format string, arg interface{},
 	argKind reflect.Kind) uint64 {
 
@@ -654,13 +648,6 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 		}
 	}
 
-	// Make sure length isn't too long, excluding the packet size bytes
-	if size > MaxPacketLen {
-		size = 2 // Length of error message
-		l, _ := errorPacketTooLong(format)
-		size += l
-	}
-
 	return uint64(size)
 }
 
@@ -701,13 +688,6 @@ func (mem *SharedMemory) Sync() int {
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	timestamp int64, format string, args ...interface{}) {
 
-	// Create the string map entry / fetch existing one
-	formatId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
-	if err != nil {
-		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n", format)
-		return
-	}
-
 	// Allocate a small slice on the stack which will cover most cases. Any
 	// situation with a very large number of arguments will allocate from the
 	// heap.
@@ -718,12 +698,29 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 
 	packetSize := mem.computePacketSize(format, argumentKinds, args...)
 
+	// Make sure length isn't too long, excluding the packet size bytes
+	if packetSize > MaxPacketLen {
+		args = make([]interface{}, 1)
+		args[0] = format
+		argumentKinds[0] = reflect.String
+		format = "ERROR: Log data exceeds allowable length: %s"
+
+		packetSize = mem.computePacketSize(format, argumentKinds, args...)
+	}
+
 	partialWrite := false
 	if mem.testMode && len(mem.testDropStr) < len(format) &&
 		strings.Compare(mem.testDropStr,
 			format[:len(mem.testDropStr)]) == 0 {
 
 		partialWrite = true
+	}
+
+	// Create the string map entry / fetch existing one
+	formatId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
+	if err != nil {
+		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n", format)
+		return
 	}
 
 	mem.circBuf.writePacket(partialWrite, format, formatId, reqId, timestamp,
