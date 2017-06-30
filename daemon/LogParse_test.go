@@ -39,19 +39,6 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 	return logs[boundaryStart : boundaryEnd+1]
 }
 
-func TestMaxStringFail_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		longStr := string(GenData(math.MaxUint16))
-
-		test.qfs.c.wlog("%s %d", longStr, 255)
-
-		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
-		test.Assert(strings.Contains(testLogs,
-			"Packet has been clipped"),
-			"Over length string doesn't cause last parameter to drop")
-	})
-}
-
 func TestMaxStringLast_test(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		longStr := string(GenData(math.MaxUint16))
