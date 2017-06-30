@@ -31,7 +31,7 @@ const mmapStrMapSize = 512 * 1024
 const QlogVersion = 4
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
-// so the max packet length is 7 bits long
+// so the max packet length is 15 bits long
 const MaxPacketLen = 32767
 
 type MmapHeader struct {
