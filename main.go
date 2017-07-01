@@ -268,13 +268,13 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	}
 
 	// Call the walker library.
-	c.vlog("%s TTL refresh for %s/%s/%s (%s)", startPrefix, ts, ns, ws, rootID.Text())
+	c.vlog("%s TTL refresh for %s/%s/%s (%s)", startPrefix, ts, ns, ws, rootID.String())
 	if err = walker.Walk(c.qctx, c.ds, rootID, walkFunc); err != nil {
 		c.elog("TTL refresh for %s/%s/%s (%s), err(%v)", ts, ns, ws,
-			rootID.Text(), err)
+			rootID.String(), err)
 		WriteWorkspaceWalkDuration(c, ts, ns, false, ws, time.Since(start))
 	} else {
-		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws, rootID.Text())
+		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws, rootID.String())
 		WriteWorkspaceWalkDuration(c, ts, ns, true, ws, time.Since(start))
 	}
 	return err
