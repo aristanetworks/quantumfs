@@ -104,7 +104,7 @@ func (t *tracker) printKeyPathInfo(keys []string) {
 		for p := range t.keys[k].otherPaths {
 			paths = append(paths, p)
 		}
-		fmt.Printf("%s %s %v\n", k, qKey.Text(), paths)
+		fmt.Printf("%s %s %v\n", k, qKey.String(), paths)
 	}
 }
 

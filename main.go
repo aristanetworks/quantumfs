@@ -352,10 +352,10 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID, walkFunc); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
+		return fmt.Errorf("rootID: %s err: %v", rootID.String(), err)
 	}
 	fmt.Println()
-	fmt.Printf("Success: rootID: %s", rootID.Text())
+	fmt.Printf("Success: rootID: %s", rootID.String())
 	return nil
 }
 
@@ -398,10 +398,10 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 	}
 
 	if err = walker.Walk(c, qfsds, rootID, walkFunc); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
+		return fmt.Errorf("rootID: %s err: %v", rootID.String(), err)
 	}
 	fmt.Println()
-	fmt.Printf("Success: rootID: %s", rootID.Text())
+	fmt.Printf("Success: rootID: %s", rootID.String())
 	return nil
 }
 
@@ -443,7 +443,7 @@ func printList(c *quantumfs.Ctx, progress bool, qfsds quantumfs.DataStore,
 					return fmt.Errorf("RootId not found for %v err: %v", wsname, err)
 				}
 				fmt.Println()
-				fmt.Printf("%v : %s\n", rootID.Text(), wsname)
+				fmt.Printf("%v : %s\n", rootID.String(), wsname)
 			}
 		}
 	}
@@ -491,7 +491,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 
 		metadata, err := cqlds.Metadata(walkutils.ToECtx(c), key.Value())
 		if err != nil {
-			return fmt.Errorf("path:%v key %v: %v", path, key.Text(), err)
+			return fmt.Errorf("path:%v key %v: %v", path, key.String(), err)
 		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
@@ -519,10 +519,10 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 
 	// Walk
 	if err = walker.Walk(c, qfsds, rootID, bucketer); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID.Text(), err)
+		return fmt.Errorf("rootID: %s err: %v", rootID.String(), err)
 	}
 	fmt.Println()
-	fmt.Printf("Success: rootID: %s\n", rootID.Text())
+	fmt.Printf("Success: rootID: %s\n", rootID.String())
 	fmt.Printf("Days(s)   %5s\n", "Count")
 	hist.Print()
 	return nil
@@ -583,7 +583,7 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 
 	fmt.Printf("Search path: %v\n", searchPath)
 	for _, key := range keyList {
-		fmt.Println(key.Text())
+		fmt.Println(key.String())
 	}
 	return nil
 }
@@ -640,7 +640,7 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 				metadata, err := cqlds.Metadata(
 					walkutils.ToECtx(c), key.Value())
 				if err != nil {
-					return fmt.Errorf("path: %v key %v: %v", path, key.Text(), err)
+					return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
 				}
 
 				ttl, ok := metadata[cql.TimeToLive]
