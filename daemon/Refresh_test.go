@@ -51,7 +51,7 @@ func synced_op(test *testHelper, workspace string,
 	test.SyncAllWorkspaces()
 	newRootId := getRootId(test, workspace)
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
-	test.Log("new rootID %s", newRootId.Text())
+	test.Log("new rootID %s", newRootId.String())
 
 	return newRootId
 }

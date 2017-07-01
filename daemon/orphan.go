@@ -64,7 +64,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 	for i := 0; i < attributes.NumAttributes(); i++ {
 		name, attrKey := attributes.Attribute(i)
 
-		c.vlog("Found attribute key: %s", attrKey.Text())
+		c.vlog("Found attribute key: %s", attrKey.String())
 		buffer := c.dataStore.Get(&c.Ctx, attrKey)
 		if buffer == nil {
 			c.elog("Failed to retrieve attribute datablock")
