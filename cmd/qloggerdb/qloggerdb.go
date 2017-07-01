@@ -124,14 +124,9 @@ func main() {
 		return
 	}
 
-	extractors := make([]qlogstats.StatExtractorConfig, 0)
 	db := loadTimeSeriesDB()
 
-	// sample extractor
-	extractors = append(extractors, qlogstats.NewStatExtractorConfig(
-		qlogstats.NewExtPairStats(qlog.FnEnterStr+"Mux::GetAttr Inode %d\n",
-			qlog.FnExitStr+"Mux::GetAttr\n", true, "Mux::GetAttr"),
-		(5*time.Second)))
+	extractors := createExtractors()
 
 	qlogstats.AggregateLogs(qlog.ReadThenTail, lastParam, db, extractors)
 }
