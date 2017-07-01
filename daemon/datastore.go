@@ -110,6 +110,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		c.Vlog(qlog.LogDaemon, "Found key in readcache")
 		return bufResult
 	}
+	c.Vlog(qlog.LogDaemon, "Cache miss")
 
 	buf := newEmptyBuffer()
 	initBuffer(&buf, store, key)
