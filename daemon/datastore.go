@@ -7,7 +7,7 @@ import (
 	"container/list"
 	"os"
 	"os/signal"
-	"runtime"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
@@ -43,7 +43,7 @@ func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal) {
 		}()
 
 		// Release the memory
-		runtime.GC()
+		debug.FreeOSMemory()
 	}
 }
 
