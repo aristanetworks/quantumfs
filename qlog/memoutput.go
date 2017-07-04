@@ -191,7 +191,7 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 		insertUint16(buf, lenOffset, uint16(flagAndLength))
 	} else {
 		insertUint16(buf, 0+length, uint16(flagAndLength))
-		circ.wrapWrite_(dataOffset, buf)
+		circ.wrapWrite_(lenOffset, buf[length:])
 	}
 }
 
