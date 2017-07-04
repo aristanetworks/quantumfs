@@ -28,7 +28,7 @@ func init() {
 // and drop the contents of the cache. The intended use is as a way to free the bulk
 // of the memory used by quantumfsd when it is being gracefully shutdown by lazily
 // unmounting it.
-func dropCacheHandler(store *dataStore, sigUsr1Chan chan os.Signal) {
+func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal) {
 	for {
 		<-sigUsr1Chan
 
@@ -40,10 +40,10 @@ func dropCacheHandler(store *dataStore, sigUsr1Chan chan os.Signal) {
 			store.freeSpace = -1
 			store.cache = make(map[string]*buffer, 0)
 			store.lru = list.List{}
-
-			// Release the memory
-			runtime.GC()
 		}()
+
+		// Release the memory
+		runtime.GC()
 	}
 }
 
@@ -58,7 +58,7 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 
 	sigUsr1Chan := make(chan os.Signal, 1)
 	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
-	go dropCacheHandler(store, sigUsr1Chan)
+	go signalHandler(store, sigUsr1Chan)
 
 	return store
 }
@@ -83,7 +83,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	defer store.cacheLock.Lock().Unlock()
 
 	if size > store.cacheSize {
-		if store.cacheSize != 0 {
+		if store.cacheSize != -1 {
 			c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
 				" total capacity of the cache")
 		}
