@@ -121,7 +121,7 @@ func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	num, err := c.workspaceDB.NumWorkspaces(&c.Ctx, typespace, namespace)
 	if err != nil {
-		c.elog("Error fecthing number of workspace in %s/%s: %s", typespace,
+		c.elog("Error fetching number of workspace in %s/%s: %s", typespace,
 			namespace, err.Error())
 		num = 3 // Minimum acceptable value indicating one workspace
 	}
