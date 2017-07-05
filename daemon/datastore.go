@@ -123,6 +123,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 
 const CacheHitLog = "Found key in readcache"
 const CacheMissLog = "Cache miss"
+
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 

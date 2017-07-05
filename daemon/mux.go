@@ -821,6 +821,7 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 
 // Trigger all active workspaces to sync
 const SyncAllLog = "Mux::syncAll"
+
 func (qfs *QuantumFs) syncAll(c *ctx) {
 	defer c.funcIn(SyncAllLog).Out()
 
@@ -843,6 +844,7 @@ func logRequestPanic(c *ctx) {
 }
 
 const LookupLog = "Mux::Lookup"
+
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	out *fuse.EntryOut) (result fuse.Status) {
 
@@ -1134,6 +1136,7 @@ func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
 }
 
 const ForgetLog = "Mux::Forget"
+
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer qfs.c.funcIn(ForgetLog).Out()
 	defer logRequestPanic(&qfs.c)
@@ -1158,6 +1161,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 }
 
 const GetAttrLog = "Mux::GetAttr"
+
 func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 	out *fuse.AttrOut) (result fuse.Status) {
 
@@ -1178,6 +1182,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 }
 
 const SetAttrLog = "Mux::SetAttr"
+
 func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 	out *fuse.AttrOut) (result fuse.Status) {
 
@@ -1202,6 +1207,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 }
 
 const MknodLog = "Mux::Mknod"
+
 func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	out *fuse.EntryOut) (result fuse.Status) {
 
@@ -1226,6 +1232,7 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 }
 
 const MkdirLog = "Mux::Mkdir"
+
 func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	out *fuse.EntryOut) (result fuse.Status) {
 
@@ -1250,6 +1257,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 }
 
 const UnlinkLog = "Mux::Unlink"
+
 func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 	name string) (result fuse.Status) {
 
@@ -1274,6 +1282,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 }
 
 const RmdirLog = "Mux::Rmdir"
+
 func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 	name string) (result fuse.Status) {
 
@@ -1299,6 +1308,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 
 const RenameLog = "Mux::Rename"
 const RenameDebugLog = "Inode %d newdir %d %s -> %s"
+
 func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	newName string) (result fuse.Status) {
 
@@ -1341,6 +1351,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 const LinkLog = "Mux::Link"
 const LinkDebugLog = "inode %d to name %s in dstDir %d"
+
 func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	out *fuse.EntryOut) (result fuse.Status) {
 
@@ -1396,6 +1407,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 }
 
 const SymlinkLog = "Mux::Symlink"
+
 func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	linkName string, out *fuse.EntryOut) (result fuse.Status) {
 
@@ -1420,6 +1432,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 }
 
 const ReadlinkLog = "Mux::Readlink"
+
 func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 	result fuse.Status) {
 
@@ -1441,6 +1454,7 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 }
 
 const AccessLog = "Mux::Access"
+
 func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 	result = fuse.EIO
 
@@ -1459,6 +1473,7 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 }
 
 const GetXAttrSizeLog = "Mux::GetXAttrSize"
+
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int,
 	result fuse.Status) {
 
@@ -1525,6 +1540,7 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 }
 
 const GetXAttrDataLog = "Mux::GetXAttrData"
+
 func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []byte,
 	result fuse.Status) {
 
@@ -1554,6 +1570,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 }
 
 const ListXAttrLog = "Mux::ListXAttr"
+
 func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 	result fuse.Status) {
 
@@ -1575,6 +1592,7 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 }
 
 const SetXAttrLog = "Mux:SetXAttr"
+
 func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	data []byte) (result fuse.Status) {
 
@@ -1604,6 +1622,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 }
 
 const RemoveXAttrLog = "Mux::RemoveXAttr"
+
 func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	attr string) (result fuse.Status) {
 
@@ -1633,6 +1652,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 }
 
 const CreateLog = "Mux::Create"
+
 func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) (result fuse.Status) {
 
@@ -1657,6 +1677,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 }
 
 const OpenLog = "Mux::Open"
+
 func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 	out *fuse.OpenOut) (result fuse.Status) {
 
@@ -1681,6 +1702,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 }
 
 const ReadLog = "Mux::Read"
+
 func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadResult,
 	result fuse.Status) {
 
@@ -1703,6 +1725,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 }
 
 const ReleaseLog = "Mux::Release"
+
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
@@ -1712,6 +1735,7 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 }
 
 const WriteLog = "Mux::Write"
+
 func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 	result fuse.Status) {
 
@@ -1735,6 +1759,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 
 const FlushLog = "Mux::Flush"
 const FlushDebugLog = "Fh: %v Context %d %d %d"
+
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 	result = fuse.EIO
 
@@ -1747,6 +1772,7 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 }
 
 const FsyncLog = "Mux::Fsync"
+
 func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 	result = fuse.EIO
 
@@ -1765,6 +1791,7 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 }
 
 const FallocateLog = "Mux::Fallocate"
+
 func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
 	result = fuse.EIO
 
@@ -1777,6 +1804,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
 }
 
 const OpenDirLog = "Mux::OpenDir"
+
 func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 	out *fuse.OpenOut) (result fuse.Status) {
 
@@ -1797,6 +1825,7 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 }
 
 const ReadDirLog = "Mux::ReadDir"
+
 func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 	out *fuse.DirEntryList) (result fuse.Status) {
 
@@ -1811,6 +1840,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 }
 
 const ReadDirPlusLog = "Mux::ReadDirPlus"
+
 func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 	out *fuse.DirEntryList) (result fuse.Status) {
 
@@ -1831,6 +1861,7 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 }
 
 const ReleaseDirLog = "Mux::ReleaseDir"
+
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
@@ -1840,6 +1871,7 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 }
 
 const FsyncDirLog = "Mux::FsyncDir"
+
 func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 	result = fuse.EIO
 
@@ -1858,6 +1890,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 }
 
 const StatFsLog = "Mux::StatFs"
+
 func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 	out *fuse.StatfsOut) (result fuse.Status) {
 

@@ -221,6 +221,7 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 
 const EtherGetLog = "EtherBlobStoreTranslator::Get"
 const KeyLog = "key %s"
+
 // Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
@@ -246,6 +247,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 }
 
 const EtherSetLog = "EtherBlobStoreTranslator::Set"
+
 // Set adpats quantumfs.DataStore's Set API to ether.BlobStore.Insert
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
@@ -344,6 +346,7 @@ func (w *etherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 }
 
 const EtherTypespaceLog = "EtherWsdbTranslator::TypespaceList"
+
 func (w *etherWsdbTranslator) TypespaceList(
 	c *quantumfs.Ctx) ([]string, error) {
 
@@ -372,6 +375,7 @@ func (w *etherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 
 const EtherNamespaceLog = "EtherWsdbTranslator::NamespaceList"
 const EtherNamespaceDebugLog = "typespace: %s"
+
 func (w *etherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 	typespace string) ([]string, error) {
 
@@ -401,6 +405,7 @@ func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 
 const EtherWorkspaceListLog = "EtherWsdbTranslator::WorkspaceList"
 const EtherWorkspaceListDebugLog = "%s/%s"
+
 func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	typespace string, namespace string) ([]string, error) {
 
@@ -459,6 +464,7 @@ func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 
 const EtherWorkspaceLog = "EtherWsdbTranslator::Workspace"
 const EtherWorkspaceDebugLog = "%s/%s/%s"
+
 func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
@@ -475,6 +481,7 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 
 const EtherBranchLog = "EtherWsdbTranslator::BranchWorkspace"
 const EtherBranchDebugLog = "%s/%s/%s -> %s/%s/%s"
+
 func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
@@ -508,6 +515,7 @@ func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 
 const EtherAdvanceLog = "EtherWsdbTranslator::AdvanceWorkspace"
 const EtherAdvanceDebugLog = "%s/%s/%s %s -> %s"
+
 func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
