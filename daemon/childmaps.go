@@ -26,7 +26,7 @@ type ChildMap struct {
 func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
 
-	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.Text()).Out()
+	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.String()).Out()
 
 	cmap := &ChildMap{
 		wsr:              wsr_,
@@ -337,7 +337,8 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
-	childId InodeId) (copy quantumfs.DirectoryRecord, err fuse.Status) {
+	linkId HardlinkId, childId InodeId) (copy quantumfs.DirectoryRecord,
+	err fuse.Status) {
 
 	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
 
@@ -376,7 +377,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
 	cmap.delRecord(childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.wsr.newHardlink(c, fingerprint, childId, child)
+	newLink := cmap.wsr.newHardlink(c, fingerprint, linkId, childId, child)
 
 	linkCopy := *newLink
 	linkSrcCopy := *newLink
