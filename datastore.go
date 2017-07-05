@@ -150,7 +150,12 @@ const ObjectKeyLength = 1 + HashSize
 
 // base64 consume more memory than daemon.sourceDataLength: 30 * 4 / 3
 const ExtendedKeyLength = 40
-const XAttrTypeKey = "quantumfs.key"
+const (
+	XAttrTypePrefix = "quantumfs."
+
+	XAttrTypeKey    = XAttrTypePrefix + "key"
+	XAttrTypeLinkID = XAttrTypePrefix + "linkid"
+)
 
 type ObjectKey struct {
 	key encoding.ObjectKey
@@ -195,18 +200,11 @@ func (key ObjectKey) Type() KeyType {
 }
 
 func (key ObjectKey) String() string {
-	hex := fmt.Sprintf("(%s: %016x%016x%08x)", KeyTypeToString(key.Type()),
-		key.key.Part2(), key.key.Part3(), key.key.Part4())
-
-	return hex
-}
-
-func (key ObjectKey) Text() string {
 	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
 		hex.EncodeToString(key.Value()))
 }
 
-func FromText(text string) (ObjectKey, error) {
+func FromString(text string) (ObjectKey, error) {
 	bytes, err := hex.DecodeString(text)
 	if err != nil {
 		return ZeroKey,
@@ -1216,6 +1214,16 @@ func (ea *ExtendedAttributes) SetNumAttributes(num int) {
 func (ea *ExtendedAttributes) Attribute(i int) (name string, id ObjectKey) {
 	attribute := ea.ea.Attributes().At(i)
 	return attribute.Name(), overlayObjectKey(attribute.Id())
+}
+
+func (ea *ExtendedAttributes) AttributeByKey(attr string) ObjectKey {
+	for i := 0; i < ea.NumAttributes(); i++ {
+		name, key := ea.Attribute(i)
+		if name == attr {
+			return key
+		}
+	}
+	return EmptyBlockKey
 }
 
 func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {

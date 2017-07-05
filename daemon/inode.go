@@ -152,7 +152,7 @@ type Inode interface {
 	parentGetChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory)
+	parentCheckLinkReparent(c *ctx, parent *Directory) HardlinkId
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean_()  // Mark this Inode as cleaned
@@ -368,7 +368,9 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 }
 
 // Locks the parent
-func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
+func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
+	parent *Directory) HardlinkId {
+
 	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
 
 	// Ensure we lock in the UP direction
@@ -380,7 +382,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	record := parent.children.record(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
-		return
+		return InvalidHardlinkId
 	}
 
 	link := record.(*Hardlink)
@@ -390,7 +392,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
-		return
+		return InvalidHardlinkId
 	}
 
 	// reparent the child to the given parent
@@ -403,6 +405,8 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
 	parent.children.loadChild(c, newRecord, inodeId)
 	parent.dirty(c)
+
+	return link.linkId
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
@@ -633,8 +637,8 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	return err
 }
 
-func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
-	remoteRecord quantumfs.DirectRecord) {
+func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()
@@ -653,6 +657,12 @@ func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
 			subdir.refresh_DOWN(c, hrc, remoteRecord.ID())
 		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
+	case quantumfs.ObjectTypeHardlink:
+		linkId := decodeHardlinkKey(remoteRecord.ID())
+		valid, hardlinkRecord := wsr.getHardlink(linkId)
+		utils.Assert(valid, "hardlink %d not found", linkId)
+		remoteRecord = &hardlinkRecord
+		fallthrough
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
 	case quantumfs.ObjectTypeMediumFile:
