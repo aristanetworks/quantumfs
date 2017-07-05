@@ -58,13 +58,13 @@ func newQfsExtPair(common string,
 }
 
 func createExtractors() []qlogstats.StatExtractorConfig {
-	return []qlogstats.StatExtractorConfig {
+	return []qlogstats.StatExtractorConfig{
 		qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheHitLog, "cache_hit"),
 			statPeriod),
 		qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheMissLog,
-			"cache_miss"), statPeriod),
+				"cache_miss"), statPeriod),
 
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
 			thirdparty_backends.KeyLog),
