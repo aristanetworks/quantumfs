@@ -84,7 +84,10 @@ func fillRootAttrWrapper(c *ctx, attr *fuse.Attr, inodeNum InodeId, _ string,
 func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	defer c.FuncIn("fillRootAttr", "inode %d", inodeNum).Out()
 	num, err := c.workspaceDB.NumTypespaces(&c.Ctx)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	if err != nil {
+		c.elog("Error fetching number of typespaces: %s", err.Error())
+		num = 5 // Arbitrary, but should be more than 2
+	}
 
 	c.vlog("/ has %d children", num)
 
@@ -100,7 +103,11 @@ func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	defer c.FuncIn("fillTypespaceAttr", "inode %d", inodeNum).Out()
 
 	num, err := c.workspaceDB.NumNamespaces(&c.Ctx, typespace)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	if err != nil {
+		c.elog("Error fetching number of namespaces in %s: %s", typespace,
+			err.Error())
+		num = 3 // Minimum acceptable value indicating one namespace
+	}
 
 	c.vlog("%s/%s has %d children", typespace, namespace, num)
 
@@ -113,7 +120,11 @@ func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	defer c.FuncIn("fillNamespaceAttr", "inode %d", inodeNum).Out()
 
 	num, err := c.workspaceDB.NumWorkspaces(&c.Ctx, typespace, namespace)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	if err != nil {
+		c.elog("Error fecthing number of workspace in %s/%s: %s", typespace,
+			namespace, err.Error())
+		num = 3 // Minimum acceptable value indicating one workspace
+	}
 
 	c.vlog("%s/%s has %d children", typespace, namespace, num)
 
