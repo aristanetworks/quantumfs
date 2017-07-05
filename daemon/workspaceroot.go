@@ -76,7 +76,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		typespace, namespace, workspace)
 	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
 	c.vlog("Workspace Loading %s/%s/%s %s",
-		typespace, namespace, workspace, rootId.Text())
+		typespace, namespace, workspace, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -537,8 +537,8 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 				entry.inodeId); inode != nil {
 
 				c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
-					oldRecord.ID().Text(),
-					hardlink.Record().ID().Text())
+					oldRecord.ID().String(),
+					hardlink.Record().ID().String())
 				utils.Assert(!hardlink.Record().Type().IsImmutable(),
 					"An immutable type cannot be reloaded.")
 				reload(c, wsr, hrc, inode, hardlink.Record())
@@ -692,8 +692,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 				wsr.workspace
 
 			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.Text(), newRootId.Text(),
-				wsr.publishedRootId.Text(), err.Error())
+				rootId.String(), newRootId.String(),
+				wsr.publishedRootId.String(), err.Error())
 			c.wlog("Another quantumfs instance is writing to %s, %s",
 				workspacePath,
 				"your changes will be lost. "+
@@ -708,8 +708,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			return
 		}
 
-		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.Text(),
-			rootId.Text())
+		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
+			rootId.String())
 		wsr.publishedRootId = rootId
 	}
 }

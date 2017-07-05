@@ -26,7 +26,7 @@ type ChildMap struct {
 func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
 
-	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.Text()).Out()
+	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.String()).Out()
 
 	cmap := &ChildMap{
 		wsr:              wsr_,
