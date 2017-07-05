@@ -292,7 +292,11 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("TypespaceList::getChildSnapshot").Out()
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	if err != nil {
+		c.wlog("Unexpected error type from WorkspaceDB.TypespaceList: %s",
+			err.Error())
+		list = []string{}
+	}
 
 	defer tsl.Lock().Unlock()
 
@@ -621,7 +625,11 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("NamespaceList::getChildSnapshot").Out()
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	if err != nil {
+		c.wlog("Unexpected error type from WorkspaceDB.NamespaceList: %s",
+			err.Error())
+		list = []string{}
+	}
 
 	defer nsl.Lock().Unlock()
 
@@ -948,7 +956,11 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	if err != nil {
+		c.wlog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
+			err.Error())
+		list = []string{}
+	}
 
 	defer wsl.Lock().Unlock()
 
