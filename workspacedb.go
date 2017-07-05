@@ -93,7 +93,7 @@ func (err WorkspaceDbErr) Error() string {
 	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.Msg)
 }
 
-func (err WorkspaceDbErr) ErrorCode() string {
+func (err *WorkspaceDbErr) ErrorCode() string {
 	switch err.Code {
 	default:
 		return "Unknown wsdb error"
