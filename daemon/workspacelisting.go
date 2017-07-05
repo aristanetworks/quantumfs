@@ -314,19 +314,26 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 		return fuse.OK
 	}
 
-	exists, err := c.workspaceDB.TypespaceExists(&c.Ctx, name)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
-
-	if !exists {
-		return fuse.ENOENT
+	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
+	if err != nil {
+		switch err := err.(type) {
+		default:
+			c.wlog("Unknown error from WorkspaceDB.TypespaceList: %s",
+				err.Error())
+			return fuse.EIO
+		case quantumfs.WorkspaceDbErr:
+			switch err.Code {
+			default:
+				c.wlog("Unhandled error from WorkspaceDB."+
+					"TypespaceList: %s", err.Error())
+				return fuse.EIO
+			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+				return fuse.ENOENT
+			}
+		}
 	}
 
 	c.vlog("Typespace exists")
-
-	var list []string
-	list, err = c.workspaceDB.TypespaceList(&c.Ctx)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
-
 	defer tsl.Lock().Unlock()
 
 	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
@@ -620,19 +627,26 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	defer c.FuncIn("NamespaceList::Lookup", "name %s", name).Out()
 
-	exists, err := c.workspaceDB.NamespaceExists(&c.Ctx, nsl.typespaceName, name)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
-
-	if !exists {
-		return fuse.ENOENT
+	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
+	if err != nil {
+		switch err := err.(type) {
+		default:
+			c.wlog("Unknown error from WorkspaceDB.NamespaceList: %s",
+				err.Error())
+			return fuse.EIO
+		case quantumfs.WorkspaceDbErr:
+			switch err.Code {
+			default:
+				c.wlog("Unhandled error from WorkspaceDB."+
+					"NamespaceList: %s", err.Error())
+				return fuse.EIO
+			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+				return fuse.ENOENT
+			}
+		}
 	}
 
 	c.vlog("Namespace exists")
-
-	var list []string
-	list, err = c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
-
 	defer nsl.Lock().Unlock()
 
 	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
@@ -940,21 +954,27 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	defer c.FuncIn("WorkspaceList::Lookup", "name %s", name).Out()
 
-	exists, err := c.workspaceDB.WorkspaceExists(&c.Ctx, wsl.typespaceName,
-		wsl.namespaceName, name)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
-
-	if !exists {
-		return fuse.ENOENT
+	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
+		wsl.namespaceName)
+	if err != nil {
+		switch err := err.(type) {
+		default:
+			c.wlog("Unknown error from WorkspaceDB.WorkspaceList: %s",
+				err.Error())
+			return fuse.EIO
+		case quantumfs.WorkspaceDbErr:
+			switch err.Code {
+			default:
+				c.wlog("Unhandled error from WorkspaceDB."+
+					"WorkspaceList: %s", err.Error())
+				return fuse.EIO
+			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+				return fuse.ENOENT
+			}
+		}
 	}
 
 	c.vlog("Workspace exists")
-
-	var list []string
-	list, err = c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
-		wsl.namespaceName)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
-
 	defer wsl.Lock().Unlock()
 
 	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)

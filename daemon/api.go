@@ -823,6 +823,32 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 		"Workspace deletion succeeded")
 }
 
+func (api *ApiHandle) processImmutablilityError(c *ctx, err error,
+	workspacePath string, msg string) int {
+
+	switch err := err.(type) {
+	default:
+		c.wlog("Unknown error type from WorkspaceDB."+
+			"WorkspaceIsImmutable: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"%s of WorkspaceRoot %s", msg, workspacePath)
+	case quantumfs.WorkspaceDbErr:
+		switch err.Code {
+		default:
+			c.wlog("Unhandled error from WorkspaceDB."+
+				"WorkspaceIsImmutable: %s", err.Error())
+			return api.queueErrorResponse(
+				quantumfs.ErrorWorkspaceNotFound,
+				"%s of WorkspaceRoot %s", msg, workspacePath)
+		case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+			c.vlog("Workspace does not exist: %s", workspacePath)
+			return api.queueErrorResponse(
+				quantumfs.ErrorWorkspaceNotFound,
+				"WorkspaceRoot %s does not exist", workspacePath)
+		}
+	}
+}
+
 func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 	defer c.funcIn("Api::enableRootWrite").Out()
 
@@ -835,19 +861,11 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 
 	workspacePath := cmd.Workspace
 	dst := strings.Split(workspacePath, "/")
-	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
-	if !exists {
-		c.vlog("Workspace does not exist: %s", workspacePath)
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist", workspacePath)
-	}
-
 	immutable, err := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
 		dst[0], dst[1], dst[2])
 	if err != nil {
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"Failed to get immutability of WorkspaceRoot %s",
-			workspacePath)
+		return api.processImmutablilityError(c, err, workspacePath,
+			"Failed to get immutability")
 	}
 
 	c.vlog("Setting immutable")
@@ -962,16 +980,10 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 
 	workspacePath := cmd.WorkspacePath
 	dst := strings.Split(workspacePath, "/")
-	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
-	if !exists {
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist", workspacePath)
-	}
-
 	err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx, dst[0], dst[1], dst[2])
 	if err != nil {
-		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"Workspace %s can't be set immutable", workspacePath)
+		return api.processImmutablilityError(c, err, workspacePath,
+			"Failed to set immutability")
 	}
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
