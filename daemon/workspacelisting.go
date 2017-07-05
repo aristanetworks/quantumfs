@@ -331,21 +331,20 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		switch err := err.(type) {
-		default:
-			c.wlog("Unknown error from WorkspaceDB.TypespaceList: %s",
-				err.Error())
-			return fuse.EIO
-		case quantumfs.WorkspaceDbErr:
-			switch err.Code {
-			default:
-				c.wlog("Unhandled error from WorkspaceDB."+
-					"TypespaceList: %s", err.Error())
-				return fuse.EIO
-			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
-				return fuse.ENOENT
-			}
+		c.wlog("Unexpected error from WorkspaceDB.TypespaceList: %s",
+			err.Error())
+		return fuse.EIO
+	}
+
+	exists := false
+	for _, typespace := range list {
+		if name == typespace {
+			exists = true
+			break
 		}
+	}
+	if !exists {
+		return fuse.ENOENT
 	}
 
 	c.vlog("Typespace exists")
@@ -648,21 +647,20 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		switch err := err.(type) {
-		default:
-			c.wlog("Unknown error from WorkspaceDB.NamespaceList: %s",
-				err.Error())
-			return fuse.EIO
-		case quantumfs.WorkspaceDbErr:
-			switch err.Code {
-			default:
-				c.wlog("Unhandled error from WorkspaceDB."+
-					"NamespaceList: %s", err.Error())
-				return fuse.EIO
-			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
-				return fuse.ENOENT
-			}
+		c.wlog("Unexpected error from WorkspaceDB.NamespaceList: %s",
+			err.Error())
+		return fuse.EIO
+	}
+
+	exists := false
+	for _, namespace := range list {
+		if name == namespace {
+			exists = true
+			break
 		}
+	}
+	if !exists {
+		return fuse.ENOENT
 	}
 
 	c.vlog("Namespace exists")
@@ -980,21 +978,20 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		switch err := err.(type) {
-		default:
-			c.wlog("Unknown error from WorkspaceDB.WorkspaceList: %s",
-				err.Error())
-			return fuse.EIO
-		case quantumfs.WorkspaceDbErr:
-			switch err.Code {
-			default:
-				c.wlog("Unhandled error from WorkspaceDB."+
-					"WorkspaceList: %s", err.Error())
-				return fuse.EIO
-			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
-				return fuse.ENOENT
-			}
+		c.wlog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
+			err.Error())
+		return fuse.EIO
+	}
+
+	exists := false
+	for _, workspace := range list {
+		if name == workspace {
+			exists = true
+			break
 		}
+	}
+	if !exists {
+		return fuse.ENOENT
 	}
 
 	c.vlog("Workspace exists")
