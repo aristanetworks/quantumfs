@@ -75,7 +75,7 @@ type dataStore struct {
 
 func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
-		buf.key.Text()).Out()
+		buf.key.String()).Out()
 
 	size := buf.Size()
 
@@ -90,7 +90,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		return
 	}
 
-	if _, exists := store.cache[buf.key.Text()]; exists {
+	if _, exists := store.cache[buf.key.String()]; exists {
 		// It is possible when storing dirty data that we could reproduce the
 		// contents which already exist in the cache. We don't want to have
 		// the same data in the LRU queue twice as that is wasteful, though
@@ -115,9 +115,9 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	for store.freeSpace < 0 {
 		evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
 		store.freeSpace += evictedBuf.Size()
-		delete(store.cache, evictedBuf.key.Text())
+		delete(store.cache, evictedBuf.key.String())
 	}
-	store.cache[buf.key.Text()] = &buf
+	store.cache[buf.key.String()] = &buf
 	buf.lruElement = store.lru.PushBack(buf)
 }
 
@@ -125,7 +125,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get",
-		"key %s", key.Text()).Out()
+		"key %s", key.String()).Out()
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
@@ -135,7 +135,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	bufResult := func() quantumfs.Buffer {
 		defer store.cacheLock.Lock().Unlock()
 
-		if buf, exists := store.cache[key.Text()]; exists {
+		if buf, exists := store.cache[key.String()]; exists {
 			store.lru.MoveToBack(buf.lruElement)
 			return buf.clone()
 		}
@@ -164,7 +164,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return buf.clone()
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
-		err.Error(), key.Text())
+		err.Error(), key.String())
 
 	return nil
 }
@@ -381,7 +381,7 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.Text())
+	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
 }

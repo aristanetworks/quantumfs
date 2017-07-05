@@ -74,7 +74,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
 	defer c.FuncIn("initDirectory",
-		"baselayer from %s", baseLayerId.Text()).Out()
+		"baselayer from %s", baseLayerId.String()).Out()
 
 	// Set directory data before processing the children in case the children
 	// access the parent.
@@ -391,8 +391,8 @@ func (dir *Directory) publish_(c *ctx) {
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records())
 
-	c.vlog("Directory key %s -> %s", oldBaseLayer.Text(),
-		dir.baseLayerId.Text())
+	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
+		dir.baseLayerId.String())
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
@@ -1002,7 +1002,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	if result == fuse.OK {
 		dir.self.dirty(c)
-		c.vlog("Created new symlink with key: %s", key.Text())
+		c.vlog("Created new symlink with key: %s", key.String())
 	}
 
 	return result
@@ -1394,7 +1394,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
-		dir.inodeNum(), inodeNum, newKey.Text()).Out()
+		dir.inodeNum(), inodeNum, newKey.String()).Out()
 
 	defer dir.Lock().Unlock()
 	dir.self.dirty(c)
@@ -1469,7 +1469,7 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 		return nil, fuse.ENODATA
 	}
 
-	c.vlog("Found attribute key: %s", key.Text())
+	c.vlog("Found attribute key: %s", key.String())
 	buffer := c.dataStore.Get(&c.Ctx, key)
 
 	if buffer == nil {
@@ -1745,7 +1745,7 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 		constructor = newSpecial
 	}
 
-	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().Text())
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)

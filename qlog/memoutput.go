@@ -262,8 +262,13 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 		panic(fmt.Sprintf("Unable to ensure log file path exists: %s", dir))
 	}
 
-	mapFile, err := os.OpenFile(dir+"/"+filename,
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+	filepath := dir + string(os.PathSeparator) + filename
+
+	// Unlink any existing qlog file so we don't risk two processes both writing
+	// to the same log.
+	os.Remove(filepath)
+
+	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
 		panic(fmt.Sprintf("Unable to create shared memory log file: %s/%s",
 			dir, filename))
