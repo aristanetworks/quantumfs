@@ -225,7 +225,7 @@ const KeyLog = "key %s"
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
-	defer c.FuncIn(qlog.LogDatastore, EtherGetLog, KeyLog, key.Text()).Out()
+	defer c.FuncIn(qlog.LogDatastore, EtherGetLog, KeyLog, key.String()).Out()
 	kv := key.Value()
 	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), kv)
 	if err != nil {
@@ -251,7 +251,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	buf quantumfs.Buffer) error {
 
 	kv := key.Value()
-	ks := key.Text()
+	ks := key.String()
 
 	defer c.FuncIn(qlog.LogDatastore, EtherSetLog, KeyLog, ks).Out()
 
@@ -514,12 +514,12 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherAdvanceLog, EtherAdvanceDebugLog,
 		typespace, namespace, workspace,
-		currentRootId.Text(),
-		newRootId.Text()).Out()
+		currentRootId.String(),
+		newRootId.String()).Out()
 
 	utils.Assert(newRootId.IsValid(), "Tried advancing to an invalid rootID. "+
 		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
-		currentRootId.Text(), newRootId.Text())
+		currentRootId.String(), newRootId.String())
 
 	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
 		workspace, currentRootId.Value(), newRootId.Value())

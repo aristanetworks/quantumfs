@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -1468,12 +1469,16 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	defer logRequestPanic(c)
 	defer c.FuncIn(GetXAttrSizeLog, InodeOnlyLog, header.NodeId).Out()
 
-	if attr == quantumfs.XAttrTypeKey {
-		_, status := getQuantumfsExtendedKey(c, qfs, InodeId(header.NodeId))
-		if status != fuse.OK {
-			return 0, status
+	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
+		if attr == quantumfs.XAttrTypeKey {
+			_, status := getQuantumfsExtendedKey(c, qfs,
+				InodeId(header.NodeId))
+			if status != fuse.OK {
+				return 0, status
+			}
+			return quantumfs.ExtendedKeyLength, status
 		}
-		return quantumfs.ExtendedKeyLength, status
+		return 0, fuse.ENODATA
 	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
@@ -1530,8 +1535,12 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	defer logRequestPanic(c)
 	defer c.FuncIn(GetXAttrDataLog, InodeOnlyLog, header.NodeId).Out()
 
-	if attr == quantumfs.XAttrTypeKey {
-		return getQuantumfsExtendedKey(c, qfs, InodeId(header.NodeId))
+	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
+		if attr == quantumfs.XAttrTypeKey {
+			return getQuantumfsExtendedKey(c, qfs,
+				InodeId(header.NodeId))
+		}
+		return nil, fuse.ENODATA
 	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
@@ -1575,8 +1584,8 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	defer logRequestPanic(c)
 	defer c.FuncIn(SetXAttrLog, InodeOnlyLog, input.NodeId).Out()
 
-	if attr == quantumfs.XAttrTypeKey {
-		// quantumfs.key is immutable from userspace
+	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
+		// quantumfs keys are immutable from userspace
 		return fuse.EPERM
 	}
 
@@ -1604,8 +1613,8 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 	defer logRequestPanic(c)
 	defer c.FuncIn(RemoveXAttrLog, InodeOnlyLog, header.NodeId).Out()
 
-	if attr == quantumfs.XAttrTypeKey {
-		// quantumfs.key is immutable from userspace
+	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
+		// quantumfs keys are immutable from userspace
 		return fuse.EPERM
 	}
 

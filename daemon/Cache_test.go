@@ -31,7 +31,7 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	store.test.Assert(store.shouldRead, "Received unexpected Get for %s",
-		key.Text())
+		key.String())
 	return store.datastore.Get(c, key, buf)
 }
 
@@ -257,10 +257,10 @@ func TestCacheCaching(t *testing.T) {
 
 		// Because of the size constraint, the least recent used entry
 		// keys[1] should be deleted from cache
-		_, exists := datastore.cache[keys[1].Text()]
+		_, exists := datastore.cache[keys[1].String()]
 		test.Assert(!exists, "Failed to forget block 1")
 		// The content is oversized, so it should be stored in the cache
-		_, exists = datastore.cache[keys[257].Text()]
+		_, exists = datastore.cache[keys[257].String()]
 		test.Assert(!exists, "Failed to forget block 257")
 
 		// Reading again should come entirely from the cache. If not

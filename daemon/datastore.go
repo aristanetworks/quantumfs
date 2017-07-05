@@ -5,6 +5,10 @@ package daemon
 
 import (
 	"container/list"
+	"os"
+	"os/signal"
+	"runtime/debug"
+	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/encoding"
@@ -20,14 +24,43 @@ func init() {
 	zeros = make([]byte, quantumfs.MaxBlockSize)
 }
 
+// If we receive the signal SIGUSR1, then we will prevent further writes to the cache
+// and drop the contents of the cache. The intended use is as a way to free the bulk
+// of the memory used by quantumfsd when it is being gracefully shutdown by lazily
+// unmounting it.
+func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal) {
+	for {
+		<-sigUsr1Chan
+
+		func() {
+			defer store.cacheLock.Lock().Unlock()
+
+			// Prevent future additions
+			store.cacheSize = -1
+			store.freeSpace = -1
+			store.cache = make(map[string]*buffer, 0)
+			store.lru = list.List{}
+		}()
+
+		// Release the memory
+		debug.FreeOSMemory()
+	}
+}
+
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	entryNum := cacheSize / 102400
-	return &dataStore{
+	store := &dataStore{
 		durableStore: durableStore,
 		cache:        make(map[string]*buffer, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
 	}
+
+	sigUsr1Chan := make(chan os.Signal, 1)
+	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
+	go signalHandler(store, sigUsr1Chan)
+
+	return store
 }
 
 type dataStore struct {
@@ -42,7 +75,7 @@ type dataStore struct {
 
 func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
-		buf.key.Text()).Out()
+		buf.key.String()).Out()
 
 	size := buf.Size()
 
@@ -50,12 +83,14 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	defer store.cacheLock.Lock().Unlock()
 
 	if size > store.cacheSize {
-		c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
-			" total capacity of the cache")
+		if store.cacheSize != -1 {
+			c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
+				" total capacity of the cache")
+		}
 		return
 	}
 
-	if _, exists := store.cache[buf.key.Text()]; exists {
+	if _, exists := store.cache[buf.key.String()]; exists {
 		// It is possible when storing dirty data that we could reproduce the
 		// contents which already exist in the cache. We don't want to have
 		// the same data in the LRU queue twice as that is wasteful, though
@@ -63,7 +98,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		// recovered.
 		//
 		// Now if we have reproduced the same data already in the cache we
-		// could move/set the buffer to be the least recently used. We choose
+		// could move/set the buffer to be the most recently used. We choose
 		// not to do that because inserting newly uploaded data into the
 		// cache is an optimization for the relatively common case where a
 		// file is written and then read shortly afterwards. However, that
@@ -80,9 +115,9 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	for store.freeSpace < 0 {
 		evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
 		store.freeSpace += evictedBuf.Size()
-		delete(store.cache, evictedBuf.key.Text())
+		delete(store.cache, evictedBuf.key.String())
 	}
-	store.cache[buf.key.Text()] = &buf
+	store.cache[buf.key.String()] = &buf
 	buf.lruElement = store.lru.PushBack(buf)
 }
 
@@ -92,7 +127,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get",
-		"key %s", key.Text()).Out()
+		"key %s", key.String()).Out()
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to fetch embedded key")
@@ -102,7 +137,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	bufResult := func() quantumfs.Buffer {
 		defer store.cacheLock.Lock().Unlock()
 
-		if buf, exists := store.cache[key.Text()]; exists {
+		if buf, exists := store.cache[key.String()]; exists {
 			store.lru.MoveToBack(buf.lruElement)
 			return buf.clone()
 		}
@@ -132,7 +167,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return buf.clone()
 	}
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
-		err.Error(), key.Text())
+		err.Error(), key.String())
 
 	return nil
 }
@@ -349,7 +384,7 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.Text())
+	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
 	err := buf.dataStore.Set(c, buf)
 	return buf.key, err
 }
