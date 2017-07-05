@@ -127,7 +127,7 @@ func (fi *SmallFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	fi.key = key
 	fi.buf = c.dataStore.Get(&c.Ctx, fi.key)
 	if fi.buf == nil {
-		panic(key.Text())
+		panic(key.String())
 	}
 	fi.size = fi.buf.Size()
 }
