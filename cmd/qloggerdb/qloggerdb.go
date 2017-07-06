@@ -44,7 +44,7 @@ func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
 	return tsdb
 }
 
-const statPeriod = 5 * time.Second
+const statPeriod = 30 * time.Second
 
 func newQfsExtPair(common string,
 	startPostfix string) qlogstats.StatExtractorConfig {
@@ -60,11 +60,11 @@ func newQfsExtPair(common string,
 func createExtractors() []qlogstats.StatExtractorConfig {
 	return []qlogstats.StatExtractorConfig{
 		qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(daemon.CacheHitLog, "cache_hit"),
-			statPeriod),
+			qlogstats.NewExtPointStats(daemon.CacheHitLog,
+				"readcache_hit"), statPeriod),
 		qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheMissLog,
-				"cache_miss"), statPeriod),
+				"readcache_miss"), statPeriod),
 
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
 			thirdparty_backends.KeyLog),
