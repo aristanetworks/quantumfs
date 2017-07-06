@@ -369,8 +369,8 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 	}
 
 	c.wlog("entry %s goes %d:%s -> %d:%s", remoteRecord.Filename(),
-		localRecord.Type(), localRecord.ID().Text(),
-		remoteRecord.Type(), remoteRecord.ID().Text())
+		localRecord.Type(), localRecord.ID().String(),
+		remoteRecord.Type(), remoteRecord.ID().String())
 
 	utils.Assert(underlyingTypesMatch(dir.wsr, localRecord, remoteRecord),
 		"type mismatch %d vs. %d", underlyingTypeOf(dir.wsr, localRecord),
