@@ -62,8 +62,6 @@ func insertMap_(cache workspaceMap, typespace string,
 type workspaceDB struct {
 	cacheMutex utils.DeferableRwMutex
 	cache      workspaceMap
-	stateMutex utils.DeferableRwMutex
-	state      workspaceMap
 }
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
@@ -291,17 +289,8 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 		typespace, namespace, workspace).Out()
 	// Through all these checks, if the workspace could not exist, we return
 	// success. The caller wanted that workspace to not exist and it doesn't.
-	err := func() error {
-		defer wsdb.cacheMutex.Lock().Unlock()
-		return deleteWorkspaceRecord_(c, wsdb.cache, typespace,
-			namespace, workspace)
-	}()
-	if err != nil {
-		return err
-	}
-
-	defer wsdb.stateMutex.Lock().Unlock()
-	return deleteWorkspaceRecord_(c, wsdb.state, typespace, namespace, workspace)
+	defer wsdb.cacheMutex.Lock().Unlock()
+	return deleteWorkspaceRecord_(c, wsdb.cache, typespace, namespace, workspace)
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
@@ -352,7 +341,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	defer wsdb.stateMutex.RLock().RUnlock()
+	defer wsdb.cacheMutex.RLock().RUnlock()
 	info, err := wsdb.workspace_(c, typespace, namespace, workspace)
 	if err != nil {
 		return false, nil
