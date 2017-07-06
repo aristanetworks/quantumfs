@@ -79,7 +79,7 @@ type Aggregator struct {
 	requestSequence list.List
 
 	// Uses a prefix (slower) system to extract data
-	errorCount	*extPointStats
+	errorCount *extPointStats
 
 	statExtractors  []StatExtractorConfig
 	statTriggers    map[string][]extractorIdx
@@ -90,6 +90,7 @@ type Aggregator struct {
 }
 
 const errorStr = "ERROR: "
+
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	extractors []StatExtractorConfig, daemonVersion_ string) *Aggregator {
 
