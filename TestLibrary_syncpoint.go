@@ -16,18 +16,18 @@ const (
 )
 
 type SyncPoint struct {
-	c      chan SyncState
-	w      chan SyncState
-	die    chan interface{}
-	logger Logger
-	state  SyncState
+	signalchan chan SyncState
+	waitchan   chan SyncState
+	die        chan interface{}
+	logger     Logger
+	state      SyncState
 }
 
 func NewSyncPoint(logger Logger) *SyncPoint {
 	var syncpoint SyncPoint
 
-	syncpoint.c = make(chan SyncState, 1)
-	syncpoint.w = make(chan SyncState, 1)
+	syncpoint.signalchan = make(chan SyncState, 1)
+	syncpoint.waitchan = make(chan SyncState, 1)
 	syncpoint.die = make(chan interface{}, 1)
 	syncpoint.state = InvalidSyncState
 	syncpoint.logger = logger
@@ -41,7 +41,7 @@ func (syncpoint *SyncPoint) daemon() {
 		case <-syncpoint.die:
 			syncpoint.logger("SyncPoint died at %d", syncpoint.state)
 			return
-		case state := <-syncpoint.c:
+		case state := <-syncpoint.signalchan:
 			syncpoint.logger("transition %d -> %d",
 				syncpoint.state, state)
 			syncpoint.state = state
@@ -49,7 +49,7 @@ func (syncpoint *SyncPoint) daemon() {
 			// break out as soon as no waiter is reading
 			for done := false; !done; {
 				select {
-				case syncpoint.w <- syncpoint.state:
+				case syncpoint.waitchan <- syncpoint.state:
 				default:
 					done = true
 					break
@@ -67,7 +67,7 @@ func (syncpoint *SyncPoint) WaitFor(expected SyncState) bool {
 		case <-syncpoint.die:
 			syncpoint.logger("SyncPoint died")
 			return false
-		case state := <-syncpoint.w:
+		case state := <-syncpoint.waitchan:
 			if state == expected {
 				syncpoint.logger("got to state %d", state)
 				return true
@@ -93,7 +93,7 @@ func (syncpoint *SyncPoint) WaitFor(expected SyncState) bool {
 
 func (syncpoint *SyncPoint) Signal(state SyncState) {
 	syncpoint.logger("Signalling state %d", state)
-	syncpoint.c <- state
+	syncpoint.signalchan <- state
 }
 
 func (syncpoint *SyncPoint) Die() {
