@@ -47,9 +47,9 @@ func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
 const statPeriod = 30 * time.Second
 
 func newQfsExtPair(common string,
-	startPostfix string) *qlogstats.StatExtractorConfig {
+	startPostfix string) qlogstats.StatExtractorConfig {
 
-	return &qlogstats.NewStatExtractorConfig(
+	return qlogstats.NewStatExtractorConfig(
 		qlogstats.NewExtPairStats(
 			qlog.FnEnterStr+common+" "+startPostfix,
 			qlog.FnExitStr+common,
