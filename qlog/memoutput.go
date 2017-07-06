@@ -159,7 +159,7 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	if fastpath {
 		insertUint16(buf, lenOffset, uint16(flagAndLength))
 	} else {
-		insertUint16(buf, offset+length, uint16(flagAndLength))
+		insertUint16(buf, length, uint16(flagAndLength))
 	}
 
 	// Write the entry header
@@ -190,7 +190,7 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	if fastpath {
 		insertUint16(buf, lenOffset, uint16(flagAndLength))
 	} else {
-		insertUint16(buf, 0+length, uint16(flagAndLength))
+		insertUint16(buf, length, uint16(flagAndLength))
 		circ.wrapWrite_(lenOffset, buf[length:])
 	}
 }
