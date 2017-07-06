@@ -61,7 +61,7 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 	return []qlogstats.StatExtractorConfig{
 		qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheHitLog,
-			"readcache_hit"), statPeriod),
+				"readcache_hit"), statPeriod),
 		qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheMissLog,
 				"readcache_miss"), statPeriod),
