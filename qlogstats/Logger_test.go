@@ -103,8 +103,8 @@ func TestMatches(t *testing.T) {
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
 			(300*time.Millisecond)), checker)
 
 		test.Assert(checkedAvg, "test not checking average")
@@ -175,8 +175,8 @@ func TestPercentiles(t *testing.T) {
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
 			(300*time.Millisecond)), checker)
 
 		for i := 0; i < 7; i++ {
@@ -210,7 +210,7 @@ func TestPointCount(t *testing.T) {
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPointStats("TestLog\n", "TestLog Name Tag"),
+			NewExtPointStats("TestLog", "TestLog Name Tag"),
 			(300*time.Millisecond)), checker)
 
 		test.Assert(checked, "test not checking anything")
@@ -260,8 +260,8 @@ func TestIndentation(t *testing.T) {
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
 			(300*time.Millisecond)), checker)
 
 		test.Assert(checkedAvg, "test not checking average")
