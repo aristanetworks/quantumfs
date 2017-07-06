@@ -23,10 +23,13 @@ func runReader(qlogFile string,
 }
 
 func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
-	cfg StatExtractorConfig, check func(*processlocal.Memdb)) {
+	cfg *StatExtractorConfig, check func(*processlocal.Memdb)) {
 
 	// Setup an extractor
-	extractors := []StatExtractorConfig{cfg}
+	extractors := []StatExtractorConfig{}
+	if cfg != nil {
+		extractors = append(extractors, *cfg)
+	}
 
 	// Run the reader
 	memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
@@ -263,5 +266,33 @@ func TestIndentation(t *testing.T) {
 
 		test.Assert(checkedAvg, "test not checking average")
 		test.Assert(checkedSamples, "test not checking samples")
+	})
+}
+
+func TestErrorCounting(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.ShouldFailLogscan = true
+		qlogHandle := test.Logger
+
+		// Artificially insert some error logs
+		for i := int64(0); i < 123; i++ {
+			qlogHandle.Log_(time.Unix(i, 20000+i), qlog.LogTest,
+				uint64(i), 2, "ERROR: TestMatch")
+		}
+
+		checked := false
+		checker := func(memdb *processlocal.Memdb) {
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "SystemErrors" {
+					test.Assert(v.Data == 123,
+						"incorrect count %d", v.Data)
+					checked = true
+				}
+			}
+		}
+
+		test.runExtractorTest(qlogHandle, nil, checker)
+		test.Assert(checked, "test not checking count")
+
 	})
 }
