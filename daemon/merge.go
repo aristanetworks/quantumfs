@@ -10,7 +10,7 @@ import (
 )
 
 func loadWorkspaceRoot(c *ctx,
-	key quantumfs.ObjectKey) (hardlinks map[HardlinkId]linkEntry,
+	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]linkEntry,
 	directory quantumfs.ObjectKey, err error) {
 
 	buffer := c.dataStore.Get(&c.Ctx, key)
@@ -53,7 +53,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 			toSet, getNewId := mergeLink(c, baseExists, v, localLink, k)
 			idToUse := k
 			if getNewId {
-				idToUse = generateUniqueHardlinkId(c, localHardlinks)
+				idToUse = generateUniqueFileId(c, localHardlinks)
 			}
 
 			localHardlinks[idToUse] = toSet
@@ -81,7 +81,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 }
 
 func mergeLink(c *ctx, baseExists bool, remote linkEntry, local linkEntry,
-	localId HardlinkId) (toSet linkEntry, generateNewId bool) {
+	localId quantumfs.FileId) (toSet linkEntry, generateNewId bool) {
 
 	// If there is no base entry, that means that these hardlinks were
 	// both created independently and aren't related. Separate them by setting
