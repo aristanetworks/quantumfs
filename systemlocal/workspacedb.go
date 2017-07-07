@@ -272,6 +272,10 @@ func getWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
 
 	encoded := workspaces.Get([]byte(workspace))
 
+	if encoded == nil {
+		return nil
+	}
+
 	var info workspaceInfo
 	err := json.Unmarshal(encoded, &info)
 	if err != nil {
