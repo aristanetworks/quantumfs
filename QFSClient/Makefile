@@ -28,7 +28,7 @@ TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
 
 all: $(TARGET) test
 
-qfsclient: $(TARGET) test
+qfsclient: $(TARGET)
 
 clean: qfsc-clean
 

@@ -9,10 +9,10 @@ ExecStartPre=/bin/mkdir -p /dev/shm/quantumfs /qfs
 ExecStart=/usr/sbin/quantumfsd \
 	  -datastore ether.cql -datastoreconf /etc/quantumfsd.conf \
 	  -workspaceDB ether.cql -workspaceDBconf /etc/quantumfsd.conf
-ExecStop=/usr/bin/fusermount -u /qfs
+ExecStop=/usr/bin/umount -l /qfs
 ExecStop=/usr/bin/killall -SIGUSR1 quantumfsd
-ExecStop=/bin/bash -c 'while grep -q QuantumFS /proc/self/mountinfo; do sleep 1; done'
 User=root
+KillMode=none
 
 [Install]
 WantedBy=multi-user.target
