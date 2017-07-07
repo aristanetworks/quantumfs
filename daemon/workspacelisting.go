@@ -981,7 +981,6 @@ func (wsl *WorkspaceList) updateChildren(c *ctx, names map[string]quantumfs.Nonc
 
 				delete(wsl.workspacesByName, name)
 				delete(wsl.workspacesById, info.id)
-
 			}
 		}
 	}()
