@@ -870,7 +870,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string, workspace stri
 		InodeCommon:      InodeCommon{id: inodeNum},
 		typespaceName:    typespace,
 		namespaceName:    namespace,
-		workspacesByName: make(map[string]InodeId),
+		workspacesByName: make(map[string]workspaceInfo),
 		workspacesById:   make(map[InodeId]string),
 	}
 	wsl.self = &wsl
@@ -880,13 +880,18 @@ func newWorkspaceList(c *ctx, typespace string, namespace string, workspace stri
 	return &wsl, nil
 }
 
+type workspaceInfo struct {
+	id    InodeId
+	nonce quantumfs.Nonce
+}
+
 type WorkspaceList struct {
 	InodeCommon
 	typespaceName string
 	namespaceName string
 
 	// Map from child name to Inode ID
-	workspacesByName map[string]InodeId
+	workspacesByName map[string]workspaceInfo
 	workspacesById   map[InodeId]string
 
 	realTreeLock sync.RWMutex
@@ -954,41 +959,49 @@ func (wsl *WorkspaceList) updateChildren(c *ctx, names map[string]quantumfs.Nonc
 	defer c.FuncIn("WorkspaceList::updateChildren", "Parent Inode %d",
 		wsl.inodeNum()).Out()
 
-	touched := make(map[string]bool)
-	// First add any new entries
-	for name, _ := range names {
+	// First delete any outdated entries
+	func() {
+		// We must lock the instantiation lock to ensure no races between
+		// when we check inodeNoInstantiate and when we call
+		// setInode/removeUninstantiated
+		defer c.qfs.instantiationLock.Lock().Unlock()
+
+		for name, info := range wsl.workspacesByName {
+			wsdbNonce, exists := names[name]
+			if !exists || wsdbNonce != info.nonce {
+				c.vlog("Removing deleted child %s (%d)", name,
+					info.nonce)
+
+				if c.qfs.inodeNoInstantiate(c, info.id) == nil {
+					c.qfs.removeUninstantiated(c,
+						[]InodeId{info.id})
+				} else {
+					c.qfs.setInode(c, info.id, nil)
+				}
+
+				delete(wsl.workspacesByName, name)
+				delete(wsl.workspacesById, info.id)
+
+			}
+		}
+	}()
+
+	// Then re-add any new entries
+	for name, nonce := range names {
 		if _, exists := wsl.workspacesByName[name]; !exists {
-			c.vlog("Adding new child %s", name)
+			c.vlog("Adding new child %s (%d)", name, nonce)
 			inodeId := c.qfs.newInodeId()
-			wsl.workspacesByName[name] = inodeId
+			wsl.workspacesByName[name] = workspaceInfo{
+				id:    inodeId,
+				nonce: nonce,
+			}
 			wsl.workspacesById[inodeId] = name
 
 			c.qfs.addUninstantiated(c, []InodeId{inodeId},
 				wsl.inodeNum())
 		}
-		touched[name] = true
 	}
 
-	// We must lock the instantiation lock to ensure no races between when we
-	// check inodeNoInstantiate and when we call setInode/removeUninstantiated
-	defer c.qfs.instantiationLock.Lock().Unlock()
-
-	// Then delete entries which no longer exist
-	for name, id := range wsl.workspacesByName {
-		if _, exists := touched[name]; !exists {
-			c.vlog("Removing deleted child %s", name)
-
-			if c.qfs.inodeNoInstantiate(c, id) == nil {
-				c.qfs.removeUninstantiated(c, []InodeId{id})
-			} else {
-				c.qfs.setInode(c, id, nil)
-			}
-
-			delete(wsl.workspacesByName, name)
-			delete(wsl.workspacesById, id)
-
-		}
-	}
 }
 
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -1005,9 +1018,13 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer wsl.Lock().Unlock()
 
 	wsl.updateChildren(c, list)
-	children := snapshotChildren(c, wsl, &wsl.workspacesByName,
-		wsl.typespaceName, wsl.namespaceName, fillWorkspaceAttrFake,
-		fillNamespaceAttr, fillTypespaceAttr)
+	namesAndIds := make(map[string]InodeId, len(wsl.workspacesByName))
+	for name, info := range wsl.workspacesByName {
+		namesAndIds[name] = info.id
+	}
+	children := snapshotChildren(c, wsl, &namesAndIds, wsl.typespaceName,
+		wsl.namespaceName, fillWorkspaceAttrFake, fillNamespaceAttr,
+		fillTypespaceAttr)
 
 	return children
 }
@@ -1041,11 +1058,11 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	wsl.updateChildren(c, workspaces)
 
-	inodeNum := wsl.workspacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
-	out.NodeId = uint64(inodeNum)
+	inodeInfo := wsl.workspacesByName[name]
+	c.qfs.increaseLookupCount(c, inodeInfo.id)
+	out.NodeId = uint64(inodeInfo.id)
 	fillEntryOutCacheData(c, out)
-	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, "", "")
+	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id, "", "")
 
 	return fuse.OK
 }

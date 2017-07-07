@@ -73,7 +73,12 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		wslInode := test.qfs.inodeNoInstantiate(c, wslId)
 		wsl := wslInode.(*WorkspaceList)
 
+		namesAndIds := make(map[string]InodeId, len(wsl.workspacesByName))
+		for name, info := range wsl.workspacesByName {
+			namesAndIds[name] = info.id
+		}
+
 		verifyWorkspacelistingInodeStatus(c, test, work_, "workspace",
-			true, &wsl.workspacesByName)
+			true, &namesAndIds)
 	})
 }
