@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -299,8 +298,13 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 		panic(fmt.Sprintf("Unable to ensure log file path exists: %s", dir))
 	}
 
-	mapFile, err := os.OpenFile(dir+"/"+filename,
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+	filepath := dir + string(os.PathSeparator) + filename
+
+	// Unlink any existing qlog file so we don't risk two processes both writing
+	// to the same log.
+	os.Remove(filepath)
+
+	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
 		panic(fmt.Sprintf("Unable to create shared memory log file: %s/%s",
 			dir, filename))
@@ -393,18 +397,6 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	newMap[format] = newIdx
 
 	strMap.buffer[newIdx] = newLog
-
-	// Delay garbage collection of the previous map until all possible current
-	// users are finished.
-	go func(mapToClear map[string]uint16) {
-		time.Sleep(1 * time.Second)
-
-		// Waste time to avoid possible optimizations which eliminates the
-		// reference to the map.
-		for k, _ := range mapToClear {
-			delete(mapToClear, k)
-		}
-	}(strMap.ids)
 
 	// Now publish the new map, no writing may occur to this map after this
 	// point.
