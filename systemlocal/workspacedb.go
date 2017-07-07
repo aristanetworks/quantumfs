@@ -68,13 +68,17 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	}
 
 	// Create the null workspace
-	db.Update(func(tx *bolt.Tx) error {
-		setWorkspaceInfo_(tx, quantumfs.NullSpaceName,
+	err = db.Update(func(tx *bolt.Tx) error {
+		return setWorkspaceInfo_(tx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 			nullWorkspace)
-
-		return nil
 	})
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create null workspace: %s",
+			err.Error()))
+	}
+
 	return wsdb
 }
 
@@ -271,8 +275,8 @@ func getWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
 	var info workspaceInfo
 	err := json.Unmarshal(encoded, &info)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to decode workspaceInfo: %s '%s'",
-			err.Error(), encoded))
+		panic(fmt.Sprintf("Failed to decode workspaceInfo for %s: %s '%s'",
+			workspace, err.Error(), string(encoded)))
 	}
 	return &info
 }
