@@ -951,7 +951,6 @@ func (wsl *WorkspaceList) directChildInodes() []InodeId {
 
 // Update the internal workspace list with the most recent available listing
 func (wsl *WorkspaceList) updateChildren(c *ctx, names map[string]quantumfs.Nonce) {
-
 	defer c.FuncIn("WorkspaceList::updateChildren", "Parent Inode %d",
 		wsl.inodeNum()).Out()
 
