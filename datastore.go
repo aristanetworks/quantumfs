@@ -201,7 +201,7 @@ type keyString struct {
 
 func (key ObjectKey) MarshalJSON() ([]byte, error) {
 	return json.Marshal(keyString{
-		Value: key.String(),
+		Value: hex.EncodeToString(key.Value()),
 	})
 }
 
