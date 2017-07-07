@@ -455,7 +455,8 @@ func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 }
 
 func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+	namespace string, workspace string) (quantumfs.ObjectKey, quantumfs.Nonce,
+	error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::Workspace",
@@ -463,10 +464,10 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 
 	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, convertWsdbError(err)
+		return quantumfs.ObjectKey{}, 0, convertWsdbError(err)
 	}
 
-	return quantumfs.NewObjectKeyFromBytes(key), nil
+	return quantumfs.NewObjectKeyFromBytes(key), 0, nil
 }
 
 func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
@@ -503,7 +504,8 @@ func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 }
 
 func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
+	namespace string, workspace string, nonce quantumfs.Nonce,
+	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb,
