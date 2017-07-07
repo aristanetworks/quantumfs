@@ -36,16 +36,16 @@ func TestDeleteWorkspace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		createWorkspaces(test.ctx, test.wsdb)
 
-		_, err := test.wsdb.Workspace(test.ctx, "type1", "name2", "work2")
+		_, _, err := test.wsdb.Workspace(test.ctx, "type1", "name2", "work2")
 		utils.Assert(err == nil, "Expected workspace doesn't exist: %v", err)
 
 		err = test.wsdb.DeleteWorkspace(test.ctx, "type1", "name2", "work2")
 		utils.Assert(err == nil, "Error deleting workspace: %v", err)
 
-		_, err = test.wsdb.Workspace(test.ctx, "type1", "name2", "work2")
+		_, _, err = test.wsdb.Workspace(test.ctx, "type1", "name2", "work2")
 		utils.Assert(err != nil, "Workspace still exists!")
 
-		_, err = test.wsdb.Workspace(test.ctx, "type1", "name2", "work3")
+		_, _, err = test.wsdb.Workspace(test.ctx, "type1", "name2", "work3")
 		utils.Assert(err == nil, "Sibling workspace removed")
 	})
 }

@@ -20,12 +20,13 @@ func getRootId(test *testHelper, workspace string) quantumfs.ObjectKey {
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)
 
-	return test.workspaceRootId(wsTypespaceName, wsNamespaceName,
+	rootId, _ := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 		wsWorkspaceName)
+	return rootId
 }
 
 func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
-	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
+	nonce quantumfs.Nonce, src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
 	wsdb := test.GetWorkspaceDB()
 
@@ -33,7 +34,7 @@ func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
 		test.getWorkspaceComponents(workspace)
 
 	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
-		wsNamespaceName, wsWorkspaceName, src, dst)
+		wsNamespaceName, wsWorkspaceName, nonce, src, dst)
 	test.AssertNoErr(err)
 
 	wsr, cleanup := test.getWorkspaceRoot(workspace)
@@ -215,8 +216,11 @@ func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectK
 func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
+	t, n, w := test.getWorkspaceComponents(workspace)
+	_, nonce := test.workspaceRootId(t, n, w)
+
 	markImmutable(ctx, workspace)
-	advanceWorkspace(ctx, test, workspace, src, dst)
+	advanceWorkspace(ctx, test, workspace, nonce, src, dst)
 	refreshTo(ctx, test, workspace, dst)
 	markMutable(ctx, workspace)
 }
@@ -224,9 +228,12 @@ func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
+	t, n, w := test.getWorkspaceComponents(workspace)
+	_, nonce := test.workspaceRootId(t, n, w)
+
 	markImmutable(ctx, workspace)
 	test.remountFilesystem()
-	advanceWorkspace(ctx, test, workspace, src, dst)
+	advanceWorkspace(ctx, test, workspace, nonce, src, dst)
 	refreshTo(ctx, test, workspace, dst)
 	markMutable(ctx, workspace)
 }

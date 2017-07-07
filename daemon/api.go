@@ -533,7 +533,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 
 	baseRootId := quantumfs.EmptyWorkspaceKey
 	base := strings.Split(cmd.BaseWorkspace, "/")
-	baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
+	baseRootId, _, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
 		base[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", base, err.Error())
@@ -544,7 +544,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	local := strings.Split(cmd.LocalWorkspace, "/")
-	localRootId, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
+	localRootId, localNonce, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
 		local[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", local, err.Error())
@@ -554,7 +554,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	remote := strings.Split(cmd.RemoteWorkspace, "/")
-	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
+	remoteRootId, _, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", remote, err.Error())
@@ -575,7 +575,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
-		local[2], localRootId, newRootId)
+		local[2], localNonce, localRootId, newRootId)
 	if err != nil {
 		c.vlog("Workspace can't advance after merge began, try again: %s",
 			err.Error())
@@ -636,7 +636,8 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	}
 
 	ref := strings.Split(cmd.ReferenceWorkspace, "/")
-	refRootId, err := c.workspaceDB.Workspace(&c.Ctx, ref[0], ref[1], ref[2])
+	refRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, ref[0], ref[1],
+		ref[2])
 
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -645,7 +646,7 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	}
 
 	rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, workspace[0],
-		workspace[1], workspace[2], wsr.publishedRootId, refRootId)
+		workspace[1], workspace[2], nonce, wsr.publishedRootId, refRootId)
 
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,

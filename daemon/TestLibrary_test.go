@@ -221,13 +221,13 @@ func (th *testHelper) getInode(path string) Inode {
 }
 
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
-	workspace string) quantumfs.ObjectKey {
+	workspace string) (quantumfs.ObjectKey, quantumfs.Nonce) {
 
-	key, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
+	key, nonce, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
 		typespace, namespace, workspace)
 	th.Assert(err == nil, "Error fetching key")
 
-	return key
+	return key, nonce
 }
 
 func (th *testHelper) MakeFile(filepath string) (data []byte) {

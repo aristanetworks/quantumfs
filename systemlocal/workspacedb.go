@@ -24,6 +24,7 @@ func init() {
 
 type workspaceInfo struct {
 	Key       string // hex encoded ObjectKey.Value()
+	Nonce     quantumfs.Nonce
 	Immutable bool
 }
 
@@ -81,6 +82,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 
 	nullWorkspace := workspaceInfo{
 		Key:       encodeKey(quantumfs.EmptyWorkspaceKey),
+		Nonce:     0,
 		Immutable: true,
 	}
 
@@ -367,6 +369,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 		newInfo := workspaceInfo{
 			Key:       srcInfo.Key,
+			Nonce:     quantumfs.Nonce(time.Now().UnixNano()),
 			Immutable: false,
 		}
 
@@ -440,11 +443,13 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+	namespace string, workspace string) (quantumfs.ObjectKey, quantumfs.Nonce,
+	error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::Workspace").Out()
 
 	var rootid string
+	var nonce quantumfs.Nonce
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
@@ -456,15 +461,17 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 		}
 
 		rootid = info.Key
+		nonce = info.Nonce
 
 		return nil
 	})
 
-	return decodeKey(rootid), err
+	return decodeKey(rootid), nonce, err
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
+	namespace string, workspace string, nonce quantumfs.Nonce,
+	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -478,6 +485,13 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"Advance failed")
+		}
+
+		if nonce != info.Nonce {
+			e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
+				"Nonce %d does not match WSDB (%d)", nonce,
+				info.Nonce)
+			return e
 		}
 
 		if encodeKey(currentRootId) != info.Key {

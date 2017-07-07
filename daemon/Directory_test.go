@@ -134,8 +134,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, after we
 		// trigger a delayed sync, change the workspace rootId and mark the
 		// fileDescriptor clean.
-		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
-			wsWorkspaceName)
+		oldRootId, _ := test.workspaceRootId(wsTypespaceName,
+			wsNamespaceName, wsWorkspaceName)
 
 		c := test.newCtx()
 		_, err = file.accessor.writeBlock(c, 0, 0, []byte("update"))
@@ -143,8 +143,8 @@ func TestRecursiveDirectoryFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.SyncAllWorkspaces()
-		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
-			wsWorkspaceName)
+		newRootId, _ := test.workspaceRootId(wsTypespaceName,
+			wsNamespaceName, wsWorkspaceName)
 
 		test.Assert(!oldRootId.IsEqualTo(newRootId),
 			"Workspace rootId didn't change")
@@ -864,164 +864,6 @@ func TestRenameIntoIndirectChild(t *testing.T) {
 		childFile = workspace + "/parent/indirect/child/test2"
 		err = syscall.Stat(childFile, &stat)
 		test.Assert(err == nil, "Rename failed: %v", err)
-	})
-}
-
-func TestDirectoryRenameDir(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		dir1 := workspace + "/dir1"
-		file1 := dir1 + "/file1"
-		dir2 := workspace + "/dir2"
-
-		test.AssertNoErr(os.Mkdir(dir1, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(os.Mkdir(dir2, 0777))
-
-		test.AssertNoErr(syscall.Rename(dir1, dir2))
-
-		_, err := os.Stat(dir1)
-		test.AssertErr(err)
-		_, err = os.Stat(dir2)
-		test.AssertNoErr(err)
-		_, err = os.Stat(dir2 + "/file1")
-		test.AssertNoErr(err)
-	})
-}
-
-func TestDirectoryRenameDirNotEmpty(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		dir1 := workspace + "/dir1"
-		file1 := dir1 + "/file1"
-		dir2 := workspace + "/dir2"
-		file2 := dir2 + "/file2"
-
-		test.AssertNoErr(os.Mkdir(dir1, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(os.Mkdir(dir2, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file2, ""))
-
-		err := syscall.Rename(dir1, dir2)
-		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTEMPTY,
-			"Non-empty directory shouldn't be destination in rename")
-	})
-}
-
-func TestDirectoryRenameDirOntoFile(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		dir1 := workspace + "/dir1"
-		file1 := dir1 + "/file1"
-		file2 := workspace + "/file2"
-
-		test.AssertNoErr(os.Mkdir(dir1, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(testutils.PrintToFile(file2, ""))
-
-		err := syscall.Rename(dir1, file2)
-		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTDIR,
-			"Directory cannot be renamed onto file")
-	})
-}
-
-func TestDirectoryRenameFileOntoDir(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		file1 := workspace + "/file1"
-		dir2 := workspace + "/dir2"
-		file2 := dir2 + "/file2"
-
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(os.Mkdir(dir2, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file2, ""))
-
-		err := syscall.Rename(file1, dir2)
-		test.Assert(err != nil && err.(syscall.Errno) == syscall.EISDIR,
-			"File cannot be renamed onto directory")
-	})
-}
-
-func TestDirectoryMvChildDir(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		otherdir := workspace + "/otherdir"
-		test.AssertNoErr(os.Mkdir(otherdir, 0777))
-		dir1 := workspace + "/dir1"
-		file1 := dir1 + "/file1"
-		dir2 := otherdir + "/dir2"
-
-		test.AssertNoErr(os.Mkdir(dir1, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(os.Mkdir(dir2, 0777))
-
-		test.AssertNoErr(syscall.Rename(dir1, dir2))
-
-		_, err := os.Stat(dir1)
-		test.AssertErr(err)
-		_, err = os.Stat(dir2)
-		test.AssertNoErr(err)
-		_, err = os.Stat(dir2 + "/file1")
-		test.AssertNoErr(err)
-	})
-}
-
-func TestDirectoryMvChildDirNotEmpty(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		otherdir := workspace + "/otherdir"
-		test.AssertNoErr(os.Mkdir(otherdir, 0777))
-		dir1 := workspace + "/dir1"
-		file1 := dir1 + "/file1"
-		dir2 := otherdir + "/dir2"
-		file2 := dir2 + "/file2"
-
-		test.AssertNoErr(os.Mkdir(dir1, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(os.Mkdir(dir2, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file2, ""))
-
-		err := syscall.Rename(dir1, dir2)
-		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTEMPTY,
-			"Non-empty directory shouldn't be destination in rename")
-	})
-}
-
-func TestDirectoryMvChildDirOntoFile(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		otherdir := workspace + "/otherdir"
-		test.AssertNoErr(os.Mkdir(otherdir, 0777))
-		dir1 := workspace + "/dir1"
-		file1 := dir1 + "/file1"
-		file2 := otherdir + "/file2"
-
-		test.AssertNoErr(os.Mkdir(dir1, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(testutils.PrintToFile(file2, ""))
-
-		err := syscall.Rename(dir1, file2)
-		test.Assert(err != nil && err.(syscall.Errno) == syscall.ENOTDIR,
-			"Directory cannot be renamed onto file")
-	})
-}
-
-func TestDirectoryMvChildFileOntoDir(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		otherdir := workspace + "/otherdir"
-		test.AssertNoErr(os.Mkdir(otherdir, 0777))
-		file1 := workspace + "/file1"
-		dir2 := otherdir + "/dir2"
-		file2 := dir2 + "/file2"
-
-		test.AssertNoErr(testutils.PrintToFile(file1, ""))
-		test.AssertNoErr(os.Mkdir(dir2, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file2, ""))
-
-		err := syscall.Rename(file1, dir2)
-		test.Assert(err != nil && err.(syscall.Errno) == syscall.EISDIR,
-			"File cannot be renamed onto directory")
 	})
 }
 

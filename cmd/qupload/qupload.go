@@ -275,7 +275,7 @@ func main() {
 	// check forced upload into workspace
 	if !cliParams.wsforce {
 		wsParts := strings.Split(cliParams.ws, "/")
-		_, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
+		_, _, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
 			wsParts[2])
 		if err != nil {
 			wE, ok := err.(*quantumfs.WorkspaceDbErr)

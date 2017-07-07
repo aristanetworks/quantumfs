@@ -5,6 +5,7 @@ package processlocal
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -13,6 +14,7 @@ import (
 
 type workspaceInfo struct {
 	key       quantumfs.ObjectKey
+	nonce     quantumfs.Nonce
 	immutable bool
 }
 
@@ -30,6 +32,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	// Create the null workspace
 	nullWorkspace := workspaceInfo{
 		key:       quantumfs.EmptyWorkspaceKey,
+		nonce:     0,
 		immutable: true,
 	}
 	insertMap_(wsdb.cache, type_, name_, work_, &nullWorkspace)
@@ -233,6 +236,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	newInfo := workspaceInfo{
 		key:       info.key,
+		nonce:     quantumfs.Nonce(time.Now().UnixNano()),
 		immutable: false,
 	}
 	insertMap_(wsdb.cache, dstTypespace, dstNamespace, dstWorkspace, &newInfo)
@@ -294,7 +298,8 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+	namespace string, workspace string) (quantumfs.ObjectKey, quantumfs.Nonce,
+	error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::Workspace").Out()
@@ -302,13 +307,14 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	defer wsdb.cacheMutex.RLock().RUnlock()
 	info, err := wsdb.workspace_(c, typespace, namespace, workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, err
+		return quantumfs.ObjectKey{}, 0, err
 	}
-	return info.key, nil
+	return info.key, info.nonce, nil
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
+	namespace string, workspace string, nonce quantumfs.Nonce,
+	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -320,6 +326,12 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		wsdbErr := err.(quantumfs.WorkspaceDbErr)
 		e := quantumfs.NewWorkspaceDbErr(wsdbErr.Code, "Advance failed: %s",
 			wsdbErr.ErrorCode())
+		return info.key, e
+	}
+
+	if nonce != info.nonce {
+		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
+			"Nonce %d does not match WSDB (%d)", nonce, info.nonce)
 		return info.key, e
 	}
 
