@@ -4,6 +4,7 @@
 package systemlocal
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/boltdb/bolt"
 )
 
@@ -21,8 +23,19 @@ func init() {
 }
 
 type workspaceInfo struct {
-	Key       quantumfs.ObjectKey
+	Key       string // hex encoded ObjectKey.Value()
 	Immutable bool
+}
+
+func encodeKey(key quantumfs.ObjectKey) string {
+	return hex.EncodeToString(key.Value())
+}
+
+func decodeKey(key string) quantumfs.ObjectKey {
+	data, err := hex.DecodeString(key)
+	utils.Assert(err == nil, "Error decoding string '%s' from database: %v", key,
+		err)
+	return quantumfs.NewObjectKeyFromBytes(data)
 }
 
 // The database underlying the system local workspaceDB has three levels of buckets.
@@ -63,7 +76,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	}
 
 	nullWorkspace := workspaceInfo{
-		Key:       quantumfs.EmptyWorkspaceKey,
+		Key:       encodeKey(quantumfs.EmptyWorkspaceKey),
 		Immutable: true,
 	}
 
@@ -362,7 +375,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 				"Branch workspace '%s/%s/%s' to '%s/%s/%s' with %s",
 				srcTypespace, srcNamespace, srcWorkspace,
 				dstTypespace, dstNamespace, dstWorkspace,
-				objectKey.String())
+				decodeKey(objectKey).String())
 		}
 
 		return err
@@ -428,7 +441,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::Workspace").Out()
 
-	var rootid quantumfs.ObjectKey
+	var rootid string
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
@@ -444,7 +457,11 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 		return nil
 	})
 
-	return rootid, err
+	if rootid != "" {
+		return decodeKey(rootid), err
+	} else {
+		return quantumfs.ZeroKey, err
+	}
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
@@ -454,7 +471,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"systemlocal::AdvanceWorkspace").Out()
 
-	var dbRootId quantumfs.ObjectKey
+	var dbRootId string
 
 	err := wsdb.db.Update(func(tx *bolt.Tx) error {
 		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
@@ -464,12 +481,12 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 				"Advance failed")
 		}
 
-		if !currentRootId.IsEqualTo(info.Key) {
+		if encodeKey(currentRootId) != info.Key {
 			dbRootId = info.Key
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_OUT_OF_DATE,
 				"%s vs %s Advance failed", currentRootId.String(),
-				dbRootId.String())
+				decodeKey(dbRootId).String())
 
 		}
 
@@ -481,15 +498,19 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 		// The workspace exists and the caller has the uptodate rootid, so
 		// advance the rootid in the DB.
-		info.Key = newRootId
+		info.Key = encodeKey(newRootId)
 		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
 		if err == nil {
-			dbRootId = newRootId
+			dbRootId = info.Key
 		}
 		return err
 	})
 
-	return dbRootId, err
+	if dbRootId != "" {
+		return decodeKey(dbRootId), err
+	} else {
+		return quantumfs.ZeroKey, err
+	}
 }
 
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,

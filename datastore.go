@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -197,20 +196,6 @@ func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
 
 type keyString struct {
 	Value string
-}
-
-func (key ObjectKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(keyString{
-		Value: hex.EncodeToString(key.Value()),
-	})
-}
-
-func (key ObjectKey) UnmarshalJSON(encoded []byte) error {
-	var str keyString
-	err := json.Unmarshal(encoded, &str)
-	newKey, err := FromString(str.Value)
-	key.key = newKey.key
-	return err
 }
 
 // Extract the type of the object. Returns a KeyType
