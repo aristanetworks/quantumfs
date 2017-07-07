@@ -194,10 +194,6 @@ func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
 	return key
 }
 
-type keyString struct {
-	Value string
-}
-
 // Extract the type of the object. Returns a KeyType
 func (key ObjectKey) Type() KeyType {
 	return KeyType(key.key.KeyType())
