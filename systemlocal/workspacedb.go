@@ -32,6 +32,10 @@ func encodeKey(key quantumfs.ObjectKey) string {
 }
 
 func decodeKey(key string) quantumfs.ObjectKey {
+	if key == "" {
+		return quantumfs.ZeroKey
+	}
+
 	data, err := hex.DecodeString(key)
 	utils.Assert(err == nil, "Error decoding string '%s' from database: %v", key,
 		err)
@@ -370,12 +374,11 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 			dstWorkspace, newInfo)
 
 		if c != nil {
-			objectKey := srcInfo.Key
 			c.Dlog(qlog.LogWorkspaceDb,
 				"Branch workspace '%s/%s/%s' to '%s/%s/%s' with %s",
 				srcTypespace, srcNamespace, srcWorkspace,
 				dstTypespace, dstNamespace, dstWorkspace,
-				decodeKey(objectKey).String())
+				decodeKey(srcInfo.Key).String())
 		}
 
 		return err
@@ -457,11 +460,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 		return nil
 	})
 
-	if rootid != "" {
-		return decodeKey(rootid), err
-	} else {
-		return quantumfs.ZeroKey, err
-	}
+	return decodeKey(rootid), err
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
@@ -506,11 +505,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		return err
 	})
 
-	if dbRootId != "" {
-		return decodeKey(dbRootId), err
-	} else {
-		return quantumfs.ZeroKey, err
-	}
+	return decodeKey(dbRootId), err
 }
 
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
