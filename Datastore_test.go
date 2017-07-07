@@ -67,10 +67,10 @@ func TestEmptyKeyToString(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		key := EmptyDirKey
-		parts := strings.Split(strings.Trim(key.Text(), "()"), " ")
+		parts := strings.Split(strings.Trim(key.String(), "()"), " ")
 		text := parts[1]
-		key2, err := FromText(text)
-		test.Assert(err == nil, "error in FromText() err: %v", err)
+		key2, err := FromString(text)
+		test.Assert(err == nil, "error in FromString() err: %v", err)
 		test.Assert(key.IsEqualTo(key2),
 			"The key before and after are not the same")
 	})
@@ -84,10 +84,10 @@ func TestKeyToString(t *testing.T) {
 		test.Assert(err == nil, "error in hex.DecodeString() err: %v", err)
 		key1 := NewObjectKeyFromBytes(bytes)
 
-		parts := strings.Split(strings.Trim(key1.Text(), "()"), " ")
+		parts := strings.Split(strings.Trim(key1.String(), "()"), " ")
 		text := parts[1]
-		key2, err := FromText(text)
-		test.Assert(err == nil, "error in FromText() err: %v", err)
+		key2, err := FromString(text)
+		test.Assert(err == nil, "error in FromString() err: %v", err)
 		test.Assert(key1.IsEqualTo(key2),
 			"The key before and after are not the same")
 	})

@@ -86,7 +86,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"WorkspaceRoot buffer %s", rootID.Text())
+		"WorkspaceRoot buffer %s", rootID.String())
 
 	wsr := buf.AsWorkspaceRoot()
 	//===============================================
@@ -169,7 +169,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		}
 
 		simplebuffer.AssertNonZeroBuf(buf,
-			"WorkspaceRoot buffer %s", key.Text())
+			"WorkspaceRoot buffer %s", key.String())
 
 		if err := writeToChan(c, keyChan, "", key,
 			uint64(buf.Size())); err != nil {
@@ -191,7 +191,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"MultiBlockFile buffer %s", key.Text())
+		"MultiBlockFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -225,7 +225,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 
 	simplebuffer.AssertNonZeroBuf(buf,
-		"VeryLargeFile buffer %s", key.Text())
+		"VeryLargeFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
 		uint64(buf.Size())); err != nil {
@@ -253,7 +253,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		}
 
 		simplebuffer.AssertNonZeroBuf(buf,
-			"DirectoryEntry buffer %s", key.Text())
+			"DirectoryEntry buffer %s", key.String())
 
 		// When wf returns SkipDir for a DirectoryEntry, we can skip all the
 		// DirectoryRecord in that DirectoryEntry
@@ -336,7 +336,7 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		return nil
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"Attributes List buffer %s", extKey.Text())
+		"Attributes List buffer %s", extKey.String())
 
 	err := writeToChan(c, keyChan, fpath, extKey, uint64(buf.Size()))
 	if err != nil {
@@ -356,7 +356,7 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 			return nil
 		}
 		simplebuffer.AssertNonZeroBuf(buf,
-			"Attributes List buffer %s", key.Text())
+			"Attributes List buffer %s", key.String())
 
 		err := writeToChan(c, keyChan, fpath, key,
 			uint64(buf.Size()))

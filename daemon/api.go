@@ -650,7 +650,7 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"Workspace %s is already at %s",
-			cmd.Workspace, rootId.Text())
+			cmd.Workspace, rootId.String())
 	}
 
 	return api.queueErrorResponse(quantumfs.ErrorOK,
@@ -753,7 +753,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	if key.Type() != quantumfs.KeyTypeEmbedded {
 		if buffer := c.dataStore.Get(&c.Ctx, key); buffer == nil {
-			c.vlog("Key not found: %s", key.Text())
+			c.vlog("Key not found: %s", key.String())
 			return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
 				"Key does not exist in the datastore")
 		}
