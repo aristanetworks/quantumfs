@@ -21,8 +21,8 @@ func init() {
 }
 
 type workspaceInfo struct {
-	key       quantumfs.ObjectKey
-	immutable bool
+	Key       quantumfs.ObjectKey
+	Immutable bool
 }
 
 // The database underlying the system local workspaceDB has three levels of buckets.
@@ -63,8 +63,8 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	}
 
 	nullWorkspace := workspaceInfo{
-		key:       quantumfs.EmptyWorkspaceKey,
-		immutable: true,
+		Key:       quantumfs.EmptyWorkspaceKey,
+		Immutable: true,
 	}
 
 	// Create the null workspace
@@ -341,15 +341,15 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 		}
 
 		newInfo := workspaceInfo{
-			key:       srcInfo.key,
-			immutable: false,
+			Key:       srcInfo.Key,
+			Immutable: false,
 		}
 
 		err := setWorkspaceInfo_(tx, dstTypespace, dstNamespace,
 			dstWorkspace, newInfo)
 
 		if c != nil {
-			objectKey := srcInfo.key
+			objectKey := srcInfo.Key
 			c.Dlog(qlog.LogWorkspaceDb,
 				"Branch workspace '%s/%s/%s' to '%s/%s/%s' with %s",
 				srcTypespace, srcNamespace, srcWorkspace,
@@ -431,7 +431,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 				"workspace does not exist")
 		}
 
-		rootid = info.key
+		rootid = info.Key
 
 		return nil
 	})
@@ -456,8 +456,8 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 				"Advance failed")
 		}
 
-		if !currentRootId.IsEqualTo(info.key) {
-			dbRootId = info.key
+		if !currentRootId.IsEqualTo(info.Key) {
+			dbRootId = info.Key
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_OUT_OF_DATE,
 				"%s vs %s Advance failed", currentRootId.String(),
@@ -473,7 +473,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 		// The workspace exists and the caller has the uptodate rootid, so
 		// advance the rootid in the DB.
-		info.key = newRootId
+		info.Key = newRootId
 		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
 		if err == nil {
 			dbRootId = newRootId
@@ -495,7 +495,7 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"Workspace not found")
 		}
-		immutable = info.immutable
+		immutable = info.Immutable
 		return nil
 	})
 
@@ -532,7 +532,7 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 				"Workspace not found")
 		}
 
-		info.immutable = true
+		info.Immutable = true
 
 		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
 
