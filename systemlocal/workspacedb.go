@@ -237,11 +237,11 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
-	namespace string) ([]string, error) {
+	namespace string) (map[string]quantumfs.Nonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::WorkspaceList").Out()
 
-	workspaceList := make([]string, 0, 100)
+	workspaceList := make(map[string]quantumfs.Nonce, 100)
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		typespaces := tx.Bucket(typespacesBucket)
@@ -262,14 +262,27 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 		}
 
 		workspaces := bucket.Cursor()
-		for w, _ := workspaces.First(); w != nil; w, _ = workspaces.Next() {
-			workspaceList = append(workspaceList, string(w))
+		for name, infoBytes := workspaces.First(); name != nil; name, infoBytes = workspaces.Next() {
+
+			info := bytesToInfo(infoBytes, string(name))
+			workspaceList[string(name)] = info.Nonce
 		}
 
 		return nil
 	})
 
 	return workspaceList, err
+}
+
+func bytesToInfo(str []byte, workspace string) workspaceInfo {
+	var info workspaceInfo
+	err := json.Unmarshal(str, &info)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decode workspaceInfo for %s: %s '%s'",
+			workspace, err.Error(), string(str)))
+	}
+
+	return info
 }
 
 // Get the workspace key. This must be run inside a boltDB transaction
@@ -295,12 +308,7 @@ func getWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
 		return nil
 	}
 
-	var info workspaceInfo
-	err := json.Unmarshal(encoded, &info)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to decode workspaceInfo for %s: %s '%s'",
-			workspace, err.Error(), string(encoded)))
-	}
+	info := bytesToInfo(encoded, workspace)
 	return &info
 }
 

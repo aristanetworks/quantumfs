@@ -143,7 +143,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 // Assume WorkspaceExists run prior to this function everytime when it is called
 // Otherwise, it probably tries to fetch non-existing key-value pairs
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
-	namespace string) ([]string, error) {
+	namespace string) (map[string]quantumfs.Nonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::WorkspaceList").Out()
@@ -154,10 +154,10 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 		return nil, err
 	}
 
-	workspaceList := make([]string, 0, len(workspaces))
+	workspaceList := make(map[string]quantumfs.Nonce, len(workspaces))
 
-	for name, _ := range workspaces {
-		workspaceList = append(workspaceList, name)
+	for name, info := range workspaces {
+		workspaceList[name] = info.nonce
 	}
 
 	return workspaceList, nil
