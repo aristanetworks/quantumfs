@@ -1237,7 +1237,7 @@ func TestRefreshType_special2special(t *testing.T) {
 	})
 }
 
-func GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(
+func GenTestRefresh_Hardlink2HardlinkWithFileIdChange(
 	workspaceRootHardlinks bool) func(*testHelper) {
 
 	return func(test *testHelper) {
@@ -1307,12 +1307,12 @@ func GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(
 	}
 }
 
-func TestRefresh_Hardlink2HardlinkWithLinkIdChangeSrcWorkspaceroot(t *testing.T) {
-	runTest(t, GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(true))
+func TestRefresh_Hardlink2HardlinkWithFileIdChangeSrcWorkspaceroot(t *testing.T) {
+	runTest(t, GenTestRefresh_Hardlink2HardlinkWithFileIdChange(true))
 }
 
-func TestRefresh_Hardlink2HardlinkWithLinkIdChangeSrcSubdir(t *testing.T) {
-	runTest(t, GenTestRefresh_Hardlink2HardlinkWithLinkIdChange(false))
+func TestRefresh_Hardlink2HardlinkWithFileIdChangeSrcSubdir(t *testing.T) {
+	runTest(t, GenTestRefresh_Hardlink2HardlinkWithFileIdChange(false))
 }
 
 func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
@@ -1349,7 +1349,7 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		defer cleanup()
 
 		inode := test.getInode(fullName)
-		isHardlink, linkId1 := wsr.checkHardlink(inode.inodeNum())
+		isHardlink, fileId1 := wsr.checkHardlink(inode.inodeNum())
 		test.Assert(isHardlink, "testfile is not a hardlin.")
 
 		test.AssertNoErr(syscall.Unlink(fullName))
@@ -1364,12 +1364,12 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		newRootId2 := test.getRootId(workspace)
 
 		inode = test.getInode(fullName)
-		isHardlink, linkId2 := wsr.checkHardlink(inode.inodeNum())
+		isHardlink, fileId2 := wsr.checkHardlink(inode.inodeNum())
 		test.Assert(isHardlink, "testfile is not a hardlin.")
 
-		test.Assert(linkId1 == linkId2,
-			"hardlinkId changed after unlink and relink %d vs. %d",
-			linkId1, linkId2)
+		test.Assert(fileId1 == fileId2,
+			"fileId changed after unlink and relink %d vs. %d",
+			fileId1, fileId2)
 
 		file1, err := os.OpenFile(fullName, os.O_RDWR, 0777)
 		test.AssertNoErr(err)

@@ -146,9 +146,9 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	defer c.FuncIn("ChildMap::loadChild", "inode %d", inodeId).Out()
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
-		linkId := decodeHardlinkKey(entry.ID())
-		entry = newHardlink(entry.Filename(), linkId, cmap.wsr)
-		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, linkId)
+		fileId := decodeFileId(entry.ID())
+		entry = newHardlink(entry.Filename(), fileId, cmap.wsr)
+		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, fileId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
 		// should normally match the actual inodeId.
@@ -209,7 +209,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	// This may be a hardlink that is due to be converted.
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
 		newRecord, inodeId := cmap.wsr.removeHardlink(c,
-			hardlink.linkId)
+			hardlink.fileId)
 
 		// Wsr says we're about to orphan the last hardlink copy
 		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
@@ -226,11 +226,11 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 		if !fixHardlinks {
 			return nil
 		}
-		if !cmap.wsr.hardlinkExists(c, link.linkId) {
+		if !cmap.wsr.hardlinkExists(c, link.fileId) {
 			c.vlog("hardlink does not exist")
 			return nil
 		}
-		if cmap.wsr.hardlinkDec(link.linkId) {
+		if cmap.wsr.hardlinkDec(link.fileId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
 			c.vlog("Hardlink referenced elsewhere")
@@ -337,7 +337,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
-	linkId HardlinkId, childId InodeId) (copy quantumfs.DirectoryRecord,
+	fileId quantumfs.FileId, childId InodeId) (copy quantumfs.DirectoryRecord,
 	err fuse.Status) {
 
 	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
@@ -355,7 +355,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		cmap.wsr.hardlinkInc(link.linkId)
+		cmap.wsr.hardlinkInc(link.fileId)
 
 		return &recordCopy, fuse.OK
 	}
@@ -377,7 +377,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
 	cmap.delRecord(childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.wsr.newHardlink(c, fingerprint, linkId, childId, child)
+	newLink := cmap.wsr.newHardlink(c, fingerprint, fileId, childId, child)
 
 	linkCopy := *newLink
 	linkSrcCopy := *newLink

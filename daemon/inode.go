@@ -152,7 +152,7 @@ type Inode interface {
 	parentGetChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory) HardlinkId
+	parentCheckLinkReparent(c *ctx, parent *Directory) quantumfs.FileId
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean_()  // Mark this Inode as cleaned
@@ -369,7 +369,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 
 // Locks the parent
 func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
-	parent *Directory) HardlinkId {
+	parent *Directory) quantumfs.FileId {
 
 	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
 
@@ -382,17 +382,17 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
 	record := parent.children.record(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
-		return InvalidHardlinkId
+		return quantumfs.InvalidFileId
 	}
 
 	link := record.(*Hardlink)
 
 	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.wsr.removeHardlink(c, link.linkId)
+	newRecord, inodeId := parent.wsr.removeHardlink(c, link.fileId)
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
-		return InvalidHardlinkId
+		return quantumfs.InvalidFileId
 	}
 
 	// reparent the child to the given parent
@@ -406,7 +406,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
 	parent.children.loadChild(c, newRecord, inodeId)
 	parent.dirty(c)
 
-	return link.linkId
+	return link.fileId
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
@@ -658,9 +658,9 @@ func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
 		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
 	case quantumfs.ObjectTypeHardlink:
-		linkId := decodeHardlinkKey(remoteRecord.ID())
-		valid, hardlinkRecord := wsr.getHardlink(linkId)
-		utils.Assert(valid, "hardlink %d not found", linkId)
+		fileId := decodeFileId(remoteRecord.ID())
+		valid, hardlinkRecord := wsr.getHardlink(fileId)
+		utils.Assert(valid, "hardlink %d not found", fileId)
 		remoteRecord = &hardlinkRecord
 		fallthrough
 	case quantumfs.ObjectTypeSmallFile:

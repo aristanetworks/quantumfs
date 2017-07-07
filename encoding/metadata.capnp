@@ -34,6 +34,7 @@ struct DirectoryRecord {
         extendedAttributes @7 :ObjectKey;
         contentTime        @8 :UInt64;
         modificationTime   @9 :UInt64;
+        fileId             @10:UInt64;
 }
 
 struct DirectoryEntry {
@@ -43,9 +44,8 @@ struct DirectoryEntry {
 }
 
 struct HardlinkRecord {
-        hardlinkID @0 :UInt64;
-        record     @1 :DirectoryRecord;
-        nlinks     @2 :UInt32;
+        record     @0 :DirectoryRecord;
+        nlinks     @1 :UInt32;
 }
 
 struct HardlinkEntry {
