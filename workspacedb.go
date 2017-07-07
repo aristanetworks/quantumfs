@@ -37,7 +37,8 @@ type WorkspaceDB interface {
 	NumNamespaces(c *Ctx, typespace string) (int, error)
 	NamespaceList(c *Ctx, typespace string) ([]string, error)
 	NumWorkspaces(c *Ctx, typespace string, namespace string) (int, error)
-	WorkspaceList(c *Ctx, typespace string, namespace string) ([]string, error)
+	WorkspaceList(c *Ctx, typespace string, namespace string) (map[string]Nonce,
+		error)
 
 	// These methods need to be up to date
 	Workspace(c *Ctx, typespace string, namespace string,

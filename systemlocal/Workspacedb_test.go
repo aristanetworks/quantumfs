@@ -46,18 +46,18 @@ func TestEmptyDB(t *testing.T) {
 		utils.Assert(err == nil, "Error in counting namespaces: %v", err)
 		utils.Assert(num == 1, "Too many namespaces")
 
-		list, err = db.WorkspaceList(ctx, quantumfs.NullSpaceName,
+		wsList, err := db.WorkspaceList(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error checking existence of namespace: %v",
 			err)
-		utils.Assert(len(list) == 1, "Expected namespace not there")
+		utils.Assert(len(wsList) == 1, "Expected namespace not there")
 
-		list, err = db.WorkspaceList(ctx, quantumfs.NullSpaceName,
+		wsList, err = db.WorkspaceList(ctx, quantumfs.NullSpaceName,
 			"test")
 		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 			"Namespace shouldn't exist: %v", err)
-		utils.Assert(len(list) == 0, "Unexpected namespace")
+		utils.Assert(len(wsList) == 0, "Unexpected namespace")
 
 		num, err = db.NumWorkspaces(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName)
@@ -157,7 +157,7 @@ func TestNamespaceList(t *testing.T) {
 		a := false
 		b := false
 
-		for _, workspace := range workspaces {
+		for workspace, _ := range workspaces {
 			if workspace == "a" {
 				a = true
 			}
@@ -189,9 +189,9 @@ func TestWorkspaceList(t *testing.T) {
 		utils.Assert(err == nil, "Error getting typespace list: %v", err)
 		utils.Assert(len(typespaces) == 2, "Incorrect number of typespaces")
 
-		list, err = db.WorkspaceList(ctx, "branch", "test")
+		wsList, err := db.WorkspaceList(ctx, "branch", "test")
 		utils.Assert(err == nil, "Error checking namespace exists: %v", err)
-		utils.Assert(len(list) > 0, "Namespace not really created")
+		utils.Assert(len(wsList) > 0, "Namespace not really created")
 
 		namespaces, err := db.NamespaceList(ctx, "branch")
 		utils.Assert(err == nil, "Error getting namespace list: %v", err)

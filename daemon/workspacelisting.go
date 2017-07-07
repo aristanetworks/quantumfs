@@ -949,6 +949,49 @@ func (wsl *WorkspaceList) directChildInodes() []InodeId {
 	return rtn
 }
 
+// Update the internal workspace list with the most recent available listing
+func (wsl *WorkspaceList) updateChildren(c *ctx, names map[string]quantumfs.Nonce) {
+
+	defer c.FuncIn("WorkspaceList::updateChildren", "Parent Inode %d",
+		wsl.inodeNum()).Out()
+
+	touched := make(map[string]bool)
+	// First add any new entries
+	for name, _ := range names {
+		if _, exists := wsl.workspacesByName[name]; !exists {
+			c.vlog("Adding new child %s", name)
+			inodeId := c.qfs.newInodeId()
+			wsl.workspacesByName[name] = inodeId
+			wsl.workspacesById[inodeId] = name
+
+			c.qfs.addUninstantiated(c, []InodeId{inodeId},
+				wsl.inodeNum())
+		}
+		touched[name] = true
+	}
+
+	// We must lock the instantiation lock to ensure no races between when we
+	// check inodeNoInstantiate and when we call setInode/removeUninstantiated
+	defer c.qfs.instantiationLock.Lock().Unlock()
+
+	// Then delete entries which no longer exist
+	for name, id := range wsl.workspacesByName {
+		if _, exists := touched[name]; !exists {
+			c.vlog("Removing deleted child %s", name)
+
+			if c.qfs.inodeNoInstantiate(c, id) == nil {
+				c.qfs.removeUninstantiated(c, []InodeId{id})
+			} else {
+				c.qfs.setInode(c, id, nil)
+			}
+
+			delete(wsl.workspacesByName, name)
+			delete(wsl.workspacesById, id)
+
+		}
+	}
+}
+
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("WorkspaceList::getChildSnapshot").Out()
 
@@ -957,12 +1000,12 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	if err != nil {
 		c.wlog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
-		list = []string{}
+		list = map[string]quantumfs.Nonce{}
 	}
 
 	defer wsl.Lock().Unlock()
 
-	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)
+	wsl.updateChildren(c, list)
 	children := snapshotChildren(c, wsl, &wsl.workspacesByName,
 		wsl.typespaceName, wsl.namespaceName, fillWorkspaceAttrFake,
 		fillNamespaceAttr, fillTypespaceAttr)
@@ -975,7 +1018,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	defer c.FuncIn("WorkspaceList::Lookup", "name %s", name).Out()
 
-	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
+	workspaces, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
 		c.wlog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
@@ -984,7 +1027,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	}
 
 	exists := false
-	for _, workspace := range list {
+	for workspace, _ := range workspaces {
 		if name == workspace {
 			exists = true
 			break
@@ -997,7 +1040,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	c.vlog("Workspace exists")
 	defer wsl.Lock().Unlock()
 
-	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)
+	wsl.updateChildren(c, workspaces)
 
 	inodeNum := wsl.workspacesByName[name]
 	c.qfs.increaseLookupCount(c, inodeNum)

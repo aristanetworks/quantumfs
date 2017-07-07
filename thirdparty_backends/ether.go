@@ -398,7 +398,7 @@ func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 }
 
 func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
-	typespace string, namespace string) ([]string, error) {
+	typespace string, namespace string) (map[string]quantumfs.Nonce, error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::WorkspaceList",
@@ -408,7 +408,11 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	if err != nil {
 		return nil, convertWsdbError(err)
 	}
-	return list, nil
+	result := make(map[string]quantumfs.Nonce, len(list))
+	for _, name := range list {
+		result[name] = 0
+	}
+	return result, nil
 }
 
 func (w *etherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
