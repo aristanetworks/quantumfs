@@ -8,8 +8,10 @@ package daemon
 import (
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
 )
 
 func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
@@ -80,5 +82,40 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 
 		verifyWorkspacelistingInodeStatus(c, test, work_, "workspace",
 			true, &namesAndIds)
+	})
+}
+
+func TestWorkspaceReplacement(t *testing.T) {
+	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
+		workspaceName := "test/test/test"
+		workspacePath := test.AbsPath(workspaceName)
+		fileName := workspacePath + "/file"
+
+		api := test.getApi()
+
+		// Create the workspace, put something in it, delete it and then
+		// create the same name again.
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+		test.AssertNoErr(api.EnableRootWrite(workspaceName))
+
+		origInodeNum := test.getInodeNum(workspacePath)
+
+		test.AssertNoErr(testutils.PrintToFile(fileName, "data"))
+
+		test.AssertNoErr(api.DeleteWorkspace(workspaceName))
+
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+
+		// Wait for the kernel cache to expire natually
+		time.Sleep(150 * time.Millisecond)
+
+		// Confirm the inode number has changed and that the file no longer
+		// exists.
+		newInodeNum := test.getInodeNum(workspacePath)
+
+		test.Assert(newInodeNum != origInodeNum, "Inode number unchanged")
+		var stat syscall.Stat_t
+		err := syscall.Stat(fileName, &stat)
+		test.AssertErr(err)
 	})
 }
