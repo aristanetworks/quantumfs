@@ -361,7 +361,7 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 }
 
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
-	ids := (*map[string]uint16)(strMap.currentMapPtr)
+	ids := (*map[string]uint16)(atomic.LoadPointer(&strMap.currentMapPtr))
 	entry, ok := (*ids)[format]
 
 	if ok {
