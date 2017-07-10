@@ -14,7 +14,7 @@ import (
 
 type workspaceInfo struct {
 	key       quantumfs.ObjectKey
-	nonce     quantumfs.Nonce
+	nonce     quantumfs.WorkspaceNonce
 	immutable bool
 }
 
@@ -143,7 +143,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 // Assume WorkspaceExists run prior to this function everytime when it is called
 // Otherwise, it probably tries to fetch non-existing key-value pairs
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
-	namespace string) (map[string]quantumfs.Nonce, error) {
+	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::WorkspaceList").Out()
@@ -154,7 +154,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 		return nil, err
 	}
 
-	workspaceList := make(map[string]quantumfs.Nonce, len(workspaces))
+	workspaceList := make(map[string]quantumfs.WorkspaceNonce, len(workspaces))
 
 	for name, info := range workspaces {
 		workspaceList[name] = info.nonce
@@ -236,7 +236,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	newInfo := workspaceInfo{
 		key:       info.key,
-		nonce:     quantumfs.Nonce(time.Now().UnixNano()),
+		nonce:     quantumfs.WorkspaceNonce(time.Now().UnixNano()),
 		immutable: false,
 	}
 	insertMap_(wsdb.cache, dstTypespace, dstNamespace, dstWorkspace, &newInfo)
@@ -298,8 +298,8 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, quantumfs.Nonce,
-	error) {
+	namespace string, workspace string) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::Workspace").Out()
@@ -313,7 +313,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, nonce quantumfs.Nonce,
+	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 

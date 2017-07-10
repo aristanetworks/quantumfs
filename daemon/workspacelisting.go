@@ -882,7 +882,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string, workspace stri
 
 type workspaceInfo struct {
 	id    InodeId
-	nonce quantumfs.Nonce
+	nonce quantumfs.WorkspaceNonce
 }
 
 type WorkspaceList struct {
@@ -955,7 +955,9 @@ func (wsl *WorkspaceList) directChildInodes() []InodeId {
 }
 
 // Update the internal workspace list with the most recent available listing
-func (wsl *WorkspaceList) updateChildren(c *ctx, names map[string]quantumfs.Nonce) {
+func (wsl *WorkspaceList) updateChildren(c *ctx,
+	names map[string]quantumfs.WorkspaceNonce) {
+
 	defer c.FuncIn("WorkspaceList::updateChildren", "Parent Inode %d",
 		wsl.inodeNum()).Out()
 
@@ -1011,7 +1013,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	if err != nil {
 		c.wlog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
-		list = map[string]quantumfs.Nonce{}
+		list = map[string]quantumfs.WorkspaceNonce{}
 	}
 
 	defer wsl.Lock().Unlock()

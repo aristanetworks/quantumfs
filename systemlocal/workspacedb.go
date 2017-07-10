@@ -24,7 +24,7 @@ func init() {
 
 type workspaceInfo struct {
 	Key       string // hex encoded ObjectKey.Value()
-	Nonce     quantumfs.Nonce
+	Nonce     quantumfs.WorkspaceNonce
 	Immutable bool
 }
 
@@ -237,11 +237,11 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
-	namespace string) (map[string]quantumfs.Nonce, error) {
+	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::WorkspaceList").Out()
 
-	workspaceList := make(map[string]quantumfs.Nonce, 100)
+	workspaceList := make(map[string]quantumfs.WorkspaceNonce, 100)
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		typespaces := tx.Bucket(typespacesBucket)
@@ -377,7 +377,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 		newInfo := workspaceInfo{
 			Key:       srcInfo.Key,
-			Nonce:     quantumfs.Nonce(time.Now().UnixNano()),
+			Nonce:     quantumfs.WorkspaceNonce(time.Now().UnixNano()),
 			Immutable: false,
 		}
 
@@ -451,13 +451,13 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, quantumfs.Nonce,
-	error) {
+	namespace string, workspace string) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::Workspace").Out()
 
 	var rootid string
-	var nonce quantumfs.Nonce
+	var nonce quantumfs.WorkspaceNonce
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
@@ -478,7 +478,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, nonce quantumfs.Nonce,
+	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
