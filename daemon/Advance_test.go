@@ -12,7 +12,7 @@ import (
 )
 
 func makeWorkspaceRootIdAdvance(test *testHelper,
-	workspace string) (quantumfs.ObjectKey, quantumfs.Nonce) {
+	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)

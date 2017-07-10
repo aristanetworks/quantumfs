@@ -26,7 +26,8 @@ func getRootId(test *testHelper, workspace string) quantumfs.ObjectKey {
 }
 
 func advanceWorkspace(ctx *ctx, test *testHelper, workspace string,
-	nonce quantumfs.Nonce, src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
+	nonce quantumfs.WorkspaceNonce, src quantumfs.ObjectKey,
+	dst quantumfs.ObjectKey) {
 
 	wsdb := test.GetWorkspaceDB()
 

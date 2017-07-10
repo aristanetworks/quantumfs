@@ -221,7 +221,7 @@ func (th *testHelper) getInode(path string) Inode {
 }
 
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
-	workspace string) (quantumfs.ObjectKey, quantumfs.Nonce) {
+	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 
 	key, nonce, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
 		typespace, namespace, workspace)

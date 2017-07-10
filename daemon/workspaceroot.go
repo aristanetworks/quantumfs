@@ -23,7 +23,7 @@ type WorkspaceRoot struct {
 	namespace       string
 	workspace       string
 	publishedRootId quantumfs.ObjectKey
-	nonce           quantumfs.Nonce
+	nonce           quantumfs.WorkspaceNonce
 
 	listLock   sync.Mutex
 	accessList quantumfs.PathsAccessed

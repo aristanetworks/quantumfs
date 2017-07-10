@@ -398,7 +398,8 @@ func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 }
 
 func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
-	typespace string, namespace string) (map[string]quantumfs.Nonce, error) {
+	typespace string, namespace string) (map[string]quantumfs.WorkspaceNonce,
+	error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::WorkspaceList",
@@ -408,7 +409,7 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	if err != nil {
 		return nil, convertWsdbError(err)
 	}
-	result := make(map[string]quantumfs.Nonce, len(list))
+	result := make(map[string]quantumfs.WorkspaceNonce, len(list))
 	for _, name := range list {
 		result[name] = 0
 	}
@@ -459,8 +460,8 @@ func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string
 }
 
 func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, quantumfs.Nonce,
-	error) {
+	namespace string, workspace string) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::Workspace",
@@ -508,7 +509,7 @@ func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 }
 
 func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, nonce quantumfs.Nonce,
+	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
