@@ -323,10 +323,10 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	defer wsdb.cacheMutex.Lock().Unlock()
 	info, err := wsdb.workspace_(c, typespace, namespace, workspace)
 	if err != nil {
-		wsdbErr := err.(quantumfs.WorkspaceDbErr)
+		wsdbErr := err.(*quantumfs.WorkspaceDbErr)
 		e := quantumfs.NewWorkspaceDbErr(wsdbErr.Code, "Advance failed: %s",
 			wsdbErr.ErrorCode())
-		return info.key, e
+		return quantumfs.ZeroKey, e
 	}
 
 	if nonce != info.nonce {
