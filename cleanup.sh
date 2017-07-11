@@ -12,9 +12,8 @@ if [ -z "$mountPath" ]; then
 fi
 
 # Watch the output of the Makefile. If nothing is output for the timeout period,
-# then it Make has hung. No single step should take longer than 2 minutes (some
-# very slow systems may take 1 minute for daemon tests)
-TIMEOUT_SEC=120
+# then it Make has hung. No single step should take longer than 3 minutes.
+TIMEOUT_SEC=180
 READERR=0
 while true; do
 	read -t $TIMEOUT_SEC line
