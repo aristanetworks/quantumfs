@@ -264,7 +264,6 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 		workspaces := bucket.Cursor()
 		name, infoBytes := workspaces.First()
 		for ; name != nil; name, infoBytes = workspaces.Next() {
-
 			info := bytesToInfo(infoBytes, string(name))
 			workspaceList[string(name)] = info.Nonce
 		}
