@@ -203,7 +203,6 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 
 			delete(*inodeMap, name)
 			delete(*nameMap, id)
-
 		}
 	}
 }
@@ -291,16 +290,17 @@ func (tsl *TypespaceList) directChildInodes() []InodeId {
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("TypespaceList::getChildSnapshot").Out()
 
-	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
+	typespaces, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
 		c.wlog("Unexpected error type from WorkspaceDB.TypespaceList: %s",
 			err.Error())
-		list = []string{}
+		typespaces = []string{}
 	}
 
 	defer tsl.Lock().Unlock()
 
-	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
+	updateChildren(c, typespaces, &tsl.typespacesByName, &tsl.typespacesById,
+		tsl)
 
 	// The kernel will override our parent's attributes so it doesn't matter what
 	// we put into there.
@@ -623,16 +623,17 @@ func (nsl *NamespaceList) directChildInodes() []InodeId {
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("NamespaceList::getChildSnapshot").Out()
 
-	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
+	namepsaces, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
 		c.wlog("Unexpected error type from WorkspaceDB.NamespaceList: %s",
 			err.Error())
-		list = []string{}
+		namepsaces = []string{}
 	}
 
 	defer nsl.Lock().Unlock()
 
-	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
+	updateChildren(c, namepsaces, &nsl.namespacesByName, &nsl.namespacesById,
+		nsl)
 	children := snapshotChildren(c, nsl, &nsl.namespacesByName,
 		nsl.typespaceName, "", fillNamespaceAttr, fillTypespaceAttr,
 		fillRootAttrWrapper)
@@ -1008,17 +1009,17 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("WorkspaceList::getChildSnapshot").Out()
 
-	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
+	workspaces, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
 		c.wlog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
-		list = map[string]quantumfs.WorkspaceNonce{}
+		workspaces = map[string]quantumfs.WorkspaceNonce{}
 	}
 
 	defer wsl.Lock().Unlock()
 
-	wsl.updateChildren(c, list)
+	wsl.updateChildren(c, workspaces)
 	namesAndIds := make(map[string]InodeId, len(wsl.workspacesByName))
 	for name, info := range wsl.workspacesByName {
 		namesAndIds[name] = info.id
