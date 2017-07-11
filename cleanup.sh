@@ -11,26 +11,31 @@ if [ -z "$mountPath" ]; then
         sudo mount -t fusectl none $mountPath
 fi
 
-# On an idle system, the go-test should take no longer than
-# 3 minutes. Otherwise, it is hanging.
-SLEEPTIME=${SLEEPTIME:-180}
-while  [ $SLEEPTIME -gt 0 ]; do
-	# Escape from the sleep loop when the make process is finished
-	if ps -p $ppid > /dev/null; then
-		let "SLEEPTIME-=1"
-		sleep 1
-	else
-		SLEEPTIME=0
+# Watch the output of the Makefile. If nothing is output for the timeout period,
+# then it Make has hung. No single step should take longer than 2 minutes (some
+# very slow systems may take 1 minute for daemon tests)
+TIMEOUT_SEC=120
+READERR=0
+while true; do
+	read -t $TIMEOUT_SEC line
+	READERR=$?
+
+	if [[ $READERR -ne 0 ]]; then
+		break
 	fi
 done
 
-# Force to kill the parent process "make all" because it has hung too long
-for pid in `ps ux | grep --color=never 'make' | awk '{print $2}'`; do
-	if [ $ppid -eq $pid ]; then
-		echo "Sending SIGKILL to $pid"
-		kill -9 $pid
-	fi
-done
+# If read finished without a timeout error, READERR will be 142. EOF returns 1.
+if [[ $READERR -eq 142 ]]; then
+	echo "Make TIMED OUT"
+	# Force to kill the parent process "make all" because it has hung too long
+	for pid in `ps ux | grep --color=never 'make' | awk '{print $2}'`; do
+		if [ $ppid -eq $pid ]; then
+			echo "Sending SIGKILL to $pid"
+			kill -9 $pid
+		fi
+	done
+fi
 
 # Prevent $rootContainer is accidentally set empty
 if [[ -z ${rootContainer// } ]]; then
@@ -52,5 +57,10 @@ while [ `mount | grep /dev/shm/$rootContainer | wc -l` -gt 0 ]; do
 	done
 done
 
-# Clean up the rootContainder in /dev/shm
-sudo rm -r /dev/shm/$rootContainer
+# Clean up the rootContainder in /dev/shm if it exists
+if [[ -d "/dev/shm/$rootContainer" ]]; then
+	echo "Removing /dev/shm/$rootContainer."
+	sudo rm -r /dev/shm/$rootContainer
+else
+	echo "No /dev/shm folder to cleanup... finished."
+fi
