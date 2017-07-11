@@ -13,7 +13,7 @@ fi
 
 # Watch the output of the Makefile. If nothing is output for the timeout period,
 # then it Make has hung. No single step should take longer than 3 minutes.
-TIMEOUT_SEC=180
+TIMEOUT_SEC=${TIMEOUT_SEC:-180}
 READERR=0
 while true; do
 	read -t $TIMEOUT_SEC line
