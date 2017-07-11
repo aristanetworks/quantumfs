@@ -293,7 +293,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.TypespaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.TypespaceList: %s",
 			err.Error())
 		list = []string{}
 	}
@@ -629,7 +629,7 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		c.wlog("Unexpected error type from WorkspaceDB.NamespaceList: %s",
+		c.elog("Unexpected error type from WorkspaceDB.NamespaceList: %s",
 			err.Error())
 		list = []string{}
 	}
@@ -964,7 +964,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		c.wlog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
+		c.elog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
 		list = []string{}
 	}
