@@ -449,3 +449,290 @@ func (th *testHelper) checkZeroSparse(fileA string, offset int) {
 			fileA)
 	}
 }
+
+func (test *testHelper) getRootId(workspace string) quantumfs.ObjectKey {
+	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
+		test.getWorkspaceComponents(workspace)
+
+	return test.workspaceRootId(wsTypespaceName, wsNamespaceName,
+		wsWorkspaceName)
+}
+
+func (test *testHelper) advanceWorkspace(workspace string,
+	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
+
+	ctx := test.TestCtx()
+	wsdb := test.GetWorkspaceDB()
+
+	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
+		test.getWorkspaceComponents(workspace)
+
+	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
+		wsNamespaceName, wsWorkspaceName, src, dst)
+	test.AssertNoErr(err)
+
+	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	defer cleanup()
+	test.Assert(wsr != nil, "workspace root does not exist")
+	wsr.publishedRootId = dst
+}
+
+// Sync the workspace, perform the nosync_op, then sync the workspace again,
+// and verify that the workspaceroot has changed because of the operation.
+func (test *testHelper) synced_op(workspace string,
+	nosync_op func()) quantumfs.ObjectKey {
+
+	test.SyncAllWorkspaces()
+	oldRootId := test.getRootId(workspace)
+	nosync_op()
+	test.SyncAllWorkspaces()
+	newRootId := test.getRootId(workspace)
+	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
+	test.Log("new rootID %s", newRootId.String())
+
+	return newRootId
+}
+
+func (test *testHelper) createFile(workspace string, name string,
+	size int) {
+
+	filename := workspace + "/" + name
+	err := testutils.PrintToFile(filename, string(GenData(size)))
+	test.AssertNoErr(err)
+}
+
+func (test *testHelper) createFileSync(workspace string, name string,
+	size int) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.createFile(workspace, name, size)
+	})
+}
+
+func (test *testHelper) removeFile(
+	workspace string, name string) {
+
+	filename := workspace + "/" + name
+	err := os.Remove(filename)
+	test.AssertNoErr(err)
+}
+
+func (test *testHelper) removeFileSync(
+	workspace string, name string) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.removeFile(workspace, name)
+	})
+}
+
+func (test *testHelper) linkFile(workspace string, src string,
+	dst string) {
+
+	srcfilename := workspace + "/" + src
+	dstfilename := workspace + "/" + dst
+	test.Log("Before link %s -> %s", src, dst)
+	err := syscall.Link(srcfilename, dstfilename)
+	test.AssertNoErr(err)
+
+}
+
+func (test *testHelper) linkFileSync(workspace string, src string,
+	dst string) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.linkFile(workspace, src, dst)
+	})
+}
+
+func (test *testHelper) setXattr(workspace string,
+	testfile string, attr string, data []byte) {
+
+	testFilename := workspace + "/" + testfile
+	test.Log("Before setting xattr %s on %s", attr, testfile)
+	err := syscall.Setxattr(testFilename, attr, data, 0)
+	test.AssertNoErr(err)
+}
+
+func (test *testHelper) verifyXattr(workspace string,
+	testfile string, attr string, content []byte) {
+
+	data := make([]byte, 100)
+	size, err := syscall.Getxattr(workspace+"/"+testfile, attr, data)
+	test.Assert(err == nil, "Error reading data XAttr: %v", err)
+	test.Assert(size == len(content),
+		"data XAttr size incorrect: %d", size)
+	test.Assert(bytes.Equal(data[:size], content),
+		"Didn't get the same data back '%s' '%s'", data,
+		content)
+}
+
+func (test *testHelper) verifyNoXattr(workspace string,
+	testfile string, attr string) {
+
+	data := make([]byte, 100)
+	_, err := syscall.Getxattr(workspace+"/"+testfile, attr, data)
+	test.AssertErr(err)
+	test.Assert(err == syscall.ENODATA, "xattr must not exist %s", err.Error())
+}
+
+func (test *testHelper) setXattrSync(
+	workspace string, testfile string, attr string,
+	data []byte) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.setXattr(workspace, testfile, attr, data)
+	})
+}
+
+func (test *testHelper) delXattr(workspace string, testfile string,
+	attr string) {
+
+	testFilename := workspace + "/" + testfile
+	test.Log("Before removing xattr %s on %s", attr, testfile)
+	err := syscall.Removexattr(testFilename, attr)
+	test.AssertNoErr(err)
+}
+
+func (test *testHelper) delXattrSync(workspace string, testfile string,
+	attr string) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.delXattr(workspace, testfile, attr)
+	})
+}
+
+func (test *testHelper) createSymlink(workspace string, name string,
+	symname string) {
+
+	err := syscall.Symlink(workspace+"/"+name, workspace+"/"+symname)
+	test.AssertNoErr(err)
+}
+
+func (test *testHelper) createSymlinkSync(
+	workspace string, name string, symname string) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.createSymlink(workspace, name, symname)
+	})
+}
+
+func (test *testHelper) createSpecialFile(workspace string, name string,
+	dev int) {
+
+	err := syscall.Mknod(workspace+"/"+name, syscall.S_IFBLK|syscall.S_IRWXU,
+		dev)
+	test.AssertNoErr(err)
+}
+
+func (test *testHelper) createSpecialFileSync(workspace string,
+	name string, dev int) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.createSpecialFile(workspace, name, dev)
+	})
+}
+
+func (test *testHelper) assertFileIsOfSize(fullname string, size int64) {
+	var stat syscall.Stat_t
+
+	err := syscall.Stat(fullname, &stat)
+	test.AssertNoErr(err)
+	test.Assert(stat.Size == size,
+		"Incorrect file size. Expected: %d", stat.Size)
+}
+
+func (test *testHelper) assertNoFile(fullname string) {
+	var stat syscall.Stat_t
+	err := syscall.Stat(fullname, &stat)
+	test.AssertErr(err)
+	test.Assert(err == syscall.ENOENT, "Expected ENOENT, got %s", err.Error())
+}
+
+func (test *testHelper) assertOpenFileIsOfSize(fd int, size int64) {
+	var stat syscall.Stat_t
+
+	err := syscall.Fstat(fd, &stat)
+	test.AssertNoErr(err)
+	test.Assert(stat.Size == size,
+		"Incorrect file size. Expected: %d", stat.Size)
+}
+
+func (test *testHelper) verifyContentStartsWith(file *os.File, expected string) {
+	content := make([]byte, len(expected))
+	_, err := file.Seek(0, os.SEEK_SET)
+	test.AssertNoErr(err)
+	_, err = io.ReadFull(file, content)
+	test.AssertNoErr(err)
+	test.Assert(string(content) == expected,
+		"content mismatch %s vs. %s", content, expected)
+}
+
+func createSparseFile(name string, size int64) error {
+	fd, err := syscall.Creat(name, 0124)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	return os.Truncate(name, size)
+}
+
+func CreateSmallFile(name string, content string) error {
+	fd, err := syscall.Creat(name, 0124)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func CreateMediumFile(name string, content string) error {
+	size := int64(quantumfs.MaxMediumFileSize()) -
+		int64(quantumfs.MaxBlockSize)
+	err := createSparseFile(name, size)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func CreateLargeFile(name string, content string) error {
+	size := int64(quantumfs.MaxMediumFileSize()) +
+		int64(quantumfs.MaxBlockSize)
+	err := createSparseFile(name, size)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func CreateVeryLargeFile(name string, content string) error {
+	size := int64(quantumfs.MaxLargeFileSize()) +
+		int64(quantumfs.MaxBlockSize)
+	err := createSparseFile(name, size)
+	if err != nil {
+		return err
+	}
+	return testutils.OverWriteFile(name, content)
+}
+
+func CreateHardlink(name string, content string) error {
+	fd, err := syscall.Creat(name, syscall.O_CREAT)
+	if err != nil {
+		return err
+	}
+	err = syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+	err = testutils.OverWriteFile(name, content)
+	if err != nil {
+		return err
+	}
+	return syscall.Link(name, name+"_link")
+}
