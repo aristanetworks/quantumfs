@@ -293,14 +293,18 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.wlog("Unexpected error type from WorkspaceDB.TypespaceList: %s",
+		c.wlog("Unexpected error from WorkspaceDB.TypespaceList: %s",
 			err.Error())
 		list = []string{}
 	}
 
 	defer tsl.Lock().Unlock()
 
-	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
+	if err == nil {
+		// We only accept positive lists
+		updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById,
+			tsl)
+	}
 
 	// The kernel will override our parent's attributes so it doesn't matter what
 	// we put into there.
@@ -632,7 +636,12 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer nsl.Lock().Unlock()
 
-	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
+	if err == nil {
+		// We only accept positive lists
+		updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById,
+			nsl)
+	}
+
 	children := snapshotChildren(c, nsl, &nsl.namespacesByName,
 		nsl.typespaceName, "", fillNamespaceAttr, fillTypespaceAttr,
 		fillRootAttrWrapper)
@@ -962,7 +971,12 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer wsl.Lock().Unlock()
 
-	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)
+	if err == nil {
+		// We only accept positive lists
+		updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById,
+			wsl)
+	}
+
 	children := snapshotChildren(c, wsl, &wsl.workspacesByName,
 		wsl.typespaceName, wsl.namespaceName, fillWorkspaceAttrFake,
 		fillNamespaceAttr, fillTypespaceAttr)
