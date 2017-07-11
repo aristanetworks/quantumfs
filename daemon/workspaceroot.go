@@ -5,7 +5,6 @@ package daemon
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -191,28 +190,8 @@ func (wsr *WorkspaceRoot) removeHardlink_(fileId quantumfs.FileId, inodeId Inode
 	}
 }
 
-// We need a reference map of hardlinks to prevent the improbable event of random
-// number collision
-func generateUniqueFileId(c *ctx,
-	hardlinks map[quantumfs.FileId]linkEntry) quantumfs.FileId {
-
-	// We assume here that the probability that we'll continually generate new
-	// random numbers for hardlinks that already exist is basically zero
-	for {
-		newId := quantumfs.FileId(rand.Uint64())
-		if newId == quantumfs.InvalidFileId {
-			continue
-		}
-		if _, exists := hardlinks[newId]; exists {
-			c.wlog("FileId generation collision: %d", newId)
-		} else {
-			return newId
-		}
-	}
-}
-
-func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string,
-	inodeId InodeId, record quantumfs.DirectoryRecord) *Hardlink {
+func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
+	record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
 
@@ -227,23 +206,14 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string,
 
 	defer wsr.linkLock.Lock().Unlock()
 
-	fileId := dirRecord.FileId()
-	if fileId == quantumfs.InvalidFileId {
-		fileId = generateUniqueFileId(c, wsr.hardlinks)
-		c.vlog("New Hardlink %d created for inodeId %d", fileId, inodeId)
-	}
-
 	newEntry := newLinkEntry(dirRecord)
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
 	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
-	// The hardlink filename will be the fingerprint of the filename
-	// which was the source of the first link operation that created
-	// the hardlink. This field is used to support seamless refreshing
-	// of a set of files into a set of hardlinks.
-	newEntry.record.SetFilename(fingerprint)
-	newEntry.record.SetFileId(fileId)
+	newEntry.record.SetFilename("")
 
+	fileId := dirRecord.FileId()
+	utils.Assert(fileId != quantumfs.InvalidFileId, "invalid fileId")
 	wsr.hardlinks[fileId] = newEntry
 	wsr.inodeToLink[inodeId] = fileId
 

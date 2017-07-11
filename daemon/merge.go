@@ -53,7 +53,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 			toSet, getNewId := mergeLink(c, baseExists, v, localLink, k)
 			idToUse := k
 			if getNewId {
-				idToUse = generateUniqueFileId(c, localHardlinks)
+				idToUse = generateUniqueFileId()
 			}
 
 			localHardlinks[idToUse] = toSet
