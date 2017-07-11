@@ -658,7 +658,7 @@ func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
 		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
 	case quantumfs.ObjectTypeHardlink:
-		fileId := decodeFileId(remoteRecord.ID())
+		fileId := remoteRecord.FileId()
 		valid, hardlinkRecord := wsr.getHardlink(fileId)
 		utils.Assert(valid, "hardlink %d not found", fileId)
 		remoteRecord = &hardlinkRecord

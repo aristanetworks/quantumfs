@@ -1820,6 +1820,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
+	entry.SetFileId(quantumfs.InvalidFileId)
 
 	return entry
 }

@@ -4,10 +4,10 @@
 package daemon
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 // Should implement quantumfs.DirectoryRecord
@@ -17,25 +17,11 @@ type Hardlink struct {
 	wsr    *WorkspaceRoot
 }
 
-func decodeFileId(key quantumfs.ObjectKey) (fileId quantumfs.FileId) {
-	if key.Type() != quantumfs.KeyTypeEmbedded {
-		panic("Non-embedded key attempted decode as Hardlink Id")
-	}
-
-	hash := key.Hash()
-	return quantumfs.FileId(binary.LittleEndian.Uint64(hash[0:8]))
-}
-
-func encodeFileId(fileId quantumfs.FileId) quantumfs.ObjectKey {
-	var hash [quantumfs.ObjectKeyLength - 1]byte
-
-	binary.LittleEndian.PutUint64(hash[0:8], uint64(fileId))
-	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
-}
-
 func newHardlink(name string, fileId quantumfs.FileId,
 	wsr *WorkspaceRoot) *Hardlink {
 
+	utils.Assert(fileId != quantumfs.InvalidFileId,
+		"invalid fileId for %s", name)
 	var newLink Hardlink
 	newLink.name = name
 	newLink.wsr = wsr
@@ -68,16 +54,13 @@ func (link *Hardlink) SetFilename(v string) {
 }
 
 func (link *Hardlink) ID() quantumfs.ObjectKey {
-	return encodeFileId(link.fileId)
+	var empty [quantumfs.ObjectKeyLength - 1]byte
+	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, empty)
 }
 
 func (link *Hardlink) SetID(v quantumfs.ObjectKey) {
-	decodedId := decodeFileId(v)
-
-	if decodedId != link.fileId {
-		panic(fmt.Sprintf("Change of ID attempted on Hardlink to %d",
-			decodedId))
-	}
+	utils.Assert(v.Type() == quantumfs.KeyTypeEmbedded,
+		"invalid key type %d", v.Type())
 }
 
 func (link *Hardlink) Type() quantumfs.ObjectType {
@@ -166,21 +149,21 @@ func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
 }
 
 func (link *Hardlink) FileId() quantumfs.FileId {
-	return link.get().FileId()
+	return link.fileId
 }
 
 func (link *Hardlink) SetFileId(fileId quantumfs.FileId) {
-	link.set(func(dir *quantumfs.DirectRecord) {
-		dir.SetFileId(fileId)
-	})
+	utils.Assert(fileId == link.fileId,
+		"attempt to change fileId %d -> %d", fileId, link.fileId)
 }
 
 func (link *Hardlink) Record() quantumfs.DirectRecord {
 	// Note: this is a DirectRecord shallow copy type
 	rtn := quantumfs.NewDirectoryRecord()
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
-	rtn.SetID(encodeFileId(link.fileId))
 	rtn.SetFilename(link.name)
+	rtn.SetFileId(link.fileId)
+	rtn.SetID(link.ID())
 
 	// we only need to return a thin record - just enough information to
 	// create the hardlink. The rest is stored in workspaceroot.
