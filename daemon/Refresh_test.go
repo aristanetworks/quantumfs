@@ -217,8 +217,8 @@ func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectK
 func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
-	t, n, w := test.getWorkspaceComponents(workspace)
-	_, nonce := test.workspaceRootId(t, n, w)
+	ts, ns, ws := test.getWorkspaceComponents(workspace)
+	_, nonce := test.workspaceRootId(ts, ns, ws)
 
 	markImmutable(ctx, workspace)
 	advanceWorkspace(ctx, test, workspace, nonce, src, dst)
@@ -229,8 +229,8 @@ func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
-	t, n, w := test.getWorkspaceComponents(workspace)
-	_, nonce := test.workspaceRootId(t, n, w)
+	ts, ns, ws := test.getWorkspaceComponents(workspace)
+	_, nonce := test.workspaceRootId(ts, ns, ws)
 
 	markImmutable(ctx, workspace)
 	test.remountFilesystem()
