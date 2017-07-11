@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	registerTimeSeriesDB("influxlib", newInfluxDB)
+	registerTimeSeriesDB("influxdb", newInfluxDB)
 }
 
 type influxlibAdapter struct {

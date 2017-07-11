@@ -121,6 +121,9 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	buf.lruElement = store.lru.PushBack(buf)
 }
 
+const CacheHitLog = "Found key in readcache"
+const CacheMissLog = "Cache miss"
+
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
@@ -142,9 +145,10 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return nil
 	}()
 	if bufResult != nil {
-		c.Vlog(qlog.LogDaemon, "Found key in readcache")
+		c.Vlog(qlog.LogDaemon, CacheHitLog)
 		return bufResult
 	}
+	c.Vlog(qlog.LogDaemon, CacheMissLog)
 
 	buf := newEmptyBuffer()
 	initBuffer(&buf, store, key)

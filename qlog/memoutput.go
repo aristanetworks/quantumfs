@@ -11,7 +11,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -31,7 +30,7 @@ const mmapStrMapSize = 512 * 1024
 const QlogVersion = 4
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
-// so the max packet length is 7 bits long
+// so the max packet length is 15 bits long
 const MaxPacketLen = 32767
 
 type MmapHeader struct {
@@ -127,23 +126,55 @@ func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 }
 
 // Note: in development code, you should never provide a True partialWrite
-func (circ *CircMemLogs) writeData(data []byte, length int, partialWrite bool) {
+func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
+	formatId uint16, reqId uint64, timestamp int64, length uint64,
+	argKinds []reflect.Kind, args ...interface{}) {
+
+	// Account for the packet length field
+	packetLength := length + 2
+
 	// For now, if the message is too long then just toss it
-	if uint64(length) > circ.length {
+	if packetLength > circ.length {
 		return
 	}
 
-	// We only want to use the lower 2 bytes, but need all 4 to use sync/atomic
-	dataLen := uint32(length)
-	dataRaw := (*[2]byte)(unsafe.Pointer(&dataLen))
-	// Append the data field to the packet
-	data = append(data, dataRaw[:]...)
+	dataOffset := circ.reserveMem(packetLength)
 
-	dataStart := circ.reserveMem(uint64(len(data)))
+	// Write the length field without the completion bit
+	lenOffset := (dataOffset + length) % circ.length
+	flagAndLength := length & ^uint64(entryCompleteBit)
 
-	// Now that we know we have space, write in the entry
-	circ.wrapWrite_(dataStart, data)
-	lenStart := (dataStart + uint64(dataLen)) % circ.length
+	offset := dataOffset
+	buf := circ.buffer
+	fastpath := true
+	if lenOffset <= dataOffset {
+		// Slow path, we need to wrap some of the data around the end of the
+		// buffer. This is an uncommon case, so use a staging buffer.
+		fastpath = false
+		buf = make([]byte, packetLength)
+		offset = 0
+	}
+
+	if fastpath {
+		insertUint16(buf, lenOffset, uint16(flagAndLength))
+	} else {
+		insertUint16(buf, length, uint16(flagAndLength))
+	}
+
+	// Write the entry header
+	offset = insertUint16(buf, offset, uint16(len(args)))
+	offset = insertUint16(buf, offset, formatId)
+	offset = insertUint64(buf, offset, reqId)
+	offset = insertUint64(buf, offset, uint64(timestamp))
+
+	// Write the entry arguments
+	for i, arg := range args {
+		offset = writeArg(buf, offset, format, arg, argKinds[i])
+	}
+
+	if !fastpath {
+		circ.wrapWrite_(dataOffset, buf)
+	}
 
 	// For testing purposes only: if we need to generate some partially written
 	// packets, then do so by not finishing this one.
@@ -152,10 +183,15 @@ func (circ *CircMemLogs) writeData(data []byte, length int, partialWrite bool) {
 	}
 
 	// Now that the entry is written completely, mark the packet as safe to read,
-	// but use an atomic operation to load to ensure a memory barrier
-	dataLen &= ^uint32(entryCompleteBit)
-	atomic.AddUint32(&dataLen, entryCompleteBit)
-	circ.wrapWrite_(lenStart, (*dataRaw)[:])
+	// but use an atomic operation to ensure a compiler and memory barrier
+	atomic.AddUint64(&flagAndLength, uint64(entryCompleteBit))
+
+	if fastpath {
+		insertUint16(buf, lenOffset, uint16(flagAndLength))
+	} else {
+		insertUint16(buf, length, uint16(flagAndLength))
+		circ.wrapWrite_(lenOffset, buf[length:])
+	}
 }
 
 const LogStrSize = 64
@@ -217,7 +253,6 @@ type IdStrMap struct {
 	currentMapPtr unsafe.Pointer
 
 	lock utils.DeferableMutex // Protects everything below here
-	ids  map[string]uint16
 
 	buffer  *[mmapStrMapSize / LogStrSize]LogStr
 	freeIdx uint16
@@ -240,7 +275,6 @@ func newCircBuf(mapHeader *circBufHeader,
 func newIdStrMap(buf []byte, offset int) IdStrMap {
 	var rtn IdStrMap
 	ids := make(map[string]uint16)
-	rtn.ids = ids
 	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
 	rtn.freeIdx = 0
 	rtn.buffer = (*[mmapStrMapSize /
@@ -327,8 +361,7 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 }
 
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
-
-	ids := (*map[string]uint16)(strMap.currentMapPtr)
+	ids := (*map[string]uint16)(atomic.LoadPointer(&strMap.currentMapPtr))
 	entry, ok := (*ids)[format]
 
 	if ok {
@@ -343,7 +376,8 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 
 	defer strMap.lock.Lock().Unlock()
 
-	if existingId, ok := strMap.ids[format]; ok {
+	ids := *(*map[string]uint16)(strMap.currentMapPtr)
+	if existingId, ok := ids[format]; ok {
 		// Somebody beat us to adding this format, we have no work to do
 		return existingId, nil
 	}
@@ -354,8 +388,8 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	strMap.freeIdx++
 
 	// Copy the old map into the new one and add the additional format entry
-	newMap := make(map[string]uint16, len(strMap.ids)+1)
-	for k, v := range strMap.ids {
+	newMap := make(map[string]uint16, len(ids)+1)
+	for k, v := range ids {
 		newMap[k] = v
 	}
 	newMap[format] = newIdx
@@ -364,7 +398,6 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 
 	// Now publish the new map, no writing may occur to this map after this
 	// point.
-	strMap.ids = newMap
 	atomic.StorePointer(&strMap.currentMapPtr, unsafe.Pointer(&newMap))
 
 	return newIdx, err
@@ -409,138 +442,113 @@ type emptyInterface struct {
 	value unsafe.Pointer
 }
 
+func interfaceAsByteSlice(intf interface{}) []byte {
+	ei := (*emptyInterface)(unsafe.Pointer(&intf))
+	return *(*[]byte)(ei.value)
+}
+
 func interfaceAsUint8(intf interface{}) uint8 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint8)(ei.value))
+	return *(*uint8)(ei.value)
 }
 
 func interfaceAsUint16(intf interface{}) uint16 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint16)(ei.value))
+	return *(*uint16)(ei.value)
 }
 
 func interfaceAsUint32(intf interface{}) uint32 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint32)(ei.value))
+	return *(*uint32)(ei.value)
 }
 
 func interfaceAsUint64(intf interface{}) uint64 {
 	ei := (*emptyInterface)(unsafe.Pointer(&intf))
-	return (*(*uint64)(ei.value))
+	return *(*uint64)(ei.value)
 }
 
-// Writes the data, with a type prefix field two bytes long, to output. We pass in a
-// pointer to the output array instead of returning one to append so that we can
-// take advantage of output having a larger capacity and reducing memmoves
-func (mem *SharedMemory) binaryWrite(data interface{}, format string,
-	output []byte, offset int) ([]byte, int) {
+func errorUnknownType(arg interface{}) (msgSize int,
+	msg string) {
 
-	dataType := reflect.TypeOf(data)
-	dataKind := dataType.Kind()
-	switch {
-	case dataKind == reflect.Int8:
-		offset = toBinaryUint16(output, offset, TypeInt8)
-		offset = toBinaryUint8(output, offset, interfaceAsUint8(data))
-	case dataKind == reflect.Uint8:
-		offset = toBinaryUint16(output, offset, TypeUint8)
-		offset = toBinaryUint8(output, offset, interfaceAsUint8(data))
-	case dataKind == reflect.Int16:
-		offset = toBinaryUint16(output, offset, TypeInt16)
-		offset = toBinaryUint16(output, offset, interfaceAsUint16(data))
-	case dataKind == reflect.Uint16:
-		offset = toBinaryUint16(output, offset, TypeUint16)
-		offset = toBinaryUint16(output, offset, interfaceAsUint16(data))
-	case dataKind == reflect.Int32:
-		offset = toBinaryUint16(output, offset, TypeInt32)
-		offset = toBinaryUint32(output, offset, interfaceAsUint32(data))
-	case dataKind == reflect.Uint32:
-		offset = toBinaryUint16(output, offset, TypeUint32)
-		offset = toBinaryUint32(output, offset, interfaceAsUint32(data))
-	case dataKind == reflect.Int:
-		offset = toBinaryUint16(output, offset, TypeInt64)
-		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
-	case dataKind == reflect.Uint:
-		offset = toBinaryUint16(output, offset, TypeUint64)
-		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
-	case dataKind == reflect.Int64:
-		offset = toBinaryUint16(output, offset, TypeInt64)
-		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
-	case dataKind == reflect.Uint64:
-		offset = toBinaryUint16(output, offset, TypeUint64)
-		offset = toBinaryUint64(output, offset, interfaceAsUint64(data))
-	case dataKind == reflect.String:
-		output, offset = writeArray(output, offset, format,
-			[]byte(data.(string)), TypeString)
-	case dataKind == reflect.Slice && dataType.Elem().Kind() == reflect.Uint8:
-		output, offset = writeArray(output, offset, format, data.([]uint8),
-			TypeByteArray)
-	case dataKind == reflect.Bool:
-		offset = toBinaryUint16(output, offset, TypeBoolean)
-		if data.(bool) {
-			offset = toBinaryUint8(output, offset, 1)
+	str := fmt.Sprintf("ERROR: Unsupported qlog type %s",
+		reflect.TypeOf(arg).String())
+
+	return len(str), str
+}
+
+func writeArg(buf []byte, offset uint64, format string, arg interface{},
+	argKind reflect.Kind) uint64 {
+
+	// The structure and sizes written here must match
+	// SharedMemory.computePacketSize() to ensure the size is computed correctly.
+	switch argKind {
+	case reflect.Int8:
+		offset = insertUint16(buf, offset, TypeInt8)
+		offset = insertUint8(buf, offset, interfaceAsUint8(arg))
+	case reflect.Uint8:
+		offset = insertUint16(buf, offset, TypeUint8)
+		offset = insertUint8(buf, offset, interfaceAsUint8(arg))
+	case reflect.Bool:
+		offset = insertUint16(buf, offset, TypeBoolean)
+		if arg.(bool) {
+			offset = insertUint8(buf, offset, 1)
 		} else {
-			offset = toBinaryUint8(output, offset, 0)
+			offset = insertUint8(buf, offset, 0)
 		}
+	case reflect.Int16:
+		offset = insertUint16(buf, offset, TypeInt16)
+		offset = insertUint16(buf, offset, interfaceAsUint16(arg))
+	case reflect.Uint16:
+		offset = insertUint16(buf, offset, TypeUint16)
+		offset = insertUint16(buf, offset, interfaceAsUint16(arg))
+	case reflect.Int32:
+		offset = insertUint16(buf, offset, TypeInt32)
+		offset = insertUint32(buf, offset, interfaceAsUint32(arg))
+	case reflect.Uint32:
+		offset = insertUint16(buf, offset, TypeUint32)
+		offset = insertUint32(buf, offset, interfaceAsUint32(arg))
+	case reflect.Int:
+		offset = insertUint16(buf, offset, TypeInt64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
+	case reflect.Uint:
+		offset = insertUint16(buf, offset, TypeUint64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
+	case reflect.Int64:
+		offset = insertUint16(buf, offset, TypeInt64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
+	case reflect.Uint64:
+		offset = insertUint16(buf, offset, TypeUint64)
+		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
+	case reflect.String:
+		offset = writeArray(buf, offset, format, []byte(arg.(string)),
+			TypeString)
+	case sliceOfBytesKind:
+		offset = writeArray(buf, offset, format, interfaceAsByteSlice(arg),
+			TypeByteArray)
 	default:
-		errorPrefix := "ERROR: LogConverter needed for %s at %s: %v"
-
-		unknownType := reflect.ValueOf(data).String()
-		str := fmt.Sprintf(errorPrefix, unknownType, string(debug.Stack()),
-			data)
-		output, offset = writeArray(output, offset, errorPrefix+format,
-			[]byte(str), TypeString)
+		_, msg := errorUnknownType(arg)
+		offset = writeArray(buf, offset, format, []byte(msg), TypeString)
 	}
 
-	return output, offset
+	return offset
 }
 
-func writeArray(output []byte, offset int, format string, data []byte,
-	byteType uint16) ([]byte, int) {
+func writeArray(buf []byte, offset uint64, format string, data []byte,
+	byteType uint16) uint64 {
 
 	if len(data) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: "+
 			"%s", format))
 	}
 
-	offset = toBinaryUint16(output, offset, byteType)
-	offset = toBinaryUint16(output, offset, uint16(len(data)))
+	offset = insertUint16(buf, offset, byteType)
+	offset = insertUint16(buf, offset, uint16(len(data)))
 
-	if cap(output)-offset < len(data) {
-		output = expandBuffer(output, len(data))
+	for _, v := range data {
+		offset = insertUint8(buf, offset, v)
 	}
 
-	for i, v := range data {
-		output[offset+i] = v
-	}
-
-	offset += len(data)
-
-	return output, offset
-}
-
-// Don't use interfaces where possible because they're slow
-func toBinaryUint8(buf []byte, offset int, input uint8) int {
-	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 1
-}
-
-func toBinaryUint16(buf []byte, offset int, input uint16) int {
-	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 2
-}
-
-func toBinaryUint32(buf []byte, offset int, input uint32) int {
-	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 4
-}
-
-func toBinaryUint64(buf []byte, offset int, input uint64) int {
-	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 8
+	return offset
 }
 
 func expandBuffer(buf []byte, howMuch int) []byte {
@@ -552,38 +560,109 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 	return tmp
 }
 
-func (mem *SharedMemory) generateLogEntry(buf []byte, strMapId uint16, reqId uint64,
-	timestamp int64, format string, args ...interface{}) ([]byte, int) {
+const sliceOfBytesKind = (reflect.Slice << 16) | reflect.Uint8
 
-	offset := 0
+func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
+	args ...interface{}) uint64 {
 
-	// Two bytes prefix for the total packet length, before the num of args.
-	// Write the log entry header with no prefixes
-	offset = toBinaryUint16(buf, offset, uint16(len(args)))
-	offset = toBinaryUint16(buf, offset, strMapId)
-	offset = toBinaryUint64(buf, offset, reqId)
-	offset = toBinaryUint64(buf, offset, uint64(timestamp))
+	// The structure of this method should match CircMemLogs.writePacket() and
+	// CircMemLogs.writeArg() to ensure the size is computed correctly. This is
+	// especially critical for the error strings.
 
-	originalOffset := offset
+	size := 0
+	size += 2 // Number of arguments
+	size += 2 // LogEntry.strIdx
+	size += 8 // LogEntry.reqId
+	size += 8 // LogEntry.timestamp
 
-	for i := 0; i < len(args); i++ {
-		if cap(buf)-offset < 10 {
-			buf = expandBuffer(buf, 10)
+	for i, arg := range args {
+		argType := reflect.TypeOf(arg)
+		argKind := argType.Kind()
+
+		kinds[i] = argKind
+
+		size += 2 // Argument type, ie. TypeInt8
+
+		switch argKind {
+		case reflect.Int8:
+			fallthrough
+		case reflect.Uint8:
+			fallthrough
+		case reflect.Bool:
+			size += 1
+
+		case reflect.Int16:
+			fallthrough
+		case reflect.Uint16:
+			size += 2
+
+		case reflect.Int32:
+			fallthrough
+		case reflect.Uint32:
+			size += 4
+
+		case reflect.Int:
+			fallthrough
+		case reflect.Uint:
+			fallthrough
+		case reflect.Int64:
+			fallthrough
+		case reflect.Uint64:
+			size += 8
+
+		case reflect.String:
+			size += 2 // Length of string
+			size += len([]byte(arg.(string)))
+
+		default:
+			// The if-else form of switch is slower, so avoid it and
+			// check the complex cases within the default case.
+			if argKind == reflect.Slice &&
+				argType.Elem().Kind() == reflect.Uint8 {
+
+				// Store a compound kind because this is a compound
+				// type and we don't want to carry/regenerate the
+				// reflect.Type object for all the arguments in
+				// CircMemLogs.writeArg()
+				kinds[i] = sliceOfBytesKind
+
+				size += 2 // Length of slice
+				size += len(interfaceAsByteSlice(arg))
+			} else {
+				// Truly unknown
+				size += 2 // Length of error message
+				l, _ := errorUnknownType(arg)
+				size += l
+			}
 		}
-		buf, offset = mem.binaryWrite(args[i], format, buf, offset)
 	}
 
-	// Make sure length isn't too long, excluding the size bytes
-	if offset > MaxPacketLen {
-		offset = originalOffset
+	return uint64(size)
+}
 
-		errorPrefix := "Log data exceeds allowable length at %s: %s"
-		str := fmt.Sprintf(errorPrefix, string(debug.Stack()), format)
-		buf, offset = mem.binaryWrite(str, format, buf, offset)
-	}
+// Don't use interfaces where possible because they're slow
+func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
+	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 1
+}
 
-	buf = buf[:offset]
-	return buf, offset
+func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
+	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 2
+}
+
+func insertUint32(buf []byte, offset uint64, input uint32) uint64 {
+	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 4
+}
+
+func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
+	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 8
 }
 
 func (mem *SharedMemory) Sync() int {
@@ -598,17 +677,26 @@ func (mem *SharedMemory) Sync() int {
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	timestamp int64, format string, args ...interface{}) {
 
-	// Create the string map entry / fetch existing one
-	strId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
-	if err != nil {
-		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n", format)
-		return
+	// Allocate a small slice on the stack which will cover most cases. Any
+	// situation with a very large number of arguments will allocate from the
+	// heap.
+	argumentKinds := make([]reflect.Kind, 32)
+	if len(args) > 32 {
+		argumentKinds = make([]reflect.Kind, len(args))
 	}
 
-	// Generate the byte array packet
-	data := make([]byte, 128)
-	data, length := mem.generateLogEntry(data, strId, reqId, timestamp, format,
-		args...)
+	packetSize := mem.computePacketSize(format, argumentKinds, args...)
+
+	// Make sure length isn't too long, excluding the packet size bytes
+	if packetSize > MaxPacketLen {
+		args = make([]interface{}, 1)
+		args[0] = format
+		argumentKinds[0] = reflect.String
+		format = "Log data exceeds allowable length: %s"
+		level = 0
+
+		packetSize = mem.computePacketSize(format, argumentKinds, args...)
+	}
 
 	partialWrite := false
 	if mem.testMode && len(mem.testDropStr) < len(format) &&
@@ -618,5 +706,13 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 		partialWrite = true
 	}
 
-	mem.circBuf.writeData(data, length, partialWrite)
+	// Create the string map entry / fetch existing one
+	formatId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
+	if err != nil {
+		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n", format)
+		return
+	}
+
+	mem.circBuf.writePacket(partialWrite, format, formatId, reqId, timestamp,
+		packetSize, argumentKinds, args...)
 }
