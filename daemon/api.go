@@ -544,8 +544,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	local := strings.Split(cmd.LocalWorkspace, "/")
-	localRootId, localNonce, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
-		local[2])
+	localRootId, localNonce, err := c.workspaceDB.Workspace(&c.Ctx, local[0],
+		local[1], local[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", local, err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
