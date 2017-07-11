@@ -152,7 +152,7 @@ type Inode interface {
 	parentGetChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory) quantumfs.FileId
+	parentCheckLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean_()  // Mark this Inode as cleaned
@@ -368,9 +368,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 }
 
 // Locks the parent
-func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
-	parent *Directory) quantumfs.FileId {
-
+func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
 
 	// Ensure we lock in the UP direction
@@ -382,7 +380,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
 	record := parent.children.record(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
-		return quantumfs.InvalidFileId
+		return
 	}
 
 	link := record.(*Hardlink)
@@ -392,7 +390,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
-		return quantumfs.InvalidFileId
+		return
 	}
 
 	// reparent the child to the given parent
@@ -405,8 +403,6 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
 	parent.children.loadChild(c, newRecord, inodeId)
 	parent.dirty(c)
-
-	return link.fileId
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
