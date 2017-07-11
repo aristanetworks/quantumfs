@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -506,59 +505,7 @@ func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 
 	child := c.qfs.inode(c, childId)
 	if child != nil {
-		fileId := child.parentCheckLinkReparent(c, dir)
-		dir.stashChildFileId(c, childId, fileId)
-	}
-}
-
-func extractFileId(c *ctx, data []byte) quantumfs.FileId {
-	if id, err := strconv.ParseUint(string(data), 16, 64); err != nil {
-		c.elog("Failed to extract fileId from %s, err %s",
-			string(data), err.Error())
-		return quantumfs.InvalidFileId
-	} else {
-		return quantumfs.FileId(id)
-	}
-}
-
-func (dir *Directory) childStashedFileIdFromRecord(c *ctx,
-	record quantumfs.DirectoryRecord) quantumfs.FileId {
-
-	attributeList, status := dir.getRecordExtendedAttributes(c, record)
-	if status != fuse.OK {
-		c.vlog("Could not retrieve any attributes")
-		return quantumfs.InvalidFileId
-	}
-	key := attributeList.AttributeByKey(quantumfs.XAttrTypeFileId)
-	if key == quantumfs.EmptyBlockKey {
-		c.vlog("Nothing stashed")
-		return quantumfs.InvalidFileId
-	}
-
-	buffer := c.dataStore.Get(&c.Ctx, key)
-	if buffer == nil {
-		c.elog("Failed to retrieve attribute datablock")
-		return quantumfs.InvalidFileId
-	}
-	return extractFileId(c, buffer.Get())
-}
-
-func (dir *Directory) childStashedFileIdFromInode(c *ctx,
-	childId InodeId) quantumfs.FileId {
-
-	if buf, status := dir.getChildXAttrData(c, childId,
-		quantumfs.XAttrTypeFileId); status == fuse.OK {
-		return extractFileId(c, buf)
-	}
-	return quantumfs.InvalidFileId
-}
-
-func (dir *Directory) stashChildFileId(c *ctx, childId InodeId,
-	fileId quantumfs.FileId) {
-
-	if fileId != quantumfs.InvalidFileId {
-		dir.setChildXAttr(c, childId, quantumfs.XAttrTypeFileId,
-			strconv.AppendUint(nil, uint64(fileId), 16))
+		child.parentCheckLinkReparent(c, dir)
 	}
 }
 

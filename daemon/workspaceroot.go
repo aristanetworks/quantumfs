@@ -212,8 +212,7 @@ func generateUniqueFileId(c *ctx,
 }
 
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string,
-	fileId quantumfs.FileId, inodeId InodeId,
-	record quantumfs.DirectoryRecord) *Hardlink {
+	inodeId InodeId, record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
 
@@ -228,6 +227,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string,
 
 	defer wsr.linkLock.Lock().Unlock()
 
+	fileId := dirRecord.FileId()
 	if fileId == quantumfs.InvalidFileId {
 		fileId = generateUniqueFileId(c, wsr.hardlinks)
 		c.vlog("New Hardlink %d created for inodeId %d", fileId, inodeId)
