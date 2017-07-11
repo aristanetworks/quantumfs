@@ -205,7 +205,7 @@ func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
-		fileId := decodeFileId(localRecord.ID())
+		fileId := localRecord.FileId()
 		hrc.claimedLinks[fileId] = inodeId
 		inode.setParent(dir.inodeNum())
 		return remoteRecord
@@ -213,7 +213,7 @@ func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
 	utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
 		"either local or remote should be hardlinks to be normalized")
 
-	fileId := decodeFileId(remoteRecord.ID())
+	fileId := remoteRecord.FileId()
 	dir.wsr.updateHardlinkInodeId(c, fileId, inodeId)
 	inode.setParent(dir.wsr.inodeNum())
 	return newHardlink(localRecord.Filename(), fileId, dir.wsr)
@@ -300,7 +300,7 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 			localRecord.Type() == quantumfs.ObjectTypeHardlink {
 			// If the ids do not match, then all legs have been deleted
 			// and recreated.
-			return remoteRecord.ID().IsEqualTo(localRecord.ID()), true
+			return remoteRecord.FileId() == localRecord.FileId(), true
 		}
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
@@ -311,7 +311,7 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 				c.vlog("No stashed fileId found.")
 				return false, true
 			}
-			fileId := decodeFileId(localRecord.ID())
+			fileId := localRecord.FileId()
 			if stashedFileId != fileId {
 				c.vlog("fileId mismatch %d vs. %d",
 					fileId, stashedFileId)
@@ -324,7 +324,7 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 		if remoteRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			localRecord.Type() != quantumfs.ObjectTypeHardlink {
 
-			fileId := decodeFileId(remoteRecord.ID())
+			fileId := remoteRecord.FileId()
 			valid, hardlinkRecord := dir.wsr.getHardlink(fileId)
 			utils.Assert(valid, "hardlink %d not found", fileId)
 

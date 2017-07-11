@@ -109,7 +109,7 @@ func (wsr *WorkspaceRoot) checkHardlink(inodeId InodeId) (bool, quantumfs.FileId
 	defer wsr.linkLock.RLock().RUnlock()
 	fileId, exists := wsr.inodeToLink[inodeId]
 	if !exists {
-		return false, 0
+		return false, quantumfs.InvalidFileId
 	}
 
 	return true, fileId
@@ -242,7 +242,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string,
 	// the hardlink. This field is used to support seamless refreshing
 	// of a set of files into a set of hardlinks.
 	newEntry.record.SetFilename(fingerprint)
-	newEntry.record.SetFileId(quantumfs.FileId(fileId))
+	newEntry.record.SetFileId(fileId)
 
 	wsr.hardlinks[fileId] = newEntry
 	wsr.inodeToLink[inodeId] = fileId

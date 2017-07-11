@@ -400,7 +400,7 @@ func underlyingTypeOf(wsr *WorkspaceRoot,
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record.Type()
 	}
-	fileId := decodeFileId(record.ID())
+	fileId := record.FileId()
 	valid, hardlinkRecord := wsr.getHardlink(fileId)
 	utils.Assert(valid, "hardlink %d not found", fileId)
 	utils.Assert(hardlinkRecord.Type() != quantumfs.ObjectTypeHardlink,
