@@ -6,13 +6,10 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
-ppid:=$(shell ps -o ppid= $$$$)
-ROOTDIRNAME:=$(shell echo -e "$(USER)-RootContainer-$(ppid)" | tr -d '[:space:]')
-export ROOTDIRNAME
 
-.PHONY: all cleanup $(COMMANDS) $(PKGS_TO_TEST)
+.PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
 
-all: cleanup lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS)
@@ -22,9 +19,6 @@ fetch:
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
-
-cleanup:
-	./cleanup.sh $(ppid) &
 
 lockcheck:
 	./lockcheck.sh
@@ -40,13 +34,13 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 		exit 1; \
 	fi
 
-$(COMMANDS): cleanup encoding/metadata.capnp.go
+$(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
-$(PKGS_TO_TEST): cleanup encoding/metadata.capnp.go
+$(PKGS_TO_TEST): encoding/metadata.capnp.go
 	sudo -E go test -gcflags '-e' github.com/aristanetworks/$@
 
 quploadRPM: $(COMMANDS)
