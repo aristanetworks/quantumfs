@@ -364,7 +364,8 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 	}
 
 	var curKey quantumfs.ObjectKey
-	curKey, nonce, err := wsdb.Workspace(qctx, wsParts[0], wsParts[1], wsParts[2])
+	curKey, nonce, err := wsdb.Workspace(qctx, wsParts[0], wsParts[1],
+		wsParts[2])
 	if err != nil {
 		return err
 	}
