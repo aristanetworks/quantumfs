@@ -17,6 +17,18 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
+// Arbitrary nlinks for directories if we fail to retrieve the real number from the
+// WorkspaceDB. 2 are for . and ..
+//
+// Choose five to represent 3 typespaces.
+const estimatedTypespaceNum = 5
+
+// Choose three to represent 1 namespace
+const minimumNamespaceNum = 3
+
+// Choose three to represent 1 workspace
+const minimumWorkspaceNum = 3
+
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
 		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
@@ -86,7 +98,7 @@ func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	num, err := c.workspaceDB.NumTypespaces(&c.Ctx)
 	if err != nil {
 		c.elog("Error fetching number of typespaces: %s", err.Error())
-		num = 5 // Arbitrary, but should be more than 2
+		num = estimatedTypespaceNum
 	}
 
 	c.vlog("/ has %d children", num)
@@ -106,7 +118,7 @@ func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	if err != nil {
 		c.elog("Error fetching number of namespaces in %s: %s", typespace,
 			err.Error())
-		num = 3 // Minimum acceptable value indicating one namespace
+		num = minimumNamespaceNum
 	}
 
 	c.vlog("%s/%s has %d children", typespace, namespace, num)
@@ -123,7 +135,7 @@ func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	if err != nil {
 		c.elog("Error fetching number of workspace in %s/%s: %s", typespace,
 			namespace, err.Error())
-		num = 3 // Minimum acceptable value indicating one workspace
+		num = minimumWorkspaceNum
 	}
 
 	c.vlog("%s/%s has %d children", typespace, namespace, num)
