@@ -344,7 +344,7 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 	defer wsdb.cacheMutex.RLock().RUnlock()
 	info, err := wsdb.workspace_(c, typespace, namespace, workspace)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	return info.immutable, nil

@@ -308,31 +308,33 @@ func setWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
 
 	typespaces, err := tx.CreateBucketIfNotExists(typespacesBucket)
 	if err != nil {
-		panic("Unable to create Typespaces bucket")
+		return fmt.Errorf("Unable to create typespaces bucket: %s",
+			err.Error())
 	}
 
 	typeBucket, err := typespaces.CreateBucketIfNotExists([]byte("" +
 		typespace))
 	if err != nil {
-		panic(fmt.Sprintf("Unable to create typespace %s", typespace))
+		return fmt.Errorf("Unable to create typespace: %s", typespace,
+			err.Error())
 	}
 
 	nameBucket, err := typeBucket.CreateBucketIfNotExists([]byte("" +
 		namespace))
 	if err != nil {
-		return fmt.Errorf("Unable to create namespace %s/%s", typespace,
-			namespace)
+		return fmt.Errorf("Unable to create namespace %s/%s: %s", typespace,
+			namespace, err.Error())
 	}
 
 	encoded, err := json.Marshal(info)
 	if err != nil {
-		return fmt.Errorf("Unable to encode workspace info %s", err.Error())
+		return fmt.Errorf("Unable to encode workspace info: %s", err.Error())
 	}
 
 	err = nameBucket.Put([]byte(workspace), encoded)
 	if err != nil {
-		return fmt.Errorf("Unable to set workspace %s/%s/%s", typespace,
-			namespace, workspace)
+		return fmt.Errorf("Unable to set workspace %s/%s/%s: %s", typespace,
+			namespace, workspace, err.Error())
 	}
 
 	return nil
