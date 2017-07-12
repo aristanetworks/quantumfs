@@ -18,7 +18,7 @@ type extPointStats struct {
 
 func NewExtPointStats(format_ string, nametag string) *extPointStats {
 	return &extPointStats{
-		format: format_,
+		format: format_ + "\n",
 		name:   nametag,
 	}
 }
