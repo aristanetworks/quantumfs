@@ -218,12 +218,14 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 	return b.Insert((*dsApiCtx)(c), key, buf, newmetadata)
 }
 
+const EtherGetLog = "EtherBlobStoreTranslator::Get"
+const KeyLog = "key %s"
+
 // Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
-	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Get",
-		"key %s", key.String()).Out()
+	defer c.FuncIn(qlog.LogDatastore, EtherGetLog, KeyLog, key.String()).Out()
 	kv := key.Value()
 	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), kv)
 	if err != nil {
@@ -243,6 +245,8 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	return nil
 }
 
+const EtherSetLog = "EtherBlobStoreTranslator::Set"
+
 // Set adpats quantumfs.DataStore's Set API to ether.BlobStore.Insert
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
@@ -250,8 +254,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	kv := key.Value()
 	ks := key.String()
 
-	defer c.FuncIn(qlog.LogDatastore, "EtherBlobStoreTranslator::Set",
-		"key %s", ks).Out()
+	defer c.FuncIn(qlog.LogDatastore, EtherSetLog, KeyLog, ks).Out()
 
 	metadata, err := ebt.Blobstore.Metadata((*dsApiCtx)(c), kv)
 
@@ -341,11 +344,12 @@ func (w *etherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	return count, nil
 }
 
+const EtherTypespaceLog = "EtherWsdbTranslator::TypespaceList"
+
 func (w *etherWsdbTranslator) TypespaceList(
 	c *quantumfs.Ctx) ([]string, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::TypespaceList").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, EtherTypespaceLog).Out()
 
 	list, err := w.wsdb.TypespaceList((*wsApiCtx)(c))
 	if err != nil {
@@ -368,12 +372,14 @@ func (w *etherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 	return count, nil
 }
 
+const EtherNamespaceLog = "EtherWsdbTranslator::NamespaceList"
+const EtherNamespaceDebugLog = "typespace: %s"
+
 func (w *etherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 	typespace string) ([]string, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::NamespaceList",
-		"typespace: %s", typespace).Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherNamespaceLog,
+		EtherNamespaceDebugLog, typespace).Out()
 
 	list, err := w.wsdb.NamespaceList((*wsApiCtx)(c), typespace)
 	if err != nil {
@@ -396,12 +402,14 @@ func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 	return count, nil
 }
 
+const EtherWorkspaceListLog = "EtherWsdbTranslator::WorkspaceList"
+const EtherWorkspaceListDebugLog = "%s/%s"
+
 func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	typespace string, namespace string) ([]string, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::WorkspaceList",
-		"%s/%s", typespace, namespace).Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceListLog,
+		EtherWorkspaceListDebugLog, typespace, namespace).Out()
 
 	list, err := w.wsdb.WorkspaceList((*wsApiCtx)(c), typespace, namespace)
 	if err != nil {
@@ -410,12 +418,14 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	return list, nil
 }
 
+const EtherWorkspaceLog = "EtherWsdbTranslator::Workspace"
+const EtherWorkspaceDebugLog = "%s/%s/%s"
+
 func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::Workspace",
-		"%s/%s/%s", typespace, namespace, workspace).Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceLog,
+		EtherWorkspaceDebugLog, typespace, namespace, workspace).Out()
 
 	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
 	if err != nil {
@@ -425,13 +435,14 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	return quantumfs.NewObjectKeyFromBytes(key), nil
 }
 
+const EtherBranchLog = "EtherWsdbTranslator::BranchWorkspace"
+const EtherBranchDebugLog = "%s/%s/%s -> %s/%s/%s"
+
 func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::BranchWorkspace",
-		"%s/%s/%s -> %s/%s/%s",
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherBranchLog, EtherBranchDebugLog,
 		srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace).Out()
 
@@ -458,13 +469,14 @@ func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 	return nil
 }
 
+const EtherAdvanceLog = "EtherWsdbTranslator::AdvanceWorkspace"
+const EtherAdvanceDebugLog = "%s/%s/%s %s -> %s"
+
 func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::AdvanceWorkspace",
-		"%s/%s/%s %s -> %s",
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherAdvanceLog, EtherAdvanceDebugLog,
 		typespace, namespace, workspace,
 		currentRootId.String(),
 		newRootId.String()).Out()
