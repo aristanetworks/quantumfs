@@ -347,7 +347,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.TypespaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.TypespaceList: %s",
 			err.Error())
 		return fuse.EIO
 	}
@@ -668,7 +668,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.NamespaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.NamespaceList: %s",
 			err.Error())
 		return fuse.EIO
 	}
@@ -1004,7 +1004,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
 		return fuse.EIO
 	}
