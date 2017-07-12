@@ -2,7 +2,7 @@
 # Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 # Arista Networks, Inc. Confidential and Proprietary.
 
-ppid=$1
+pid=$1
 rootContainer=$ROOTDIRNAME
 
 mountPath=`sudo mount -t fusectl | awk '{print $3}'`
@@ -25,9 +25,9 @@ while true; do
 done
 
 # If read finished with a timeout error, READERR will be 142. EOF returns 1.
-if [[ $READERR -eq 142 ]]; then
+if [[ ( $READERR -eq 142 ) && !( -z "$pid" ) ]]; then
 	echo "Make TIMED OUT... sending SIGKILL to $pid"
-	kill -9 $pid
+	kill -9 $pid 2> /dev/null
 fi
 
 # Prevent $rootContainer is accidentally set empty
