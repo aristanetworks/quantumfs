@@ -2,7 +2,7 @@
 # Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 # Arista Networks, Inc. Confidential and Proprietary.
 
-ppid=$1
+pid=$1
 rootContainer=$ROOTDIRNAME
 
 mountPath=`sudo mount -t fusectl | awk '{print $3}'`
@@ -11,26 +11,24 @@ if [ -z "$mountPath" ]; then
         sudo mount -t fusectl none $mountPath
 fi
 
-# On an idle system, the go-test should take no longer than
-# 3 minutes. Otherwise, it is hanging.
-SLEEPTIME=${SLEEPTIME:-180}
-while  [ $SLEEPTIME -gt 0 ]; do
-	# Escape from the sleep loop when the make process is finished
-	if ps -p $ppid > /dev/null; then
-		let "SLEEPTIME-=1"
-		sleep 1
-	else
-		SLEEPTIME=0
+# Watch the output of make. If nothing is printed for the timeout period,
+# then it make has hung. No single step should take longer than 3 minutes.
+TIMEOUT_SEC=${TIMEOUT_SEC:-180}
+READERR=0
+while true; do
+	read -t $TIMEOUT_SEC line
+	READERR=$?
+
+	if [[ $READERR -ne 0 ]]; then
+		break
 	fi
 done
 
-# Force to kill the parent process "make all" because it has hung too long
-for pid in `ps ux | grep --color=never 'make' | awk '{print $2}'`; do
-	if [ $ppid -eq $pid ]; then
-		echo "Sending SIGKILL to $pid"
-		kill -9 $pid
-	fi
-done
+# If read finished with a timeout error, READERR will be 142. EOF returns 1.
+if [[ ( $READERR -eq 142 ) && !( -z "$pid" ) ]]; then
+	echo "Make TIMED OUT... sending SIGKILL to $pid"
+	kill -9 $pid 2> /dev/null
+fi
 
 # Prevent $rootContainer is accidentally set empty
 if [[ -z ${rootContainer// } ]]; then
@@ -52,5 +50,10 @@ while [ `mount | grep /dev/shm/$rootContainer | wc -l` -gt 0 ]; do
 	done
 done
 
-# Clean up the rootContainder in /dev/shm
-sudo rm -r /dev/shm/$rootContainer
+# Clean up the rootContainder in /dev/shm if it exists
+if [[ -d "/dev/shm/$rootContainer" ]]; then
+	echo "Removing /dev/shm/$rootContainer."
+	sudo rm -r /dev/shm/$rootContainer
+else
+	echo "No /dev/shm folder to cleanup... finished."
+fi
