@@ -11,8 +11,8 @@ if [ -z "$mountPath" ]; then
         sudo mount -t fusectl none $mountPath
 fi
 
-# Watch the output of the Makefile. If nothing is output for the timeout period,
-# then it Make has hung. No single step should take longer than 3 minutes.
+# Watch the output of make. If nothing is printed for the timeout period,
+# then it make has hung. No single step should take longer than 3 minutes.
 TIMEOUT_SEC=${TIMEOUT_SEC:-180}
 READERR=0
 while true; do
@@ -24,16 +24,10 @@ while true; do
 	fi
 done
 
-# If read finished without a timeout error, READERR will be 142. EOF returns 1.
+# If read finished with a timeout error, READERR will be 142. EOF returns 1.
 if [[ $READERR -eq 142 ]]; then
-	echo "Make TIMED OUT"
-	# Force to kill the parent process "make all" because it has hung too long
-	for pid in `ps ux | grep --color=never 'make' | awk '{print $2}'`; do
-		if [ $ppid -eq $pid ]; then
-			echo "Sending SIGKILL to $pid"
-			kill -9 $pid
-		fi
-	done
+	echo "Make TIMED OUT... sending SIGKILL to $pid"
+	kill -9 $pid
 fi
 
 # Prevent $rootContainer is accidentally set empty
