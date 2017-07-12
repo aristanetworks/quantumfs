@@ -49,6 +49,7 @@ func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
 
 		case <-quit:
 			signal.Stop(sigUsr1Chan)
+			close(sigUsr1Chan)
 			return
 		}
 	}
