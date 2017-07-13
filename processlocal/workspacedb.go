@@ -22,7 +22,10 @@ type workspaceMap map[string]map[string]map[string]*workspaceInfo
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	wsdb := &workspaceDB{
-		cache: make(workspaceMap),
+		cache:         make(workspaceMap),
+		callback:      nil,
+		updates:       map[string]quantumfs.WorkspaceState{},
+		subscriptions: map[string]bool{},
 	}
 
 	type_ := quantumfs.NullSpaceName
@@ -65,6 +68,10 @@ func insertMap_(cache workspaceMap, typespace string,
 type workspaceDB struct {
 	cacheMutex utils.DeferableRwMutex
 	cache      workspaceMap
+
+	callback      quantumfs.SubscriptionCallback
+	updates       map[string]quantumfs.WorkspaceState
+	subscriptions map[string]bool
 }
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
@@ -374,4 +381,21 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 	workspaceInfo.immutable = true
 
 	return nil
+}
+
+func (wsdb *workspaceDB) SetCallback(callback quantumfs.SubscriptionCallback) {
+	defer wsdb.cacheMutex.Lock().Unlock()
+	wsdb.callback = callback
+}
+
+func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
+	defer wsdb.cacheMutex.Lock().Unlock()
+	wsdb.subscriptions[workspaceName] = true
+
+	return nil
+}
+
+func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
+	defer wsdb.cacheMutex.Lock().Unlock()
+	delete(wsdb.subscriptions, workspaceName)
 }
