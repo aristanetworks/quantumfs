@@ -227,9 +227,12 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		// conditions have to be satisfied. Only when two api goroutines
 		// starts at the same point, they will share the same prior
 		// apiFileSize. Only if their partial reads interleave, will the
-		// posterior apiFileSizes be the same
+		// posterior apiFileSizes both be changed. We cannot assume they
+		// will be the same in the event that one polls a little early.
 		test.Assert(initFileSize == initFileSize2 &&
-			endFileSize == endFileSize2 && endFileSize != 0,
+			endFileSize2 != initFileSize2 &&
+			endFileSize != initFileSize &&
+			endFileSize != 0 && endFileSize2 != 0,
 			"Error two api's aren't running in concurrent %d %d %d %d",
 			initFileSize, initFileSize2, endFileSize, endFileSize2)
 	})
