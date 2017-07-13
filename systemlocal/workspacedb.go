@@ -77,7 +77,10 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	}
 
 	wsdb := &workspaceDB{
-		db: db,
+		db:            db,
+		callback:      nil,
+		updates:       map[string]quantumfs.WorkspaceState{},
+		subscriptions: map[string]bool{},
 	}
 
 	nullWorkspace := workspaceInfo{
@@ -105,6 +108,11 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 // one Quantumfs instance at a time however.
 type workspaceDB struct {
 	db *bolt.DB
+
+	lock          utils.DeferableMutex
+	callback      quantumfs.SubscriptionCallback
+	updates       map[string]quantumfs.WorkspaceState
+	subscriptions map[string]bool
 }
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
@@ -584,4 +592,21 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 
 		return err
 	})
+}
+
+func (wsdb *workspaceDB) SetCallback(callback quantumfs.SubscriptionCallback) {
+	defer wsdb.lock.Lock().Unlock()
+	wsdb.callback = callback
+}
+
+func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
+	defer wsdb.lock.Lock().Unlock()
+	wsdb.subscriptions[workspaceName] = true
+
+	return nil
+}
+
+func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
+	defer wsdb.lock.Lock().Unlock()
+	delete(wsdb.subscriptions, workspaceName)
 }
