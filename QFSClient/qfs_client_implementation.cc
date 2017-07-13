@@ -566,6 +566,35 @@ Error ApiImpl::Branch(const char *source, const char *destination) {
 	return util::getError(kSuccess);
 }
 
+Error ApiImpl::Delete(const char *workspace) {
+	Error err = this->CheckWorkspaceNameValid(workspace);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	// create JSON with:
+	//    CommandId = kCmdDeleteWorkspace and
+	//    Workspace = workspace
+	json_error_t json_error;
+	json_t *request_json = json_pack_ex(&json_error, 0,
+					    kDeleteJSON,
+					    kCommandId, kCmdDeleteWorkspace,
+					    kWorkspaceRoot, workspace);
+	if (request_json == NULL) {
+		return util::getError(kJsonEncodingError, json_error.text);
+	}
+
+	ApiContext context;
+	context.SetRequestJsonObject(request_json);
+
+	err = this->SendJson(&context);
+	if (err.code != kSuccess) {
+		return err;
+	}
+
+	return util::getError(kSuccess);
+}
+
 Error ApiImpl::SetBlock(const std::vector<byte> &key,
 			const std::vector<byte> &data) {
 	// convert key and data to base64 before stuffing into JSON
