@@ -226,7 +226,7 @@ func (th *TestHelper) WaitForLogString(text string, failMsg string) {
 	th.WaitFor(failMsg, func() bool {
 		contains := th.messagesInTestLog([]TLA{TLA{true, text, failMsg}})
 
-		return (contains[0] == true)
+		return contains[0]
 	})
 	th.AssertTestLog([]TLA{TLA{true, text, failMsg}})
 }
