@@ -6,7 +6,7 @@ ROOTDIRNAME:=$(shell echo -e "$(USER)-RootContainer-$(ppid)" | tr -d '[:space:]'
 export ROOTDIRNAME
 
 all:
-	$(MAKE) -f $(TARGETMAKEFILE) | tee /dev/tty | ./cleanup.sh $(ppid)
+	$(MAKE) -f $(TARGETMAKEFILE) 2>&1 | ./cleanup.sh $(ppid)
 
 %:
-	$(MAKE) -f $(TARGETMAKEFILE) $@ | tee /dev/tty | ./cleanup.sh $(ppid)
+	$(MAKE) -f $(TARGETMAKEFILE) $@ 2>&1 | ./cleanup.sh $(ppid)
