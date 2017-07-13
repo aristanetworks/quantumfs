@@ -13,9 +13,10 @@ import "fmt"
 type WorkspaceNonce uint64
 
 type WorkspaceState struct {
-	rootId    ObjectKey
-	nonce     WorkspaceNonce
-	immutable bool
+	RootId    ObjectKey
+	Nonce     WorkspaceNonce
+	Immutable bool
+	Deleted   bool
 }
 
 type SubscriptionCallback func(updates map[string]WorkspaceState)
