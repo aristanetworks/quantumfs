@@ -579,7 +579,7 @@ Error ApiImpl::Delete(const char *workspace) {
 	json_t *request_json = json_pack_ex(&json_error, 0,
 					    kDeleteJSON,
 					    kCommandId, kCmdDeleteWorkspace,
-					    kWorkspaceRoot, workspace);
+					    kWorkspacePath, workspace);
 	if (request_json == NULL) {
 		return util::getError(kJsonEncodingError, json_error.text);
 	}
