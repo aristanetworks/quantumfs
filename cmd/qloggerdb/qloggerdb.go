@@ -49,20 +49,18 @@ const statPeriod = 30 * time.Second
 func newQfsExtPair(common string,
 	startPostfix string) qlogstats.StatExtractorConfig {
 
-	return qlogstats.NewStatExtractorConfig(
+	return *qlogstats.NewStatExtractorConfig(
 		qlogstats.NewExtPairStats(
 			qlog.FnEnterStr+common+" "+startPostfix,
-			qlog.FnExitStr+common,
-			true, common),
-		statPeriod)
+			qlog.FnExitStr+common, true, common), statPeriod)
 }
 
 func createExtractors() []qlogstats.StatExtractorConfig {
 	return []qlogstats.StatExtractorConfig{
-		qlogstats.NewStatExtractorConfig(
+		*qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheHitLog,
 				"readcache_hit"), statPeriod),
-		qlogstats.NewStatExtractorConfig(
+		*qlogstats.NewStatExtractorConfig(
 			qlogstats.NewExtPointStats(daemon.CacheMissLog,
 				"readcache_miss"), statPeriod),
 
