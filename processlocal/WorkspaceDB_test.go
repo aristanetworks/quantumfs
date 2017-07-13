@@ -154,3 +154,86 @@ func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
 			"Workspace is either immutable or with error: %v", err)
 	})
 }
+
+func TestPubSubBranch(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb.SetCallback(callback)
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
+
+func TestPubSubAdvanceAndUnsubscribe(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb.SetCallback(callback)
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+		wsdb.UnsubscribeFrom("test/test/test")
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		err = wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+		test.Assert(!called, "Notification when not subscribed!")
+
+		key, nonce, err := wsdb.Workspace(test.ctx, "test", "test", "test")
+		test.AssertNoErr(err)
+
+		_, err = wsdb.AdvanceWorkspace(test.ctx, "test", "test", "test",
+			nonce, key, key)
+		test.AssertNoErr(err)
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
+
+func TestPubSubDelete(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb.SetCallback(callback)
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		err = wsdb.DeleteWorkspace(test.ctx, "test", "test", "test")
+		test.AssertNoErr(err)
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+		test.Assert(false, "Intentional")
+	})
+}
