@@ -426,7 +426,7 @@ func TestRefreshUninstantiated(t *testing.T) {
 			"no changes to the rootId")
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
-		test.AssertLogContains("Adding uninstantiated",
+		test.WaitForLogString("Adding uninstantiated",
 			"There are no uninstantiated inodes")
 
 		for i := 0; i < nfiles; i++ {
