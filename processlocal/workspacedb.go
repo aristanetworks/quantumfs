@@ -24,7 +24,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	wsdb := &workspaceDB{
 		cache:         make(workspaceMap),
 		callback:      nil,
-		updates:       map[string]quantumfs.WorkspaceState{},
+		updates:       nil,
 		subscriptions: map[string]bool{},
 	}
 
@@ -248,6 +248,8 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	}
 	insertMap_(wsdb.cache, dstTypespace, dstNamespace, dstWorkspace, &newInfo)
 
+	wsdb.notifySubscribers_(c, dstTypespace, dstNamespace, dstWorkspace)
+
 	keyDebug := newInfo.key.String()
 
 	c.Dlog(qlog.LogWorkspaceDb,
@@ -301,7 +303,11 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	// Through all these checks, if the workspace could not exist, we return
 	// success. The caller wanted that workspace to not exist and it doesn't.
 	defer wsdb.cacheMutex.Lock().Unlock()
-	return deleteWorkspaceRecord_(c, wsdb.cache, typespace, namespace, workspace)
+	err := deleteWorkspaceRecord_(c, wsdb.cache, typespace, namespace, workspace)
+
+	wsdb.notifySubscribers_(c, typespace, namespace, workspace)
+
+	return err
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
@@ -351,6 +357,8 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	wsdb.cache[typespace][namespace][workspace].key = newRootId
 
+	wsdb.notifySubscribers_(c, typespace, namespace, workspace)
+
 	c.Vlog(qlog.LogWorkspaceDb, "Advanced rootID for %s/%s from %s to %s",
 		namespace, workspace, currentRootId.String(), newRootId.String())
 
@@ -380,6 +388,8 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 
 	workspaceInfo.immutable = true
 
+	wsdb.notifySubscribers_(c, typespace, namespace, workspace)
+
 	return nil
 }
 
@@ -398,4 +408,109 @@ func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
 func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
 	defer wsdb.cacheMutex.Lock().Unlock()
 	delete(wsdb.subscriptions, workspaceName)
+}
+
+// Must hold cacheMutex
+func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
+	namespace string, workspace string) {
+
+	c.FuncIn(qlog.LogWorkspaceDb, "processlocal::notifySubscribers_",
+		"workspace %s/%s/%s", typespace, namespace, workspace)
+
+	workspaceName := typespace + "/" + namespace + "/" + workspace
+
+	if _, subscribed := wsdb.subscriptions[workspaceName]; !subscribed {
+		c.Vlog(qlog.LogWorkspaceDb, "No subscriptions for workspace")
+		return
+	}
+
+	startTransmission := false
+	if wsdb.updates == nil {
+		c.Vlog(qlog.LogWorkspaceDb, "No notification goroutine running")
+		wsdb.updates = map[string]quantumfs.WorkspaceState{}
+		startTransmission = true
+	}
+
+	// Update/set the state of this workspace
+	state, exists := wsdb.updates[workspaceName]
+	if !exists {
+		state = quantumfs.WorkspaceState{}
+	}
+
+	wsInfo, err := wsdb.workspace_(c, typespace, namespace, workspace)
+	if err != nil {
+		switch err := err.(type) {
+		default:
+			c.Elog(qlog.LogWorkspaceDb,
+				"Unknown error type fetching workspace: %s",
+				err.Error())
+			return
+		case *quantumfs.WorkspaceDbErr:
+			switch err.Code {
+			default:
+				c.Elog(qlog.LogWorkspaceDb,
+					"Unexpected error fetching workspace: %s",
+					err.Error())
+				return
+			case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+				c.Vlog(qlog.LogWorkspaceDb, "Workspace was deleted")
+				state.Deleted = true
+			}
+		}
+	} else {
+		// If we didn't receive an error, then we have valid information to
+		// pass to the client.
+		state.RootId = wsInfo.key
+		state.Nonce = wsInfo.nonce
+		state.Immutable = wsInfo.immutable
+	}
+
+	wsdb.updates[workspaceName] = state
+
+	// Possibly start notifying the client.
+	if !startTransmission {
+		// There is already an update in progress and we need to wait for
+		// that to complete. The goroutine which is running the callback will
+		// find these new updates and send them when it completes.
+		return
+	}
+
+	updatesToSend := wsdb.updates
+	wsdb.updates = nil
+
+	go wsdb.sendNotifications(c, updatesToSend, wsdb.callback)
+}
+
+// This function runs it its own goroutine whenever there isn't already one running
+// and there are updates to send. It must continue to send additional updates as long
+// as such updates exist.
+func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
+	updates map[string]quantumfs.WorkspaceState,
+	callback quantumfs.SubscriptionCallback) {
+
+	c.FuncIn(qlog.LogWorkspaceDb, "processlocal::sendNotifications",
+		"Starting with %d updates", len(updates))
+
+	for {
+		if callback != nil {
+			c.Vlog(qlog.LogWorkspaceDb, "Notifying callback of %d updates",
+				len(updates))
+			callback(updates)
+		} else {
+			c.Vlog(qlog.LogWorkspaceDb, "nil callback, dropping %d "+
+				"updates", len(updates))
+		}
+
+		func() {
+			defer wsdb.cacheMutex.Lock().Unlock()
+			callback = wsdb.callback
+			updates = wsdb.updates
+			wsdb.updates = nil
+		}()
+
+		if updates == nil {
+			c.Vlog(qlog.LogWorkspaceDb, "No further updates")
+			return
+		}
+	}
 }
