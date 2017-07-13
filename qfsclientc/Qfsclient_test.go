@@ -40,7 +40,7 @@ func TestBasicInterface(t *testing.T) {
 	})
 }
 
-func TestBranchInterface(t *testing.T) {
+func TestBranchAndDeleteInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
@@ -50,6 +50,14 @@ func TestBranchInterface(t *testing.T) {
 		// Ensure that the branch was created
 		_, err = os.Stat(test.AbsPath("test/test/test"))
 		test.AssertNoErr(err)
+
+		// Test that we can delete it
+		err = api.Delete("test/test/test")
+		test.AssertNoErr(err)
+
+		// Ensure it's gone
+		_, err = os.Stat(test.AbsPath("test/test/test"))
+		test.Assert(os.IsNotExist(err), "Workspace not deleted")
 
 		err = ReleaseApi(api)
 		test.AssertNoErr(err)
