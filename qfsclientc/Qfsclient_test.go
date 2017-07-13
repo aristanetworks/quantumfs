@@ -55,9 +55,11 @@ func TestBranchAndDeleteInterface(t *testing.T) {
 		err = api.Delete("test/test/test")
 		test.AssertNoErr(err)
 
-		// Ensure it's gone
-		_, err = os.Stat(test.AbsPath("test/test/test"))
-		test.Assert(os.IsNotExist(err), "Workspace not deleted")
+		test.WaitFor("Workspace deletion", func() bool {
+			// Ensure it's gone
+			_, err = os.Stat(test.AbsPath("test/test/test"))
+			return os.IsNotExist(err)
+		})
 
 		err = ReleaseApi(api)
 		test.AssertNoErr(err)

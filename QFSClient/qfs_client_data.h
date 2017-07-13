@@ -46,6 +46,7 @@ enum CommandError {
 // names of commonly-used JSON fields
 static const char kCommandId[] = "CommandId";
 static const char kWorkspaceRoot[] = "WorkspaceRoot";
+static const char kWorkspacePath[] = "WorkspacePath";
 static const char kErrorCode[] = "ErrorCode";
 static const char kMessage[] = "Message";
 static const char kPathList[] = "PathList";
