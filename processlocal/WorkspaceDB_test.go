@@ -8,6 +8,7 @@ package processlocal
 
 import (
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -234,5 +235,64 @@ func TestPubSubDelete(t *testing.T) {
 		test.AssertNoErr(err)
 
 		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
+
+func TestPubSubBacklog(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		iteration1Len := 0
+		iteration2Len := 0
+		iteration2Deleted := false
+		callStep := 0
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			callStep++
+			if callStep == 0 {
+				time.Sleep(100 * time.Millisecond)
+				iteration1Len = len(updates)
+			} else {
+				test2, ok := updates["test2"]
+				iteration2Len = len(updates)
+				iteration2Deleted = ok && test2.Deleted
+			}
+		}
+		wsdb.SetCallback(callback)
+
+		test.AssertNoErr(wsdb.SubscribeTo("test1/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test2/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test3/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test4/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test5/test/test"))
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test1", "test", "test"))
+
+		test.WaitFor("Callback to be invoked the first time",
+			func() bool { return callStep == 1 })
+
+		// At this point the notification goroutine is busy, so these
+		// following should all be coalesced.
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test2", "test", "test"))
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test3", "test", "test"))
+
+		test.AssertNoErr(wsdb.DeleteWorkspace(test.ctx, "test2", "test",
+			"test"))
+
+		test.WaitFor("Callback to be invoked the second time",
+			func() bool { return callStep == 2 })
+
+		test.Assert(iteration1Len == 1, "Iteration 1: length wrong %d",
+			iteration1Len)
+		test.Assert(iteration2Len == 2, "Iteration 2: length wrong %d",
+			iteration2Len)
+		test.Assert(iteration2Deleted, "Iteration 2: not deleted")
 	})
 }
