@@ -209,6 +209,8 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	stopFlushTimer <- true
 	<-flushTimerStopped
 
+	qfs.c.dataStore.shutdown()
+
 	return nil
 }
 
