@@ -234,6 +234,5 @@ func TestPubSubDelete(t *testing.T) {
 		test.AssertNoErr(err)
 
 		test.WaitFor("Callback to be invoked", func() bool { return called })
-		test.Assert(false, "Intentional")
 	})
 }
