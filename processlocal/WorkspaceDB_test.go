@@ -296,3 +296,27 @@ func TestPubSubBacklog(t *testing.T) {
 		test.Assert(iteration2Deleted, "Iteration 2: not deleted")
 	})
 }
+
+func TestPubSubPanic(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			panic("Intentional, test initiated panic")
+		}
+
+		wsdb.SetCallback(callback)
+
+		test.AssertNoErr(wsdb.SubscribeTo("test/test/test"))
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		// Give the callback time to run and panic before ending this test.
+		// This will ensure all the processlocal tests do not complete before
+		// the callback has panic'ed.
+		time.Sleep(300 * time.Millisecond)
+
+	})
+}

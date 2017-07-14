@@ -5,6 +5,7 @@ package processlocal
 
 import (
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -492,7 +493,7 @@ func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
 		if callback != nil {
 			c.Vlog(qlog.LogWorkspaceDb, "Notifying callback of %d updates",
 				len(updates))
-			callback(updates)
+			safelyCall(c, callback, updates)
 		} else {
 			c.Vlog(qlog.LogWorkspaceDb, "nil callback, dropping %d "+
 				"updates", len(updates))
@@ -521,4 +522,27 @@ func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
 			return
 		}
 	}
+}
+
+func safelyCall(c *quantumfs.Ctx, callback quantumfs.SubscriptionCallback,
+	updates map[string]quantumfs.WorkspaceState) {
+
+	// If the subscription callback should panic, we'll log and then continue on.
+	// The update set which caused the panic may be lost, but subsequent update
+	// sets will be attempted.
+	defer func() {
+		exception := recover()
+		if exception == nil {
+			return
+		}
+
+		stackTrace := debug.Stack()
+
+		c.Elog(qlog.LogWorkspaceDb, "PANIC executing subscription "+
+			"callback: '%s' StackTrace: %s",
+			fmt.Sprintf("%v", exception),
+			utils.BytesToString(stackTrace))
+	}()
+
+	callback(updates)
 }
