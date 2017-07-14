@@ -24,6 +24,7 @@ func init() {
 
 type workspaceInfo struct {
 	Key       string // hex encoded ObjectKey.Value()
+	Nonce     quantumfs.WorkspaceNonce
 	Immutable bool
 }
 
@@ -81,6 +82,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 
 	nullWorkspace := workspaceInfo{
 		Key:       encodeKey(quantumfs.EmptyWorkspaceKey),
+		Nonce:     0,
 		Immutable: true,
 	}
 
@@ -235,11 +237,11 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
-	namespace string) ([]string, error) {
+	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::WorkspaceList").Out()
 
-	workspaceList := make([]string, 0, 100)
+	workspaceList := make(map[string]quantumfs.WorkspaceNonce, 100)
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		typespaces := tx.Bucket(typespacesBucket)
@@ -260,14 +262,27 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 		}
 
 		workspaces := bucket.Cursor()
-		for w, _ := workspaces.First(); w != nil; w, _ = workspaces.Next() {
-			workspaceList = append(workspaceList, string(w))
+		name, infoBytes := workspaces.First()
+		for ; name != nil; name, infoBytes = workspaces.Next() {
+			info := bytesToInfo(infoBytes, string(name))
+			workspaceList[string(name)] = info.Nonce
 		}
 
 		return nil
 	})
 
 	return workspaceList, err
+}
+
+func bytesToInfo(str []byte, workspace string) workspaceInfo {
+	var info workspaceInfo
+	err := json.Unmarshal(str, &info)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decode workspaceInfo for %s: %s '%s'",
+			workspace, err.Error(), string(str)))
+	}
+
+	return info
 }
 
 // Get the workspace key. This must be run inside a boltDB transaction
@@ -293,12 +308,7 @@ func getWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
 		return nil
 	}
 
-	var info workspaceInfo
-	err := json.Unmarshal(encoded, &info)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to decode workspaceInfo for %s: %s '%s'",
-			workspace, err.Error(), string(encoded)))
-	}
+	info := bytesToInfo(encoded, workspace)
 	return &info
 }
 
@@ -369,6 +379,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 		newInfo := workspaceInfo{
 			Key:       srcInfo.Key,
+			Nonce:     quantumfs.WorkspaceNonce(time.Now().UnixNano()),
 			Immutable: false,
 		}
 
@@ -442,11 +453,13 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 }
 
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+	namespace string, workspace string) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::Workspace").Out()
 
 	var rootid string
+	var nonce quantumfs.WorkspaceNonce
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
 		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
@@ -458,15 +471,17 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 		}
 
 		rootid = info.Key
+		nonce = info.Nonce
 
 		return nil
 	})
 
-	return decodeKey(rootid), err
+	return decodeKey(rootid), nonce, err
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
+	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
+	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -480,6 +495,13 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"Advance failed")
+		}
+
+		if nonce != info.Nonce {
+			e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
+				"Nonce %d does not match WSDB (%d)", nonce,
+				info.Nonce)
+			return e
 		}
 
 		if encodeKey(currentRootId) != info.Key {
