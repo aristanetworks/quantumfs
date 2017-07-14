@@ -248,11 +248,11 @@ func TestPubSubBacklog(t *testing.T) {
 		callStep := 0
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
 			callStep++
-			if callStep == 0 {
+			if callStep == 1 {
 				time.Sleep(100 * time.Millisecond)
 				iteration1Len = len(updates)
 			} else {
-				test2, ok := updates["test2"]
+				test2, ok := updates["test2/test/test"]
 				iteration2Len = len(updates)
 				iteration2Deleted = ok && test2.Deleted
 			}
