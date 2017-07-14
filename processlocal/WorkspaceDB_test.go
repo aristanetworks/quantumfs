@@ -126,10 +126,10 @@ func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		createWorkspaces(test.ctx, test.wsdb)
 
-		immutable, err := test.wsdb.WorkspaceIsImmutable(test.ctx, "type1",
+		_, err := test.wsdb.WorkspaceIsImmutable(test.ctx, "type1",
 			"name1", "work10")
-		utils.Assert(err == nil && !immutable,
-			"Workspace is either immutable or with error: %v", err)
+		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Workspace exists")
 	})
 }
 
@@ -151,8 +151,8 @@ func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
 
 		immutable, err = test.wsdb.WorkspaceIsImmutable(test.ctx, "type1",
 			"name1", "work1")
-		utils.Assert(err == nil && !immutable,
-			"Workspace is either immutable or with error: %v", err)
+		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Workspace not deleted")
 	})
 }
 
