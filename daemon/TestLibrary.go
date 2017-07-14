@@ -6,6 +6,7 @@ package daemon
 // Test library for daemon package
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -38,6 +39,30 @@ type TestHelper struct {
 	qfsWait        sync.WaitGroup
 	fuseConnection int
 	api            quantumfs.Api
+}
+
+func logFuseWaiting(th *TestHelper) {
+	if th.fuseConnection == 0 {
+		// There is no connection to log
+		return
+	}
+
+	buf := make([]byte, 100)
+
+	path := fmt.Sprintf("%s/connections/%d/waiting", fusectlPath,
+		th.fuseConnection)
+	waiting, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		th.Log("ERROR: Failed to open FUSE connection waiting err: %s",
+			err.Error())
+	} else if _, err := waiting.Read(buf); err != nil {
+		th.Log("ERROR: Failed to read FUSE connection waiting err: %s",
+			err.Error())
+	} else {
+		str := bytes.TrimRight(buf, "\u0000\n")
+		th.Log("There are %s pending requests", str)
+	}
+	waiting.Close()
 }
 
 func abortFuse(th *TestHelper) {
@@ -80,13 +105,15 @@ func (th *TestHelper) EndTest() {
 				exception)
 			abortFuse(th)
 		}
-
+		logFuseWaiting(th)
 		if err := th.qfs.server.Unmount(); err != nil {
 			th.Log("ERROR: Failed to unmount quantumfs instance.")
 			th.Log("Are you leaking a file descriptor?: %s", err.Error())
+			logFuseWaiting(th)
 
 			abortFuse(th)
 			runtime.GC()
+			logFuseWaiting(th)
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs "+
 					"after aborting: %s", err.Error())
