@@ -432,10 +432,7 @@ func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 	}
 
 	// Update/set the state of this workspace
-	state, exists := wsdb.updates[workspaceName]
-	if !exists {
-		state = quantumfs.WorkspaceState{}
-	}
+	state := quantumfs.WorkspaceState{}
 
 	wsInfo, err := wsdb.workspace_(c, typespace, namespace, workspace)
 	if err != nil {
@@ -476,7 +473,7 @@ func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 	}
 
 	updatesToSend := wsdb.updates
-	wsdb.updates = nil
+	wsdb.updates = map[string]quantumfs.WorkspaceState{}
 
 	go wsdb.sendNotifications(c, updatesToSend, wsdb.callback)
 }
@@ -502,10 +499,21 @@ func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
 		}
 
 		func() {
+			c.Vlog(qlog.LogWorkspaceDb, "Checking for more updates")
 			defer wsdb.cacheMutex.Lock().Unlock()
 			callback = wsdb.callback
 			updates = wsdb.updates
-			wsdb.updates = nil
+
+			if len(updates) == 0 {
+				// No new updates since the last time around, we have
+				// caught up.
+				wsdb.updates = nil
+				updates = nil
+			} else {
+				// There have been new updates since the previous
+				// time through the loop. Loop again.
+				wsdb.updates = map[string]quantumfs.WorkspaceState{}
+			}
 		}()
 
 		if updates == nil {
