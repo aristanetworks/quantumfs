@@ -140,6 +140,14 @@ class Api {
 	virtual Error Branch(const char *source,
 			     const char *destination) = 0;
 
+	/// Delete a given workspace with the supplied name.
+	///
+	/// @param [in] `workspace` A string containing the root name of the
+	/// workspace that is to be deleted.
+	///
+	/// @return An `Error` object that indicates success or failure.
+	virtual Error Delete(const char *workspace) = 0;
+
 	/// Store a block of data persistently.
 	///
 	/// @param [in] `key` A base64 string (which could represent a binary key)
