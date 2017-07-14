@@ -1,0 +1,15 @@
+[Unit]
+Description=QloggerDB
+Requires=quantumfs.service
+After=quantumfs.service
+
+[Service]
+Type=simple
+ExecStartPre=touch /dev/shm/quantumfs/qlog
+ExecStart=/usr/sbin/qloggerdb -db influxdb /dev/shm/quantumfs/qlog
+ExecStop=/usr/bin/killall -SIGUSR1 qloggerdb
+User=root
+KillMode=none
+
+[Install]
+WantedBy=multi-user.target
