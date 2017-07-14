@@ -28,22 +28,30 @@ func init() {
 // and drop the contents of the cache. The intended use is as a way to free the bulk
 // of the memory used by quantumfsd when it is being gracefully shutdown by lazily
 // unmounting it.
-func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal) {
+func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
+	quit chan struct{}) {
+
 	for {
-		<-sigUsr1Chan
+		select {
+		case <-sigUsr1Chan:
+			func() {
+				defer store.cacheLock.Lock().Unlock()
 
-		func() {
-			defer store.cacheLock.Lock().Unlock()
+				// Prevent future additions
+				store.cacheSize = -1
+				store.freeSpace = -1
+				store.cache = make(map[string]*buffer, 0)
+				store.lru = list.List{}
+			}()
 
-			// Prevent future additions
-			store.cacheSize = -1
-			store.freeSpace = -1
-			store.cache = make(map[string]*buffer, 0)
-			store.lru = list.List{}
-		}()
+			// Release the memory
+			debug.FreeOSMemory()
 
-		// Release the memory
-		debug.FreeOSMemory()
+		case <-quit:
+			signal.Stop(sigUsr1Chan)
+			close(sigUsr1Chan)
+			return
+		}
 	}
 }
 
@@ -54,11 +62,12 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 		cache:        make(map[string]*buffer, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
+		quit:         make(chan struct{}),
 	}
 
 	sigUsr1Chan := make(chan os.Signal, 1)
 	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
-	go signalHandler(store, sigUsr1Chan)
+	go signalHandler(store, sigUsr1Chan, store.quit)
 
 	return store
 }
@@ -71,6 +80,11 @@ type dataStore struct {
 	cache     map[string]*buffer
 	cacheSize int
 	freeSpace int
+	quit      chan struct{} // Signal termination
+}
+
+func (store *dataStore) shutdown() {
+	store.quit <- struct{}{}
 }
 
 func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {

@@ -45,9 +45,9 @@ type StatExtractorConfig struct {
 }
 
 func NewStatExtractorConfig(ext StatExtractor,
-	period time.Duration) StatExtractorConfig {
+	period time.Duration) *StatExtractorConfig {
 
-	return StatExtractorConfig{
+	return &StatExtractorConfig{
 		extractor:  ext,
 		statPeriod: period,
 	}
@@ -78,6 +78,9 @@ type Aggregator struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
+	// Uses a prefix (slower) system to extract data
+	errorCount *extPointStats
+
 	statExtractors  []StatExtractorConfig
 	statTriggers    map[string][]extractorIdx
 	requestEndAfter time.Duration
@@ -86,6 +89,8 @@ type Aggregator struct {
 	queueLogs  []qlog.LogOutput
 }
 
+const errorStr = "ERROR: "
+
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	extractors []StatExtractorConfig, daemonVersion_ string) *Aggregator {
 
@@ -93,6 +98,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:              db_,
 		logsByRequest:   make(map[uint64]logTrack),
 		daemonVersion:   daemonVersion_,
+		errorCount:      NewExtPointStats(errorStr, "SystemErrors"),
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
@@ -202,6 +208,16 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 
 		if qlog.IsFunctionOut(curlog.Format) {
 			indentCount--
+		}
+
+		// Check for partial matching for errors
+		if curlog.Format[:len(errorStr)] == errorStr {
+			agg.errorCount.ProcessRequest([]indentedLog{
+				indentedLog{
+					log:    curlog,
+					indent: indentCount,
+				},
+			})
 		}
 
 		// The statTriggers map is a map that uses a log format string for

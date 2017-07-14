@@ -148,6 +148,17 @@ extern "C" {
 		return errStr(err);
 	}
 
+	const char * cDelete(uint32_t apiHandle, const char *workspace) {
+
+		auto api = findApi(apiHandle);
+		if (!api) {
+			return "Api doesn't exist.";
+		}
+
+		qfsclient::Error err = api->Delete(workspace);
+		return errStr(err);
+	}
+
 	const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 		uint32_t len) {
 
