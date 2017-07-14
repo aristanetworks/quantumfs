@@ -5,6 +5,10 @@ package daemon
 
 import (
 	"container/list"
+	"os"
+	"os/signal"
+	"runtime/debug"
+	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/encoding"
@@ -20,14 +24,52 @@ func init() {
 	zeros = make([]byte, quantumfs.MaxBlockSize)
 }
 
+// If we receive the signal SIGUSR1, then we will prevent further writes to the cache
+// and drop the contents of the cache. The intended use is as a way to free the bulk
+// of the memory used by quantumfsd when it is being gracefully shutdown by lazily
+// unmounting it.
+func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
+	quit chan struct{}) {
+
+	for {
+		select {
+		case <-sigUsr1Chan:
+			func() {
+				defer store.cacheLock.Lock().Unlock()
+
+				// Prevent future additions
+				store.cacheSize = -1
+				store.freeSpace = -1
+				store.cache = make(map[string]*buffer, 0)
+				store.lru = list.List{}
+			}()
+
+			// Release the memory
+			debug.FreeOSMemory()
+
+		case <-quit:
+			signal.Stop(sigUsr1Chan)
+			close(sigUsr1Chan)
+			return
+		}
+	}
+}
+
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	entryNum := cacheSize / 102400
-	return &dataStore{
+	store := &dataStore{
 		durableStore: durableStore,
 		cache:        make(map[string]*buffer, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
+		quit:         make(chan struct{}),
 	}
+
+	sigUsr1Chan := make(chan os.Signal, 1)
+	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
+	go signalHandler(store, sigUsr1Chan, store.quit)
+
+	return store
 }
 
 type dataStore struct {
@@ -38,6 +80,11 @@ type dataStore struct {
 	cache     map[string]*buffer
 	cacheSize int
 	freeSpace int
+	quit      chan struct{} // Signal termination
+}
+
+func (store *dataStore) shutdown() {
+	store.quit <- struct{}{}
 }
 
 func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
@@ -50,8 +97,10 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	defer store.cacheLock.Lock().Unlock()
 
 	if size > store.cacheSize {
-		c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
-			" total capacity of the cache")
+		if store.cacheSize != -1 {
+			c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
+				" total capacity of the cache")
+		}
 		return
 	}
 
@@ -63,7 +112,7 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		// recovered.
 		//
 		// Now if we have reproduced the same data already in the cache we
-		// could move/set the buffer to be the least recently used. We choose
+		// could move/set the buffer to be the most recently used. We choose
 		// not to do that because inserting newly uploaded data into the
 		// cache is an optimization for the relatively common case where a
 		// file is written and then read shortly afterwards. However, that
@@ -86,6 +135,9 @@ func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	buf.lruElement = store.lru.PushBack(buf)
 }
 
+const CacheHitLog = "Found key in readcache"
+const CacheMissLog = "Cache miss"
+
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 
@@ -107,9 +159,10 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		return nil
 	}()
 	if bufResult != nil {
-		c.Vlog(qlog.LogDaemon, "Found key in readcache")
+		c.Vlog(qlog.LogDaemon, CacheHitLog)
 		return bufResult
 	}
+	c.Vlog(qlog.LogDaemon, CacheMissLog)
 
 	buf := newEmptyBuffer()
 	initBuffer(&buf, store, key)

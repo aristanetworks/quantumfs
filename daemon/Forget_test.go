@@ -37,7 +37,7 @@ func TestForgetOnDirectory(t *testing.T) {
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
 
-		test.AssertLogContains("Forget called",
+		test.WaitForLogString("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -69,7 +69,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
 
-		test.AssertLogContains("Forget called",
+		test.WaitForLogString("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Now read all the files back to make sure we still can
@@ -100,7 +100,7 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
-		test.AssertLogContains("Forget called",
+		test.WaitForLogString("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Make sure that the workspace has already been uninstantiated
@@ -168,7 +168,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
 
-		test.AssertLogContains("Forget called",
+		test.WaitForLogString("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		test.qfs.mapMutex.Lock()
@@ -242,7 +242,7 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		// Now force the kernel to drop all cached inodes
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
-		test.AssertLogContains("Forget called",
+		test.WaitForLogString("Forget called",
 			"No inode forget triggered during dentry drop.")
 
 		// Make sure that the workspace has already been uninstantiated

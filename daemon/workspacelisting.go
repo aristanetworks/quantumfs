@@ -17,6 +17,18 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
+// Arbitrary nlinks for directories if we fail to retrieve the real number from the
+// WorkspaceDB. 2 are for . and ..
+//
+// Choose five to represent 3 typespaces.
+const estimatedTypespaceNum = 5
+
+// Choose three to represent 1 namespace
+const minimumNamespaceNum = 3
+
+// Choose three to represent 1 workspace
+const minimumWorkspaceNum = 3
+
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
 		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
@@ -86,7 +98,7 @@ func fillRootAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId) {
 	num, err := c.workspaceDB.NumTypespaces(&c.Ctx)
 	if err != nil {
 		c.elog("Error fetching number of typespaces: %s", err.Error())
-		num = 5 // Arbitrary, but should be more than 2
+		num = estimatedTypespaceNum
 	}
 
 	c.vlog("/ has %d children", num)
@@ -106,7 +118,7 @@ func fillTypespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	if err != nil {
 		c.elog("Error fetching number of namespaces in %s: %s", typespace,
 			err.Error())
-		num = 3 // Minimum acceptable value indicating one namespace
+		num = minimumNamespaceNum
 	}
 
 	c.vlog("%s/%s has %d children", typespace, namespace, num)
@@ -123,7 +135,7 @@ func fillNamespaceAttr(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	if err != nil {
 		c.elog("Error fetching number of workspace in %s/%s: %s", typespace,
 			namespace, err.Error())
-		num = 3 // Minimum acceptable value indicating one workspace
+		num = minimumWorkspaceNum
 	}
 
 	c.vlog("%s/%s has %d children", typespace, namespace, num)
@@ -293,14 +305,18 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.wlog("Unexpected error type from WorkspaceDB.TypespaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.TypespaceList: %s",
 			err.Error())
 		list = []string{}
 	}
 
 	defer tsl.Lock().Unlock()
 
-	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
+	if err == nil {
+		// We only accept positive lists
+		updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById,
+			tsl)
+	}
 
 	// The kernel will override our parent's attributes so it doesn't matter what
 	// we put into there.
@@ -331,7 +347,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.TypespaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.TypespaceList: %s",
 			err.Error())
 		return fuse.EIO
 	}
@@ -625,14 +641,19 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		c.wlog("Unexpected error type from WorkspaceDB.NamespaceList: %s",
+		c.elog("Unexpected error type from WorkspaceDB.NamespaceList: %s",
 			err.Error())
 		list = []string{}
 	}
 
 	defer nsl.Lock().Unlock()
 
-	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
+	if err == nil {
+		// We only accept positive lists
+		updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById,
+			nsl)
+	}
+
 	children := snapshotChildren(c, nsl, &nsl.namespacesByName,
 		nsl.typespaceName, "", fillNamespaceAttr, fillTypespaceAttr,
 		fillRootAttrWrapper)
@@ -647,7 +668,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.NamespaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.NamespaceList: %s",
 			err.Error())
 		return fuse.EIO
 	}
@@ -955,14 +976,19 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		c.wlog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
+		c.elog("Unexpected error type from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
 		list = []string{}
 	}
 
 	defer wsl.Lock().Unlock()
 
-	updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById, wsl)
+	if err == nil {
+		// We only accept positive lists
+		updateChildren(c, list, &wsl.workspacesByName, &wsl.workspacesById,
+			wsl)
+	}
+
 	children := snapshotChildren(c, wsl, &wsl.workspacesByName,
 		wsl.typespaceName, wsl.namespaceName, fillWorkspaceAttrFake,
 		fillNamespaceAttr, fillTypespaceAttr)
@@ -978,7 +1004,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	list, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		c.wlog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
+		c.elog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
 			err.Error())
 		return fuse.EIO
 	}
