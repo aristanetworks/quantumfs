@@ -47,7 +47,6 @@ func init() {
 // actually never refreshed since TTL > refreshTTLTimeSecs (=0) always
 
 func newEtherFilesystemStore(path string) quantumfs.DataStore {
-
 	blobstore, err := filesystem.NewFilesystemStore(path)
 	if err != nil {
 		fmt.Printf("Failed to init ether.filesystem datastore: %s\n",
@@ -417,49 +416,6 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 		return nil, convertWsdbError(err)
 	}
 	return list, nil
-}
-
-func (w *etherWsdbTranslator) TypespaceExists(c *quantumfs.Ctx,
-	typespace string) (bool, error) {
-
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::TypespaceExists",
-		"typespace: %s", typespace).Out()
-
-	exists, err := w.wsdb.TypespaceExists((*wsApiCtx)(c), typespace)
-	if err != nil {
-		return exists, convertWsdbError(err)
-	}
-	return exists, nil
-}
-
-func (w *etherWsdbTranslator) NamespaceExists(c *quantumfs.Ctx,
-	typespace string, namespace string) (bool, error) {
-
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::NamespaceExists",
-		"%s/%s", typespace, namespace).Out()
-
-	exists, err := w.wsdb.NamespaceExists((*wsApiCtx)(c), typespace, namespace)
-	if err != nil {
-		return exists, convertWsdbError(err)
-	}
-	return exists, nil
-}
-
-func (w *etherWsdbTranslator) WorkspaceExists(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (bool, error) {
-
-	defer c.FuncIn(qlog.LogWorkspaceDb,
-		"EtherWsdbTranslator::WorkspaceExists",
-		"%s/%s/%s", typespace, namespace, workspace).Out()
-
-	exists, err := w.wsdb.WorkspaceExists((*wsApiCtx)(c), typespace,
-		namespace, workspace)
-	if err != nil {
-		return exists, convertWsdbError(err)
-	}
-	return exists, nil
 }
 
 const EtherWorkspaceLog = "EtherWsdbTranslator::Workspace"
