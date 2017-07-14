@@ -46,6 +46,7 @@ enum CommandError {
 // names of commonly-used JSON fields
 static const char kCommandId[] = "CommandId";
 static const char kWorkspaceRoot[] = "WorkspaceRoot";
+static const char kWorkspacePath[] = "WorkspacePath";
 static const char kErrorCode[] = "ErrorCode";
 static const char kMessage[] = "Message";
 static const char kPathList[] = "PathList";
@@ -67,9 +68,11 @@ const int kExtendedKeyLength = 40;
 // need to build a JSON string.
 // See http://jansson.readthedocs.io/en/2.4/apiref.html#building-values for
 // an explanation of the format strings that json_pack_ex() can take.
+// These must match the structures in quantumfs/cmds.go
 static const char kGetAccessedJSON[] = "{s:i,s:s}";
 static const char kInsertInodeJSON[] = "{s:i,s:s,s:s,s:i,s:i,s:i}";
 static const char kBranchJSON[] = "{s:i,s:s,s:s}";
+static const char kDeleteJSON[] = "{s:i,s:s}";
 static const char kSetBlockJSON[] = "{s:i,s:s,s:s}";
 static const char kGetBlockJSON[] = "{s:i,s:s}";
 
