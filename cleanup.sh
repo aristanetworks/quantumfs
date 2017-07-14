@@ -19,6 +19,8 @@ while true; do
 	read -t $TIMEOUT_SEC line
 	READERR=$?
 
+        echo $line
+
 	if [[ $READERR -ne 0 ]]; then
 		break
 	fi

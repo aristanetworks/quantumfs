@@ -168,7 +168,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 	// Use Walker to walk all the blocks in the workspace.
 	c := &th.TestCtx().Ctx
 	root := strings.Split(th.RelPath(workspace), "/")
-	rootID, err := db.Workspace(c, root[0], root[1], root[2])
+	rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
 	th.Assert(err == nil, "Error getting rootID for %v: %v",
 		root, err)
 

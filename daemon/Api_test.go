@@ -7,10 +7,11 @@ package daemon
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -173,68 +174,72 @@ func TestApiAccessListConcurrent(t *testing.T) {
 		accessList, expectedSize := generateFiles(test,
 			size, workspace, filename)
 
-		api := test.getApi()
-		relpath := test.RelPath(workspace)
-
-		var wg sync.WaitGroup
-		initFileSize, endFileSize, initFileSize2, endFileSize2 := 0, 0, 0, 0
-
-		wg.Add(1)
-		startApi := make(chan struct{})
-		startApi2 := make(chan struct{})
-
 		workspace2 := test.NewWorkspace()
 
 		filename2 := "concurrentconcurrentconcurrent" +
 			"concurrentconcurrent"
-		generateFiles(test, size, workspace2, filename2)
+		accessList2, expectedSize2 := generateFiles(test,
+			size, workspace2, filename2)
 
-		relpath2 := test.RelPath(workspace2)
-		api2 := test.getUniqueApi(workspace2 + "/api")
-		defer api2.Close()
-		test.Assert(api != api2, "Error getting the same file descriptor")
+		fd1, err := os.OpenFile(workspace+"/api",
+			os.O_RDWR|syscall.O_DIRECT, 0)
+		defer fd1.Close()
+		test.AssertNoErr(err)
 
-		go func() {
-			defer wg.Done()
-			close(startApi)
-			<-startApi2
-			initFileSize2 = int(
-				atomic.LoadInt64(&test.qfs.apiFileSize))
-			_, err := api2.GetAccessed(relpath2)
-			test.Assert(err == nil, "Error getting accessList with api2")
-			endFileSize2 = int(
-				atomic.LoadInt64(&test.qfs.apiFileSize))
-		}()
-		<-startApi
-		close(startApi2)
+		fd2, err := os.OpenFile(workspace2+"/api",
+			os.O_RDWR|syscall.O_DIRECT, 0)
+		defer fd2.Close()
+		test.AssertNoErr(err)
 
-		initFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
-		responselist, err := api.GetAccessed(relpath)
-		endFileSize = int(atomic.LoadInt64(&test.qfs.apiFileSize))
+		writeRequest := func(wsr string, fd *os.File) {
+			cmd := quantumfs.AccessedRequest{
+				CommandCommon: quantumfs.CommandCommon{
+					CommandId: quantumfs.CmdGetAccessed},
+				WorkspaceRoot: test.RelPath(wsr),
+			}
+			cmdBuf, err := json.Marshal(cmd)
+			test.AssertNoErr(err)
+			test.AssertNoErr(utils.WriteAll(fd, cmdBuf))
+		}
 
-		wg.Wait()
+		readResponse := func(fd *os.File) *quantumfs.PathsAccessed {
+			fd.Seek(0, 0)
+			size := quantumfs.BufferSize
+			buf := make([]byte, quantumfs.BufferSize)
+			result := make([]byte, 0)
+			for size == quantumfs.BufferSize {
+				size, err := fd.Read(buf)
+				if err == io.EOF {
+					break
+				}
+				test.AssertNoErr(err)
+				result = append(result, buf[:size]...)
+			}
+			result = bytes.TrimRight(result, "\u0000")
 
-		test.Assert(err == nil, "Error getting accessList with api")
+			var accesslistResponse quantumfs.AccessListResponse
+			test.AssertNoErr(json.Unmarshal(result, &accesslistResponse))
+			errorResponse := accesslistResponse.ErrorResponse
+			test.Assert(errorResponse.ErrorCode == quantumfs.ErrorOK,
+				"qfs command Error:%s", errorResponse.Message)
+			return &accesslistResponse.PathList
+		}
 
-		test.Assert(mapKeySizeSum(responselist) == expectedSize,
-			"Error getting unequal sizes %d != %d",
-			mapKeySizeSum(responselist), expectedSize)
+		verifyResponse := func(responselist *quantumfs.PathsAccessed,
+			accessList quantumfs.PathsAccessed, expectedSize int) {
 
-		test.assertAccessList(accessList, responselist,
-			"Error two maps different")
+			test.Assert(mapKeySizeSum(responselist) == expectedSize,
+				"Error getting unequal sizes %d != %d",
+				mapKeySizeSum(responselist), expectedSize)
+			test.assertAccessList(accessList, responselist,
+				"Error two maps different")
+		}
 
-		// In order to prove two api goroutines ran concurrently. Two
-		// conditions have to be satisfied. Only when two api goroutines
-		// starts at the same point, they will share the same prior
-		// apiFileSize. Only if their partial reads interleave, will the
-		// posterior apiFileSizes both be changed. We cannot assume they
-		// will be the same in the event that one polls a little early.
-		test.Assert(initFileSize == initFileSize2 &&
-			endFileSize2 != initFileSize2 &&
-			endFileSize != initFileSize &&
-			endFileSize != 0 && endFileSize2 != 0,
-			"Error two api's aren't running in concurrent %d %d %d %d",
-			initFileSize, initFileSize2, endFileSize, endFileSize2)
+		writeRequest(workspace, fd1)
+		writeRequest(workspace2, fd2)
+
+		verifyResponse(readResponse(fd1), accessList, expectedSize)
+		verifyResponse(readResponse(fd2), accessList2, expectedSize2)
 	})
 }
 
