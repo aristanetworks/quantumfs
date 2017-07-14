@@ -27,8 +27,8 @@ func NewExtPairStats(start string, stop string, matchingIndent bool,
 	nametag string) *extPairStats {
 
 	return &extPairStats{
-		fmtStart:  start,
-		fmtStop:   stop,
+		fmtStart:  start + "\n",
+		fmtStop:   stop + "\n",
 		sameScope: matchingIndent,
 		name:      nametag,
 	}

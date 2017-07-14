@@ -18,6 +18,7 @@ const char * cGetAccessed(uint32_t apiHandle, const char * workspaceRoot,
 const char * cInsertInode(uint32_t apiHandle, const char *dest, const char *key,
 	uint32_t permissions, uint32_t uid, uint32_t gid);
 const char * cBranch(uint32_t apiHandle, const char *source, const char *dest);
+const char * cDelete(uint32_t apiHandle, const char *workspace);
 const char * cSetBlock(uint32_t apiHandle, const char *key, uint8_t *data,
 	uint32_t len);
 const char * cGetBlock(uint32_t apiHandle, const char *key, char *dataOut,
@@ -133,6 +134,12 @@ func (api *QfsClientApi) InsertInode(dest string, key string, permissions uint32
 func (api *QfsClientApi) Branch(source string, dest string) error {
 	err := C.GoString(C.cBranch(C.uint32_t(api.handle), C.CString(source),
 		C.CString(dest)))
+
+	return checkError(err)
+}
+
+func (api *QfsClientApi) Delete(workspace string) error {
+	err := C.GoString(C.cDelete(C.uint32_t(api.handle), C.CString(workspace)))
 
 	return checkError(err)
 }

@@ -143,7 +143,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 const logEnvTag = "TRACE"
 const maxLogLevels = 4
 const defaultMmapFile = "qlog"
-const entryCompleteBit = 1 << 15
+const entryCompleteBit = uint16(1 << 15)
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {

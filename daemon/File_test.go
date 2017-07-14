@@ -60,7 +60,7 @@ func TestFileWriteBlockSize(t *testing.T) {
 
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing to new fd: %v", err)
-		test.AssertLogContains("operateOnBlocks offset 0 size 131072",
+		test.WaitForLogString("operateOnBlocks offset 0 size 131072",
 			"Write block size not expected")
 	})
 }
