@@ -12,12 +12,12 @@ import (
 )
 
 func makeWorkspaceRootIdAdvance(test *testHelper,
-	workspace string) quantumfs.ObjectKey {
+	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)
 
-	oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
+	oldRootId, _ := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 		wsWorkspaceName)
 	filename := workspace + "/subdir/testFile"
 	err := testutils.PrintToFile(filename, string(GenData(1000)))
@@ -25,12 +25,12 @@ func makeWorkspaceRootIdAdvance(test *testHelper,
 
 	test.SyncAllWorkspaces()
 
-	newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
+	newRootId, nonce := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 		wsWorkspaceName)
 
 	test.Assert(!newRootId.IsEqualTo(oldRootId), "no changes to the rootId")
 
-	return newRootId
+	return newRootId, nonce
 }
 
 func TestAdvanceFail(t *testing.T) {
@@ -42,14 +42,15 @@ func TestAdvanceFail(t *testing.T) {
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
-		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
-			wsWorkspaceName)
-		newRootId := makeWorkspaceRootIdAdvance(test, workspace)
+		oldRootId, nonce := test.workspaceRootId(wsTypespaceName,
+			wsNamespaceName, wsWorkspaceName)
+		newRootId, _ := makeWorkspaceRootIdAdvance(test, workspace)
 
 		wsdb := test.GetWorkspaceDB()
 		ctx := test.TestCtx()
 		_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
-			wsNamespaceName, wsWorkspaceName, oldRootId, newRootId)
+			wsNamespaceName, wsWorkspaceName, nonce, oldRootId,
+			newRootId)
 		test.Assert(err != nil, "Advance must not succeed")
 	})
 }
@@ -62,8 +63,8 @@ func TestAdvanceSucceed(t *testing.T) {
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
-		newRootId1 := makeWorkspaceRootIdAdvance(test, workspace)
-		newRootId2 := makeWorkspaceRootIdAdvance(test, workspace)
+		newRootId1, _ := makeWorkspaceRootIdAdvance(test, workspace)
+		newRootId2, nonce := makeWorkspaceRootIdAdvance(test, workspace)
 
 		wsdb := test.GetWorkspaceDB()
 		ctx := test.TestCtx()
@@ -72,7 +73,8 @@ func TestAdvanceSucceed(t *testing.T) {
 		// currentRootId, however, it will cause all future changes to the
 		// workspace to fail.
 		_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
-			wsNamespaceName, wsWorkspaceName, newRootId2, newRootId1)
+			wsNamespaceName, wsWorkspaceName, nonce, newRootId2,
+			newRootId1)
 		test.AssertNoErr(err)
 	})
 }
@@ -85,9 +87,9 @@ func TestAdvanceGoBackToOld(t *testing.T) {
 		wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 			test.getWorkspaceComponents(workspace)
 
-		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
-			wsWorkspaceName)
-		newRootId1 := makeWorkspaceRootIdAdvance(test, workspace)
+		oldRootId, nonce := test.workspaceRootId(wsTypespaceName,
+			wsNamespaceName, wsWorkspaceName)
+		newRootId1, _ := makeWorkspaceRootIdAdvance(test, workspace)
 
 		wsdb := test.GetWorkspaceDB()
 		ctx := test.TestCtx()
@@ -96,7 +98,8 @@ func TestAdvanceGoBackToOld(t *testing.T) {
 		// currentRootId, however, it will cause all future changes to the
 		// workspace to fail.
 		_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
-			wsNamespaceName, wsWorkspaceName, newRootId1, oldRootId)
+			wsNamespaceName, wsWorkspaceName, nonce, newRootId1,
+			oldRootId)
 		test.AssertNoErr(err)
 	})
 }

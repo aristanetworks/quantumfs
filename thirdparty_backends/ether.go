@@ -406,7 +406,8 @@ const EtherWorkspaceListLog = "EtherWsdbTranslator::WorkspaceList"
 const EtherWorkspaceListDebugLog = "%s/%s"
 
 func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
-	typespace string, namespace string) ([]string, error) {
+	typespace string, namespace string) (map[string]quantumfs.WorkspaceNonce,
+	error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceListLog,
 		EtherWorkspaceListDebugLog, typespace, namespace).Out()
@@ -415,24 +416,29 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	if err != nil {
 		return nil, convertWsdbError(err)
 	}
-	return list, nil
+	result := make(map[string]quantumfs.WorkspaceNonce, len(list))
+	for _, name := range list {
+		result[name] = 0
+	}
+	return result, nil
 }
 
 const EtherWorkspaceLog = "EtherWsdbTranslator::Workspace"
 const EtherWorkspaceDebugLog = "%s/%s/%s"
 
 func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) (quantumfs.ObjectKey, error) {
+	namespace string, workspace string) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceLog,
 		EtherWorkspaceDebugLog, typespace, namespace, workspace).Out()
 
 	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, convertWsdbError(err)
+		return quantumfs.ObjectKey{}, 0, convertWsdbError(err)
 	}
 
-	return quantumfs.NewObjectKeyFromBytes(key), nil
+	return quantumfs.NewObjectKeyFromBytes(key), 0, nil
 }
 
 const EtherBranchLog = "EtherWsdbTranslator::BranchWorkspace"
@@ -473,7 +479,8 @@ const EtherAdvanceLog = "EtherWsdbTranslator::AdvanceWorkspace"
 const EtherAdvanceDebugLog = "%s/%s/%s %s -> %s"
 
 func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string, currentRootId quantumfs.ObjectKey,
+	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
+	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherAdvanceLog, EtherAdvanceDebugLog,
