@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"syscall"
 )
 
@@ -89,4 +90,19 @@ func GetDebugString(obj JSONwriter, name string) (string, error) {
 		return "", err
 	}
 	return bs.String(), nil
+}
+
+func WriteAll(fd *os.File, data []byte) error {
+	for {
+		size, err := fd.Write(data)
+		if err != nil {
+			return err
+		}
+
+		if len(data) == size {
+			return nil
+		}
+
+		data = data[size:]
+	}
 }

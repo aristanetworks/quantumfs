@@ -47,3 +47,10 @@ Limits
 ------
 
 * Maximum supported file size is 2.25 Petabytes
+
+Signals
+-------
+Sending SIGUSR1 to quantumfsd will cause the read cache to be dropped and further
+additions disallowed. This puts QuantumFS into a lower memory mode. This is useful,
+for example, when attempting to gracefully upgrade QuantumFS to a newer version
+without forcefully terminating existing users.
