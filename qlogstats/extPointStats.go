@@ -18,7 +18,7 @@ type extPointStats struct {
 
 func NewExtPointStats(format_ string, nametag string) *extPointStats {
 	return &extPointStats{
-		format: format_,
+		format: format_ + "\n",
 		name:   nametag,
 	}
 }
@@ -32,9 +32,7 @@ func (ext *extPointStats) TriggerStrings() []string {
 
 func (ext *extPointStats) ProcessRequest(request []indentedLog) {
 	for _, v := range request {
-		if v.log.Format == ext.format {
-			ext.stats.NewPoint(uint64(v.log.T))
-		}
+		ext.stats.NewPoint(uint64(v.log.T))
 	}
 }
 
