@@ -954,6 +954,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				qfs.removeUninstantiated(c, inodeChildren)
 			}
 		}()
+		inode.cleanup(c)
 
 		c.vlog("Set inode %d to nil", inodeNum)
 
