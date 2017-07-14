@@ -23,8 +23,9 @@ import "fmt"
 // data is not required.
 type WorkspaceDB interface {
 
-	// These methods need to be instant, but not necessarily completely up to
-	// date
+	// These methods need to be instant, but not necessarily perfectly up to
+	// date. Positive caching over short periods, such as one second, is
+	// acceptable. Negative caching is not acceptable.
 	NumTypespaces(c *Ctx) (int, error)
 	TypespaceList(c *Ctx) ([]string, error)
 	NumNamespaces(c *Ctx, typespace string) (int, error)
@@ -33,10 +34,6 @@ type WorkspaceDB interface {
 	WorkspaceList(c *Ctx, typespace string, namespace string) ([]string, error)
 
 	// These methods need to be up to date
-	TypespaceExists(c *Ctx, typespace string) (bool, error)
-	NamespaceExists(c *Ctx, typespace string, namespace string) (bool, error)
-	WorkspaceExists(c *Ctx, typespace string, namespace string,
-		workspace string) (bool, error)
 	Workspace(c *Ctx, typespace string, namespace string,
 		workspace string) (ObjectKey, error)
 
@@ -92,7 +89,7 @@ const (
 	WSDB_OUT_OF_DATE = 5
 )
 
-func (err *WorkspaceDbErr) Error() string {
+func (err WorkspaceDbErr) Error() string {
 	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.Msg)
 }
 

@@ -72,9 +72,13 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	var wsr WorkspaceRoot
 
-	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
-		typespace, namespace, workspace)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	rootId, err := c.workspaceDB.Workspace(&c.Ctx, typespace, namespace,
+		workspace)
+	if err != nil {
+		utils.Assert(err == nil, "Failed to fetch workspace rootId: %s",
+			err.Error())
+	}
+
 	c.vlog("Workspace Loading %s/%s/%s %s",
 		typespace, namespace, workspace, rootId.String())
 

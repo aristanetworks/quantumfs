@@ -57,8 +57,10 @@ func TestDeleteNamespaceSingleWorkspace(t *testing.T) {
 		err := test.wsdb.DeleteWorkspace(test.ctx, "type2", "name3", "work4")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ := test.wsdb.NamespaceExists(test.ctx, "type2", "name3")
-		utils.Assert(!exists, "Namespace not deleted")
+		list, err := test.wsdb.WorkspaceList(test.ctx, "type2", "name3")
+		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Namespace still exists")
+		utils.Assert(len(list) == 0, "Namespace not deleted")
 	})
 }
 
@@ -69,14 +71,16 @@ func TestDeleteNamespaceMultipleWorkspace(t *testing.T) {
 		err := test.wsdb.DeleteWorkspace(test.ctx, "type1", "name2", "work2")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ := test.wsdb.NamespaceExists(test.ctx, "type1", "name2")
-		utils.Assert(exists, "Namespace deleted early")
+		list, err := test.wsdb.WorkspaceList(test.ctx, "type1", "name2")
+		utils.Assert(err == nil, "Namespace removed early")
+		utils.Assert(len(list) == 1, "Namespace deleted early")
 
 		err = test.wsdb.DeleteWorkspace(test.ctx, "type1", "name2", "work3")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ = test.wsdb.NamespaceExists(test.ctx, "type1", "name2")
-		utils.Assert(!exists, "Namespace not deleted")
+		_, err = test.wsdb.WorkspaceList(test.ctx, "type1", "name2")
+		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Namespace found")
 	})
 }
 
@@ -87,11 +91,13 @@ func TestDeleteTypespace(t *testing.T) {
 		err := test.wsdb.DeleteWorkspace(test.ctx, "type2", "name3", "work4")
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
-		exists, _ := test.wsdb.NamespaceExists(test.ctx, "type2", "name3")
-		utils.Assert(!exists, "Namespace not deleted")
+		_, err = test.wsdb.WorkspaceList(test.ctx, "type2", "name3")
+		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Namespace not deleted")
 
-		exists, _ = test.wsdb.TypespaceExists(test.ctx, "type2")
-		utils.Assert(!exists, "Typespace not deleted")
+		_, err = test.wsdb.NamespaceList(test.ctx, "type2")
+		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Typespace not deleted")
 	})
 }
 
