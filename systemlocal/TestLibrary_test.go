@@ -29,6 +29,7 @@ func runTest(t *testing.T, test systemlocalTest) {
 		path: testDir,
 		db:   NewWorkspaceDB(testDir + "/db"),
 	}
+	th.ctx = newCtx(th.Logger)
 
 	defer th.EndTest()
 
@@ -39,13 +40,14 @@ type testHelper struct {
 	testutils.TestHelper
 	db   quantumfs.WorkspaceDB
 	path string
+	ctx  *quantumfs.Ctx
 }
 
 type systemlocalTest func(test *testHelper)
 
-func newCtx() *quantumfs.Ctx {
-	// Create  Ctx with random RequestId
-	Qlog := qlog.NewQlogTiny()
+func newCtx(logger *qlog.Qlog) *quantumfs.Ctx {
+	// Create Ctx with random RequestId
+	Qlog := logger
 	requestId := qlog.TestReqId
 	ctx := &quantumfs.Ctx{
 		Qlog:      Qlog,
