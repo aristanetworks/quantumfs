@@ -533,7 +533,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 
 	baseRootId := quantumfs.EmptyWorkspaceKey
 	base := strings.Split(cmd.BaseWorkspace, "/")
-	baseRootId, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
+	baseRootId, _, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
 		base[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", base, err.Error())
@@ -544,8 +544,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	local := strings.Split(cmd.LocalWorkspace, "/")
-	localRootId, err := c.workspaceDB.Workspace(&c.Ctx, local[0], local[1],
-		local[2])
+	localRootId, localNonce, err := c.workspaceDB.Workspace(&c.Ctx, local[0],
+		local[1], local[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", local, err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -554,7 +554,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	remote := strings.Split(cmd.RemoteWorkspace, "/")
-	remoteRootId, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
+	remoteRootId, _, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
 	if err != nil {
 		c.vlog("Workspace not fetched (%s): %s", remote, err.Error())
@@ -575,7 +575,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
-		local[2], localRootId, newRootId)
+		local[2], localNonce, localRootId, newRootId)
 	if err != nil {
 		c.vlog("Workspace can't advance after merge began, try again: %s",
 			err.Error())
@@ -636,7 +636,8 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	}
 
 	ref := strings.Split(cmd.ReferenceWorkspace, "/")
-	refRootId, err := c.workspaceDB.Workspace(&c.Ctx, ref[0], ref[1], ref[2])
+	refRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, ref[0], ref[1],
+		ref[2])
 
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
@@ -645,7 +646,7 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	}
 
 	rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, workspace[0],
-		workspace[1], workspace[2], wsr.publishedRootId, refRootId)
+		workspace[1], workspace[2], nonce, wsr.publishedRootId, refRootId)
 
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
@@ -823,6 +824,32 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 		"Workspace deletion succeeded")
 }
 
+func (api *ApiHandle) processImmutablilityError(c *ctx, err error,
+	workspacePath string, msg string) int {
+
+	switch err := err.(type) {
+	default:
+		c.wlog("Unknown error type from WorkspaceDB."+
+			"WorkspaceIsImmutable: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
+			"%s of WorkspaceRoot %s", msg, workspacePath)
+	case quantumfs.WorkspaceDbErr:
+		switch err.Code {
+		default:
+			c.wlog("Unhandled error from WorkspaceDB."+
+				"WorkspaceIsImmutable: %s", err.Error())
+			return api.queueErrorResponse(
+				quantumfs.ErrorCommandFailed,
+				"%s of WorkspaceRoot %s", msg, workspacePath)
+		case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+			c.vlog("Workspace does not exist: %s", workspacePath)
+			return api.queueErrorResponse(
+				quantumfs.ErrorWorkspaceNotFound,
+				"WorkspaceRoot %s does not exist", workspacePath)
+		}
+	}
+}
+
 func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 	defer c.funcIn("Api::enableRootWrite").Out()
 
@@ -835,19 +862,11 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 
 	workspacePath := cmd.Workspace
 	dst := strings.Split(workspacePath, "/")
-	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
-	if !exists {
-		c.vlog("Workspace does not exist: %s", workspacePath)
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist", workspacePath)
-	}
-
 	immutable, err := c.workspaceDB.WorkspaceIsImmutable(&c.Ctx,
 		dst[0], dst[1], dst[2])
 	if err != nil {
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"Failed to get immutability of WorkspaceRoot %s",
-			workspacePath)
+		return api.processImmutablilityError(c, err, workspacePath,
+			"Failed to get immutability")
 	}
 
 	c.vlog("Setting immutable")
@@ -962,16 +981,10 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 
 	workspacePath := cmd.WorkspacePath
 	dst := strings.Split(workspacePath, "/")
-	exists, _ := c.workspaceDB.WorkspaceExists(&c.Ctx, dst[0], dst[1], dst[2])
-	if !exists {
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist", workspacePath)
-	}
-
 	err := c.workspaceDB.SetWorkspaceImmutable(&c.Ctx, dst[0], dst[1], dst[2])
 	if err != nil {
-		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
-			"Workspace %s can't be set immutable", workspacePath)
+		return api.processImmutablilityError(c, err, workspacePath,
+			"Failed to set immutability")
 	}
 
 	defer c.qfs.mutabilityLock.Lock().Unlock()
