@@ -4,21 +4,42 @@
 package systemlocal
 
 import (
-	"bytes"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/boltdb/bolt"
 )
 
 var typespacesBucket []byte
-var stateTypespacesBucket []byte
 
 func init() {
 	typespacesBucket = []byte("Typespaces")
-	stateTypespacesBucket = []byte("StateTypespaces")
+}
+
+type workspaceInfo struct {
+	Key       string // hex encoded ObjectKey.Value()
+	Immutable bool
+}
+
+func encodeKey(key quantumfs.ObjectKey) string {
+	return hex.EncodeToString(key.Value())
+}
+
+func decodeKey(key string) quantumfs.ObjectKey {
+	if key == "" {
+		return quantumfs.ZeroKey
+	}
+
+	data, err := hex.DecodeString(key)
+	utils.Assert(err == nil, "Error decoding string '%s' from database: %v", key,
+		err)
+	return quantumfs.NewObjectKeyFromBytes(data)
 }
 
 // The database underlying the system local workspaceDB has three levels of buckets.
@@ -58,39 +79,24 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 		db: db,
 	}
 
+	nullWorkspace := workspaceInfo{
+		Key:       encodeKey(quantumfs.EmptyWorkspaceKey),
+		Immutable: true,
+	}
+
 	// Create the null workspace
-	db.Update(func(tx *bolt.Tx) error {
-		insertMap(tx, typespacesBucket)
-		insertMap(tx, stateTypespacesBucket)
-
-		return nil
+	err = db.Update(func(tx *bolt.Tx) error {
+		return setWorkspaceInfo_(tx, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			nullWorkspace)
 	})
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create null workspace: %s",
+			err.Error()))
+	}
+
 	return wsdb
-}
-
-func insertMap(tx *bolt.Tx, bucketKey []byte) {
-	typespaces, err := tx.CreateBucketIfNotExists(bucketKey)
-	if err != nil {
-		panic("Unable to create Typespaces bucket")
-	}
-
-	_null_, err := typespaces.CreateBucketIfNotExists([]byte("" +
-		quantumfs.NullSpaceName))
-	if err != nil {
-		panic("Unable to create null typespace")
-	}
-
-	_null, err := _null_.CreateBucketIfNotExists([]byte("" +
-		quantumfs.NullSpaceName))
-	if err != nil {
-		panic("Unable to create null namespace")
-	}
-
-	err = _null.Put([]byte(quantumfs.NullSpaceName),
-		quantumfs.EmptyWorkspaceKey.Value())
-	if err != nil {
-		panic("Unable to reset null workspace")
-	}
 }
 
 // workspaceDB is a persistent, system local quantumfs.WorkspaceDB. It only supports
@@ -265,10 +271,10 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 }
 
 // Get the workspace key. This must be run inside a boltDB transaction
-func getWorkspaceContent_(tx *bolt.Tx, root []byte, typespace string,
-	namespace string, workspace string) []byte {
+func getWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
+	workspace string) *workspaceInfo {
 
-	typespaces := tx.Bucket(root)
+	typespaces := tx.Bucket(typespacesBucket)
 	namespaces := typespaces.Bucket([]byte(typespace))
 	if namespaces == nil {
 		// The typespace doesn't exist, so the namespace cannot exist
@@ -281,7 +287,57 @@ func getWorkspaceContent_(tx *bolt.Tx, root []byte, typespace string,
 		return nil
 	}
 
-	return workspaces.Get([]byte(workspace))
+	encoded := workspaces.Get([]byte(workspace))
+
+	if encoded == nil {
+		return nil
+	}
+
+	var info workspaceInfo
+	err := json.Unmarshal(encoded, &info)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decode workspaceInfo for %s: %s '%s'",
+			workspace, err.Error(), string(encoded)))
+	}
+	return &info
+}
+
+// Set the workspace key. This must be run inside a boltDB transaction
+func setWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
+	workspace string, info workspaceInfo) error {
+
+	typespaces, err := tx.CreateBucketIfNotExists(typespacesBucket)
+	if err != nil {
+		return fmt.Errorf("Unable to create typespaces bucket: %s",
+			err.Error())
+	}
+
+	typeBucket, err := typespaces.CreateBucketIfNotExists([]byte("" +
+		typespace))
+	if err != nil {
+		return fmt.Errorf("Unable to create typespace: %s", typespace,
+			err.Error())
+	}
+
+	nameBucket, err := typeBucket.CreateBucketIfNotExists([]byte("" +
+		namespace))
+	if err != nil {
+		return fmt.Errorf("Unable to create namespace %s/%s: %s", typespace,
+			namespace, err.Error())
+	}
+
+	encoded, err := json.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("Unable to encode workspace info: %s", err.Error())
+	}
+
+	err = nameBucket.Put([]byte(workspace), encoded)
+	if err != nil {
+		return fmt.Errorf("Unable to set workspace %s/%s/%s: %s", typespace,
+			namespace, workspace, err.Error())
+	}
+
+	return nil
 }
 
 func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
@@ -292,39 +348,18 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
 		// Get the source workspace rootID
-		typespaces := tx.Bucket(typespacesBucket)
-		namespaces := typespaces.Bucket([]byte(srcTypespace))
-		if namespaces == nil {
+		srcInfo := getWorkspaceInfo_(tx, srcTypespace, srcNamespace,
+			srcWorkspace)
+		if srcInfo == nil {
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
-				"Source Typespace %s does not exist",
-				srcTypespace)
-		}
-		workspaces := namespaces.Bucket([]byte(srcNamespace))
-		if workspaces == nil {
-			return quantumfs.NewWorkspaceDbErr(
-				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
-				"Source Namespace %s does not exist",
-				srcNamespace)
+				"Source Workspace %s/%s/%s does not exist",
+				srcTypespace, srcNamespace, srcWorkspace)
 		}
 
-		srcKey := workspaces.Get([]byte(srcWorkspace))
-		if srcKey == nil {
-			return quantumfs.NewWorkspaceDbErr(
-				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
-				"Source Workspace %s does not exist",
-				srcWorkspace)
-		}
-
-		// Create the destination typespace/namespace if necessary
-		workspaces, err := getWorkspaces(typespaces,
-			dstTypespace, dstNamespace)
-		if err != nil {
-			return err
-		}
-
-		dstKey := workspaces.Get([]byte(dstWorkspace))
-		if dstKey != nil {
+		dstInfo := getWorkspaceInfo_(tx, dstTypespace, dstNamespace,
+			dstWorkspace)
+		if dstInfo != nil {
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_EXISTS,
 				"Workspace already exists %s/%s/%s",
@@ -332,82 +367,24 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 				dstWorkspace)
 		}
 
-		err = workspaces.Put([]byte(dstWorkspace), srcKey)
-
-		// Set the workspace to mutable by default
-		typespaces = tx.Bucket(stateTypespacesBucket)
-		workspaces, err = getWorkspaces(typespaces, dstTypespace,
-			dstNamespace)
-		if err != nil {
-			return err
+		newInfo := workspaceInfo{
+			Key:       srcInfo.Key,
+			Immutable: false,
 		}
 
-		err = workspaces.Put([]byte(dstWorkspace), []byte("F"))
-		if err != nil {
-			return err
-		}
+		err := setWorkspaceInfo_(tx, dstTypespace, dstNamespace,
+			dstWorkspace, newInfo)
 
 		if c != nil {
-			objectKey := quantumfs.NewObjectKeyFromBytes(srcKey)
 			c.Dlog(qlog.LogWorkspaceDb,
 				"Branch workspace '%s/%s/%s' to '%s/%s/%s' with %s",
 				srcTypespace, srcNamespace, srcWorkspace,
 				dstTypespace, dstNamespace, dstWorkspace,
-				objectKey.String())
+				decodeKey(srcInfo.Key).String())
 		}
 
-		return nil
-	})
-}
-
-func deleteWorkspace_(tx *bolt.Tx, root []byte, typespace string,
-	namespace string, workspace string) error {
-
-	typespaces := tx.Bucket(root)
-	namespaces := typespaces.Bucket([]byte(typespace))
-	if namespaces == nil {
-		// No such typespace indicates no such workspace. Success.
-		return nil
-	}
-
-	workspaces := namespaces.Bucket([]byte(namespace))
-	if workspaces == nil {
-		// No such namespace indicates no such workspace. Success.
-		return nil
-	}
-
-	err := workspaces.Delete([]byte(workspace))
-	if err != nil {
 		return err
-	}
-
-	var count int
-	workspaces.ForEach(func(k []byte, v []byte) error {
-		count++
-		return nil
 	})
-
-	if count == 0 {
-		err = namespaces.DeleteBucket([]byte(namespace))
-		if err != nil {
-			return err
-		}
-	}
-
-	count = 0
-	namespaces.ForEach(func(k []byte, v []byte) error {
-		count++
-		return nil
-	})
-
-	if count == 0 {
-		err = typespaces.DeleteBucket([]byte(typespace))
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
@@ -416,15 +393,51 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::DeleteWorkspace").Out()
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
-		err := deleteWorkspace_(tx, typespacesBucket,
-			typespace, namespace, workspace)
+		typespaces := tx.Bucket(typespacesBucket)
+		namespaces := typespaces.Bucket([]byte(typespace))
+		if namespaces == nil {
+			// No such typespace indicates no such workspace. Success.
+			return nil
+		}
+
+		workspaces := namespaces.Bucket([]byte(namespace))
+		if workspaces == nil {
+			// No such namespace indicates no such workspace. Success.
+			return nil
+		}
+
+		err := workspaces.Delete([]byte(workspace))
 		if err != nil {
 			return err
 		}
 
-		// Remove the possible record in the state table
-		return deleteWorkspace_(tx, stateTypespacesBucket,
-			typespace, namespace, workspace)
+		var count int
+		workspaces.ForEach(func(k []byte, v []byte) error {
+			count++
+			return nil
+		})
+
+		if count == 0 {
+			err = namespaces.DeleteBucket([]byte(namespace))
+			if err != nil {
+				return err
+			}
+		}
+
+		count = 0
+		namespaces.ForEach(func(k []byte, v []byte) error {
+			count++
+			return nil
+		})
+
+		if count == 0 {
+			err = typespaces.DeleteBucket([]byte(typespace))
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 
@@ -433,24 +446,23 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::Workspace").Out()
 
-	var rootid quantumfs.ObjectKey
+	var rootid string
 
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
-		key := getWorkspaceContent_(tx, typespacesBucket,
-			typespace, namespace, workspace)
+		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
 
-		if key == nil {
+		if info == nil {
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"workspace does not exist")
 		}
 
-		rootid = quantumfs.NewObjectKeyFromBytes(key)
+		rootid = info.Key
 
 		return nil
 	})
 
-	return rootid, err
+	return decodeKey(rootid), err
 }
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
@@ -460,23 +472,22 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"systemlocal::AdvanceWorkspace").Out()
 
-	var dbRootId quantumfs.ObjectKey
+	var dbRootId string
 
 	err := wsdb.db.Update(func(tx *bolt.Tx) error {
-		rootId := getWorkspaceContent_(tx, typespacesBucket,
-			typespace, namespace, workspace)
-		if rootId == nil {
+		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
+		if info == nil {
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"Advance failed")
 		}
 
-		if !bytes.Equal(currentRootId.Value(), rootId) {
-			dbRootId = quantumfs.NewObjectKeyFromBytes(rootId)
+		if encodeKey(currentRootId) != info.Key {
+			dbRootId = info.Key
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_OUT_OF_DATE,
 				"%s vs %s Advance failed", currentRootId.String(),
-				dbRootId.String())
+				decodeKey(dbRootId).String())
 
 		}
 
@@ -488,17 +499,15 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 		// The workspace exists and the caller has the uptodate rootid, so
 		// advance the rootid in the DB.
-		typespaces := tx.Bucket(typespacesBucket)
-		namespaces := typespaces.Bucket([]byte(typespace))
-		workspaces := namespaces.Bucket([]byte(namespace))
-		err := workspaces.Put([]byte(workspace), newRootId.Value())
+		info.Key = encodeKey(newRootId)
+		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
 		if err == nil {
-			dbRootId = newRootId
+			dbRootId = info.Key
 		}
 		return err
 	})
 
-	return dbRootId, err
+	return decodeKey(dbRootId), err
 }
 
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
@@ -506,22 +515,24 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 
 	var immutable bool
 	err := wsdb.db.View(func(tx *bolt.Tx) error {
-		immutableBytes := getWorkspaceContent_(tx, stateTypespacesBucket,
-			typespace, namespace, workspace)
-		if immutableBytes == nil {
+		info := getWorkspaceInfo_(tx, typespace, namespace, workspace)
+		if info == nil {
 			return quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"Workspace not found")
 		}
-		immutable = immutableBytes[0] == byte('T')
+		immutable = info.Immutable
 		return nil
 	})
 
 	return immutable, err
 }
 
-func getWorkspaces(typespaces *bolt.Bucket, typespace string,
+// Must be called from a BoltDB transaction
+func getWorkspaces_(tx *bolt.Tx, typespace string,
 	namespace string) (*bolt.Bucket, error) {
+
+	typespaces := tx.Bucket(typespacesBucket)
 
 	namespaces, err := typespaces.CreateBucketIfNotExists([]byte(typespace))
 	if err != nil {
@@ -539,17 +550,18 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 	namespace string, workspace string) error {
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
-		typespaces := tx.Bucket(stateTypespacesBucket)
-		workspaces, err := getWorkspaces(typespaces, typespace, namespace)
-		if err != nil {
-			return err
+		info := getWorkspaceInfo_(tx, typespace, namespace,
+			workspace)
+		if info == nil {
+			return quantumfs.NewWorkspaceDbErr(
+				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+				"Workspace not found")
 		}
 
-		err = workspaces.Put([]byte(workspace), []byte("T"))
-		if err != nil {
-			return err
-		}
+		info.Immutable = true
 
-		return nil
+		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
+
+		return err
 	})
 }
