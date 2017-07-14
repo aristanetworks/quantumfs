@@ -73,6 +73,15 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	var wsr WorkspaceRoot
 
+	// Subscribe before fetching the rootID and loading the metadata to ensure we
+	// don't miss any updates.
+	err := c.workspaceDB.SubscribeTo(typespace + "/" + namespace + "/" +
+		workspace)
+	if err != nil {
+		c.elog("Failed to subscribe to workspace %s/%s/%s: %s", typespace,
+			namespace, workspace, err.Error())
+	}
+
 	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, typespace, namespace,
 		workspace)
 	if err != nil {
@@ -917,4 +926,12 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	}
 
 	return directChildren
+}
+
+func (wsr *WorkspaceRoot) cleanup(c *ctx) {
+	defer c.FuncIn("WorkspaceRoot::cleanup", "workspace %s/%s/%s", wsr.typespace,
+		wsr.namespace, wsr.workspace).Out()
+
+	c.workspaceDB.UnsubscribeFrom(wsr.typespace + "/" + wsr.namespace + "/" +
+		wsr.workspace)
 }
