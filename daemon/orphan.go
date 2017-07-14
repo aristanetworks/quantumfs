@@ -142,7 +142,9 @@ func (inode *InodeCommon) setOrphanChildXAttr(c *ctx, inodeNum InodeId, attr str
 
 	inode.parseExtendedAttributes_(c)
 
-	inode.unlinkXAttr[attr] = data
+	// copy the data as the memory backing it will
+	// be reused once this function returns
+	inode.unlinkXAttr[attr] = append([]byte(nil), data...)
 
 	return fuse.OK
 }
