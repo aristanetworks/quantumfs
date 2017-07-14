@@ -183,6 +183,12 @@ type Inode interface {
 	RLockTree() *sync.RWMutex
 
 	isWorkspaceRoot() bool
+
+	// cleanup() is called when the Inode has been uninstantiated, but before the
+	// final reference has been released. It should perform any deterministic
+	// cleanup which is necessary, but it is possible for the Inode to be
+	// accessed after cleanup() has completed.
+	cleanup(c *ctx)
 }
 
 type inodeHolder interface {
@@ -635,6 +641,10 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	}
 
 	return err
+}
+
+func (inode *InodeCommon) cleanup(c *ctx) {
+	defer c.funcIn("InodeCommon::cleanup").Out()
 }
 
 func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
