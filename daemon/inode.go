@@ -645,6 +645,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 
 func (inode *InodeCommon) cleanup(c *ctx) {
 	defer c.funcIn("InodeCommon::cleanup").Out()
+	// Most inodes have nothing to do here
 }
 
 func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
