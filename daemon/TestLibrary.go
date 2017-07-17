@@ -41,7 +41,7 @@ type TestHelper struct {
 	api            quantumfs.Api
 }
 
-func logFuseWaiting(th *TestHelper) {
+func logFuseWaiting(prefix string, th *TestHelper) {
 	if th.fuseConnection == 0 {
 		// There is no connection to log
 		return
@@ -60,7 +60,7 @@ func logFuseWaiting(th *TestHelper) {
 			err.Error())
 	} else {
 		str := bytes.TrimRight(buf, "\u0000\n")
-		th.Log("There are %s pending requests", str)
+		th.Log("%s: there are %s pending requests", prefix, str)
 	}
 	waiting.Close()
 }
@@ -105,15 +105,15 @@ func (th *TestHelper) EndTest() {
 				exception)
 			abortFuse(th)
 		}
-		logFuseWaiting(th)
+		logFuseWaiting("Before unmount", th)
 		if err := th.qfs.server.Unmount(); err != nil {
 			th.Log("ERROR: Failed to unmount quantumfs instance.")
 			th.Log("Are you leaking a file descriptor?: %s", err.Error())
-			logFuseWaiting(th)
+			logFuseWaiting("After unmount failure", th)
 
 			abortFuse(th)
 			runtime.GC()
-			logFuseWaiting(th)
+			logFuseWaiting("After aborting fuse", th)
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs "+
 					"after aborting: %s", err.Error())
