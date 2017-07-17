@@ -67,6 +67,8 @@ qfsRPM: $(COMMANDS)
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse \
+		./qloggerdb=/usr/sbin/qloggerdb \
+		./qloggerdb_system_unit=/usr/lib/systemd/system/qloggerdb.service \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
 rpm: $(COMMANDS) qfsRPM quploadRPM
