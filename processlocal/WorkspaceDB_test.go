@@ -320,3 +320,26 @@ func TestPubSubPanic(t *testing.T) {
 
 	})
 }
+
+func TestPubSubMultiHead(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb1 := test.wsdb.(*workspaceDB)
+		wsdb2 := wsdb1.getSecondHead()
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb2.SetCallback(callback)
+		err := wsdb2.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		test.AssertNoErr(wsdb1.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
