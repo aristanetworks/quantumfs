@@ -24,6 +24,7 @@ type workspaceMap map[string]map[string]map[string]*workspaceInfo
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	wsdb := &workspaceDB{
 		cache:         make(workspaceMap),
+		cacheMutex:    new(utils.DeferableRwMutex),
 		callback:      nil,
 		updates:       nil,
 		subscriptions: map[string]bool{},
@@ -67,12 +68,14 @@ func insertMap_(cache workspaceMap, typespace string,
 
 // workspaceDB is a process local quantumfs.WorkspaceDB
 type workspaceDB struct {
-	cacheMutex utils.DeferableRwMutex
+	cacheMutex *utils.DeferableRwMutex
 	cache      workspaceMap
 
 	callback      quantumfs.SubscriptionCallback
 	updates       map[string]quantumfs.WorkspaceState
 	subscriptions map[string]bool
+
+	peer *workspaceDB
 }
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
@@ -249,7 +252,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	}
 	insertMap_(wsdb.cache, dstTypespace, dstNamespace, dstWorkspace, &newInfo)
 
-	wsdb.notifySubscribers_(c, dstTypespace, dstNamespace, dstWorkspace)
+	wsdb.notifySubscribers_(c, dstTypespace, dstNamespace, dstWorkspace, true)
 
 	keyDebug := newInfo.key.String()
 
@@ -306,7 +309,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	defer wsdb.cacheMutex.Lock().Unlock()
 	err := deleteWorkspaceRecord_(c, wsdb.cache, typespace, namespace, workspace)
 
-	wsdb.notifySubscribers_(c, typespace, namespace, workspace)
+	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 
 	return err
 }
@@ -358,7 +361,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	wsdb.cache[typespace][namespace][workspace].key = newRootId
 
-	wsdb.notifySubscribers_(c, typespace, namespace, workspace)
+	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 
 	c.Vlog(qlog.LogWorkspaceDb, "Advanced rootID for %s/%s from %s to %s",
 		namespace, workspace, currentRootId.String(), newRootId.String())
@@ -389,7 +392,7 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 
 	workspaceInfo.immutable = true
 
-	wsdb.notifySubscribers_(c, typespace, namespace, workspace)
+	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 
 	return nil
 }
@@ -413,12 +416,17 @@ func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
 
 // Must hold cacheMutex
 func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
-	namespace string, workspace string) {
+	namespace string, workspace string, recurse bool) {
 
 	c.FuncIn(qlog.LogWorkspaceDb, "processlocal::notifySubscribers_",
 		"workspace %s/%s/%s", typespace, namespace, workspace)
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
+
+	if wsdb.peer != nil && recurse {
+		wsdb.peer.notifySubscribers_(c, typespace, namespace, workspace,
+			false)
+	}
 
 	if _, subscribed := wsdb.subscriptions[workspaceName]; !subscribed {
 		c.Vlog(qlog.LogWorkspaceDb, "No subscriptions for workspace")
@@ -545,4 +553,14 @@ func safelyCall(c *quantumfs.Ctx, callback quantumfs.SubscriptionCallback,
 	}()
 
 	callback(updates)
+}
+
+func (wsdb *workspaceDB) getSecondHead() *workspaceDB {
+	wsdb2 := NewWorkspaceDB("").(*workspaceDB)
+	wsdb2.cache = wsdb.cache
+	wsdb2.cacheMutex = wsdb.cacheMutex
+	wsdb2.peer = wsdb
+	wsdb.peer = wsdb2
+
+	return wsdb2
 }
