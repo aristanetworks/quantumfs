@@ -60,7 +60,7 @@ func TestFileWriteBlockSize(t *testing.T) {
 
 		_, err = file.Write(data)
 		test.Assert(err == nil, "Error writing to new fd: %v", err)
-		test.AssertLogContains("operateOnBlocks offset 0 size 131072",
+		test.WaitForLogString("operateOnBlocks offset 0 size 131072",
 			"Write block size not expected")
 	})
 }
@@ -392,8 +392,8 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		// This should trigger a refresh up the hierarchy and, because we
 		// currently do not support delayed syncing, change the workspace
 		// rootId and mark the fileDescriptor clean.
-		oldRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
-			wsWorkspaceName)
+		oldRootId, _ := test.workspaceRootId(wsTypespaceName,
+			wsNamespaceName, wsWorkspaceName)
 
 		c := test.newCtx()
 		_, err = file.accessor.writeBlock(c, 0, 0, []byte("update"))
@@ -401,8 +401,8 @@ func TestFileDescriptorDirtying(t *testing.T) {
 		fileDescriptor.dirty(c)
 
 		test.SyncAllWorkspaces()
-		newRootId := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
-			wsWorkspaceName)
+		newRootId, _ := test.workspaceRootId(wsTypespaceName,
+			wsNamespaceName, wsWorkspaceName)
 
 		test.Assert(!oldRootId.IsEqualTo(newRootId),
 			"Workspace rootId didn't change")

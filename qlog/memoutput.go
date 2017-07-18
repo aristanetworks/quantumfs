@@ -253,7 +253,6 @@ type IdStrMap struct {
 	currentMapPtr unsafe.Pointer
 
 	lock utils.DeferableMutex // Protects everything below here
-	ids  map[string]uint16
 
 	buffer  *[mmapStrMapSize / LogStrSize]LogStr
 	freeIdx uint16
@@ -276,7 +275,6 @@ func newCircBuf(mapHeader *circBufHeader,
 func newIdStrMap(buf []byte, offset int) IdStrMap {
 	var rtn IdStrMap
 	ids := make(map[string]uint16)
-	rtn.ids = ids
 	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
 	rtn.freeIdx = 0
 	rtn.buffer = (*[mmapStrMapSize /
@@ -363,8 +361,7 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 }
 
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
-
-	ids := (*map[string]uint16)(strMap.currentMapPtr)
+	ids := (*map[string]uint16)(atomic.LoadPointer(&strMap.currentMapPtr))
 	entry, ok := (*ids)[format]
 
 	if ok {
@@ -379,7 +376,8 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 
 	defer strMap.lock.Lock().Unlock()
 
-	if existingId, ok := strMap.ids[format]; ok {
+	ids := *(*map[string]uint16)(strMap.currentMapPtr)
+	if existingId, ok := ids[format]; ok {
 		// Somebody beat us to adding this format, we have no work to do
 		return existingId, nil
 	}
@@ -390,8 +388,8 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	strMap.freeIdx++
 
 	// Copy the old map into the new one and add the additional format entry
-	newMap := make(map[string]uint16, len(strMap.ids)+1)
-	for k, v := range strMap.ids {
+	newMap := make(map[string]uint16, len(ids)+1)
+	for k, v := range ids {
 		newMap[k] = v
 	}
 	newMap[format] = newIdx
@@ -400,7 +398,6 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 
 	// Now publish the new map, no writing may occur to this map after this
 	// point.
-	strMap.ids = newMap
 	atomic.StorePointer(&strMap.currentMapPtr, unsafe.Pointer(&newMap))
 
 	return newIdx, err
