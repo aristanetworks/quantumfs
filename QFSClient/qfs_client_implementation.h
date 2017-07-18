@@ -78,6 +78,8 @@ class ApiImpl: public Api {
 
 	virtual Error Branch(const char *source, const char *destination);
 
+	virtual Error Delete(const char *workspace);
+
 	virtual Error SetBlock(const std::vector<byte> &key,
 			       const std::vector<byte> &data);
 
