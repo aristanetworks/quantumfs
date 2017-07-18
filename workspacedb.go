@@ -6,6 +6,12 @@ package quantumfs
 
 import "fmt"
 
+// WorkspaceNonce is a number used to distinguish between workspaces of the same
+// path, but different lifetimes. For example, if a workspace path were deleted and
+// then recreated, the old workspace and new workspace would have different
+// WorkspaceNonces and therefore be distinguishable.
+type WorkspaceNonce uint64
+
 // WorkspaceDB provides a cluster-wide and consistent mapping between names and
 // rootids. Workspace names have two components and are represented as strings with
 // the format "<typespace>/<namespace>/<workspace>". <typespace> would often be a
@@ -23,22 +29,20 @@ import "fmt"
 // data is not required.
 type WorkspaceDB interface {
 
-	// These methods need to be instant, but not necessarily completely up to
-	// date
+	// These methods need to be instant, but not necessarily perfectly up to
+	// date. Positive caching over short periods, such as one second, is
+	// acceptable. Negative caching is not acceptable.
 	NumTypespaces(c *Ctx) (int, error)
 	TypespaceList(c *Ctx) ([]string, error)
 	NumNamespaces(c *Ctx, typespace string) (int, error)
 	NamespaceList(c *Ctx, typespace string) ([]string, error)
 	NumWorkspaces(c *Ctx, typespace string, namespace string) (int, error)
-	WorkspaceList(c *Ctx, typespace string, namespace string) ([]string, error)
+	WorkspaceList(c *Ctx, typespace string,
+		namespace string) (map[string]WorkspaceNonce, error)
 
 	// These methods need to be up to date
-	TypespaceExists(c *Ctx, typespace string) (bool, error)
-	NamespaceExists(c *Ctx, typespace string, namespace string) (bool, error)
-	WorkspaceExists(c *Ctx, typespace string, namespace string,
-		workspace string) (bool, error)
 	Workspace(c *Ctx, typespace string, namespace string,
-		workspace string) (ObjectKey, error)
+		workspace string) (ObjectKey, WorkspaceNonce, error)
 
 	// These methods need to be atomic, but may retry internally
 	BranchWorkspace(c *Ctx, srcTypespace string, srcNamespace string,
@@ -66,7 +70,7 @@ type WorkspaceDB interface {
 	// WSDB_OUT_OF_DATE: The workspace rootID was changed remotely so the local
 	//                   instance is out of date.
 	AdvanceWorkspace(c *Ctx, typespace string, namespace string,
-		workspace string, currentRootId ObjectKey,
+		workspace string, nonce WorkspaceNonce, currentRootId ObjectKey,
 		newRootId ObjectKey) (ObjectKey, error)
 }
 
@@ -92,7 +96,7 @@ const (
 	WSDB_OUT_OF_DATE = 5
 )
 
-func (err *WorkspaceDbErr) Error() string {
+func (err WorkspaceDbErr) Error() string {
 	return fmt.Sprintf("%s : %s", err.ErrorCode(), err.Msg)
 }
 
