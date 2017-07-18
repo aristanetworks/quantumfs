@@ -350,21 +350,6 @@ func (api *apiImpl) Close() {
 	api.fd.Close()
 }
 
-func writeAll(fd *os.File, data []byte) error {
-	for {
-		size, err := fd.Write(data)
-		if err != nil {
-			return err
-		}
-
-		if len(data) == size {
-			return nil
-		}
-
-		data = data[size:]
-	}
-}
-
 type CommandCommon struct {
 	CommandId uint32 // One of CmdType*
 }
@@ -494,7 +479,7 @@ type SetWorkspaceImmutableRequest struct {
 }
 
 func (api *apiImpl) sendCmd(buf []byte) ([]byte, error) {
-	err := writeAll(api.fd, buf)
+	err := utils.WriteAll(api.fd, buf)
 	if err != nil {
 		return nil, err
 	}

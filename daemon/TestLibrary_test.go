@@ -221,13 +221,13 @@ func (th *testHelper) getInode(path string) Inode {
 }
 
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
-	workspace string) quantumfs.ObjectKey {
+	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 
-	key, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
+	key, nonce, err := th.qfs.c.workspaceDB.Workspace(&th.newCtx().Ctx,
 		typespace, namespace, workspace)
 	th.Assert(err == nil, "Error fetching key")
 
-	return key
+	return key, nonce
 }
 
 func (th *testHelper) MakeFile(filepath string) (data []byte) {
@@ -454,12 +454,15 @@ func (test *testHelper) getRootId(workspace string) quantumfs.ObjectKey {
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)
 
-	return test.workspaceRootId(wsTypespaceName, wsNamespaceName,
+	key, _ := test.workspaceRootId(wsTypespaceName, wsNamespaceName,
 		wsWorkspaceName)
+
+	return key
 }
 
 func (test *testHelper) advanceWorkspace(workspace string,
-	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
+	nonce quantumfs.WorkspaceNonce, src quantumfs.ObjectKey,
+	dst quantumfs.ObjectKey) {
 
 	ctx := test.TestCtx()
 	wsdb := test.GetWorkspaceDB()
@@ -468,7 +471,7 @@ func (test *testHelper) advanceWorkspace(workspace string,
 		test.getWorkspaceComponents(workspace)
 
 	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
-		wsNamespaceName, wsWorkspaceName, src, dst)
+		wsNamespaceName, wsWorkspaceName, nonce, src, dst)
 	test.AssertNoErr(err)
 
 	wsr, cleanup := test.getWorkspaceRoot(workspace)

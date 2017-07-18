@@ -34,8 +34,11 @@ func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectK
 func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
+	ts, ns, ws := test.getWorkspaceComponents(workspace)
+	_, nonce := test.workspaceRootId(ts, ns, ws)
+
 	markImmutable(ctx, workspace)
-	test.advanceWorkspace(workspace, src, dst)
+	test.advanceWorkspace(workspace, nonce, src, dst)
 	refreshTo(ctx, test, workspace, dst)
 	markMutable(ctx, workspace)
 }
@@ -43,9 +46,12 @@ func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
+	ts, ns, ws := test.getWorkspaceComponents(workspace)
+	_, nonce := test.workspaceRootId(ts, ns, ws)
+
 	markImmutable(ctx, workspace)
 	test.remountFilesystem()
-	test.advanceWorkspace(workspace, src, dst)
+	test.advanceWorkspace(workspace, nonce, src, dst)
 	refreshTo(ctx, test, workspace, dst)
 	markMutable(ctx, workspace)
 }
@@ -426,7 +432,7 @@ func TestRefreshUninstantiated(t *testing.T) {
 			"no changes to the rootId")
 
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
-		test.AssertLogContains("Adding uninstantiated",
+		test.WaitForLogString("Adding uninstantiated",
 			"There are no uninstantiated inodes")
 
 		for i := 0; i < nfiles; i++ {

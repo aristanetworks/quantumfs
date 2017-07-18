@@ -23,6 +23,7 @@ type WorkspaceRoot struct {
 	namespace       string
 	workspace       string
 	publishedRootId quantumfs.ObjectKey
+	nonce           quantumfs.WorkspaceNonce
 
 	listLock   sync.Mutex
 	accessList quantumfs.PathsAccessed
@@ -72,9 +73,13 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	var wsr WorkspaceRoot
 
-	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
-		typespace, namespace, workspace)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, typespace, namespace,
+		workspace)
+	if err != nil {
+		utils.Assert(err == nil, "Failed to fetch workspace rootId: %s",
+			err.Error())
+	}
+
 	c.vlog("Workspace Loading %s/%s/%s %s",
 		typespace, namespace, workspace, rootId.String())
 
@@ -88,6 +93,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.namespace = namespace
 	wsr.workspace = workspace
 	wsr.publishedRootId = rootId
+	wsr.nonce = nonce
 	wsr.accessList = quantumfs.NewPathsAccessed()
 
 	wsr.treeLock_ = &wsr.realTreeLock
@@ -647,7 +653,7 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 func (wsr *WorkspaceRoot) refresh(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
-	publishedRootId, err := c.workspaceDB.Workspace(&c.Ctx,
+	publishedRootId, _, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
 	wsr.refreshTo(c, publishedRootId)
@@ -688,7 +694,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	// Update workspace rootId
 	if !newRootId.IsEqualTo(wsr.publishedRootId) {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace, wsr.publishedRootId, newRootId)
+			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
+			newRootId)
 
 		if err != nil {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +

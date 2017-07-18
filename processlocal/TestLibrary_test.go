@@ -26,8 +26,8 @@ func runTest(t *testing.T, test systemlocalTest) {
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
 		wsdb: NewWorkspaceDB(""),
-		ctx:  newCtx(),
 	}
+	th.ctx = newCtx(th.Logger)
 
 	defer th.EndTest()
 
@@ -42,9 +42,9 @@ type testHelper struct {
 
 type systemlocalTest func(test *testHelper)
 
-func newCtx() *quantumfs.Ctx {
+func newCtx(logger *qlog.Qlog) *quantumfs.Ctx {
 	// Create  Ctx with random RequestId
-	Qlog := qlog.NewQlogTiny()
+	Qlog := logger
 	requestId := qlog.TestReqId
 	ctx := &quantumfs.Ctx{
 		Qlog:      Qlog,
