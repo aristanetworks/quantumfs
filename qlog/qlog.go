@@ -100,26 +100,34 @@ func SpecialReq(reqId uint64) string {
 	}
 }
 
-var logSubsystem = []string{
-	"Daemon",
-	"Datastore",
-	"WorkspaceDb",
-	"Test",
-	"Qlog",
-	"Quark",
-	"Spin",
-	"Tool",
+var logSubsystem = []string{}
+var logSubsystemMap = map[string]LogSubsystem{}
+
+type logSubsystemPair struct {
+	name   string
+	logger LogSubsystem
 }
 
-var logSubsystemMap = map[string]LogSubsystem{
-	"daemon":      LogDaemon,
-	"datastore":   LogDatastore,
-	"workspacedb": LogWorkspaceDb,
-	"test":        LogTest,
-	"qlog":        LogQlog,
-	"quark":       LogQuark,
-	"spin":        LogSpin,
-	"tool":        LogTool,
+var logSubsystemList = []logSubsystemPair{
+	{"Daemon", LogDaemon},
+	{"Datastore", LogDatastore},
+	{"WorkspaceDb", LogWorkspaceDb},
+	{"Test", LogTest},
+	{"Qlog", LogQlog},
+	{"Quark", LogQuark},
+	{"Spin", LogSpin},
+	{"Tool", LogTool},
+}
+
+func init() {
+	for _, v := range logSubsystemList {
+		addLogSubsystem(v.name, v.logger);
+	}
+}
+
+func addLogSubsystem(sys string, l LogSubsystem) {
+	logSubsystem = append(logSubsystem, sys)
+	logSubsystemMap[strings.ToLower(sys)] = l
 }
 
 func (enum LogSubsystem) String() string {
@@ -313,10 +321,20 @@ type Qlogger struct {
 	subsystem LogSubsystem
 }
 
+// This is just a placeholder for now:
+// TODO sanity check space for logSubsystemMax before adding it in
+func newLogSubsystem(sys string) LogSubsystem {
+	//logSubsystemMax++
+	l := logSubsystemMax
+	logSubsystemList = append(logSubsystemList, logSubsystemPair{sys, l})
+	addLogSubsystem(sys, l)
+	return l
+}
+
 func newQlogger(subsystem string) *Qlogger {
-	sub, err := getSubsystem(subsystem) // TODO: register this instead
+	sub, err := getSubsystem(subsystem)
 	if err != nil {
-		panic(fmt.Sprintf("invalid subsystem %s", subsystem))
+		sub = newLogSubsystem(subsystem)
 	}
 	return &Qlogger{
 		RequestId: 0,
