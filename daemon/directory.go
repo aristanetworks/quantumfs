@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -73,7 +74,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	parent InodeId, treeLock *sync.RWMutex) []InodeId {
 
 	defer c.FuncIn("initDirectory",
-		"baselayer from %s", baseLayerId.Text()).Out()
+		"baselayer from %s", baseLayerId.String()).Out()
 
 	// Set directory data before processing the children in case the children
 	// access the parent.
@@ -187,12 +188,14 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 }
 
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	owner fuse.Owner, entry quantumfs.DirectoryRecord) {
+	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
 
-	// Ensure we're working with a shallow copy for objectTypeToFileType
-	entry = entry.ShallowCopy()
+	// Ensure we have a flattened DirectoryRecord to ensure the type is the
+	// underlying type for Hardlinks. This is required in order for
+	// objectTypeToFileType() to have access to the correct type to report.
+	entry := entry_.AsImmutableDirectoryRecord()
 
 	attr.Ino = uint64(inodeNum)
 
@@ -210,7 +213,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
 	default:
-		c.elog("Unhandled filetype in fillAttrWithDirectoryRecord",
+		c.elog("Unhandled filetype %x in fillAttrWithDirectoryRecord",
 			fileType)
 		fallthrough
 	case fuse.S_IFREG,
@@ -388,8 +391,8 @@ func (dir *Directory) publish_(c *ctx) {
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records())
 
-	c.vlog("Directory key %s -> %s", oldBaseLayer.Text(),
-		dir.baseLayerId.Text())
+	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
+		dir.baseLayerId.String())
 }
 
 func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
@@ -503,7 +506,57 @@ func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 
 	child := c.qfs.inode(c, childId)
 	if child != nil {
-		child.parentCheckLinkReparent(c, dir)
+		linkId := child.parentCheckLinkReparent(c, dir)
+		dir.stashChildLinkId(c, childId, linkId)
+	}
+}
+
+func extractHardlinkId(c *ctx, data []byte) HardlinkId {
+	if id, err := strconv.ParseUint(string(data), 16, 64); err != nil {
+		c.elog("Failed to extract hardlinkid from %s, err %s",
+			string(data), err.Error())
+		return InvalidHardlinkId
+	} else {
+		return HardlinkId(id)
+	}
+}
+
+func (dir *Directory) childStashedLinkIdFromRecord(c *ctx,
+	record quantumfs.DirectoryRecord) HardlinkId {
+
+	attributeList, status := dir.getRecordExtendedAttributes(c, record)
+	if status != fuse.OK {
+		c.vlog("Could not retrieve any attributes")
+		return InvalidHardlinkId
+	}
+	key := attributeList.AttributeByKey(quantumfs.XAttrTypeLinkID)
+	if key == quantumfs.EmptyBlockKey {
+		c.vlog("Nothing stashed")
+		return InvalidHardlinkId
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, key)
+	if buffer == nil {
+		c.elog("Failed to retrieve attribute datablock")
+		return InvalidHardlinkId
+	}
+	return extractHardlinkId(c, buffer.Get())
+}
+
+func (dir *Directory) childStashedLinkIdFromInode(c *ctx,
+	childId InodeId) HardlinkId {
+
+	if buf, status := dir.getChildXAttrData(c, childId,
+		quantumfs.XAttrTypeLinkID); status == fuse.OK {
+		return extractHardlinkId(c, buf)
+	}
+	return InvalidHardlinkId
+}
+
+func (dir *Directory) stashChildLinkId(c *ctx, childId InodeId, linkId HardlinkId) {
+	if linkId != InvalidHardlinkId {
+		dir.setChildXAttr(c, childId, quantumfs.XAttrTypeLinkID,
+			strconv.AppendUint(nil, uint64(linkId), 16))
 	}
 }
 
@@ -749,7 +802,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 // All modifications to the record must be done whilst holding the parentLock.
 // If a function only wants to read, then it may suffice to grab a "snapshot" of it.
 func (dir *Directory) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("Directory::getChildRecordCopy").Out()
 
@@ -762,7 +815,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 
 	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
-		return record.ShallowCopy(), nil
+		return record.AsImmutableDirectoryRecord(), nil
 	}
 
 	return &quantumfs.DirectRecord{},
@@ -821,7 +874,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var recordCopy quantumfs.DirectoryRecord
+		var recordCopy quantumfs.ImmutableDirectoryRecord
 		err := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 
@@ -830,7 +883,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordCopy = record.ShallowCopy()
+			recordCopy = record.AsImmutableDirectoryRecord()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
@@ -880,14 +933,14 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		var inode InodeId
 		result := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.recordByName(c, name)
-			if record == nil {
+			record_ := dir.children.recordByName(c, name)
+			if record_ == nil {
 				return fuse.ENOENT
 			}
 
 			// Use a shallow copy of record to ensure the right type for
 			// objectTypeToFileType
-			record = record.ShallowCopy()
+			record := record_.AsImmutableDirectoryRecord()
 
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {
@@ -949,7 +1002,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	if result == fuse.OK {
 		dir.self.dirty(c)
-		c.vlog("Created new symlink with key: %s", key.Text())
+		c.vlog("Created new symlink with key: %s", key.String())
 	}
 
 	return result
@@ -1341,7 +1394,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
-		dir.inodeNum(), inodeNum, newKey.Text()).Out()
+		dir.inodeNum(), inodeNum, newKey.String()).Out()
 
 	defer dir.Lock().Unlock()
 	dir.self.dirty(c)
@@ -1355,6 +1408,25 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}
 
 	entry.SetID(newKey)
+}
+
+func (dir *Directory) getRecordExtendedAttributes(c *ctx,
+	record quantumfs.DirectoryRecord) (*quantumfs.ExtendedAttributes,
+	fuse.Status) {
+
+	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
+		c.vlog("Directory::getRecordExtendedAttributes returning new object")
+		return nil, fuse.ENOENT
+	}
+
+	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
+	if buffer == nil {
+		c.dlog("Failed to retrieve attribute list")
+		return nil, fuse.EIO
+	}
+
+	attributeList := buffer.AsExtendedAttributes()
+	return &attributeList, fuse.OK
 }
 
 // Get the extended attributes object. The status is EIO on error or ENOENT if there
@@ -1371,19 +1443,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
-		c.vlog("Directory::getExtendedAttributes_ returning new object")
-		return nil, fuse.ENOENT
-	}
-
-	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
-	if buffer == nil {
-		c.dlog("Failed to retrieve attribute list")
-		return nil, fuse.EIO
-	}
-
-	attributeList := buffer.AsExtendedAttributes()
-	return &attributeList, fuse.OK
+	return dir.getRecordExtendedAttributes(c, record)
 }
 
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
@@ -1403,24 +1463,21 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 		return nil, fuse.EIO
 	}
 
-	for i := 0; i < attributeList.NumAttributes(); i++ {
-		name, key := attributeList.Attribute(i)
-		if name != attr {
-			continue
-		}
-
-		c.vlog("Found attribute key: %s", key.Text())
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			c.elog("Failed to retrieve attribute datablock")
-			return nil, fuse.EIO
-		}
-
-		return buffer, fuse.OK
+	key := attributeList.AttributeByKey(attr)
+	if key == quantumfs.EmptyBlockKey {
+		c.vlog("XAttr name not found")
+		return nil, fuse.ENODATA
 	}
 
-	c.vlog("XAttr name not found")
-	return nil, fuse.ENODATA
+	c.vlog("Found attribute key: %s", key.String())
+	buffer := c.dataStore.Get(&c.Ctx, key)
+
+	if buffer == nil {
+		c.elog("Failed to retrieve attribute datablock")
+		return nil, fuse.EIO
+	}
+
+	return buffer, fuse.OK
 }
 
 func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
@@ -1688,7 +1745,7 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 		constructor = newSpecial
 	}
 
-	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().Text())
+	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)

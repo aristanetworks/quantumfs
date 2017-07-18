@@ -6,6 +6,7 @@ package daemon
 // Test library for daemon package
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -40,6 +41,30 @@ type TestHelper struct {
 	api            quantumfs.Api
 }
 
+func logFuseWaiting(prefix string, th *TestHelper) {
+	if th.fuseConnection == 0 {
+		// There is no connection to log
+		return
+	}
+
+	buf := make([]byte, 100)
+
+	path := fmt.Sprintf("%s/connections/%d/waiting", fusectlPath,
+		th.fuseConnection)
+	waiting, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		th.Log("ERROR: Failed to open FUSE connection waiting err: %s",
+			err.Error())
+	} else if _, err := waiting.Read(buf); err != nil {
+		th.Log("ERROR: Failed to read FUSE connection waiting err: %s",
+			err.Error())
+	} else {
+		str := bytes.TrimRight(buf, "\u0000\n")
+		th.Log("%s: there are %s pending requests", prefix, str)
+	}
+	waiting.Close()
+}
+
 func abortFuse(th *TestHelper) {
 	if th.fuseConnection == 0 {
 		// Nothing to abort
@@ -54,11 +79,11 @@ func abortFuse(th *TestHelper) {
 	if err != nil {
 		// We cannot abort so we won't terminate. We are
 		// truly wedged.
-		th.Log("ERROR: Failed to abort FUSE connection (open)")
-	}
-
-	if _, err := abort.Write([]byte("1")); err != nil {
-		th.Log("ERROR: Failed to abort FUSE connection (write)")
+		th.Log("ERROR: Failed to abort FUSE connection (open) err: %s",
+			err.Error())
+	} else if _, err := abort.Write([]byte("1")); err != nil {
+		th.Log("ERROR: Failed to abort FUSE connection (write) err: %s",
+			err.Error())
 	}
 
 	abort.Close()
@@ -80,18 +105,19 @@ func (th *TestHelper) EndTest() {
 				exception)
 			abortFuse(th)
 		}
-
+		logFuseWaiting("Before unmount", th)
 		if err := th.qfs.server.Unmount(); err != nil {
+			th.Log("ERROR: Failed to unmount quantumfs instance.")
+			th.Log("Are you leaking a file descriptor?: %s", err.Error())
+			logFuseWaiting("After unmount failure", th)
+
 			abortFuse(th)
-
 			runtime.GC()
-
+			logFuseWaiting("After aborting fuse", th)
 			if err := th.qfs.server.Unmount(); err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs "+
 					"after aborting: %s", err.Error())
 			}
-			th.Log("ERROR: Failed to unmount quantumfs instance.")
-			th.Log("Are you leaking a file descriptor?: %s", err.Error())
 		}
 	}
 
@@ -169,15 +195,8 @@ func serveSafely(th *TestHelper) {
 	}(th)
 
 	var mountOptions = fuse.MountOptions{
-		AllowOther:    true,
-		MaxBackground: 1024,
-		MaxWrite:      quantumfs.MaxBlockSize,
-		FsName:        "QuantumFS",
-		Name:          th.TestName,
-		Options:       make([]string, 0),
+		Name: th.TestName,
 	}
-	mountOptions.Options = append(mountOptions.Options, "suid")
-	mountOptions.Options = append(mountOptions.Options, "dev")
 
 	// Ensure that, since we're in a test, we only sync when syncAll is called.
 	// Otherwise, we shouldn't ever need to flush.
@@ -185,7 +204,7 @@ func serveSafely(th *TestHelper) {
 
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
-	th.qfs.Serve(mountOptions)
+	th.AssertNoErr(th.qfs.Serve(mountOptions))
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {

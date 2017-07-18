@@ -55,7 +55,8 @@ func findApiPathEnvironment() string {
 	return path
 }
 
-func findApiPathMount() string {
+// Returns the path where QuantumFS is mounted at or "" on failure.
+func FindQuantumFsMountPath() string {
 	// We are look in /proc/self/mountinfo for a line which indicates that
 	// QuantumFS is mounted. That line looks like:
 	//
@@ -113,14 +114,22 @@ func findApiPathMount() string {
 		return ""
 	}
 
-	// We've found precisely one mount, ensure the file is really the api file.
-	path = fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
-	stat, err := os.Lstat(path)
+	// We've found precisely one mount, ensure it contains the api file.
+	apiPath := fmt.Sprintf("%s%c%s", path, os.PathSeparator, ApiPath)
+	stat, err := os.Lstat(apiPath)
 	if err != nil || !fileIsApi(stat) {
 		return ""
 	}
 
 	return path
+}
+
+func findApiPathMount() string {
+	mountPath := FindQuantumFsMountPath()
+	if mountPath == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s%c%s", mountPath, os.PathSeparator, ApiPath)
 }
 
 func findApiPathUpwards() (string, error) {
@@ -253,10 +262,6 @@ const (
 
 type PathFlags uint
 
-func (pf PathFlags) Primitive() interface{} {
-	return uint(pf)
-}
-
 func (pf PathFlags) Created() bool {
 	return utils.BitFlagsSet(uint(pf), PathCreated)
 }
@@ -343,21 +348,6 @@ type apiImpl struct {
 
 func (api *apiImpl) Close() {
 	api.fd.Close()
-}
-
-func writeAll(fd *os.File, data []byte) error {
-	for {
-		size, err := fd.Write(data)
-		if err != nil {
-			return err
-		}
-
-		if len(data) == size {
-			return nil
-		}
-
-		data = data[size:]
-	}
 }
 
 type CommandCommon struct {
@@ -489,7 +479,7 @@ type SetWorkspaceImmutableRequest struct {
 }
 
 func (api *apiImpl) sendCmd(buf []byte) ([]byte, error) {
-	err := writeAll(api.fd, buf)
+	err := utils.WriteAll(api.fd, buf)
 	if err != nil {
 		return nil, err
 	}

@@ -83,7 +83,7 @@ func NewTestHelper(testName string, testRunDir string,
 		StartTime:  time.Now(),
 		CachePath:  cachePath,
 		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-			60*10000*24, NoStdOut),
+			60*10000*24, "noVersion", NoStdOut),
 		TempDir: TestRunDir + "/" + testName,
 		Timeout: 1500 * time.Millisecond,
 	}
@@ -222,7 +222,12 @@ type TLA struct {
 }
 
 // Assert the test log contains the given text
-func (th *TestHelper) AssertLogContains(text string, failMsg string) {
+func (th *TestHelper) WaitForLogString(text string, failMsg string) {
+	th.WaitFor(failMsg, func() bool {
+		contains := th.messagesInTestLog([]TLA{TLA{true, text, failMsg}})
+
+		return contains[0]
+	})
 	th.AssertTestLog([]TLA{TLA{true, text, failMsg}})
 }
 

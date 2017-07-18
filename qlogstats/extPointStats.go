@@ -7,7 +7,6 @@ package qlogstats
 
 import (
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 type extPointStats struct {
@@ -19,7 +18,7 @@ type extPointStats struct {
 
 func NewExtPointStats(format_ string, nametag string) *extPointStats {
 	return &extPointStats{
-		format: format_,
+		format: format_ + "\n",
 		name:   nametag,
 	}
 }
@@ -31,24 +30,22 @@ func (ext *extPointStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPointStats) ProcessRequest(request qlog.LogStack) {
+func (ext *extPointStats) ProcessRequest(request []indentedLog) {
 	for _, v := range request {
-		if v.Format == ext.format {
-			ext.stats.NewPoint(uint64(v.T))
-		}
+		ext.stats.NewPoint(uint64(v.log.T))
 	}
 }
 
-func (ext *extPointStats) Publish() (tags []quantumfs.Tag,
+func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
 	fields []quantumfs.Field) {
 
 	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("name", ext.name))
+	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
 	fields = make([]quantumfs.Field, 0)
 
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
 	ext.stats = basicStats{}
-	return tags, fields
+	return "quantumFsPointCount", tags, fields
 }

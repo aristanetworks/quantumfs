@@ -14,7 +14,7 @@ import (
 func runReader(qlogFile string,
 	extractors []StatExtractorConfig) *processlocal.Memdb {
 
-	db := processlocal.NewMemdb()
+	db := processlocal.NewMemdb("").(*processlocal.Memdb)
 	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors)
 
 	agg.requestEndAfter = time.Millisecond * 100
@@ -23,10 +23,13 @@ func runReader(qlogFile string,
 }
 
 func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
-	cfg StatExtractorConfig, check func(*processlocal.Memdb)) {
+	cfg *StatExtractorConfig, check func(*processlocal.Memdb)) {
 
 	// Setup an extractor
-	extractors := []StatExtractorConfig{cfg}
+	extractors := []StatExtractorConfig{}
+	if cfg != nil {
+		extractors = append(extractors, *cfg)
+	}
 
 	// Run the reader
 	memdb := runReader(test.CachePath+"/ramfs/qlog", extractors)
@@ -78,27 +81,34 @@ func TestMatches(t *testing.T) {
 		qlogHandle.Log(qlog.LogTest, 12345, 3, "TestMatch")
 		qlogHandle.Log(qlog.LogTest, 12347, 3, qlog.FnExitStr+"TestMatch")
 
+		checkedAvg := false
+		checkedSamples := false
 		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 6,
+			test.Assert(len(memdb.Data[0].Fields) == 7,
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
 			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "average" {
+				if v.Name == "average_ns" {
 					test.Assert(v.Data == uint64(duration1+
 						duration2)/2, "incorrect delta %d",
 						v.Data)
+					checkedAvg = true
 				} else if v.Name == "samples" {
 					test.Assert(v.Data == 2,
 						"incorrect samples %d", v.Data)
+					checkedSamples = true
 				}
 			}
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
 			(300*time.Millisecond)), checker)
+
+		test.Assert(checkedAvg, "test not checking average")
+		test.Assert(checkedSamples, "test not checking samples")
 	})
 }
 
@@ -117,38 +127,61 @@ func TestPercentiles(t *testing.T) {
 			base += int64(i)
 		}
 
+		checked := make([]bool, 8)
 		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 6,
+			test.Assert(len(memdb.Data[0].Fields) == 7,
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
 			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "average" {
+				if v.Name == "average_ns" {
 					test.Assert(v.Data == 50,
 						"incorrect delta %d", v.Data)
+					checked[0] = true
+				} else if v.Name == "maximum_ns" {
+					test.Assert(v.Data == 100,
+						"incorrect delta %d", v.Data)
+					checked[1] = true
 				} else if v.Name == "samples" {
 					test.Assert(v.Data == 101,
 						"incorrect samples %d", v.Data)
-				} else if v.Name == "50pct" {
+					checked[2] = true
+				} else if v.Name == "50pct_ns" {
 					test.Assert(v.Data == 50,
 						"50th percentile is %d", v.Data)
-				} else if v.Name == "90pct" {
+					checked[3] = true
+				} else if v.Name == "90pct_ns" {
 					test.Assert(v.Data == 90,
 						"90th percentile is %d", v.Data)
-				} else if v.Name == "95pct" {
+					checked[4] = true
+				} else if v.Name == "95pct_ns" {
 					test.Assert(v.Data == 95,
 						"95th percentile is %d", v.Data)
-				} else if v.Name == "99pct" {
+					checked[5] = true
+				} else if v.Name == "99pct_ns" {
 					test.Assert(v.Data == 99,
 						"99th percentile is %d", v.Data)
+					checked[6] = true
+				}
+			}
+
+			for k, v := range memdb.Data[0].Tags {
+				if k == "version" {
+					test.Assert(v == "noVersion",
+						"version field not correct: %s", v)
+					checked[7] = true
 				}
 			}
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch\n",
-				qlog.FnExitStr+"TestMatch\n", true, "TestMatch"),
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
 			(300*time.Millisecond)), checker)
+
+		for i := 0; i < 7; i++ {
+			test.Assert(checked[i], "test not checking field %d", i)
+		}
 	})
 }
 
@@ -161,6 +194,7 @@ func TestPointCount(t *testing.T) {
 				uint64(i), 2, "TestLog")
 		}
 
+		checked := false
 		checker := func(memdb *processlocal.Memdb) {
 			test.Assert(len(memdb.Data[0].Fields) == 1,
 				"%d fields produced from one matching log",
@@ -170,12 +204,95 @@ func TestPointCount(t *testing.T) {
 				if v.Name == "samples" {
 					test.Assert(v.Data == 123,
 						"incorrect samples %d", v.Data)
+					checked = true
 				}
 			}
 		}
 
 		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPointStats("TestLog\n", "TestLog Name Tag"),
+			NewExtPointStats("TestLog", "TestLog Name Tag"),
 			(300*time.Millisecond)), checker)
+
+		test.Assert(checked, "test not checking anything")
+	})
+}
+
+func TestIndentation(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		qlogHandle := test.Logger
+
+		// Artificially insert matching logs at different scopes
+		durationReal := int64(10000)
+		qlogHandle.Log_(time.Unix(0, 20000), qlog.LogTest, 12345, 2,
+			qlog.FnEnterStr+"TestMatch")
+
+		// Go up in scope and place a matching string there
+		qlogHandle.Log_(time.Unix(0, 20100), qlog.LogTest, 12345, 2,
+			qlog.FnEnterStr+"Other Function")
+		qlogHandle.Log_(time.Unix(0, 20200), qlog.LogTest,
+			12345, 3, qlog.FnEnterStr+"Mismatching funcIn")
+		qlogHandle.Log_(time.Unix(0, 20300), qlog.LogTest,
+			12345, 3, qlog.FnExitStr+"TestMatch")
+		qlogHandle.Log_(time.Unix(0, 20400), qlog.LogTest, 12345, 2,
+			qlog.FnExitStr+"Other Function")
+
+		qlogHandle.Log_(time.Unix(0, 20000+durationReal), qlog.LogTest,
+			12345, 3, qlog.FnExitStr+"TestMatch")
+
+		checkedAvg := false
+		checkedSamples := false
+		checker := func(memdb *processlocal.Memdb) {
+			test.Assert(len(memdb.Data[0].Fields) == 7,
+				"%d fields produced from one matching log",
+				len(memdb.Data[0].Fields))
+
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "average_ns" {
+					test.Assert(v.Data == uint64(durationReal),
+						"incorrect delta %d", v.Data)
+					checkedAvg = true
+				} else if v.Name == "samples" {
+					test.Assert(v.Data == 1,
+						"incorrect samples %d", v.Data)
+					checkedSamples = true
+				}
+			}
+		}
+
+		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
+				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
+			(300*time.Millisecond)), checker)
+
+		test.Assert(checkedAvg, "test not checking average")
+		test.Assert(checkedSamples, "test not checking samples")
+	})
+}
+
+func TestErrorCounting(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.ShouldFailLogscan = true
+		qlogHandle := test.Logger
+
+		// Artificially insert some error logs
+		for i := int64(0); i < 123; i++ {
+			qlogHandle.Log_(time.Unix(i, 20000+i), qlog.LogTest,
+				uint64(i), 2, "ERROR: TestMatch")
+		}
+
+		checked := false
+		checker := func(memdb *processlocal.Memdb) {
+			for _, v := range memdb.Data[0].Fields {
+				if v.Name == "SystemErrors" {
+					test.Assert(v.Data == 123,
+						"incorrect count %d", v.Data)
+					checked = true
+				}
+			}
+		}
+
+		test.runExtractorTest(qlogHandle, nil, checker)
+		test.Assert(checked, "test not checking count")
+
 	})
 }

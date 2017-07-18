@@ -18,10 +18,6 @@ import (
 
 type LogSubsystem uint8
 
-func (v LogSubsystem) Primitive() interface{} {
-	return uint8(v)
-}
-
 // These should be short to save space, visually different to aid in reading
 const FnEnterStr = "---In "
 const FnExitStr = "Out-- "
@@ -147,7 +143,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 const logEnvTag = "TRACE"
 const maxLogLevels = 4
 const defaultMmapFile = "qlog"
-const entryCompleteBit = 1 << 15
+const entryCompleteBit = uint16(1 << 15)
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {
@@ -228,15 +224,16 @@ func PrintToStdout(format string, args ...interface{}) error {
 }
 
 func NewQlogTiny() *Qlog {
-	return NewQlogExt("", uint64(DefaultMmapSize), PrintToStdout)
+	return NewQlogExt("", uint64(DefaultMmapSize), "noVersion", PrintToStdout)
 }
 
 func NewQlog(ramfsPath string) *Qlog {
-	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), PrintToStdout)
+	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), "noVersion",
+		PrintToStdout)
 }
 
-func NewQlogExt(ramfsPath string, sharedMemLen uint64, outLog func(format string,
-	args ...interface{}) error) *Qlog {
+func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
+	outLog func(format string, args ...interface{}) error) *Qlog {
 
 	if sharedMemLen == 0 {
 		panic(fmt.Sprintf("Invalid shared memory length provided: %d\n",
@@ -248,7 +245,7 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, outLog func(format string
 		Write:     outLog,
 	}
 	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, int(sharedMemLen),
-		&q)
+		daemonVersion, &q)
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >

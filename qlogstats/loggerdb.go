@@ -13,6 +13,11 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
+type indentedLog struct {
+	log    qlog.LogOutput
+	indent int
+}
+
 type logTrack struct {
 	logs        qlog.LogStack
 	listElement *list.Element
@@ -28,9 +33,9 @@ type StatExtractor interface {
 	// receive. Strings must match format exactly, with a trailing "\n"
 	TriggerStrings() []string
 
-	ProcessRequest(request qlog.LogStack)
+	ProcessRequest(request []indentedLog)
 
-	Publish() ([]quantumfs.Tag, []quantumfs.Field)
+	Publish() (string, []quantumfs.Tag, []quantumfs.Field)
 }
 
 type StatExtractorConfig struct {
@@ -40,9 +45,9 @@ type StatExtractorConfig struct {
 }
 
 func NewStatExtractorConfig(ext StatExtractor,
-	period time.Duration) StatExtractorConfig {
+	period time.Duration) *StatExtractorConfig {
 
-	return StatExtractorConfig{
+	return &StatExtractorConfig{
 		extractor:  ext,
 		statPeriod: period,
 	}
@@ -52,7 +57,7 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	db quantumfs.TimeSeriesDB, extractors []StatExtractorConfig) *Aggregator {
 
 	reader := qlog.NewReader(filename)
-	agg := NewAggregator(db, extractors)
+	agg := NewAggregator(db, extractors, reader.DaemonVersion())
 
 	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
 		agg.ProcessLog(v)
@@ -66,11 +71,15 @@ type extractorIdx int
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
 	logsByRequest map[uint64]logTrack
+	daemonVersion string
 
 	// track the oldest untouched requests so we can push them to the stat
 	// extractors after the resting period (so we're confident there are no
 	// more logs coming for each request)
 	requestSequence list.List
+
+	// Uses a prefix (slower) system to extract data
+	errorCount *extPointStats
 
 	statExtractors  []StatExtractorConfig
 	statTriggers    map[string][]extractorIdx
@@ -80,12 +89,16 @@ type Aggregator struct {
 	queueLogs  []qlog.LogOutput
 }
 
+const errorStr = "ERROR: "
+
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
-	extractors []StatExtractorConfig) *Aggregator {
+	extractors []StatExtractorConfig, daemonVersion_ string) *Aggregator {
 
 	rtn := Aggregator{
 		db:              db_,
 		logsByRequest:   make(map[uint64]logTrack),
+		daemonVersion:   daemonVersion_,
+		errorCount:      NewExtPointStats(errorStr, "SystemErrors"),
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
@@ -163,9 +176,15 @@ func (agg *Aggregator) ProcessThread() {
 		// Lastly check if any extractors need to Publish
 		for i, extractor := range agg.statExtractors {
 			if now.Sub(extractor.lastOutput) > extractor.statPeriod {
-				tags, fields := extractor.extractor.Publish()
+				measurement, tags,
+					fields := extractor.extractor.Publish()
 				if tags != nil && len(tags) > 0 {
-					agg.db.Store(tags, fields)
+					// add the qfs version tag
+					tags = append(tags,
+						quantumfs.NewTag("version",
+							agg.daemonVersion))
+
+					agg.db.Store(measurement, tags, fields)
 				}
 
 				extractor.lastOutput = now
@@ -181,24 +200,47 @@ func (agg *Aggregator) ProcessThread() {
 func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 	// This is a map that contains, for each extractor that cares about a given
 	// log in logs, only the filtered logs that that extractor has said it wants
-	filteredRequests := make(map[extractorIdx][]qlog.LogOutput)
+	filteredRequests := make(map[extractorIdx][]indentedLog)
 
-	for _, log := range logs {
+	indentCount := 0
+	for _, curlog := range logs {
 		// Find if any extractors have registered for this log.
+
+		if qlog.IsFunctionOut(curlog.Format) {
+			indentCount--
+		}
+
+		// Check for partial matching for errors
+		if curlog.Format[:len(errorStr)] == errorStr {
+			agg.errorCount.ProcessRequest([]indentedLog{
+				indentedLog{
+					log:    curlog,
+					indent: indentCount,
+				},
+			})
+		}
 
 		// The statTriggers map is a map that uses a log format string for
 		// the key. The value is a list of extractors who want the log
-		if extractors, exists := agg.statTriggers[log.Format]; exists {
+		if extractors, exists := agg.statTriggers[curlog.Format]; exists {
 			for _, triggered := range extractors {
 				// This extractor wants this log, so append it
 				filtered, hasLogs := filteredRequests[triggered]
 				if !hasLogs {
-					filtered = make([]qlog.LogOutput, 0)
+					filtered = make([]indentedLog, 0)
 				}
 
-				filtered = append(filtered, log)
+				filtered = append(filtered, indentedLog{
+					log:    curlog,
+					indent: indentCount,
+				})
 				filteredRequests[triggered] = filtered
 			}
+		}
+
+		// Keep track of what level we're indented
+		if qlog.IsFunctionIn(curlog.Format) {
+			indentCount++
 		}
 	}
 
@@ -246,11 +288,20 @@ func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 type basicStats struct {
 	sum    uint64
 	points []uint64
+	max    uint64
 }
 
 func (bs *basicStats) NewPoint(data uint64) {
 	bs.sum += data
 	bs.points = append(bs.points, data)
+
+	if data > bs.max {
+		bs.max = data
+	}
+}
+
+func (bs *basicStats) Max() uint64 {
+	return bs.max
 }
 
 func (bs *basicStats) Average() uint64 {
@@ -278,10 +329,10 @@ func (bs *basicStats) Percentiles() map[string]uint64 {
 
 	lastIdx := float32(len(points) - 1)
 
-	rtn["50pct"] = points[int(lastIdx*0.50)]
-	rtn["90pct"] = points[int(lastIdx*0.90)]
-	rtn["95pct"] = points[int(lastIdx*0.95)]
-	rtn["99pct"] = points[int(lastIdx*0.99)]
+	rtn["50pct_ns"] = points[int(lastIdx*0.50)]
+	rtn["90pct_ns"] = points[int(lastIdx*0.90)]
+	rtn["95pct_ns"] = points[int(lastIdx*0.95)]
+	rtn["99pct_ns"] = points[int(lastIdx*0.99)]
 
 	return rtn
 }
