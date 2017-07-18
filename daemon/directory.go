@@ -506,57 +506,59 @@ func (dir *Directory) checkHardlink(c *ctx, childId InodeId) {
 
 	child := c.qfs.inode(c, childId)
 	if child != nil {
-		linkId := child.parentCheckLinkReparent(c, dir)
-		dir.stashChildLinkId(c, childId, linkId)
+		fileId := child.parentCheckLinkReparent(c, dir)
+		dir.stashChildFileId(c, childId, fileId)
 	}
 }
 
-func extractHardlinkId(c *ctx, data []byte) HardlinkId {
+func extractFileId(c *ctx, data []byte) quantumfs.FileId {
 	if id, err := strconv.ParseUint(string(data), 16, 64); err != nil {
-		c.elog("Failed to extract hardlinkid from %s, err %s",
+		c.elog("Failed to extract fileId from %s, err %s",
 			string(data), err.Error())
-		return InvalidHardlinkId
+		return quantumfs.InvalidFileId
 	} else {
-		return HardlinkId(id)
+		return quantumfs.FileId(id)
 	}
 }
 
-func (dir *Directory) childStashedLinkIdFromRecord(c *ctx,
-	record quantumfs.DirectoryRecord) HardlinkId {
+func (dir *Directory) childStashedFileIdFromRecord(c *ctx,
+	record quantumfs.DirectoryRecord) quantumfs.FileId {
 
 	attributeList, status := dir.getRecordExtendedAttributes(c, record)
 	if status != fuse.OK {
 		c.vlog("Could not retrieve any attributes")
-		return InvalidHardlinkId
+		return quantumfs.InvalidFileId
 	}
-	key := attributeList.AttributeByKey(quantumfs.XAttrTypeLinkID)
+	key := attributeList.AttributeByKey(quantumfs.XAttrTypeFileId)
 	if key == quantumfs.EmptyBlockKey {
 		c.vlog("Nothing stashed")
-		return InvalidHardlinkId
+		return quantumfs.InvalidFileId
 	}
 
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		c.elog("Failed to retrieve attribute datablock")
-		return InvalidHardlinkId
+		return quantumfs.InvalidFileId
 	}
-	return extractHardlinkId(c, buffer.Get())
+	return extractFileId(c, buffer.Get())
 }
 
-func (dir *Directory) childStashedLinkIdFromInode(c *ctx,
-	childId InodeId) HardlinkId {
+func (dir *Directory) childStashedFileIdFromInode(c *ctx,
+	childId InodeId) quantumfs.FileId {
 
 	if buf, status := dir.getChildXAttrData(c, childId,
-		quantumfs.XAttrTypeLinkID); status == fuse.OK {
-		return extractHardlinkId(c, buf)
+		quantumfs.XAttrTypeFileId); status == fuse.OK {
+		return extractFileId(c, buf)
 	}
-	return InvalidHardlinkId
+	return quantumfs.InvalidFileId
 }
 
-func (dir *Directory) stashChildLinkId(c *ctx, childId InodeId, linkId HardlinkId) {
-	if linkId != InvalidHardlinkId {
-		dir.setChildXAttr(c, childId, quantumfs.XAttrTypeLinkID,
-			strconv.AppendUint(nil, uint64(linkId), 16))
+func (dir *Directory) stashChildFileId(c *ctx, childId InodeId,
+	fileId quantumfs.FileId) {
+
+	if fileId != quantumfs.InvalidFileId {
+		dir.setChildXAttr(c, childId, quantumfs.XAttrTypeFileId,
+			strconv.AppendUint(nil, uint64(fileId), 16))
 	}
 }
 
@@ -1712,7 +1714,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	// add a check incase there's an inconsistency
 	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
 		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
-			inodeNum, hardlink.linkId))
+			inodeNum, hardlink.fileId))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)
@@ -1818,6 +1820,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
+	entry.SetFileId(quantumfs.InvalidFileId)
 
 	return entry
 }

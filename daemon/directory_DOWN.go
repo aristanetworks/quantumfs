@@ -188,12 +188,12 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	}
 
 	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
-	linkid := dir.childStashedLinkIdFromInode(c, toLink.inodeNum())
+	fileId := dir.childStashedFileIdFromInode(c, toLink.inodeNum())
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.makeHardlink(c, fingerprint, linkid, toLink.inodeNum())
+	return dir.children.makeHardlink(c, fingerprint, fileId, toLink.inodeNum())
 }
 
 func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
@@ -205,18 +205,18 @@ func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
-		linkId := decodeHardlinkKey(localRecord.ID())
-		hrc.claimedLinks[linkId] = inodeId
+		fileId := localRecord.FileId()
+		hrc.claimedLinks[fileId] = inodeId
 		inode.setParent(dir.inodeNum())
 		return remoteRecord
 	}
 	utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
 		"either local or remote should be hardlinks to be normalized")
 
-	linkId := decodeHardlinkKey(remoteRecord.ID())
-	dir.wsr.updateHardlinkInodeId(c, linkId, inodeId)
+	fileId := remoteRecord.FileId()
+	dir.wsr.updateHardlinkInodeId(c, fileId, inodeId)
 	inode.setParent(dir.wsr.inodeNum())
-	return newHardlink(localRecord.Filename(), linkId, dir.wsr)
+	return newHardlink(localRecord.Filename(), fileId, dir.wsr)
 }
 
 func (dir *Directory) unlinkChild_DOWN(c *ctx, childname string, childId InodeId) {
@@ -300,33 +300,33 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 			localRecord.Type() == quantumfs.ObjectTypeHardlink {
 			// If the ids do not match, then all legs have been deleted
 			// and recreated.
-			return remoteRecord.ID().IsEqualTo(localRecord.ID()), true
+			return remoteRecord.FileId() == localRecord.FileId(), true
 		}
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 
-			stashedLinkId := dir.childStashedLinkIdFromRecord(c,
+			stashedFileId := dir.childStashedFileIdFromRecord(c,
 				remoteRecord)
-			if stashedLinkId == InvalidHardlinkId {
-				c.vlog("No stashed hardlinkId found.")
+			if stashedFileId == quantumfs.InvalidFileId {
+				c.vlog("No stashed fileId found.")
 				return false, true
 			}
-			linkId := decodeHardlinkKey(localRecord.ID())
-			if stashedLinkId != linkId {
-				c.vlog("linkId mismatch %d vs. %d",
-					linkId, stashedLinkId)
+			fileId := localRecord.FileId()
+			if stashedFileId != fileId {
+				c.vlog("fileId mismatch %d vs. %d",
+					fileId, stashedFileId)
 				return false, true
 			}
-			_, exists := hrc.claimedLinks[linkId]
+			_, exists := hrc.claimedLinks[fileId]
 			utils.Assert(!exists, "Someone has claimed my inode")
-			c.vlog("Claiming inode %d from linkId %d", childId, linkId)
+			c.vlog("Claiming inode %d from fileId %d", childId, fileId)
 		}
 		if remoteRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			localRecord.Type() != quantumfs.ObjectTypeHardlink {
 
-			linkId := decodeHardlinkKey(remoteRecord.ID())
-			valid, hardlinkRecord := dir.wsr.getHardlink(linkId)
-			utils.Assert(valid, "hardlink %d not found", linkId)
+			fileId := remoteRecord.FileId()
+			valid, hardlinkRecord := dir.wsr.getHardlink(fileId)
+			utils.Assert(valid, "hardlink %d not found", fileId)
 
 			path := dir.absPath(c, localRecord.Filename())
 			if hardlinkRecord.Filename() != getPathFingerPrint(path) {
