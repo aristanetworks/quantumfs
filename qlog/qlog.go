@@ -117,7 +117,7 @@ var logSubsystemList = []logSubsystemPair{
 
 func init() {
 	for _, v := range logSubsystemList {
-		addLogSubsystem(v.name, v.logger);
+		addLogSubsystem(v.name, v.logger)
 	}
 }
 
