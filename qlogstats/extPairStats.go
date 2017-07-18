@@ -10,7 +10,6 @@ import (
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 type extPairStats struct {
@@ -28,21 +27,21 @@ func NewExtPairStats(start string, stop string, matchingIndent bool,
 	nametag string) *extPairStats {
 
 	return &extPairStats{
-		fmtStart:  start,
-		fmtStop:   stop,
+		fmtStart:  start + "\n",
+		fmtStop:   stop + "\n",
 		sameScope: matchingIndent,
 		name:      nametag,
 	}
 }
 
-func (ext *extPairStats) ExtractStatFrom(request qlog.LogStack, idx int) {
-	indentCount := 0
+func (ext *extPairStats) ExtractStatFrom(request []indentedLog, idx int) {
 	for i := idx; i < len(request); i++ {
-		if request[i].Format == ext.fmtStop && ((!ext.sameScope) ||
-			(ext.sameScope && indentCount == 1)) {
+		if request[i].log.Format == ext.fmtStop &&
+			(!ext.sameScope ||
+				request[idx].indent == request[i].indent) {
 
 			// found a match
-			delta := request[i].T - request[idx].T
+			delta := request[i].log.T - request[idx].log.T
 			if delta < 0 {
 				fmt.Printf("Negative delta (%d): |%s| to |%s|\n",
 					delta, ext.fmtStart, ext.fmtStop)
@@ -50,12 +49,6 @@ func (ext *extPairStats) ExtractStatFrom(request qlog.LogStack, idx int) {
 				ext.stats.NewPoint(uint64(delta))
 			}
 			return
-		}
-
-		if qlog.IsFunctionIn(request[i].Format) {
-			indentCount++
-		} else if qlog.IsFunctionOut(request[i].Format) {
-			indentCount--
 		}
 	}
 
@@ -71,21 +64,25 @@ func (ext *extPairStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPairStats) ProcessRequest(request qlog.LogStack) {
+func (ext *extPairStats) ProcessRequest(request []indentedLog) {
 	for i, v := range request {
-		if v.Format == ext.fmtStart {
+		if v.log.Format == ext.fmtStart {
 			ext.ExtractStatFrom(request, i)
 		}
 	}
 }
 
-func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Field) {
+func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
+	fields []quantumfs.Field) {
+
 	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("name", ext.name))
+	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
 	fields = make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("average", ext.stats.Average()))
+	fields = append(fields, quantumfs.NewField("average_ns",
+		ext.stats.Average()))
+	fields = append(fields, quantumfs.NewField("maximum_ns", ext.stats.Max()))
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
 	for name, data := range ext.stats.Percentiles() {
@@ -93,5 +90,5 @@ func (ext *extPairStats) Publish() (tags []quantumfs.Tag, fields []quantumfs.Fie
 	}
 
 	ext.stats = basicStats{}
-	return tags, fields
+	return "quantumFsLatency", tags, fields
 }

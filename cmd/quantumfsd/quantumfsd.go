@@ -194,17 +194,10 @@ func main() {
 	go reduceGCPercent(config.CacheSize)
 
 	var mountOptions = fuse.MountOptions{
-		AllowOther:    true,
-		MaxBackground: 1024,
-		MaxWrite:      quantumfs.MaxBlockSize,
-		FsName:        "QuantumFS",
-		Name:          "QuantumFS",
-		Options:       make([]string, 0),
+		Name: "QuantumFS",
 	}
-	mountOptions.Options = append(mountOptions.Options, "suid")
-	mountOptions.Options = append(mountOptions.Options, "dev")
 
-	quantumfs := daemon.NewQuantumFs(config)
+	quantumfs := daemon.NewQuantumFs(config, "QuantumFs "+version)
 	err := quantumfs.Serve(mountOptions)
 	if err != nil {
 		os.Exit(exitMountFail)

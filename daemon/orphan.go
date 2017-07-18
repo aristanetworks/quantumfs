@@ -64,7 +64,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 	for i := 0; i < attributes.NumAttributes(); i++ {
 		name, attrKey := attributes.Attribute(i)
 
-		c.vlog("Found attribute key: %s", attrKey.Text())
+		c.vlog("Found attribute key: %s", attrKey.String())
 		buffer := c.dataStore.Get(&c.Ctx, attrKey)
 		if buffer == nil {
 			c.elog("Failed to retrieve attribute datablock")
@@ -142,7 +142,9 @@ func (inode *InodeCommon) setOrphanChildXAttr(c *ctx, inodeNum InodeId, attr str
 
 	inode.parseExtendedAttributes_(c)
 
-	inode.unlinkXAttr[attr] = data
+	// copy the data as the memory backing it will
+	// be reused once this function returns
+	inode.unlinkXAttr[attr] = append([]byte(nil), data...)
 
 	return fuse.OK
 }
@@ -165,7 +167,7 @@ func (inode *InodeCommon) removeOrphanChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::getOrphanChildRecordCopy").Out()
 	defer inode.unlinkLock.Lock().Unlock()
@@ -174,7 +176,7 @@ func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
 		panic("getChildRecord on self file before unlinking")
 	}
 
-	return inode.unlinkRecord.ShallowCopy(), nil
+	return inode.unlinkRecord.AsImmutableDirectoryRecord(), nil
 }
 
 func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
@@ -263,7 +265,7 @@ func (inode *InodeCommon) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::getChildRecordCopy").Out()
 

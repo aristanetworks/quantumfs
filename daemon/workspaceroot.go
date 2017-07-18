@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ type WorkspaceRoot struct {
 	namespace       string
 	workspace       string
 	publishedRootId quantumfs.ObjectKey
+	nonce           quantumfs.WorkspaceNonce
 
 	listLock   sync.Mutex
 	accessList quantumfs.PathsAccessed
@@ -31,10 +33,9 @@ type WorkspaceRoot struct {
 	realTreeLock sync.RWMutex
 
 	// Hardlink support structures
-	linkLock       utils.DeferableRwMutex
-	hardlinks      map[HardlinkId]linkEntry
-	nextHardlinkId HardlinkId
-	inodeToLink    map[InodeId]HardlinkId
+	linkLock    utils.DeferableRwMutex
+	hardlinks   map[HardlinkId]linkEntry
+	inodeToLink map[InodeId]HardlinkId
 }
 
 type linkEntry struct {
@@ -72,11 +73,15 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	var wsr WorkspaceRoot
 
-	rootId, err := c.workspaceDB.Workspace(&c.Ctx,
-		typespace, namespace, workspace)
-	utils.Assert(err == nil, "BUG: 175630 - handle workspace API errors")
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, typespace, namespace,
+		workspace)
+	if err != nil {
+		utils.Assert(err == nil, "Failed to fetch workspace rootId: %s",
+			err.Error())
+	}
+
 	c.vlog("Workspace Loading %s/%s/%s %s",
-		typespace, namespace, workspace, rootId.Text())
+		typespace, namespace, workspace, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -88,13 +93,14 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.namespace = namespace
 	wsr.workspace = workspace
 	wsr.publishedRootId = rootId
+	wsr.nonce = nonce
 	wsr.accessList = quantumfs.NewPathsAccessed()
 
 	wsr.treeLock_ = &wsr.realTreeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
 		defer wsr.linkLock.Lock().Unlock()
-		wsr.hardlinks, wsr.nextHardlinkId = loadHardlinks(c,
+		wsr.hardlinks = loadHardlinks(c,
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]HardlinkId)
 	}()
@@ -193,8 +199,28 @@ func (wsr *WorkspaceRoot) removeHardlink_(linkId HardlinkId, inodeId InodeId) {
 	}
 }
 
-func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
-	record quantumfs.DirectoryRecord) *Hardlink {
+// We need a reference map of hardlinks to prevent the improbable event of random
+// number collision
+func generateUniqueHardlinkId(c *ctx,
+	hardlinks map[HardlinkId]linkEntry) HardlinkId {
+
+	// We assume here that the probability that we'll continually generate new
+	// random numbers for hardlinks that already exist is basically zero
+	for {
+		newId := HardlinkId(rand.Uint64())
+		if newId == InvalidHardlinkId {
+			continue
+		}
+		if _, exists := hardlinks[newId]; exists {
+			c.wlog("HardlinkId generation collision: %d", newId)
+		} else {
+			return newId
+		}
+	}
+}
+
+func (wsr *WorkspaceRoot) newHardlink(c *ctx, fingerprint string, linkId HardlinkId,
+	inodeId InodeId, record quantumfs.DirectoryRecord) *Hardlink {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
 
@@ -209,23 +235,29 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 
 	defer wsr.linkLock.Lock().Unlock()
 
-	newId := wsr.nextHardlinkId
-	wsr.nextHardlinkId++
+	if linkId == InvalidHardlinkId {
+		linkId = generateUniqueHardlinkId(c, wsr.hardlinks)
+		c.vlog("New Hardlink %d created for inodeId %d", linkId, inodeId)
+	}
 
-	c.dlog("New Hardlink %d created with inodeId %d", newId, inodeId)
 	newEntry := newLinkEntry(dirRecord)
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
 	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+	// The hardlink filename will be the fingerprint of the filename
+	// which was the source of the first link operation that created
+	// the hardlink. This field is used to support seamless refreshing
+	// of a set of files into a set of hardlinks.
+	newEntry.record.SetFilename(fingerprint)
 
-	wsr.hardlinks[newId] = newEntry
-	wsr.inodeToLink[inodeId] = newId
+	wsr.hardlinks[linkId] = newEntry
+	wsr.inodeToLink[inodeId] = linkId
 
 	// Don't reparent the inode, the caller must do so while holding the inode's
 	// parent lock
 	wsr.dirty(c)
 
-	return newHardlink(record.Filename(), newId, wsr)
+	return newHardlink(record.Filename(), linkId, wsr)
 }
 
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
@@ -408,25 +440,20 @@ func (wsr *WorkspaceRoot) setHardlink(linkId HardlinkId,
 }
 
 func loadHardlinks(c *ctx,
-	entry quantumfs.HardlinkEntry) (map[HardlinkId]linkEntry, HardlinkId) {
+	entry quantumfs.HardlinkEntry) map[HardlinkId]linkEntry {
 
 	defer c.funcIn("loadHardlinks").Out()
 
 	hardlinks := make(map[HardlinkId]linkEntry)
-	nextHardlinkId := HardlinkId(0)
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
 		newLink.nlink = hardlink.Nlinks()
 		id := HardlinkId(hardlink.HardlinkID())
 		hardlinks[id] = newLink
-
-		if id >= nextHardlinkId {
-			nextHardlinkId = id + 1
-		}
 	})
 
-	return hardlinks, nextHardlinkId
+	return hardlinks
 }
 
 func publishHardlinkMap(c *ctx,
@@ -502,10 +529,6 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 		newLink := newLinkEntry(hardlink.Record())
 		newLink.nlink = hardlink.Nlinks()
 		wsr.hardlinks[id] = newLink
-
-		if id >= wsr.nextHardlinkId {
-			wsr.nextHardlinkId = id + 1
-		}
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
@@ -520,11 +543,11 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 				entry.inodeId); inode != nil {
 
 				c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
-					oldRecord.ID().Text(),
-					hardlink.Record().ID().Text())
+					oldRecord.ID().String(),
+					hardlink.Record().ID().String())
 				utils.Assert(!hardlink.Record().Type().IsImmutable(),
 					"An immutable type cannot be reloaded.")
-				reload(c, hrc, inode, *hardlink.Record())
+				reload(c, wsr, hrc, inode, hardlink.Record())
 			}
 		}
 
@@ -534,8 +557,14 @@ func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
 	}
 }
 
+type HardlinkLoadRecord struct {
+	parent       *Directory
+	remoteRecord *quantumfs.DirectRecord
+}
+
 type HardlinkRefreshCtx struct {
 	claimedLinks map[HardlinkId]InodeId
+	loadRecords  []HardlinkLoadRecord
 }
 
 func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
@@ -592,6 +621,7 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 
 	var hrc HardlinkRefreshCtx
 	hrc.claimedLinks = make(map[HardlinkId]InodeId, 0)
+	hrc.loadRecords = make([]HardlinkLoadRecord, 0)
 
 	wsr.refreshHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
 
@@ -602,6 +632,15 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 			wsr.refresh_DOWN(c, &hrc, workspaceRoot.BaseLayer())
 	}()
 
+	for _, loadRecord := range hrc.loadRecords {
+		func() {
+			defer wsr.LockTree().Unlock()
+			defer loadRecord.parent.childRecordLock.Lock().Unlock()
+			loadRecord.parent.loadNewChild_DOWN(c,
+				loadRecord.remoteRecord)
+		}()
+	}
+
 	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
 	c.qfs.removeUninstantiated(c, removedUninstantiated)
 
@@ -611,7 +650,7 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 func (wsr *WorkspaceRoot) refresh(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
-	publishedRootId, err := c.workspaceDB.Workspace(&c.Ctx,
+	publishedRootId, _, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
 	wsr.refreshTo(c, publishedRootId)
@@ -652,15 +691,16 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 	// Update workspace rootId
 	if !newRootId.IsEqualTo(wsr.publishedRootId) {
 		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace, wsr.publishedRootId, newRootId)
+			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
+			newRootId)
 
 		if err != nil {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
 				wsr.workspace
 
 			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.Text(), newRootId.Text(),
-				wsr.publishedRootId.Text(), err.Error())
+				rootId.String(), newRootId.String(),
+				wsr.publishedRootId.String(), err.Error())
 			c.wlog("Another quantumfs instance is writing to %s, %s",
 				workspacePath,
 				"your changes will be lost. "+
@@ -675,8 +715,8 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			return
 		}
 
-		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.Text(),
-			rootId.Text())
+		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
+			rootId.String())
 		wsr.publishedRootId = rootId
 	}
 }

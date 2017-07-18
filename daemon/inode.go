@@ -18,10 +18,6 @@ import (
 
 type InodeId uint64
 
-func (v InodeId) Primitive() interface{} {
-	return uint64(v)
-}
-
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -77,8 +73,8 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx, inodeNum InodeId) (quantumfs.DirectoryRecord,
-		error)
+	getChildRecordCopy(c *ctx,
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
@@ -116,6 +112,9 @@ type Inode interface {
 	markAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	markSelfAccessed(c *ctx, op quantumfs.PathFlags)
 
+	absPath(c *ctx, path string) string
+	absPath_(c *ctx, path string) string
+
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
@@ -151,9 +150,9 @@ type Inode interface {
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 	parentGetChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.DirectoryRecord, error)
+		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory)
+	parentCheckLinkReparent(c *ctx, parent *Directory) HardlinkId
 
 	dirty(c *ctx) // Mark this Inode dirty
 	markClean_()  // Mark this Inode as cleaned
@@ -328,7 +327,7 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.DirectoryRecord, error) {
+	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
 
@@ -369,7 +368,9 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 }
 
 // Locks the parent
-func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
+func (inode *InodeCommon) parentCheckLinkReparent(c *ctx,
+	parent *Directory) HardlinkId {
+
 	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
 
 	// Ensure we lock in the UP direction
@@ -381,7 +382,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	record := parent.children.record(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
-		return
+		return InvalidHardlinkId
 	}
 
 	link := record.(*Hardlink)
@@ -391,7 +392,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
-		return
+		return InvalidHardlinkId
 	}
 
 	// reparent the child to the given parent
@@ -404,6 +405,8 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
 	parent.children.loadChild(c, newRecord, inodeId)
 	parent.dirty(c)
+
+	return link.linkId
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
@@ -542,6 +545,31 @@ func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
 	return inode.lock.RLock()
 }
 
+// the inode parentLock must be locked
+func (inode *InodeCommon) absPath_(c *ctx, path string) string {
+	defer c.FuncIn("InodeCommon::absPath_", "path %s", path).Out()
+
+	if path == "" {
+		path = inode.name()
+	} else {
+		path = inode.name() + "/" + path
+	}
+	return inode.parent_(c).absPath(c, path)
+}
+
+func (inode *InodeCommon) absPath(c *ctx, path string) string {
+	defer c.FuncIn("InodeCommon::absPath", "path %s", path).Out()
+	if inode.isWorkspaceRoot() {
+		return "/" + path
+	}
+	if inode.isOrphaned() {
+		panic("Orphaned file")
+	}
+
+	defer inode.parentLock.RLock().RUnlock()
+	return inode.absPath_(c, path)
+}
+
 func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
 	defer c.FuncIn("InodeCommon::markAccessed", "path %s CRUD %x", path,
 		op).Out()
@@ -609,8 +637,8 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	return err
 }
 
-func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
-	remoteRecord quantumfs.DirectRecord) {
+func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()
@@ -629,6 +657,12 @@ func reload(c *ctx, hrc *HardlinkRefreshCtx, inode Inode,
 			subdir.refresh_DOWN(c, hrc, remoteRecord.ID())
 		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
 		c.qfs.removeUninstantiated(c, removedUninstantiated)
+	case quantumfs.ObjectTypeHardlink:
+		linkId := decodeHardlinkKey(remoteRecord.ID())
+		valid, hardlinkRecord := wsr.getHardlink(linkId)
+		utils.Assert(valid, "hardlink %d not found", linkId)
+		remoteRecord = &hardlinkRecord
+		fallthrough
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
 	case quantumfs.ObjectTypeMediumFile:
@@ -669,10 +703,6 @@ type FileHandle interface {
 }
 
 type FileHandleId uint64
-
-func (v FileHandleId) Primitive() interface{} {
-	return uint64(v)
-}
 
 type FileHandleCommon struct {
 	id        FileHandleId

@@ -31,7 +31,7 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	store.test.Assert(store.shouldRead, "Received unexpected Get for %s",
-		key.Text())
+		key.String())
 	return store.datastore.Get(c, key, buf)
 }
 
@@ -99,6 +99,7 @@ func TestCacheLru(t *testing.T) {
 		cacheSize := (entryNum / 2) * quantumfs.ObjectKeyLength
 		c, backingStore, datastore, keys := createDatastore(test,
 			entryNum, cacheSize)
+		defer datastore.shutdown()
 		fillDatastore(c, test, backingStore, datastore, entryNum, keys)
 
 		// Prime the LRU by reading every entry in reverse order. At the end
@@ -154,6 +155,8 @@ func TestCacheLruDiffSize(t *testing.T) {
 		cacheSize := 12 + 100*quantumfs.ObjectKeyLength
 		c, backingStore, datastore, keys := createDatastore(test,
 			entryNum, cacheSize)
+		defer datastore.shutdown()
+
 		// Add a content with size greater than datastore.cacheSize, and set
 		// different sizes of several keys in advance.
 		createBuffer(c, test, backingStore, datastore, keys, 1, 2)
@@ -230,6 +233,8 @@ func TestCacheCaching(t *testing.T) {
 		entryNum := 256
 		c, backingStore, datastore, keys := createDatastore(test,
 			entryNum, 100*quantumfs.ObjectKeyLength)
+		defer datastore.shutdown()
+
 		// Add a content with size greater than datastore.cacheSize, and
 		// double the size of keys[1] in advance.
 		createBuffer(c, test, backingStore, datastore, keys, 257, 101)
@@ -257,10 +262,10 @@ func TestCacheCaching(t *testing.T) {
 
 		// Because of the size constraint, the least recent used entry
 		// keys[1] should be deleted from cache
-		_, exists := datastore.cache[keys[1].Text()]
+		_, exists := datastore.cache[keys[1].String()]
 		test.Assert(!exists, "Failed to forget block 1")
 		// The content is oversized, so it should be stored in the cache
-		_, exists = datastore.cache[keys[257].Text()]
+		_, exists = datastore.cache[keys[257].String()]
 		test.Assert(!exists, "Failed to forget block 257")
 
 		// Reading again should come entirely from the cache. If not

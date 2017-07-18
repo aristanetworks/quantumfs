@@ -88,7 +88,7 @@ type File struct {
 }
 
 func (fi *File) handleAccessorTypeChange(c *ctx,
-	remoteRecord quantumfs.DirectRecord) {
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("File::handleAccessorTypeChange", "%s: %d",
 		remoteRecord.Filename(), remoteRecord.Type()).Out()
@@ -299,7 +299,7 @@ func (fi *File) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
 }
 
 func (fi *File) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	defer c.funcIn("File::SetXAttr").Out()
+	defer c.FuncIn("File::SetXAttr", "%s", attr).Out()
 
 	return fi.parentSetChildXAttr(c, fi.inodeNum(), attr, data)
 }

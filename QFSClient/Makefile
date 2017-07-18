@@ -28,7 +28,7 @@ TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
 
 all: $(TARGET) test
 
-qfsclient: $(TARGET) test
+qfsclient: $(TARGET)
 
 clean: qfsc-clean
 
@@ -46,7 +46,7 @@ $(OBJS): $(DEPS)
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^
 
-gotests:
+gotests: qfsclient
 	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
 		go test github.com/aristanetworks/quantumfs/qfsclientc
 
