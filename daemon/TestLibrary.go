@@ -34,34 +34,37 @@ type QuantumFsTest func(test *TestHelper)
 // need to be embedded in that package's testHelper.
 type TestHelper struct {
 	testutils.TestHelper
-	qfs            *QuantumFs
-	qfsWait        sync.WaitGroup
-	fuseConnection int
-	api            quantumfs.Api
+	qfs             *QuantumFs
+	qfsInstances    []*QuantumFs
+	qfsWait         sync.WaitGroup
+	fuseConnections []int
+	api             quantumfs.Api
 }
 
 func abortFuse(th *TestHelper) {
-	if th.fuseConnection == 0 {
-		// Nothing to abort
-		return
-	}
+	for _, connection := range th.fuseConnections {
+		if connection == 0 {
+			// Nothing to abort
+			continue
+		}
 
-	// Forcefully abort the filesystem so it can be unmounted
-	th.T.Logf("Aborting FUSE connection %d", th.fuseConnection)
-	path := fmt.Sprintf("%s/connections/%d/abort", fusectlPath,
-		th.fuseConnection)
-	abort, err := os.OpenFile(path, os.O_WRONLY, 0)
-	if err != nil {
-		// We cannot abort so we won't terminate. We are
-		// truly wedged.
-		th.Log("ERROR: Failed to abort FUSE connection (open) err: %s",
-			err.Error())
-	} else if _, err := abort.Write([]byte("1")); err != nil {
-		th.Log("ERROR: Failed to abort FUSE connection (write) err: %s",
-			err.Error())
-	}
+		// Forcefully abort the filesystem so it can be unmounted
+		th.T.Logf("Aborting FUSE connection %d", connection)
+		path := fmt.Sprintf("%s/connections/%d/abort", fusectlPath,
+			connection)
+		abort, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			// We cannot abort so we won't terminate. We are
+			// truly wedged.
+			th.Log("ERROR: Failed to abort FUSE connection (open) err: %s",
+				err.Error())
+		} else if _, err := abort.Write([]byte("1")); err != nil {
+			th.Log("ERROR: Failed to abort FUSE connection (write) err: %s",
+				err.Error())
+		}
 
-	abort.Close()
+		abort.Close()
+	}
 }
 
 // EndTest cleans up the testing environment after the test has finished
@@ -72,24 +75,26 @@ func (th *TestHelper) EndTest() {
 		th.api.Close()
 	}
 
-	if th.qfs != nil && th.qfs.server != nil {
-		if exception != nil {
-			th.T.Logf("Failed with exception, forcefully unmounting: %v",
-				exception)
-			th.Log("Failed with exception, forcefully unmounting: %v",
-				exception)
-			abortFuse(th)
-		}
+	for _, qfs := range th.qfsInstances {
+		if qfs != nil && qfs.server != nil {
+			if exception != nil {
+				th.T.Logf("Failed with exception, forcefully unmounting: %v",
+					exception)
+				th.Log("Failed with exception, forcefully unmounting: %v",
+					exception)
+				abortFuse(th)
+			}
 
-		if err := th.qfs.server.Unmount(); err != nil {
-			th.Log("ERROR: Failed to unmount quantumfs instance.")
-			th.Log("Are you leaking a file descriptor?: %s", err.Error())
+			if err := qfs.server.Unmount(); err != nil {
+				th.Log("ERROR: Failed to unmount quantumfs instance.")
+				th.Log("Are you leaking a file descriptor?: %s", err.Error())
 
-			abortFuse(th)
-			runtime.GC()
-			if err := th.qfs.server.Unmount(); err != nil {
-				th.Log("ERROR: Failed to unmount quantumfs "+
-					"after aborting: %s", err.Error())
+				abortFuse(th)
+				runtime.GC()
+				if err := qfs.server.Unmount(); err != nil {
+					th.Log("ERROR: Failed to unmount quantumfs "+
+						"after aborting: %s", err.Error())
+				}
 			}
 		}
 	}
@@ -156,14 +161,16 @@ func (th *TestHelper) StartDefaultQuantumFs() {
 
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
 // hanging.
-func serveSafely(th *TestHelper) {
+func (th *TestHelper) serveSafely(qfs *QuantumFs) {
 	defer func(th *TestHelper) {
 		exception := recover()
 		if exception != nil {
-			if th.fuseConnection != 0 {
-				abortFuse(th)
+			for _, connection := range th.fuseConnections {
+				if connection != 0 {
+					abortFuse(th)
+				}
+				th.T.Fatalf("FUSE panic'd: %v", exception)
 			}
-			th.T.Fatalf("FUSE panic'd: %v", exception)
 		}
 	}(th)
 
@@ -173,11 +180,11 @@ func serveSafely(th *TestHelper) {
 
 	// Ensure that, since we're in a test, we only sync when syncAll is called.
 	// Otherwise, we shouldn't ever need to flush.
-	th.qfs.skipFlush = true
+	qfs.skipFlush = true
 
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
-	th.AssertNoErr(th.qfs.Serve(mountOptions))
+	th.AssertNoErr(qfs.Serve(mountOptions))
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
@@ -186,16 +193,21 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 	}
 
 	th.Log("Instantiating quantumfs instance...")
-	quantumfs := NewQuantumFsLogs(config, th.Logger)
-	th.qfs = quantumfs
+	qfs := NewQuantumFsLogs(config, th.Logger)
+	th.qfsInstances = append(th.qfsInstances, qfs)
 
 	th.Log("Waiting for QuantumFs instance to start...")
 
-	go serveSafely(th)
+	go th.serveSafely(qfs)
 
-	th.fuseConnection = findFuseConnection(th.TestCtx(), config.MountPath)
-	th.Assert(th.fuseConnection != -1, "Failed to find mount")
+	connection := findFuseConnection(th.TestCtx(), config.MountPath)
+	th.fuseConnections = append(th.fuseConnections, connection)
+	th.Assert(connection != -1, "Failed to find mount")
 	th.Log("QuantumFs instance started")
+
+	if th.qfs == nil {
+		th.qfs = qfs
+	}
 }
 
 func (th *TestHelper) waitForQuantumFsToFinish() {
@@ -203,14 +215,19 @@ func (th *TestHelper) waitForQuantumFsToFinish() {
 }
 
 func (th *TestHelper) RestartQuantumFs() error {
-
-	config := th.qfs.config
+	config := th.qfsInstances[0].config
 	th.api.Close()
-	err := th.qfs.server.Unmount()
-	if err != nil {
-		return err
+
+	for _, qfs := range th.qfsInstances {
+		err := qfs.server.Unmount()
+		if err != nil {
+			return err
+		}
 	}
+
 	th.waitForQuantumFsToFinish()
+	th.qfsInstances = nil
+	th.fuseConnections = nil
 	th.startQuantumFs(config)
 	return nil
 }
@@ -406,7 +423,7 @@ func (th *TestHelper) dummyReq(request uint64) *ctx {
 		},
 	}
 
-	if th.qfs != nil {
+	if th.qfsInstances[0] != nil {
 		requestCtx.qfs = th.qfs
 		requestCtx.config = th.qfs.c.config
 		requestCtx.workspaceDB = th.qfs.c.workspaceDB
