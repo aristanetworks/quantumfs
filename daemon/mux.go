@@ -225,8 +225,39 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 		len(updates)).Out()
 
 	for name, state := range updates {
-		c.vlog("Handling %s (%d)", name, state.Nonce)
+		go qfs.refreshWorkspace(c, name, state)
 	}
+}
+
+func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
+	state quantumfs.WorkspaceState) {
+
+	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
+		state.Nonce).Out()
+
+	parts := strings.Split(name, "/")
+	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	defer cleanup()
+
+	if !ok {
+		c.wlog("No workspace root for workspace %s", name)
+		return
+	}
+
+	if !qfs.workspaceIsMutable(c, wsr) {
+		// TODO At this point the workpace should be locked, flushed/synced
+		// and finally have the newly produced local RootID merged with the
+		// remote incoming RootID.
+		c.dlog("Refreshing mutable workspaces is not supported")
+		return
+	}
+
+	// TODO This should probably call wsr.refreshTo() and provide the new rootId
+	// instead of refetching from the workspaceDB. Also, calling a plaine refresh
+	// here causes many tests to fail due to a divide by zero error in
+	// MultiBlockFile.blockIdxInfo().
+	// wsr.refresh(c)
+	return
 }
 
 func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
