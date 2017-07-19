@@ -375,6 +375,7 @@ func (th *TestHelper) CreateTestDirs() {
 	utils.MkdirAll(mountPath, 0777)
 	th.Log("Using mountpath %s", mountPath)
 
+	utils.MkdirAll(th.TempDir+"/mnt2", 0777)
 	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
