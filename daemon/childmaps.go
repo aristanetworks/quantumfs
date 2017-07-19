@@ -337,8 +337,7 @@ func (cmap *ChildMap) recordByName(c *ctx, name string) quantumfs.DirectoryRecor
 }
 
 func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
-	fileId quantumfs.FileId, childId InodeId) (copy quantumfs.DirectoryRecord,
-	err fuse.Status) {
+	childId InodeId) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
 	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
 
@@ -377,7 +376,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, fingerprint string,
 	cmap.delRecord(childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.wsr.newHardlink(c, fingerprint, fileId, childId, child)
+	newLink := cmap.wsr.newHardlink(c, fingerprint, childId, child)
 
 	linkCopy := *newLink
 	linkSrcCopy := *newLink

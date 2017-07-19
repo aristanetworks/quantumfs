@@ -157,8 +157,7 @@ const ExtendedKeyLength = 40
 const (
 	XAttrTypePrefix = "quantumfs."
 
-	XAttrTypeKey    = XAttrTypePrefix + "key"
-	XAttrTypeFileId = XAttrTypePrefix + "fileId"
+	XAttrTypeKey = XAttrTypePrefix + "key"
 )
 
 type ObjectKey struct {
