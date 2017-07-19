@@ -499,8 +499,8 @@ func (wsdb *WorkspaceDB) sendNotifications(c *quantumfs.Ctx,
 
 	for {
 		if callback != nil {
-			c.Vlog(qlog.LogWorkspaceDb, "Notifying callback of %d updates",
-				len(updates))
+			c.Vlog(qlog.LogWorkspaceDb,
+				"Notifying callback of %d updates", len(updates))
 			safelyCall(c, callback, updates)
 		} else {
 			c.Vlog(qlog.LogWorkspaceDb, "nil callback, dropping %d "+
