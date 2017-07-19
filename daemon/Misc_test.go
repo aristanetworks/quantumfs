@@ -57,7 +57,6 @@ func TestUnknownInodeId(t *testing.T) {
 }
 
 func TestDualInstances(t *testing.T) {
-	t.Skip()
 	runDualQuantumFsTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		filename := workspace + "/file"
