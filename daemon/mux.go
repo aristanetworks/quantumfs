@@ -200,6 +200,8 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	go qfs.flusher(stopFlushTimer, flushTimerStopped)
 	go qfs.adjustKernelKnobs()
 
+	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
+
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
@@ -212,6 +214,19 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	qfs.c.dataStore.shutdown()
 
 	return nil
+}
+
+func (qfs *QuantumFs) handleWorkspaceChanges(
+	updates map[string]quantumfs.WorkspaceState) {
+
+	c := qfs.c
+
+	defer c.FuncIn("Mux::handleWorkspaceChanges", "%d updates",
+		len(updates)).Out()
+
+	for name, state := range updates {
+		c.vlog("Handling %s (%d)", name, state.Nonce)
+	}
 }
 
 func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
