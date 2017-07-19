@@ -685,12 +685,7 @@ func contentTest(ctx *ctx, test *testHelper, c1 createFunc, c2 createFunc) {
 
 func purgeHardlinkThenCreate(create createFunc) createFunc {
 	return func(name string, content string) error {
-		err := syscall.Unlink(name)
-		if err != nil {
-			return err
-		}
-		err = syscall.Unlink(name + "_link")
-		if err != nil {
+		if err := syscall.Unlink(name + "_link"); err != nil {
 			return err
 		}
 		return create(name, content)
@@ -841,10 +836,12 @@ func GenTestRefreshType_MediumAndLarge2HardlinkToSmallFile(
 		test.SyncAllWorkspaces()
 		newRootId1 := test.getRootId(workspace)
 
-		test.AssertNoErr(syscall.Unlink(fullName))
+		// unlink and recreate the link file so that it gets a new fileId
 		test.AssertNoErr(syscall.Unlink(fullLinkName))
+
 		test.AssertNoErr(CreateMediumFile(fullName, content2))
 		test.AssertNoErr(CreateLargeFile(fullLinkName, content3))
+
 		test.SyncAllWorkspaces()
 		newRootId2 := test.getRootId(workspace)
 
@@ -859,16 +856,16 @@ func GenTestRefreshType_MediumAndLarge2HardlinkToSmallFile(
 		refreshTestNoRemount(ctx, test, workspace, newRootId2,
 			newRootId1)
 
-		// file1 was the source of the link() syscall, so it must
-		// have the new content
+		// file1 was only modified so it must have the new content
 		test.verifyContentStartsWith(file1, content1)
 		test.AssertNoErr(file1.Close())
 
-		// file2 is now orphaned and must have its old content
+		// file2 was deleted and re-created so it must be orphaned
+		// and must have its old content
 		test.verifyContentStartsWith(file2, content3)
 		test.AssertNoErr(file2.Close())
 
-		// but after grabbing a new file handle, both should
+		// After grabbing a new file handle, both should
 		// have valid content
 		file1, err = os.OpenFile(fullName, os.O_RDWR, 0777)
 		test.AssertNoErr(err)

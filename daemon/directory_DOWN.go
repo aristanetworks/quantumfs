@@ -187,12 +187,10 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 		return linkCopy, fuse.OK
 	}
 
-	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
-
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.makeHardlink(c, fingerprint, toLink.inodeNum())
+	return dir.children.makeHardlink(c, toLink.inodeNum())
 }
 
 func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
@@ -325,14 +323,13 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 			valid, hardlinkRecord := dir.wsr.getHardlink(fileId)
 			utils.Assert(valid, "hardlink %d not found", fileId)
 
-			path := dir.absPath(c, localRecord.Filename())
-			if hardlinkRecord.Filename() != getPathFingerPrint(path) {
+			if fileId != localRecord.FileId() {
 				// This dentry has been converted to a hardlink,
 				// postpone loading it to see if an inode already
 				// exists for it
-				c.vlog("Postponing child %s (waiting for %s)",
+				c.vlog("Postponing child %s (%d vs. %d)",
 					localRecord.Filename(),
-					hardlinkRecord.Filename())
+					fileId, localRecord.FileId())
 				loadRecord := HardlinkLoadRecord{
 					parent:       dir,
 					remoteRecord: remoteRecord,
