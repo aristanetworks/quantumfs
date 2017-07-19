@@ -56,11 +56,11 @@ func abortFuse(th *TestHelper) {
 		if err != nil {
 			// We cannot abort so we won't terminate. We are
 			// truly wedged.
-			th.Log("ERROR: Failed to abort FUSE connection (open) err: %s",
-				err.Error())
+			th.Log("ERROR: Failed to abort FUSE connection (open) "+
+				"err: %s", err.Error())
 		} else if _, err := abort.Write([]byte("1")); err != nil {
-			th.Log("ERROR: Failed to abort FUSE connection (write) err: %s",
-				err.Error())
+			th.Log("ERROR: Failed to abort FUSE connection (write) "+
+				"err: %s", err.Error())
 		}
 
 		abort.Close()
@@ -78,16 +78,17 @@ func (th *TestHelper) EndTest() {
 	for _, qfs := range th.qfsInstances {
 		if qfs != nil && qfs.server != nil {
 			if exception != nil {
-				th.T.Logf("Failed with exception, forcefully unmounting: %v",
-					exception)
-				th.Log("Failed with exception, forcefully unmounting: %v",
-					exception)
+				th.T.Logf("Failed with exception, forcefully "+
+					"unmounting: %v", exception)
+				th.Log("Failed with exception, forcefully "+
+					"unmounting: %v", exception)
 				abortFuse(th)
 			}
 
 			if err := qfs.server.Unmount(); err != nil {
-				th.Log("ERROR: Failed to unmount quantumfs instance.")
-				th.Log("Are you leaking a file descriptor?: %s", err.Error())
+				th.Log("ERROR: Failed to unmount quantumfs instance")
+				th.Log("Are you leaking a file descriptor?: %s",
+					err.Error())
 
 				abortFuse(th)
 				runtime.GC()
