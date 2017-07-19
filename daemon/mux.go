@@ -219,7 +219,7 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 func (qfs *QuantumFs) handleWorkspaceChanges(
 	updates map[string]quantumfs.WorkspaceState) {
 
-	c := qfs.c
+	c := qfs.c.reqId(qlog.RefreshReqId, nil)
 
 	defer c.FuncIn("Mux::handleWorkspaceChanges", "%d updates",
 		len(updates)).Out()
