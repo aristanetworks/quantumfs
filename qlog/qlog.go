@@ -76,6 +76,7 @@ const (
 	FlushReqId
 	QlogReqId
 	TestReqId
+	RefreshReqId
 	MinSpecialReqId
 )
 
