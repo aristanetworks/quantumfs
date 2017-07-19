@@ -192,7 +192,9 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 		th.T.Fatalf("Unable to setup test ramfs path")
 	}
 
-	th.Log("Instantiating quantumfs instance...")
+	instanceNum := len(th.qfsInstances) + 1
+
+	th.Log("Instantiating quantumfs instance %d...", instanceNum)
 	qfs := NewQuantumFsLogs(config, th.Logger)
 	th.qfsInstances = append(th.qfsInstances, qfs)
 
@@ -205,7 +207,7 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 	th.Assert(connection != -1, "Failed to find mount")
 	th.Log("QuantumFs instance started")
 
-	if th.qfs == nil {
+	if instanceNum == 1 {
 		th.qfs = qfs
 	}
 }
