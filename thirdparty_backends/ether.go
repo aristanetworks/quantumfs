@@ -514,7 +514,8 @@ func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	return false, nil
 }
 
-func (wsdb *etherWsdbTranslator) SetCallback(callback quantumfs.SubscriptionCallback) {
+func (wsdb *etherWsdbTranslator) SetCallback(
+	callback quantumfs.SubscriptionCallback) {
 }
 
 func (wsdb *etherWsdbTranslator) SubscribeTo(workspaceName string) error {
