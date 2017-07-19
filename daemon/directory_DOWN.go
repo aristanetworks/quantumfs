@@ -188,12 +188,11 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	}
 
 	fingerprint := getPathFingerPrint(toLink.absPath_(c, ""))
-	fileId := dir.childStashedFileIdFromInode(c, toLink.inodeNum())
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.makeHardlink(c, fingerprint, fileId, toLink.inodeNum())
+	return dir.children.makeHardlink(c, fingerprint, toLink.inodeNum())
 }
 
 func (dir *Directory) normalizeHardlinks_DOWN(c *ctx,
@@ -305,16 +304,14 @@ func (dir *Directory) handleChild_DOWN(c *ctx, hrc *HardlinkRefreshCtx,
 		if localRecord.Type() == quantumfs.ObjectTypeHardlink &&
 			remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 
-			stashedFileId := dir.childStashedFileIdFromRecord(c,
-				remoteRecord)
-			if stashedFileId == quantumfs.InvalidFileId {
-				c.vlog("No stashed fileId found.")
+			if remoteRecord.FileId() == quantumfs.InvalidFileId {
+				c.vlog("No fileIds found in the remote record.")
 				return false, true
 			}
 			fileId := localRecord.FileId()
-			if stashedFileId != fileId {
+			if remoteRecord.FileId() != fileId {
 				c.vlog("fileId mismatch %d vs. %d",
-					fileId, stashedFileId)
+					fileId, remoteRecord.FileId())
 				return false, true
 			}
 			_, exists := hrc.claimedLinks[fileId]
