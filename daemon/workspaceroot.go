@@ -623,9 +623,16 @@ func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
 func (wsr *WorkspaceRoot) refresh(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
-	publishedRootId, _, err := c.workspaceDB.Workspace(&c.Ctx,
+	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
+	if nonce != wsr.nonce {
+		c.dlog("Not refreshing workspace %s/%s/%s due to mismatching "+
+			"nonces %d vs %d", wsr.typespace, wsr.namespace,
+			wsr.workspace, wsr.nonce, nonce)
+		return
+	}
+
 	wsr.refreshTo(c, publishedRootId)
 	wsr.publishedRootId = publishedRootId
 }
