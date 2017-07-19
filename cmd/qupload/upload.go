@@ -364,14 +364,13 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 	}
 
 	var curKey quantumfs.ObjectKey
-	curKey, err = wsdb.Workspace(qctx,
-		wsParts[0], wsParts[1], wsParts[2])
+	curKey, nonce, err := wsdb.Workspace(qctx, wsParts[0], wsParts[1],
+		wsParts[2])
 	if err != nil {
 		return err
 	}
-	_, err = wsdb.AdvanceWorkspace(qctx,
-		wsParts[0], wsParts[1], wsParts[2],
-		curKey, newKey)
+	_, err = wsdb.AdvanceWorkspace(qctx, wsParts[0], wsParts[1], wsParts[2],
+		nonce, curKey, newKey)
 	if err != nil {
 		return err
 	}
@@ -404,7 +403,7 @@ func byPass(c *Ctx, cli *params) error {
 	referenceWS := cli.referenceWS
 	refWSParts := strings.Split(referenceWS, "/")
 
-	refKey, err := wsDB.Workspace(c.Qctx,
+	refKey, _, err := wsDB.Workspace(c.Qctx,
 		refWSParts[0], refWSParts[1], refWSParts[2])
 	if err != nil {
 		return err

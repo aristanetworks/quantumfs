@@ -375,7 +375,7 @@ func TestWalkPanicString(t *testing.T) {
 		// Use Walker to walk all the blocks in the workspace.
 		c := &test.TestCtx().Ctx
 		root := strings.Split(test.RelPath(workspace), "/")
-		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
@@ -413,7 +413,7 @@ func TestWalkPanicErr(t *testing.T) {
 		// Use Walker to walk all the blocks in the workspace.
 		c := &test.TestCtx().Ctx
 		root := strings.Split(test.RelPath(workspace), "/")
-		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
@@ -451,7 +451,7 @@ func TestWalkErr(t *testing.T) {
 		// Use Walker to walk all the blocks in the workspace.
 		c := &test.TestCtx().Ctx
 		root := strings.Split(test.RelPath(workspace), "/")
-		rootID, err := db.Workspace(c, root[0], root[1], root[2])
+		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
