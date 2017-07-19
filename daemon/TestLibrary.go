@@ -423,7 +423,7 @@ func (th *TestHelper) dummyReq(request uint64) *ctx {
 		},
 	}
 
-	if th.qfsInstances[0] != nil {
+	if th.qfs != nil {
 		requestCtx.qfs = th.qfs
 		requestCtx.config = th.qfs.c.config
 		requestCtx.workspaceDB = th.qfs.c.workspaceDB
