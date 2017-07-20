@@ -5,8 +5,6 @@ package daemon
 
 import (
 	"bufio"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -204,11 +202,6 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
 }
 
-func getPathFingerPrint(path string) string {
-	md5sum := md5.Sum([]byte(path))
-	return hex.EncodeToString(md5sum[:])
-}
-
 // Determine if the process has a matching group. Normally the primary group is all
 // we need to check, but sometimes we also much check the supplementary groups.
 func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
@@ -400,9 +393,9 @@ func underlyingTypeOf(wsr *WorkspaceRoot,
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record.Type()
 	}
-	linkId := decodeHardlinkKey(record.ID())
-	valid, hardlinkRecord := wsr.getHardlink(linkId)
-	utils.Assert(valid, "hardlink %d not found", linkId)
+	fileId := record.FileId()
+	valid, hardlinkRecord := wsr.getHardlink(fileId)
+	utils.Assert(valid, "hardlink %d not found", fileId)
 	utils.Assert(hardlinkRecord.Type() != quantumfs.ObjectTypeHardlink,
 		"The underlying type cannot be hardlink")
 	return hardlinkRecord.Type()
