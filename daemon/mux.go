@@ -236,6 +236,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		state.Nonce).Out()
 
 	// Due to BUG210141 this code is disabled.
+	return
 
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
