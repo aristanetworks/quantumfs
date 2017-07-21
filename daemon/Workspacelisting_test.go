@@ -6,6 +6,8 @@ package daemon
 // Test some special properties of workspacelisting type
 
 import (
+	"fmt"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -117,5 +119,44 @@ func TestWorkspaceReplacement(t *testing.T) {
 		var stat syscall.Stat_t
 		err := syscall.Stat(fileName, &stat)
 		test.AssertErr(err)
+	})
+}
+
+func TestRemoteWorkspaceDeletion(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		// Create a workspace and stick a file in there
+		workspaceName := "test/test/test"
+		// We need a sibling to ensure the namespace stays around
+		workspaceSibling := "test/test/testB"
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(),
+			workspaceSibling))
+
+		fileName := "testFile"
+		test.AssertNoErr(testutils.PrintToFile(fileName, "test data"))
+		fileHandle, err := os.Open(fileName)
+		test.AssertNoErr(err)
+		defer fileHandle.Close()
+
+		// Now simulate the workspace being remotely removed
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx, "test",
+			"test", "test")
+		test.AssertNoErr(err)
+
+		// Check to ensure that we can't access the workspace inode anymore
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.AbsPath(fileName), &stat)
+		test.Assert(err != nil, "Still able to stat deleted workspace")
+
+		// Make sure we cause updateChildren on the namespace
+		namespaceInode := test.getInode(test.AbsPath("test/test"))
+		ManualLookup(&test.qfs.c, namespaceInode, "testB")
+
+		// Check to ensure that we can't access the workspace's child
+		_, err = fileHandle.Stat()
+		// We should still be able to stat our orphaned file
+		test.AssertNoErr(err)
 	})
 }
