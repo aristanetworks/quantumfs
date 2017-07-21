@@ -373,16 +373,21 @@ func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 		// refreshed
 		needed := group.refreshNeeded(c)
 		if needed {
-			ec.rwMutex.RUnlock()
-			// fetch data from CQL without locking cache
-			fetchList := ec.fetcher(c, ec.fetcherArg, entityPath[:i]...)
-			// update the group under write lock unless the fetched
-			// data has been invalidated by a local insert/delete
-			group.refresh(c, fetchList)
 
-			ec.rwMutex.RLock()
+			func() {
+				ec.rwMutex.RUnlock()
+				defer ec.rwMutex.RLock()
+
+				// fetch data from CQL without locking cache
+				fetchList := ec.fetcher(c, ec.fetcherArg, entityPath[:i]...)
+
+				// update the group under write lock unless the fetched
+				// data has been invalidated by a local insert/delete
+				group.refresh(c, fetchList)
+			}()
+
 			// in between the release of write lock in group.refresh()
-			// and acquire of read lock here, there can be many local inserts
+			// and acquire of read lock, there can be many local inserts
 			// or deletes that may happen. Since each local update also
 			// maintains cache local coherency, we'll see all local updates
 			// correctly.

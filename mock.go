@@ -472,6 +472,20 @@ func setupMockWsdbCacheCqlFetch(sess *MockSession, iter *MockIter,
 	sess.On("Query", stmt, vals).Return(fetchQuery)
 }
 
+func mockWsdbCacheTypespaceFetchPanic(sess *MockSession) {
+	iter := new(MockIter)
+	raisePanic := func(dest ...interface{}) bool { panic("PanicOnFetch") }
+	iter.On("Scan", mock.AnythingOfType("*string")).Return(raisePanic)
+
+	fetchQuery := new(MockQuery)
+	fetchQuery.On("Iter").Return(iter)
+
+	sess.On("Query", `
+SELECT distinct typespace
+FROM ether.workspacedb`, []interface{}(nil)).Return(fetchQuery)
+
+}
+
 func mockWsdbCacheTypespaceFetch(sess *MockSession,
 	rows mockDbRows, vals []interface{},
 	iter *MockIter, fetchPause chan bool) {

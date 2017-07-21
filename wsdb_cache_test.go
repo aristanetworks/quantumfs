@@ -702,6 +702,23 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceOK() {
 	suite.common.TestDeleteWorkspaceOK()
 }
 
+func (suite *wsdbCacheTestSuite) TestPanicDuringFetch() {
+	mockWsdbCacheTypespaceFetchPanic(suite.common.mockSess)
+
+	// force the typespace fetch to be invoked
+	suite.cache.enableCqlRefresh(unitTestEtherCtx)
+
+	// Don't use Require().Panics(f) test so that reason for
+	// panic can be verified.
+	defer func() {
+		ex := recover()
+		suite.Require().NotNil(ex, "expected panic, didn't occur")
+		suite.Require().Equal("PanicOnFetch", ex,
+			"actual panic: %v", ex)
+	}()
+	suite.common.wsdb.NumTypespaces(unitTestEtherCtx)
+}
+
 // TestCacheDeleteWorkspaceNumOK tests if the cache is updated
 // properly when a workspace is deleted
 func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
