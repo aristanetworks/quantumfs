@@ -367,6 +367,7 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	}
 }
 
+const skipForgetLog = "inode %d doesn't need to be forgotten"
 // Requires treeLock for read and the instantiationLock
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).Out()
@@ -375,7 +376,7 @@ func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
 		inodeNum == quantumfs.InodeIdApi {
 
-		c.dlog("inode %d doesn't need to be forgotten", inodeNum)
+		c.dlog(skipForgetLog, inodeNum)
 		// Nothing to do
 		return
 	}
