@@ -126,22 +126,23 @@ func TestRemoteWorkspaceDeletion(t *testing.T) {
 		api := test.getApi()
 
 		// Create a workspace and stick a file in there
-		workspaceName := "test/test/test"
+		workspaceName := "testA/testB/testC"
 		// We need a sibling to ensure the namespace stays around
-		workspaceSibling := "test/test/testB"
+		workspaceSibling := "testA/testB/testC2"
 		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
 		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(),
 			workspaceSibling))
 
-		fileName := "testFile"
+		test.AssertNoErr(api.EnableRootWrite(workspaceName))
+		fileName := test.AbsPath(workspaceName + "/testFile")
 		test.AssertNoErr(testutils.PrintToFile(fileName, "test data"))
 		fileHandle, err := os.Open(fileName)
 		test.AssertNoErr(err)
 		defer fileHandle.Close()
 
 		// Now simulate the workspace being remotely removed
-		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx, "test",
-			"test", "test")
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
+			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 
 		// Check to ensure that we can't access the workspace inode anymore
@@ -150,8 +151,9 @@ func TestRemoteWorkspaceDeletion(t *testing.T) {
 		test.Assert(err != nil, "Still able to stat deleted workspace")
 
 		// Make sure we cause updateChildren on the namespace
-		namespaceInode := test.getInode(test.AbsPath("test/test"))
-		ManualLookup(&test.qfs.c, namespaceInode, "testB")
+		namespaceInode := test.getInode(test.AbsPath("testA/testB"))
+		test.Assert(namespaceInode != nil, "cannot fetch namespace inode")
+		ManualLookup(&test.qfs.c, namespaceInode, "testC2")
 
 		// Check to ensure that we can't access the workspace's child
 		_, err = fileHandle.Stat()
@@ -166,9 +168,9 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
-		workspaceName := "test/test/test"
+		workspaceName := "testA/testB/testC"
 		// We need a sibling to ensure the typespace stays around
-		workspaceSibling := "test/testB/testB2"
+		workspaceSibling := "testA/testB2/testC2"
 		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
 		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(),
 			workspaceSibling))
@@ -178,18 +180,18 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 		defer fileHandle.Close()
 
 		// Now simulate the namespace being remotely removed
-		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx, "test",
-			"test", "test")
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
+			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 
 		// Check to ensure that we can't access the namespace inode anymore
 		var stat syscall.Stat_t
-		err = syscall.Stat(test.AbsPath("test/test"), &stat)
+		err = syscall.Stat(test.AbsPath("testA/testB"), &stat)
 		test.Assert(err != nil, "Still able to stat deleted namespace")
 
 		// Make sure we cause updateChildren on the typespace
-		typespaceInode := test.getInode(test.AbsPath("test"))
-		ManualLookup(&test.qfs.c, typespaceInode, "testB")
+		typespaceInode := test.getInode(test.AbsPath("testA"))
+		ManualLookup(&test.qfs.c, typespaceInode, "testB2")
 
 		// Check to ensure that we can't access the workspace's child
 		_, err = fileHandle.Stat()
