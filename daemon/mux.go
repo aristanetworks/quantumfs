@@ -628,7 +628,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	// If we don't have an instantiated Inode and cannot instantiate it, then we
 	// know nothing about that InodeId.
 	if !canBeInstantiated {
-		c.elog("Instantiation request for inode we don't know about. %d", id)
+		c.wlog("Instantiation request for inode we don't know about. %d", id)
 		return nil
 	}
 
