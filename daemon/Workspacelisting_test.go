@@ -6,7 +6,6 @@ package daemon
 // Test some special properties of workspacelisting type
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 	"testing"
@@ -153,6 +152,44 @@ func TestRemoteWorkspaceDeletion(t *testing.T) {
 		// Make sure we cause updateChildren on the namespace
 		namespaceInode := test.getInode(test.AbsPath("test/test"))
 		ManualLookup(&test.qfs.c, namespaceInode, "testB")
+
+		// Check to ensure that we can't access the workspace's child
+		_, err = fileHandle.Stat()
+		// We should still be able to stat our orphaned file
+		test.AssertNoErr(err)
+	})
+}
+
+func TestRemoteNamespaceDeletion(t *testing.T) {
+	// BUG210390
+	t.Skip()
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		workspaceName := "test/test/test"
+		// We need a sibling to ensure the typespace stays around
+		workspaceSibling := "test/testB/testB2"
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(),
+			workspaceSibling))
+
+		fileHandle, err := os.Open(test.AbsPath(workspaceName))
+		test.AssertNoErr(err)
+		defer fileHandle.Close()
+
+		// Now simulate the namespace being remotely removed
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx, "test",
+			"test", "test")
+		test.AssertNoErr(err)
+
+		// Check to ensure that we can't access the namespace inode anymore
+		var stat syscall.Stat_t
+		err = syscall.Stat(test.AbsPath("test/test"), &stat)
+		test.Assert(err != nil, "Still able to stat deleted namespace")
+
+		// Make sure we cause updateChildren on the typespace
+		typespaceInode := test.getInode(test.AbsPath("test"))
+		ManualLookup(&test.qfs.c, typespaceInode, "testB")
 
 		// Check to ensure that we can't access the workspace's child
 		_, err = fileHandle.Stat()
