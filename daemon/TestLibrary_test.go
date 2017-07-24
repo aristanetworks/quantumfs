@@ -185,6 +185,9 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 
 		th.startQuantumFs(config)
 	}
+	if numDefaultQfs > 2 {
+		th.T.Fatalf("Too many QuantumFS instances requested")
+	}
 
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
