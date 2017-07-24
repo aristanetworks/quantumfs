@@ -106,16 +106,17 @@ func (th *TestHelper) EndTest() {
 	for _, qfs := range th.qfsInstances {
 		if qfs != nil && qfs.server != nil {
 			if exception != nil {
-				th.T.Logf("Failed with exception, forcefully unmounting: %v",
-					exception)
-				th.Log("Failed with exception, forcefully unmounting: %v",
-					exception)
+				th.T.Logf("Failed with exception, forcefully "+
+					"unmounting: %v", exception)
+				th.Log("Failed with exception, forcefully "+
+					"unmounting: %v", exception)
 				abortFuse(th)
 			}
 			logFuseWaiting("Before unmount", th)
 			if err := qfs.server.Unmount(); err != nil {
-				th.Log("ERROR: Failed to unmount quantumfs instance.")
-				th.Log("Are you leaking a file descriptor?: %s", err.Error())
+				th.Log("ERROR: Failed to unmount quantumfs instance")
+				th.Log("Are you leaking a file descriptor?: %s",
+					err.Error())
 				logFuseWaiting("After unmount failure", th)
 
 				abortFuse(th)
