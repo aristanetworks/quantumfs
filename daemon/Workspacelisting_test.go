@@ -148,16 +148,13 @@ func TestRemoteWorkspaceDeletion(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// Check to ensure that we can't access the workspace inode anymore
-		var stat syscall.Stat_t
-		err = syscall.Stat(test.AbsPath(fileName), &stat)
-		test.Assert(err != nil, "Still able to stat deleted workspace")
+		test.assertNoFile(test.AbsPath(fileName))
 
 		// Make sure we cause updateChildren on the namespace
 		namespaceInode := test.getInode(test.AbsPath("testA/testB"))
 		test.Assert(namespaceInode != nil, "cannot fetch namespace inode")
 		ManualLookup(&test.qfs.c, namespaceInode, "testC2")
 
-		// Check to ensure that we can't access the workspace's child
 		_, err = fileHandle.Stat()
 		// We should still be able to stat our orphaned file
 		test.AssertNoErr(err)
