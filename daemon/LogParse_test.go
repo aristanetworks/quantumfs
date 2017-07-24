@@ -228,7 +228,7 @@ func TestQlogWrapAround(t *testing.T) {
 		// At this point the qlog file should have wrapped around several
 		// times. When the test harness goes to parse it, it will panic if
 		// the offset isn't properly adjusted with respect to the file size
-		// with a "slike bounds out of range" failure in readBack().
+		// with a "bounds out of range" failure in readBack().
 
 		test.Log("Test fill complete")
 		test.WaitForLogString("Test fill complete", "Qlog parsing failed")
