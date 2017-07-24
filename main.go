@@ -4,14 +4,12 @@
 package main
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/aristanetworks/ether/blobstore"
@@ -155,7 +153,6 @@ func main() {
 func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 3 {
 		fmt.Println("du sub-command takes 2 args: wsname path")
 		walkFlags.Usage()
@@ -166,37 +163,15 @@ func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 	searchPath := walkFlags.Arg(2)
 	searchPath = filepath.Clean("/" + searchPath)
 
-	// Get RootID
-	var err error
-	var rootID quantumfs.ObjectKey
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
+	filter := func(path string) bool { return !strings.HasPrefix(path, searchPath) }
+
+	showDedupeInfo := false
+	tracker, sizer := getTrackerHandler(showDedupeInfo, filter)
+	showRootIDStatus := false
+	if err := walkHelper(c, qfsds, qfsdb, wsname, progress, showRootIDStatus,
+		sizer); err != nil {
 		return err
 	}
-
-	start := time.Now()
-	var keysWalked uint64
-	tracker := newTracker(false)
-	var mapLock utils.DeferableMutex
-	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
-
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
-		defer mapLock.Lock().Unlock()
-		if !strings.HasPrefix(path, searchPath) {
-			return nil
-		}
-		tracker.addKey(hex.EncodeToString(key.Value()),
-			path, size)
-		return nil
-	}
-
-	// Walk
-	if err = walker.Walk(c, qfsds, rootID, sizer); err != nil {
-		return err
-	}
-
-	fmt.Println()
 	fmt.Println("Total Size = ", qubitutils.HumanizeBytes(tracker.totalSize()))
 	return nil
 }
@@ -204,45 +179,23 @@ func handleDiskUsage(c *quantumfs.Ctx, progress bool,
 func handleKeyCount(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() < 2 || walkFlags.NArg() > 3 {
 		fmt.Println("keycount sub-command args: wsname [dedupe]")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 	wsname := walkFlags.Arg(1)
-	start := time.Now()
 	showDedupeInfo := false
 	if walkFlags.Arg(2) == "dedupe" {
 		showDedupeInfo = true
 	}
 
-	var mapLock utils.DeferableMutex
-	var keysWalked uint64
-	tracker := newTracker(showDedupeInfo)
-	sizer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
-
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
-		defer mapLock.Lock().Unlock()
-		tracker.addKey(hex.EncodeToString(key.Value()), path, size)
-		return nil
-	}
-
-	// Get RootID
-	var err error
-	var rootID quantumfs.ObjectKey
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
+	tracker, keyCounter := getTrackerHandler(showDedupeInfo, nil)
+	showRootIDStatus := false
+	if err := walkHelper(c, qfsds, qfsdb, wsname, progress, showRootIDStatus,
+		keyCounter); err != nil {
 		return err
 	}
-
-	// Walk
-	if err = walker.Walk(c, qfsds, rootID, sizer); err != nil {
-		return err
-	}
-
-	fmt.Println()
 	fmt.Println("Unique Keys = ", tracker.uniqueKeys())
 	fmt.Println("Unique Size = ", qubitutils.HumanizeBytes(tracker.uniqueSize()))
 	fmt.Println("Total Keys = ", tracker.totalKeys())
@@ -251,11 +204,9 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 	return nil
 }
 
-// TODO(sid) combine this with handleKeyCount
 func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() < 3 || walkFlags.NArg() > 4 {
 		fmt.Println("keydiffcount sub-command args: wsname1 wsname2 [keys]")
 		fmt.Println()
@@ -266,46 +217,22 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 	// Get RootIDs
 	wsname1 := walkFlags.Arg(1)
 	wsname2 := walkFlags.Arg(2)
-	start := time.Now()
 	showKeys := false
 	if walkFlags.Arg(3) == "keys" {
 		showKeys = true
 	}
-	var rootID1, rootID2 quantumfs.ObjectKey
-	var keysWalked uint64
-	var err error
-	if rootID1, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname1); err != nil {
+
+	tracker1, keyCounter1 := getTrackerHandler(showKeys, nil)
+	showRootIDStatus := false
+	if err := walkHelper(c, qfsds, qfsdb, wsname1, progress, showRootIDStatus,
+		keyCounter1); err != nil {
 		return err
 	}
-
-	tracker := newTracker(showKeys)
-	var mapLock utils.DeferableMutex
-	keyRecorder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
-
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
-		defer mapLock.Lock().Unlock()
-		tracker.addKey(hex.EncodeToString(key.Value()), path, size)
-		return nil
-	}
-	if err = walker.Walk(c, qfsds, rootID1, keyRecorder); err != nil {
+	tracker2, keyCounter2 := getTrackerHandler(showKeys, nil)
+	if err := walkHelper(c, qfsds, qfsdb, wsname2, progress, showRootIDStatus,
+		keyCounter2); err != nil {
 		return err
 	}
-	tracker1 := tracker
-
-	if rootID2, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname2); err != nil {
-		return err
-	}
-
-	tracker = newTracker(showKeys)
-	// Walk
-	if err = walker.Walk(c, qfsds, rootID2, keyRecorder); err != nil {
-		return err
-	}
-	tracker2 := tracker
-
-	fmt.Println()
 	fmt.Printf("UniqueKeys\t\tUniqueSize\n")
 	fmt.Printf("==========\t\t==========\n")
 	diffKeys, diffSize := tracker1.trackerKeyDiff(tracker2)
@@ -324,38 +251,24 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
 	qfsdb quantumfs.WorkspaceDB, ttlCfg *qubitutils.TTLConfig) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 2 {
 		fmt.Println("ttl sub-command takes 1 arg: wsname")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 
-	// Get RootID
 	wsname := walkFlags.Arg(1)
-	var err error
-	var rootID quantumfs.ObjectKey
-	var keysWalked uint64
-	start := time.Now()
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
-		return err
-	}
 
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
 		return walkutils.RefreshTTL(c, path, key, size, isDir, cqlds,
 			ttlCfg.TTLThreshold, ttlCfg.TTLNew)
 	}
 
-	// Walk
-	if err = walker.Walk(c, qfsds, rootID, walkFunc); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID.String(), err)
+	if err := walkHelper(c, qfsds, qfsdb, wsname, true, true, walkFunc); err != nil {
+		return err
 	}
-	fmt.Println()
-	fmt.Printf("Success: rootID: %s", rootID.String())
 	return nil
 }
 
@@ -363,14 +276,12 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
 	qfsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 3 {
 		fmt.Println("forceTTL sub-command takes 2 arg: wsname <new TTL(hrs)>")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 	wsname := walkFlags.Arg(1)
-	start := time.Now()
 
 	var err error
 	var newTTL int64
@@ -381,34 +292,23 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 	}
 	newTTL = newTTL * 3600 // Hours to seconds
 
-	// Get RootID
-	var rootID quantumfs.ObjectKey
-	var keysWalked uint64
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
-		return err
-	}
 	// Internal Walker for TTL.
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
 		return walkutils.RefreshTTL(c, path, key, size, isDir, cqlds,
 			newTTL, newTTL)
 	}
 
-	if err = walker.Walk(c, qfsds, rootID, walkFunc); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID.String(), err)
+	if err := walkHelper(c, qfsds, qfsdb, wsname, true, true, walkFunc); err != nil {
+		return err
 	}
-	fmt.Println()
-	fmt.Printf("Success: rootID: %s", rootID.String())
 	return nil
 }
 
 func printList(c *quantumfs.Ctx, progress bool, qfsds quantumfs.DataStore,
 	cqlds blobstore.BlobStore, wsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 1 {
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
@@ -454,24 +354,19 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
 	qfsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 2 {
 		fmt.Println("ttlHistogram sub-command takes 1 args: wsname ")
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 	wsname := walkFlags.Arg(1)
-	start := time.Now()
 
-	var keysWalked uint64
-	tracker := make(map[quantumfs.ObjectKey]bool)
+	keymap := make(map[quantumfs.ObjectKey]bool)
 	var maplock utils.DeferableMutex
 	hist := qubitutils.NewHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
 		if walker.SkipKey(c, key) {
 			return nil
 		}
@@ -479,10 +374,10 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		// So that the lock is not held during cql ops.
 		present := func() bool {
 			defer maplock.Lock().Unlock()
-			if _, ok := tracker[key]; ok {
+			if _, ok := keymap[key]; ok {
 				return true
 			}
-			tracker[key] = true
+			keymap[key] = true
 			return false
 		}()
 		if present {
@@ -510,19 +405,9 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 		return nil
 	}
 
-	// Get RootID
-	var err error
-	var rootID quantumfs.ObjectKey
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
+	if err := walkHelper(c, qfsds, qfsdb, wsname, true, true, bucketer); err != nil {
 		return err
 	}
-
-	// Walk
-	if err = walker.Walk(c, qfsds, rootID, bucketer); err != nil {
-		return fmt.Errorf("rootID: %s err: %v", rootID.String(), err)
-	}
-	fmt.Println()
-	fmt.Printf("Success: rootID: %s\n", rootID.String())
 	fmt.Printf("Days(s)   %5s\n", "Count")
 	hist.Print()
 	return nil
@@ -537,7 +422,6 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 func printPath2Key(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 3 {
 		fmt.Println("path2key sub-command takes 2 args: wsname path")
 		walkFlags.Usage()
@@ -548,22 +432,11 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 	searchPath := walkFlags.Arg(2)
 	searchPath = filepath.Clean("/" + searchPath)
 
-	// Get RootID
-	var err error
-	var rootID quantumfs.ObjectKey
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
-		return err
-	}
-
-	start := time.Now()
 	var listLock utils.DeferableMutex
 	keyList := make([]quantumfs.ObjectKey, 0, 10)
-	var keysWalked uint64
 	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
 
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
 		if strings.Compare(path, searchPath) == 0 {
 			defer listLock.Lock().Unlock()
 			keyList = append(keyList, key)
@@ -571,12 +444,9 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 		return nil
 	}
 
-	// Walk
-	if err = walker.Walk(c, qfsds, rootID, finder); err != nil {
+	if err := walkHelper(c, qfsds, qfsdb, wsname, true, false, finder); err != nil {
 		return err
 	}
-
-	fmt.Println()
 	if len(keyList) == 0 {
 		return fmt.Errorf("Key not found for path %v", searchPath)
 	}
@@ -594,7 +464,6 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
 	wsdb quantumfs.WorkspaceDB) error {
 
-	// Cleanup Args
 	if walkFlags.NArg() != 3 {
 		fmt.Println("findconstantkeys sub-command takes 2 args: wsname num_days")
 		walkFlags.Usage()
@@ -609,25 +478,14 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 		os.Exit(exitBadCmd)
 	}
 
-	// Get RootID
-	var rootID quantumfs.ObjectKey
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, wsdb, wsname); err != nil {
-		return err
-	}
-
 	cds := quantumfs.ConstantStore
-	start := time.Now()
 	var mapLock utils.DeferableMutex
 	matchKey := make(map[quantumfs.ObjectKey]struct {
 		p string
 		t int64
 	})
-	var keysWalked uint64
 	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {
-
-		atomic.AddUint64(&keysWalked, 1)
-		defer showProgress(progress, start, keysWalked)
 
 		// Print the key if:
 		// - It is of type Constant,
@@ -669,9 +527,7 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 		return nil
 	}
 
-	// Walk
-	err = walker.Walk(c, qfsds, rootID, finder)
-
+	err = walkHelper(c, qfsds, wsdb, wsname, true, false, finder)
 	// Print all matches that we have collected so far
 	// even though we hit an error.
 	for k, v := range matchKey {
