@@ -640,7 +640,7 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 		idx++
 	}
 
-	return header.CircBuf.PastEndIdx,
+	return header.CircBuf.EndIndex(),
 		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
 }
 
