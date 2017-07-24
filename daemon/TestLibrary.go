@@ -6,6 +6,7 @@ package daemon
 // Test library for daemon package
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -39,6 +40,33 @@ type TestHelper struct {
 	qfsWait         sync.WaitGroup
 	fuseConnections []int
 	api             quantumfs.Api
+}
+
+func logFuseWaiting(prefix string, th *TestHelper) {
+	for _, connection := range th.fuseConnections {
+		if connection == 0 {
+			// There is no connection to log
+			return
+		}
+
+		buf := make([]byte, 100)
+
+		path := fmt.Sprintf("%s/connections/%d/waiting", fusectlPath,
+			connection)
+		waiting, err := os.OpenFile(path, os.O_RDONLY, 0)
+		if err != nil {
+			th.Log("ERROR: Failed to open FUSE connection (%d) "+
+				"waiting err: %s", connection, err.Error())
+		} else if _, err := waiting.Read(buf); err != nil {
+			th.Log("ERROR: Failed to read FUSE connection (%d) "+
+				"waiting err: %s", connection, err.Error())
+		} else {
+			str := bytes.TrimRight(buf, "\u0000\n")
+			th.Log("%s: there are %s pending requests on connection %d",
+				prefix, str, connection)
+		}
+		waiting.Close()
+	}
 }
 
 func abortFuse(th *TestHelper) {
@@ -78,20 +106,21 @@ func (th *TestHelper) EndTest() {
 	for _, qfs := range th.qfsInstances {
 		if qfs != nil && qfs.server != nil {
 			if exception != nil {
-				th.T.Logf("Failed with exception, forcefully "+
-					"unmounting: %v", exception)
-				th.Log("Failed with exception, forcefully "+
-					"unmounting: %v", exception)
+				th.T.Logf("Failed with exception, forcefully unmounting: %v",
+					exception)
+				th.Log("Failed with exception, forcefully unmounting: %v",
+					exception)
 				abortFuse(th)
 			}
-
+			logFuseWaiting("Before unmount", th)
 			if err := qfs.server.Unmount(); err != nil {
-				th.Log("ERROR: Failed to unmount quantumfs instance")
-				th.Log("Are you leaking a file descriptor?: %s",
-					err.Error())
+				th.Log("ERROR: Failed to unmount quantumfs instance.")
+				th.Log("Are you leaking a file descriptor?: %s", err.Error())
+				logFuseWaiting("After unmount failure", th)
 
 				abortFuse(th)
 				runtime.GC()
+				logFuseWaiting("After aborting fuse", th)
 				if err := qfs.server.Unmount(); err != nil {
 					th.Log("ERROR: Failed to unmount quantumfs "+
 						"after aborting: %s", err.Error())

@@ -4,61 +4,45 @@
 package daemon
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
-
-type HardlinkId uint64
-
-const InvalidHardlinkId = 0
 
 // Should implement quantumfs.DirectoryRecord
 type Hardlink struct {
 	name   string
-	linkId HardlinkId
+	fileId quantumfs.FileId
 	wsr    *WorkspaceRoot
 }
 
-func decodeHardlinkKey(key quantumfs.ObjectKey) (hardlinkId HardlinkId) {
-	if key.Type() != quantumfs.KeyTypeEmbedded {
-		panic("Non-embedded key attempted decode as Hardlink Id")
-	}
+func newHardlink(name string, fileId quantumfs.FileId,
+	wsr *WorkspaceRoot) *Hardlink {
 
-	hash := key.Hash()
-	return HardlinkId(binary.LittleEndian.Uint64(hash[0:8]))
-}
-
-func encodeHardlinkId(hardlinkId HardlinkId) quantumfs.ObjectKey {
-	var hash [quantumfs.ObjectKeyLength - 1]byte
-
-	binary.LittleEndian.PutUint64(hash[0:8], uint64(hardlinkId))
-	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash)
-}
-
-func newHardlink(name string, linkId HardlinkId, wsr *WorkspaceRoot) *Hardlink {
+	utils.Assert(fileId != quantumfs.InvalidFileId,
+		"invalid fileId for %s", name)
 	var newLink Hardlink
 	newLink.name = name
 	newLink.wsr = wsr
-	newLink.linkId = linkId
+	newLink.fileId = fileId
 
 	return &newLink
 }
 
 func (link *Hardlink) get() *quantumfs.DirectRecord {
-	valid, link_ := link.wsr.getHardlink(link.linkId)
+	valid, link_ := link.wsr.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.linkId))
+			link.fileId))
 	}
 
 	return &link_
 }
 
 func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectRecord)) {
-	link.wsr.setHardlink(link.linkId, fnSetter)
+	link.wsr.setHardlink(link.fileId, fnSetter)
 }
 
 func (link *Hardlink) Filename() string {
@@ -70,16 +54,13 @@ func (link *Hardlink) SetFilename(v string) {
 }
 
 func (link *Hardlink) ID() quantumfs.ObjectKey {
-	return encodeHardlinkId(link.linkId)
+	var empty [quantumfs.ObjectKeyLength - 1]byte
+	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, empty)
 }
 
 func (link *Hardlink) SetID(v quantumfs.ObjectKey) {
-	decodedId := decodeHardlinkKey(v)
-
-	if decodedId != link.linkId {
-		panic(fmt.Sprintf("Change of ID attempted on Hardlink to %d",
-			decodedId))
-	}
+	utils.Assert(v.Type() == quantumfs.KeyTypeEmbedded,
+		"invalid key type %d", v.Type())
 }
 
 func (link *Hardlink) Type() quantumfs.ObjectType {
@@ -167,12 +148,22 @@ func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
 	})
 }
 
+func (link *Hardlink) FileId() quantumfs.FileId {
+	return link.fileId
+}
+
+func (link *Hardlink) SetFileId(fileId quantumfs.FileId) {
+	utils.Assert(fileId == link.fileId,
+		"attempt to change fileId %d -> %d", fileId, link.fileId)
+}
+
 func (link *Hardlink) Record() quantumfs.DirectRecord {
 	// Note: this is a DirectRecord shallow copy type
 	rtn := quantumfs.NewDirectoryRecord()
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
-	rtn.SetID(encodeHardlinkId(link.linkId))
 	rtn.SetFilename(link.name)
+	rtn.SetFileId(link.fileId)
+	rtn.SetID(link.ID())
 
 	// we only need to return a thin record - just enough information to
 	// create the hardlink. The rest is stored in workspaceroot.
@@ -181,15 +172,15 @@ func (link *Hardlink) Record() quantumfs.DirectRecord {
 }
 
 func (link *Hardlink) Nlinks() uint32 {
-	return link.wsr.nlinks(link.linkId)
+	return link.wsr.nlinks(link.fileId)
 }
 
 func (link *Hardlink) EncodeExtendedKey() []byte {
-	valid, realRecord := link.wsr.getHardlink(link.linkId)
+	valid, realRecord := link.wsr.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.linkId))
+			link.fileId))
 	}
 
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
@@ -200,11 +191,11 @@ func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryReco
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
-	valid, realRecord := link.wsr.getHardlink(link.linkId)
+	valid, realRecord := link.wsr.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.linkId))
+			link.fileId))
 	}
 
 	return quantumfs.NewImmutableRecord(
@@ -219,9 +210,10 @@ func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryReco
 		link.ContentTime(),
 		link.ModificationTime(),
 		link.Nlinks(),
+		link.FileId(),
 	)
 }
 
 func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
-	return newHardlink(link.name, link.linkId, link.wsr)
+	return newHardlink(link.name, link.fileId, link.wsr)
 }
