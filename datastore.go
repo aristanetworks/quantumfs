@@ -17,6 +17,10 @@ import (
 	capn "github.com/glycerine/go-capnproto"
 )
 
+type FileId uint64
+
+const InvalidFileId = FileId(0)
+
 // 160 bit hash, must match hash.HashSize
 const HashSize = 20
 
@@ -153,8 +157,7 @@ const ExtendedKeyLength = 40
 const (
 	XAttrTypePrefix = "quantumfs."
 
-	XAttrTypeKey    = XAttrTypePrefix + "key"
-	XAttrTypeLinkID = XAttrTypePrefix + "linkid"
+	XAttrTypeKey = XAttrTypePrefix + "key"
 )
 
 type ObjectKey struct {
@@ -630,12 +633,12 @@ func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
 	return &record
 }
 
-func (r *HardlinkRecord) HardlinkID() uint64 {
-	return r.record.HardlinkID()
+func (r *HardlinkRecord) FileId() uint64 {
+	return r.record.Record().FileId()
 }
 
-func (r *HardlinkRecord) SetHardlinkID(v uint64) {
-	r.record.SetHardlinkID(v)
+func (r *HardlinkRecord) SetFileId(v uint64) {
+	r.record.Record().SetFileId(v)
 }
 
 func (r *HardlinkRecord) Record() *DirectRecord {
@@ -844,6 +847,9 @@ type DirectoryRecord interface {
 	ModificationTime() Time
 	SetModificationTime(v Time)
 
+	FileId() FileId
+	SetFileId(fileId FileId)
+
 	Record() DirectRecord
 	Nlinks() uint32
 
@@ -871,6 +877,7 @@ type ImmutableDirectoryRecord interface {
 	ExtendedAttributes() ObjectKey
 	ContentTime() Time
 	ModificationTime() Time
+	FileId() FileId
 	Nlinks() uint32
 	EncodeExtendedKey() []byte
 	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
@@ -953,8 +960,16 @@ func (record *DirectRecord) ModificationTime() Time {
 	return Time(record.record.ModificationTime())
 }
 
+func (record *DirectRecord) FileId() FileId {
+	return FileId(record.record.FileId())
+}
+
 func (record *DirectRecord) SetModificationTime(t Time) {
 	record.record.SetModificationTime(uint64(t))
+}
+
+func (record *DirectRecord) SetFileId(fileId FileId) {
+	record.record.SetFileId(uint64(fileId))
 }
 
 func (record *DirectRecord) ContentTime() Time {
@@ -1013,6 +1028,7 @@ func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecor
 		xattr:       record.ExtendedAttributes(),
 		ctime:       record.ContentTime(),
 		mtime:       record.ModificationTime(),
+		fileId:      record.FileId(),
 		nlinks:      record.Nlinks(),
 	}
 }
@@ -1030,6 +1046,7 @@ func (record *DirectRecord) Clone() DirectoryRecord {
 	newEntry.SetContentTime(record.ContentTime())
 	newEntry.SetModificationTime(record.ModificationTime())
 	newEntry.SetNlinks(record.Nlinks())
+	newEntry.SetFileId(record.FileId())
 
 	return newEntry
 }
@@ -1381,7 +1398,8 @@ func init() {
 
 func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
 	permissions uint32, owner UID, group GID, size uint64, xattr ObjectKey,
-	ctime Time, mtime Time, nlinks uint32) ImmutableDirectoryRecord {
+	ctime Time, mtime Time, nlinks uint32,
+	fileId FileId) ImmutableDirectoryRecord {
 
 	return &ImmutableRecord{
 		filename:    filename,
@@ -1395,6 +1413,7 @@ func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
 		ctime:       ctime,
 		mtime:       mtime,
 		nlinks:      nlinks,
+		fileId:      fileId,
 	}
 }
 
@@ -1410,6 +1429,7 @@ type ImmutableRecord struct {
 	ctime       Time
 	mtime       Time
 	nlinks      uint32
+	fileId      FileId
 }
 
 func (ir *ImmutableRecord) Filename() string {
@@ -1450,6 +1470,10 @@ func (ir *ImmutableRecord) ContentTime() Time {
 
 func (ir *ImmutableRecord) ModificationTime() Time {
 	return ir.mtime
+}
+
+func (ir *ImmutableRecord) FileId() FileId {
+	return ir.fileId
 }
 
 func (ir *ImmutableRecord) Nlinks() uint32 {
