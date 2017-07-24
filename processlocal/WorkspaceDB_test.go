@@ -246,10 +246,11 @@ func TestPubSubBacklog(t *testing.T) {
 		iteration2Len := 0
 		iteration2Deleted := false
 		callStep := 0
+		wait := make(chan struct{})
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
 			callStep++
 			if callStep == 1 {
-				time.Sleep(100 * time.Millisecond)
+				<-wait
 				iteration1Len = len(updates)
 			} else {
 				test2, ok := updates["test2/test/test"]
@@ -273,7 +274,7 @@ func TestPubSubBacklog(t *testing.T) {
 			func() bool { return callStep == 1 })
 
 		// At this point the notification goroutine is busy, so these
-		// following should all be coalesced.
+		// following will be coalesced.
 
 		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
@@ -285,6 +286,8 @@ func TestPubSubBacklog(t *testing.T) {
 
 		test.AssertNoErr(wsdb.DeleteWorkspace(test.ctx, "test2", "test",
 			"test"))
+
+		wait <- struct{}{}
 
 		test.WaitFor("Callback to be invoked the second time",
 			func() bool { return callStep == 2 })
