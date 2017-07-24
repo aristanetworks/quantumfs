@@ -88,7 +88,7 @@ type WorkspaceDB interface {
 	// workspace modification.
 
 	// Configure which call back to pass the updates since the last run. The
-	// WorkspaceDB guarrantees to call a single instance at any one time. The
+	// WorkspaceDB guarantees to call a single instance at any one time. The
 	// argument to this callback is a map from workspace names to new rootIds. If
 	// multiple updates come in while a previous instance of the callback is
 	// still processing, then the intermediate states are coalesced and only the
@@ -96,7 +96,7 @@ type WorkspaceDB interface {
 	//
 	// Setting a second callback will overwrite the first. Set nil to disable
 	// receiving subscriptions. Subscriptions will continue to be tracked even if
-	// no callbackis configured, but any changes which occur while there is no
+	// no callback is configured, but any changes which occur while there is no
 	// callback configured are dropped.
 	SetCallback(callback SubscriptionCallback)
 	SubscribeTo(workspaceName string) error
