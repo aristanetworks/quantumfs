@@ -247,11 +247,11 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		return
 	}
 
-	if !qfs.workspaceIsMutable(c, wsr) {
+	if qfs.workspaceIsMutable(c, wsr) {
 		// TODO At this point the workpace should be locked, flushed/synced
 		// and finally have the newly produced local RootID merged with the
 		// remote incoming RootID.
-		c.dlog("Refreshing mutable workspaces is not supported")
+		c.elog("Refreshing mutable workspaces is not supported")
 		return
 	}
 
@@ -259,8 +259,8 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	// instead of refetching from the workspaceDB. Also, calling a plain refresh
 	// here causes many tests to fail due to a divide by zero error in
 	// MultiBlockFile.blockIdxInfo().
+	//
 	// wsr.refresh(c)
-	return
 }
 
 func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
