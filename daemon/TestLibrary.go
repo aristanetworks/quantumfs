@@ -55,6 +55,11 @@ func logFuseWaiting(prefix string, th *TestHelper) {
 			connection)
 		waiting, err := os.OpenFile(path, os.O_RDONLY, 0)
 		if err != nil {
+			if os.IsNotExist(err) {
+				// If the fuse connection doesn't exist, then this
+				// particular connection has successfully terminated.
+				continue
+			}
 			th.Log("ERROR: Open FUSE connection (%d) failed "+
 				"waiting err: %s", connection, err.Error())
 		} else if _, err := waiting.Read(buf); err != nil {
