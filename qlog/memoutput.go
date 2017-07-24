@@ -47,6 +47,10 @@ type circBufHeader struct {
 	PastEndIdx uint64
 }
 
+func (cbh *circBufHeader) EndIndex() uint64 {
+	return cbh.PastEndIdx % cbh.Size
+}
+
 type SharedMemory struct {
 	fd       *os.File
 	mapSize  int

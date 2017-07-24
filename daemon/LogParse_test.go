@@ -216,3 +216,21 @@ func TestBooleanLogType(t *testing.T) {
 			"boolean log types incorrectly output: %s", testLogs)
 	})
 }
+
+func TestQlogWrapAround(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		// Overflow the qlog file
+		for i := 0; i < 100000000; i++ {
+			test.Logger.Log(qlog.LogTest, qlog.TestReqId, 3,
+				"Filler %s", "12345678901234567890")
+		}
+
+		// At this point the qlog file should have wrapped around several
+		// times. When the test harness goes to parse it, it will panic if
+		// the offset isn't properly adjusted with respect to the file size
+		// with a "slike bounds out of range" failure in readBack().
+
+		test.Log("Test fill complete")
+		test.WaitForLogString("Test fill complete", "Qlog parsing failed")
+	})
+}
