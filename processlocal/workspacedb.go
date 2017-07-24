@@ -487,9 +487,9 @@ func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 	go wsdb.sendNotifications(c, updatesToSend, wsdb.callback)
 }
 
-// This function runs it its own goroutine whenever there isn't already one running
-// and there are updates to send. It must continue to send additional updates as long
-// as such updates exist.
+// Send all notifications to the registered callback. This should be run in its own
+// goroutine as it will repeatedly run the callback on any notifications which arrive
+// while the callback is processing the previous set of updates.
 func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
 	updates map[string]quantumfs.WorkspaceState,
 	callback quantumfs.SubscriptionCallback) {
@@ -535,7 +535,7 @@ func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
 func safelyCall(c *quantumfs.Ctx, callback quantumfs.SubscriptionCallback,
 	updates map[string]quantumfs.WorkspaceState) {
 
-	// If the subscription callback should panic, we'll log and then continue on.
+	// Should the subscription callback panic, we'll log and then continue on.
 	// The update set which caused the panic may be lost, but subsequent update
 	// sets will be attempted.
 	defer func() {
