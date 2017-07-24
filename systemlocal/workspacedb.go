@@ -487,6 +487,18 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	return decodeKey(rootid), nonce, err
 }
 
+func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
+	typespace string, namespace string, workspace string) (
+	quantumfs.ObjectKey, quantumfs.WorkspaceNonce, error) {
+
+	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
+	if err != nil {
+		return quantumfs.ObjectKey{}, 0, err
+	}
+
+	return wsdb.Workspace(c, typespace, namespace, workspace)
+}
+
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,

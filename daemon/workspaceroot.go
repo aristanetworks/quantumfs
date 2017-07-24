@@ -73,16 +73,8 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	var wsr WorkspaceRoot
 
-	// Subscribe before fetching the rootID and loading the metadata to ensure we
-	// don't miss any updates.
-	err := c.workspaceDB.SubscribeTo(workspaceName)
-	if err != nil {
-		c.elog("Failed to subscribe to workspace %s: %s", workspaceName,
-			err.Error())
-	}
-
-	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, typespace, namespace,
-		workspace)
+	rootId, nonce, err := c.workspaceDB.FetchAndSubscribeWorkspace(&c.Ctx,
+		typespace, namespace, workspace)
 	if err != nil {
 		utils.Assert(err == nil, "Failed to fetch workspace rootId: %s",
 			err.Error())
