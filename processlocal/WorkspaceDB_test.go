@@ -304,7 +304,12 @@ func TestPubSubPanic(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		wsdb := test.wsdb
 
+		wait := make(chan struct{})
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			defer func() {
+				wait <- struct{}{}
+			}()
+
 			panic("Intentional, test initiated panic")
 		}
 
@@ -318,7 +323,8 @@ func TestPubSubPanic(t *testing.T) {
 
 		// Give the callback time to run and panic before ending this test.
 		// This will ensure all the processlocal tests do not complete before
-		// the callback has panic'ed.
+		// the callback has panic'ed and that panic has been processed.
+		<-wait
 		time.Sleep(300 * time.Millisecond)
 
 	})
