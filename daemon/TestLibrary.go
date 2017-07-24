@@ -55,10 +55,10 @@ func logFuseWaiting(prefix string, th *TestHelper) {
 			connection)
 		waiting, err := os.OpenFile(path, os.O_RDONLY, 0)
 		if err != nil {
-			th.Log("ERROR: Failed to open FUSE connection (%d) "+
+			th.Log("ERROR: Open FUSE connection (%d) failed "+
 				"waiting err: %s", connection, err.Error())
 		} else if _, err := waiting.Read(buf); err != nil {
-			th.Log("ERROR: Failed to read FUSE connection (%d) "+
+			th.Log("ERROR: Read FUSE connection (%d) failed "+
 				"waiting err: %s", connection, err.Error())
 		} else {
 			str := bytes.TrimRight(buf, "\u0000\n")
