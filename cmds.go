@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -490,6 +491,9 @@ func (api *apiImpl) sendCmd(buf []byte) ([]byte, error) {
 	result := make([]byte, 0)
 	for size == BufferSize {
 		size, err = api.fd.Read(buf)
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			return nil, err
 		}

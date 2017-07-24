@@ -96,46 +96,46 @@ func SpecialReq(reqId uint64) string {
 	}
 }
 
+var logSubsystem = []string{}
+var logSubsystemMap = map[string]LogSubsystem{}
+
+type logSubsystemPair struct {
+	name   string
+	logger LogSubsystem
+}
+
+var logSubsystemList = []logSubsystemPair{
+	{"Daemon", LogDaemon},
+	{"Datastore", LogDatastore},
+	{"WorkspaceDb", LogWorkspaceDb},
+	{"Test", LogTest},
+	{"Qlog", LogQlog},
+	{"Quark", LogQuark},
+	{"Spin", LogSpin},
+	{"Tool", LogTool},
+}
+
+func init() {
+	for _, v := range logSubsystemList {
+		addLogSubsystem(v.name, v.logger)
+	}
+}
+
+func addLogSubsystem(sys string, l LogSubsystem) {
+	logSubsystem = append(logSubsystem, sys)
+	logSubsystemMap[strings.ToLower(sys)] = l
+}
+
 func (enum LogSubsystem) String() string {
-	switch enum {
-	case LogDaemon:
-		return "Daemon"
-	case LogDatastore:
-		return "Datastore"
-	case LogWorkspaceDb:
-		return "WorkspaceDb"
-	case LogTest:
-		return "Test"
-	case LogQlog:
-		return "Qlog"
-	case LogQuark:
-		return "Quark"
-	case LogSpin:
-		return "Spin"
-	case LogTool:
-		return "Tool"
+	if 0 <= enum && enum <= logSubsystemMax {
+		return logSubsystem[enum]
 	}
 	return ""
 }
 
 func getSubsystem(sys string) (LogSubsystem, error) {
-	switch strings.ToLower(sys) {
-	case "daemon":
-		return LogDaemon, nil
-	case "datastore":
-		return LogDatastore, nil
-	case "workspacedb":
-		return LogWorkspaceDb, nil
-	case "test":
-		return LogTest, nil
-	case "qlog":
-		return LogQlog, nil
-	case "quark":
-		return LogQuark, nil
-	case "spin":
-		return LogSpin, nil
-	case "tool":
-		return LogTool, nil
+	if m, ok := logSubsystemMap[strings.ToLower(sys)]; ok {
+		return m, nil
 	}
 	return LogDaemon, errors.New("Invalid subsystem string")
 }
@@ -318,10 +318,20 @@ type Qlogger struct {
 	subsystem LogSubsystem
 }
 
+// This is just a placeholder for now:
+// TODO sanity check space for logSubsystemMax before adding it in
+func newLogSubsystem(sys string) LogSubsystem {
+	//logSubsystemMax++
+	l := logSubsystemMax
+	logSubsystemList = append(logSubsystemList, logSubsystemPair{sys, l})
+	addLogSubsystem(sys, l)
+	return l
+}
+
 func newQlogger(subsystem string) *Qlogger {
-	sub, err := getSubsystem(subsystem) // TODO: register this instead
+	sub, err := getSubsystem(subsystem)
 	if err != nil {
-		panic(fmt.Sprintf("invalid subsystem %s", subsystem))
+		sub = newLogSubsystem(subsystem)
 	}
 	return &Qlogger{
 		RequestId: 0,
