@@ -8,6 +8,7 @@ package processlocal
 
 import (
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -152,5 +153,202 @@ func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
 			"name1", "work1")
 		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Workspace not deleted")
+	})
+}
+
+func TestPubSubBranch(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb.SetCallback(callback)
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
+
+func TestPubSubAdvanceAndUnsubscribe(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb.SetCallback(callback)
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+		wsdb.UnsubscribeFrom("test/test/test")
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		err = wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+		test.Assert(!called, "Notification when not subscribed!")
+
+		key, nonce, err := wsdb.Workspace(test.ctx, "test", "test", "test")
+		test.AssertNoErr(err)
+
+		_, err = wsdb.AdvanceWorkspace(test.ctx, "test", "test", "test",
+			nonce, key, key)
+		test.AssertNoErr(err)
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
+
+func TestPubSubDelete(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb.SetCallback(callback)
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		err = wsdb.DeleteWorkspace(test.ctx, "test", "test", "test")
+		test.AssertNoErr(err)
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
+	})
+}
+
+func TestPubSubBacklog(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		iteration1Len := 0
+		iteration2Len := 0
+		iteration2Deleted := false
+		callStep := 0
+		wait := make(chan struct{})
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			callStep++
+			if callStep == 1 {
+				<-wait
+				iteration1Len = len(updates)
+			} else {
+				test2, ok := updates["test2/test/test"]
+				iteration2Len = len(updates)
+				iteration2Deleted = ok && test2.Deleted
+			}
+		}
+		wsdb.SetCallback(callback)
+
+		test.AssertNoErr(wsdb.SubscribeTo("test1/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test2/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test3/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test4/test/test"))
+		test.AssertNoErr(wsdb.SubscribeTo("test5/test/test"))
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test1", "test", "test"))
+
+		test.WaitFor("Callback to be invoked the first time",
+			func() bool { return callStep == 1 })
+
+		// At this point the notification goroutine is busy, so these
+		// following will be coalesced.
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test2", "test", "test"))
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test3", "test", "test"))
+
+		test.AssertNoErr(wsdb.DeleteWorkspace(test.ctx, "test2", "test",
+			"test"))
+
+		wait <- struct{}{}
+
+		test.WaitFor("Callback to be invoked the second time",
+			func() bool { return callStep == 2 })
+
+		test.Assert(iteration1Len == 1, "Iteration 1: length wrong %d",
+			iteration1Len)
+		test.Assert(iteration2Len == 2, "Iteration 2: length wrong %d",
+			iteration2Len)
+		test.Assert(iteration2Deleted, "Iteration 2: not deleted")
+	})
+}
+
+func TestPubSubPanic(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb := test.wsdb
+
+		wait := make(chan struct{})
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			defer func() {
+				wait <- struct{}{}
+			}()
+
+			panic("Intentional, test initiated panic")
+		}
+
+		wsdb.SetCallback(callback)
+
+		test.AssertNoErr(wsdb.SubscribeTo("test/test/test"))
+
+		test.AssertNoErr(wsdb.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		// Give the callback time to run and panic before ending this test.
+		// This will ensure all the processlocal tests do not complete before
+		// the callback has panic'ed and that panic has been processed.
+		<-wait
+		time.Sleep(300 * time.Millisecond)
+
+	})
+}
+
+func TestPubSubMultiHead(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb1 := test.wsdb.(*workspaceDB)
+		wsdb2 := wsdb1.getSecondHead()
+
+		called := false
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			test.Assert(len(updates) == 1, "Wrong number of updates: %d",
+				len(updates))
+			called = true
+		}
+		wsdb2.SetCallback(callback)
+		err := wsdb2.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		test.AssertNoErr(wsdb1.BranchWorkspace(test.ctx,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, "test", "test", "test"))
+
+		test.WaitFor("Callback to be invoked", func() bool { return called })
 	})
 }
