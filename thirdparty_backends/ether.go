@@ -514,6 +514,17 @@ func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	return false, nil
 }
 
+func (wsdb *etherWsdbTranslator) SetCallback(
+	callback quantumfs.SubscriptionCallback) {
+}
+
+func (wsdb *etherWsdbTranslator) SubscribeTo(workspaceName string) error {
+	return nil
+}
+
+func (wsdb *etherWsdbTranslator) UnsubscribeFrom(workspaceName string) {
+}
+
 type dsApiCtx quantumfs.Ctx
 
 func (dc *dsApiCtx) Elog(fmtStr string, args ...interface{}) {
