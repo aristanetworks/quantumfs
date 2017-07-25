@@ -20,9 +20,7 @@ import (
 // It is inefficient, not wrong.
 // One way to fix it would be to not pursure paths where we know
 // there is no possibility of finding the searchPath.
-func printPath2Key(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
-
+func printPath2Key() error {
 	if walkFlags.NArg() != 3 {
 		fmt.Println("path2key sub-command takes 2 args: wsname path")
 		walkFlags.Usage()
@@ -46,7 +44,8 @@ func printPath2Key(c *quantumfs.Ctx, progress bool,
 	}
 
 	showRootIDStatus := false
-	if err := walkHelper(c, qfsds, qfsdb, wsname, progress, showRootIDStatus, finder); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
+		showRootIDStatus, finder); err != nil {
 		return err
 	}
 	if len(keyList) == 0 {

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/ether/blobstore"
 	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -18,10 +17,7 @@ import (
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
-func handleTTL(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
-	qfsdb quantumfs.WorkspaceDB, ttlCfg *qubitutils.TTLConfig) error {
-
+func handleTTL() error {
 	if walkFlags.NArg() != 2 {
 		fmt.Println("ttl sub-command takes 1 arg: wsname")
 		walkFlags.Usage()
@@ -33,22 +29,19 @@ func handleTTL(c *quantumfs.Ctx, progress bool,
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		return walkutils.RefreshTTL(c, path, key, size, isDir, cqlds,
-			ttlCfg.TTLThreshold, ttlCfg.TTLNew)
+		return walkutils.RefreshTTL(c, path, key, size, isDir,
+			cs.cqlds, cs.ttlCfg.TTLThreshold, cs.ttlCfg.TTLNew)
 	}
 
 	showRootIDStatus := true
-	if err := walkHelper(c, qfsds, qfsdb, wsname, progress, showRootIDStatus,
-		walkFunc); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname,
+		co.progress, showRootIDStatus, walkFunc); err != nil {
 		return err
 	}
 	return nil
 }
 
-func handleForceTTL(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
-	qfsdb quantumfs.WorkspaceDB) error {
-
+func handleForceTTL() error {
 	if walkFlags.NArg() != 3 {
 		fmt.Println("forceTTL sub-command takes 2 arg: wsname <new TTL(hrs)>")
 		walkFlags.Usage()
@@ -69,22 +62,19 @@ func handleForceTTL(c *quantumfs.Ctx, progress bool,
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
-		return walkutils.RefreshTTL(c, path, key, size, isDir, cqlds,
-			newTTL, newTTL)
+		return walkutils.RefreshTTL(c, path, key, size, isDir,
+			cs.cqlds, newTTL, newTTL)
 	}
 
 	showRootIDStatus := true
-	if err := walkHelper(c, qfsds, qfsdb, wsname, progress, showRootIDStatus,
-		walkFunc); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
+		showRootIDStatus, walkFunc); err != nil {
 		return err
 	}
 	return nil
 }
 
-func printTTLHistogram(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
-	qfsdb quantumfs.WorkspaceDB) error {
-
+func printTTLHistogram() error {
 	if walkFlags.NArg() != 2 {
 		fmt.Println("ttlHistogram sub-command takes 1 args: wsname ")
 		walkFlags.Usage()
@@ -115,7 +105,7 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 			return nil
 		}
 
-		metadata, err := cqlds.Metadata(walkutils.ToECtx(c), key.Value())
+		metadata, err := cs.cqlds.Metadata(walkutils.ToECtx(c), key.Value())
 		if err != nil {
 			return fmt.Errorf("path:%v key %v: %v", path, key.String(), err)
 		}
@@ -137,8 +127,8 @@ func printTTLHistogram(c *quantumfs.Ctx, progress bool,
 	}
 
 	showRootIDStatus := true
-	if err := walkHelper(c, qfsds, qfsdb, wsname, progress,
-		showRootIDStatus, bucketer); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname,
+		co.progress, showRootIDStatus, bucketer); err != nil {
 		return err
 	}
 	fmt.Printf("Days(s)   %5s\n", "Count")

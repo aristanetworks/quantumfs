@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
@@ -25,13 +26,67 @@ const (
 var walkFlags *flag.FlagSet
 var version string
 
+// options usable by all commands
+type commonOpts struct {
+	config   string
+	progress bool
+}
+
+var co commonOpts
+
+// state usable by all commands
+type commonState struct {
+	ttlCfg *qubitutils.TTLConfig
+	cqlds  blobstore.BlobStore
+	qfsds  quantumfs.DataStore
+	qfsdb  quantumfs.WorkspaceDB
+	ctx    *quantumfs.Ctx
+}
+
+var cs commonState
+
+func setupCommonState() {
+	var err error
+
+	if co.config == "" {
+		fmt.Fprintf(os.Stderr, "Error: configuration file must be specified")
+		os.Exit(exitBadConfig)
+	}
+
+	cs.ttlCfg, err = qubitutils.LoadTTLConfig(co.config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to load TTL values: %s\n", err)
+		os.Exit(exitBadConfig)
+	}
+
+	cs.qfsds, err = thirdparty_backends.ConnectDatastore("ether.cql",
+		co.config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Connection to DataStore failed: %s\n",
+			err)
+		os.Exit(exitBadConfig)
+	}
+	v, ok := cs.qfsds.(*thirdparty_backends.EtherBlobStoreTranslator)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Error: Non-ether datastore found")
+		os.Exit(exitBadConfig)
+	}
+	v.ApplyTTLPolicy = false
+	cs.cqlds = v.Blobstore
+
+	cs.qfsdb, err = thirdparty_backends.ConnectWorkspaceDB("ether.cql", co.config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Connection to workspaceDB failed: %s\n",
+			err)
+		os.Exit(exitBadConfig)
+	}
+
+	cs.ctx = newCtx()
+}
+
 func main() {
 
 	walkFlags = flag.NewFlagSet("Walker cmd", flag.ExitOnError)
-
-	config := walkFlags.String("cfg", "", "datastore and workspaceDB config file")
-	progress := walkFlags.Bool("progress", false, "show progress")
-
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkercmd version", version)
 		fmt.Println("usage: walker -cfg <config> [-progress] <sub-command> ARG1[,ARG2[,...]]")
@@ -73,68 +128,45 @@ func main() {
 		walkFlags.PrintDefaults()
 	}
 
+	var err error
+	walkFlags.StringVar(&co.config, "cfg", "", "datastore and workspaceDB config file")
+	walkFlags.BoolVar(&co.progress, "progress", false, "show progress")
+
 	walkFlags.Parse(os.Args[1:])
 
-	if *config == "" {
-		walkFlags.Usage()
-		os.Exit(exitBadConfig)
-	}
+	// failure in setting up common state causes error exit
+	setupCommonState()
 
-	ttlCfg, err := qubitutils.LoadTTLConfig(*config)
-	if err != nil {
-		fmt.Printf("Failed to init ether.cql TTL values: %s\n",
-			err.Error())
-		os.Exit(exitBadConfig)
-	}
-
-	qfsds, err := thirdparty_backends.ConnectDatastore("ether.cql", *config)
-	if err != nil {
-		fmt.Printf("Connection to DataStore failed")
-		os.Exit(exitBadConfig)
-	}
-	var cqlds blobstore.BlobStore
-	if v, ok := qfsds.(*thirdparty_backends.EtherBlobStoreTranslator); ok {
-		cqlds = v.Blobstore
-		v.ApplyTTLPolicy = false
-	}
-
-	qfsdb, err := thirdparty_backends.ConnectWorkspaceDB("ether.cql", *config)
-	if err != nil {
-		fmt.Printf("Connection to workspaceDB failed")
-		os.Exit(exitBadConfig)
-	}
-
-	c := newCtx()
 	start := time.Now()
 
 	switch walkFlags.Arg(0) {
 	case "du":
-		err = handleDiskUsage(c, *progress, qfsds, qfsdb)
+		err = handleDiskUsage()
 	case "keycount":
-		err = handleKeyCount(c, *progress, qfsds, qfsdb)
+		err = handleKeyCount()
 	case "keydiffcount":
-		err = handleKeyDiffCount(c, *progress, qfsds, qfsdb)
+		err = handleKeyDiffCount()
 	case "ttl":
-		err = handleTTL(c, *progress, qfsds, cqlds, qfsdb, ttlCfg)
+		err = handleTTL()
 	case "forceTTL":
-		err = handleForceTTL(c, *progress, qfsds, cqlds, qfsdb)
+		err = handleForceTTL()
 	case "list":
-		err = printList(c, *progress, qfsds, cqlds, qfsdb)
+		err = printList()
 	case "ttlHistogram":
-		err = printTTLHistogram(c, *progress, qfsds, cqlds, qfsdb)
+		err = printTTLHistogram()
 	case "path2key":
-		err = printPath2Key(c, *progress, qfsds, qfsdb)
+		err = printPath2Key()
 	case "findconstantkeys":
-		err = printConstantKeys(c, *progress, qfsds, cqlds, qfsdb)
+		err = printConstantKeys()
 	default:
-		fmt.Println("Unsupported walk sub-command: ", walkFlags.Arg(0))
+		fmt.Fprintf(os.Stderr, "Unsupported walk sub-command: %s", walkFlags.Arg(0))
 		walkFlags.Usage()
 		os.Exit(exitBadCmd)
 	}
 
 	walkTime := time.Since(start)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(exitBadCmd)
 	}
 

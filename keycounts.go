@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aristanetworks/quantumfs"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
-func handleKeyCount(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
-
+func handleKeyCount() error {
 	if walkFlags.NArg() < 2 || walkFlags.NArg() > 3 {
 		fmt.Println("keycount sub-command args: wsname [dedupe]")
 		walkFlags.Usage()
@@ -27,8 +24,8 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 
 	tracker, keyCounter := getTrackerHandler(showDedupeInfo, nil)
 	showRootIDStatus := false
-	if err := walkHelper(c, qfsds, qfsdb, wsname, progress, showRootIDStatus,
-		keyCounter); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
+		showRootIDStatus, keyCounter); err != nil {
 		return err
 	}
 	fmt.Println("Unique Keys = ", tracker.uniqueKeys())
@@ -39,9 +36,7 @@ func handleKeyCount(c *quantumfs.Ctx, progress bool,
 	return nil
 }
 
-func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, qfsdb quantumfs.WorkspaceDB) error {
-
+func handleKeyDiffCount() error {
 	if walkFlags.NArg() < 3 || walkFlags.NArg() > 4 {
 		fmt.Println("keydiffcount sub-command args: wsname1 wsname2 [keys]")
 		fmt.Println()
@@ -59,13 +54,13 @@ func handleKeyDiffCount(c *quantumfs.Ctx, progress bool,
 
 	tracker1, keyCounter1 := getTrackerHandler(showKeys, nil)
 	showRootIDStatus := false
-	if err := walkHelper(c, qfsds, qfsdb, wsname1, progress, showRootIDStatus,
-		keyCounter1); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname1, co.progress,
+		showRootIDStatus, keyCounter1); err != nil {
 		return err
 	}
 	tracker2, keyCounter2 := getTrackerHandler(showKeys, nil)
-	if err := walkHelper(c, qfsds, qfsdb, wsname2, progress, showRootIDStatus,
-		keyCounter2); err != nil {
+	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname2,
+		co.progress, showRootIDStatus, keyCounter2); err != nil {
 		return err
 	}
 	fmt.Printf("UniqueKeys\t\tUniqueSize\n")

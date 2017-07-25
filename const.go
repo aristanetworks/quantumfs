@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/ether/blobstore"
 	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -20,10 +19,7 @@ import (
 
 const oneDaySecs = int64((24 * time.Hour) / time.Second)
 
-func printConstantKeys(c *quantumfs.Ctx, progress bool,
-	qfsds quantumfs.DataStore, cqlds blobstore.BlobStore,
-	wsdb quantumfs.WorkspaceDB) error {
-
+func printConstantKeys() error {
 	if walkFlags.NArg() != 3 {
 		fmt.Println("findconstantkeys sub-command takes 2 args: wsname num_days")
 		walkFlags.Usage()
@@ -55,7 +51,7 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 			buf := simplebuffer.New(nil, key)
 			if err := cds.Get(nil, key, buf); err != nil {
 
-				metadata, err := cqlds.Metadata(
+				metadata, err := cs.cqlds.Metadata(
 					walkutils.ToECtx(c), key.Value())
 				if err != nil {
 					return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
@@ -88,7 +84,8 @@ func printConstantKeys(c *quantumfs.Ctx, progress bool,
 	}
 
 	showRootIDStatus := false
-	err = walkHelper(c, qfsds, wsdb, wsname, progress, showRootIDStatus, finder)
+	err = walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
+		showRootIDStatus, finder)
 	// Print all matches that we have collected so far
 	// even though we hit an error.
 	for k, v := range matchKey {
