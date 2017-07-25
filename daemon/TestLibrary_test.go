@@ -20,6 +20,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestMain(m *testing.M) {
@@ -738,4 +739,10 @@ func CreateHardlink(name string, content string) error {
 		return err
 	}
 	return syscall.Link(name, name+"_link")
+}
+
+func ManualLookup(c *ctx, parent Inode, childName string) {
+	var dummy fuse.EntryOut
+	defer parent.RLockTree().RUnlock()
+	parent.Lookup(c, childName, &dummy)
 }
