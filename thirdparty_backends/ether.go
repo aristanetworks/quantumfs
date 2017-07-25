@@ -441,6 +441,18 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	return quantumfs.NewObjectKeyFromBytes(key), 0, nil
 }
 
+func (w *etherWsdbTranslator) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
+	typespace string, namespace string, workspace string) (
+	quantumfs.ObjectKey, quantumfs.WorkspaceNonce, error) {
+
+	err := w.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
+	if err != nil {
+		return quantumfs.ObjectKey{}, 0, err
+	}
+
+	return w.Workspace(c, typespace, namespace, workspace)
+}
+
 const EtherBranchLog = "EtherWsdbTranslator::BranchWorkspace"
 const EtherBranchDebugLog = "%s/%s/%s -> %s/%s/%s"
 
