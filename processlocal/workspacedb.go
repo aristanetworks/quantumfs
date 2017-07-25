@@ -493,34 +493,22 @@ func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 		return
 	}
 
-	updatesToSend := wsdb.updates
-	wsdb.updates = map[string]quantumfs.WorkspaceState{}
-
-	go wsdb.sendNotifications(c, updatesToSend, wsdb.callback)
+	go wsdb.sendNotifications(c)
 }
 
 // Send all notifications to the registered callback. This should be run in its own
 // goroutine as it will repeatedly run the callback on any notifications which arrive
 // while the callback is processing the previous set of updates.
-func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
-	updates map[string]quantumfs.WorkspaceState,
-	callback quantumfs.SubscriptionCallback) {
+func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx) {
+	defer c.FuncInName(qlog.LogWorkspaceDb,
+		"processlocal::sendNotifications").Out()
 
-	c.FuncIn(qlog.LogWorkspaceDb, "processlocal::sendNotifications",
-		"Starting with %d updates", len(updates))
+	var callback quantumfs.SubscriptionCallback
+	var updates map[string]quantumfs.WorkspaceState
 
 	for {
-		if callback != nil {
-			c.Vlog(qlog.LogWorkspaceDb,
-				"Notifying callback of %d updates", len(updates))
-			safelyCall(c, callback, updates)
-		} else {
-			c.Vlog(qlog.LogWorkspaceDb, "nil callback, dropping %d "+
-				"updates", len(updates))
-		}
-
 		func() {
-			c.Vlog(qlog.LogWorkspaceDb, "Checking for more updates")
+			c.Vlog(qlog.LogWorkspaceDb, "Checking for updates")
 			defer wsdb.cacheMutex.Lock().Unlock()
 			callback = wsdb.callback
 			updates = wsdb.updates
@@ -540,6 +528,15 @@ func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx,
 		if updates == nil {
 			c.Vlog(qlog.LogWorkspaceDb, "No further updates")
 			return
+		}
+
+		if callback != nil {
+			c.Vlog(qlog.LogWorkspaceDb,
+				"Notifying callback of %d updates", len(updates))
+			safelyCall(c, callback, updates)
+		} else {
+			c.Vlog(qlog.LogWorkspaceDb, "nil callback, dropping %d "+
+				"updates", len(updates))
 		}
 	}
 }
