@@ -12,6 +12,15 @@ import "fmt"
 // WorkspaceNonces and therefore be distinguishable.
 type WorkspaceNonce uint64
 
+type WorkspaceState struct {
+	RootId    ObjectKey
+	Nonce     WorkspaceNonce
+	Immutable bool
+	Deleted   bool
+}
+
+type SubscriptionCallback func(updates map[string]WorkspaceState)
+
 // WorkspaceDB provides a cluster-wide and consistent mapping between names and
 // rootids. Workspace names have two components and are represented as strings with
 // the format "<typespace>/<namespace>/<workspace>". <typespace> would often be a
@@ -72,6 +81,26 @@ type WorkspaceDB interface {
 	AdvanceWorkspace(c *Ctx, typespace string, namespace string,
 		workspace string, nonce WorkspaceNonce, currentRootId ObjectKey,
 		newRootId ObjectKey) (ObjectKey, error)
+
+	// Workspace RootID update subscriptions. Clients will subscribe to rootId
+	// updates in order to take the newly published data into consideration as
+	// quickly as possible and thereby minimize conflicts caused by concurrent
+	// workspace modification.
+
+	// Configure which call back to pass the updates since the last run. The
+	// WorkspaceDB guarantees to call a single instance at any one time. The
+	// argument to this callback is a map from workspace names to new rootIds. If
+	// multiple updates come in while a previous instance of the callback is
+	// still processing, then the intermediate states are coalesced and only the
+	// most recent, as of the initiation of the call, passed in.
+	//
+	// Setting a second callback will overwrite the first. Set nil to disable
+	// receiving subscriptions. Subscriptions will continue to be tracked even if
+	// no callback is configured, but any changes which occur while there is no
+	// callback configured are dropped.
+	SetCallback(callback SubscriptionCallback)
+	SubscribeTo(workspaceName string) error
+	UnsubscribeFrom(workspaceName string)
 }
 
 type WsdbErrCode int
