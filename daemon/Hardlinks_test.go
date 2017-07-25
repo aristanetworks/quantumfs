@@ -16,7 +16,6 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestHardlinkReload(t *testing.T) {
@@ -560,12 +559,6 @@ func TestHardlinkRename(t *testing.T) {
 				"file %s data not preserved", v)
 		}
 	})
-}
-
-func ManualLookup(c *ctx, parent Inode, childName string) {
-	var dummy fuse.EntryOut
-	defer parent.RLockTree().RUnlock()
-	parent.Lookup(c, childName, &dummy)
 }
 
 func TestHardlinkReparentRace(t *testing.T) {
