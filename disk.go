@@ -1,26 +1,44 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
-func handleDiskUsage() error {
-	if walkFlags.NArg() != 3 {
-		fmt.Println("du sub-command takes 2 args: wsname path")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func init() {
+	registerDuCmd()
+}
+
+func registerDuCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "du"
+	cmd.Usage = "workspace path"
+	cmd.Short = "shows the disk usage of path in a workspace"
+	cmd.Details = `
+workspace
+	name of the workspace
+path
+	absolute path from root of the workspace	
+`
+	cmd.Run = handleDiskUsage
+
+	cmdproc.RegisterCommand(cmd)
+}
+
+func handleDiskUsage(args []string) error {
+	if len(args) != 2 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
 
-	wsname := walkFlags.Arg(1)
-	searchPath := walkFlags.Arg(2)
+	wsname := args[0]
+	searchPath := args[1]
 	searchPath = filepath.Clean("/" + searchPath)
 
 	filter := func(path string) bool { return !strings.HasPrefix(path, searchPath) }
@@ -30,7 +48,7 @@ func handleDiskUsage() error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, sizer); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	fmt.Println("Total Size = ", qubitutils.HumanizeBytes(tracker.totalSize()))
 	return nil

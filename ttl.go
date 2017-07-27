@@ -1,11 +1,10 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package main
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -13,18 +12,37 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
+	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	walkutils "github.com/aristanetworks/qubit/tools/qwalker/utils"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
-func handleTTL() error {
-	if walkFlags.NArg() != 2 {
-		fmt.Println("ttl sub-command takes 1 arg: wsname")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func init() {
+	registerTTLCmd()
+	registerForceTTLCmd()
+	registerTTLHistogramCmd()
+}
+
+func registerTTLCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "ttl"
+	cmd.Usage = "workspace"
+	cmd.Short = "update all blocks in workspace with TTL values from configuration"
+	cmd.Details = `
+workspace
+	name of the workspace
+`
+	cmd.Run = handleTTL
+
+	cmdproc.RegisterCommand(cmd)
+}
+
+func handleTTL(args []string) error {
+	if len(args) != 1 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
 
-	wsname := walkFlags.Arg(1)
+	wsname := args[0]
 
 	walkFunc := func(c *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
@@ -36,25 +54,37 @@ func handleTTL() error {
 	showRootIDStatus := true
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname,
 		co.progress, showRootIDStatus, walkFunc); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	return nil
 }
 
-func handleForceTTL() error {
-	if walkFlags.NArg() != 3 {
-		fmt.Println("forceTTL sub-command takes 2 arg: wsname <new TTL(hrs)>")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func registerForceTTLCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "forceTTL"
+	cmd.Usage = "workspace new_ttl_hours"
+	cmd.Short = "update all blocks in workspace with lower TTL to given TTL"
+	cmd.Details = `
+workspace
+	name of the workspace
+new_ttl_hours
+	TTL of the block is set to this value if its lower than this value
+`
+	cmd.Run = handleForceTTL
+
+	cmdproc.RegisterCommand(cmd)
+}
+
+func handleForceTTL(args []string) error {
+	if len(args) != 2 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
-	wsname := walkFlags.Arg(1)
+	wsname := args[0]
 
 	var err error
 	var newTTL int64
-	if newTTL, err = strconv.ParseInt(walkFlags.Arg(2), 10, 64); err != nil {
-		fmt.Println("TTL val is not a valid integer")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+	if newTTL, err = strconv.ParseInt(args[1], 10, 64); err != nil {
+		return cmdproc.NewBadArgExitErr("TTL value is not a valid integer")
 	}
 	newTTL = newTTL * 3600 // Hours to seconds
 
@@ -69,18 +99,30 @@ func handleForceTTL() error {
 	showRootIDStatus := true
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, walkFunc); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	return nil
 }
 
-func printTTLHistogram() error {
-	if walkFlags.NArg() != 2 {
-		fmt.Println("ttlHistogram sub-command takes 1 args: wsname ")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func registerTTLHistogramCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "ttlHistogram"
+	cmd.Usage = "workspace"
+	cmd.Short = "show a histogram of TTL values of blocks within a workspace"
+	cmd.Details = `
+workspace
+	name of the workspace
+`
+	cmd.Run = handleTTLHistogram
+
+	cmdproc.RegisterCommand(cmd)
+}
+
+func handleTTLHistogram(args []string) error {
+	if len(args) != 1 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
-	wsname := walkFlags.Arg(1)
+	wsname := args[0]
 
 	keymap := make(map[quantumfs.ObjectKey]bool)
 	var maplock utils.DeferableMutex
@@ -129,7 +171,7 @@ func printTTLHistogram() error {
 	showRootIDStatus := true
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname,
 		co.progress, showRootIDStatus, bucketer); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	fmt.Printf("Days(s)   %5s\n", "Count")
 	hist.Print()

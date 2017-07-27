@@ -1,11 +1,10 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package main
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -14,24 +13,41 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 	"github.com/aristanetworks/quantumfs/walker"
+	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	walkutils "github.com/aristanetworks/qubit/tools/qwalker/utils"
 )
 
+func init() {
+	registerConstCmd()
+}
+
+func registerConstCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "findconstantkeys"
+	cmd.Usage = "workspace num_days"
+	cmd.Short = "list constant keys with TTL greater than num_days along with their paths"
+	cmd.Details = `
+workspace
+	name of the workspace
+num_days
+	select keys with TTL greater than num_days
+`
+	cmd.Run = printConstantKeys
+
+	cmdproc.RegisterCommand(cmd)
+}
+
 const oneDaySecs = int64((24 * time.Hour) / time.Second)
 
-func printConstantKeys() error {
-	if walkFlags.NArg() != 3 {
-		fmt.Println("findconstantkeys sub-command takes 2 args: wsname num_days")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func printConstantKeys(args []string) error {
+	if len(args) != 2 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
-	wsname := walkFlags.Arg(1)
+	wsname := args[0]
 	var numDays int64
 	var err error
-	if numDays, err = strconv.ParseInt(walkFlags.Arg(2), 10, 32); err != nil {
-		fmt.Println("num_days is not a valid integer")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+	if numDays, err = strconv.ParseInt(args[1], 10, 32); err != nil {
+		return cmdproc.NewBadArgExitErr("num_days is not a valid integer")
 	}
 
 	cds := quantumfs.ConstantStore
@@ -86,10 +102,13 @@ func printConstantKeys() error {
 	showRootIDStatus := false
 	err = walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, finder)
+	if err != nil {
+		return cmdproc.NewBadCmdExitErr("%s", err)
+	}
 	// Print all matches that we have collected so far
 	// even though we hit an error.
 	for k, v := range matchKey {
 		fmt.Println(k, ": ", v)
 	}
-	return err
+	return nil
 }

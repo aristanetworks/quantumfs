@@ -1,24 +1,43 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package main
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
-func handleKeyCount() error {
-	if walkFlags.NArg() < 2 || walkFlags.NArg() > 3 {
-		fmt.Println("keycount sub-command args: wsname [dedupe]")
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func init() {
+	registerKeyCountCmd()
+	registerKeyDiffCountCmd()
+}
+
+func registerKeyCountCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "keycount"
+	cmd.Usage = "workspace [dedupe]"
+	cmd.Short = "shows total and unique keys and size within a workspace"
+	cmd.Details = `
+workspace
+	name of the workspace
+dedupe
+	prints dedupe information
+`
+	cmd.Run = handleKeyCount
+
+	cmdproc.RegisterCommand(cmd)
+}
+
+func handleKeyCount(args []string) error {
+	if len(args) != 1 && len(args) != 2 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
-	wsname := walkFlags.Arg(1)
+	wsname := args[0]
 	showDedupeInfo := false
-	if walkFlags.Arg(2) == "dedupe" {
+	if len(args) == 2 && args[1] == "dedupe" {
 		showDedupeInfo = true
 	}
 
@@ -26,7 +45,7 @@ func handleKeyCount() error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, keyCounter); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	fmt.Println("Unique Keys = ", tracker.uniqueKeys())
 	fmt.Println("Unique Size = ", qubitutils.HumanizeBytes(tracker.uniqueSize()))
@@ -36,19 +55,32 @@ func handleKeyCount() error {
 	return nil
 }
 
-func handleKeyDiffCount() error {
-	if walkFlags.NArg() < 3 || walkFlags.NArg() > 4 {
-		fmt.Println("keydiffcount sub-command args: wsname1 wsname2 [keys]")
-		fmt.Println()
-		walkFlags.Usage()
-		os.Exit(exitBadCmd)
+func registerKeyDiffCountCmd() {
+	var cmd cmdproc.CommandInfo
+	cmd.Name = "keydiffcount"
+	cmd.Usage = "workspace1 workspace2 [keys]"
+	cmd.Short = "compares two workspaces in terms of keycounts and optionally shows unique keys"
+	cmd.Details = `
+workspace1 workspace2
+	name of the workspaces
+keys
+	prints unique key information
+`
+	cmd.Run = handleKeyDiffCount
+
+	cmdproc.RegisterCommand(cmd)
+}
+
+func handleKeyDiffCount(args []string) error {
+	if len(args) != 2 && len(args) != 3 {
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
 
 	// Get RootIDs
-	wsname1 := walkFlags.Arg(1)
-	wsname2 := walkFlags.Arg(2)
+	wsname1 := args[0]
+	wsname2 := args[1]
 	showKeys := false
-	if walkFlags.Arg(3) == "keys" {
+	if len(args) == 3 && args[2] == "keys" {
 		showKeys = true
 	}
 
@@ -56,12 +88,12 @@ func handleKeyDiffCount() error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname1, co.progress,
 		showRootIDStatus, keyCounter1); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	tracker2, keyCounter2 := getTrackerHandler(showKeys, nil)
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname2,
 		co.progress, showRootIDStatus, keyCounter2); err != nil {
-		return err
+		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	fmt.Printf("UniqueKeys\t\tUniqueSize\n")
 	fmt.Printf("==========\t\t==========\n")
