@@ -70,3 +70,16 @@ func TestDualInstances(t *testing.T) {
 		test.CheckData(path, expectedData)
 	})
 }
+
+func TestWorkspacePubSubCallback(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		test.MakeFile(filename)
+		test.SyncAllWorkspaces()
+
+		test.WaitForLogString("Mux::handleWorkspaceChanges",
+			"Workspace pubsub callback to be called")
+	})
+}
