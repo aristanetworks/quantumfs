@@ -55,3 +55,31 @@ func TestUnknownInodeId(t *testing.T) {
 			"Expected ENOENT, got %s", err.Error())
 	})
 }
+
+func TestDualInstances(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		expectedData := test.MakeFile(filename)
+		test.SyncAllWorkspaces()
+
+		path := test.qfsInstances[1].config.MountPath + "/" +
+			test.RelPath(filename)
+
+		test.CheckData(path, expectedData)
+	})
+}
+
+func TestWorkspacePubSubCallback(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		test.MakeFile(filename)
+		test.SyncAllWorkspaces()
+
+		test.WaitForLogString("Mux::handleWorkspaceChanges",
+			"Workspace pubsub callback to be called")
+	})
+}

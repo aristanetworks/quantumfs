@@ -27,6 +27,12 @@ const defaultParseThreads = 30
 const defaultChunkSize = 4
 const clippedMsg = "Packet has been clipped."
 
+var clippedError error
+
+func init() {
+	clippedError = errors.New(clippedMsg)
+}
+
 type LogOutput struct {
 	Subsystem LogSubsystem
 	ReqId     uint64
@@ -640,7 +646,7 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 		idx++
 	}
 
-	return header.CircBuf.PastEndIdx,
+	return header.CircBuf.EndIndex(),
 		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
 }
 
@@ -692,7 +698,7 @@ func grabMemory(filepath string) []byte {
 
 func parseArg(idx *uint64, data []byte) (interface{}, error) {
 	if len(data[*idx:]) < 2 {
-		return nil, errors.New(clippedMsg)
+		return nil, clippedError
 	}
 	var byteType uint16
 	byteType = *(*uint16)(unsafe.Pointer(&data[*idx]))
@@ -777,7 +783,7 @@ func parseArg(idx *uint64, data []byte) (interface{}, error) {
 
 	if byteType == TypeString || byteType == TypeByteArray {
 		if len(data[*idx:]) < 2 {
-			return nil, errors.New(clippedMsg)
+			return nil, clippedError
 		}
 		var strLen uint16
 		strLen = *(*uint16)(unsafe.Pointer(&data[*idx]))
@@ -960,8 +966,12 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 		if err != nil {
 			// If the timestamp is zero, we will fill it in later with
 			// the previous log's timestamp
+			prefix := "ERROR"
+			if err == clippedError {
+				prefix = "WARN"
+			}
 			*out = newLog(LogQlog, QlogReqId, 0,
-				"ERROR: Packet read error (%s). i"+
+				prefix+": Packet read error (%s). "+
 					"Dump of %d bytes:\n%x\n",
 				[]interface{}{err, len(packetData),
 					packetData})

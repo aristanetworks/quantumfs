@@ -67,20 +67,20 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
 	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
 
-	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s/%s/%s", typespace,
-		namespace, workspace).Out()
+	workspaceName := typespace + "/" + namespace + "/" + workspace
+
+	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s", workspaceName).Out()
 
 	var wsr WorkspaceRoot
 
-	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx, typespace, namespace,
-		workspace)
+	rootId, nonce, err := c.workspaceDB.FetchAndSubscribeWorkspace(&c.Ctx,
+		typespace, namespace, workspace)
 	if err != nil {
 		utils.Assert(err == nil, "Failed to fetch workspace rootId: %s",
 			err.Error())
 	}
 
-	c.vlog("Workspace Loading %s/%s/%s %s",
-		typespace, namespace, workspace, rootId.String())
+	c.vlog("Workspace Loading %s %s", workspaceName, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
@@ -897,4 +897,11 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 	}
 
 	return directChildren
+}
+
+func (wsr *WorkspaceRoot) cleanup(c *ctx) {
+	workspaceName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
+	defer c.FuncIn("WorkspaceRoot::cleanup", "workspace %s", workspaceName).Out()
+
+	c.workspaceDB.UnsubscribeFrom(workspaceName)
 }
