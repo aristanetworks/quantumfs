@@ -200,6 +200,8 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	go qfs.flusher(stopFlushTimer, flushTimerStopped)
 	go qfs.adjustKernelKnobs()
 
+	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
+
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
@@ -212,6 +214,53 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 	qfs.c.dataStore.shutdown()
 
 	return nil
+}
+
+func (qfs *QuantumFs) handleWorkspaceChanges(
+	updates map[string]quantumfs.WorkspaceState) {
+
+	c := qfs.c.reqId(qlog.RefreshReqId, nil)
+
+	defer c.FuncIn("Mux::handleWorkspaceChanges", "%d updates",
+		len(updates)).Out()
+
+	for name, state := range updates {
+		go qfs.refreshWorkspace(c, name, state)
+	}
+}
+
+func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
+	state quantumfs.WorkspaceState) {
+
+	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
+		state.Nonce).Out()
+
+	// Due to BUG210141 this code is disabled.
+	return
+
+	parts := strings.Split(name, "/")
+	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	defer cleanup()
+
+	if !ok {
+		c.wlog("No workspace root for workspace %s", name)
+		return
+	}
+
+	if qfs.workspaceIsMutable(c, wsr) {
+		// TODO At this point the workpace should be locked, flushed/synced
+		// and finally have the newly produced local RootID merged with the
+		// remote incoming RootID.
+		c.elog("Refreshing mutable workspaces is not supported")
+		return
+	}
+
+	// TODO This should probably call wsr.refreshTo() and provide the new rootId
+	// instead of refetching from the workspaceDB. Also, calling a plain refresh
+	// here causes many tests to fail due to a divide by zero error in
+	// MultiBlockFile.blockIdxInfo().
+	//
+	// wsr.refresh(c)
 }
 
 func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
@@ -367,6 +416,8 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 	}
 }
 
+const skipForgetLog = "inode %d doesn't need to be forgotten"
+
 // Requires treeLock for read and the instantiationLock
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).Out()
@@ -375,7 +426,7 @@ func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
 		inodeNum == quantumfs.InodeIdApi {
 
-		c.dlog("inode %d doesn't need to be forgotten", inodeNum)
+		c.dlog(skipForgetLog, inodeNum)
 		// Nothing to do
 		return
 	}
@@ -626,6 +677,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	// If we don't have an instantiated Inode and cannot instantiate it, then we
 	// know nothing about that InodeId.
 	if !canBeInstantiated {
+		c.wlog("Instantiation request for inode we don't know about. %d", id)
 		return nil
 	}
 
@@ -954,6 +1006,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				qfs.removeUninstantiated(c, inodeChildren)
 			}
 		}()
+		inode.cleanup(c)
 
 		c.vlog("Set inode %d to nil", inodeNum)
 
