@@ -16,7 +16,6 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestHardlinkReload(t *testing.T) {
@@ -301,7 +300,7 @@ func TestHardlinkConversion(t *testing.T) {
 
 		wsr, cleanup := test.getWorkspaceRoot(workspace)
 		defer cleanup()
-		linkId := func() HardlinkId {
+		fileId := func() quantumfs.FileId {
 			defer wsr.linkLock.Lock().Unlock()
 			return wsr.inodeToLink[linkInode]
 		}()
@@ -329,7 +328,7 @@ func TestHardlinkConversion(t *testing.T) {
 		wsrB, cleanup := test.getWorkspaceRoot(workspace)
 		defer cleanup()
 		defer wsrB.linkLock.Lock().Unlock()
-		_, exists := wsrB.hardlinks[linkId]
+		_, exists := wsrB.hardlinks[fileId]
 		test.Assert(!exists, "hardlink not converted back to file")
 	})
 }
@@ -463,10 +462,10 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 	// Extract the internal ObjectKey from QuantumFS
 	inode := test.getInode(path)
 	// parent should be the workspace root.
-	isHardlink, linkId := wsr.checkHardlink(inode.inodeNum())
+	isHardlink, fileId := wsr.checkHardlink(inode.inodeNum())
 	test.Assert(isHardlink, "Expected hardlink isn't one.")
 
-	valid, record := wsr.getHardlink(linkId)
+	valid, record := wsr.getHardlink(fileId)
 	test.Assert(valid, "Unable to get hardlink from wsr")
 
 	// Verify the type and key matching
@@ -560,12 +559,6 @@ func TestHardlinkRename(t *testing.T) {
 				"file %s data not preserved", v)
 		}
 	})
-}
-
-func ManualLookup(c *ctx, parent Inode, childName string) {
-	var dummy fuse.EntryOut
-	defer parent.RLockTree().RUnlock()
-	parent.Lookup(c, childName, &dummy)
 }
 
 func TestHardlinkReparentRace(t *testing.T) {

@@ -207,12 +207,9 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 		if _, exists := touched[name]; !exists {
 			c.vlog("Removing deleted child %s", name)
 
-			if c.qfs.inodeNoInstantiate(c, id) == nil {
-				c.qfs.removeUninstantiated(c, []InodeId{id})
-			} else {
-				c.qfs.setInode(c, id, nil)
-			}
-
+			// Note: do not uninstantiate them now - remove them
+			// from their parents and let the kernel forget them
+			// naturally.
 			delete(*inodeMap, name)
 			delete(*nameMap, id)
 		}
@@ -994,13 +991,9 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 				c.vlog("Removing deleted child %s (%d)", name,
 					info.nonce)
 
-				if c.qfs.inodeNoInstantiate(c, info.id) == nil {
-					c.qfs.removeUninstantiated(c,
-						[]InodeId{info.id})
-				} else {
-					c.qfs.setInode(c, info.id, nil)
-				}
-
+				// Note: do not uninstantiate them now - remove them
+				// from their parents and let the kernel forget them
+				// naturally.
 				delete(wsl.workspacesByName, name)
 				delete(wsl.workspacesById, info.id)
 			}

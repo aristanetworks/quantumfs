@@ -21,6 +21,7 @@ import (
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestMain(m *testing.M) {
@@ -184,6 +185,9 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 		}
 
 		th.startQuantumFs(config)
+	}
+	if numDefaultQfs > 2 {
+		th.T.Fatalf("Too many QuantumFS instances requested")
 	}
 
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
@@ -759,4 +763,10 @@ func CreateHardlink(name string, content string) error {
 		return err
 	}
 	return syscall.Link(name, name+"_link")
+}
+
+func ManualLookup(c *ctx, parent Inode, childName string) {
+	var dummy fuse.EntryOut
+	defer parent.RLockTree().RUnlock()
+	parent.Lookup(c, childName, &dummy)
 }
