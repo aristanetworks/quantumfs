@@ -53,6 +53,11 @@ type WorkspaceDB interface {
 	Workspace(c *Ctx, typespace string, namespace string,
 		workspace string) (ObjectKey, WorkspaceNonce, error)
 
+	// Like Workspace(), but also atomically subscribes to updates for that
+	// workspace.
+	FetchAndSubscribeWorkspace(c *Ctx, typespace string, namespace string,
+		workspace string) (ObjectKey, WorkspaceNonce, error)
+
 	// These methods need to be atomic, but may retry internally
 	BranchWorkspace(c *Ctx, srcTypespace string, srcNamespace string,
 		srcWorkspace string, dstTypespace string, dstNamespace string,

@@ -216,3 +216,25 @@ func TestBooleanLogType(t *testing.T) {
 			"boolean log types incorrectly output: %s", testLogs)
 	})
 }
+
+func TestQlogWrapAround(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		test.ShouldFailLogscan = true
+
+		// Overflow the qlog file
+		for i := 0; i < 100000000; i++ {
+			test.Logger.Log(qlog.LogTest, qlog.TestReqId, 3,
+				"Filler %s", "12345678901234567890")
+		}
+
+		// At this point the qlog file should have wrapped around several
+		// times. When the test harness goes to parse it, it will panic if
+		// the offset isn't properly adjusted with respect to the file size
+		// with a "bounds out of range" failure in readBack().
+
+		// Processing all these logs takes too long. Instead return an error
+		// an expect this test to fail. This moves the log parsing outside of
+		// the timed portion of the test.
+		test.Log("ERROR: Test fill complete")
+	})
+}
