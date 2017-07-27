@@ -46,7 +46,7 @@ func logFuseWaiting(prefix string, th *TestHelper) {
 	for _, connection := range th.fuseConnections {
 		if connection == 0 {
 			// There is no connection to log
-			return
+			continue
 		}
 
 		buf := make([]byte, 100)
