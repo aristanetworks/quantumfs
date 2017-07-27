@@ -15,6 +15,8 @@ clean:
 	rm -f $(COMMANDS)
 
 fetch:
+	go get -u google.golang.org/grpc
+	go get -u github.com/golang/protobuf/protoc-gen-go
 	for cmd in $(COMMANDS); do \
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
