@@ -55,7 +55,7 @@ func NewReader(qlogFile string) *Reader {
 		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
 	}
 
-	rtn.lastPastEndIdx = header.CircBuf.PastEndIdx
+	rtn.lastPastEndIdx = header.CircBuf.EndIndex()
 	return &rtn
 }
 
@@ -130,7 +130,7 @@ func (read *Reader) DaemonVersion() string {
 func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 	if mode == ReadThenTail || mode == ReadOnly {
 		freshHeader := read.ReadHeader()
-		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.PastEndIdx)
+		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.EndIndex())
 
 		read.lastPastEndIdx = newIdx
 		for _, v := range newLogs {
@@ -146,9 +146,9 @@ func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 	// Run indefinitely
 	for {
 		freshHeader := read.ReadHeader()
-		if freshHeader.CircBuf.PastEndIdx != read.lastPastEndIdx {
+		if freshHeader.CircBuf.EndIndex() != read.lastPastEndIdx {
 			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
-				freshHeader.CircBuf.PastEndIdx)
+				freshHeader.CircBuf.EndIndex())
 
 			read.lastPastEndIdx = newPastEndIdx
 			for _, v := range newLogs {
@@ -199,7 +199,7 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 
 		// Read the header to see if the log end just passed us as we parsed
 		freshHeader := read.ReadHeader()
-		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.PastEndIdx,
+		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.EndIndex(),
 			read.circBufSize)
 
 		// Distance to the moving end of logs should be decreasing. The
