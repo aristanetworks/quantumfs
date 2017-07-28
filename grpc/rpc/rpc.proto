@@ -19,7 +19,7 @@ service WorkspaceDb {
 	rpc FetchWorkspace(WorkspaceName) returns (FetchWorkspaceResponse) {}
 
 	rpc BranchWorkspace(BranchWorkspaceRequest) returns (Response) {}
-	rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (Response) {}
+	rpc DeleteWorkspace(WorkspaceName) returns (Response) {}
 	rpc SetWorkspaceImmutable(WorkspaceName) returns (Response) {}
 	rpc AdvanceWorkspace(AdvanceWorkspaceRequest) returns (AdvanceWorkspaceResponse) {}
 }
@@ -52,7 +52,8 @@ message ObjectKey {
 }
 
 message WorkspaceName {
-	string name = 1;
+	RequestId requestId = 1;
+	string name = 2;
 }
 
 message Void {
@@ -104,14 +105,6 @@ message WorkspaceTableResponse {
 }
 
 // Subscriptions
-message SubscribeTo {
-	string workspaceName = 1;
-}
-
-message UnsubscribeFrom {
-	string workspaceName = 1;
-}
-
 message WorkspaceUpdate {
 	ObjectKey rootId = 1;
 	fixed64 nonce = 2;
@@ -124,28 +117,6 @@ message BranchWorkspaceRequest {
 	RequestId header = 1;
 	string source = 2; // Workspace name, ie. build/eos-trunk/latestPass
 	string destination = 3; // Workspace name
-}
-
-message BranchWorkspaceResponse {
-	Response header = 1;
-}
-
-message DeleteWorkspaceRequest {
-	RequestId header = 1;
-	string workspaceName = 2;
-}
-
-message DeleteWorkspaceResponse {
-	Response header = 1;
-}
-
-message SetWorkspaceImmutableRequest {
-	RequestId header = 1;
-	string workspaceName = 2;
-}
-
-message SetWorkspaceImmutableResponse {
-	Response header = 1;
 }
 
 // No WorkspaceIsImmutable, use FetchWorkspace instead.
