@@ -28,8 +28,8 @@ done
 
 # If read finished with a timeout error, READERR will be 142. EOF returns 1.
 if [[ ( $READERR -eq 142 ) && !( -z "$pid" ) ]]; then
-	echo "Make TIMED OUT... sending SIGKILL to $pid"
-	kill -9 $pid 2> /dev/null
+	echo "Make TIMED OUT... sending SIGQUIT to $pid"
+	kill -QUIT $pid
 fi
 
 # Prevent $rootContainer is accidentally set empty
