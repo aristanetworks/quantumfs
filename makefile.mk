@@ -3,7 +3,7 @@ PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
-PKGS_TO_TEST+=quantumfs/utils/excludespec
+PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
@@ -45,7 +45,7 @@ $(COMMANDS): encoding/metadata.capnp.go
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
-$(PKGS_TO_TEST): encoding/metadata.capnp.go
+$(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
 	sudo -E go test -gcflags '-e' github.com/aristanetworks/$@
 
 quploadRPM: $(COMMANDS)
