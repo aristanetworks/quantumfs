@@ -4,10 +4,10 @@
 package utils
 
 type AlternatingLocker struct {
-	slowSideLock	DeferableMutex
-	slowSideCounter	int
+	slowSideLock    DeferableMutex
+	slowSideCounter int
 
-	fastSideLock	DeferableRwMutex
+	fastSideLock DeferableRwMutex
 }
 
 // Acquire the slow side lock for reading and increment the counter
