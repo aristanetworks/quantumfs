@@ -9,3 +9,4 @@
 /QuantumFS*.rpm
 .*.swp
 .swp
+workspacedb_daemon/rpc/rpc.pb.go
