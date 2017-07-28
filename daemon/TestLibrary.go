@@ -104,9 +104,7 @@ func abortFuse(th *TestHelper) {
 func (th *TestHelper) EndTest() {
 	exception := recover()
 
-	if th.api != nil {
-		th.api.Close()
-	}
+	th.putApi()
 
 	for _, qfs := range th.qfsInstances {
 		if qfs != nil && qfs.server != nil {
@@ -254,7 +252,8 @@ func (th *TestHelper) waitForQuantumFsToFinish() {
 
 func (th *TestHelper) RestartQuantumFs() error {
 	config := th.qfsInstances[0].config
-	th.api.Close()
+
+	th.putApi()
 
 	for _, qfs := range th.qfsInstances {
 		err := qfs.server.Unmount()
@@ -286,12 +285,6 @@ func (th *TestHelper) putApi() {
 		th.api.Close()
 	}
 	th.api = nil
-}
-
-func (th *TestHelper) getUniqueApi(fdPath string) quantumfs.Api {
-	api, err := quantumfs.NewApiWithPath(fdPath)
-	th.Assert(err == nil, "Error getting unique api: %v", err)
-	return api
 }
 
 // Make the given path absolute to the mount root
