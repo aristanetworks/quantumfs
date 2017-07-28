@@ -22,7 +22,7 @@ type workspaceInfo struct {
 type workspaceMap map[string]map[string]map[string]*workspaceInfo
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
-	wsdb := &workspaceDB{
+	wsdb := &WorkspaceDB{
 		cache:         make(workspaceMap),
 		cacheMutex:    new(utils.DeferableRwMutex),
 		callback:      nil,
@@ -66,8 +66,8 @@ func insertMap_(cache workspaceMap, typespace string,
 
 }
 
-// workspaceDB is a process local quantumfs.WorkspaceDB
-type workspaceDB struct {
+// WorkspaceDB is a process local quantumfs.WorkspaceDB
+type WorkspaceDB struct {
 	cacheMutex *utils.DeferableRwMutex
 	cache      workspaceMap
 
@@ -75,10 +75,10 @@ type workspaceDB struct {
 	updates       map[string]quantumfs.WorkspaceState
 	subscriptions map[string]bool
 
-	peer *workspaceDB
+	peer *WorkspaceDB
 }
 
-func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
+func (wsdb *WorkspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::NumTypespaces").Out()
 
@@ -88,7 +88,7 @@ func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	return num, nil
 }
 
-func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
+func (wsdb *WorkspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::TypespaceList").Out()
 
 	defer wsdb.cacheMutex.RLock().RUnlock()
@@ -101,7 +101,7 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	return typespaces, nil
 }
 
-func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
+func (wsdb *WorkspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "processlocal::NumNamespaces").Out()
@@ -115,7 +115,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	return len(namespaces), nil
 }
 
-func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
+func (wsdb *WorkspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -136,7 +136,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	return namespaceList, nil
 }
 
-func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -153,7 +153,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 
 // Assume WorkspaceExists run prior to this function everytime when it is called
 // Otherwise, it probably tries to fetch non-existing key-value pairs
-func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -175,7 +175,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 }
 
 // Must hold cacheMutex for read
-func (wsdb *workspaceDB) typespace_(c *quantumfs.Ctx,
+func (wsdb *WorkspaceDB) typespace_(c *quantumfs.Ctx,
 	typespace string) (map[string]map[string]*workspaceInfo, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -191,7 +191,7 @@ func (wsdb *workspaceDB) typespace_(c *quantumfs.Ctx,
 }
 
 // Must hold cacheMutex for read
-func (wsdb *workspaceDB) namespace_(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) namespace_(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]*workspaceInfo, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -211,7 +211,7 @@ func (wsdb *workspaceDB) namespace_(c *quantumfs.Ctx, typespace string,
 }
 
 // Must hold cacheMutex for read
-func (wsdb *workspaceDB) workspace_(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) workspace_(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (*workspaceInfo, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
@@ -231,7 +231,7 @@ func (wsdb *workspaceDB) workspace_(c *quantumfs.Ctx, typespace string,
 	return info, nil
 }
 
-func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
+func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
@@ -299,7 +299,7 @@ func deleteWorkspaceRecord_(c *quantumfs.Ctx, cache workspaceMap,
 	return nil
 }
 
-func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, "processlocal::DeleteWorkspace %s/%s/%s",
@@ -314,7 +314,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	return err
 }
 
-func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey,
 	quantumfs.WorkspaceNonce, error) {
 
@@ -329,7 +329,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	return info.key, info.nonce, nil
 }
 
-func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
+func (wsdb *WorkspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (
 	quantumfs.ObjectKey, quantumfs.WorkspaceNonce, error) {
 
@@ -341,7 +341,7 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 	return wsdb.Workspace(c, typespace, namespace, workspace)
 }
 
-func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
@@ -381,7 +381,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	return newRootId, nil
 }
 
-func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
 	defer wsdb.cacheMutex.RLock().RUnlock()
@@ -393,7 +393,7 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 	return info.immutable, nil
 }
 
-func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	defer wsdb.cacheMutex.Lock().Unlock()
@@ -409,25 +409,25 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 	return nil
 }
 
-func (wsdb *workspaceDB) SetCallback(callback quantumfs.SubscriptionCallback) {
+func (wsdb *WorkspaceDB) SetCallback(callback quantumfs.SubscriptionCallback) {
 	defer wsdb.cacheMutex.Lock().Unlock()
 	wsdb.callback = callback
 }
 
-func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
+func (wsdb *WorkspaceDB) SubscribeTo(workspaceName string) error {
 	defer wsdb.cacheMutex.Lock().Unlock()
 	wsdb.subscriptions[workspaceName] = true
 
 	return nil
 }
 
-func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
+func (wsdb *WorkspaceDB) UnsubscribeFrom(workspaceName string) {
 	defer wsdb.cacheMutex.Lock().Unlock()
 	delete(wsdb.subscriptions, workspaceName)
 }
 
 // Must hold cacheMutex
-func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
+func (wsdb *WorkspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, recurse bool) {
 
 	c.FuncIn(qlog.LogWorkspaceDb, "processlocal::notifySubscribers_",
@@ -499,7 +499,7 @@ func (wsdb *workspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 // Send all notifications to the registered callback. This should be run in its own
 // goroutine as it will repeatedly run the callback on any notifications which arrive
 // while the callback is processing the previous set of updates.
-func (wsdb *workspaceDB) sendNotifications(c *quantumfs.Ctx) {
+func (wsdb *WorkspaceDB) sendNotifications(c *quantumfs.Ctx) {
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::sendNotifications").Out()
 
@@ -564,8 +564,8 @@ func safelyCall(c *quantumfs.Ctx, callback quantumfs.SubscriptionCallback,
 	callback(updates)
 }
 
-func (wsdb *workspaceDB) getSecondHead() *workspaceDB {
-	wsdb2 := NewWorkspaceDB("").(*workspaceDB)
+func (wsdb *WorkspaceDB) GetSecondHead() *WorkspaceDB {
+	wsdb2 := NewWorkspaceDB("").(*WorkspaceDB)
 	wsdb2.cache = wsdb.cache
 	wsdb2.cacheMutex = wsdb.cacheMutex
 	wsdb2.peer = wsdb
