@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/hanwen/go-fuse/fuse"
@@ -96,13 +97,13 @@ func TestPanicFilesystemAbort(t *testing.T) {
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, true, nil, true)
+	runTestCommon(t, test, 1, nil, true)
 }
 
 // If you need to initialize the QuantumFS instance in some special way,
 // then use this variant.
 func runTestNoQfs(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, false, nil, true)
+	runTestCommon(t, test, 0, nil, true)
 }
 
 // configModifier is a function which is given the default configuration
@@ -114,7 +115,7 @@ type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
 func runTestCustomConfig(t *testing.T, configModifier configModifierFunc,
 	test quantumFsTest) {
 
-	runTestCommon(t, test, true, configModifier, true)
+	runTestCommon(t, test, 1, configModifier, true)
 }
 
 // If you need to initialize the QuantumFS instance in some special way and the test
@@ -134,10 +135,10 @@ func runDualQuantumFsTest(t *testing.T, test quantumFsTest) {
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
 func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, true, nil, false)
+	runTestCommon(t, test, 1, nil, false)
 }
 
-func runTestCommon(t *testing.T, test quantumFsTest, startDefaultQfs bool,
+func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	configModifier configModifierFunc, parallel bool) {
 
 	// the stack depth of test name for all callers of runTestCommon
