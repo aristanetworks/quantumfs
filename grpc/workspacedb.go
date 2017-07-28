@@ -65,10 +65,7 @@ func (wsdb *workspaceDB) reconnect() {
 	wsdb.server = rpc.NewWorkspaceDbClient(conn)
 }
 
-func (wsdb *workspaceDB) handleGrpcError(c *quantumfs.Ctx, err error) error {
-	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::handleGrpcError", "err: %s",
-		err.Error()).Out()
-
+func (wsdb *workspaceDB) handleGrpcError(err error) error {
 	// TODO Reconnect
 	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 		"gRPC failed: %s", err.Error())
@@ -86,7 +83,7 @@ func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 
 	response, err := wsdb.server.NumTypespaces(context.TODO(), &request)
 	if err != nil {
-		return 0, wsdb.handleGrpcError(c, err)
+		return 0, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
@@ -103,7 +100,7 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 
 	response, err := wsdb.server.TypespaceTable(context.TODO(), &request)
 	if err != nil {
-		return []string{}, wsdb.handleGrpcError(c, err)
+		return []string{}, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
@@ -125,7 +122,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 
 	response, err := wsdb.server.NumNamespaces(context.TODO(), &request)
 	if err != nil {
-		return 0, wsdb.handleGrpcError(c, err)
+		return 0, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
@@ -147,7 +144,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 
 	response, err := wsdb.server.NamespaceTable(context.TODO(), &request)
 	if err != nil {
-		return []string{}, wsdb.handleGrpcError(c, err)
+		return []string{}, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
@@ -170,7 +167,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.NumWorkspaces(context.TODO(), &request)
 	if err != nil {
-		return 0, wsdb.handleGrpcError(c, err)
+		return 0, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
@@ -195,7 +192,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.WorkspaceTable(context.TODO(), &request)
 	if err != nil {
-		return workspaces, wsdb.handleGrpcError(c, err)
+		return workspaces, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
@@ -223,7 +220,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	response, err := wsdb.server.BranchWorkspace(context.TODO(), &request)
 	if err != nil {
-		return wsdb.handleGrpcError(c, err)
+		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
@@ -245,7 +242,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.DeleteWorkspace(context.TODO(), &request)
 	if err != nil {
-		return wsdb.handleGrpcError(c, err)
+		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
@@ -306,7 +303,7 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 
 	response, err := wsdb.server.SetWorkspaceImmutable(context.TODO(), &request)
 	if err != nil {
-		return wsdb.handleGrpcError(c, err)
+		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
@@ -332,7 +329,7 @@ func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
 
 	response, err := wsdb.server.SubscribeTo(context.TODO(), &request)
 	if err != nil {
-		return wsdb.handleGrpcError(c, err)
+		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
@@ -353,7 +350,7 @@ func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
 
 	response, err := wsdb.server.UnsubscribeFrom(context.TODO(), &request)
 	if err != nil {
-		wsdb.handleGrpcError(c, err)
+		wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
