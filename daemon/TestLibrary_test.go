@@ -21,6 +21,7 @@ import (
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -141,6 +142,10 @@ func runExpensiveTest(t *testing.T, test quantumFsTest) {
 func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	configModifier configModifierFunc, parallel bool) {
 
+	if parallel {
+		t.Parallel()
+	}
+
 	// the stack depth of test name for all callers of runTestCommon
 	// is 2. Since the stack looks as follows:
 	// 2 <testname>
@@ -155,6 +160,24 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	}
 	th.CreateTestDirs()
 	defer th.EndTest()
+
+	var alt utils.AlternatingLocker
+	func () {
+		if parallel {
+			alt.SlowLock()
+			defer alt.SlowUnlock()
+		}
+		startQuantumFsInstances(numDefaultQfs, configModifier, th)
+	} ()
+
+	if parallel {
+		defer alt.FastLock().RUnlock()
+	}
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+}
+
+func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFunc,
+	th *testHelper) {
 
 	// Allow tests to run for up to 1 seconds before considering them timed out.
 	// If we are going to start a standard QuantumFS instance we can start the
@@ -186,11 +209,6 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	if numDefaultQfs > 2 {
 		th.T.Fatalf("Too many QuantumFS instances requested")
 	}
-
-	if parallel && false {
-		t.Parallel()
-	}
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
 type quantumFsTest func(test *testHelper)
