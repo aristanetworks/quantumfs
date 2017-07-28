@@ -69,7 +69,7 @@ func TestSyncFileOverwrite(t *testing.T) {
 		}
 		test.Assert(totalWritten == len(data), "Written mismatch")
 
-		test.api.Close()
+		test.putApi()
 		err := test.qfs.server.Unmount()
 		test.Assert(err == nil, "Failed to unmount during test")
 
@@ -122,7 +122,7 @@ func TestSyncToDatastore(t *testing.T) {
 
 		// Now end quantumfs A, and start B with the same datastore so we
 		// can verify that the data was preserved via the datastore
-		test.api.Close()
+		test.putApi()
 		err := test.qfs.server.Unmount()
 		test.Assert(err == nil, "Failed to unmount during test")
 		test.waitForQuantumFsToFinish()
