@@ -71,7 +71,7 @@ func (wsdb *workspaceDB) handleGrpcError(err error) error {
 		"gRPC failed: %s", err.Error())
 }
 
-func (wsdb *workspaceDB) convertErr(c *quantumfs.Ctx, response rpc.Response) error {
+func (wsdb *workspaceDB) convertErr(response rpc.Response) error {
 	return quantumfs.NewWorkspaceDbErr(quantumfs.WsdbErrCode(response.Err),
 		response.ErrCause)
 }
@@ -87,7 +87,7 @@ func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	}
 
 	if response.Header.Err != 0 {
-		return 0, wsdb.convertErr(c, *response.Header)
+		return 0, wsdb.convertErr(*response.Header)
 	}
 
 	return int(response.NumTypespaces), nil
@@ -104,7 +104,7 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	}
 
 	if response.Header.Err != 0 {
-		return []string{}, wsdb.convertErr(c, *response.Header)
+		return []string{}, wsdb.convertErr(*response.Header)
 	}
 
 	return response.Typespaces, nil
@@ -126,7 +126,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	}
 
 	if response.Header.Err != 0 {
-		return 0, wsdb.convertErr(c, *response.Header)
+		return 0, wsdb.convertErr(*response.Header)
 	}
 
 	return int(response.NumNamespaces), nil
@@ -148,7 +148,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	}
 
 	if response.Header.Err != 0 {
-		return []string{}, wsdb.convertErr(c, *response.Header)
+		return []string{}, wsdb.convertErr(*response.Header)
 	}
 
 	return response.Namespaces, nil
@@ -171,7 +171,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	}
 
 	if response.Header.Err != 0 {
-		return 0, wsdb.convertErr(c, *response.Header)
+		return 0, wsdb.convertErr(*response.Header)
 	}
 
 	return int(response.NumWorkspaces), nil
@@ -196,7 +196,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	}
 
 	if response.Header.Err != 0 {
-		return workspaces, wsdb.convertErr(c, *response.Header)
+		return workspaces, wsdb.convertErr(*response.Header)
 	}
 
 	for name, nonce := range response.Workspaces {
@@ -224,7 +224,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	}
 
 	if response.Err != 0 {
-		return wsdb.convertErr(c, *response)
+		return wsdb.convertErr(*response)
 	}
 
 	return nil
@@ -246,7 +246,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	}
 
 	if response.Err != 0 {
-		return wsdb.convertErr(c, *response)
+		return wsdb.convertErr(*response)
 	}
 
 	return nil
@@ -307,7 +307,7 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 	}
 
 	if response.Err != 0 {
-		return wsdb.convertErr(c, *response)
+		return wsdb.convertErr(*response)
 	}
 
 	return nil
@@ -333,7 +333,7 @@ func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
 	}
 
 	if response.Err != 0 {
-		return wsdb.convertErr(c, *response)
+		return wsdb.convertErr(*response)
 	}
 
 	return nil
@@ -354,7 +354,7 @@ func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
 	}
 
 	if response.Err != 0 {
-		err := wsdb.convertErr(c, *response)
+		err := wsdb.convertErr(*response)
 		panic(fmt.Sprintf("Unexpected error from server: %s", err.Error()))
 	}
 }
