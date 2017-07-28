@@ -3,11 +3,32 @@
 
 syntax = "proto3";
 
+// This is essentially a thin wrapper around quantumfs.WorkspaceDB
+service WorkspaceDb {
+	rpc NumTypespaces(RequestId) returns (NumTypespacesResponse) {}
+	rpc TypespaceTable(RequestId) returns (TypespaceTableResponse) {}
+	rpc NumNamespaces(NumNamespacesRequest) returns (NumNamespacesResponse) {}
+	rpc NamespaceTable(NamespaceTableRequest) returns (NamespaceTableResponse) {}
+	rpc NumWorkspaces(NumWorkspacesRequest) returns (NumWorkspacesResponse) {}
+	rpc WorkspaceTable(WorkspaceTableRequest) returns (WorkspaceTableResponse) {}
+
+	rpc SubscribeTo(WorkspaceName) returns (Response) {}
+	rpc UnsubscribeFrom(WorkspaceName) returns (Response) {}
+	rpc ListenForUpdates(Void) returns (stream WorkspaceUpdate) {}
+
+	rpc FetchWorkspace(WorkspaceName) returns (FetchWorkspaceResponse) {}
+
+	rpc BranchWorkspace(BranchWorkspaceRequest) returns (Response) {}
+	rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (Response) {}
+	rpc SetWorkspaceImmutable(WorkspaceName) returns (Response) {}
+	rpc AdvanceWorkspace(AdvanceWorkspaceRequest) returns (AdvanceWorkspaceResponse) {}
+}
+
 message RequestId {
 	int64 id = 1;
 }
 
-message RequestHeader {
+message Request {
 	RequestId requestId = 1;
 }
 
@@ -20,7 +41,7 @@ enum ResponseCodes {
 	OUT_OF_DATE = 5;
 }
 
-message ResponseHeader {
+message Response {
 	RequestId requestId = 1;
 	ResponseCodes err = 2;
 }
@@ -29,66 +50,66 @@ message ObjectKey {
 	bytes data = 1;
 }
 
-// Query Typespaces
-message NumTypespacesRequest {
-	RequestHeader header = 1;
+message WorkspaceName {
+	string name = 1;
 }
 
+message Void {
+	bool dummy = 1;
+}
+
+// Query Typespaces
 message NumTypespacesResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	int64 numTypespaces = 2;
 }
 
-message TypespaceTableRequest {
-	RequestHeader header = 1;
-}
-
 message TypespaceTableResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	repeated string typespaces = 2;
 }
 
 // Query Namespaces
 message NumNamespacesRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string typespace = 2;
 }
 
 message NumNamespacesResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	int64 numNamespaces = 2;
 }
 
 message NamespaceTableRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string typespace = 2;
 }
 
 message NamespaceTableResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	repeated string namespaces = 2;
 }
 
 // Query Workspaces
 message NumWorkspacesRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string typespace = 2;
 	string namespace = 3;
 }
 
 message NumWorkspacesResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	int64 numWorkspaces = 2;
 }
 
 message WorkspaceTableRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string typespace = 2;
 	string namespace = 3;
 }
 
 message WorkspaceTableResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	repeated string workspaces = 2;
 }
 
@@ -110,37 +131,37 @@ message WorkspaceUpdate {
 
 // Work with Workspaces
 message BranchWorkspaceRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string source = 2; // Workspace name, ie. build/eos-trunk/latestPass
 	string destination = 3; // Workspace name
 }
 
 message BranchWorkspaceResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 }
 
 message DeleteWorkspaceRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string workspaceName = 2;
 }
 
 message DeleteWorkspaceResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 }
 
 message SetWorkspaceImmutableRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string workspaceName = 2;
 }
 
 message SetWorkspaceImmutableResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 }
 
 // No WorkspaceIsImmutable, use FetchWorkspace instead.
 
 message AdvanceWorkspaceRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string workspaceName = 2;
 	fixed64 nonce = 3;
 	ObjectKey currentRootId = 4;
@@ -148,17 +169,17 @@ message AdvanceWorkspaceRequest {
 }
 
 message AdvanceWorkspaceResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	ObjectKey newKey = 2;
 }
 
 message FetchWorkspaceRequest {
-	RequestHeader header = 1;
+	Request header = 1;
 	string workspaceName = 2;
 }
 
 message FetchWorkspaceResponse {
-	ResponseHeader header = 1;
+	Response header = 1;
 	ObjectKey key = 2;
 	fixed64 nonce = 3;
 	bool immutable = 4;
