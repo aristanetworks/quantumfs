@@ -7,10 +7,10 @@ syntax = "proto3";
 service WorkspaceDb {
 	rpc NumTypespaces(RequestId) returns (NumTypespacesResponse) {}
 	rpc TypespaceTable(RequestId) returns (TypespaceTableResponse) {}
-	rpc NumNamespaces(NumNamespacesRequest) returns (NumNamespacesResponse) {}
-	rpc NamespaceTable(NamespaceTableRequest) returns (NamespaceTableResponse) {}
-	rpc NumWorkspaces(NumWorkspacesRequest) returns (NumWorkspacesResponse) {}
-	rpc WorkspaceTable(WorkspaceTableRequest) returns (WorkspaceTableResponse) {}
+	rpc NumNamespaces(NamespaceRequest) returns (NumNamespacesResponse) {}
+	rpc NamespaceTable(NamespaceRequest) returns (NamespaceTableResponse) {}
+	rpc NumWorkspaces(WorkspaceRequest) returns (NumWorkspacesResponse) {}
+	rpc WorkspaceTable(WorkspaceRequest) returns (WorkspaceTableResponse) {}
 
 	rpc SubscribeTo(WorkspaceName) returns (Response) {}
 	rpc UnsubscribeFrom(WorkspaceName) returns (Response) {}
@@ -24,12 +24,12 @@ service WorkspaceDb {
 	rpc AdvanceWorkspace(AdvanceWorkspaceRequest) returns (AdvanceWorkspaceResponse) {}
 }
 
-message RequestId {
-	uint64 id = 1;
+message WorkspaceNonce {
+	fixed64 nonce = 1;
 }
 
-message Request {
-	RequestId requestId = 1;
+message RequestId {
+	uint64 id = 1;
 }
 
 enum ResponseCodes {
@@ -71,8 +71,8 @@ message TypespaceTableResponse {
 }
 
 // Query Namespaces
-message NumNamespacesRequest {
-	Request header = 1;
+message NamespaceRequest {
+	RequestId header = 1;
 	string typespace = 2;
 }
 
@@ -81,19 +81,14 @@ message NumNamespacesResponse {
 	int64 numNamespaces = 2;
 }
 
-message NamespaceTableRequest {
-	Request header = 1;
-	string typespace = 2;
-}
-
 message NamespaceTableResponse {
 	Response header = 1;
 	repeated string namespaces = 2;
 }
 
 // Query Workspaces
-message NumWorkspacesRequest {
-	Request header = 1;
+message WorkspaceRequest {
+	RequestId header = 1;
 	string typespace = 2;
 	string namespace = 3;
 }
@@ -103,15 +98,9 @@ message NumWorkspacesResponse {
 	int64 numWorkspaces = 2;
 }
 
-message WorkspaceTableRequest {
-	Request header = 1;
-	string typespace = 2;
-	string namespace = 3;
-}
-
 message WorkspaceTableResponse {
 	Response header = 1;
-	repeated string workspaces = 2;
+	map<string, WorkspaceNonce> workspaces = 2;
 }
 
 // Subscriptions
@@ -132,7 +121,7 @@ message WorkspaceUpdate {
 
 // Work with Workspaces
 message BranchWorkspaceRequest {
-	Request header = 1;
+	RequestId header = 1;
 	string source = 2; // Workspace name, ie. build/eos-trunk/latestPass
 	string destination = 3; // Workspace name
 }
@@ -142,7 +131,7 @@ message BranchWorkspaceResponse {
 }
 
 message DeleteWorkspaceRequest {
-	Request header = 1;
+	RequestId header = 1;
 	string workspaceName = 2;
 }
 
@@ -151,7 +140,7 @@ message DeleteWorkspaceResponse {
 }
 
 message SetWorkspaceImmutableRequest {
-	Request header = 1;
+	RequestId header = 1;
 	string workspaceName = 2;
 }
 
@@ -162,7 +151,7 @@ message SetWorkspaceImmutableResponse {
 // No WorkspaceIsImmutable, use FetchWorkspace instead.
 
 message AdvanceWorkspaceRequest {
-	Request header = 1;
+	RequestId header = 1;
 	string workspaceName = 2;
 	fixed64 nonce = 3;
 	ObjectKey currentRootId = 4;
@@ -175,13 +164,13 @@ message AdvanceWorkspaceResponse {
 }
 
 message FetchWorkspaceRequest {
-	Request header = 1;
+	RequestId header = 1;
 	string workspaceName = 2;
 }
 
 message FetchWorkspaceResponse {
 	Response header = 1;
 	ObjectKey key = 2;
-	fixed64 nonce = 3;
+	WorkspaceNonce nonce = 3;
 	bool immutable = 4;
 }
