@@ -12,6 +12,8 @@ import (
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 
+	"golang.org/x/net/context"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -63,20 +65,52 @@ func (wsdb *workspaceDB) reconnect() {
 	wsdb.server = rpc.NewWorkspaceDbClient(conn)
 }
 
-func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
-	var num int
+func (wsdb *workspaceDB) handleGrpcError(c *quantumfs.Ctx, err error) error {
+	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::handleGrpcError", "err: %s",
+		err.Error()).Out()
 
+	// TODO Reconnect
+	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
+		"gRPC failed: %s", err.Error())
+}
+
+func (wsdb *workspaceDB) convertErr(c *quantumfs.Ctx, response rpc.Response) error {
+	return quantumfs.NewWorkspaceDbErr(quantumfs.WsdbErrCode(response.Err),
+		response.ErrCause)
+}
+
+func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumTypespaces").Out()
 
-	return num, nil
+	request := rpc.RequestId{Id: c.RequestId}
+
+	response, err := wsdb.server.NumTypespaces(context.TODO(), &request)
+	if err != nil {
+		return 0, wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Header.Err != 0 {
+		return 0, wsdb.convertErr(c, *response.Header)
+	}
+
+	return int(response.NumTypespaces), nil
 }
 
 func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
-	typespaceList := make([]string, 0, 100)
-
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::TypespaceList").Out()
 
-	return typespaceList, nil
+	request := rpc.RequestId{Id: c.RequestId}
+
+	response, err := wsdb.server.TypespaceTable(context.TODO(), &request)
+	if err != nil {
+		return []string{}, wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Header.Err != 0 {
+		return []string{}, wsdb.convertErr(c, *response.Header)
+	}
+
+	return response.Typespaces, nil
 }
 
 func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
@@ -84,9 +118,21 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumNamespaces").Out()
 
-	var num int
+	request := rpc.NamespaceRequest{
+		Header:    &rpc.RequestId{Id: c.RequestId},
+		Typespace: typespace,
+	}
 
-	return num, nil
+	response, err := wsdb.server.NumNamespaces(context.TODO(), &request)
+	if err != nil {
+		return 0, wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Header.Err != 0 {
+		return 0, wsdb.convertErr(c, *response.Header)
+	}
+
+	return int(response.NumNamespaces), nil
 }
 
 func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
@@ -94,9 +140,21 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NamespaceList").Out()
 
-	namespaceList := make([]string, 0, 100)
+	request := rpc.NamespaceRequest{
+		Header:    &rpc.RequestId{Id: c.RequestId},
+		Typespace: typespace,
+	}
 
-	return namespaceList, nil
+	response, err := wsdb.server.NamespaceTable(context.TODO(), &request)
+	if err != nil {
+		return []string{}, wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Header.Err != 0 {
+		return []string{}, wsdb.convertErr(c, *response.Header)
+	}
+
+	return response.Namespaces, nil
 }
 
 func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
@@ -104,9 +162,22 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumWorkspaces").Out()
 
-	var num int
+	request := rpc.WorkspaceRequest{
+		Header:    &rpc.RequestId{Id: c.RequestId},
+		Typespace: typespace,
+		Namespace: namespace,
+	}
 
-	return num, nil
+	response, err := wsdb.server.NumWorkspaces(context.TODO(), &request)
+	if err != nil {
+		return 0, wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Header.Err != 0 {
+		return 0, wsdb.convertErr(c, *response.Header)
+	}
+
+	return int(response.NumWorkspaces), nil
 }
 
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
@@ -114,9 +185,28 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::WorkspaceList").Out()
 
-	workspaceList := make(map[string]quantumfs.WorkspaceNonce, 100)
+	request := rpc.WorkspaceRequest{
+		Header:    &rpc.RequestId{Id: c.RequestId},
+		Typespace: typespace,
+		Namespace: namespace,
+	}
 
-	return workspaceList, nil
+	workspaces := map[string]quantumfs.WorkspaceNonce{}
+
+	response, err := wsdb.server.WorkspaceTable(context.TODO(), &request)
+	if err != nil {
+		return workspaces, wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Header.Err != 0 {
+		return workspaces, wsdb.convertErr(c, *response.Header)
+	}
+
+	for name, nonce := range response.Workspaces {
+		workspaces[name] = quantumfs.WorkspaceNonce(nonce.Nonce)
+	}
+
+	return workspaces, nil
 }
 
 func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
@@ -125,6 +215,21 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::BranchWorkspace").Out()
 
+	request := rpc.BranchWorkspaceRequest{
+		Header:      &rpc.RequestId{Id: c.RequestId},
+		Source:      srcTypespace + "/" + srcNamespace + "/" + srcWorkspace,
+		Destination: dstTypespace + "/" + dstNamespace + "/" + dstWorkspace,
+	}
+
+	response, err := wsdb.server.BranchWorkspace(context.TODO(), &request)
+	if err != nil {
+		return wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Err != 0 {
+		return wsdb.convertErr(c, *response)
+	}
+
 	return nil
 }
 
@@ -132,6 +237,20 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::DeleteWorkspace").Out()
+
+	request := rpc.WorkspaceName{
+		RequestId: &rpc.RequestId{Id: c.RequestId},
+		Name:      typespace + "/" + namespace + "/" + workspace,
+	}
+
+	response, err := wsdb.server.DeleteWorkspace(context.TODO(), &request)
+	if err != nil {
+		return wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Err != 0 {
+		return wsdb.convertErr(c, *response)
+	}
 
 	return nil
 }
@@ -180,6 +299,20 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
+	request := rpc.WorkspaceName{
+		RequestId: &rpc.RequestId{Id: c.RequestId},
+		Name:      typespace + "/" + namespace + "/" + workspace,
+	}
+
+	response, err := wsdb.server.SetWorkspaceImmutable(context.TODO(), &request)
+	if err != nil {
+		return wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Err != 0 {
+		return wsdb.convertErr(c, *response)
+	}
+
 	return nil
 }
 
@@ -192,10 +325,39 @@ func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
 	defer wsdb.lock.Lock().Unlock()
 	wsdb.subscriptions[workspaceName] = true
 
+	request := rpc.WorkspaceName{
+		RequestId: &rpc.RequestId{Id: 0},
+		Name:      workspaceName,
+	}
+
+	response, err := wsdb.server.SubscribeTo(context.TODO(), &request)
+	if err != nil {
+		return wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Err != 0 {
+		return wsdb.convertErr(c, *response)
+	}
+
 	return nil
 }
 
 func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
 	defer wsdb.lock.Lock().Unlock()
 	delete(wsdb.subscriptions, workspaceName)
+
+	request := rpc.WorkspaceName{
+		RequestId: &rpc.RequestId{Id: 0},
+		Name:      workspaceName,
+	}
+
+	response, err := wsdb.server.UnsubscribeFrom(context.TODO(), &request)
+	if err != nil {
+		wsdb.handleGrpcError(c, err)
+	}
+
+	if response.Err != 0 {
+		err := wsdb.convertErr(c, *response)
+		panic(fmt.Sprintf("Unexpected error from server: %s", err.Error()))
+	}
 }
