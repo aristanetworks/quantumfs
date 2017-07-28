@@ -4,9 +4,16 @@
 package grpc
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/grpc/rpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 // The gRPC WorkspaceDB backend is a networked stub which communicates with an RPC
@@ -16,14 +23,44 @@ import (
 // processed.
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
-	wsdb := &workspaceDB{}
+	wsdb := &workspaceDB{
+		config:        conf,
+		subscriptions: map[string]bool{},
+	}
+
+	wsdb.reconnect()
+
 	return wsdb
 }
 
 type workspaceDB struct {
+	config        string
 	lock          utils.DeferableMutex
+	server        rpc.WorkspaceDbClient
 	callback      quantumfs.SubscriptionCallback
 	subscriptions map[string]bool
+}
+
+func (wsdb *workspaceDB) reconnect() {
+	connOptions := []grpc.DialOption{
+		grpc.WithInsecure(),
+		grpc.WithBackoffMaxDelay(100 * time.Millisecond),
+		grpc.WithBlock(),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                5 * time.Second,
+			Timeout:             1 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	}
+
+	var conn *grpc.ClientConn
+
+	err := fmt.Errorf("Not an error")
+	for err != nil {
+		conn, err = grpc.Dial(wsdb.config, connOptions...)
+	}
+
+	wsdb.server = rpc.NewWorkspaceDbClient(conn)
 }
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
