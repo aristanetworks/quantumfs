@@ -44,6 +44,7 @@ enum ResponseCodes {
 message Response {
 	RequestId requestId = 1;
 	ResponseCodes err = 2;
+	string errCause = 3;
 }
 
 message ObjectKey {
