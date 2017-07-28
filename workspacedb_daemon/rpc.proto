@@ -1,0 +1,165 @@
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
+// Arista Networks, Inc. Confidential and Proprietary.
+
+syntax = "proto3";
+
+message RequestId {
+	int64 id = 1;
+}
+
+message RequestHeader {
+	RequestId requestId = 1;
+}
+
+enum ResponseCodes {
+	SUCCESS = 0;
+	WORKSPACE_NOT_FOUND = 1;
+	WORKSPACE_EXISTS = 2;
+	FATAL_DB_ERROR = 3;
+	LOCKED = 4;
+	OUT_OF_DATE = 5;
+}
+
+message ResponseHeader {
+	RequestId requestId = 1;
+	ResponseCodes err = 2;
+}
+
+message ObjectKey {
+	bytes data = 1;
+}
+
+// Query Typespaces
+message NumTypespacesRequest {
+	RequestHeader header = 1;
+}
+
+message NumTypespacesResponse {
+	ResponseHeader header = 1;
+	int64 numTypespaces = 2;
+}
+
+message TypespaceTableRequest {
+	RequestHeader header = 1;
+}
+
+message TypespaceTableResponse {
+	ResponseHeader header = 1;
+	repeated string typespaces = 2;
+}
+
+// Query Namespaces
+message NumNamespacesRequest {
+	RequestHeader header = 1;
+	string typespace = 2;
+}
+
+message NumNamespacesResponse {
+	ResponseHeader header = 1;
+	int64 numNamespaces = 2;
+}
+
+message NamespaceTableRequest {
+	RequestHeader header = 1;
+	string typespace = 2;
+}
+
+message NamespaceTableResponse {
+	ResponseHeader header = 1;
+	repeated string namespaces = 2;
+}
+
+// Query Workspaces
+message NumWorkspacesRequest {
+	RequestHeader header = 1;
+	string typespace = 2;
+	string namespace = 3;
+}
+
+message NumWorkspacesResponse {
+	ResponseHeader header = 1;
+	int64 numWorkspaces = 2;
+}
+
+message WorkspaceTableRequest {
+	RequestHeader header = 1;
+	string typespace = 2;
+	string namespace = 3;
+}
+
+message WorkspaceTableResponse {
+	ResponseHeader header = 1;
+	repeated string workspaces = 2;
+}
+
+// Subscriptions
+message SubscribeTo {
+	string workspaceName = 1;
+}
+
+message UnsubscribeFrom {
+	string workspaceName = 1;
+}
+
+message WorkspaceUpdate {
+	ObjectKey rootId = 1;
+	fixed64 nonce = 2;
+	bool immutable = 3;
+	bool deleted = 4;
+}
+
+// Work with Workspaces
+message BranchWorkspaceRequest {
+	RequestHeader header = 1;
+	string source = 2; // Workspace name, ie. build/eos-trunk/latestPass
+	string destination = 3; // Workspace name
+}
+
+message BranchWorkspaceResponse {
+	ResponseHeader header = 1;
+}
+
+message DeleteWorkspaceRequest {
+	RequestHeader header = 1;
+	string workspaceName = 2;
+}
+
+message DeleteWorkspaceResponse {
+	ResponseHeader header = 1;
+}
+
+message SetWorkspaceImmutableRequest {
+	RequestHeader header = 1;
+	string workspaceName = 2;
+}
+
+message SetWorkspaceImmutableResponse {
+	ResponseHeader header = 1;
+}
+
+// No WorkspaceIsImmutable, use FetchWorkspace instead.
+
+message AdvanceWorkspaceRequest {
+	RequestHeader header = 1;
+	string workspaceName = 2;
+	fixed64 nonce = 3;
+	ObjectKey currentRootId = 4;
+	ObjectKey newRootId = 5;
+}
+
+message AdvanceWorkspaceResponse {
+	ResponseHeader header = 1;
+	ObjectKey newKey = 2;
+}
+
+message FetchWorkspaceRequest {
+	RequestHeader header = 1;
+	string workspaceName = 2;
+}
+
+message FetchWorkspaceResponse {
+	ResponseHeader header = 1;
+	ObjectKey key = 2;
+	fixed64 nonce = 3;
+	bool immutable = 4;
+}
