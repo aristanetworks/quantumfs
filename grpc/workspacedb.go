@@ -116,7 +116,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumNamespaces").Out()
 
 	request := rpc.NamespaceRequest{
-		Header:    &rpc.RequestId{Id: c.RequestId},
+		RequestId: &rpc.RequestId{Id: c.RequestId},
 		Typespace: typespace,
 	}
 
@@ -138,7 +138,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NamespaceList").Out()
 
 	request := rpc.NamespaceRequest{
-		Header:    &rpc.RequestId{Id: c.RequestId},
+		RequestId: &rpc.RequestId{Id: c.RequestId},
 		Typespace: typespace,
 	}
 
@@ -160,7 +160,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumWorkspaces").Out()
 
 	request := rpc.WorkspaceRequest{
-		Header:    &rpc.RequestId{Id: c.RequestId},
+		RequestId: &rpc.RequestId{Id: c.RequestId},
 		Typespace: typespace,
 		Namespace: namespace,
 	}
@@ -183,7 +183,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::WorkspaceList").Out()
 
 	request := rpc.WorkspaceRequest{
-		Header:    &rpc.RequestId{Id: c.RequestId},
+		RequestId: &rpc.RequestId{Id: c.RequestId},
 		Typespace: typespace,
 		Namespace: namespace,
 	}
@@ -213,7 +213,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::BranchWorkspace").Out()
 
 	request := rpc.BranchWorkspaceRequest{
-		Header:      &rpc.RequestId{Id: c.RequestId},
+		RequestId:   &rpc.RequestId{Id: c.RequestId},
 		Source:      srcTypespace + "/" + srcNamespace + "/" + srcWorkspace,
 		Destination: dstTypespace + "/" + dstNamespace + "/" + dstWorkspace,
 	}
