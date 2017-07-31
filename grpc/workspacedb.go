@@ -252,15 +252,44 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	return nil
 }
 
+func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) (
+	key quantumfs.ObjectKey, nonce quantumfs.WorkspaceNonce, immutable bool,
+	err error) {
+
+	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::fetchWorkspace", "%s",
+		workspaceName).Out()
+
+	request := rpc.WorkspaceName{
+		RequestId: &rpc.RequestId{Id: c.RequestId},
+		Name:      workspaceName,
+	}
+
+	response, err := wsdb.server.FetchWorkspace(context.TODO(), &request)
+	if err != nil {
+		return key, nonce, false, wsdb.handleGrpcError(err)
+	}
+
+	if response.Header.Err != 0 {
+		return key, nonce, false, wsdb.convertErr(*response.Header)
+	}
+
+	key = quantumfs.NewObjectKeyFromBytes(response.Key.GetData())
+	nonce = quantumfs.WorkspaceNonce(response.Nonce.Nonce)
+	immutable = response.Immutable
+
+	return key, nonce, immutable, nil
+}
+
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey,
 	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::Workspace").Out()
 
-	var nonce quantumfs.WorkspaceNonce
+	workspaceName := typespace + "/" + namespace + "/" + workspace
+	key, nonce, _, err := wsdb.fetchWorkspace(c, workspaceName)
 
-	return quantumfs.ObjectKey{}, nonce, nil
+	return key, nonce, err
 }
 
 func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
@@ -288,9 +317,12 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	var immutable bool
+	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::Workspace").Out()
 
-	return immutable, nil
+	workspaceName := typespace + "/" + namespace + "/" + workspace
+	_, _, immutable, err := wsdb.fetchWorkspace(c, workspaceName)
+
+	return immutable, err
 }
 
 func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
