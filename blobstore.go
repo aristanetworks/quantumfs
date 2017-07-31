@@ -61,6 +61,12 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 	return cbs, nil
 }
 
+// InsertLog is used in qloggerdb for log parsing
+const InsertLog = "Cql::Insert"
+
+// KeyTTLLog is used in qloggerdb for log parsing
+const KeyTTLLog = "Key: %s TTL: %s"
+
 // Insert is the CQL implementation of blobstore.Insert()
 func (b *cqlBlobStore) Insert(c ether.Ctx, key []byte, value []byte,
 	metadata map[string]string) error {
@@ -77,7 +83,7 @@ func (b *cqlBlobStore) Insert(c ether.Ctx, key []byte, value []byte,
 			TimeToLive, metadata)
 	}
 
-	defer c.FuncIn("cql::Insert", "key: %s TTL:%s", keyHex, ttl).Out()
+	defer c.FuncIn(InsertLog, KeyTTLLog, keyHex, ttl).Out()
 	queryStr := fmt.Sprintf(`INSERT
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
@@ -97,10 +103,16 @@ USING TTL %s`, b.keyspace, ttl)
 	return nil
 }
 
+// GetLog is used in qloggerdb for log parsing
+const GetLog = "Cql::Get"
+
+// KeyLog is used in qloggerdb for log parsing
+const KeyLog = "Key: %s"
+
 // Get is the CQL implementation of blobstore.Get()
 func (b *cqlBlobStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
-	defer c.FuncIn("cql::Get", "key: %s", keyHex).Out()
+	defer c.FuncIn(GetLog, KeyLog, keyHex).Out()
 
 	// Session.Query() does not return error
 	var value []byte
@@ -128,18 +140,24 @@ WHERE key = ?`, b.keyspace)
 	return value, mdata, nil
 }
 
+// DeleteLog is used in qloggerdb for log parsing
+const DeleteLog = "Cql::Delete"
+
 // Delete is the CQL implementation of blobstore.Delete()
 func (b *cqlBlobStore) Delete(c ether.Ctx, key []byte) error {
 	keyHex := hex.EncodeToString(key)
-	defer c.FuncIn("cql::Delete", "key: %s", keyHex).Out()
+	defer c.FuncIn(DeleteLog, KeyLog, keyHex).Out()
 	return blobstore.NewError(blobstore.ErrOperationFailed,
 		"Delete operation is not implemented")
 }
 
+// MetadataLog is used in qloggerdb for log parsing
+const MetadataLog = "Cql::Metadata"
+
 // Metadata is the CQL implementation of blobstore.Metadata()
 func (b *cqlBlobStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
-	defer c.FuncIn("cql::Metadata", "key: %s", keyHex).Out()
+	defer c.FuncIn(MetadataLog, KeyLog, keyHex).Out()
 	var ttl int
 	queryStr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
@@ -167,10 +185,13 @@ WHERE key = ?`, b.keyspace)
 	return mdata, nil
 }
 
+// UpdateLog is used in qloggerdb for log parsing
+const UpdateLog = "Cql::Update"
+
 // Update is the CQL implementation of blobstore.Update()
 func (b *cqlBlobStore) Update(c ether.Ctx, key []byte, metadata map[string]string) error {
 	keyHex := hex.EncodeToString(key)
-	defer c.FuncIn("cql::Update", "key: %s", keyHex).Out()
+	defer c.FuncIn(UpdateLog, KeyLog, keyHex).Out()
 	return blobstore.NewError(blobstore.ErrOperationFailed,
 		"Update operation is not implemented")
 }
