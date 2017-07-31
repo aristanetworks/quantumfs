@@ -113,31 +113,155 @@ func (m *mux) NumTypespaces(c context.Context, request *rpc.RequestId) (
 func (m *mux) TypespaceTable(c context.Context, request *rpc.RequestId) (
 	*rpc.TypespaceTableResponse, error) {
 
-	return &rpc.TypespaceTableResponse{}, nil
+	ctx := m.newCtx(request.Id)
+	typespaces, err := m.backend.TypespaceList(ctx)
+
+	response := rpc.TypespaceTableResponse{
+		Header: &rpc.Response{
+			RequestId: request,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+	}
+
+	if err != nil {
+		response.Header.Err = 0
+		response.Typespaces = typespaces
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+
+	return &response, err
 }
 
 func (m *mux) NumNamespaces(c context.Context, request *rpc.NamespaceRequest) (
 	*rpc.NumNamespacesResponse, error) {
 
-	return &rpc.NumNamespacesResponse{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+	num, err := m.backend.NumNamespaces(ctx, request.Typespace)
+
+	response := rpc.NumNamespacesResponse{
+		Header: &rpc.Response{
+			RequestId: request.RequestId,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+		NumNamespaces: 0,
+	}
+
+	if err != nil {
+		response.Header.Err = 0
+		response.NumNamespaces = int64(num)
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+
+	return &response, err
 }
 
 func (m *mux) NamespaceTable(c context.Context, request *rpc.NamespaceRequest) (
 	*rpc.NamespaceTableResponse, error) {
 
-	return &rpc.NamespaceTableResponse{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+	namespaces, err := m.backend.NamespaceList(ctx, request.Typespace)
+
+	response := rpc.NamespaceTableResponse{
+		Header: &rpc.Response{
+			RequestId: request.RequestId,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+	}
+
+	if err != nil {
+		response.Header.Err = 0
+		response.Namespaces = namespaces
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+
+	return &response, err
 }
 
 func (m *mux) NumWorkspaces(c context.Context, request *rpc.WorkspaceRequest) (
 	*rpc.NumWorkspacesResponse, error) {
 
-	return &rpc.NumWorkspacesResponse{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+	num, err := m.backend.NumWorkspaces(ctx, request.Typespace,
+		request.Namespace)
+
+	response := rpc.NumWorkspacesResponse{
+		Header: &rpc.Response{
+			RequestId: request.RequestId,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+		NumWorkspaces: 0,
+	}
+
+	if err != nil {
+		response.Header.Err = 0
+		response.NumWorkspaces = int64(num)
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+
+	return &response, err
 }
 
 func (m *mux) WorkspaceTable(c context.Context, request *rpc.WorkspaceRequest) (
 	*rpc.WorkspaceTableResponse, error) {
 
-	return &rpc.WorkspaceTableResponse{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+	workspaceNonces, err := m.backend.WorkspaceList(ctx, request.Typespace,
+		request.Namespace)
+
+	response := rpc.WorkspaceTableResponse{
+		Header: &rpc.Response{
+			RequestId: request.RequestId,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+	}
+
+	if err != nil {
+		nonces := make(map[string]*rpc.WorkspaceNonce, len(workspaceNonces))
+		for name, nonce := range workspaceNonces {
+			nonces[name] = &rpc.WorkspaceNonce{Nonce: uint64(nonce)}
+		}
+
+		response.Header.Err = 0
+		response.Workspaces = nonces
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+
+	return &response, err
 }
 
 func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
