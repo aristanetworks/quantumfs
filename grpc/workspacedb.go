@@ -309,9 +309,34 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::AdvanceWorkspace").Out()
+	workspaceName := typespace + "/" + namespace + "/" + workspace
 
-	return quantumfs.ObjectKey{}, nil
+	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::AdvanceWorkspace",
+		"%s from %s to %s", workspaceName, currentRootId.String(),
+		newRootId.String()).Out()
+
+	request := rpc.AdvanceWorkspaceRequest{
+		RequestId:     &rpc.RequestId{Id: c.RequestId},
+		WorkspaceName: workspaceName,
+		Nonce:         uint64(nonce),
+		CurrentRootId: &rpc.ObjectKey{Data: currentRootId.Value()},
+		NewRootId:     &rpc.ObjectKey{Data: newRootId.Value()},
+	}
+
+	response, err := wsdb.server.AdvanceWorkspace(context.TODO(), &request)
+	if err != nil {
+		return quantumfs.ObjectKey{}, wsdb.handleGrpcError(err)
+	}
+
+	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
+
+	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
+		return newKey, wsdb.convertErr(*response.Header)
+	}
+
+	return newKey, nil
 }
 
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
