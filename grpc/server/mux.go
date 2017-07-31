@@ -6,6 +6,7 @@ package server
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -285,7 +286,37 @@ func (m *mux) ListenForUpdates(*rpc.Void,
 func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.FetchWorkspaceResponse, error) {
 
-	return &rpc.FetchWorkspaceResponse{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+
+	parts := strings.Split(request.Name, " ")
+	key, nonce, err := m.backend.Workspace(ctx, parts[0], parts[1], parts[2])
+
+	response := rpc.FetchWorkspaceResponse{
+		Header: &rpc.Response{
+			RequestId: request.RequestId,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+		Key:       &rpc.ObjectKey{},
+		Nonce:     &rpc.WorkspaceNonce{Nonce: 0},
+		Immutable: false,
+	}
+
+	if err != nil {
+		response.Header.Err = 0
+		response.Key.Data = key.Value()
+		response.Nonce.Nonce = uint64(nonce)
+		response.Immutable = false
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+
+	return &response, err
 }
 
 func (m *mux) BranchWorkspace(c context.Context,
