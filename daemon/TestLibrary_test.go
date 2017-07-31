@@ -559,9 +559,7 @@ func (test *testHelper) linkFile(workspace string, src string,
 	srcfilename := workspace + "/" + src
 	dstfilename := workspace + "/" + dst
 	test.Log("Before link %s -> %s", src, dst)
-	err := syscall.Link(srcfilename, dstfilename)
-	test.AssertNoErr(err)
-
+	test.AssertNoErr(syscall.Link(srcfilename, dstfilename))
 }
 
 func (test *testHelper) linkFileSync(workspace string, src string,
@@ -569,6 +567,23 @@ func (test *testHelper) linkFileSync(workspace string, src string,
 
 	return test.synced_op(workspace, func() {
 		test.linkFile(workspace, src, dst)
+	})
+}
+
+func (test *testHelper) moveFile(workspace string, src string,
+	dst string) {
+
+	srcfilename := workspace + "/" + src
+	dstfilename := workspace + "/" + dst
+	test.Log("Before move %s -> %s", src, dst)
+	test.AssertNoErr(syscall.Rename(srcfilename, dstfilename))
+}
+
+func (test *testHelper) moveFileSync(workspace string, src string,
+	dst string) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.moveFile(workspace, src, dst)
 	})
 }
 

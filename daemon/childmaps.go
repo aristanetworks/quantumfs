@@ -51,7 +51,7 @@ func (cmap *ChildMap) loadAllChildren(c *ctx,
 		if !exists {
 			inodeNum = quantumfs.InodeIdInvalid
 		}
-		c.vlog("Loading child with id %d", inodeNum)
+		c.vlog("Loading child %s with id %d", record.Filename(), inodeNum)
 		childInodeNum := cmap.loadChild(c, record, inodeNum)
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
@@ -148,7 +148,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
 		entry = newHardlink(entry.Filename(), fileId, cmap.wsr)
-		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, fileId)
+		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, fileId, inodeId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
 		// should normally match the actual inodeId.
