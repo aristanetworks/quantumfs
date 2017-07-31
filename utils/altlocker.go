@@ -10,8 +10,12 @@ type AlternatingLocker struct {
 	bSideLock DeferableRwMutex
 }
 
+type NeedAUnlock interface {
+	AUnlock()
+}
+
 // Acquire the a side lock for reading and increment the counter
-func (alt *AlternatingLocker) ALock() {
+func (alt *AlternatingLocker) ALock() NeedAUnlock {
 	// protect the counter
 	defer alt.aSideLock.Lock().Unlock()
 
@@ -21,6 +25,7 @@ func (alt *AlternatingLocker) ALock() {
 	}
 
 	alt.aSideCounter++
+	return alt
 }
 
 func (alt *AlternatingLocker) AUnlock() {
