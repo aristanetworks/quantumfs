@@ -164,14 +164,14 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	var alt utils.AlternatingLocker
 	func() {
 		if parallel {
-			alt.SlowLock()
-			defer alt.SlowUnlock()
+			alt.ALock()
+			defer alt.AUnlock()
 		}
 		startQuantumFsInstances(numDefaultQfs, configModifier, th)
 	}()
 
 	if parallel {
-		defer alt.FastLock().RUnlock()
+		defer alt.RLock().RUnlock()
 	}
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
