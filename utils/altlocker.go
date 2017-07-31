@@ -4,38 +4,38 @@
 package utils
 
 type AlternatingLocker struct {
-	slowSideLock    DeferableMutex
-	slowSideCounter int
+	aSideLock    DeferableMutex
+	aSideCounter int
 
-	fastSideLock DeferableRwMutex
+	bSideLock DeferableRwMutex
 }
 
-// Acquire the slow side lock for reading and increment the counter
-func (alt *AlternatingLocker) SlowLock() {
+// Acquire the a side lock for reading and increment the counter
+func (alt *AlternatingLocker) ALock() {
 	// protect the counter
-	defer alt.slowSideLock.Lock().Unlock()
+	defer alt.aSideLock.Lock().Unlock()
 
-	if alt.slowSideCounter == 0 {
-		// We've been letting the fast side run, so we need to lock them out
-		alt.fastSideLock.Lock()
+	if alt.aSideCounter == 0 {
+		// We've been letting the b side run, so we need to lock them out
+		alt.bSideLock.Lock()
 	}
 
-	alt.slowSideCounter++
+	alt.aSideCounter++
 }
 
-func (alt *AlternatingLocker) SlowUnlock() {
-	defer alt.slowSideLock.Lock().Unlock()
+func (alt *AlternatingLocker) AUnlock() {
+	defer alt.aSideLock.Lock().Unlock()
 
-	// Decrement the counter and see if it's time to unlock the fast side
-	alt.slowSideCounter--
+	// Decrement the counter and see if it's time to unlock the b side
+	alt.aSideCounter--
 
-	if alt.slowSideCounter < 0 {
-		panic("Counting mismatch in slowUnlock")
-	} else if alt.slowSideCounter == 0 {
-		alt.fastSideLock.Unlock()
+	if alt.aSideCounter < 0 {
+		panic("Counting mismatch in aUnlock")
+	} else if alt.aSideCounter == 0 {
+		alt.bSideLock.Unlock()
 	}
 }
 
-func (alt *AlternatingLocker) FastLock() NeedReadUnlock {
-	return alt.fastSideLock.RLock()
+func (alt *AlternatingLocker) RLock() NeedReadUnlock {
+	return alt.bSideLock.RLock()
 }
