@@ -134,11 +134,6 @@ message AdvanceWorkspaceResponse {
 	ObjectKey newKey = 2;
 }
 
-message FetchWorkspaceRequest {
-	RequestId header = 1;
-	string workspaceName = 2;
-}
-
 message FetchWorkspaceResponse {
 	Response header = 1;
 	ObjectKey key = 2;
