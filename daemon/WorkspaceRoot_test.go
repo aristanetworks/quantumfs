@@ -352,7 +352,7 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 		workspaceB := "testA/testB/testC"
 
 		// Create a nontrivial workspace
-		test.AssertNoErr(testutils.PrintToFile(workspace + "/testFile",
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/testFile",
 			"sample data"))
 
 		// Ensure we update the rootId before we branch a copy
@@ -364,7 +364,7 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 		test.AssertNoErr(api.EnableRootWrite(workspaceB))
 
 		// Open an inode
-		file, err := os.OpenFile(test.AbsPath(workspaceB) + "/testFile",
+		file, err := os.OpenFile(test.AbsPath(workspaceB)+"/testFile",
 			os.O_RDWR, 0777)
 		defer file.Close()
 		test.AssertNoErr(err)
@@ -386,7 +386,7 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 			tokens[1], tokens[2], "testA", "testB", "testC")
 
 		test.AssertNoErr(api.EnableRootWrite(workspaceB))
-		test.AssertNoErr(testutils.PrintToFile(test.AbsPath(workspaceB) +
+		test.AssertNoErr(testutils.PrintToFile(test.AbsPath(workspaceB)+
 			"/testFileC", "a bit more data"))
 
 		test.WaitForLogString("Unable to AdvanceWorkspace",
