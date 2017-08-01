@@ -19,6 +19,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/peer"
 )
 
 // Start the WorkspaceDBd goroutine. This will open a socket and list on the given
@@ -50,13 +51,10 @@ func StartWorkspaceDbd(port uint16, backend string, config string) error {
 		return err
 	}
 
-	m := mux{
-		backend: wsdb,
-		qlog:    qlog.NewQlogTiny(),
-	}
+	m := newMux(wsdb)
 
 	grpcServer := grpc.NewServer(connOptions...)
-	rpc.RegisterWorkspaceDbServer(grpcServer, &m)
+	rpc.RegisterWorkspaceDbServer(grpcServer, m)
 
 	return grpcServer.Serve(listener)
 }
@@ -66,12 +64,26 @@ func StartWorkspaceDbd(port uint16, backend string, config string) error {
 // all subscribed clients.
 type mux struct {
 	subscriptionLock utils.DeferableRwMutex
-	subscriptions    map[string]chan quantumfs.WorkspaceState
+	// workspace name to client name
+	subscriptions map[string]string
+	// client name to notification channel
+	clients map[string]chan quantumfs.WorkspaceState
 
 	// For now simply use one of the existing backends
 	backend quantumfs.WorkspaceDB
 
 	qlog *qlog.Qlog
+}
+
+func newMux(wsdb quantumfs.WorkspaceDB) *mux {
+	m := mux{
+		subscriptions: map[string]string{},
+		clients:       map[string]chan quantumfs.WorkspaceState{},
+		backend:       wsdb,
+		qlog:          qlog.NewQlogTiny(),
+	}
+
+	return &m
 }
 
 func (m *mux) newCtx(requestId uint64) *quantumfs.Ctx {
@@ -268,13 +280,41 @@ func (m *mux) WorkspaceTable(c context.Context, request *rpc.WorkspaceRequest) (
 func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	return &rpc.Response{}, nil
+	clientName, ok := peer.FromContext(c)
+	if !ok {
+		panic("Unknown client!")
+	}
+
+	defer m.subscriptionLock.Lock().Unlock()
+
+	m.subscriptions[clientName.Addr.String()] = request.Name
+
+	response := rpc.Response{
+		RequestId: request.RequestId,
+		Err:       0,
+		ErrCause:  "Success",
+	}
+	return &response, nil
 }
 
 func (m *mux) UnsubscribeFrom(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	return &rpc.Response{}, nil
+	clientName, ok := peer.FromContext(c)
+	if !ok {
+		panic("Unknown client!")
+	}
+
+	defer m.subscriptionLock.Lock().Unlock()
+
+	delete(m.subscriptions, clientName.Addr.String())
+
+	response := rpc.Response{
+		RequestId: request.RequestId,
+		Err:       0,
+		ErrCause:  "Success",
+	}
+	return &response, nil
 }
 
 func (m *mux) ListenForUpdates(*rpc.Void,
