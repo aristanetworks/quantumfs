@@ -674,7 +674,11 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
 			newRootId)
 
+		var wsdbErr *quantumfs.WorkspaceDbErr
 		if err != nil {
+			wsdbErr = err.(*quantumfs.WorkspaceDbErr)
+		}
+		if wsdbErr != nil && wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
 				wsr.workspace
 
@@ -692,6 +696,11 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			c.qfs.workspaceMutability[workspacePath] = 0 +
 				workspaceImmutableUntilRestart
 
+			return
+		} else if err != nil {
+			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
+
+			// return so that we can try again later
 			return
 		}
 
