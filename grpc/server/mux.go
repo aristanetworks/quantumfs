@@ -317,9 +317,47 @@ func (m *mux) UnsubscribeFrom(c context.Context, request *rpc.WorkspaceName) (
 	return &response, nil
 }
 
-func (m *mux) ListenForUpdates(*rpc.Void,
-	rpc.WorkspaceDb_ListenForUpdatesServer) error {
+func (m *mux) ListenForUpdates(_ *rpc.Void,
+	stream rpc.WorkspaceDb_ListenForUpdatesServer) error {
 
+	clientName, ok := peer.FromContext(stream.Context())
+	if !ok {
+		panic("Unknown client!")
+	}
+
+	changes := make(chan quantumfs.WorkspaceState)
+
+	func() {
+		defer m.subscriptionLock.Lock().Unlock()
+		m.clients[clientName.Addr.String()] = changes
+	}()
+
+	defer func() {
+		defer m.subscriptionLock.Lock().Unlock()
+		delete(m.clients, clientName.Addr.String())
+	}()
+
+	for {
+		select {
+		case change := <-changes:
+			update := rpc.WorkspaceUpdate{
+				RootId: &rpc.ObjectKey{
+					Data: change.RootId.Value(),
+				},
+				Nonce: &rpc.WorkspaceNonce{
+					Nonce: uint64(change.Nonce),
+				},
+				Immutable: change.Immutable,
+				Deleted:   change.Deleted,
+			}
+			err := stream.Send(&update)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	panic("ListenForUpdates terminated unexpectedly")
 	return nil
 }
 
