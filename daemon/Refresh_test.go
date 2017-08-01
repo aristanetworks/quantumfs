@@ -6,6 +6,8 @@ package daemon
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -1398,4 +1400,159 @@ func TestRefresh_Hardlink2Hardlink_unlinkAndRelinkSrcWorkspaceroot(t *testing.T)
 
 func TestRefresh_Hardlink2Hardlink_unlinkAndRelinkSrcSubdir(t *testing.T) {
 	runTest(t, GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(false))
+}
+
+func GenTestRefreshRename(srcName string, dstName string) func(*testHelper) {
+	return func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dstFullName := workspace + "/" + dstName
+		srcFullName := workspace + "/" + srcName
+		content1 := "original content"
+		content2 := "CONTENT2"
+		ctx := test.TestCtx()
+
+		utils.MkdirAll(workspace+"/"+filepath.Dir(dstName), 0777)
+		CreateSmallFile(dstFullName, content1)
+		test.AssertNoErr(testutils.OverWriteFile(dstFullName, content1))
+		test.SyncAllWorkspaces()
+		newRootId1 := test.getRootId(workspace)
+
+		test.moveFileSync(workspace, dstName, ".tmp")
+		os.RemoveAll(srcFullName)
+		utils.MkdirAll(workspace+"/"+filepath.Dir(srcName), 0777)
+		test.moveFileSync(workspace, ".tmp", srcName)
+		test.AssertNoErr(testutils.OverWriteFile(srcFullName, content2))
+
+		test.SyncAllWorkspaces()
+		newRootId2 := test.getRootId(workspace)
+
+		file, err := os.OpenFile(srcFullName, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		test.verifyContentStartsWith(file, content1)
+		test.AssertNoErr(file.Close())
+
+		if strings.HasPrefix(dstName, srcName) {
+			// src must exists as it is a directory to dst
+			var stat syscall.Stat_t
+			test.AssertNoErr(syscall.Stat(srcFullName, &stat))
+		} else if strings.HasPrefix(srcName, dstName) {
+			var stat syscall.Stat_t
+			err := syscall.Stat(srcFullName, &stat)
+			test.AssertErr(err)
+			test.Assert(err == syscall.ENOTDIR,
+				"Expected ENOTDIR, got %s", err.Error())
+		} else {
+			test.assertNoFile(srcFullName)
+		}
+		test.removeFile(workspace, dstName)
+	}
+}
+
+func TestRefreshRenameFileWSR2WSR(t *testing.T) {
+	runTest(t, GenTestRefreshRename("testFile", "moved"))
+}
+
+func TestRefreshRenameFileWSR2Dir(t *testing.T) {
+	runTest(t, GenTestRefreshRename("testFile", "dir1/moved"))
+}
+
+func TestRefreshRenameFileDir2WSR(t *testing.T) {
+	runTest(t, GenTestRefreshRename("dir1/testFile", "moved"))
+}
+
+func TestRefreshRenameFileDir2SameDir(t *testing.T) {
+	runTest(t, GenTestRefreshRename("dir1/testFile", "dir1/moved"))
+}
+
+func TestRefreshRenameFileDir2OtherDir1(t *testing.T) {
+	runTest(t, GenTestRefreshRename("dir1/testFile", "dir2/dir3/moved"))
+}
+
+func TestRefreshRenameFileDir2OtherDir2(t *testing.T) {
+	runTest(t, GenTestRefreshRename("dir2/dir3/testFile", "dir1/moved"))
+}
+
+func TestRefreshRenameFileDir2Subdir(t *testing.T) {
+	runTest(t, GenTestRefreshRename("dir2/testFile", "dir2/dir3/moved"))
+}
+
+func TestRefreshRenameFileSubdir2Dir(t *testing.T) {
+	runTest(t, GenTestRefreshRename("dir2/dir3/testFile", "dir2/moved"))
+}
+
+func TestRefreshMoveFileToDirWithSameNameWSR(t *testing.T) {
+	runTest(t, GenTestRefreshRename("testFile", "testFile/testFile"))
+}
+
+func TestRefreshMoveFileFromDirWithSameNameDir(t *testing.T) {
+	runTest(t, GenTestRefreshRename("testFile/testFile",
+		"testFile/testFile/testFile"))
+}
+
+func TestRefreshMoveFileFromDirWithSameNameWSR(t *testing.T) {
+	runTest(t, GenTestRefreshRename("testFile/testFile", "testFile"))
+}
+
+func TestRefreshMoveFileToDirWithSameNameDir(t *testing.T) {
+	runTest(t, GenTestRefreshRename("testFile/testFile/testFile",
+		"testFile/testFile"))
+}
+
+func TestRefreshMoveLongWayDown(t *testing.T) {
+	runTest(t, GenTestRefreshRename("t", "t/t/t/t/t/t/t/t/t"))
+}
+
+func TestRefreshMoveLongWayUp(t *testing.T) {
+	runTest(t, GenTestRefreshRename("t/t/t/t/t/t/t/t/t", "t/t"))
+}
+
+func TestRefreshMoveSmallFileToHardlinkToSmallFileAndBack(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ctx := test.TestCtx()
+		workspace := test.NewWorkspace()
+		content1 := "original content"
+		content2 := "CONTENT2"
+		utils.MkdirAll(workspace+"/subdir", 0777)
+		name := "subdir/testFile"
+		fullName := workspace + "/" + name
+
+		err := CreateHardlink(fullName, content1)
+		test.AssertNoErr(err)
+		test.SyncAllWorkspaces()
+		newRootId1 := test.getRootId(workspace)
+
+		test.removeFile(workspace, name+"_link")
+		test.AssertNoErr(testutils.OverWriteFile(fullName, content2))
+		test.moveFileSync(workspace, name, name+".tmp")
+
+		test.SyncAllWorkspaces()
+		newRootId2 := test.getRootId(workspace)
+
+		file, err := os.OpenFile(fullName+".tmp", os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		test.verifyContentStartsWith(file, content2)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		newRootId3 := test.getRootId(workspace)
+		test.Assert(newRootId3.IsEqualTo(newRootId1), "Unexpected rootid")
+
+		test.verifyContentStartsWith(file, content1)
+		test.AssertNoErr(file.Close())
+
+		file, err = os.Open(fullName)
+		test.AssertNoErr(err)
+		test.verifyContentStartsWith(file, content1)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId1, newRootId2)
+
+		test.verifyContentStartsWith(file, content2)
+		test.AssertNoErr(file.Close())
+
+		test.assertNoFile(fullName)
+		test.removeFile(workspace, name+".tmp")
+	})
 }
