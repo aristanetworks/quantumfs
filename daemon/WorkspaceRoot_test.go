@@ -355,9 +355,6 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/testFile",
 			"sample data"))
 
-		// Ensure we update the rootId before we branch a copy
-		test.SyncAllWorkspaces()
-
 		// Branch a copy so we have the original to re-copy later
 		api := test.getApi()
 		test.AssertNoErr(api.Branch(test.RelPath(workspace), workspaceB))
