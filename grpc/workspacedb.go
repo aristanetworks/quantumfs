@@ -318,7 +318,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	request := rpc.AdvanceWorkspaceRequest{
 		RequestId:     &rpc.RequestId{Id: c.RequestId},
 		WorkspaceName: workspaceName,
-		Nonce:         uint64(nonce),
+		Nonce:         &rpc.WorkspaceNonce{Nonce: uint64(nonce)},
 		CurrentRootId: &rpc.ObjectKey{Data: currentRootId.Value()},
 		NewRootId:     &rpc.ObjectKey{Data: newRootId.Value()},
 	}
