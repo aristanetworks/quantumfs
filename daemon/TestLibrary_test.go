@@ -98,13 +98,15 @@ func TestPanicFilesystemAbort(t *testing.T) {
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 1, nil, true)
+	t.Parallel()
+	runTestCommon(t, test, 1, nil)
 }
 
 // If you need to initialize the QuantumFS instance in some special way,
 // then use this variant.
 func runTestNoQfs(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 0, nil, true)
+	t.Parallel()
+	runTestCommon(t, test, 0, nil)
 }
 
 // configModifier is a function which is given the default configuration
@@ -116,19 +118,20 @@ type configModifierFunc func(test *testHelper, config *QuantumFsConfig)
 func runTestCustomConfig(t *testing.T, configModifier configModifierFunc,
 	test quantumFsTest) {
 
-	runTestCommon(t, test, 1, configModifier, true)
+	t.Parallel()
+	runTestCommon(t, test, 1, configModifier)
 }
 
 // If you need to initialize the QuantumFS instance in some special way and the test
 // is relatively expensive, then use this variant.
 func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 0, nil, false)
+	runTestCommon(t, test, 0, nil)
 }
 
 // If you need to run two concurrent instances of QuantumFS in the same test, use
 // runTestDualQuantumFS().
 func runDualQuantumFsTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 2, nil, false)
+	runTestCommon(t, test, 2, nil)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -136,15 +139,11 @@ func runDualQuantumFsTest(t *testing.T, test quantumFsTest) {
 // to prevent multiple expensive tests from running concurrently and causing each
 // other to time out due to CPU starvation.
 func runExpensiveTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 1, nil, false)
+	runTestCommon(t, test, 1, nil)
 }
 
 func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
-	configModifier configModifierFunc, parallel bool) {
-
-	if parallel {
-		t.Parallel()
-	}
+	configModifier configModifierFunc) {
 
 	// the stack depth of test name for all callers of runTestCommon
 	// is 2. Since the stack looks as follows:
@@ -163,15 +162,11 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 
 	var alt utils.AlternatingLocker
 	func() {
-		if parallel {
-			defer alt.ALock().AUnlock()
-		}
+		defer alt.ALock().AUnlock()
 		startQuantumFsInstances(numDefaultQfs, configModifier, th)
 	}()
 
-	if parallel {
-		defer alt.RLock().RUnlock()
-	}
+	defer alt.RLock().RUnlock()
 	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
