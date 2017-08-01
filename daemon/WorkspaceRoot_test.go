@@ -342,3 +342,46 @@ func TestWorkspaceRootChecker(t *testing.T) {
 			"wsr dir not routing")
 	})
 }
+
+// Test to ensure that non "out of date" workspaceDB don't prematurely make
+// workspaces immutable
+func TestWorkspaceErrorHandling(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		workspaceB := "testA/testB/testC"
+
+		// Create a nontrivial workspace
+		test.AssertNoErr(testutils.PrintToFile(workspace + "/testFile",
+			"sample data"))
+
+		// Ensure we update the rootId before we branch a copy
+		test.SyncAllWorkspaces()
+
+		// Branch a copy so we have the original to re-copy later
+		api := test.getApi()
+		test.AssertNoErr(api.Branch(workspace, workspaceB))
+		test.AssertNoErr(api.EnableRootWrite(workspaceB))
+
+		// Invalidate the underlying workspaceB so publish attempts error out
+		test.AssertNoErr(test.qfs.workspaceDB.DeleteWorkspace(&test.qfs.c,
+			"testA", "testB", "testC")
+
+		test.AssertNoErr(testutils.PrintToFile(test.AbsPath(workspaceB) +
+			"/testFileB", "other data"))
+
+		// Try to publish, causing an error on Advance
+		test.SyncAllWorkspaces()
+
+		// Now put the workspace back
+		tokens := strings.Split(test.RelPath(workspace), "/")
+		test.qfs.workspaceDB.BranchWorkspace(&test.qfs.c, tokens[0],
+			tokens[1], tokens[2], "testA", "testB", "testC")
+		test.AssertNoErr(api.EnableRootWrite(workspaceB))
+
+		test.AssertNoErr(testutils.PrintToFile(workspaceB + "/testFileC",
+			"a bit more data"))
+
+		test.WaitForLogString("Unable to AdvanceWorkspace",
+			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces)
+	})
+}
