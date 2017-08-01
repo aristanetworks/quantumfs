@@ -116,7 +116,17 @@ func (th *TestHelper) EndTest() {
 				abortFuse(th)
 			}
 			logFuseWaiting("Before unmount", th)
-			if err := qfs.server.Unmount(); err != nil {
+			var err error
+			for i := 0; i < 10; i++ {
+				err = qfs.server.Unmount()
+				if err == nil {
+					break
+				}
+				th.Log("umount try %d failed with %s, retrying",
+					i+1, err.Error())
+				time.Sleep(time.Millisecond)
+			}
+			if err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs instance")
 				th.Log("Are you leaking a file descriptor?: %s",
 					err.Error())
