@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -359,29 +360,36 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 
 		// Branch a copy so we have the original to re-copy later
 		api := test.getApi()
-		test.AssertNoErr(api.Branch(workspace, workspaceB))
+		test.AssertNoErr(api.Branch(test.RelPath(workspace), workspaceB))
 		test.AssertNoErr(api.EnableRootWrite(workspaceB))
 
-		// Invalidate the underlying workspaceB so publish attempts error out
-		test.AssertNoErr(test.qfs.workspaceDB.DeleteWorkspace(&test.qfs.c,
-			"testA", "testB", "testC")
+		// Open an inode
+		file, err := os.OpenFile(test.AbsPath(workspaceB) + "/testFile",
+			os.O_RDWR, 0777)
+		defer file.Close()
+		test.AssertNoErr(err)
 
-		test.AssertNoErr(testutils.PrintToFile(test.AbsPath(workspaceB) +
-			"/testFileB", "other data"))
+		// Invalidate the underlying workspaceB so publish attempts error out
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
+			"testA", "testB", "testC")
+		test.AssertNoErr(err)
+
+		_, err = file.Write([]byte("addon data"))
+		test.AssertNoErr(err)
 
 		// Try to publish, causing an error on Advance
 		test.SyncAllWorkspaces()
 
 		// Now put the workspace back
 		tokens := strings.Split(test.RelPath(workspace), "/")
-		test.qfs.workspaceDB.BranchWorkspace(&test.qfs.c, tokens[0],
+		test.qfs.c.workspaceDB.BranchWorkspace(&test.qfs.c.Ctx, tokens[0],
 			tokens[1], tokens[2], "testA", "testB", "testC")
-		test.AssertNoErr(api.EnableRootWrite(workspaceB))
 
-		test.AssertNoErr(testutils.PrintToFile(workspaceB + "/testFileC",
-			"a bit more data"))
+		test.AssertNoErr(api.EnableRootWrite(workspaceB))
+		test.AssertNoErr(testutils.PrintToFile(test.AbsPath(workspaceB) +
+			"/testFileC", "a bit more data"))
 
 		test.WaitForLogString("Unable to AdvanceWorkspace",
-			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces)
+			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces")
 	})
 }
