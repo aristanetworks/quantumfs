@@ -108,7 +108,7 @@ func (m *mux) NumTypespaces(c context.Context, request *rpc.RequestId) (
 		NumTypespaces: 0,
 	}
 
-	if err != nil {
+	if err == nil {
 		response.Header.Err = 0
 		response.NumTypespaces = int64(num)
 		return &response, nil
@@ -137,7 +137,7 @@ func (m *mux) TypespaceTable(c context.Context, request *rpc.RequestId) (
 		},
 	}
 
-	if err != nil {
+	if err == nil {
 		response.Header.Err = 0
 		response.Typespaces = typespaces
 		return &response, nil
@@ -167,7 +167,7 @@ func (m *mux) NumNamespaces(c context.Context, request *rpc.NamespaceRequest) (
 		NumNamespaces: 0,
 	}
 
-	if err != nil {
+	if err == nil {
 		response.Header.Err = 0
 		response.NumNamespaces = int64(num)
 		return &response, nil
@@ -196,7 +196,7 @@ func (m *mux) NamespaceTable(c context.Context, request *rpc.NamespaceRequest) (
 		},
 	}
 
-	if err != nil {
+	if err == nil {
 		response.Header.Err = 0
 		response.Namespaces = namespaces
 		return &response, nil
@@ -227,7 +227,7 @@ func (m *mux) NumWorkspaces(c context.Context, request *rpc.WorkspaceRequest) (
 		NumWorkspaces: 0,
 	}
 
-	if err != nil {
+	if err == nil {
 		response.Header.Err = 0
 		response.NumWorkspaces = int64(num)
 		return &response, nil
@@ -257,7 +257,7 @@ func (m *mux) WorkspaceTable(c context.Context, request *rpc.WorkspaceRequest) (
 		},
 	}
 
-	if err != nil {
+	if err == nil {
 		nonces := make(map[string]*rpc.WorkspaceNonce, len(workspaceNonces))
 		for name, nonce := range workspaceNonces {
 			nonces[name] = &rpc.WorkspaceNonce{Nonce: uint64(nonce)}
@@ -418,7 +418,7 @@ func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
 		Immutable: false,
 	}
 
-	if err != nil {
+	if err == nil {
 		response.Header.Err = 0
 		response.Key.Data = key.Value()
 		response.Nonce.Nonce = uint64(nonce)
