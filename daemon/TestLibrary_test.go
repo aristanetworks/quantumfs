@@ -242,6 +242,20 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 	return handles
 }
 
+func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
+	th.remountFilesystem()
+	th.SyncAllWorkspaces()
+
+	msg := fmt.Sprintf("inode %d to be uninstantiated", inode)
+	th.WaitFor(msg, func() bool {
+		if nil == th.qfs.inodeNoInstantiate(&th.qfs.c, inode) {
+			return true
+		}
+		th.SyncAllWorkspaces()
+		return false
+	})
+}
+
 // Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
 func (th *testHelper) getInodeNum(path string) InodeId {
 	var stat syscall.Stat_t
