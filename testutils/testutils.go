@@ -13,7 +13,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"runtime/pprof"
 	"sort"
 	"strings"
 	"sync"
@@ -192,22 +191,11 @@ func (th *TestHelper) EndTest() {
 	}
 }
 
-var globalDumpStackMutex utils.DeferableMutex
-
-func (th *TestHelper) dumpStackTraces() {
-	defer globalDumpStackMutex.Lock().Unlock()
-	pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
-}
-
 func (th *TestHelper) WaitForResult() string {
 	var testResult string
 	select {
 	case <-time.After(th.Timeout):
 		testResult = "ERROR: TIMED OUT"
-		if !th.ShouldFail {
-			th.dumpStackTraces()
-		}
-
 	case testResult = <-th.TestResult:
 	}
 	return testResult

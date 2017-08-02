@@ -38,6 +38,7 @@ var cacheTimeNsecs uint
 var memLogMegabytes uint
 var config daemon.QuantumFsConfig
 var showMaxSizes bool
+var qflag *flag.FlagSet
 
 func init() {
 	const (
@@ -51,36 +52,38 @@ func init() {
 
 	fmt.Printf("QuantumFS version %s\n", version)
 
-	flag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
+	qflag = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	qflag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
 		"Default location of the internal cache. Should be on a ramfs or "+
 			"tmpfs filesystem to avoid random 1 second lag spikes")
 
-	flag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
+	qflag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
 		"Size of the local cache, e.g. 8G or 512M")
 
-	flag.StringVar(&config.MountPath, "mountpath", defaultMountPath,
+	qflag.StringVar(&config.MountPath, "mountpath", defaultMountPath,
 		"Path to mount quantumfs at")
 
-	flag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
+	qflag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
 		defaultCacheTimeSeconds,
 		"Number of seconds the kernel will cache response data")
 
-	flag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
+	qflag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
-	flag.UintVar(&memLogMegabytes, "memLogMegabytes", defaultMemLogMegabytes,
+	qflag.UintVar(&memLogMegabytes, "memLogMegabytes", defaultMemLogMegabytes,
 		"The number of MB to allocate, total, to the shared memory log.")
 
-	flag.StringVar(&config.DataStoreName, "datastore", "processlocal",
+	qflag.StringVar(&config.DataStoreName, "datastore", "processlocal",
 		"Name of the datastore to use")
-	flag.StringVar(&config.DataStoreConf, "datastoreconf", "",
+	qflag.StringVar(&config.DataStoreConf, "datastoreconf", "",
 		"Options to pass to datastore")
 
-	flag.StringVar(&config.WorkspaceDbName, "workspaceDB", "processlocal",
+	qflag.StringVar(&config.WorkspaceDbName, "workspaceDB", "processlocal",
 		"Name of the WorkspaceDB to use")
-	flag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf", "",
+	qflag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf", "",
 		"Options to pass to workspaceDB")
 
-	flag.BoolVar(&showMaxSizes, "showMaxSizes", false,
+	qflag.BoolVar(&showMaxSizes, "showMaxSizes", false,
 		"Show max block counts, metadata entries and max file sizes")
 }
 
@@ -135,7 +138,7 @@ func loadWorkspaceDB() {
 //
 // Exit if processing failed
 func processArgs() {
-	flag.Parse()
+	qflag.Parse(os.Args[1:])
 
 	if showMaxSizes {
 		maxSizes()
