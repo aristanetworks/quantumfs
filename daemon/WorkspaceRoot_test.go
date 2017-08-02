@@ -7,12 +7,14 @@ package daemon
 
 import (
 	"bytes"
+	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -350,6 +352,7 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		workspaceB := "testA/testB/testC"
+		workspaceD := "testA/testB/testD"
 
 		// Create a nontrivial workspace
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/testFile",
@@ -362,31 +365,52 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 
 		// Open an inode
 		file, err := os.OpenFile(test.AbsPath(workspaceB)+"/testFile",
-			os.O_RDWR, 0777)
+			os.O_APPEND|os.O_RDWR, 0777)
 		defer file.Close()
 		test.AssertNoErr(err)
+
+		workspaceDB := test.qfs.c.workspaceDB.(*processlocal.WorkspaceDB)
+		// Grab a copy of the workspace with its nonce
+		wsCopy := func () *processlocal.WorkspaceInfo {
+			defer workspaceDB.CacheMutex.RLock().RUnlock()
+			copy, err := workspaceDB.Workspace_(&test.qfs.c.Ctx, "testA",
+				"testB", "testC")
+			test.AssertNoErr(err)
+
+			return copy
+		} ()
 
 		// Invalidate the underlying workspaceB so publish attempts error out
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 
-		_, err = file.Write([]byte("addon data"))
+		_, err = file.Write([]byte(" addon data"))
 		test.AssertNoErr(err)
 
 		// Try to publish, causing an error on Advance
 		test.SyncAllWorkspaces()
+		test.WaitForLogString("Unable to AdvanceWorkspace",
+			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces")
 
 		// Now put the workspace back
-		tokens := strings.Split(test.RelPath(workspace), "/")
-		test.qfs.c.workspaceDB.BranchWorkspace(&test.qfs.c.Ctx, tokens[0],
-			tokens[1], tokens[2], "testA", "testB", "testC")
+		func () {
+			defer workspaceDB.CacheMutex.Lock().Unlock()
+			workspaceDB.InsertMap_("testA", "testB", "testC", wsCopy)
+		} ()
+
+		// Without changing anything, test that we can sync without dirtying
+		test.AssertNoErr(api.Branch(test.RelPath(workspaceB), workspaceD))
+		branchedData, err := ioutil.ReadFile(test.AbsPath(workspaceD) +
+			"/testFile")
+		test.AssertNoErr(err)
+		test.Assert(bytes.Equal(branchedData,
+			[]byte("sample data addon data")),
+			"flushInode couldn't recover from workspaceDB error: %s",
+			branchedData)
 
 		test.AssertNoErr(api.EnableRootWrite(workspaceB))
 		test.AssertNoErr(testutils.PrintToFile(test.AbsPath(workspaceB)+
 			"/testFileC", "a bit more data"))
-
-		test.WaitForLogString("Unable to AdvanceWorkspace",
-			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces")
 	})
 }
