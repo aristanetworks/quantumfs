@@ -543,7 +543,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	return newRootId
 }
 
-func (wsr *WorkspaceRoot) publish(c *ctx) {
+func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
 	wsr.lock.RLock()
@@ -582,18 +582,20 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			c.qfs.workspaceMutability[workspacePath] = 0 +
 				workspaceImmutableUntilRestart
 
-			return
+			return false
 		} else if err != nil {
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 
 			// return so that we can try again later
-			return
+			return false
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
 			rootId.String())
 		wsr.publishedRootId = rootId
 	}
+
+	return true
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
@@ -775,11 +777,16 @@ func (wsr *WorkspaceRoot) clearList() {
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	newKey, _ := wsr.flushCanFail(c)
+	return newKey
+}
+
+func (wsr *WorkspaceRoot) flushCanFail(c *ctx) (quantumfs.ObjectKey, bool) {
 	defer c.funcIn("WorkspaceRoot::flush").Out()
 
 	wsr.Directory.flush(c)
-	wsr.publish(c)
-	return wsr.publishedRootId
+	success := wsr.publish(c)
+	return wsr.publishedRootId, success
 }
 
 func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
