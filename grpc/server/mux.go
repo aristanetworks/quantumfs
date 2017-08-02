@@ -438,7 +438,31 @@ func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
 func (m *mux) BranchWorkspace(c context.Context,
 	request *rpc.BranchWorkspaceRequest) (*rpc.Response, error) {
 
-	m.notifyChange(request.Destination, request.RequestId, false)
+	ctx := m.newCtx(request.RequestId.Id)
+
+	srcParts := strings.Split(request.Source, "/")
+	dstParts := strings.Split(request.Destination, "/")
+	err := m.backend.BranchWorkspace(ctx, srcParts[0], srcParts[1],
+		srcParts[2], dstParts[0], dstParts[1], dstParts[2])
+
+	response := rpc.Response{
+		RequestId: request.RequestId,
+		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+		ErrCause:  "Unknown",
+	}
+
+	if err == nil {
+		response.Err = 0
+		response.ErrCause = "Success"
+		m.notifyChange(request.Destination, request.RequestId, false)
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Err = rpc.ResponseCodes(err.Code)
+		response.ErrCause = err.Msg
+		return &response, nil
+	}
 	return &rpc.Response{}, nil
 }
 
