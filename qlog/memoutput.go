@@ -27,7 +27,7 @@ const mmapStrMapSize = 512 * 1024
 
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const QlogVersion = 4
+const QlogVersion = 5
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
 // so the max packet length is 15 bits long

@@ -344,11 +344,14 @@ type Api interface {
 }
 
 type apiImpl struct {
-	fd *os.File
+	fdMutex utils.DeferableMutex
+	fd      *os.File
 }
 
 func (api *apiImpl) Close() {
+	defer api.fdMutex.Lock().Unlock()
 	api.fd.Close()
+	api.fd = nil
 }
 
 type CommandCommon struct {
@@ -480,6 +483,7 @@ type SetWorkspaceImmutableRequest struct {
 }
 
 func (api *apiImpl) sendCmd(buf []byte) ([]byte, error) {
+	defer api.fdMutex.Lock().Unlock()
 	err := utils.WriteAll(api.fd, buf)
 	if err != nil {
 		return nil, err

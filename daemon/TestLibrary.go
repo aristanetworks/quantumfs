@@ -40,6 +40,8 @@ type TestHelper struct {
 	qfsWait         sync.WaitGroup
 	fuseConnections []int
 	api             quantumfs.Api
+	apiMutex        utils.DeferableMutex
+	finished        bool
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {
@@ -104,9 +106,8 @@ func abortFuse(th *TestHelper) {
 func (th *TestHelper) EndTest() {
 	exception := recover()
 
-	if th.api != nil {
-		th.api.Close()
-	}
+	th.finishApi()
+	th.putApi()
 
 	for _, qfs := range th.qfsInstances {
 		if qfs != nil && qfs.server != nil {
@@ -118,7 +119,17 @@ func (th *TestHelper) EndTest() {
 				abortFuse(th)
 			}
 			logFuseWaiting("Before unmount", th)
-			if err := qfs.server.Unmount(); err != nil {
+			var err error
+			for i := 0; i < 10; i++ {
+				err = qfs.server.Unmount()
+				if err == nil {
+					break
+				}
+				th.Log("umount try %d failed with %s, retrying",
+					i+1, err.Error())
+				time.Sleep(time.Millisecond)
+			}
+			if err != nil {
 				th.Log("ERROR: Failed to unmount quantumfs instance")
 				th.Log("Are you leaking a file descriptor?: %s",
 					err.Error())
@@ -254,7 +265,8 @@ func (th *TestHelper) waitForQuantumFsToFinish() {
 
 func (th *TestHelper) RestartQuantumFs() error {
 	config := th.qfsInstances[0].config
-	th.api.Close()
+
+	th.putApi()
 
 	for _, qfs := range th.qfsInstances {
 		err := qfs.server.Unmount()
@@ -271,6 +283,12 @@ func (th *TestHelper) RestartQuantumFs() error {
 }
 
 func (th *TestHelper) getApi() quantumfs.Api {
+	defer th.apiMutex.Lock().Unlock()
+	if th.finished {
+		// the test has finished, accessing the api file
+		// is not safe. The caller shall panic
+		return nil
+	}
 	if th.api != nil {
 		return th.api
 	}
@@ -281,17 +299,18 @@ func (th *TestHelper) getApi() quantumfs.Api {
 	return th.api
 }
 
+// Prevent any further api files to get opened
+func (th *TestHelper) finishApi() {
+	defer th.apiMutex.Lock().Unlock()
+	th.finished = true
+}
+
 func (th *TestHelper) putApi() {
+	defer th.apiMutex.Lock().Unlock()
 	if th.api != nil {
 		th.api.Close()
 	}
 	th.api = nil
-}
-
-func (th *TestHelper) getUniqueApi(fdPath string) quantumfs.Api {
-	api, err := quantumfs.NewApiWithPath(fdPath)
-	th.Assert(err == nil, "Error getting unique api: %v", err)
-	return api
 }
 
 // Make the given path absolute to the mount root

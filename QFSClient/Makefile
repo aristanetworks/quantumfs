@@ -18,9 +18,10 @@ TEST_TARGET := $(d)/qfs_client_test
 
 SRCS      := $(d)/qfs_client_implementation.cc $(d)/qfs_client_util.cc
 OBJS      := $(SRCS:.cc=.o)
-DEPS      := $(SRCS:.cc=.d)
+HDRS      := $(d)/qfs_client_implementation.h $(d)/qfs_client_util.h $(d)/qfs_client_data.h $(d)/qfs_client.h
 TEST_SRCS := $(d)/qfs_client_test.cc $(d)/qfs_client_util_test.cc
 TEST_OBJS := $(TEST_SRCS:.cc=.o)
+TEST_HDRS := $(d)/qfs_client_test.h
 
 CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -shared -Wl,-rpath,.
@@ -33,15 +34,14 @@ qfsclient: $(TARGET)
 clean: qfsc-clean
 
 qfsc-clean:
-	rm -f $(TARGET) $(OBJS) $(DEPS) $(TEST_TARGET) $(TEST_OBJS)
-
-$(OBJS): $(DEPS)
-
-%.d: %.cc
-	$(CXX) -M $(CXX_FLAGS) $< > $@
+	rm -f $(TARGET) $(OBJS) $(TEST_TARGET) $(TEST_OBJS)
 
 %.o: %.cc
 	$(CXX) $(CXX_FLAGS) -c -o $@ $<
+
+$(OBJS): $(HDRS)
+
+$(TEST_OBJS): $(TEST_HDRS)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^
@@ -61,4 +61,4 @@ cleanuplocal:
 		../cleanup.sh $(ppid) & \
 	fi
 
-.PHONY: all test cleanuplocal
+.PHONY: all test cleanuplocal gotests
