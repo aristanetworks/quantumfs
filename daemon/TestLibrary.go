@@ -40,6 +40,8 @@ type TestHelper struct {
 	qfsWait         sync.WaitGroup
 	fuseConnections []int
 	api             quantumfs.Api
+	apiMutex        utils.DeferableMutex
+	finished        bool
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {
@@ -104,6 +106,7 @@ func abortFuse(th *TestHelper) {
 func (th *TestHelper) EndTest() {
 	exception := recover()
 
+	th.finishApi()
 	th.putApi()
 
 	for _, qfs := range th.qfsInstances {
@@ -280,6 +283,12 @@ func (th *TestHelper) RestartQuantumFs() error {
 }
 
 func (th *TestHelper) getApi() quantumfs.Api {
+	defer th.apiMutex.Lock().Unlock()
+	if th.finished {
+		// the test has finished, accessing the api file
+		// is not safe. The caller shall panic
+		return nil
+	}
 	if th.api != nil {
 		return th.api
 	}
@@ -290,7 +299,14 @@ func (th *TestHelper) getApi() quantumfs.Api {
 	return th.api
 }
 
+// Prevent any further api files to get opened
+func (th *TestHelper) finishApi() {
+	defer th.apiMutex.Lock().Unlock()
+	th.finished = true
+}
+
 func (th *TestHelper) putApi() {
+	defer th.apiMutex.Lock().Unlock()
 	if th.api != nil {
 		th.api.Close()
 	}
