@@ -371,14 +371,14 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 
 		workspaceDB := test.qfs.c.workspaceDB.(*processlocal.WorkspaceDB)
 		// Grab a copy of the workspace with its nonce
-		wsCopy := func () *processlocal.WorkspaceInfo {
+		wsCopy := func() *processlocal.WorkspaceInfo {
 			defer workspaceDB.CacheMutex.RLock().RUnlock()
 			copy, err := workspaceDB.Workspace_(&test.qfs.c.Ctx, "testA",
 				"testB", "testC")
 			test.AssertNoErr(err)
 
 			return copy
-		} ()
+		}()
 
 		// Invalidate the underlying workspaceB so publish attempts error out
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
@@ -394,10 +394,10 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces")
 
 		// Now put the workspace back
-		func () {
+		func() {
 			defer workspaceDB.CacheMutex.Lock().Unlock()
 			workspaceDB.InsertMap_("testA", "testB", "testC", wsCopy)
-		} ()
+		}()
 
 		// Without changing anything, test that we can sync without dirtying
 		test.AssertNoErr(api.Branch(test.RelPath(workspaceB), workspaceD))
