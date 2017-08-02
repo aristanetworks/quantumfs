@@ -65,7 +65,7 @@ func StartWorkspaceDbd(port uint16, backend string, config string) error {
 type mux struct {
 	subscriptionLock utils.DeferableRwMutex
 	// workspace name to client name
-	subscriptions map[string]string
+	subscriptions map[string]map[string]bool
 	// client name to notification channel
 	clients map[string]chan quantumfs.WorkspaceState
 
@@ -77,7 +77,7 @@ type mux struct {
 
 func newMux(wsdb quantumfs.WorkspaceDB) *mux {
 	m := mux{
-		subscriptions: map[string]string{},
+		subscriptions: map[string]map[string]bool{},
 		clients:       map[string]chan quantumfs.WorkspaceState{},
 		backend:       wsdb,
 		qlog:          qlog.NewQlogTiny(),
@@ -287,7 +287,7 @@ func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
 
 	defer m.subscriptionLock.Lock().Unlock()
 
-	m.subscriptions[clientName.Addr.String()] = request.Name
+	m.subscriptions[request.Name][clientName.Addr.String()] = true
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -325,7 +325,7 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 		panic("Unknown client!")
 	}
 
-	changes := make(chan quantumfs.WorkspaceState)
+	changes := make(chan quantumfs.WorkspaceState, 128)
 
 	func() {
 		defer m.subscriptionLock.Lock().Unlock()
@@ -361,12 +361,48 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 	return nil
 }
 
+func (m *mux) notifyChange(workspaceName string, requestId uint64, deleted bool) {
+	var update quantumfs.WorkspaceState
+	if deleted {
+		update.Deleted = true
+	} else {
+		ctx := m.newCtx(requestId)
+
+		parts := strings.Split(workspaceName, "/")
+		key, nonce, err := m.backend.Workspace(ctx, parts[0], parts[1],
+			parts[2])
+
+		if err != nil {
+			panic("Received error when fetching workspace")
+		}
+
+		update.RootId = key
+		update.Nonce = nonce
+		update.Immutable = false
+		update.Deleted = false
+	}
+
+	defer m.subscriptionLock.RLock().RUnlock()
+	subscriptions, ok := m.subscriptions[workspaceName]
+
+	if !ok {
+		// Nobody is subscribed to this workspace
+		return
+	}
+
+	for clientName, _ := range subscriptions {
+		if client, ok := m.clients[clientName]; ok {
+			client <- update
+		}
+	}
+}
+
 func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.FetchWorkspaceResponse, error) {
 
 	ctx := m.newCtx(request.RequestId.Id)
 
-	parts := strings.Split(request.Name, " ")
+	parts := strings.Split(request.Name, "/")
 	key, nonce, err := m.backend.Workspace(ctx, parts[0], parts[1], parts[2])
 
 	response := rpc.FetchWorkspaceResponse{
