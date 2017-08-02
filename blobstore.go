@@ -61,10 +61,10 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 	return cbs, nil
 }
 
-// InsertLog is used in qloggerdb for log parsing
+// InsertLog can be used in external tool for log parsing
 const InsertLog = "Cql::Insert"
 
-// KeyTTLLog is used in qloggerdb for log parsing
+// KeyTTLLog can be used in external tool for log parsing
 const KeyTTLLog = "Key: %s TTL: %s"
 
 // Insert is the CQL implementation of blobstore.Insert()
@@ -103,10 +103,10 @@ USING TTL %s`, b.keyspace, ttl)
 	return nil
 }
 
-// GetLog is used in qloggerdb for log parsing
+// GetLog can be used in external tool for log parsing
 const GetLog = "Cql::Get"
 
-// KeyLog is used in qloggerdb for log parsing
+// KeyLog can be used in external tool for log parsing
 const KeyLog = "Key: %s"
 
 // Get is the CQL implementation of blobstore.Get()
@@ -140,7 +140,7 @@ WHERE key = ?`, b.keyspace)
 	return value, mdata, nil
 }
 
-// DeleteLog is used in qloggerdb for log parsing
+// DeleteLog can be used in external tool for log parsing
 const DeleteLog = "Cql::Delete"
 
 // Delete is the CQL implementation of blobstore.Delete()
@@ -151,7 +151,7 @@ func (b *cqlBlobStore) Delete(c ether.Ctx, key []byte) error {
 		"Delete operation is not implemented")
 }
 
-// MetadataLog is used in qloggerdb for log parsing
+// MetadataLog can be used in external tool for log parsing
 const MetadataLog = "Cql::Metadata"
 
 // Metadata is the CQL implementation of blobstore.Metadata()
@@ -185,7 +185,7 @@ WHERE key = ?`, b.keyspace)
 	return mdata, nil
 }
 
-// UpdateLog is used in qloggerdb for log parsing
+// UpdateLog can be used in external tool for log parsing
 const UpdateLog = "Cql::Update"
 
 // Update is the CQL implementation of blobstore.Update()
