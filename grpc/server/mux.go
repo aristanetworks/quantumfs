@@ -463,26 +463,99 @@ func (m *mux) BranchWorkspace(c context.Context,
 		response.ErrCause = err.Msg
 		return &response, nil
 	}
-	return &rpc.Response{}, nil
+	return &response, err
 }
 
 func (m *mux) DeleteWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	m.notifyChange(request.Name, request.RequestId, true)
-	return &rpc.Response{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+
+	parts := strings.Split(request.Name, "/")
+	err := m.backend.DeleteWorkspace(ctx, parts[0], parts[1], parts[2])
+
+	response := rpc.Response{
+		RequestId: request.RequestId,
+		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+		ErrCause:  "Unknown",
+	}
+
+	if err == nil {
+		response.Err = 0
+		response.ErrCause = "Success"
+		m.notifyChange(request.Name, request.RequestId, true)
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Err = rpc.ResponseCodes(err.Code)
+		response.ErrCause = err.Msg
+		return &response, nil
+	}
+	return &response, err
 }
 
 func (m *mux) SetWorkspaceImmutable(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	m.notifyChange(request.Name, request.RequestId, false)
-	return &rpc.Response{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+
+	parts := strings.Split(request.Name, "/")
+	err := m.backend.SetWorkspaceImmutable(ctx, parts[0], parts[1], parts[2])
+
+	response := rpc.Response{
+		RequestId: request.RequestId,
+		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+		ErrCause:  "Unknown",
+	}
+
+	if err == nil {
+		response.Err = 0
+		response.ErrCause = "Success"
+		m.notifyChange(request.Name, request.RequestId, false)
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Err = rpc.ResponseCodes(err.Code)
+		response.ErrCause = err.Msg
+		return &response, nil
+	}
+	return &response, err
 }
 
 func (m *mux) AdvanceWorkspace(c context.Context,
 	request *rpc.AdvanceWorkspaceRequest) (*rpc.AdvanceWorkspaceResponse, error) {
 
-	m.notifyChange(request.WorkspaceName, request.RequestId, false)
-	return &rpc.AdvanceWorkspaceResponse{}, nil
+	ctx := m.newCtx(request.RequestId.Id)
+
+	parts := strings.Split(request.WorkspaceName, "/")
+	currentKey := quantumfs.NewObjectKeyFromBytes(request.CurrentRootId.Data)
+	newKey := quantumfs.NewObjectKeyFromBytes(request.NewRootId.Data)
+	nonce := quantumfs.WorkspaceNonce(request.Nonce.Nonce)
+	dbKey, err := m.backend.AdvanceWorkspace(ctx, parts[0], parts[1], parts[2],
+		nonce, currentKey, newKey)
+
+	response := rpc.AdvanceWorkspaceResponse{
+		Header: &rpc.Response{
+			RequestId: request.RequestId,
+			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+			ErrCause:  "Unknown",
+		},
+	}
+
+	if err == nil {
+		response.Header.Err = 0
+		response.Header.ErrCause = "Success"
+		response.NewKey = &rpc.ObjectKey{Data: dbKey.Value()}
+		m.notifyChange(request.WorkspaceName, request.RequestId, false)
+		return &response, nil
+	}
+
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+		response.Header.Err = rpc.ResponseCodes(err.Code)
+		response.Header.ErrCause = err.Msg
+		return &response, nil
+	}
+	return &response, err
 }
