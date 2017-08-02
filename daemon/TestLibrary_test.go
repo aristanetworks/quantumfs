@@ -21,6 +21,7 @@ import (
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -159,6 +160,19 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	th.CreateTestDirs()
 	defer th.EndTest()
 
+	var alt utils.AlternatingLocker
+	func() {
+		defer alt.ALock().AUnlock()
+		startQuantumFsInstances(numDefaultQfs, configModifier, th)
+	}()
+
+	defer alt.RLock().RUnlock()
+	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+}
+
+func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFunc,
+	th *testHelper) {
+
 	// Allow tests to run for up to 1 seconds before considering them timed out.
 	// If we are going to start a standard QuantumFS instance we can start the
 	// timer before the test proper and therefore avoid false positive test
@@ -189,8 +203,6 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	if numDefaultQfs > 2 {
 		th.T.Fatalf("Too many QuantumFS instances requested")
 	}
-
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
 }
 
 type quantumFsTest func(test *testHelper)
@@ -559,9 +571,7 @@ func (test *testHelper) linkFile(workspace string, src string,
 	srcfilename := workspace + "/" + src
 	dstfilename := workspace + "/" + dst
 	test.Log("Before link %s -> %s", src, dst)
-	err := syscall.Link(srcfilename, dstfilename)
-	test.AssertNoErr(err)
-
+	test.AssertNoErr(syscall.Link(srcfilename, dstfilename))
 }
 
 func (test *testHelper) linkFileSync(workspace string, src string,
@@ -569,6 +579,23 @@ func (test *testHelper) linkFileSync(workspace string, src string,
 
 	return test.synced_op(workspace, func() {
 		test.linkFile(workspace, src, dst)
+	})
+}
+
+func (test *testHelper) moveFile(workspace string, src string,
+	dst string) {
+
+	srcfilename := workspace + "/" + src
+	dstfilename := workspace + "/" + dst
+	test.Log("Before move %s -> %s", src, dst)
+	test.AssertNoErr(syscall.Rename(srcfilename, dstfilename))
+}
+
+func (test *testHelper) moveFileSync(workspace string, src string,
+	dst string) quantumfs.ObjectKey {
+
+	return test.synced_op(workspace, func() {
+		test.moveFile(workspace, src, dst)
 	})
 }
 

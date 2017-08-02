@@ -644,7 +644,7 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
-func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
+func reload(c *ctx, wsr *WorkspaceRoot, rc *RefreshContext, inode Inode,
 	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
@@ -660,10 +660,7 @@ func reload(c *ctx, wsr *WorkspaceRoot, hrc *HardlinkRefreshCtx, inode Inode,
 		panic("symlinks cannot be reloaded.")
 	case quantumfs.ObjectTypeDirectory:
 		subdir := inode.(*Directory)
-		uninstantiated, removedUninstantiated :=
-			subdir.refresh_DOWN(c, hrc, remoteRecord.ID())
-		c.qfs.addUninstantiated(c, uninstantiated, inode.inodeNum())
-		c.qfs.removeUninstantiated(c, removedUninstantiated)
+		subdir.refresh_DOWN(c, rc, remoteRecord.ID())
 	case quantumfs.ObjectTypeHardlink:
 		fileId := remoteRecord.FileId()
 		valid, hardlinkRecord := wsr.getHardlink(fileId)
