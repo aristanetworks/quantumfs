@@ -51,7 +51,8 @@ func TestUnknownInodeId(t *testing.T) {
 		test.AssertNoErr(err)
 
 		_, err = os.Open(filename)
-		test.Assert(err != nil && os.IsNotExist(err),
+		test.AssertErr(err)
+		test.Assert(os.IsNotExist(err),
 			"Expected ENOENT, got %s", err.Error())
 	})
 }

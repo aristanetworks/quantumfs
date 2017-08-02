@@ -344,7 +344,7 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	bytes := api.currentResponse
 	maxReturnIndx := offset + uint64(size)
 	responseSize := uint64(len(bytes))
-	c.vlog("API Response size %d with offset  %d", responseSize, offset)
+	c.vlog("API Response size %d with offset %d", responseSize, offset)
 
 	if responseSize <= maxReturnIndx {
 		c.vlog("API returning len %d '%q'", len(bytes[offset:]),

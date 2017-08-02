@@ -13,7 +13,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"runtime/pprof"
 	"sort"
 	"strings"
 	"sync"
@@ -192,17 +191,11 @@ func (th *TestHelper) EndTest() {
 	}
 }
 
-func (th *TestHelper) dumpStackTraces() {
-	pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
-}
-
 func (th *TestHelper) WaitForResult() string {
 	var testResult string
 	select {
 	case <-time.After(th.Timeout):
 		testResult = "ERROR: TIMED OUT"
-		th.dumpStackTraces()
-
 	case testResult = <-th.TestResult:
 	}
 	return testResult
