@@ -361,12 +361,14 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 	return nil
 }
 
-func (m *mux) notifyChange(workspaceName string, requestId uint64, deleted bool) {
+func (m *mux) notifyChange(workspaceName string, requestId *rpc.RequestId,
+	deleted bool) {
+
 	var update quantumfs.WorkspaceState
 	if deleted {
 		update.Deleted = true
 	} else {
-		ctx := m.newCtx(requestId)
+		ctx := m.newCtx(requestId.Id)
 
 		parts := strings.Split(workspaceName, "/")
 		key, nonce, err := m.backend.Workspace(ctx, parts[0], parts[1],
@@ -436,23 +438,27 @@ func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
 func (m *mux) BranchWorkspace(c context.Context,
 	request *rpc.BranchWorkspaceRequest) (*rpc.Response, error) {
 
+	m.notifyChange(request.Destination, request.RequestId, false)
 	return &rpc.Response{}, nil
 }
 
 func (m *mux) DeleteWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
+	m.notifyChange(request.Name, request.RequestId, true)
 	return &rpc.Response{}, nil
 }
 
 func (m *mux) SetWorkspaceImmutable(c context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
+	m.notifyChange(request.Name, request.RequestId, false)
 	return &rpc.Response{}, nil
 }
 
 func (m *mux) AdvanceWorkspace(c context.Context,
 	request *rpc.AdvanceWorkspaceRequest) (*rpc.AdvanceWorkspaceResponse, error) {
 
+	m.notifyChange(request.WorkspaceName, request.RequestId, false)
 	return &rpc.AdvanceWorkspaceResponse{}, nil
 }
