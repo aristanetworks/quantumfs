@@ -162,6 +162,9 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 func hasDirectoryWritePermSticky(c *ctx, inode Inode,
 	childOwner quantumfs.UID) fuse.Status {
 
+	if c.fuseCtx == nil {
+		return fuse.OK
+	}
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid
@@ -173,6 +176,9 @@ func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
 	// Directories require execute permission in order to traverse them.
 	// So, we must check both write and execute bits
 
+	if c.fuseCtx == nil {
+		return fuse.OK
+	}
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid

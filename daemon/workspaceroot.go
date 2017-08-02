@@ -255,10 +255,10 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 }
 
 func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
-	fileId quantumfs.FileId) InodeId {
+	fileId quantumfs.FileId, inodeId InodeId) InodeId {
 
-	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeId", "fileId %d",
-		fileId).Out()
+	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeId", "fileId %d, inodeId %d",
+		fileId, inodeId).Out()
 	defer wsr.linkLock.Lock().Unlock()
 
 	// Ensure the fileId is valid
@@ -266,15 +266,19 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
 	if !exists {
 		// It should be possible, via races, that someone could check
 		// on a link which has *just* been deleted
-		return quantumfs.InodeIdInvalid
+		return inodeId
 	}
 
 	if hardlink.inodeId != quantumfs.InodeIdInvalid {
 		return hardlink.inodeId
 	}
 
+	if inodeId != quantumfs.InodeIdInvalid {
+		return inodeId
+	}
+
 	// we need to load this Hardlink partially - giving it an inode number
-	inodeId := c.qfs.newInodeId()
+	inodeId = c.qfs.newInodeId()
 	hardlink.inodeId = inodeId
 	wsr.hardlinks[fileId] = hardlink
 	wsr.inodeToLink[inodeId] = fileId
@@ -492,134 +496,6 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 	}
 }
 
-func (wsr *WorkspaceRoot) handleRemoteHardlink(c *ctx,
-	hrc *HardlinkRefreshCtx, hardlink *quantumfs.HardlinkRecord) {
-
-	defer c.funcIn("WorkspaceRoot::handleRemoteHardlink").Out()
-	id := quantumfs.FileId(hardlink.FileId())
-	if entry, exists := wsr.hardlinks[id]; !exists {
-		c.vlog("Adding new hardlink entry with id %d", id)
-		newLink := newLinkEntry(hardlink.Record())
-		newLink.nlink = hardlink.Nlinks()
-		wsr.hardlinks[id] = newLink
-	} else {
-		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
-			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
-		oldRecord := entry.record
-
-		entry.nlink = hardlink.Nlinks()
-		entry.record = hardlink.Record()
-		wsr.hardlinks[id] = entry
-
-		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
-			if inode := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId); inode != nil {
-
-				c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
-					oldRecord.ID().String(),
-					hardlink.Record().ID().String())
-				utils.Assert(!hardlink.Record().Type().IsImmutable(),
-					"An immutable type cannot be reloaded.")
-				reload(c, wsr, hrc, inode, hardlink.Record())
-			}
-		}
-
-		status := c.qfs.invalidateInode(entry.inodeId)
-		utils.Assert(status == fuse.OK,
-			"invalidating %d failed with %d", entry.inodeId, status)
-	}
-}
-
-type HardlinkLoadRecord struct {
-	parent       *Directory
-	remoteRecord *quantumfs.DirectRecord
-}
-
-type HardlinkRefreshCtx struct {
-	claimedLinks map[quantumfs.FileId]InodeId
-	loadRecords  []HardlinkLoadRecord
-}
-
-func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
-	hrc *HardlinkRefreshCtx, entry quantumfs.HardlinkEntry) {
-
-	defer c.funcIn("WorkspaceRoot::refreshHardlinks").Out()
-	defer wsr.linkLock.Lock().Unlock()
-
-	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
-		hrc.claimedLinks[quantumfs.FileId(hardlink.FileId())] =
-			quantumfs.InodeIdInvalid
-		wsr.handleRemoteHardlink(c, hrc, hardlink)
-	})
-}
-
-func (wsr *WorkspaceRoot) removeStaleHardlinks(c *ctx,
-	hrc *HardlinkRefreshCtx, entry quantumfs.HardlinkEntry) {
-
-	defer c.funcIn("WorkspaceRoot::removeStaleHardlinks").Out()
-	defer wsr.linkLock.Lock().Unlock()
-
-	for fileId, entry := range wsr.hardlinks {
-		if inodeId, exists := hrc.claimedLinks[fileId]; !exists {
-			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
-				fileId, entry.inodeId, entry.nlink)
-			if inode := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId); inode != nil {
-
-				inode.orphan(c, entry.record)
-			}
-			wsr.removeHardlink_(fileId, entry.inodeId)
-		} else if inodeId != quantumfs.InodeIdInvalid {
-			wsr.removeHardlink_(fileId, entry.inodeId)
-		}
-	}
-}
-
-func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
-	defer c.funcIn("WorkspaceRoot::refreshTo").Out()
-
-	c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",
-		wsr.typespace, wsr.namespace, wsr.workspace,
-		wsr.publishedRootId.String(), rootId.String())
-
-	func() {
-		defer c.qfs.mutabilityLock.Lock().Unlock()
-		utils.Assert(c.qfs.workspaceMutability[wsr.workspace] !=
-			workspaceMutable,
-			"Cannot handle mutable workspaces yet")
-	}()
-
-	buffer := c.dataStore.Get(&c.Ctx, rootId)
-	workspaceRoot := buffer.AsWorkspaceRoot()
-
-	var hrc HardlinkRefreshCtx
-	hrc.claimedLinks = make(map[quantumfs.FileId]InodeId, 0)
-	hrc.loadRecords = make([]HardlinkLoadRecord, 0)
-
-	wsr.refreshHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
-
-	var addedUninstantiated, removedUninstantiated []InodeId
-	func() {
-		defer wsr.LockTree().Unlock()
-		addedUninstantiated, removedUninstantiated =
-			wsr.refresh_DOWN(c, &hrc, workspaceRoot.BaseLayer())
-	}()
-
-	for _, loadRecord := range hrc.loadRecords {
-		func() {
-			defer wsr.LockTree().Unlock()
-			defer loadRecord.parent.childRecordLock.Lock().Unlock()
-			loadRecord.parent.loadNewChild_DOWN(c,
-				loadRecord.remoteRecord)
-		}()
-	}
-
-	c.qfs.addUninstantiated(c, addedUninstantiated, wsr.inodeNum())
-	c.qfs.removeUninstantiated(c, removedUninstantiated)
-
-	wsr.removeStaleHardlinks(c, &hrc, workspaceRoot.HardlinkEntry())
-}
-
 func (wsr *WorkspaceRoot) refresh(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
@@ -632,6 +508,16 @@ func (wsr *WorkspaceRoot) refresh(c *ctx) {
 			wsr.workspace, wsr.nonce, nonce)
 		return
 	}
+	func() {
+		defer c.qfs.mutabilityLock.Lock().Unlock()
+		utils.Assert(c.qfs.workspaceMutability[wsr.workspace] !=
+			workspaceMutable,
+			"Cannot handle mutable workspaces yet")
+	}()
+
+	c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",
+		wsr.typespace, wsr.namespace, wsr.workspace,
+		wsr.publishedRootId.String(), publishedRootId.String())
 
 	wsr.refreshTo(c, publishedRootId)
 	wsr.publishedRootId = publishedRootId
