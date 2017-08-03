@@ -19,11 +19,11 @@ func TestBasicInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		apiNoPath, err := GetApi()
 		test.AssertNoErr(err)
-		err = ReleaseApi(apiNoPath)
-		test.AssertNoErr(err)
+		test.putApi(apiNoPath)
 
 		api, err := GetApiPath(test.TempDir + "/mnt/api")
 		test.AssertNoErr(err)
+		defer test.putApi(api)
 
 		testKey := "ABABABABABABABABABAB"
 		testData := daemon.GenData(2000)
@@ -34,15 +34,13 @@ func TestBasicInterface(t *testing.T) {
 		test.AssertNoErr(err)
 		test.Assert(bytes.Equal(testData, readBack),
 			"Data changed between SetBlock and GetBlock")
-
-		err = ReleaseApi(api)
-		test.AssertNoErr(err)
 	})
 }
 
 func TestBranchAndDeleteInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
+		defer test.putApi(api)
 
 		err := api.Branch("_/_/_", "test/test/test")
 		test.AssertNoErr(err)
@@ -60,9 +58,6 @@ func TestBranchAndDeleteInterface(t *testing.T) {
 			_, err = os.Stat(test.AbsPath("test/test/test"))
 			return os.IsNotExist(err)
 		})
-
-		err = ReleaseApi(api)
-		test.AssertNoErr(err)
 	})
 }
 
@@ -81,6 +76,7 @@ func TestInsertInode(t *testing.T) {
 		fileKey := string(attrKey[:attrLen])
 
 		api := test.getApi()
+		defer test.putApi(api)
 
 		err = api.InsertInode(test.RelPath(workspace)+"/fileCopy", fileKey,
 			0777, uint32(os.Getuid()), uint32(os.Getgid()))
@@ -89,9 +85,6 @@ func TestInsertInode(t *testing.T) {
 		readBack, err := ioutil.ReadFile(workspace + "/fileCopy")
 		test.Assert(bytes.Equal(readBack, filedata),
 			"inserted inode data mismatch")
-
-		err = ReleaseApi(api)
-		test.AssertNoErr(err)
 	})
 }
 
@@ -102,6 +95,7 @@ func TestAccessFileList(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(filename, "contents"))
 
 		api := test.getApi()
+		defer test.putApi(api)
 
 		paths, err := api.GetAccessed(test.RelPath(workspace))
 		test.AssertNoErr(err)
@@ -111,6 +105,5 @@ func TestAccessFileList(t *testing.T) {
 		test.Assert(paths.Paths["/file"] == quantumfs.PathCreated|
 			quantumfs.PathUpdated, "Incorrect access mark %x",
 			paths.Paths["/file"])
-		test.AssertNoErr(ReleaseApi(api))
 	})
 }

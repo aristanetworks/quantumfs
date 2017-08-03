@@ -77,3 +77,7 @@ func (th *testHelper) getApi() QfsClientApi {
 	th.AssertNoErr(err)
 	return api
 }
+
+func (th *testHelper) putApi(api QfsClientApi) {
+	th.AssertNoErr(ReleaseApi(api))
+}
