@@ -1,19 +1,31 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package grpc
+package server
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
-func runTest(t *testing.T, test systemlocalTest) {
+var serversLock utils.DeferableMutex
+var servers map[uint16]*Server
+
+func init() {
+	servers = map[uint16]*Server{}
+}
+
+const initialPort = uint16(33333)
+
+func runTest(t *testing.T, test serverTest) {
 	t.Parallel()
 
 	// the stack depth of test name for all callers of runTest
@@ -22,12 +34,30 @@ func runTest(t *testing.T, test systemlocalTest) {
 	// 0 runTest
 	testName := testutils.TestName(1)
 
+	defer serversLock.Lock().Unlock()
+	port := initialPort
+	for {
+		if _, used := servers[port]; !used {
+			break
+		}
+		port++
+	}
+
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
-		wsdb: NewWorkspaceDB(""),
 	}
 	th.ctx = newCtx(th.Logger)
+
+	server, err := StartWorkspaceDbd(port, "processlocal", "")
+	if err != nil {
+		t.Fatalf(fmt.Sprintf("Failed to initialize wsdb server: %s",
+			err.Error()))
+	}
+
+	servers[port] = server
+	th.server = server
+	th.port = port
 
 	defer th.EndTest()
 
@@ -36,11 +66,12 @@ func runTest(t *testing.T, test systemlocalTest) {
 
 type testHelper struct {
 	testutils.TestHelper
-	ctx  *quantumfs.Ctx
-	wsdb quantumfs.WorkspaceDB
+	ctx    *quantumfs.Ctx
+	server *Server
+	port   uint16
 }
 
-type systemlocalTest func(test *testHelper)
+type serverTest func(test *testHelper)
 
 func newCtx(logger *qlog.Qlog) *quantumfs.Ctx {
 	// Create Ctx with random RequestId
@@ -62,6 +93,17 @@ func (th *testHelper) testHelperUpcast(
 	}
 }
 
+func (th *testHelper) EndTest() {
+	th.AssertNoErr(th.server.GracefulStop())
+
+	func() {
+		defer serversLock.Lock().Unlock()
+		delete(servers, th.port)
+	}()
+
+	th.TestHelper.EndTest()
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 
@@ -70,4 +112,11 @@ func TestMain(m *testing.M) {
 	testutils.PostTestRuns()
 
 	os.Exit(result)
+}
+
+func (th *testHelper) newClient() quantumfs.WorkspaceDB {
+	config := fmt.Sprintf("[::1]:%d", th.port)
+	client := grpc.NewWorkspaceDB(config)
+
+	return client
 }
