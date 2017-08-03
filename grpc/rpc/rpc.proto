@@ -107,9 +107,10 @@ message WorkspaceTableResponse {
 // Subscriptions
 message WorkspaceUpdate {
 	ObjectKey rootId = 1;
-	fixed64 nonce = 2;
-	bool immutable = 3;
-	bool deleted = 4;
+	string name = 2;
+	fixed64 nonce = 3;
+	bool immutable = 4;
+	bool deleted = 5;
 }
 
 // Work with Workspaces
