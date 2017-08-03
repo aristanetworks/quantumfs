@@ -217,7 +217,7 @@ type InodeCommon struct {
 	// to ensure that all Inode locks are only acquired child to parent.
 	treeLock_ *sync.RWMutex
 
-	// This element is protected by the DirtyQueueLock
+	// This element is protected by the flusher lock
 	dirtyElement__ *list.Element
 
 	unlinkRecord quantumfs.DirectoryRecord
@@ -462,7 +462,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 		return
 	}
 
-	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock().Unlock()
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
 		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
@@ -470,7 +470,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 }
 
 // Mark this Inode as having been cleaned
-// dirtyQueueLock must be locked when calling this function
+// flusher lock must be locked when calling this function
 func (inode *InodeCommon) markClean_() {
 	inode.dirtyElement__ = nil
 }
@@ -484,12 +484,12 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 func (inode *InodeCommon) queueToForget(c *ctx) {
 	defer c.funcIn("InodeCommon::queueToForget").Out()
 
-	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock().Unlock()
 	de := c.qfs.queueInodeToForget_(c, inode.self)
 	inode.dirtyElement__ = de
 }
 
-// dirtyQueueLock must be locked when calling this function
+// flusher lock must be locked when calling this function
 func (inode *InodeCommon) dirtyElement_() *list.Element {
 	return inode.dirtyElement__
 }
