@@ -4,7 +4,12 @@
 // This is the interface to the Workspace Name database.
 package quantumfs
 
-import "fmt"
+import (
+	"fmt"
+	"runtime/debug"
+
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 // WorkspaceNonce is a number used to distinguish between workspaces of the same
 // path, but different lifetimes. For example, if a workspace path were deleted and
@@ -149,4 +154,26 @@ func (err *WorkspaceDbErr) ErrorCode() string {
 	case WSDB_LOCKED:
 		return "Workspace lock error"
 	}
+}
+
+func SafelyCallSubscriptionCallback(callback SubscriptionCallback,
+	updates map[string]WorkspaceState) {
+
+	// Should the subscription callback panic, we'll log and then continue on.
+	// The update set which caused the panic may be lost, but subsequent update
+	// sets will be attempted.
+	defer func() {
+		exception := recover()
+		if exception == nil {
+			return
+		}
+
+		stackTrace := debug.Stack()
+
+		fmt.Printf("PANIC executing subscription callback: '%s' "+
+			"StackTrace: %s\n", fmt.Sprintf("%v", exception),
+			utils.BytesToString(stackTrace))
+	}()
+
+	callback(updates)
 }
