@@ -41,6 +41,7 @@ type workspaceDB struct {
 	server        rpc.WorkspaceDbClient
 	callback      quantumfs.SubscriptionCallback
 	subscriptions map[string]bool
+	updates       map[string]quantumfs.WorkspaceState
 }
 
 func (wsdb *workspaceDB) reconnect() {
@@ -63,6 +64,88 @@ func (wsdb *workspaceDB) reconnect() {
 	}
 
 	wsdb.server = rpc.NewWorkspaceDbClient(conn)
+
+	go wsdb.waitForWorkspaceUpdates()
+}
+
+func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
+	stream, err := wsdb.server.ListenForUpdates(context.TODO(), &rpc.Void{})
+	if err != nil {
+		wsdb.reconnect()
+		return
+	}
+
+	for {
+		update, err := stream.Recv()
+		if err != nil {
+			wsdb.reconnect()
+			return
+		}
+
+		startTransmission := false
+
+		func() {
+			defer wsdb.lock.Lock().Unlock()
+			if _, exists := wsdb.subscriptions[update.Name]; !exists {
+				// We aren't subscribed for this workspace
+				return
+			}
+
+			if wsdb.updates == nil {
+				startTransmission = true
+			}
+			wsdb.updates = map[string]quantumfs.WorkspaceState{}
+		}()
+
+		wsdb.updates[update.Name] = quantumfs.WorkspaceState{
+			RootId:    quantumfs.NewObjectKeyFromBytes(update.RootId.Data),
+			Nonce:     quantumfs.WorkspaceNonce(update.Nonce.Nonce),
+			Immutable: update.Immutable,
+			Deleted:   update.Deleted,
+		}
+
+		if !startTransmission {
+			// There is already an update in progress and we need to wait for
+			// that to complete. The goroutine which is running the callback will
+			// find these new updates and send them when it completes.
+			continue
+		}
+
+		go wsdb.sendNotifications()
+	}
+
+}
+
+func (wsdb *workspaceDB) sendNotifications() {
+	var callback quantumfs.SubscriptionCallback
+	var updates map[string]quantumfs.WorkspaceState
+
+	for {
+		func() {
+			defer wsdb.lock.Lock().Unlock()
+			callback = wsdb.callback
+			updates = wsdb.updates
+
+			if len(updates) == 0 {
+				// No new updates since the last time around, we have
+				// caught up.
+				wsdb.updates = nil
+				updates = nil
+			} else {
+				// There have been new updates since the previous
+				// time through the loop. Loop again.
+				wsdb.updates = map[string]quantumfs.WorkspaceState{}
+			}
+		}()
+
+		if updates == nil {
+			return
+		}
+
+		if callback != nil {
+			quantumfs.SafelyCallSubscriptionCallback(callback, updates)
+		}
+	}
 }
 
 func (wsdb *workspaceDB) handleGrpcError(err error) error {
