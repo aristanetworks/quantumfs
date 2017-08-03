@@ -22,6 +22,16 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+type Server struct {
+	server *grpc.Server
+	Error  error // Error after serving ceases
+}
+
+func (server *Server) GracefulStop() error {
+	server.server.GracefulStop()
+	return server.Error
+}
+
 // Start the WorkspaceDBd goroutine. This will open a socket and list on the given
 // port until an error occurs.
 //
@@ -29,10 +39,11 @@ import (
 // systemlocal are the only supported backends.
 //
 // config is the configuration string to pass to that backend.
-func StartWorkspaceDbd(port uint16, backend string, config string) error {
+func StartWorkspaceDbd(port uint16, backend string, config string) (
+	*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	connOptions := []grpc.ServerOption{
@@ -48,7 +59,7 @@ func StartWorkspaceDbd(port uint16, backend string, config string) error {
 
 	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m := newMux(wsdb)
@@ -56,7 +67,15 @@ func StartWorkspaceDbd(port uint16, backend string, config string) error {
 	grpcServer := grpc.NewServer(connOptions...)
 	rpc.RegisterWorkspaceDbServer(grpcServer, m)
 
-	return grpcServer.Serve(listener)
+	s := &Server{
+		server: grpcServer,
+	}
+
+	go func() {
+		s.Error = grpcServer.Serve(listener)
+	}()
+
+	return s, nil
 }
 
 // mux is the central component of the Workspace DB daemon. It receives the RPCs from
