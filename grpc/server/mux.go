@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -39,7 +40,7 @@ func (server *Server) Stop() error {
 // systemlocal are the only supported backends.
 //
 // config is the configuration string to pass to that backend.
-func StartWorkspaceDbd(port uint16, backend string, config string) (
+func StartWorkspaceDbd(qlog *qlog.Qlog, port uint16, backend string, config string) (
 	*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -62,7 +63,7 @@ func StartWorkspaceDbd(port uint16, backend string, config string) (
 		return nil, err
 	}
 
-	m := newMux(wsdb)
+	m := newMux(wsdb, qlog)
 
 	grpcServer := grpc.NewServer(connOptions...)
 	rpc.RegisterWorkspaceDbServer(grpcServer, m)
@@ -91,32 +92,47 @@ type mux struct {
 	// For now simply use one of the existing backends
 	backend quantumfs.WorkspaceDB
 
-	qlog *qlog.Qlog
+	qlog          *qlog.Qlog
+	lastRequestId uint64
 }
 
-func newMux(wsdb quantumfs.WorkspaceDB) *mux {
+func newMux(wsdb quantumfs.WorkspaceDB, qlog *qlog.Qlog) *mux {
 	m := mux{
 		subscriptions: map[string]map[string]bool{},
 		clients:       map[string]chan quantumfs.WorkspaceState{},
 		backend:       wsdb,
-		qlog:          qlog.NewQlogTiny(),
+		qlog:          qlog,
 	}
 
 	return &m
 }
 
-func (m *mux) newCtx(requestId uint64) *quantumfs.Ctx {
-	return &quantumfs.Ctx{
-		Qlog:      m.qlog,
-		RequestId: requestId,
+func (m *mux) newCtx(remoteRequestId uint64, context context.Context) *ctx {
+	requestId := atomic.AddUint64(&m.lastRequestId, 1)
+	clientName := "unknown"
+	client, ok := peer.FromContext(context)
+	if ok {
+		clientName = client.Addr.String()
 	}
+
+	c := &ctx{
+		Ctx: quantumfs.Ctx{
+			Qlog:      m.qlog,
+			RequestId: requestId,
+		},
+		clientName: clientName,
+	}
+
+	c.vlog("Starting remote request %d", remoteRequestId)
+
+	return c
 }
 
-func (m *mux) NumTypespaces(c context.Context, request *rpc.RequestId) (
+func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 	*rpc.NumTypespacesResponse, error) {
 
-	ctx := m.newCtx(request.Id)
-	num, err := m.backend.NumTypespaces(ctx)
+	c := m.newCtx(request.Id, ctx)
+	num, err := m.backend.NumTypespaces(&c.Ctx)
 
 	response := rpc.NumTypespacesResponse{
 		Header: &rpc.Response{
@@ -142,11 +158,11 @@ func (m *mux) NumTypespaces(c context.Context, request *rpc.RequestId) (
 	return &response, err
 }
 
-func (m *mux) TypespaceTable(c context.Context, request *rpc.RequestId) (
+func (m *mux) TypespaceTable(ctx context.Context, request *rpc.RequestId) (
 	*rpc.TypespaceTableResponse, error) {
 
-	ctx := m.newCtx(request.Id)
-	typespaces, err := m.backend.TypespaceList(ctx)
+	c := m.newCtx(request.Id, ctx)
+	typespaces, err := m.backend.TypespaceList(&c.Ctx)
 
 	response := rpc.TypespaceTableResponse{
 		Header: &rpc.Response{
@@ -171,11 +187,11 @@ func (m *mux) TypespaceTable(c context.Context, request *rpc.RequestId) (
 	return &response, err
 }
 
-func (m *mux) NumNamespaces(c context.Context, request *rpc.NamespaceRequest) (
+func (m *mux) NumNamespaces(ctx context.Context, request *rpc.NamespaceRequest) (
 	*rpc.NumNamespacesResponse, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
-	num, err := m.backend.NumNamespaces(ctx, request.Typespace)
+	c := m.newCtx(request.RequestId.Id, ctx)
+	num, err := m.backend.NumNamespaces(&c.Ctx, request.Typespace)
 
 	response := rpc.NumNamespacesResponse{
 		Header: &rpc.Response{
@@ -201,11 +217,11 @@ func (m *mux) NumNamespaces(c context.Context, request *rpc.NamespaceRequest) (
 	return &response, err
 }
 
-func (m *mux) NamespaceTable(c context.Context, request *rpc.NamespaceRequest) (
+func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest) (
 	*rpc.NamespaceTableResponse, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
-	namespaces, err := m.backend.NamespaceList(ctx, request.Typespace)
+	c := m.newCtx(request.RequestId.Id, ctx)
+	namespaces, err := m.backend.NamespaceList(&c.Ctx, request.Typespace)
 
 	response := rpc.NamespaceTableResponse{
 		Header: &rpc.Response{
@@ -230,11 +246,11 @@ func (m *mux) NamespaceTable(c context.Context, request *rpc.NamespaceRequest) (
 	return &response, err
 }
 
-func (m *mux) NumWorkspaces(c context.Context, request *rpc.WorkspaceRequest) (
+func (m *mux) NumWorkspaces(ctx context.Context, request *rpc.WorkspaceRequest) (
 	*rpc.NumWorkspacesResponse, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
-	num, err := m.backend.NumWorkspaces(ctx, request.Typespace,
+	c := m.newCtx(request.RequestId.Id, ctx)
+	num, err := m.backend.NumWorkspaces(&c.Ctx, request.Typespace,
 		request.Namespace)
 
 	response := rpc.NumWorkspacesResponse{
@@ -261,11 +277,11 @@ func (m *mux) NumWorkspaces(c context.Context, request *rpc.WorkspaceRequest) (
 	return &response, err
 }
 
-func (m *mux) WorkspaceTable(c context.Context, request *rpc.WorkspaceRequest) (
+func (m *mux) WorkspaceTable(ctx context.Context, request *rpc.WorkspaceRequest) (
 	*rpc.WorkspaceTableResponse, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
-	workspaceNonces, err := m.backend.WorkspaceList(ctx, request.Typespace,
+	c := m.newCtx(request.RequestId.Id, ctx)
+	workspaceNonces, err := m.backend.WorkspaceList(&c.Ctx, request.Typespace,
 		request.Namespace)
 
 	response := rpc.WorkspaceTableResponse{
@@ -296,13 +312,10 @@ func (m *mux) WorkspaceTable(c context.Context, request *rpc.WorkspaceRequest) (
 	return &response, err
 }
 
-func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
+func (m *mux) SubscribeTo(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	clientName, ok := peer.FromContext(c)
-	if !ok {
-		panic("Unknown client!")
-	}
+	c := m.newCtx(request.RequestId.Id, ctx)
 
 	defer m.subscriptionLock.Lock().Unlock()
 
@@ -310,7 +323,7 @@ func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
 		m.subscriptions[request.Name] = map[string]bool{}
 	}
 
-	m.subscriptions[request.Name][clientName.Addr.String()] = true
+	m.subscriptions[request.Name][c.clientName] = true
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -320,17 +333,13 @@ func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
 	return &response, nil
 }
 
-func (m *mux) UnsubscribeFrom(c context.Context, request *rpc.WorkspaceName) (
+func (m *mux) UnsubscribeFrom(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	clientName, ok := peer.FromContext(c)
-	if !ok {
-		panic("Unknown client!")
-	}
-
+	c := m.newCtx(request.RequestId.Id, ctx)
 	defer m.subscriptionLock.Lock().Unlock()
 
-	delete(m.subscriptions, clientName.Addr.String())
+	delete(m.subscriptions, c.clientName)
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -343,21 +352,18 @@ func (m *mux) UnsubscribeFrom(c context.Context, request *rpc.WorkspaceName) (
 func (m *mux) ListenForUpdates(_ *rpc.Void,
 	stream rpc.WorkspaceDb_ListenForUpdatesServer) error {
 
-	clientName, ok := peer.FromContext(stream.Context())
-	if !ok {
-		panic("Unknown client!")
-	}
+	c := m.newCtx(0, stream.Context())
 
 	changes := make(chan quantumfs.WorkspaceState, 128)
 
 	func() {
 		defer m.subscriptionLock.Lock().Unlock()
-		m.clients[clientName.Addr.String()] = changes
+		m.clients[c.clientName] = changes
 	}()
 
 	defer func() {
 		defer m.subscriptionLock.Lock().Unlock()
-		delete(m.clients, clientName.Addr.String())
+		delete(m.clients, c.clientName)
 	}()
 
 	for {
@@ -384,17 +390,18 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 	return nil
 }
 
-func (m *mux) notifyChange(workspaceName string, requestId *rpc.RequestId,
+func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestId,
 	deleted bool) {
+
+	defer c.FuncIn("mux::notifyChange", "workspace %s deleted %t", workspaceName,
+		deleted).Out()
 
 	var update quantumfs.WorkspaceState
 	if deleted {
 		update.Deleted = true
 	} else {
-		ctx := m.newCtx(requestId.Id)
-
 		parts := strings.Split(workspaceName, "/")
-		key, nonce, err := m.backend.Workspace(ctx, parts[0], parts[1],
+		key, nonce, err := m.backend.Workspace(&c.Ctx, parts[0], parts[1],
 			parts[2])
 
 		if err != nil {
@@ -411,24 +418,25 @@ func (m *mux) notifyChange(workspaceName string, requestId *rpc.RequestId,
 	subscriptions, ok := m.subscriptions[workspaceName]
 
 	if !ok {
-		// Nobody is subscribed to this workspace
+		c.vlog("Nobody is subscribed to this workspace")
 		return
 	}
 
 	for clientName, _ := range subscriptions {
 		if client, ok := m.clients[clientName]; ok {
+			c.vlog("Sending update to client %s", clientName)
 			client <- update
 		}
 	}
 }
 
-func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
+func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.FetchWorkspaceResponse, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
+	c := m.newCtx(request.RequestId.Id, ctx)
 
 	parts := strings.Split(request.Name, "/")
-	key, nonce, err := m.backend.Workspace(ctx, parts[0], parts[1], parts[2])
+	key, nonce, err := m.backend.Workspace(&c.Ctx, parts[0], parts[1], parts[2])
 
 	response := rpc.FetchWorkspaceResponse{
 		Header: &rpc.Response{
@@ -458,14 +466,14 @@ func (m *mux) FetchWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	return &response, err
 }
 
-func (m *mux) BranchWorkspace(c context.Context,
+func (m *mux) BranchWorkspace(ctx context.Context,
 	request *rpc.BranchWorkspaceRequest) (*rpc.Response, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
+	c := m.newCtx(request.RequestId.Id, ctx)
 
 	srcParts := strings.Split(request.Source, "/")
 	dstParts := strings.Split(request.Destination, "/")
-	err := m.backend.BranchWorkspace(ctx, srcParts[0], srcParts[1],
+	err := m.backend.BranchWorkspace(&c.Ctx, srcParts[0], srcParts[1],
 		srcParts[2], dstParts[0], dstParts[1], dstParts[2])
 
 	response := rpc.Response{
@@ -477,7 +485,7 @@ func (m *mux) BranchWorkspace(c context.Context,
 	if err == nil {
 		response.Err = 0
 		response.ErrCause = "Success"
-		m.notifyChange(request.Destination, request.RequestId, false)
+		m.notifyChange(c, request.Destination, request.RequestId, false)
 		return &response, nil
 	}
 
@@ -489,13 +497,13 @@ func (m *mux) BranchWorkspace(c context.Context,
 	return &response, err
 }
 
-func (m *mux) DeleteWorkspace(c context.Context, request *rpc.WorkspaceName) (
+func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
+	c := m.newCtx(request.RequestId.Id, ctx)
 
 	parts := strings.Split(request.Name, "/")
-	err := m.backend.DeleteWorkspace(ctx, parts[0], parts[1], parts[2])
+	err := m.backend.DeleteWorkspace(&c.Ctx, parts[0], parts[1], parts[2])
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -506,7 +514,7 @@ func (m *mux) DeleteWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	if err == nil {
 		response.Err = 0
 		response.ErrCause = "Success"
-		m.notifyChange(request.Name, request.RequestId, true)
+		m.notifyChange(c, request.Name, request.RequestId, true)
 		return &response, nil
 	}
 
@@ -518,13 +526,13 @@ func (m *mux) DeleteWorkspace(c context.Context, request *rpc.WorkspaceName) (
 	return &response, err
 }
 
-func (m *mux) SetWorkspaceImmutable(c context.Context, request *rpc.WorkspaceName) (
+func (m *mux) SetWorkspaceImmutable(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
+	c := m.newCtx(request.RequestId.Id, ctx)
 
 	parts := strings.Split(request.Name, "/")
-	err := m.backend.SetWorkspaceImmutable(ctx, parts[0], parts[1], parts[2])
+	err := m.backend.SetWorkspaceImmutable(&c.Ctx, parts[0], parts[1], parts[2])
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -535,7 +543,7 @@ func (m *mux) SetWorkspaceImmutable(c context.Context, request *rpc.WorkspaceNam
 	if err == nil {
 		response.Err = 0
 		response.ErrCause = "Success"
-		m.notifyChange(request.Name, request.RequestId, false)
+		m.notifyChange(c, request.Name, request.RequestId, false)
 		return &response, nil
 	}
 
@@ -547,16 +555,16 @@ func (m *mux) SetWorkspaceImmutable(c context.Context, request *rpc.WorkspaceNam
 	return &response, err
 }
 
-func (m *mux) AdvanceWorkspace(c context.Context,
+func (m *mux) AdvanceWorkspace(ctx context.Context,
 	request *rpc.AdvanceWorkspaceRequest) (*rpc.AdvanceWorkspaceResponse, error) {
 
-	ctx := m.newCtx(request.RequestId.Id)
+	c := m.newCtx(request.RequestId.Id, ctx)
 
 	parts := strings.Split(request.WorkspaceName, "/")
 	currentKey := quantumfs.NewObjectKeyFromBytes(request.CurrentRootId.Data)
 	newKey := quantumfs.NewObjectKeyFromBytes(request.NewRootId.Data)
 	nonce := quantumfs.WorkspaceNonce(request.Nonce.Nonce)
-	dbKey, err := m.backend.AdvanceWorkspace(ctx, parts[0], parts[1], parts[2],
+	dbKey, err := m.backend.AdvanceWorkspace(&c.Ctx, parts[0], parts[1], parts[2],
 		nonce, currentKey, newKey)
 
 	response := rpc.AdvanceWorkspaceResponse{
@@ -571,7 +579,7 @@ func (m *mux) AdvanceWorkspace(c context.Context,
 		response.Header.Err = 0
 		response.Header.ErrCause = "Success"
 		response.NewKey = &rpc.ObjectKey{Data: dbKey.Value()}
-		m.notifyChange(request.WorkspaceName, request.RequestId, false)
+		m.notifyChange(c, request.WorkspaceName, request.RequestId, false)
 		return &response, nil
 	}
 
