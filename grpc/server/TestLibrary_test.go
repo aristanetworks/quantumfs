@@ -34,30 +34,32 @@ func runTest(t *testing.T, test serverTest) {
 	// 0 runTest
 	testName := testutils.TestName(1)
 
-	defer serversLock.Lock().Unlock()
-	port := initialPort
-	for {
-		if _, used := servers[port]; !used {
-			break
-		}
-		port++
-	}
-
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
 	}
 	th.ctx = newCtx(th.Logger)
 
-	server, err := StartWorkspaceDbd(port, "processlocal", "")
-	if err != nil {
-		t.Fatalf(fmt.Sprintf("Failed to initialize wsdb server: %s",
-			err.Error()))
-	}
+	func() {
+		defer serversLock.Lock().Unlock()
+		port := initialPort
+		for {
+			if _, used := servers[port]; !used {
+				break
+			}
+			port++
+		}
 
-	servers[port] = server
-	th.server = server
-	th.port = port
+		server, err := StartWorkspaceDbd(port, "processlocal", "")
+		if err != nil {
+			t.Fatalf(fmt.Sprintf("Failed to initialize wsdb server: %s",
+				err.Error()))
+		}
+
+		servers[port] = server
+		th.server = server
+		th.port = port
+	}()
 
 	defer th.EndTest()
 
