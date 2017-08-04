@@ -13,7 +13,7 @@ import (
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
-func runTest(t *testing.T, test systemlocalTest) {
+func runTest(t *testing.T, test grpcTest) {
 	t.Parallel()
 
 	// the stack depth of test name for all callers of runTest
@@ -40,7 +40,7 @@ type testHelper struct {
 	wsdb quantumfs.WorkspaceDB
 }
 
-type systemlocalTest func(test *testHelper)
+type grpcTest func(test *testHelper)
 
 func newCtx(logger *qlog.Qlog) *quantumfs.Ctx {
 	// Create Ctx with random RequestId
