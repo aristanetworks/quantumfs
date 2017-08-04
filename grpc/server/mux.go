@@ -375,7 +375,13 @@ func (m *mux) SubscribeTo(ctx context.Context, request *rpc.WorkspaceName) (
 		m.subscriptionsByWorkspace[request.Name] = map[string]bool{}
 	}
 
+	if _, ok := m.subscriptionsByClient[c.clientName]; !ok {
+		c.vlog("Creating client subscriptions map")
+		m.subscriptionsByClient[c.clientName] = map[string]bool{}
+	}
+
 	m.subscriptionsByWorkspace[request.Name][c.clientName] = true
+	m.subscriptionsByClient[c.clientName][request.Name] = true
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -391,20 +397,41 @@ func (m *mux) UnsubscribeFrom(ctx context.Context, request *rpc.WorkspaceName) (
 	c := m.newCtx(request.RequestId.Id, ctx)
 	defer c.FuncIn("mux::UnsubscribeFrom", "%s", request.Name).Out()
 
+	response := rpc.Response{
+		RequestId: request.RequestId,
+		Err:       0,
+		ErrCause:  "Success",
+	}
+
 	defer m.subscriptionLock.Lock().Unlock()
 
-	delete(m.subscriptionsByWorkspace[request.Name], c.clientName)
+	if _, ok := m.subscriptionsByClient[c.clientName]; !ok {
+		c.vlog("Client is not subscribed to any workspace names")
+		return &response, nil
+	}
+
+	_, subscribed := m.subscriptionsByClient[c.clientName][request.Name]
+	if !subscribed {
+		c.vlog("Client is not subscribed to workspace")
+		return &response, nil
+	}
+
+	delete(m.subscriptionsByClient[c.clientName], request.Name)
+
+	if _, ok := m.subscriptionsByWorkspace[request.Name]; ok {
+		delete(m.subscriptionsByWorkspace[request.Name], c.clientName)
+	}
 
 	if len(m.subscriptionsByWorkspace[request.Name]) == 0 {
 		c.vlog("Deleting workspace subscriptions map")
 		delete(m.subscriptionsByWorkspace, request.Name)
 	}
 
-	response := rpc.Response{
-		RequestId: request.RequestId,
-		Err:       0,
-		ErrCause:  "Success",
+	if len(m.subscriptionsByClient[c.clientName]) == 0 {
+		c.vlog("Deleting client subscription map")
+		delete(m.subscriptionsByClient, c.clientName)
 	}
+
 	return &response, nil
 }
 
