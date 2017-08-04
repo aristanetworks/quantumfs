@@ -306,6 +306,10 @@ func (m *mux) SubscribeTo(c context.Context, request *rpc.WorkspaceName) (
 
 	defer m.subscriptionLock.Lock().Unlock()
 
+	if _, ok := m.subscriptions[request.Name]; !ok {
+		m.subscriptions[request.Name] = map[string]bool{}
+	}
+
 	m.subscriptions[request.Name][clientName.Addr.String()] = true
 
 	response := rpc.Response{
