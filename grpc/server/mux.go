@@ -45,8 +45,13 @@ type workspaceState struct {
 // systemlocal are the only supported backends.
 //
 // config is the configuration string to pass to that backend.
-func StartWorkspaceDbd(qlog *qlog.Qlog, port uint16, backend string, config string) (
+func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string, config string) (
 	*Server, error) {
+
+	logger.Log(qlog.LogWorkspaceDb, 0, 2,
+		"Starting grpc WorkspaceDB Server on port %d against backend %s",
+		port, backend)
+
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
@@ -65,10 +70,12 @@ func StartWorkspaceDbd(qlog *qlog.Qlog, port uint16, backend string, config stri
 
 	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
 	if err != nil {
+		logger.Log(qlog.LogWorkspaceDb, 0, 0,
+			"Failed to instantiate backend: %s", err.Error())
 		return nil, err
 	}
 
-	m := newMux(wsdb, qlog)
+	m := newMux(wsdb, logger)
 
 	grpcServer := grpc.NewServer(connOptions...)
 	rpc.RegisterWorkspaceDbServer(grpcServer, m)
@@ -78,7 +85,17 @@ func StartWorkspaceDbd(qlog *qlog.Qlog, port uint16, backend string, config stri
 	}
 
 	go func() {
+		logger.Log(qlog.LogWorkspaceDb, 0, 2, "Serving clients")
 		s.Error = grpcServer.Serve(listener)
+
+		if s.Error == nil {
+			logger.Log(qlog.LogWorkspaceDb, 0, 2,
+				"Finished serving clients")
+		} else {
+			logger.Log(qlog.LogWorkspaceDb, 0, 2,
+				"Finished serving clients with error %s",
+				s.Error.Error())
+		}
 	}()
 
 	return s, nil
@@ -128,7 +145,7 @@ func (m *mux) newCtx(remoteRequestId uint64, context context.Context) *ctx {
 		clientName: clientName,
 	}
 
-	c.vlog("Starting remote request %d", remoteRequestId)
+	c.vlog("Starting remote request (%s: %d)", clientName, remoteRequestId)
 
 	return c
 }
@@ -137,6 +154,8 @@ func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 	*rpc.NumTypespacesResponse, error) {
 
 	c := m.newCtx(request.Id, ctx)
+	defer c.funcIn("mux::NumTypespacesResponse").Out()
+
 	num, err := m.backend.NumTypespaces(&c.Ctx)
 
 	response := rpc.NumTypespacesResponse{
@@ -157,9 +176,11 @@ func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -167,6 +188,8 @@ func (m *mux) TypespaceTable(ctx context.Context, request *rpc.RequestId) (
 	*rpc.TypespaceTableResponse, error) {
 
 	c := m.newCtx(request.Id, ctx)
+	defer c.funcIn("mux::TypespaceTable").Out()
+
 	typespaces, err := m.backend.TypespaceList(&c.Ctx)
 
 	response := rpc.TypespaceTableResponse{
@@ -186,9 +209,11 @@ func (m *mux) TypespaceTable(ctx context.Context, request *rpc.RequestId) (
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error %s", err.Error())
 	return &response, err
 }
 
@@ -196,6 +221,8 @@ func (m *mux) NumNamespaces(ctx context.Context, request *rpc.NamespaceRequest) 
 	*rpc.NumNamespacesResponse, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::NumNamespaces", "typespace %s", request.Typespace).Out()
+
 	num, err := m.backend.NumNamespaces(&c.Ctx, request.Typespace)
 
 	response := rpc.NumNamespacesResponse{
@@ -216,9 +243,11 @@ func (m *mux) NumNamespaces(ctx context.Context, request *rpc.NamespaceRequest) 
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -226,6 +255,8 @@ func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest)
 	*rpc.NamespaceTableResponse, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::NamespaceTable", "typespace %s", request.Typespace).Out()
+
 	namespaces, err := m.backend.NamespaceList(&c.Ctx, request.Typespace)
 
 	response := rpc.NamespaceTableResponse{
@@ -245,9 +276,11 @@ func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest)
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -255,6 +288,9 @@ func (m *mux) NumWorkspaces(ctx context.Context, request *rpc.WorkspaceRequest) 
 	*rpc.NumWorkspacesResponse, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::NumWorkspaces", "typespace %s namespace %s",
+		request.Typespace, request.Namespace).Out()
+
 	num, err := m.backend.NumWorkspaces(&c.Ctx, request.Typespace,
 		request.Namespace)
 
@@ -276,9 +312,11 @@ func (m *mux) NumWorkspaces(ctx context.Context, request *rpc.WorkspaceRequest) 
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -286,6 +324,9 @@ func (m *mux) WorkspaceTable(ctx context.Context, request *rpc.WorkspaceRequest)
 	*rpc.WorkspaceTableResponse, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::WorkspaceTable", "typespace %s namespace %s",
+		request.Typespace, request.Namespace).Out()
+
 	workspaceNonces, err := m.backend.WorkspaceList(&c.Ctx, request.Typespace,
 		request.Namespace)
 
@@ -311,9 +352,11 @@ func (m *mux) WorkspaceTable(ctx context.Context, request *rpc.WorkspaceRequest)
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -321,10 +364,12 @@ func (m *mux) SubscribeTo(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::SubscribeTo", "%s", request.Name).Out()
 
 	defer m.subscriptionLock.Lock().Unlock()
 
 	if _, ok := m.subscriptions[request.Name]; !ok {
+		c.vlog("Creating workspace subscriptions map")
 		m.subscriptions[request.Name] = map[string]bool{}
 	}
 
@@ -342,9 +387,16 @@ func (m *mux) UnsubscribeFrom(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::UnsubscribeFrom", "%s", request.Name).Out()
+
 	defer m.subscriptionLock.Lock().Unlock()
 
-	delete(m.subscriptions, c.clientName)
+	delete(m.subscriptions[request.Name], c.clientName)
+
+	if len(m.subscriptions[request.Name]) == 0 {
+		c.vlog("Deleting workspace subscriptions map")
+		delete(m.subscriptions, request.Name)
+	}
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -358,8 +410,7 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 	stream rpc.WorkspaceDb_ListenForUpdatesServer) error {
 
 	c := m.newCtx(0, stream.Context())
-
-	defer c.FuncIn("mux::ListenForUpdates", "client: %s", c.clientName).Out()
+	defer c.funcIn("mux::ListenForUpdates").Out()
 
 	changes := make(chan workspaceState, 128)
 
@@ -392,6 +443,7 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 			}
 			err := stream.Send(&update)
 			if err != nil {
+				c.vlog("Recevied stream send error: %s", err.Error())
 				return err
 			}
 		}
@@ -447,6 +499,7 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.FetchWorkspaceResponse, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::FetchWorkspace", "%s", request.Name).Out()
 
 	parts := strings.Split(request.Name, "/")
 	key, nonce, err := m.backend.Workspace(&c.Ctx, parts[0], parts[1], parts[2])
@@ -473,9 +526,11 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
 
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -483,6 +538,8 @@ func (m *mux) BranchWorkspace(ctx context.Context,
 	request *rpc.BranchWorkspaceRequest) (*rpc.Response, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::BranchWorkspace", "%s -> %s", request.Source,
+		request.Destination).Out()
 
 	srcParts := strings.Split(request.Source, "/")
 	dstParts := strings.Split(request.Destination, "/")
@@ -505,8 +562,11 @@ func (m *mux) BranchWorkspace(ctx context.Context,
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
+
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -514,6 +574,7 @@ func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	*rpc.Response, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::DeleteWorkspace", "%s", request.Name).Out()
 
 	parts := strings.Split(request.Name, "/")
 	err := m.backend.DeleteWorkspace(&c.Ctx, parts[0], parts[1], parts[2])
@@ -534,8 +595,11 @@ func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
+
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -543,6 +607,7 @@ func (m *mux) SetWorkspaceImmutable(ctx context.Context, request *rpc.WorkspaceN
 	*rpc.Response, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::SetWorkspaceImmutable", "%s", request.Name).Out()
 
 	parts := strings.Split(request.Name, "/")
 	err := m.backend.SetWorkspaceImmutable(&c.Ctx, parts[0], parts[1], parts[2])
@@ -563,20 +628,27 @@ func (m *mux) SetWorkspaceImmutable(ctx context.Context, request *rpc.WorkspaceN
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
+
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
 func (m *mux) AdvanceWorkspace(ctx context.Context,
 	request *rpc.AdvanceWorkspaceRequest) (*rpc.AdvanceWorkspaceResponse, error) {
 
-	c := m.newCtx(request.RequestId.Id, ctx)
-
-	parts := strings.Split(request.WorkspaceName, "/")
 	currentKey := quantumfs.NewObjectKeyFromBytes(request.CurrentRootId.Data)
 	newKey := quantumfs.NewObjectKeyFromBytes(request.NewRootId.Data)
 	nonce := quantumfs.WorkspaceNonce(request.Nonce.Nonce)
+
+	c := m.newCtx(request.RequestId.Id, ctx)
+	defer c.FuncIn("mux::AdvanceWorkspace", "workspace %s (%d): %s -> %s",
+		request.WorkspaceName, nonce, currentKey.String(),
+		newKey.String()).Out()
+
+	parts := strings.Split(request.WorkspaceName, "/")
 	dbKey, err := m.backend.AdvanceWorkspace(&c.Ctx, parts[0], parts[1], parts[2],
 		nonce, currentKey, newKey)
 
@@ -599,7 +671,10 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
 		return &response, nil
 	}
+
+	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
