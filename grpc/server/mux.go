@@ -393,6 +393,9 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestId,
 	deleted bool) {
 
+	defer c.FuncIn("mux::notifyChange", "workspace %s deleted %t", workspaceName,
+		deleted).Out()
+
 	var update quantumfs.WorkspaceState
 	if deleted {
 		update.Deleted = true
@@ -415,12 +418,13 @@ func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestI
 	subscriptions, ok := m.subscriptions[workspaceName]
 
 	if !ok {
-		// Nobody is subscribed to this workspace
+		c.vlog("Nobody is subscribed to this workspace")
 		return
 	}
 
 	for clientName, _ := range subscriptions {
 		if client, ok := m.clients[clientName]; ok {
+			c.vlog("Sending update to client %s", clientName)
 			client <- update
 		}
 	}
