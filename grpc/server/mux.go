@@ -33,6 +33,11 @@ func (server *Server) Stop() error {
 	return server.Error
 }
 
+type workspaceState struct {
+	name string
+	data quantumfs.WorkspaceState
+}
+
 // Start the WorkspaceDBd goroutine. This will open a socket and list on the given
 // port until an error occurs.
 //
@@ -87,7 +92,7 @@ type mux struct {
 	// workspace name to client name
 	subscriptions map[string]map[string]bool
 	// client name to notification channel
-	clients map[string]chan quantumfs.WorkspaceState
+	clients map[string]chan workspaceState
 
 	// For now simply use one of the existing backends
 	backend quantumfs.WorkspaceDB
@@ -99,7 +104,7 @@ type mux struct {
 func newMux(wsdb quantumfs.WorkspaceDB, qlog *qlog.Qlog) *mux {
 	m := mux{
 		subscriptions: map[string]map[string]bool{},
-		clients:       map[string]chan quantumfs.WorkspaceState{},
+		clients:       map[string]chan workspaceState{},
 		backend:       wsdb,
 		qlog:          qlog,
 	}
@@ -354,14 +359,18 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 
 	c := m.newCtx(0, stream.Context())
 
-	changes := make(chan quantumfs.WorkspaceState, 128)
+	defer c.FuncIn("mux::ListenForUpdates", "client: %s", c.clientName).Out()
+
+	changes := make(chan workspaceState, 128)
 
 	func() {
 		defer m.subscriptionLock.Lock().Unlock()
 		m.clients[c.clientName] = changes
 	}()
+	c.vlog("Registered client")
 
 	defer func() {
+		c.vlog("Unregistering client")
 		defer m.subscriptionLock.Lock().Unlock()
 		delete(m.clients, c.clientName)
 	}()
@@ -369,15 +378,17 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 	for {
 		select {
 		case change := <-changes:
+			c.vlog("Received update for %s", change.name)
 			update := rpc.WorkspaceUpdate{
+				Name: change.name,
 				RootId: &rpc.ObjectKey{
-					Data: change.RootId.Value(),
+					Data: change.data.RootId.Value(),
 				},
 				Nonce: &rpc.WorkspaceNonce{
-					Nonce: uint64(change.Nonce),
+					Nonce: uint64(change.data.Nonce),
 				},
-				Immutable: change.Immutable,
-				Deleted:   change.Deleted,
+				Immutable: change.data.Immutable,
+				Deleted:   change.data.Deleted,
 			}
 			err := stream.Send(&update)
 			if err != nil {
@@ -396,9 +407,11 @@ func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestI
 	defer c.FuncIn("mux::notifyChange", "workspace %s deleted %t", workspaceName,
 		deleted).Out()
 
-	var update quantumfs.WorkspaceState
+	var update workspaceState
+	update.name = workspaceName
+
 	if deleted {
-		update.Deleted = true
+		update.data.Deleted = true
 	} else {
 		parts := strings.Split(workspaceName, "/")
 		key, nonce, err := m.backend.Workspace(&c.Ctx, parts[0], parts[1],
@@ -408,10 +421,10 @@ func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestI
 			panic("Received error when fetching workspace")
 		}
 
-		update.RootId = key
-		update.Nonce = nonce
-		update.Immutable = false
-		update.Deleted = false
+		update.data.RootId = key
+		update.data.Nonce = nonce
+		update.data.Immutable = false
+		update.data.Deleted = false
 	}
 
 	defer m.subscriptionLock.RLock().RUnlock()
