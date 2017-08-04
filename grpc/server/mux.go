@@ -107,7 +107,8 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string, config st
 type mux struct {
 	subscriptionLock utils.DeferableRwMutex
 	// workspace name to client name
-	subscriptions map[string]map[string]bool
+	subscriptionsByWorkspace map[string]map[string]bool
+	subscriptionsByClient    map[string]map[string]bool
 	// client name to notification channel
 	clients map[string]chan workspaceState
 
@@ -120,10 +121,11 @@ type mux struct {
 
 func newMux(wsdb quantumfs.WorkspaceDB, qlog *qlog.Qlog) *mux {
 	m := mux{
-		subscriptions: map[string]map[string]bool{},
-		clients:       map[string]chan workspaceState{},
-		backend:       wsdb,
-		qlog:          qlog,
+		subscriptionsByWorkspace: map[string]map[string]bool{},
+		subscriptionsByClient:    map[string]map[string]bool{},
+		clients:                  map[string]chan workspaceState{},
+		backend:                  wsdb,
+		qlog:                     qlog,
 	}
 
 	return &m
@@ -368,12 +370,18 @@ func (m *mux) SubscribeTo(ctx context.Context, request *rpc.WorkspaceName) (
 
 	defer m.subscriptionLock.Lock().Unlock()
 
-	if _, ok := m.subscriptions[request.Name]; !ok {
+	if _, ok := m.subscriptionsByWorkspace[request.Name]; !ok {
 		c.vlog("Creating workspace subscriptions map")
-		m.subscriptions[request.Name] = map[string]bool{}
+		m.subscriptionsByWorkspace[request.Name] = map[string]bool{}
 	}
 
-	m.subscriptions[request.Name][c.clientName] = true
+	if _, ok := m.subscriptionsByClient[c.clientName]; !ok {
+		c.vlog("Creating client subscriptions map")
+		m.subscriptionsByClient[c.clientName] = map[string]bool{}
+	}
+
+	m.subscriptionsByWorkspace[request.Name][c.clientName] = true
+	m.subscriptionsByClient[c.clientName][request.Name] = true
 
 	response := rpc.Response{
 		RequestId: request.RequestId,
@@ -389,20 +397,41 @@ func (m *mux) UnsubscribeFrom(ctx context.Context, request *rpc.WorkspaceName) (
 	c := m.newCtx(request.RequestId.Id, ctx)
 	defer c.FuncIn("mux::UnsubscribeFrom", "%s", request.Name).Out()
 
-	defer m.subscriptionLock.Lock().Unlock()
-
-	delete(m.subscriptions[request.Name], c.clientName)
-
-	if len(m.subscriptions[request.Name]) == 0 {
-		c.vlog("Deleting workspace subscriptions map")
-		delete(m.subscriptions, request.Name)
-	}
-
 	response := rpc.Response{
 		RequestId: request.RequestId,
 		Err:       0,
 		ErrCause:  "Success",
 	}
+
+	defer m.subscriptionLock.Lock().Unlock()
+
+	if _, ok := m.subscriptionsByClient[c.clientName]; !ok {
+		c.vlog("Client is not subscribed to any workspace names")
+		return &response, nil
+	}
+
+	_, subscribed := m.subscriptionsByClient[c.clientName][request.Name]
+	if !subscribed {
+		c.vlog("Client is not subscribed to workspace")
+		return &response, nil
+	}
+
+	delete(m.subscriptionsByClient[c.clientName], request.Name)
+
+	if _, ok := m.subscriptionsByWorkspace[request.Name]; ok {
+		delete(m.subscriptionsByWorkspace[request.Name], c.clientName)
+	}
+
+	if len(m.subscriptionsByWorkspace[request.Name]) == 0 {
+		c.vlog("Deleting workspace subscriptions map")
+		delete(m.subscriptionsByWorkspace, request.Name)
+	}
+
+	if len(m.subscriptionsByClient[c.clientName]) == 0 {
+		c.vlog("Deleting client subscription map")
+		delete(m.subscriptionsByClient, c.clientName)
+	}
+
 	return &response, nil
 }
 
@@ -424,6 +453,14 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 		c.vlog("Unregistering client")
 		defer m.subscriptionLock.Lock().Unlock()
 		delete(m.clients, c.clientName)
+
+		for workspace, _ := range m.subscriptionsByClient[c.clientName] {
+			if _, ok := m.subscriptionsByWorkspace[workspace]; ok {
+				delete(m.subscriptionsByWorkspace[workspace],
+					c.clientName)
+			}
+		}
+		delete(m.subscriptionsByClient, c.clientName)
 	}()
 
 	for {
@@ -480,7 +517,7 @@ func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestI
 	}
 
 	defer m.subscriptionLock.RLock().RUnlock()
-	subscriptions, ok := m.subscriptions[workspaceName]
+	subscriptions, ok := m.subscriptionsByWorkspace[workspaceName]
 
 	if !ok {
 		c.vlog("Nobody is subscribed to this workspace")
