@@ -104,16 +104,18 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 		}
 
 		wsdb.updates[update.Name] = quantumfs.WorkspaceState{
-			RootId:    quantumfs.NewObjectKeyFromBytes(update.RootId.Data),
+			RootId: quantumfs.NewObjectKeyFromBytes(
+				update.RootId.Data),
 			Nonce:     quantumfs.WorkspaceNonce(update.Nonce.Nonce),
 			Immutable: update.Immutable,
 			Deleted:   update.Deleted,
 		}
 
 		if !startTransmission {
-			// There is already an update in progress and we need to wait for
-			// that to complete. The goroutine which is running the callback will
-			// find these new updates and send them when it completes.
+			// There is already an update in progress and we need to wait
+			// for that to complete. The goroutine which is running the
+			// callback will find these new updates and send them when it
+			// completes.
 			continue
 		}
 
@@ -172,10 +174,13 @@ func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 
 	response, err := wsdb.server.NumTypespaces(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return 0, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return 0, wsdb.convertErr(*response.Header)
 	}
 
@@ -189,10 +194,13 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 
 	response, err := wsdb.server.TypespaceTable(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return []string{}, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return []string{}, wsdb.convertErr(*response.Header)
 	}
 
@@ -211,10 +219,13 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 
 	response, err := wsdb.server.NumNamespaces(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return 0, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return 0, wsdb.convertErr(*response.Header)
 	}
 
@@ -233,10 +244,13 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 
 	response, err := wsdb.server.NamespaceTable(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return []string{}, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return []string{}, wsdb.convertErr(*response.Header)
 	}
 
@@ -256,10 +270,13 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.NumWorkspaces(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return 0, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return 0, wsdb.convertErr(*response.Header)
 	}
 
@@ -281,10 +298,13 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.WorkspaceTable(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return workspaces, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return workspaces, wsdb.convertErr(*response.Header)
 	}
 
@@ -309,10 +329,13 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	response, err := wsdb.server.BranchWorkspace(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Err, response.ErrCause)
 		return wsdb.convertErr(*response)
 	}
 
@@ -331,10 +354,13 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.DeleteWorkspace(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Err, response.ErrCause)
 		return wsdb.convertErr(*response)
 	}
 
@@ -355,10 +381,13 @@ func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) 
 
 	response, err := wsdb.server.FetchWorkspace(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return key, nonce, false, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
+			response.Header.Err, response.Header.ErrCause)
 		return key, nonce, false, wsdb.convertErr(*response.Header)
 	}
 
@@ -414,13 +443,14 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	response, err := wsdb.server.AdvanceWorkspace(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return quantumfs.ObjectKey{}, wsdb.handleGrpcError(err)
 	}
 
 	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
 
 	if response.Header.Err != 0 {
-		c.Vlog(qlog.LogWorkspaceDb, "Received error %d: %s",
+		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
 		return newKey, wsdb.convertErr(*response.Header)
 	}
@@ -449,10 +479,13 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 
 	response, err := wsdb.server.SetWorkspaceImmutable(context.TODO(), &request)
 	if err != nil {
+		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
 		return wsdb.handleGrpcError(err)
 	}
 
 	if response.Err != 0 {
+		c.Vlog(qlog.LogWorkspaceDb, "Received error %d: %s", response.Err,
+			response.ErrCause)
 		return wsdb.convertErr(*response)
 	}
 
