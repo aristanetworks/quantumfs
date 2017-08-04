@@ -45,8 +45,8 @@ type workspaceState struct {
 // systemlocal are the only supported backends.
 //
 // config is the configuration string to pass to that backend.
-func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string, config string) (
-	*Server, error) {
+func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
+	config string) (*Server, error) {
 
 	logger.Log(qlog.LogWorkspaceDb, 0, 2,
 		"Starting grpc WorkspaceDB Server on port %d against backend %s",
@@ -257,7 +257,8 @@ func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest)
 	*rpc.NamespaceTableResponse, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
-	defer c.FuncIn("mux::NamespaceTable", "typespace %s", request.Typespace).Out()
+	defer c.FuncIn("mux::NamespaceTable", "typespace %s",
+		request.Typespace).Out()
 
 	namespaces, err := m.backend.NamespaceList(&c.Ctx, request.Typespace)
 
@@ -640,8 +641,8 @@ func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	return &response, err
 }
 
-func (m *mux) SetWorkspaceImmutable(ctx context.Context, request *rpc.WorkspaceName) (
-	*rpc.Response, error) {
+func (m *mux) SetWorkspaceImmutable(ctx context.Context,
+	request *rpc.WorkspaceName) (*rpc.Response, error) {
 
 	c := m.newCtx(request.RequestId.Id, ctx)
 	defer c.FuncIn("mux::SetWorkspaceImmutable", "%s", request.Name).Out()
@@ -674,7 +675,8 @@ func (m *mux) SetWorkspaceImmutable(ctx context.Context, request *rpc.WorkspaceN
 }
 
 func (m *mux) AdvanceWorkspace(ctx context.Context,
-	request *rpc.AdvanceWorkspaceRequest) (*rpc.AdvanceWorkspaceResponse, error) {
+	request *rpc.AdvanceWorkspaceRequest) (
+	*rpc.AdvanceWorkspaceResponse, error) {
 
 	currentKey := quantumfs.NewObjectKeyFromBytes(request.CurrentRootId.Data)
 	newKey := quantumfs.NewObjectKeyFromBytes(request.NewRootId.Data)
@@ -686,8 +688,8 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 		newKey.String()).Out()
 
 	parts := strings.Split(request.WorkspaceName, "/")
-	dbKey, err := m.backend.AdvanceWorkspace(&c.Ctx, parts[0], parts[1], parts[2],
-		nonce, currentKey, newKey)
+	dbKey, err := m.backend.AdvanceWorkspace(&c.Ctx, parts[0], parts[1],
+		parts[2], nonce, currentKey, newKey)
 
 	response := rpc.AdvanceWorkspaceResponse{
 		Header: &rpc.Response{
