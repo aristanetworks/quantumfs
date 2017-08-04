@@ -44,10 +44,13 @@ func runTestCommon(t *testing.T, test qfsclientTest) {
 	th.CreateTestDirs()
 	defer th.EndTest()
 
-	th.StartDefaultQuantumFs()
+	startChan := make(chan struct{}, 0)
+
+	th.StartDefaultQuantumFs(startChan)
 	th.waitForApi()
 
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+	th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
+		startChan, th.AbortFuse)
 }
 
 type testHelper struct {
@@ -76,4 +79,8 @@ func (th *testHelper) getApi() QfsClientApi {
 	api, err := GetApiPath(th.TempDir + "/mnt/api")
 	th.AssertNoErr(err)
 	return api
+}
+
+func (th *testHelper) putApi(api QfsClientApi) {
+	th.AssertNoErr(ReleaseApi(api))
 }
