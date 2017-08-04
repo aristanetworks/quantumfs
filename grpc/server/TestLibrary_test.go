@@ -23,7 +23,7 @@ func init() {
 	servers = map[uint16]*Server{}
 }
 
-const initialPort = uint16(33333)
+const initialPort = uint16(22222)
 
 func runTest(t *testing.T, test serverTest) {
 	t.Parallel()
