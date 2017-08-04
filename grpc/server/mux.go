@@ -453,6 +453,14 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 		c.vlog("Unregistering client")
 		defer m.subscriptionLock.Lock().Unlock()
 		delete(m.clients, c.clientName)
+
+		for workspace, _ := range m.subscriptionsByClient[c.clientName] {
+			if _, ok := m.subscriptionsByWorkspace[workspace]; ok {
+				delete(m.subscriptionsByWorkspace[workspace],
+					c.clientName)
+			}
+		}
+		delete(m.subscriptionsByClient, c.clientName)
 	}()
 
 	for {
