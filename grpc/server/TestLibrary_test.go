@@ -50,7 +50,7 @@ func runTest(t *testing.T, test serverTest) {
 			port++
 		}
 
-		server, err := StartWorkspaceDbd(port, "processlocal", "")
+		server, err := StartWorkspaceDbd(th.Logger, port, "processlocal", "")
 		if err != nil {
 			t.Fatalf(fmt.Sprintf("Failed to initialize wsdb server: %s",
 				err.Error()))
