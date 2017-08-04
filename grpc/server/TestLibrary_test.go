@@ -96,7 +96,7 @@ func (th *testHelper) testHelperUpcast(
 }
 
 func (th *testHelper) EndTest() {
-	th.AssertNoErr(th.server.GracefulStop())
+	th.AssertNoErr(th.server.Stop())
 
 	func() {
 		defer serversLock.Lock().Unlock()

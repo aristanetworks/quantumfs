@@ -27,8 +27,8 @@ type Server struct {
 	Error  error // Error after serving ceases
 }
 
-func (server *Server) GracefulStop() error {
-	server.server.GracefulStop()
+func (server *Server) Stop() error {
+	server.server.Stop()
 	return server.Error
 }
 
