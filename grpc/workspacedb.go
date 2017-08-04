@@ -84,18 +84,24 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 
 		startTransmission := false
 
-		func() {
+		subscribed := func() bool {
 			defer wsdb.lock.Lock().Unlock()
 			if _, exists := wsdb.subscriptions[update.Name]; !exists {
 				// We aren't subscribed for this workspace
-				return
+				return false
 			}
 
 			if wsdb.updates == nil {
 				startTransmission = true
 			}
 			wsdb.updates = map[string]quantumfs.WorkspaceState{}
+
+			return true
 		}()
+
+		if !subscribed {
+			return
+		}
 
 		wsdb.updates[update.Name] = quantumfs.WorkspaceState{
 			RootId:    quantumfs.NewObjectKeyFromBytes(update.RootId.Data),
