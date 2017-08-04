@@ -96,7 +96,9 @@ func (th *testHelper) testHelperUpcast(
 }
 
 func (th *testHelper) EndTest() {
-	th.AssertNoErr(th.server.Stop())
+	if th.server != nil {
+		th.AssertNoErr(th.server.Stop())
+	}
 
 	func() {
 		defer serversLock.Lock().Unlock()
@@ -121,4 +123,16 @@ func (th *testHelper) newClient() quantumfs.WorkspaceDB {
 	client := grpc.NewWorkspaceDB(config)
 
 	return client
+}
+
+func (th *testHelper) restartServer() {
+	th.server.Stop()
+	th.server = nil
+
+	defer serversLock.Lock().Unlock()
+	server, err := StartWorkspaceDbd(th.Logger, th.port, "processlocal", "")
+	th.AssertNoErr(err)
+
+	th.server = server
+	servers[th.port] = th.server
 }
