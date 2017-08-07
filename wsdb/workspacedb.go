@@ -7,6 +7,7 @@ package wsdb
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/ether"
 )
@@ -127,6 +128,11 @@ type WorkspaceDB interface {
 	// DeleteWorkspace deletes the workspace
 	DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
 		workspace string) error
+
+	// WorkspaceLastWriteTime returns the time when the workspace DB entry
+	// was created or when the rootID was advanced. The time returned is in UTC.
+	WorkspaceLastWriteTime(c ether.Ctx, typespace string, namespace string,
+		workspace string) (time.Time, error)
 
 	// AdvanceWorkspace changes the workspace rootID. If the
 	// current rootID doesn't match what the client considers
