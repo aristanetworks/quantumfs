@@ -51,6 +51,10 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceOK() {
 	suite.common.TestIntegDeleteWorkspaceOK()
 }
 
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceLastWriteTime() {
+	suite.common.TestIntegWorkspaceLastWriteTime()
+}
+
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 	err := suite.common.db.BranchWorkspace(integTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName,

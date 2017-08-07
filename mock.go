@@ -369,6 +369,21 @@ WHERE typespace=? AND namespace=? AND workspace=?`
 	}
 }
 
+func mockWsdbWorkspaceLastWriteTime(sess *MockSession, typespace string,
+	namespace string, workspace string, microSecs int64, err error) {
+
+	query := new(MockQuery)
+	qScanFunc := newMockQueryScanStrings(err, []interface{}{microSecs})
+	query.On("Scan", mock.AnythingOfType("*int64")).Return(qScanFunc)
+
+	args := []interface{}{typespace, namespace, workspace}
+
+	sess.On("Query", `
+SELECT WRITETIME(key)
+FROM ether.workspacedb
+WHERE typespace=? AND namespace=? AND workspace=?`, args).Return(query)
+}
+
 func mockWsdbKeyGet(sess *MockSession, typespace string,
 	namespace string, workspace string, key []byte, err error) {
 

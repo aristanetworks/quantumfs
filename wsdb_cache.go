@@ -188,6 +188,21 @@ func (cw *cacheWsdb) DeleteWorkspace(c ether.Ctx, typespace string, namespace st
 	return nil
 }
 
+func (cw *cacheWsdb) WorkspaceLastWriteTime(c ether.Ctx, typespace string, namespace string,
+	workspace string) (time.Time, error) {
+
+	defer c.FuncIn("cacheWsdb::WorkspaceLastWriteTime", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
+
+	ts, err := cw.base.WorkspaceLastWriteTime(c, typespace, namespace,
+		workspace)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return ts, nil
+}
+
 func (cw *cacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
 	workspace string) (wsdb.ObjectKey, error) {
 

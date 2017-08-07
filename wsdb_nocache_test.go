@@ -93,6 +93,10 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheDeleteWorkspaceOK() {
 	suite.common.TestDeleteWorkspaceOK()
 }
 
+func (suite *wsdbNoCacheTestSuite) TestNoCacheWorkspaceLastWriteTime() {
+	suite.common.TestWorkspaceLastWriteTime()
+}
+
 func (suite *wsdbNoCacheTestSuite) TearDownTest() {
 	resetCqlStore()
 }

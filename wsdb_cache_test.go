@@ -702,6 +702,10 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceOK() {
 	suite.common.TestDeleteWorkspaceOK()
 }
 
+func (suite *wsdbCacheTestSuite) TestCacheWorkspaceLastWriteTime() {
+	suite.common.TestWorkspaceLastWriteTime()
+}
+
 func (suite *wsdbCacheTestSuite) TestPanicDuringFetch() {
 	mockWsdbCacheTypespaceFetchPanic(suite.common.mockSess)
 

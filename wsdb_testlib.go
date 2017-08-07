@@ -9,6 +9,7 @@ package cql
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/gocql/gocql"
@@ -305,4 +306,14 @@ func (s *wsdbCommonUnitTest) TestDeleteWorkspaceOK() {
 	mockWsdbKeyDel(s.mockSess, "ts1", "ns1", "ws1", nil)
 	err := s.wsdb.DeleteWorkspace(unitTestEtherCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
+}
+
+func (s *wsdbCommonUnitTest) TestWorkspaceLastWriteTime() {
+	microSecs := int64(4237423784)
+	mockWsdbWorkspaceLastWriteTime(s.mockSess, "ts1", "ns1", "ws1", microSecs, nil)
+	ts, err := s.wsdb.WorkspaceLastWriteTime(unitTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Failed in getting last write time for ts1/ns1/ws1 workspace")
+	s.req.True(
+		ts.Equal(time.Unix(microSecs/int64(time.Second/time.Microsecond), 0).UTC()),
+		"Expected and received time stamp mismatch")
 }

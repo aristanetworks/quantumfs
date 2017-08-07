@@ -9,6 +9,7 @@ package cql
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/stretchr/testify/require"
@@ -121,4 +122,17 @@ func (s *wsdbCommonIntegTest) TestIntegDeleteNullTypespace() {
 func (s *wsdbCommonIntegTest) TestIntegDeleteWorkspaceOK() {
 	err := s.db.DeleteWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
+}
+
+func (s *wsdbCommonIntegTest) TestIntegWorkspaceLastWriteTime() {
+	currentTime := time.Now().UTC()
+	e := s.db.BranchWorkspace(integTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
+	s.req.NoError(e, "Error branching null workspace: %v", e)
+	ts, err := s.db.WorkspaceLastWriteTime(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Failed in getting last write time for ts1/ns1/ws1 workspace")
+
+	// Check if the 2 time stamps are close to each other.
+	s.req.True(ts.Unix()-currentTime.Unix() < 5,
+		"Time stamp is off by more than 5 seconds")
 }

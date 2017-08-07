@@ -53,6 +53,10 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteNullTypespace() {
 	suite.common.TestIntegDeleteNullTypespace()
 }
 
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegWorkspaceLastWriteTime() {
+	suite.common.TestIntegWorkspaceLastWriteTime()
+}
+
 func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteWorkspaceOK() {
 	suite.common.TestIntegDeleteWorkspaceOK()
 }

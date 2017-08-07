@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/qubit/wsdb"
@@ -309,6 +310,26 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	return newRootID, nil
 }
 
+func (nc *noCacheWsdb) WorkspaceLastWriteTime(c ether.Ctx, typespace string,
+	namespace string, workspace string) (time.Time, error) {
+
+	defer c.FuncIn("noCacheWsdb::WorkspaceLastWriteTime", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
+
+	microSec, err := nc.wsdbKeyLastWriteTime(c, typespace, namespace, workspace)
+	if err != nil {
+		return time.Time{}, wsdb.NewError(wsdb.ErrFatal,
+			"during getting WorkspaceLastWriteTime %s/%s/%s : %s",
+			typespace, namespace, workspace, err)
+	}
+
+	// CQL's write time is time in micro-second from epoch. Below we
+	// convert it to golang's time.Time.
+	ts := time.Unix(microSec/int64(time.Second/time.Microsecond), 0).UTC()
+
+	return ts, nil
+}
+
 // --- helper routines ---
 
 func (nc *noCacheWsdb) wsdbTypespaceExists(c ether.Ctx, typespace string) (bool, error) {
@@ -489,6 +510,7 @@ WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace)
 
 	return query.Exec()
 }
+
 func (nc *noCacheWsdb) wsdbKeyPut(c ether.Ctx, typespace string,
 	namespace string, workspace string,
 	key []byte) error {
@@ -505,4 +527,25 @@ VALUES (?,?,?,?)`, nc.keyspace)
 		namespace, workspace, key)
 
 	return query.Exec()
+}
+
+func (nc *noCacheWsdb) wsdbKeyLastWriteTime(c ether.Ctx, typespace string,
+	namespace string, workspace string) (int64, error) {
+
+	defer c.FuncIn("noCacheWsdb::wsdbKeyLastWriteTime", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
+
+	qryStr := fmt.Sprintf(`
+SELECT WRITETIME(key)
+FROM %s.workspacedb
+WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace)
+
+	query := nc.store.session.Query(qryStr, typespace,
+		namespace, workspace)
+
+	var writeTime int64
+	if err := query.Scan(&writeTime); err != nil {
+		return int64(0), err
+	}
+	return writeTime, nil
 }
