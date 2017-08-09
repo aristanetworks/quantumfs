@@ -116,9 +116,14 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 					return true
 				case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
 					// Workspace may have been deleted
+					zero := quantumfs.ZeroKey
 					initialUpdates = append(initialUpdates,
 						&rpc.WorkspaceUpdate{
-							Name:    workspace,
+							Name: workspace,
+							RootId: &rpc.ObjectKey{
+								Data: zero.Value(),
+							},
+							Nonce:   &rpc.WorkspaceNonce{},
 							Deleted: true,
 						})
 					continue
