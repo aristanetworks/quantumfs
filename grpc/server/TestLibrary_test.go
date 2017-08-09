@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -97,7 +98,12 @@ func (th *testHelper) testHelperUpcast(
 
 func (th *testHelper) EndTest() {
 	if th.server != nil {
-		th.AssertNoErr(th.server.Stop())
+		err := th.server.Stop()
+		if err != nil && !strings.Contains(err.Error(),
+			"use of closed network connection") {
+
+			th.AssertNoErr(err)
+		}
 	}
 
 	func() {
