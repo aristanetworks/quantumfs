@@ -21,9 +21,13 @@ func TestServerDisconnection(t *testing.T) {
 
 		test.restartServer()
 
-		num, err := client.NumTypespaces(test.ctx)
-		test.AssertNoErr(err)
-		test.Assert(num == 1, "Incorrect number of typespaces: %d", num)
+		test.WaitFor("new server to start", func() bool {
+			num, err := client.NumTypespaces(test.ctx)
+			if err != nil || num != 1 {
+				return false
+			}
+			return true
+		})
 	})
 }
 
