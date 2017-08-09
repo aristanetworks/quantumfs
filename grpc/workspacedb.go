@@ -75,11 +75,73 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 		return
 	}
 
+	var initialUpdates []*rpc.WorkspaceUpdate
+	hitError := func() bool {
+		// Replay the current state for all subscribed updates to ensure we
+		// haven't missed any notifications while we were disconnected.
+		defer wsdb.lock.Lock().Unlock()
+		for workspace, _ := range wsdb.subscriptions {
+			key, nonce, immutable, err := wsdb.fetchWorkspace(nil,
+				workspace)
+
+			if err == nil {
+				initialUpdates = append(initialUpdates,
+					&rpc.WorkspaceUpdate{
+						Name:   workspace,
+						RootId: &rpc.ObjectKey{Data: key.Value()},
+						Nonce: &rpc.WorkspaceNonce{
+							Nonce: uint64(nonce),
+						},
+						Immutable: immutable,
+						Deleted:   false,
+					})
+				continue
+			}
+
+			switch err := err.(type) {
+			default:
+				// Unknown error
+				wsdb.reconnect()
+				return true
+			case quantumfs.WorkspaceDbErr:
+				switch err.Code {
+				default:
+					// Unhandled error
+					wsdb.reconnect()
+					return true
+				case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
+					// Workspace may have been deleted
+					initialUpdates = append(initialUpdates,
+						&rpc.WorkspaceUpdate{
+							Name:    workspace,
+							Deleted: true,
+						})
+					continue
+				}
+			}
+		}
+		return false
+	}()
+	if hitError {
+		return
+	}
+
 	for {
-		update, err := stream.Recv()
-		if err != nil {
-			wsdb.reconnect()
-			return
+		var update *rpc.WorkspaceUpdate
+		var err error
+
+		if initialUpdates == nil {
+			update, err = stream.Recv()
+			if err != nil {
+				wsdb.reconnect()
+				return
+			}
+		} else {
+			update = initialUpdates[0]
+			initialUpdates = initialUpdates[1:]
+			if len(initialUpdates) == 0 {
+				initialUpdates = nil
+			}
 		}
 
 		startTransmission := false
@@ -498,9 +560,15 @@ func (wsdb *workspaceDB) SetCallback(callback quantumfs.SubscriptionCallback) {
 }
 
 func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
-	defer wsdb.lock.Lock().Unlock()
-	wsdb.subscriptions[workspaceName] = true
+	func() {
+		defer wsdb.lock.Lock().Unlock()
+		wsdb.subscriptions[workspaceName] = true
+	}()
 
+	return wsdb.subscribeTo(workspaceName)
+}
+
+func (wsdb *workspaceDB) subscribeTo(workspaceName string) error {
 	request := rpc.WorkspaceName{
 		RequestId: &rpc.RequestId{Id: 0},
 		Name:      workspaceName,
@@ -519,8 +587,10 @@ func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
 }
 
 func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
-	defer wsdb.lock.Lock().Unlock()
-	delete(wsdb.subscriptions, workspaceName)
+	func() {
+		defer wsdb.lock.Lock().Unlock()
+		delete(wsdb.subscriptions, workspaceName)
+	}()
 
 	request := rpc.WorkspaceName{
 		RequestId: &rpc.RequestId{Id: 0},
