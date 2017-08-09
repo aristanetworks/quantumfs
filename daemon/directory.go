@@ -1182,6 +1182,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			return fuse.OK
 		}()
 		if result != fuse.OK {
+			parent.lock.Unlock()
 			return result
 		}
 
