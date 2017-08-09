@@ -35,6 +35,11 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 		test.AssertNoErr(client.SubscribeTo("test2/test/test"))
 		test.AssertNoErr(client.SubscribeTo("test3/test/test"))
 
+		err := client.BranchWorkspace(test.ctx, quantumfs.NullSpaceName,
+			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+			"test1", "test", "test")
+		test.AssertNoErr(err)
+
 		updated := map[string]bool{}
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
 			for workspace, _ := range updates {
@@ -45,7 +50,15 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 
 		test.restartServer()
 
-		err := client.BranchWorkspace(test.ctx, quantumfs.NullSpaceName,
+		// Confirm replay after reconnection
+		test.WaitFor("to receive workspace notification", func() bool {
+			_, exists := updated["test1/test/test"]
+			return exists
+		})
+
+		// Confirm continuity of subscription
+		updated = map[string]bool{}
+		err = client.BranchWorkspace(test.ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 			"test", "test", "test")
 		test.AssertNoErr(err)
