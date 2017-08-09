@@ -1182,6 +1182,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			return fuse.OK
 		}()
 		if result != fuse.OK {
+			parent.lock.Unlock()
 			return result
 		}
 
@@ -1548,7 +1549,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	// Append attribute
 	if !set {
-		if attributeList.NumAttributes() >
+		if attributeList.NumAttributes() >=
 			quantumfs.MaxNumExtendedAttributes() {
 
 			c.vlog("XAttr list full %d", attributeList.NumAttributes())

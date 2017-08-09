@@ -21,6 +21,7 @@ import (
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -159,6 +160,22 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	th.CreateTestDirs()
 	defer th.EndTest()
 
+	var startChan chan struct{}
+	var alt utils.AlternatingLocker
+	func() {
+		defer alt.ALock().AUnlock()
+		startChan = startQuantumFsInstances(numDefaultQfs, configModifier,
+			th)
+	}()
+
+	defer alt.RLock().RUnlock()
+	th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
+		startChan, th.AbortFuse)
+}
+
+func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFunc,
+	th *testHelper) (startChan chan struct{}) {
+
 	// Allow tests to run for up to 1 seconds before considering them timed out.
 	// If we are going to start a standard QuantumFS instance we can start the
 	// timer before the test proper and therefore avoid false positive test
@@ -170,7 +187,8 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 			configModifier(th, &config)
 		}
 
-		th.startQuantumFs(config)
+		startChan = make(chan struct{}, 0)
+		th.startQuantumFs(config, startChan)
 	}
 	if numDefaultQfs >= 2 {
 		config := th.defaultConfig()
@@ -184,13 +202,22 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 			configModifier(th, &config)
 		}
 
-		th.startQuantumFs(config)
+		startChan1 := startChan
+		startChan2 := make(chan struct{}, 0)
+		th.startQuantumFs(config, startChan2)
+
+		startChan = make(chan struct{}, 0)
+		go func() {
+			// Wait for both startChan1 and startChan2 to get closed
+			<-startChan1
+			<-startChan2
+			close(startChan)
+		}()
 	}
 	if numDefaultQfs > 2 {
 		th.T.Fatalf("Too many QuantumFS instances requested")
 	}
-
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+	return
 }
 
 type quantumFsTest func(test *testHelper)
@@ -228,6 +255,20 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 	}
 
 	return handles
+}
+
+func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
+	th.remountFilesystem()
+	th.SyncAllWorkspaces()
+
+	msg := fmt.Sprintf("inode %d to be uninstantiated", inode)
+	th.WaitFor(msg, func() bool {
+		if nil == th.qfs.inodeNoInstantiate(&th.qfs.c, inode) {
+			return true
+		}
+		th.SyncAllWorkspaces()
+		return false
+	})
 }
 
 // Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
