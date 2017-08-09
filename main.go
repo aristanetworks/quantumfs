@@ -183,13 +183,13 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 			continue
 		}
 		for _, ns := range nsl {
-			wsl, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
+			wsMap, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
 				c.elog("Not able to get list of Workspaces "+
 					"for TS:%s NS:%s", ts, ns)
 				continue
 			}
-			for _, ws := range wsl {
+			for ws := range wsMap {
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
 					c.elog("walkFullWSDB: %v", err)
 					return err
@@ -255,7 +255,7 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	c := oldC.newRequestID() // So that each walk has its own ID in the qlog.
 
 	start := time.Now()
-	if rootID, err = qubitutils.GetWorkspaceRootID(c.qctx, c.wsdb, wsname); err != nil {
+	if rootID, _, err = qubitutils.GetWorkspaceRootID(c.qctx, c.wsdb, wsname); err != nil {
 		return err
 	}
 
