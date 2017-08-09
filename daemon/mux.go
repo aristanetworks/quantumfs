@@ -179,7 +179,9 @@ type QuantumFs struct {
 	workspaceMutability map[string]workspaceState
 }
 
-func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
+func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
+	startChan chan<- struct{}) error {
+
 	qfs.c.dlog("QuantumFs::Serve Initializing server")
 
 	// Set the common set of required options
@@ -204,6 +206,9 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
+	if startChan != nil {
+		close(startChan)
+	}
 	qfs.server.Serve()
 	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
