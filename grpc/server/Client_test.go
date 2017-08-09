@@ -62,5 +62,6 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 
 		_, exists := updated["test/test/test"]
 		test.Assert(!exists, "Invalid workspace notification received")
+		test.Assert(false, "Intentional")
 	})
 }
