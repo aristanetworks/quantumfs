@@ -32,6 +32,11 @@ message RequestId {
 	uint64 id = 1;
 }
 
+enum ReservedRequestIds {
+        RESERVED = 0;
+        RESYNC = 1;
+}
+
 enum ResponseCodes {
 	SUCCESS = 0;
 	WORKSPACE_NOT_FOUND = 1;
