@@ -46,16 +46,16 @@ func printList(args []string) error {
 			continue
 		}
 		for _, ns := range nsl {
-			wsl, err := cs.qfsdb.WorkspaceList(cs.ctx, ts, ns)
+			wsMap, err := cs.qfsdb.WorkspaceList(cs.ctx, ts, ns)
 			if err != nil {
 				fmt.Printf("Listing Workspaces "+
 					"for TS:%s NS:%s failed: %s\n", ts, ns, err)
 				continue
 			}
-			for _, ws := range wsl {
+			for ws := range wsMap {
 				var rootID quantumfs.ObjectKey
 				wsname := ts + "/" + ns + "/" + ws
-				if rootID, err = qubitutils.GetWorkspaceRootID(cs.ctx, cs.qfsdb, wsname); err != nil {
+				if rootID, _, err = qubitutils.GetWorkspaceRootID(cs.ctx, cs.qfsdb, wsname); err != nil {
 					return cmdproc.NewBadCmdExitErr("RootId not found for %v err: %v", wsname, err)
 				}
 				fmt.Println()

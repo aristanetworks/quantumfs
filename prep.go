@@ -45,7 +45,7 @@ func walkHelper(c *quantumfs.Ctx,
 	handler walker.WalkFunc) (err error) {
 
 	var rootID quantumfs.ObjectKey
-	if rootID, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
+	if rootID, _, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
 		return
 	}
 
