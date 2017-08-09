@@ -175,7 +175,7 @@ func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -208,7 +208,7 @@ func (m *mux) TypespaceTable(ctx context.Context, request *rpc.RequestId) (
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -242,7 +242,7 @@ func (m *mux) NumNamespaces(ctx context.Context, request *rpc.NamespaceRequest) 
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -276,7 +276,7 @@ func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest)
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -312,7 +312,7 @@ func (m *mux) NumWorkspaces(ctx context.Context, request *rpc.WorkspaceRequest) 
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -561,7 +561,7 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -597,7 +597,7 @@ func (m *mux) BranchWorkspace(ctx context.Context,
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -630,7 +630,7 @@ func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -663,7 +663,7 @@ func (m *mux) SetWorkspaceImmutable(ctx context.Context,
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -707,7 +707,7 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
 		response.Header.Err = rpc.ResponseCodes(err.Code)
 		response.Header.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
