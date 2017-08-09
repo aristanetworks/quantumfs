@@ -80,8 +80,13 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 		// Replay the current state for all subscribed updates to ensure we
 		// haven't missed any notifications while we were disconnected.
 		defer wsdb.lock.Lock().Unlock()
+
+		ctx := quantumfs.Ctx{
+			Qlog:      qlog.NewQlogTiny(),
+			RequestId: uint64(rpc.ReservedRequestIds_RESYNC),
+		}
 		for workspace, _ := range wsdb.subscriptions {
-			key, nonce, immutable, err := wsdb.fetchWorkspace(nil,
+			key, nonce, immutable, err := wsdb.fetchWorkspace(&ctx,
 				workspace)
 
 			if err == nil {
