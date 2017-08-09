@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"strings"
 	"syscall"
 )
 
@@ -105,4 +107,13 @@ func WriteAll(fd *os.File, data []byte) error {
 
 		data = data[size:]
 	}
+}
+
+func callername(depth int) string {
+	// The +1 to the depth accounts for callername function on the stack
+	pc, _, _, _ := runtime.Caller(depth + 1)
+	name := runtime.FuncForPC(pc).Name()
+	lastSlash := strings.LastIndex(name, "/")
+	name = name[lastSlash+1:]
+	return name
 }
