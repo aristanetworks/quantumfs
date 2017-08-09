@@ -302,11 +302,11 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 	}
 }
 
-func (wsr *WorkspaceRoot) refreshTo(c *ctx, rootId quantumfs.ObjectKey) {
-	defer c.funcIn("WorkspaceRoot::refreshTo").Out()
+// The caller must hold the tree lock
+func (wsr *WorkspaceRoot) refreshTo_(c *ctx, rootId quantumfs.ObjectKey) {
+	defer c.funcIn("WorkspaceRoot::refreshTo_").Out()
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
-	defer wsr.LockTree().Unlock()
 	workspaceRoot := buffer.AsWorkspaceRoot()
 	baseLayerId := workspaceRoot.BaseLayer()
 	hardlinkEntry := workspaceRoot.HardlinkEntry()
