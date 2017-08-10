@@ -394,7 +394,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 		}()
 
 		if !success {
-			// Stop trying to flush on failure
+			// Stop trying to flush on failure and retry later
 			candidate.expiryTime =
 				time.Now().Add(qfs.config.DirtyFlushDelay)
 			return candidate.expiryTime
