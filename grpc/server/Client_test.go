@@ -12,7 +12,7 @@ import (
 )
 
 func TestServerDisconnection(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestWithEphemeralBackend(t, func(test *testHelper) {
 		client := test.newClient()
 		err := client.BranchWorkspace(test.ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
