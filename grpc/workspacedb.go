@@ -268,7 +268,7 @@ func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		result, err = wsdb.numTypespaces(c)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -309,7 +309,7 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		result, err := wsdb.typespaceList(c)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -353,7 +353,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		result, err = wsdb.numNamespaces(c, typespace)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -401,7 +401,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		result, err = wsdb.namespaceList(c, typespace)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -449,7 +449,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		result, err = wsdb.numWorkspaces(c, typespace, namespace)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -498,7 +498,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		result, err = wsdb.workspaceList(c, typespace, namespace)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -553,7 +553,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 		err = wsdb.branchWorkspace(c, srcTypespace, srcNamespace,
 			srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
 		if !shouldRetry(err) {
-			return nil
+			return err
 		}
 
 		if attempt < maxRetries-1 {
@@ -602,7 +602,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		err = wsdb.deleteWorkspace(c, typespace, namespace, workspace)
 		if !shouldRetry(err) {
-			return nil
+			return err
 		}
 
 		if attempt < maxRetries-1 {
@@ -650,7 +650,7 @@ func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) 
 		key, nonce, immutable, err = wsdb._fetchWorkspace(c,
 			workspaceName)
 		if !shouldRetry(err) {
-			return key, nonce, immutable, nil
+			return key, nonce, immutable, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -760,7 +760,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		result, err = wsdb.advanceWorkspace(c, typespace, namespace,
 			workspace, nonce, currentRootId, newRootId)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -818,7 +818,7 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 		result, err = wsdb.workspaceIsImmutable(c, typespace, namespace,
 			workspace)
 		if !shouldRetry(err) {
-			return result, nil
+			return result, err
 		}
 
 		if attempt < maxRetries-1 {
@@ -853,7 +853,7 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		err = wsdb.setWorkspaceImmutable(c, typespace, namespace, workspace)
 		if !shouldRetry(err) {
-			return nil
+			return err
 		}
 
 		if attempt < maxRetries-1 {
@@ -911,7 +911,7 @@ func (wsdb *workspaceDB) subscribeTo(workspaceName string) error {
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		err = wsdb._subscribeTo(workspaceName)
 		if !shouldRetry(err) {
-			return nil
+			return err
 		}
 	}
 
