@@ -43,6 +43,7 @@ type TestHelper struct {
 	Logger            *qlog.Qlog
 	TempDir           string
 	TestResult        chan string
+	Failed            chan struct{}
 	StartTime         time.Time
 	ShouldFail        bool
 	ShouldFailLogscan bool
@@ -78,7 +79,8 @@ func NewTestHelper(testName string, testRunDir string,
 	return TestHelper{
 		T:          t,
 		TestName:   testName,
-		TestResult: make(chan string, 2), // must be buffered
+		TestResult: make(chan string, 0),
+		Failed:     make(chan struct{}, 0),
 		StartTime:  time.Now(),
 		CachePath:  cachePath,
 		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
@@ -88,15 +90,25 @@ func NewTestHelper(testName string, testRunDir string,
 	}
 }
 
-func (th *TestHelper) RunTestCommonEpilog(testName string,
-	testArg QuantumFsTest) {
+func (th *TestHelper) RunTestCommonEpilog(testName string, testArg QuantumFsTest) {
+	th.RunDaemonTestCommonEpilog(testName, testArg, nil, nil)
+}
+
+func (th *TestHelper) RunDaemonTestCommonEpilog(testName string,
+	testArg QuantumFsTest, startChan <-chan struct{}, cleanup func()) {
 
 	th.Log("Finished test preamble, starting test proper")
 	beforeTest := time.Now()
 
 	go th.Execute(testArg)
 
-	testResult := th.WaitForResult()
+	testResult := th.WaitForResult(startChan)
+	failed := false
+	defer func() {
+		if failed {
+			cleanup()
+		}
+	}()
 
 	// Record how long the test took so we can make a histogram
 	afterTest := time.Now()
@@ -110,8 +122,10 @@ func (th *TestHelper) RunTestCommonEpilog(testName string,
 
 	if !th.ShouldFail && testResult != "" {
 		th.Log("ERROR: Test failed unexpectedly:\n%s\n", testResult)
+		failed = true
 	} else if th.ShouldFail && testResult == "" {
 		th.Log("ERROR: Test is expected to fail, but didn't")
+		failed = true
 	}
 }
 
@@ -162,9 +176,10 @@ func (th *TestHelper) Execute(test QuantumFsTest) {
 			result += "\nStack Trace:\n" + trace
 		}
 
-		// This can hang if the channel isn't buffered because in some rare
-		// situations the other side isn't there to read from the channel
-		th.TestResult <- result
+		select {
+		case th.TestResult <- result:
+		case <-th.Failed:
+		}
 	}(th)
 
 	test(th)
@@ -191,14 +206,26 @@ func (th *TestHelper) EndTest() {
 	}
 }
 
-func (th *TestHelper) WaitForResult() string {
-	var testResult string
+func (th *TestHelper) WaitForResult(startChan <-chan struct{}) (testResult string) {
+	defer func() {
+		if testResult != "" {
+			close(th.Failed)
+		}
+	}()
+	if startChan != nil {
+		select {
+		case <-time.After(3 * time.Second):
+			testResult = "ERROR: Timed out starting the qfs server"
+			return
+		case <-startChan:
+		}
+	}
 	select {
 	case <-time.After(th.Timeout):
-		testResult = "ERROR: TIMED OUT"
+		testResult = "ERROR: Timed out running the test"
 	case testResult = <-th.TestResult:
 	}
-	return testResult
+	return
 }
 
 var TestRunDir string
