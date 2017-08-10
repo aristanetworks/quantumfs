@@ -25,12 +25,12 @@ import (
 
 type Server struct {
 	server *grpc.Server
-	Error  error // Error after serving ceases
+	Error  chan error // Error after serving ceases
 }
 
-func (server *Server) GracefulStop() error {
-	server.server.GracefulStop()
-	return server.Error
+func (server *Server) Stop() error {
+	server.server.Stop()
+	return <-server.Error
 }
 
 type workspaceState struct {
@@ -38,7 +38,7 @@ type workspaceState struct {
 	data quantumfs.WorkspaceState
 }
 
-// Start the WorkspaceDBd goroutine. This will open a socket and list on the given
+// Start the WorkspaceDBd goroutine. This will open a socket and listen on the given
 // port until an error occurs.
 //
 // backend is a string specifying which backend to use, currently ether.cql and
@@ -82,11 +82,13 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 
 	s := &Server{
 		server: grpcServer,
+		Error:  make(chan error),
 	}
 
 	go func() {
 		logger.Log(qlog.LogWorkspaceDb, 0, 2, "Serving clients")
-		s.Error = grpcServer.Serve(listener)
+		err := grpcServer.Serve(listener)
+		s.Error <- err
 
 		if s.Error == nil {
 			logger.Log(qlog.LogWorkspaceDb, 0, 2,
@@ -94,7 +96,7 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 		} else {
 			logger.Log(qlog.LogWorkspaceDb, 0, 2,
 				"Finished serving clients with error %s",
-				s.Error.Error())
+				err.Error())
 		}
 	}()
 
