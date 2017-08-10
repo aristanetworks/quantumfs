@@ -27,19 +27,37 @@ func init() {
 const initialPort = uint16(22222)
 
 func runTest(t *testing.T, test serverTest) {
+	runTestCommon(t, test, false)
+}
+
+// Run a server where the backend is erased when the server dies
+func runTestWithEphemeralBackend(t *testing.T, test serverTest) {
+	runTestCommon(t, test, true)
+}
+
+func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
 	t.Parallel()
 
 	// the stack depth of test name for all callers of runTest
-	// is 1. Since the stack looks as follows:
-	// 1 <testname>
-	// 0 runTest
-	testName := testutils.TestName(1)
+	// is 2. Since the stack looks as follows:
+	// 2 <testname>
+	// 1 runTest
+	// 0 runTestCommon
+	testName := testutils.TestName(2)
 
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
 	}
 	th.ctx = newCtx(th.Logger)
+
+	if ephemeral {
+		th.backendType = "processlocal"
+		th.backendConfig = ""
+	} else {
+		th.backendType = "systemlocal"
+		th.backendConfig = th.TempDir + "/workspacedb"
+	}
 
 	func() {
 		defer serversLock.Lock().Unlock()
@@ -51,7 +69,8 @@ func runTest(t *testing.T, test serverTest) {
 			port++
 		}
 
-		server, err := StartWorkspaceDbd(th.Logger, port, "processlocal", "")
+		server, err := StartWorkspaceDbd(th.Logger, port, th.backendType,
+			th.backendConfig)
 		if err != nil {
 			t.Fatalf(fmt.Sprintf("Failed to initialize wsdb server: %s",
 				err.Error()))
@@ -69,9 +88,11 @@ func runTest(t *testing.T, test serverTest) {
 
 type testHelper struct {
 	testutils.TestHelper
-	ctx    *quantumfs.Ctx
-	server *Server
-	port   uint16
+	ctx           *quantumfs.Ctx
+	server        *Server
+	port          uint16
+	backendType   string
+	backendConfig string
 }
 
 type serverTest func(test *testHelper)
@@ -136,7 +157,8 @@ func (th *testHelper) restartServer() {
 	th.server = nil
 
 	defer serversLock.Lock().Unlock()
-	server, err := StartWorkspaceDbd(th.Logger, th.port, "processlocal", "")
+	server, err := StartWorkspaceDbd(th.Logger, th.port, th.backendType,
+		th.backendConfig)
 	th.AssertNoErr(err)
 
 	th.server = server
