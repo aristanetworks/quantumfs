@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -112,6 +113,11 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 		newQfsExtPair(daemon.ReleaseDirLog, daemon.FileHandleLog),
 		newQfsExtPair(daemon.FsyncDirLog, daemon.FileHandleLog),
 		newQfsExtPair(daemon.StatFsLog, ""),
+		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
+		newQfsExtPair(cql.GetLog, cql.KeyLog),
+		newQfsExtPair(cql.InsertLog, cql.KeyTTLLog),
+		newQfsExtPair(cql.UpdateLog, cql.KeyLog),
+		newQfsExtPair(cql.MetadataLog, cql.KeyLog),
 	}
 }
 
