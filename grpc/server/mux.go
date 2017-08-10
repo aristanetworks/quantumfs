@@ -154,6 +154,14 @@ func (m *mux) newCtx(remoteRequestId uint64, context context.Context) *ctx {
 	return c
 }
 
+func defaultResponseHeader(request *rpc.RequestId) *rpc.Response {
+	return &rpc.Response{
+		RequestId: request,
+		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
+		ErrCause:  "Unknown",
+	}
+}
+
 func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 	*rpc.NumTypespacesResponse, error) {
 
@@ -163,11 +171,7 @@ func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 	num, err := m.backend.NumTypespaces(&c.Ctx)
 
 	response := rpc.NumTypespacesResponse{
-		Header: &rpc.Response{
-			RequestId: request,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header:        defaultResponseHeader(request),
 		NumTypespaces: 0,
 	}
 
@@ -197,11 +201,7 @@ func (m *mux) TypespaceTable(ctx context.Context, request *rpc.RequestId) (
 	typespaces, err := m.backend.TypespaceList(&c.Ctx)
 
 	response := rpc.TypespaceTableResponse{
-		Header: &rpc.Response{
-			RequestId: request,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header: defaultResponseHeader(request),
 	}
 
 	if err == nil {
@@ -230,11 +230,7 @@ func (m *mux) NumNamespaces(ctx context.Context, request *rpc.NamespaceRequest) 
 	num, err := m.backend.NumNamespaces(&c.Ctx, request.Typespace)
 
 	response := rpc.NumNamespacesResponse{
-		Header: &rpc.Response{
-			RequestId: request.RequestId,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header:        defaultResponseHeader(request.RequestId),
 		NumNamespaces: 0,
 	}
 
@@ -265,11 +261,7 @@ func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest)
 	namespaces, err := m.backend.NamespaceList(&c.Ctx, request.Typespace)
 
 	response := rpc.NamespaceTableResponse{
-		Header: &rpc.Response{
-			RequestId: request.RequestId,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header: defaultResponseHeader(request.RequestId),
 	}
 
 	if err == nil {
@@ -300,11 +292,7 @@ func (m *mux) NumWorkspaces(ctx context.Context, request *rpc.WorkspaceRequest) 
 		request.Namespace)
 
 	response := rpc.NumWorkspacesResponse{
-		Header: &rpc.Response{
-			RequestId: request.RequestId,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header:        defaultResponseHeader(request.RequestId),
 		NumWorkspaces: 0,
 	}
 
@@ -336,11 +324,7 @@ func (m *mux) WorkspaceTable(ctx context.Context, request *rpc.WorkspaceRequest)
 		request.Namespace)
 
 	response := rpc.WorkspaceTableResponse{
-		Header: &rpc.Response{
-			RequestId: request.RequestId,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header: defaultResponseHeader(request.RequestId),
 	}
 
 	if err == nil {
@@ -545,11 +529,7 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	key, nonce, err := m.backend.Workspace(&c.Ctx, parts[0], parts[1], parts[2])
 
 	response := rpc.FetchWorkspaceResponse{
-		Header: &rpc.Response{
-			RequestId: request.RequestId,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header:    defaultResponseHeader(request.RequestId),
 		Key:       &rpc.ObjectKey{},
 		Nonce:     &rpc.WorkspaceNonce{Nonce: 0},
 		Immutable: false,
@@ -586,28 +566,24 @@ func (m *mux) BranchWorkspace(ctx context.Context,
 	err := m.backend.BranchWorkspace(&c.Ctx, srcParts[0], srcParts[1],
 		srcParts[2], dstParts[0], dstParts[1], dstParts[2])
 
-	response := rpc.Response{
-		RequestId: request.RequestId,
-		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-		ErrCause:  "Unknown",
-	}
+	response := defaultResponseHeader(request.RequestId)
 
 	if err == nil {
 		response.Err = 0
 		response.ErrCause = "Success"
 		m.notifyChange(c, request.Destination, request.RequestId, false)
-		return &response, nil
+		return response, nil
 	}
 
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
+		return response, nil
 	}
 
 	c.vlog("Received other error: %s", err.Error())
-	return &response, err
+	return response, err
 }
 
 func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
@@ -619,28 +595,23 @@ func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	parts := strings.Split(request.Name, "/")
 	err := m.backend.DeleteWorkspace(&c.Ctx, parts[0], parts[1], parts[2])
 
-	response := rpc.Response{
-		RequestId: request.RequestId,
-		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-		ErrCause:  "Unknown",
-	}
-
+	response := defaultResponseHeader(request.RequestId)
 	if err == nil {
 		response.Err = 0
 		response.ErrCause = "Success"
 		m.notifyChange(c, request.Name, request.RequestId, true)
-		return &response, nil
+		return response, nil
 	}
 
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
+		return response, nil
 	}
 
 	c.vlog("Received other error: %s", err.Error())
-	return &response, err
+	return response, err
 }
 
 func (m *mux) SetWorkspaceImmutable(ctx context.Context,
@@ -652,28 +623,24 @@ func (m *mux) SetWorkspaceImmutable(ctx context.Context,
 	parts := strings.Split(request.Name, "/")
 	err := m.backend.SetWorkspaceImmutable(&c.Ctx, parts[0], parts[1], parts[2])
 
-	response := rpc.Response{
-		RequestId: request.RequestId,
-		Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-		ErrCause:  "Unknown",
-	}
+	response := defaultResponseHeader(request.RequestId)
 
 	if err == nil {
 		response.Err = 0
 		response.ErrCause = "Success"
 		m.notifyChange(c, request.Name, request.RequestId, false)
-		return &response, nil
+		return response, nil
 	}
 
 	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
+		return response, nil
 	}
 
 	c.vlog("Received other error: %s", err.Error())
-	return &response, err
+	return response, err
 }
 
 func (m *mux) AdvanceWorkspace(ctx context.Context,
@@ -694,11 +661,7 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 		parts[2], nonce, currentKey, newKey)
 
 	response := rpc.AdvanceWorkspaceResponse{
-		Header: &rpc.Response{
-			RequestId: request.RequestId,
-			Err:       quantumfs.WSDB_FATAL_DB_ERROR,
-			ErrCause:  "Unknown",
-		},
+		Header: defaultResponseHeader(request.RequestId),
 	}
 
 	if err == nil {
