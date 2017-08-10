@@ -231,7 +231,8 @@ func (wsdb *workspaceDB) sendNotifications() {
 }
 
 func (wsdb *workspaceDB) handleGrpcError(err error) error {
-	// TODO Reconnect
+	wsdb.reconnect()
+
 	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 		"gRPC failed: %s", err.Error())
 }
