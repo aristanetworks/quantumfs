@@ -55,7 +55,7 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 		test.restartServer()
 
 		// Confirm replay after reconnection
-		test.WaitFor("to receive workspace notification", func() bool {
+		test.WaitFor("to receive workspace reconnection", func() bool {
 			_, exists := updated["test1/test/test"]
 			return exists
 		})
