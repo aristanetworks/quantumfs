@@ -519,7 +519,8 @@ func (wsr *WorkspaceRoot) refresh(c *ctx) {
 		wsr.typespace, wsr.namespace, wsr.workspace,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
-	wsr.refreshTo(c, publishedRootId)
+	defer wsr.LockTree().Unlock()
+	wsr.refreshTo_(c, publishedRootId)
 	wsr.publishedRootId = publishedRootId
 }
 
