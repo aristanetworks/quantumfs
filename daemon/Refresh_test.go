@@ -26,7 +26,10 @@ func markMutable(ctx *ctx, workspace string) {
 	ctx.qfs.workspaceMutability[workspace] = workspaceMutable
 }
 
-func refreshTo(c *ctx, test *testHelper, workspace string, dst quantumfs.ObjectKey) {
+// The caller must hold the tree lock
+func refreshTo_(c *ctx, test *testHelper, workspace string,
+	dst quantumfs.ObjectKey) {
+
 	wsr, cleanup := test.getWorkspaceRoot(workspace)
 	defer cleanup()
 	test.Assert(wsr != nil, "workspace root does not exist")
@@ -44,7 +47,7 @@ func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 	defer cleanup()
 	defer wsr.LockTree().Unlock()
 	test.advanceWorkspace(workspace, nonce, src, dst)
-	refreshTo(ctx, test, workspace, dst)
+	refreshTo_(ctx, test, workspace, dst)
 	markMutable(ctx, workspace)
 }
 
@@ -60,7 +63,7 @@ func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	defer wsr.LockTree().Unlock()
 	test.remountFilesystem()
 	test.advanceWorkspace(workspace, nonce, src, dst)
-	refreshTo(ctx, test, workspace, dst)
+	refreshTo_(ctx, test, workspace, dst)
 	markMutable(ctx, workspace)
 }
 
@@ -88,8 +91,11 @@ func TestRefreshUnchanged(t *testing.T) {
 		newRootId1 := test.createFileSync(workspace, name, 1000)
 
 		markImmutable(ctx, workspace)
+		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		defer cleanup()
+		defer wsr.LockTree().Unlock()
 		test.remountFilesystem()
-		refreshTo(ctx, test, workspace, newRootId1)
+		refreshTo_(ctx, test, workspace, newRootId1)
 		markMutable(ctx, workspace)
 
 		newRootId2 := test.getRootId(workspace)
