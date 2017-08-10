@@ -162,6 +162,26 @@ func defaultResponseHeader(request *rpc.RequestId) *rpc.Response {
 	}
 }
 
+func parseWorkspaceDbError(c *ctx, response *rpc.Response, err error) (
+	responseValid bool, outerr error) {
+
+	if err == nil {
+		response.Err = 0
+		response.ErrCause = "Success"
+		return true, nil
+	}
+
+	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
+		response.Err = rpc.ResponseCodes(err.Code)
+		response.ErrCause = err.Msg
+		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
+		return false, nil
+	}
+
+	c.vlog("Received other error: %s", err.Error())
+	return false, err
+}
+
 func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 	*rpc.NumTypespacesResponse, error) {
 
@@ -175,20 +195,11 @@ func (m *mux) NumTypespaces(ctx context.Context, request *rpc.RequestId) (
 		NumTypespaces: 0,
 	}
 
-	if err == nil {
-		response.Header.Err = 0
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.NumTypespaces = int64(num)
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -204,20 +215,11 @@ func (m *mux) TypespaceTable(ctx context.Context, request *rpc.RequestId) (
 		Header: defaultResponseHeader(request),
 	}
 
-	if err == nil {
-		response.Header.Err = 0
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.Typespaces = typespaces
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error %s", err.Error())
 	return &response, err
 }
 
@@ -234,20 +236,11 @@ func (m *mux) NumNamespaces(ctx context.Context, request *rpc.NamespaceRequest) 
 		NumNamespaces: 0,
 	}
 
-	if err == nil {
-		response.Header.Err = 0
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.NumNamespaces = int64(num)
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -264,20 +257,11 @@ func (m *mux) NamespaceTable(ctx context.Context, request *rpc.NamespaceRequest)
 		Header: defaultResponseHeader(request.RequestId),
 	}
 
-	if err == nil {
-		response.Header.Err = 0
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.Namespaces = namespaces
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -296,20 +280,11 @@ func (m *mux) NumWorkspaces(ctx context.Context, request *rpc.WorkspaceRequest) 
 		NumWorkspaces: 0,
 	}
 
-	if err == nil {
-		response.Header.Err = 0
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.NumWorkspaces = int64(num)
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -327,25 +302,16 @@ func (m *mux) WorkspaceTable(ctx context.Context, request *rpc.WorkspaceRequest)
 		Header: defaultResponseHeader(request.RequestId),
 	}
 
-	if err == nil {
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		nonces := make(map[string]*rpc.WorkspaceNonce, len(workspaceNonces))
 		for name, nonce := range workspaceNonces {
 			nonces[name] = &rpc.WorkspaceNonce{Nonce: uint64(nonce)}
 		}
 
-		response.Header.Err = 0
 		response.Workspaces = nonces
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -535,22 +501,13 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 		Immutable: false,
 	}
 
-	if err == nil {
-		response.Header.Err = 0
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.Key.Data = key.Value()
 		response.Nonce.Nonce = uint64(nonce)
 		response.Immutable = false
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
 
@@ -568,21 +525,11 @@ func (m *mux) BranchWorkspace(ctx context.Context,
 
 	response := defaultResponseHeader(request.RequestId)
 
-	if err == nil {
-		response.Err = 0
-		response.ErrCause = "Success"
+	ok, err := parseWorkspaceDbError(c, response, err)
+	if ok {
 		m.notifyChange(c, request.Destination, request.RequestId, false)
-		return response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Err = rpc.ResponseCodes(err.Code)
-		response.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return response, err
 }
 
@@ -596,21 +543,12 @@ func (m *mux) DeleteWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	err := m.backend.DeleteWorkspace(&c.Ctx, parts[0], parts[1], parts[2])
 
 	response := defaultResponseHeader(request.RequestId)
-	if err == nil {
-		response.Err = 0
-		response.ErrCause = "Success"
+
+	ok, err := parseWorkspaceDbError(c, response, err)
+	if ok {
 		m.notifyChange(c, request.Name, request.RequestId, true)
-		return response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Err = rpc.ResponseCodes(err.Code)
-		response.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return response, err
 }
 
@@ -625,21 +563,11 @@ func (m *mux) SetWorkspaceImmutable(ctx context.Context,
 
 	response := defaultResponseHeader(request.RequestId)
 
-	if err == nil {
-		response.Err = 0
-		response.ErrCause = "Success"
+	ok, err := parseWorkspaceDbError(c, response, err)
+	if ok {
 		m.notifyChange(c, request.Name, request.RequestId, false)
-		return response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Err = rpc.ResponseCodes(err.Code)
-		response.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return response, err
 }
 
@@ -664,21 +592,11 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 		Header: defaultResponseHeader(request.RequestId),
 	}
 
-	if err == nil {
-		response.Header.Err = 0
-		response.Header.ErrCause = "Success"
+	ok, err := parseWorkspaceDbError(c, response.Header, err)
+	if ok {
 		response.NewKey = &rpc.ObjectKey{Data: dbKey.Value()}
 		m.notifyChange(c, request.WorkspaceName, request.RequestId, false)
-		return &response, nil
 	}
 
-	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
-		response.Header.Err = rpc.ResponseCodes(err.Code)
-		response.Header.ErrCause = err.Msg
-		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
-		return &response, nil
-	}
-
-	c.vlog("Received other error: %s", err.Error())
 	return &response, err
 }
