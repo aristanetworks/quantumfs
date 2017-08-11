@@ -47,7 +47,10 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	wsdb := &workspaceDB{
 		config:        conf,
 		subscriptions: map[string]bool{},
+		reconnectChan: make(chan chan struct{}),
 	}
+
+	go wsdb.reconnector()
 
 	wsdb.reconnect()
 
@@ -61,30 +64,80 @@ type workspaceDB struct {
 	callback      quantumfs.SubscriptionCallback
 	subscriptions map[string]bool
 	updates       map[string]quantumfs.WorkspaceState
+
+	// In order to avoid deadlocks, infinite recursions and a thundering herd of
+	// reconnections there exists a single goroutine which performs the
+	// reconnection. It waits for notification on the channel, reconnects,
+	// replaces the notification channel with a newly instantiated channel and
+	// empties the previous channel of all notifications. This is done to prevent
+	// stale reconnection requests from causing a new connection to be closed.
+	reconnectLock utils.DeferableMutex
+	reconnectChan chan chan struct{}
+}
+
+// Run in a separate goroutine to trigger reconnection when the connection has failed
+func (wsdb *workspaceDB) reconnector() {
+	for {
+		// Wait for a notification
+		var waiter chan struct{}
+		select {
+		case waiter = <-wsdb.reconnectChan:
+		}
+
+		// Reconnect
+		connOptions := []grpc.DialOption{
+			grpc.WithInsecure(),
+			grpc.WithBackoffMaxDelay(100 * time.Millisecond),
+			grpc.WithBlock(),
+			grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:                5 * time.Second,
+				Timeout:             1 * time.Second,
+				PermitWithoutStream: true,
+			}),
+		}
+
+		var conn *grpc.ClientConn
+
+		err := fmt.Errorf("Not an error")
+		for err != nil {
+			conn, err = grpc.Dial(wsdb.config, connOptions...)
+		}
+
+		wsdb.server = rpc.NewWorkspaceDbClient(conn)
+
+		// Swizzle a new notification channel into place and drain the old
+		// one
+		func() {
+			defer wsdb.reconnectLock.Lock().Unlock()
+			oldChan := wsdb.reconnectChan
+			wsdb.reconnectChan = make(chan chan struct{})
+
+			waiter <- struct{}{}
+
+			for {
+				select {
+				case waiter := <-oldChan:
+					waiter <- struct{}{}
+				default:
+					return
+				}
+			}
+		}()
+
+		// Resync subscriptions
+		go wsdb.waitForWorkspaceUpdates()
+	}
 }
 
 func (wsdb *workspaceDB) reconnect() {
-	connOptions := []grpc.DialOption{
-		grpc.WithInsecure(),
-		grpc.WithBackoffMaxDelay(100 * time.Millisecond),
-		grpc.WithBlock(),
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                5 * time.Second,
-			Timeout:             1 * time.Second,
-			PermitWithoutStream: true,
-		}),
-	}
+	trigger := func() chan chan struct{} {
+		defer wsdb.reconnectLock.Lock().Unlock()
+		return wsdb.reconnectChan
+	}()
 
-	var conn *grpc.ClientConn
-
-	err := fmt.Errorf("Not an error")
-	for err != nil {
-		conn, err = grpc.Dial(wsdb.config, connOptions...)
-	}
-
-	wsdb.server = rpc.NewWorkspaceDbClient(conn)
-
-	go wsdb.waitForWorkspaceUpdates()
+	wait := make(chan struct{})
+	trigger <- wait
+	<-wait
 }
 
 func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
