@@ -423,6 +423,9 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 
 	for {
 		select {
+		case <-stream.Context().Done():
+			c.vlog("Client cancelled")
+			return nil
 		case change := <-changes:
 			c.vlog("Received update for %s", change.name)
 			update := rpc.WorkspaceUpdate{
