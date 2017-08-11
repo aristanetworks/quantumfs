@@ -438,7 +438,7 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 			}
 			err := stream.Send(&update)
 			if err != nil {
-				c.vlog("Recevied stream send error: %s", err.Error())
+				c.vlog("Received stream send error: %s", err.Error())
 				return err
 			}
 		}
