@@ -90,7 +90,7 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 		err := grpcServer.Serve(listener)
 		s.Error <- err
 
-		if s.Error == nil {
+		if err == nil {
 			logger.Log(qlog.LogWorkspaceDb, 0, 2,
 				"Finished serving clients")
 		} else {
