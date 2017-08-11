@@ -519,7 +519,8 @@ func (wsr *WorkspaceRoot) refresh(c *ctx) {
 		wsr.typespace, wsr.namespace, wsr.workspace,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
-	wsr.refreshTo(c, publishedRootId)
+	defer wsr.LockTree().Unlock()
+	wsr.refreshTo_(c, publishedRootId)
 	wsr.publishedRootId = publishedRootId
 }
 
@@ -543,7 +544,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	return newRootId
 }
 
-func (wsr *WorkspaceRoot) publish(c *ctx) {
+func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
 	wsr.lock.RLock()
@@ -560,7 +561,11 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
 			newRootId)
 
+		var wsdbErr *quantumfs.WorkspaceDbErr
 		if err != nil {
+			wsdbErr = err.(*quantumfs.WorkspaceDbErr)
+		}
+		if wsdbErr != nil && wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
 				wsr.workspace
 
@@ -578,13 +583,20 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			c.qfs.workspaceMutability[workspacePath] = 0 +
 				workspaceImmutableUntilRestart
 
-			return
+			return false
+		} else if err != nil {
+			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
+
+			// return so that we can try again later
+			return false
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
 			rootId.String())
 		wsr.publishedRootId = rootId
 	}
+
+	return true
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
@@ -766,11 +778,16 @@ func (wsr *WorkspaceRoot) clearList() {
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	newKey, _ := wsr.flushCanFail(c)
+	return newKey
+}
+
+func (wsr *WorkspaceRoot) flushCanFail(c *ctx) (quantumfs.ObjectKey, bool) {
 	defer c.funcIn("WorkspaceRoot::flush").Out()
 
 	wsr.Directory.flush(c)
-	wsr.publish(c)
-	return wsr.publishedRootId
+	success := wsr.publish(c)
+	return wsr.publishedRootId, success
 }
 
 func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
