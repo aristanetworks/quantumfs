@@ -85,8 +85,11 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 		Error:  make(chan error),
 	}
 
+	wait := make(chan struct{})
+
 	go func() {
 		logger.Log(qlog.LogWorkspaceDb, 0, 2, "Serving clients")
+		wait <- struct{}{}
 		err := grpcServer.Serve(listener)
 		s.Error <- err
 
@@ -99,6 +102,8 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 				err.Error())
 		}
 	}()
+
+	<-wait
 
 	return s, nil
 }
