@@ -123,11 +123,14 @@ type mux struct {
 
 func newMux(wsdb quantumfs.WorkspaceDB, qlog *qlog.Qlog) *mux {
 	m := mux{
+		// map[workspaceName][clientName]
 		subscriptionsByWorkspace: map[string]map[string]bool{},
-		subscriptionsByClient:    map[string]map[string]bool{},
-		clients:                  map[string]chan workspaceState{},
-		backend:                  wsdb,
-		qlog:                     qlog,
+		// map[clientName][workspaceName]
+		subscriptionsByClient: map[string]map[string]bool{},
+		// map[clientName]
+		clients: map[string]chan workspaceState{},
+		backend: wsdb,
+		qlog:    qlog,
 	}
 
 	return &m
