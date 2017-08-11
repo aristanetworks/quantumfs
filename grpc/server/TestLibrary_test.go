@@ -117,7 +117,7 @@ func (th *testHelper) testHelperUpcast(
 	}
 }
 
-func (th *testHelper) EndTest() {
+func (th *testHelper) stopServer() {
 	if th.server != nil {
 		err := th.server.Stop()
 		if err != nil && !strings.Contains(err.Error(),
@@ -126,6 +126,11 @@ func (th *testHelper) EndTest() {
 			th.AssertNoErr(err)
 		}
 	}
+	th.server = nil
+}
+
+func (th *testHelper) EndTest() {
+	th.stopServer()
 
 	func() {
 		defer serversLock.Lock().Unlock()
@@ -153,8 +158,7 @@ func (th *testHelper) newClient() quantumfs.WorkspaceDB {
 }
 
 func (th *testHelper) restartServer() {
-	th.server.Stop()
-	th.server = nil
+	th.stopServer()
 
 	defer serversLock.Lock().Unlock()
 	server, err := StartWorkspaceDbd(th.Logger, th.port, th.backendType,
