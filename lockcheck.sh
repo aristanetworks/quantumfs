@@ -41,13 +41,13 @@ do
 				if [[ ( "$LINE" =~ ".LockTree().Unlock()" ) || \
 					( "$LINE" =~ ".LockTreeWaitAtMost(" ) ||\
 					( "$LINE" =~ "LockTreeGet" ) ||\
-					( "$LINE" =~ "func" && "$LINE" =~ "_(" ) ]]
+					( "$LINE" =~ "func " && "$LINE" =~ "_(" ) ]]
 					then
 					if [ "$LOCKLINE" -ne "-1" ]; then
 						LOCKLINE=-1
 					fi
 				fi
-				if [[ "$LINE" =~ "func" ]]; then
+				if [[ "$LINE" =~ "func " ]]; then
 					if [ "$LOCKLINE" -ne "-1" ]; then
 						echo "$WARNTEXT, line $LOCKLINE"
 						((FAILED++))
