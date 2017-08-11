@@ -109,10 +109,10 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 type mux struct {
 	subscriptionLock utils.DeferableRwMutex
 	// workspace name to client name
-	subscriptionsByWorkspace map[string]map[string]bool
-	subscriptionsByClient    map[string]map[string]bool
+	subscriptionsByWorkspace map[string]map[clientname]bool
+	subscriptionsByClient    map[clientname]map[string]bool
 	// client name to notification channel
-	clients map[string]chan workspaceState
+	clients map[clientname]chan workspaceState
 
 	// For now simply use one of the existing backends
 	backend quantumfs.WorkspaceDB
@@ -124,13 +124,11 @@ type mux struct {
 func newMux(wsdb quantumfs.WorkspaceDB, qlog *qlog.Qlog) *mux {
 	m := mux{
 		// map[workspaceName][clientName]
-		subscriptionsByWorkspace: map[string]map[string]bool{},
-		// map[clientName][workspaceName]
-		subscriptionsByClient: map[string]map[string]bool{},
-		// map[clientName]
-		clients: map[string]chan workspaceState{},
-		backend: wsdb,
-		qlog:    qlog,
+		subscriptionsByWorkspace: map[string]map[clientname]bool{},
+		subscriptionsByClient:    map[clientname]map[string]bool{},
+		clients:                  map[clientname]chan workspaceState{},
+		backend:                  wsdb,
+		qlog:                     qlog,
 	}
 
 	return &m
@@ -149,7 +147,7 @@ func (m *mux) newCtx(remoteRequestId uint64, context context.Context) *ctx {
 			Qlog:      m.qlog,
 			RequestId: requestId,
 		},
-		clientName: clientName,
+		clientName: clientname(clientName),
 	}
 
 	c.vlog("Starting remote request (%s: %d)", clientName, remoteRequestId)
@@ -328,7 +326,7 @@ func (m *mux) SubscribeTo(ctx context.Context, request *rpc.WorkspaceName) (
 
 	if _, ok := m.subscriptionsByWorkspace[request.Name]; !ok {
 		c.vlog("Creating workspace subscriptions map")
-		m.subscriptionsByWorkspace[request.Name] = map[string]bool{}
+		m.subscriptionsByWorkspace[request.Name] = map[clientname]bool{}
 	}
 
 	if _, ok := m.subscriptionsByClient[c.clientName]; !ok {
