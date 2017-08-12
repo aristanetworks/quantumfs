@@ -30,7 +30,9 @@ type Server struct {
 
 func (server *Server) Stop() error {
 	server.server.Stop()
-	return <-server.Error
+	err := <-server.Error
+	close(server.Error)
+	return err
 }
 
 type workspaceState struct {
