@@ -178,10 +178,10 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
-	qfs.flusher.sync(&qfs.c, false)
+	err = qfs.flusher.sync(&qfs.c, false)
 	qfs.c.dataStore.shutdown()
 
-	return nil
+	return err
 }
 
 func (qfs *QuantumFs) handleWorkspaceChanges(
@@ -670,9 +670,9 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 // Trigger all active workspaces to sync
 const SyncAllLog = "Mux::syncAll"
 
-func (qfs *QuantumFs) syncAll(c *ctx) {
+func (qfs *QuantumFs) syncAll(c *ctx) error {
 	defer c.funcIn(SyncAllLog).Out()
-	qfs.flusher.sync(c, true)
+	return qfs.flusher.sync(c, true)
 }
 
 func logRequestPanic(c *ctx) {

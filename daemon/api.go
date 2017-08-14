@@ -507,7 +507,11 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	c.vlog("Branching %s/%s/%s to %s/%s/%s", src[0], src[1], src[2], dst[0],
 		dst[1], dst[2])
 
-	c.qfs.syncAll(c)
+	if err := c.qfs.syncAll(c); err != nil {
+		c.vlog("syncAll failed: %s", err.Error())
+		return api.queueErrorResponse(
+			quantumfs.ErrorCommandFailed, "%s", err.Error())
+	}
 
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
 		dst[0], dst[1], dst[2]); err != nil {
@@ -710,7 +714,12 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 func (api *ApiHandle) syncAll(c *ctx) int {
 	defer c.funcIn("ApiHandle::syncAll").Out()
 
-	c.qfs.syncAll(c)
+	if err := c.qfs.syncAll(c); err != nil {
+		c.vlog("Error syncAll %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, "%s",
+			err.Error())
+
+	}
 	return api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
 }
 

@@ -88,6 +88,7 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 }
 
 func TestWorkspaceReplacement(t *testing.T) {
+	t.Skip()
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		workspaceName := "test/test/test"
 		workspacePath := test.AbsPath(workspaceName)

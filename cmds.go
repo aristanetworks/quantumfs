@@ -652,17 +652,7 @@ func (api *apiImpl) SyncAll() error {
 	cmd := SyncAllRequest{
 		CommandCommon: CommandCommon{CommandId: CmdSyncAll},
 	}
-
-	cmdBuf, err := json.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	if _, err := api.sendCmd(cmdBuf); err != nil {
-		return err
-	}
-
-	return nil
+	return api.processCmd(cmd, nil)
 }
 
 func (api *apiImpl) InsertInode(dst string, key string, permissions uint32,
