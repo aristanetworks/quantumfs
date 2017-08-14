@@ -544,28 +544,18 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	return newRootId
 }
 
-func (wsr *WorkspaceRoot) publish(c *ctx) bool {
-	defer c.funcIn("WorkspaceRoot::publish").Out()
+func parsePublishErr(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
+	newRootId quantumfs.ObjectKey, err error) bool {
 
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
-	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
-	defer wsr.linkLock.RLock().RUnlock()
+	switch err := err.(type) {
+	default:
+		c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 
-	// Upload the workspaceroot object
-	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+		// return so that we can try again later
+		return false
 
-	// Update workspace rootId
-	if !newRootId.IsEqualTo(wsr.publishedRootId) {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
-			newRootId)
-
-		var wsdbErr *quantumfs.WorkspaceDbErr
-		if err != nil {
-			wsdbErr = err.(*quantumfs.WorkspaceDbErr)
-		}
-		if wsdbErr != nil && wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
+	case quantumfs.WorkspaceDbErr:
+		if err.Code == quantumfs.WSDB_OUT_OF_DATE {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
 				wsr.workspace
 
@@ -584,11 +574,35 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 				workspaceImmutableUntilRestart
 
 			return false
-		} else if err != nil {
+		} else {
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 
 			// return so that we can try again later
 			return false
+		}
+	}
+	return false
+}
+
+func (wsr *WorkspaceRoot) publish(c *ctx) bool {
+	defer c.funcIn("WorkspaceRoot::publish").Out()
+
+	wsr.lock.RLock()
+	defer wsr.lock.RUnlock()
+	// Ensure wsr lock is held because wsr.hardlinks needs to be protected
+	defer wsr.linkLock.RLock().RUnlock()
+
+	// Upload the workspaceroot object
+	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+
+	// Update workspace rootId
+	if !newRootId.IsEqualTo(wsr.publishedRootId) {
+		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
+			newRootId)
+
+		if err != nil {
+			return parsePublishErr(c, wsr, rootId, newRootId, err)
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
