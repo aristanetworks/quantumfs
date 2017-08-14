@@ -14,6 +14,7 @@ import (
 	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -69,6 +70,7 @@ func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
 			port++
 		}
 
+		th.Log("Starting server with path %s", th.backendConfig)
 		server, err := StartWorkspaceDbd(th.Logger, port, th.backendType,
 			th.backendConfig)
 		if err != nil {
@@ -79,6 +81,10 @@ func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
 		servers[port] = server
 		th.server = server
 		th.port = port
+
+		if !ephemeral {
+			th.backend = server.backend
+		}
 	}()
 
 	defer th.EndTest()
@@ -93,6 +99,7 @@ type testHelper struct {
 	port          uint16
 	backendType   string
 	backendConfig string
+	backend       quantumfs.WorkspaceDB
 }
 
 type serverTest func(test *testHelper)
@@ -158,11 +165,19 @@ func (th *testHelper) newClient() quantumfs.WorkspaceDB {
 }
 
 func (th *testHelper) restartServer() {
+	backend := th.backend
+	if backend == nil {
+		wsdb, err := thirdparty_backends.ConnectWorkspaceDB(
+			th.backendType, th.backendConfig)
+		th.AssertNoErr(err)
+		backend = wsdb
+	}
+
 	th.stopServer()
 
 	defer serversLock.Lock().Unlock()
-	server, err := StartWorkspaceDbd(th.Logger, th.port, th.backendType,
-		th.backendConfig)
+	th.Log("Starting server with path %s", th.backendConfig)
+	server, err := startWorkspaceDbdWithBackend(th.Logger, th.port, backend)
 	th.AssertNoErr(err)
 
 	th.server = server
