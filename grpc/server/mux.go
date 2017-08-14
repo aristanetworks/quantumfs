@@ -24,8 +24,9 @@ import (
 )
 
 type Server struct {
-	server *grpc.Server
-	Error  chan error // Error after serving ceases
+	server  *grpc.Server
+	backend quantumfs.WorkspaceDB
+	Error   chan error // Error after serving ceases
 }
 
 func (server *Server) Stop() error {
@@ -50,6 +51,19 @@ type workspaceState struct {
 func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 	config string) (*Server, error) {
 
+	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
+	if err != nil {
+		logger.Log(qlog.LogWorkspaceDb, 0, 0,
+			"Failed to instantiate backend: %s", err.Error())
+		return nil, err
+	}
+
+	return startWorkspaceDbdWithBackend(logger, port, wsdb)
+}
+
+func startWorkspaceDbdWithBackend(logger *qlog.Qlog, port uint16,
+	backend quantumfs.WorkspaceDB) (*Server, error) {
+
 	logger.Log(qlog.LogWorkspaceDb, 0, 2,
 		"Starting grpc WorkspaceDB Server on port %d against backend %s",
 		port, backend)
@@ -70,21 +84,15 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 		}),
 	}
 
-	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
-	if err != nil {
-		logger.Log(qlog.LogWorkspaceDb, 0, 0,
-			"Failed to instantiate backend: %s", err.Error())
-		return nil, err
-	}
-
-	m := newMux(wsdb, logger)
+	m := newMux(backend, logger)
 
 	grpcServer := grpc.NewServer(connOptions...)
 	rpc.RegisterWorkspaceDbServer(grpcServer, m)
 
 	s := &Server{
-		server: grpcServer,
-		Error:  make(chan error),
+		server:  grpcServer,
+		backend: backend,
+		Error:   make(chan error),
 	}
 
 	wait := make(chan struct{})
