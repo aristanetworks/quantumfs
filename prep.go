@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -16,16 +17,50 @@ import (
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
-func newCtx() *quantumfs.Ctx {
+// Ctx implements both quantumfs.Ctx and ether.Ctx
+type Ctx struct {
+	quantumfs.Ctx
+}
+
+func (c *Ctx) Elog(fmtStr string, args ...interface{}) {
+	c.Ctx.Elog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (c *Ctx) Wlog(fmtStr string, args ...interface{}) {
+	c.Ctx.Wlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (c *Ctx) Dlog(fmtStr string, args ...interface{}) {
+	c.Ctx.Dlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (c *Ctx) Vlog(fmtStr string, args ...interface{}) {
+	c.Ctx.Vlog(qlog.LogWorkspaceDb, fmtStr, args...)
+}
+
+func (c *Ctx) FuncIn(funcName string, fmtStr string,
+	args ...interface{}) ether.FuncOut {
+
+	el := c.Ctx.FuncIn(qlog.LogWorkspaceDb, funcName,
+		fmtStr, args...)
+	return (ether.FuncOut)(el)
+}
+
+func (c *Ctx) FuncInName(funcName string) ether.FuncOut {
+	return c.FuncIn(funcName, "")
+}
+
+func newCtx() *Ctx {
+	var c Ctx
 	// Create  Ctx with random RequestId
 	Qlog := qlog.NewQlogTiny()
 	requestID := uint64(1)
-	ctx := &quantumfs.Ctx{
+	c.Ctx = quantumfs.Ctx{
 		Qlog:      Qlog,
 		RequestId: requestID,
 	}
 
-	return ctx
+	return &c
 }
 
 func showProgress(progress bool, start time.Time, keysWalked uint64) {
@@ -36,7 +71,7 @@ func showProgress(progress bool, start time.Time, keysWalked uint64) {
 	}
 }
 
-func walkHelper(c *quantumfs.Ctx,
+func walkHelper(c *Ctx,
 	qfsds quantumfs.DataStore,
 	qfsdb quantumfs.WorkspaceDB,
 	wsname string,
@@ -45,7 +80,7 @@ func walkHelper(c *quantumfs.Ctx,
 	handler walker.WalkFunc) (err error) {
 
 	var rootID quantumfs.ObjectKey
-	if rootID, _, err = qubitutils.GetWorkspaceRootID(c, qfsdb, wsname); err != nil {
+	if rootID, _, err = qubitutils.GetWorkspaceRootID(&c.Ctx, qfsdb, wsname); err != nil {
 		return
 	}
 
@@ -79,7 +114,7 @@ func walkHelper(c *quantumfs.Ctx,
 		defer fmt.Println()
 	}
 
-	if err = walker.Walk(c, qfsds, rootID, wrapper); err != nil {
+	if err = walker.Walk(&c.Ctx, qfsds, rootID, wrapper); err != nil {
 		return err
 	}
 

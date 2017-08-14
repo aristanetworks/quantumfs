@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/ether/cql"
+	qubit "github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
@@ -31,9 +33,10 @@ var co commonOpts
 type commonState struct {
 	ttlCfg *qubitutils.TTLConfig
 	cqlds  blobstore.BlobStore
+	cqldb  qubit.WorkspaceDB
 	qfsds  quantumfs.DataStore
 	qfsdb  quantumfs.WorkspaceDB
-	ctx    *quantumfs.Ctx
+	ctx    *Ctx
 }
 
 var cs commonState
@@ -65,6 +68,7 @@ func setupCommonState() error {
 	if err != nil {
 		return cmdproc.NewPreCmdExitErr("Connection to workspaceDB failed: %s", err)
 	}
+	cs.cqldb = cql.NewWorkspaceDB(co.config)
 
 	cs.ctx = newCtx()
 	return nil
