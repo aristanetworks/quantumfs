@@ -12,6 +12,7 @@ package daemon
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 
@@ -36,8 +37,9 @@ const (
 
 type DirtyQueue struct {
 	// The Front of the list are the Inodes next in line to flush.
-	l   *list.List
-	cmd chan FlushCmd
+	l    *list.List
+	cmd  chan FlushCmd
+	done chan error
 }
 
 func NewDirtyQueue() *DirtyQueue {
@@ -47,7 +49,8 @@ func NewDirtyQueue() *DirtyQueue {
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
 		// This should change to consolidate all KICKs into one
-		cmd: make(chan FlushCmd, 1000),
+		cmd:  make(chan FlushCmd, 1000),
+		done: make(chan error),
 	}
 	return &dq
 }
@@ -118,12 +121,14 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 				}
 			}()
 		}
-		if cmd == ABORT {
+		switch cmd {
+		case KICK:
+			if c.qfs.flusher.skip {
+				continue
+			}
+		case QUIT:
+		case ABORT:
 			return
-		}
-
-		if cmd == KICK && c.qfs.flusher.skip {
-			continue
 		}
 
 		nextExpiringInode, done = func() (time.Time, bool) {
@@ -137,8 +142,16 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 					// all expiring inodes have been flushed
 					return candidate.expiryTime, false
 				}
+				if !flushCandidate_(c, *candidate) {
+					candidate.expiryTime = time.Now().Add(
+						c.qfs.config.DirtyFlushDelay)
+					if cmd == QUIT {
+						dq.done <- fmt.Errorf("Failed to flush inode %d",
+							candidate.inode.inodeNum())
+					}
+					return candidate.expiryTime, false
+				}
 				dq.PopFront_()
-				flushCandidate_(c, *candidate)
 			}
 			return time.Now(), true
 		}()
@@ -151,7 +164,6 @@ type Flusher struct {
 	// this is an easy way to sort Inodes by workspace.
 	dqs  map[*sync.RWMutex]*DirtyQueue
 	lock utils.DeferableMutex
-	wg   *sync.WaitGroup
 	// Set to true to disable timer based flushing. Use for tests only
 	skip bool
 }
@@ -160,20 +172,15 @@ func NewFlusher() *Flusher {
 	dqs := Flusher{
 		dqs:  make(map[*sync.RWMutex]*DirtyQueue),
 		skip: false,
-		wg:   &sync.WaitGroup{},
 	}
 	return &dqs
 }
 
-func (flusher *Flusher) sync(c *ctx, force bool) {
+func (flusher *Flusher) sync(c *ctx, force bool) error {
 	defer c.FuncIn("Flusher::sync", "%t", force).Out()
-	var wg *sync.WaitGroup
+	doneChannels := make([]chan error, 0)
 	func() {
 		defer flusher.lock.Lock().Unlock()
-
-		// swap the wg out so that we do not wait for any newly dirtied queue
-		// after the sync is issued
-		flusher.wg, wg = &sync.WaitGroup{}, flusher.wg
 		// The cmd channels are buffered, so the fact that we hold the lock
 		// must not cause deadlock.
 		// We cannot close the channel, as we have to distinguish between
@@ -186,9 +193,16 @@ func (flusher *Flusher) sync(c *ctx, force bool) {
 			} else {
 				dq.cmd <- ABORT
 			}
+			doneChannels = append(doneChannels, dq.done)
 		}
 	}()
-	wg.Wait()
+
+	for _, c := range doneChannels {
+		if err := <-c; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // flusher lock must be locked when calling this function
@@ -238,15 +252,13 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	treelock := inode.treeLock()
 	dq := flusher.dqs[treelock]
 	if launch {
-		wg := flusher.wg
-		wg.Add(1)
 		go func() {
 			defer flusher.lock.Lock().Unlock()
 			// KICK start the flusher
 			dq.cmd <- KICK
 			dq.flush_(c)
+			close(dq.done)
 			delete(flusher.dqs, treelock)
-			wg.Done()
 		}()
 	} else {
 		select {
