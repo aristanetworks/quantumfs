@@ -833,7 +833,7 @@ func (api *ApiHandle) processImmutablilityError(c *ctx, err error,
 			"WorkspaceIsImmutable: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"%s of WorkspaceRoot %s", msg, workspacePath)
-	case *quantumfs.WorkspaceDbErr:
+	case quantumfs.WorkspaceDbErr:
 		switch err.Code {
 		default:
 			c.wlog("Unhandled error from WorkspaceDB."+

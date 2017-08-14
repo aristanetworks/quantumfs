@@ -117,7 +117,7 @@ type WorkspaceDbErr struct {
 func NewWorkspaceDbErr(code WsdbErrCode, format string,
 	args ...interface{}) error {
 
-	return &WorkspaceDbErr{Code: code, Msg: fmt.Sprintf(format, args...)}
+	return WorkspaceDbErr{Code: code, Msg: fmt.Sprintf(format, args...)}
 }
 
 const (
