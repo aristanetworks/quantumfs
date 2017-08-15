@@ -181,7 +181,7 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 				// Unknown error
 				wsdb.reconnect()
 				return true
-			case quantumfs.WorkspaceDbErr:
+			case *quantumfs.WorkspaceDbErr:
 				switch err.Code {
 				default:
 					// Unhandled error
