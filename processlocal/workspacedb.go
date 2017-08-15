@@ -352,7 +352,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	defer wsdb.CacheMutex.Lock().Unlock()
 	info, err := wsdb.Workspace_(c, typespace, namespace, workspace)
 	if err != nil {
-		wsdbErr := err.(*quantumfs.WorkspaceDbErr)
+		wsdbErr := err.(quantumfs.WorkspaceDbErr)
 		e := quantumfs.NewWorkspaceDbErr(wsdbErr.Code, "Advance failed: %s",
 			wsdbErr.ErrorCode())
 		return quantumfs.ZeroKey, e
@@ -463,7 +463,7 @@ func (wsdb *WorkspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 				"Unknown error type fetching workspace: %s",
 				err.Error())
 			return
-		case *quantumfs.WorkspaceDbErr:
+		case quantumfs.WorkspaceDbErr:
 			switch err.Code {
 			default:
 				c.Elog(qlog.LogWorkspaceDb,

@@ -37,7 +37,7 @@ func TestEmptyDB(t *testing.T) {
 		utils.Assert(len(list) == 1, "Expected typespace not there")
 
 		list, err = db.NamespaceList(ctx, "test")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 			"Typespace shouldn't exist: %v", err)
 		utils.Assert(len(list) == 0, "Unexpected namespace")
@@ -54,7 +54,7 @@ func TestEmptyDB(t *testing.T) {
 
 		wsList, err = db.WorkspaceList(ctx, quantumfs.NullSpaceName,
 			"test")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 			"Namespace shouldn't exist: %v", err)
 		utils.Assert(len(wsList) == 0, "Unexpected namespace")
@@ -73,7 +73,7 @@ func TestEmptyDB(t *testing.T) {
 
 		key, _, err = db.Workspace(ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, "other")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 			"Workspace shouldn't exist: %v", err)
 	})
@@ -405,7 +405,7 @@ func TestDeleteNamespaceMultipleWorkspace(t *testing.T) {
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
 		_, err = wsdb.WorkspaceList(ctx, "type1", "name2")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Namespace not deleted")
 	})
 }
@@ -420,11 +420,11 @@ func TestDeleteTypespace(t *testing.T) {
 		utils.Assert(err == nil, "Failed deleting workspace: %v", err)
 
 		_, err = wsdb.WorkspaceList(ctx, "type2", "name3")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Namespace not deleted")
 
 		_, err = wsdb.NamespaceList(ctx, "type2")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Typespace not deleted")
 	})
 }
@@ -457,7 +457,7 @@ func TestSetNonExistingWorkspaceImmutable(t *testing.T) {
 		createWorkspaces(wsdb, ctx)
 
 		_, err := wsdb.WorkspaceIsImmutable(ctx, "type1", "name1", "work10")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND, "Workspace found: %v",
 			err)
 	})
@@ -482,7 +482,7 @@ func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
 
 		_, err = wsdb.WorkspaceIsImmutable(ctx,
 			"type1", "name1", "work1")
-		utils.Assert(err.(*quantumfs.WorkspaceDbErr).Code ==
+		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 			"Workspace immutable flag exists after delete", err)
 	})
