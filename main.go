@@ -70,7 +70,7 @@ func main() {
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
-		fmt.Println("usage: qwalkerd -cfg <config> [-logdir dir] [-progress ] ")
+		fmt.Println("usage: qwalkerd -cfg <config> [-logdir dir]")
 		fmt.Println("                [-influxServer serverIP -influxPort port" +
 			" -influxDBName dbname] [-numWalkers num]")
 		fmt.Println()
