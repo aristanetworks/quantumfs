@@ -544,6 +544,38 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	return newRootId
 }
 
+func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
+	newRootId quantumfs.ObjectKey, err error) {
+
+	switch err := err.(type) {
+	default:
+		c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
+
+		// return so that we can try again later
+	case quantumfs.WorkspaceDbErr:
+		if err.Code == quantumfs.WSDB_OUT_OF_DATE {
+			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
+				wsr.workspace
+
+			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
+				rootId.String(), newRootId.String(),
+				wsr.publishedRootId.String(), err.Error())
+			c.wlog("Another quantumfs instance is writing to %s, %s",
+				workspacePath,
+				"your changes will be lost. "+
+					"Unable to sync to datastore - save your"+
+					" work somewhere else.")
+
+			// Lock the user out of the workspace
+			defer c.qfs.mutabilityLock.Lock().Unlock()
+			c.qfs.workspaceMutability[workspacePath] = 0 +
+				workspaceImmutableUntilRestart
+		} else {
+			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
+		}
+	}
+}
+
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
@@ -561,33 +593,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
 			newRootId)
 
-		var wsdbErr *quantumfs.WorkspaceDbErr
 		if err != nil {
-			wsdbErr = err.(*quantumfs.WorkspaceDbErr)
-		}
-		if wsdbErr != nil && wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
-			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
-				wsr.workspace
-
-			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.String(), newRootId.String(),
-				wsr.publishedRootId.String(), err.Error())
-			c.wlog("Another quantumfs instance is writing to %s, %s",
-				workspacePath,
-				"your changes will be lost. "+
-					"Unable to sync to datastore - save your"+
-					" work somewhere else.")
-
-			// Lock the user out of the workspace
-			defer c.qfs.mutabilityLock.Lock().Unlock()
-			c.qfs.workspaceMutability[workspacePath] = 0 +
-				workspaceImmutableUntilRestart
-
-			return false
-		} else if err != nil {
-			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
-
-			// return so that we can try again later
+			handleAdvanceError(c, wsr, rootId, newRootId, err)
+			// Try again later
 			return false
 		}
 
