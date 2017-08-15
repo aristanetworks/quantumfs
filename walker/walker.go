@@ -41,7 +41,8 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 // Ctx maintains context for the walker library.
 type Ctx struct {
 	context.Context
-	Qctx *quantumfs.Ctx
+	Qctx   *quantumfs.Ctx
+	rootID quantumfs.ObjectKey
 }
 
 type workerData struct {
@@ -102,6 +103,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	c := &Ctx{
 		Context: groupCtx,
 		Qctx:    cq,
+		rootID:  rootID,
 	}
 
 	// Start Workers
