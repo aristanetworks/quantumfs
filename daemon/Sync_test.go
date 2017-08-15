@@ -43,7 +43,7 @@ func TestSyncFileOverwrite(t *testing.T) {
 		config := test.defaultConfig()
 
 		// Make an instance of QuantumFs and put things there
-		test.startQuantumFs(config)
+		test.startQuantumFs(config, nil)
 		workspace := test.NewWorkspace()
 
 		// Generate some deterministic, pseudorandom data for a folder
@@ -73,7 +73,7 @@ func TestSyncFileOverwrite(t *testing.T) {
 		err := test.qfs.server.Unmount()
 		test.Assert(err == nil, "Failed to unmount during test")
 
-		test.startQuantumFs(config)
+		test.startQuantumFs(config, nil)
 
 		fileRestored, err := ioutil.ReadFile(workspace + "/testFile")
 		test.Assert(err == nil, "Unable to read file after qfs reload: %s",
@@ -89,7 +89,7 @@ func TestSyncToDatastore(t *testing.T) {
 		config := test.defaultConfig()
 
 		// Make an instance of QuantumFs and put things there
-		test.startQuantumFs(config)
+		test.startQuantumFs(config, nil)
 		workspace := test.NewWorkspace()
 
 		// Generate some deterministic, pseudorandom data for a folder
@@ -127,7 +127,7 @@ func TestSyncToDatastore(t *testing.T) {
 		test.Assert(err == nil, "Failed to unmount during test")
 		test.waitForQuantumFsToFinish()
 
-		test.startQuantumFs(config)
+		test.startQuantumFs(config, nil)
 
 		// Iterate in the exact same way, but this time verifying instead of
 		// creating the data

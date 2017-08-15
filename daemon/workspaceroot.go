@@ -519,7 +519,8 @@ func (wsr *WorkspaceRoot) refresh(c *ctx) {
 		wsr.typespace, wsr.namespace, wsr.workspace,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
-	wsr.refreshTo(c, publishedRootId)
+	defer wsr.LockTree().Unlock()
+	wsr.refreshTo_(c, publishedRootId)
 	wsr.publishedRootId = publishedRootId
 }
 
@@ -543,7 +544,39 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	return newRootId
 }
 
-func (wsr *WorkspaceRoot) publish(c *ctx) {
+func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
+	newRootId quantumfs.ObjectKey, err error) {
+
+	switch err := err.(type) {
+	default:
+		c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
+
+		// return so that we can try again later
+	case quantumfs.WorkspaceDbErr:
+		if err.Code == quantumfs.WSDB_OUT_OF_DATE {
+			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
+				wsr.workspace
+
+			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
+				rootId.String(), newRootId.String(),
+				wsr.publishedRootId.String(), err.Error())
+			c.wlog("Another quantumfs instance is writing to %s, %s",
+				workspacePath,
+				"your changes will be lost. "+
+					"Unable to sync to datastore - save your"+
+					" work somewhere else.")
+
+			// Lock the user out of the workspace
+			defer c.qfs.mutabilityLock.Lock().Unlock()
+			c.qfs.workspaceMutability[workspacePath] = 0 +
+				workspaceImmutableUntilRestart
+		} else {
+			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
+		}
+	}
+}
+
+func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
 	wsr.lock.RLock()
@@ -561,30 +594,17 @@ func (wsr *WorkspaceRoot) publish(c *ctx) {
 			newRootId)
 
 		if err != nil {
-			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
-				wsr.workspace
-
-			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.String(), newRootId.String(),
-				wsr.publishedRootId.String(), err.Error())
-			c.wlog("Another quantumfs instance is writing to %s, %s",
-				workspacePath,
-				"your changes will be lost. "+
-					"Unable to sync to datastore - save your"+
-					" work somewhere else.")
-
-			// Lock the user out of the workspace
-			defer c.qfs.mutabilityLock.Lock().Unlock()
-			c.qfs.workspaceMutability[workspacePath] = 0 +
-				workspaceImmutableUntilRestart
-
-			return
+			handleAdvanceError(c, wsr, rootId, newRootId, err)
+			// Try again later
+			return false
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
 			rootId.String())
 		wsr.publishedRootId = rootId
 	}
+
+	return true
 }
 
 func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
@@ -766,11 +786,16 @@ func (wsr *WorkspaceRoot) clearList() {
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
+	newKey, _ := wsr.flushCanFail(c)
+	return newKey
+}
+
+func (wsr *WorkspaceRoot) flushCanFail(c *ctx) (quantumfs.ObjectKey, bool) {
 	defer c.funcIn("WorkspaceRoot::flush").Out()
 
 	wsr.Directory.flush(c)
-	wsr.publish(c)
-	return wsr.publishedRootId
+	success := wsr.publish(c)
+	return wsr.publishedRootId, success
 }
 
 func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
