@@ -36,10 +36,6 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		client := test.newClient()
 
-		test.AssertNoErr(client.SubscribeTo("test1/test/test"))
-		test.AssertNoErr(client.SubscribeTo("test2/test/test"))
-		test.AssertNoErr(client.SubscribeTo("test3/test/test"))
-
 		err := client.BranchWorkspace(test.ctx, quantumfs.NullSpaceName,
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 			"test1", "test", "test")
@@ -56,6 +52,9 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 		}
 
 		client.SetCallback(callback)
+		test.AssertNoErr(client.SubscribeTo("test1/test/test"))
+		test.AssertNoErr(client.SubscribeTo("test2/test/test"))
+		test.AssertNoErr(client.SubscribeTo("test3/test/test"))
 
 		test.restartServer()
 
