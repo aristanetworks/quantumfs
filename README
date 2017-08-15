@@ -24,12 +24,15 @@ README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 	make all check CXXFLAGS="-g -O3 -msse4.2"
 	sudo make install
 
-4) Ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
+4) Install protobufs:
+	sudo yum install protobuf-devel
 
-5) Follow the instructions in QFSClient/README to install the prerequisites for
+5) Ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
+
+6) Follow the instructions in QFSClient/README to install the prerequisites for
 building QFSClient.
 
-6) If you want to generate an RPM, you must also install fpm
+7) If you want to generate an RPM, you must also install fpm
 (https://fpm.readthedocs.io).
 
 Instructions
