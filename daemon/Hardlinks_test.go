@@ -196,12 +196,10 @@ func TestHardlinkForget(t *testing.T) {
 		data := GenData(2000)
 
 		testFile := workspace + "/testFile"
-		err := testutils.PrintToFile(testFile, string(data))
-		test.AssertNoErr(err)
+		test.AssertNoErr(testutils.PrintToFile(testFile, string(data)))
 
 		linkFile := workspace + "/testLink"
-		err = syscall.Link(testFile, linkFile)
-		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Link(testFile, linkFile))
 
 		// Read the hardlink to ensure it's instantiated
 		readData, err := ioutil.ReadFile(linkFile)
@@ -210,17 +208,7 @@ func TestHardlinkForget(t *testing.T) {
 
 		// Forget it
 		linkInode := test.getInodeNum(linkFile)
-
-		test.remountFilesystem()
-		test.SyncAllWorkspaces()
-
-		// Check that it's uninstantiated
-		msg := fmt.Sprintf("hardlink inode %d to be uninstantiated",
-			linkInode)
-		test.WaitFor(msg, func() bool {
-			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, linkInode)
-			return inode == nil
-		})
+		test.WaitToBeUninstantiated(linkInode)
 	})
 }
 
@@ -256,22 +244,14 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		linkInode := test.getInodeNum(linkFile)
 		test.qfs.increaseLookupCount(test.newCtx(), linkInode)
 
-		test.remountFilesystem()
-		test.SyncAllWorkspaces()
-
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.
-		msg := fmt.Sprintf("hardlink parent inode %d to be uninstantiated",
-			dirInode)
-		test.WaitFor(msg, func() bool {
-			inode := test.qfs.inodeNoInstantiate(&test.qfs.c, dirInode)
-			return inode == nil
-		})
+		test.WaitToBeUninstantiated(dirInode)
 
 		// Even though the directory "parent" should have been
 		// uninstantiated, the WorkspaceRoot must not have been
 		// uninstantiated because the hardlink is instantiated.
-		msg = fmt.Sprintf("Not all children unloaded, %d in %d", linkInode,
+		msg := fmt.Sprintf("Not all children unloaded, %d in %d", linkInode,
 			wsrInode)
 		test.WaitFor("WSR to be held by instantiated hardlink",
 			func() bool { return test.TestLogContains(msg) })

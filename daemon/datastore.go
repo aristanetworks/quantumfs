@@ -405,18 +405,17 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 }
 
 func (buf *buffer) SetSize(size int) {
-	if size > quantumfs.MaxBlockSize {
+	switch {
+	case size > quantumfs.MaxBlockSize:
 		panic("New block size greater than maximum")
-	}
-
-	if len(buf.data) > size {
-		buf.data = buf.data[:size]
-		return
-	}
-
-	if size > len(buf.data) {
-		// we have to increase our capacity first
+	case size > len(buf.data):
+		// We have to increase our capacity first
 		buf.padWithZeros(size)
+	case size == len(buf.data):
+		// No change
+		return
+	case size < len(buf.data):
+		buf.data = buf.data[:size]
 	}
 
 	buf.dirty = true

@@ -354,7 +354,7 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 		quantumfs.NullSpaceName,
 		wsParts[0], wsParts[1], wsParts[2])
 	if err != nil {
-		if wsdbErrCode, ok := err.(*quantumfs.WorkspaceDbErr); ok {
+		if wsdbErrCode, ok := err.(quantumfs.WorkspaceDbErr); ok {
 			if wsdbErrCode.Code != quantumfs.WSDB_WORKSPACE_EXISTS {
 				// see note above on why we can ignore
 				// this error
