@@ -32,7 +32,8 @@ RUN dnf install -y make go \
        openssl-devel \
        capnproto \
        fuse \
-       which
+       which \
+       protobuf-devel
 
 RUN go get github.com/google/cityhash || ls $GOPATH/src/github.com/google/cityhash
 

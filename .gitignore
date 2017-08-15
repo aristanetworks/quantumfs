@@ -9,3 +9,4 @@
 /QuantumFS*.rpm
 .*.swp
 .swp
+grpc/rpc/rpc.pb.go
