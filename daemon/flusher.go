@@ -94,8 +94,37 @@ func flushCandidate_(c *ctx, dirtyInode dirtyInode) bool {
 }
 
 // flusher lock must be locked when calling this function
+func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (time.Time, bool) {
+	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
+	defer logRequestPanic(c)
+	for dq.Len_() > 0 {
+		// Should we clean this inode?
+		candidate := dq.Front_().Value.(*dirtyInode)
+
+		now := time.Now()
+		if !flushAll && candidate.expiryTime.After(now) {
+			// all expiring inodes have been flushed
+			return candidate.expiryTime, false
+		}
+		if !flushCandidate_(c, *candidate) {
+			candidate.expiryTime = time.Now().Add(
+				c.qfs.config.DirtyFlushDelay)
+			if flushAll {
+				// Unblock the waiter with an error message as
+				// the flushing hit an error in this iteration
+				dq.done <- fmt.Errorf("Flushing inode %d failed",
+					candidate.inode.inodeNum())
+			}
+			return candidate.expiryTime, false
+		}
+		dq.PopFront_()
+	}
+	return time.Now(), true
+}
+
+// flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flush_(c *ctx) {
-	defer c.funcIn("DirtyQueue::flush").Out()
+	defer c.funcIn("DirtyQueue::flush_").Out()
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	done := false
@@ -121,40 +150,18 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 				}
 			}()
 		}
+		flushAll := false
 		switch cmd {
 		case KICK:
 			if c.qfs.flusher.skip {
 				continue
 			}
 		case QUIT:
+			flushAll = true
 		case ABORT:
 			return
 		}
-
-		nextExpiringInode, done = func() (time.Time, bool) {
-			defer logRequestPanic(c)
-			for dq.Len_() > 0 {
-				// Should we clean this inode?
-				candidate := dq.Front_().Value.(*dirtyInode)
-
-				now := time.Now()
-				if cmd != QUIT && candidate.expiryTime.After(now) {
-					// all expiring inodes have been flushed
-					return candidate.expiryTime, false
-				}
-				if !flushCandidate_(c, *candidate) {
-					candidate.expiryTime = time.Now().Add(
-						c.qfs.config.DirtyFlushDelay)
-					if cmd == QUIT {
-						dq.done <- fmt.Errorf("Failed to flush inode %d",
-							candidate.inode.inodeNum())
-					}
-					return candidate.expiryTime, false
-				}
-				dq.PopFront_()
-			}
-			return time.Now(), true
-		}()
+		nextExpiringInode, done = dq.flushQueue_(c, flushAll)
 	}
 }
 
