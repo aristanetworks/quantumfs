@@ -31,7 +31,7 @@ func shouldRetry(err error) bool {
 		return false
 	}
 
-	wsdbErr, ok := err.(*quantumfs.WorkspaceDbErr)
+	wsdbErr, ok := err.(quantumfs.WorkspaceDbErr)
 	if !ok {
 		return true
 	}
@@ -181,7 +181,7 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 				// Unknown error
 				wsdb.reconnect()
 				return true
-			case *quantumfs.WorkspaceDbErr:
+			case quantumfs.WorkspaceDbErr:
 				switch err.Code {
 				default:
 					// Unhandled error
