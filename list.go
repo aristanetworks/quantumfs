@@ -65,7 +65,7 @@ func printList(args []string) error {
 					return cmdproc.NewBadCmdExitErr("Cannot find lastWriteTime for %s: %v", wsname, err)
 				}
 				fmt.Println()
-				fmt.Printf("[%s] %v : %s\n", lastWrite.Format(time.UnixDate), rootID.String(), wsname)
+				fmt.Printf("[%s] %v : %s\n", lastWrite.Local().Format(time.UnixDate), rootID.String(), wsname)
 			}
 		}
 	}
