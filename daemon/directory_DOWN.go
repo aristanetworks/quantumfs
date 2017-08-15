@@ -195,7 +195,9 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
-		inode.setParent(dir.inodeNum())
+		if inode != nil {
+			inode.setParent(dir.inodeNum())
+		}
 		return remoteRecord
 	}
 	utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
@@ -203,7 +205,9 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 
 	fileId := remoteRecord.FileId()
 	dir.wsr.updateHardlinkInodeId(c, fileId, inodeId)
-	inode.setParent(dir.wsr.inodeNum())
+	if inode != nil {
+		inode.setParent(dir.wsr.inodeNum())
+	}
 	return newHardlink(localRecord.Filename(), fileId, dir.wsr)
 }
 

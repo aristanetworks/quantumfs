@@ -179,7 +179,9 @@ type QuantumFs struct {
 	workspaceMutability map[string]workspaceState
 }
 
-func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
+func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
+	startChan chan<- struct{}) error {
+
 	qfs.c.dlog("QuantumFs::Serve Initializing server")
 
 	// Set the common set of required options
@@ -204,6 +206,9 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions) error {
 
 	qfs.server = server
 	qfs.c.dlog("QuantumFs::Serve Serving")
+	if startChan != nil {
+		close(startChan)
+	}
 	qfs.server.Serve()
 	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
@@ -376,9 +381,7 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 			return candidate.expiryTime
 		}
 
-		dirtyList.Remove(dirtyList.Front())
-
-		func() {
+		success := func() (flushed bool) {
 			// We must release the dirtyQueueLock because when we flush
 			// an Inode it will modify its parent and likely place that
 			// parent onto the dirty queue. If we still hold that lock
@@ -387,24 +390,44 @@ func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
 			// the case of a panic.
 			qfs.dirtyQueueLock.Unlock()
 			defer qfs.dirtyQueueLock.Lock()
-			qfs.flushInode(c, *candidate)
+			return qfs.flushInode(c, *candidate)
 		}()
+
+		if !success {
+			// Stop trying to flush on failure and retry later
+			candidate.expiryTime =
+				time.Now().Add(qfs.config.DirtyFlushDelay)
+			return candidate.expiryTime
+		}
+
+		dirtyList.Remove(dirtyList.Front())
 	}
 
 	// If we get here then we've emptied the dirtyList out entirely.
 	return time.Now().Add(flushSanityTimeout)
 }
 
-func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
+func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) bool {
 	inodeNum := dirtyInode.inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
 		inodeNum, dirtyInode.shouldUninstantiate).Out()
 
 	defer dirtyInode.inode.RLockTree().RUnlock()
 
+	flushSuccess := true
 	if !dirtyInode.inode.isOrphaned() {
-		dirtyInode.inode.flush(c)
+		if wsr, isWsr := dirtyInode.inode.(*WorkspaceRoot); isWsr {
+			_, flushSuccess = wsr.flushCanFail(c)
+		} else {
+			dirtyInode.inode.flush(c)
+		}
 	}
+
+	if !flushSuccess {
+		c.wlog("Escaping flushInode due to flush failure")
+		return false
+	}
+
 	func() {
 		defer qfs.dirtyQueueLock.Lock().Unlock()
 		dirtyInode.inode.markClean_()
@@ -414,6 +437,8 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) {
 		defer qfs.instantiationLock.Lock().Unlock()
 		qfs.uninstantiateInode_(c, inodeNum)
 	}
+
+	return true
 }
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"
