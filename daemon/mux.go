@@ -181,7 +181,7 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	for qfs.flusher.sync(&qfs.c, false) != nil {
+	for qfs.flusher.syncAll(&qfs.c, false) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -701,7 +701,15 @@ const SyncAllLog = "Mux::syncAll"
 
 func (qfs *QuantumFs) syncAll(c *ctx) error {
 	defer c.funcIn(SyncAllLog).Out()
-	return qfs.flusher.sync(c, true)
+	return qfs.flusher.syncAll(c, true)
+}
+
+// Sync the workspace keyed with key
+const SyncWorkspaceLog = "Mux::syncWorkspace"
+
+func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
+	defer c.funcIn(SyncWorkspaceLog).Out()
+	return qfs.flusher.syncWorkspace(c, workspace)
 }
 
 func logRequestPanic(c *ctx) {

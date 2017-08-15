@@ -59,6 +59,7 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
+	fmt.Println("  syncWorkspace <workspace>")
 }
 
 func main() {
@@ -99,6 +100,8 @@ func main() {
 		refresh()
 	case "advanceWSDB":
 		advanceWSDB()
+	case "syncWorkspace":
+		syncWorkspace()
 	}
 }
 
@@ -225,6 +228,24 @@ func advanceWSDB() {
 		os.Exit(exitApiNotFound)
 	}
 	if err := api.AdvanceWSDB(workspace, referenceWorkspace); err != nil {
+		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func syncWorkspace() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for syncWorkspace command")
+		os.Exit(exitBadArgs)
+	}
+	workspace := flag.Arg(1)
+
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
+	if err := api.SyncWorkspace(workspace); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}

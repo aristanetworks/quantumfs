@@ -13,6 +13,7 @@ package daemon
 import (
 	"container/list"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -108,6 +109,15 @@ func flushCandidate_(c *ctx, dirtyInode dirtyInode) bool {
 	return c.qfs.flushInode(c, dirtyInode)
 }
 
+func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
+	// Release the flusher lock as the caller may not be waiting for it yet
+	c.qfs.flusher.lock.Unlock()
+	defer c.qfs.flusher.lock.Lock()
+	// Unblock the waiter with an error message as
+	// the flushing hit an error in this iteration
+	dq.done <- fmt.Errorf("Flushing inode %d failed", inodeId)
+}
+
 // flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 	done bool) {
@@ -129,10 +139,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 			candidate.expiryTime = time.Now().Add(
 				c.qfs.config.DirtyFlushDelay)
 			if flushAll {
-				// Unblock the waiter with an error message as
-				// the flushing hit an error in this iteration
-				dq.done <- fmt.Errorf("Flushing inode %d failed",
-					candidate.inode.inodeNum())
+				dq.handleFlushError_(c, candidate.inode.inodeNum())
 			}
 			return candidate.expiryTime, false
 		}
@@ -209,7 +216,7 @@ func NewFlusher() *Flusher {
 	return &dqs
 }
 
-func (flusher *Flusher) sync(c *ctx, force bool) error {
+func (flusher *Flusher) sync(c *ctx, force bool, workspace string) error {
 	defer c.FuncIn("Flusher::sync", "%t", force).Out()
 	doneChannels := make([]chan error, 0)
 	var err error
@@ -220,6 +227,10 @@ func (flusher *Flusher) sync(c *ctx, force bool) error {
 		c.vlog("Flusher: %d dirty queues should finish off",
 			len(flusher.dqs))
 		for _, dq := range flusher.dqs {
+			if workspace != "" &&
+				!strings.HasPrefix(workspace, dq.name) {
+				continue
+			}
 			if force || !flusher.skip {
 				err = dq.TryCommand_(c, QUIT)
 			} else {
@@ -242,6 +253,15 @@ func (flusher *Flusher) sync(c *ctx, force bool) error {
 		}
 	}
 	return err
+}
+
+func (flusher *Flusher) syncAll(c *ctx, force bool) error {
+	return flusher.sync(c, force, "")
+}
+
+func (flusher *Flusher) syncWorkspace(c *ctx, workspace string) error {
+	defer c.FuncIn("Flusher::syncWorkspace", "%s", workspace).Out()
+	return flusher.sync(c, true, workspace)
 }
 
 // flusher lock must be locked when calling this function

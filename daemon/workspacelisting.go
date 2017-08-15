@@ -36,7 +36,7 @@ func NewTypespaceList() Inode {
 		typespacesById:   make(map[InodeId]string),
 	}
 	tsl.self = &tsl
-	treeLock := TreeLock{lock: &tsl.realTreeLock, name: "/"}
+	treeLock := TreeLock{lock: &tsl.realTreeLock, name: ""}
 	tsl.InodeCommon.treeLock_ = &treeLock
 	utils.Assert(tsl.treeLock() != nil, "TypespaceList treeLock nil at init")
 	return &tsl
