@@ -498,7 +498,7 @@ func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestI
 
 	for clientName, _ := range subscriptions {
 		if client, ok := m.clients[clientName]; ok {
-			c.vlog("Sending update to client %s", clientName)
+			c.vlog("Sending update to client %s", string(clientName))
 			client <- update
 		}
 	}
