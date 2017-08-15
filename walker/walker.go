@@ -41,7 +41,8 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 // Ctx maintains context for the walker library.
 type Ctx struct {
 	context.Context
-	Qctx *quantumfs.Ctx
+	Qctx   *quantumfs.Ctx
+	rootID quantumfs.ObjectKey
 }
 
 type workerData struct {
@@ -102,6 +103,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	c := &Ctx{
 		Context: groupCtx,
 		Qctx:    cq,
+		rootID:  rootID,
 	}
 
 	// Start Workers
@@ -332,7 +334,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 	buf := simplebuffer.New(nil, extKey)
 	if err := ds.Get(c.Qctx, extKey, buf); err != nil {
 		// TODO(sid): change back to return err
-		fmt.Printf("attrlist block missing %s:%s\n", extKey, fpath)
+		fmt.Printf("attrlist block missing %s:%s in rootID%s\n",
+			extKey, fpath, c.rootID)
 		return nil
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
@@ -351,8 +354,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		buf := simplebuffer.New(nil, key)
 		if err := ds.Get(c.Qctx, key, buf); err != nil {
 			// TODO(sid): change back to return err
-			fmt.Printf("xattrdata[%d] block missing %s:%s\n",
-				i, extKey, fpath)
+			fmt.Printf("xattrdata[%d] block missing %s:%s"+
+				" in rootID:%s\n", i, extKey, fpath, c.rootID)
 			return nil
 		}
 		simplebuffer.AssertNonZeroBuf(buf,
