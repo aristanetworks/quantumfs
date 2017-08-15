@@ -158,6 +158,7 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 			RequestId: uint64(rpc.ReservedRequestIds_RESYNC),
 		}
 		for workspace, _ := range wsdb.subscriptions {
+			wsdb.subscribeTo(workspace)
 			key, nonce, immutable, err := wsdb.fetchWorkspace(&ctx,
 				workspace)
 
@@ -237,14 +238,14 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 
 			if wsdb.updates == nil {
 				startTransmission = true
+				wsdb.updates = map[string]quantumfs.WorkspaceState{}
 			}
-			wsdb.updates = map[string]quantumfs.WorkspaceState{}
 
 			return true
 		}()
 
 		if !subscribed {
-			return
+			continue
 		}
 
 		wsdb.updates[update.Name] = quantumfs.WorkspaceState{
