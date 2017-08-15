@@ -76,7 +76,7 @@ func logFuseWaiting(prefix string, th *TestHelper) {
 	}
 }
 
-func abortFuse(th *TestHelper) {
+func (th *TestHelper) AbortFuse() {
 	for _, connection := range th.fuseConnections {
 		if connection == 0 {
 			// Nothing to abort
@@ -116,7 +116,7 @@ func (th *TestHelper) EndTest() {
 					"unmounting: %v", exception)
 				th.Log("Failed with exception, forcefully "+
 					"unmounting: %v", exception)
-				abortFuse(th)
+				th.AbortFuse()
 			}
 			logFuseWaiting("Before unmount", th)
 			var err error
@@ -135,7 +135,7 @@ func (th *TestHelper) EndTest() {
 					err.Error())
 				logFuseWaiting("After unmount failure", th)
 
-				abortFuse(th)
+				th.AbortFuse()
 				runtime.GC()
 				logFuseWaiting("After aborting fuse", th)
 				if err := qfs.server.Unmount(); err != nil {
@@ -201,20 +201,20 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 }
 
 // StartDefaultQuantumFs start the qfs daemon with default config.
-func (th *TestHelper) StartDefaultQuantumFs() {
+func (th *TestHelper) StartDefaultQuantumFs(startChan chan<- struct{}) {
 	config := th.defaultConfig()
-	th.startQuantumFs(config)
+	th.startQuantumFs(config, startChan)
 }
 
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
 // hanging.
-func (th *TestHelper) serveSafely(qfs *QuantumFs) {
+func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 	defer func(th *TestHelper) {
 		exception := recover()
 		if exception != nil {
 			for _, connection := range th.fuseConnections {
 				if connection != 0 {
-					abortFuse(th)
+					th.AbortFuse()
 				}
 				th.T.Fatalf("FUSE panic'd: %v", exception)
 			}
@@ -231,10 +231,12 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs) {
 
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
-	th.AssertNoErr(qfs.Serve(mountOptions))
+	th.AssertNoErr(qfs.Serve(mountOptions, startChan))
 }
 
-func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
+func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
+	startChan chan<- struct{}) {
+
 	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
 	}
@@ -247,7 +249,7 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig) {
 
 	th.Log("Waiting for QuantumFs instance to start...")
 
-	go th.serveSafely(qfs)
+	go th.serveSafely(qfs, startChan)
 
 	connection := findFuseConnection(th.TestCtx(), config.MountPath)
 	th.fuseConnections = append(th.fuseConnections, connection)
@@ -278,7 +280,7 @@ func (th *TestHelper) RestartQuantumFs() error {
 	th.waitForQuantumFsToFinish()
 	th.qfsInstances = nil
 	th.fuseConnections = nil
-	th.startQuantumFs(config)
+	th.startQuantumFs(config, nil)
 	return nil
 }
 

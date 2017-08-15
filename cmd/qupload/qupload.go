@@ -278,7 +278,7 @@ func main() {
 		_, _, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
 			wsParts[2])
 		if err != nil {
-			wE, ok := err.(*quantumfs.WorkspaceDbErr)
+			wE, ok := err.(quantumfs.WorkspaceDbErr)
 			if ok && wE.Code != quantumfs.WSDB_WORKSPACE_NOT_FOUND {
 				fmt.Println(err)
 				os.Exit(exitErrArgs)
