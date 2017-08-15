@@ -47,7 +47,7 @@ $(COMMANDS): encoding/metadata.capnp.go
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
-	sudo -E go test -gcflags '-e' github.com/aristanetworks/$@
+	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' github.com/aristanetworks/$@
 
 quploadRPM: $(COMMANDS)
 	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-upload --no-depends \

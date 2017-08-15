@@ -26,11 +26,10 @@ var xattrData = []byte("1111222233334444")
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test walkerTest) {
 	t.Parallel()
-	runTestCommon(t, test, true)
+	runTestCommon(t, test)
 }
 
-func runTestCommon(t *testing.T, test walkerTest,
-	startDefaultQfs bool) {
+func runTestCommon(t *testing.T, test walkerTest) {
 
 	// the stack depth of test name for all callers of runTestCommon
 	// is 2. Since the stack looks as follows:
@@ -49,11 +48,10 @@ func runTestCommon(t *testing.T, test walkerTest,
 	th.CreateTestDirs()
 	defer th.EndTest()
 
-	if startDefaultQfs {
-		th.StartDefaultQuantumFs()
-	}
-
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+	startChan := make(chan struct{}, 0)
+	th.StartDefaultQuantumFs(startChan)
+	th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
+		startChan, th.AbortFuse)
 }
 
 type testHelper struct {

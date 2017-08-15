@@ -103,7 +103,7 @@ func startWorkspaceDbdWithBackend(logger *qlog.Qlog, port uint16,
 		err := grpcServer.Serve(listener)
 		s.Error <- err
 
-		if s.Error == nil {
+		if err == nil {
 			logger.Log(qlog.LogWorkspaceDb, 0, 2,
 				"Finished serving clients")
 		} else {
@@ -124,10 +124,10 @@ func startWorkspaceDbdWithBackend(logger *qlog.Qlog, port uint16,
 type mux struct {
 	subscriptionLock utils.DeferableRwMutex
 	// workspace name to client name
-	subscriptionsByWorkspace map[string]map[string]bool
-	subscriptionsByClient    map[string]map[string]bool
+	subscriptionsByWorkspace map[string]map[clientname]bool
+	subscriptionsByClient    map[clientname]map[string]bool
 	// client name to notification channel
-	clients map[string]chan workspaceState
+	clients map[clientname]chan workspaceState
 
 	// For now simply use one of the existing backends
 	backend quantumfs.WorkspaceDB
@@ -138,9 +138,10 @@ type mux struct {
 
 func newMux(wsdb quantumfs.WorkspaceDB, qlog *qlog.Qlog) *mux {
 	m := mux{
-		subscriptionsByWorkspace: map[string]map[string]bool{},
-		subscriptionsByClient:    map[string]map[string]bool{},
-		clients:                  map[string]chan workspaceState{},
+		// map[workspaceName][clientName]
+		subscriptionsByWorkspace: map[string]map[clientname]bool{},
+		subscriptionsByClient:    map[clientname]map[string]bool{},
+		clients:                  map[clientname]chan workspaceState{},
 		backend:                  wsdb,
 		qlog:                     qlog,
 	}
@@ -161,7 +162,7 @@ func (m *mux) newCtx(remoteRequestId uint64, context context.Context) *ctx {
 			Qlog:      m.qlog,
 			RequestId: requestId,
 		},
-		clientName: clientName,
+		clientName: clientname(clientName),
 	}
 
 	c.vlog("Starting remote request (%s: %d)", clientName, remoteRequestId)
@@ -186,7 +187,7 @@ func parseWorkspaceDbError(c *ctx, response *rpc.Response, err error) (
 		return true, nil
 	}
 
-	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
@@ -340,7 +341,7 @@ func (m *mux) SubscribeTo(ctx context.Context, request *rpc.WorkspaceName) (
 
 	if _, ok := m.subscriptionsByWorkspace[request.Name]; !ok {
 		c.vlog("Creating workspace subscriptions map")
-		m.subscriptionsByWorkspace[request.Name] = map[string]bool{}
+		m.subscriptionsByWorkspace[request.Name] = map[clientname]bool{}
 	}
 
 	if _, ok := m.subscriptionsByClient[c.clientName]; !ok {

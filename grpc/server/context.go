@@ -8,9 +8,11 @@ import (
 	"github.com/aristanetworks/quantumfs/qlog"
 )
 
+type clientname string
+
 type ctx struct {
 	quantumfs.Ctx
-	clientName string
+	clientName clientname
 }
 
 func (c *ctx) elog(format string, args ...interface{}) {
