@@ -172,7 +172,7 @@ func parseWorkspaceDbError(c *ctx, response *rpc.Response, err error) (
 		return true, nil
 	}
 
-	if err, ok := err.(*quantumfs.WorkspaceDbErr); ok {
+	if err, ok := err.(quantumfs.WorkspaceDbErr); ok {
 		response.Err = rpc.ResponseCodes(err.Code)
 		response.ErrCause = err.Msg
 		c.vlog("Received workspaceDB error %d: %s", err.Code, err.Msg)
