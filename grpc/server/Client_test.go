@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func TestServerDisconnection(t *testing.T) {
@@ -44,18 +45,23 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 			"test1", "test", "test")
 		test.AssertNoErr(err)
 
+		var mutex utils.DeferableMutex
 		updated := map[string]bool{}
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			defer mutex.Lock().Unlock()
 			for workspace, _ := range updates {
+				test.Log("Received notification for %s", workspace)
 				updated[workspace] = true
 			}
 		}
+
 		client.SetCallback(callback)
 
 		test.restartServer()
 
 		// Confirm replay after reconnection
 		test.WaitFor("to receive workspace reconnection", func() bool {
+			defer mutex.Lock().Unlock()
 			_, exists := updated["test1/test/test"]
 			return exists
 		})
@@ -73,10 +79,12 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 		test.AssertNoErr(err)
 
 		test.WaitFor("to receive workspace notification", func() bool {
+			defer mutex.Lock().Unlock()
 			_, exists := updated["test2/test/test"]
 			return exists
 		})
 
+		defer mutex.Lock().Unlock()
 		_, exists := updated["test/test/test"]
 		test.Assert(!exists, "Invalid workspace notification received")
 	})
