@@ -106,9 +106,9 @@ message WorkspaceTableResponse {
 
 // Subscriptions
 message WorkspaceUpdate {
-	ObjectKey rootId = 1;
-	string name = 2;
-	fixed64 nonce = 3;
+	string name = 1;
+	ObjectKey rootId = 2;
+	WorkspaceNonce nonce = 3;
 	bool immutable = 4;
 	bool deleted = 5;
 }
@@ -125,7 +125,7 @@ message BranchWorkspaceRequest {
 message AdvanceWorkspaceRequest {
 	RequestId requestId = 1;
 	string workspaceName = 2;
-	fixed64 nonce = 3;
+	WorkspaceNonce nonce = 3;
 	ObjectKey currentRootId = 4;
 	ObjectKey newRootId = 5;
 }
