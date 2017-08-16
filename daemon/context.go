@@ -4,6 +4,8 @@
 package daemon
 
 import (
+	"math/rand"
+
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/hanwen/go-fuse/fuse"
@@ -41,6 +43,15 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
 	return c.reqId(header.Unique, &header.Context)
+}
+
+// Assign a unique request id to the context
+// this is useful for threading through goroutines that do not
+// have a corresponding RequestId
+func (c *ctx) uniqCtx() *ctx {
+	nc := *c
+	nc.Ctx.RequestId = rand.Uint64()
+	return &nc
 }
 
 // local daemon package specific log wrappers
