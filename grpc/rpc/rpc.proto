@@ -1,0 +1,143 @@
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
+// Arista Networks, Inc. Confidential and Proprietary.
+
+syntax = "proto3";
+
+// This is essentially a thin wrapper around quantumfs.WorkspaceDB
+service WorkspaceDb {
+	rpc NumTypespaces(RequestId) returns (NumTypespacesResponse) {}
+	rpc TypespaceTable(RequestId) returns (TypespaceTableResponse) {}
+	rpc NumNamespaces(NamespaceRequest) returns (NumNamespacesResponse) {}
+	rpc NamespaceTable(NamespaceRequest) returns (NamespaceTableResponse) {}
+	rpc NumWorkspaces(WorkspaceRequest) returns (NumWorkspacesResponse) {}
+	rpc WorkspaceTable(WorkspaceRequest) returns (WorkspaceTableResponse) {}
+
+	rpc SubscribeTo(WorkspaceName) returns (Response) {}
+	rpc UnsubscribeFrom(WorkspaceName) returns (Response) {}
+	rpc ListenForUpdates(Void) returns (stream WorkspaceUpdate) {}
+
+	rpc FetchWorkspace(WorkspaceName) returns (FetchWorkspaceResponse) {}
+
+	rpc BranchWorkspace(BranchWorkspaceRequest) returns (Response) {}
+	rpc DeleteWorkspace(WorkspaceName) returns (Response) {}
+	rpc SetWorkspaceImmutable(WorkspaceName) returns (Response) {}
+	rpc AdvanceWorkspace(AdvanceWorkspaceRequest) returns (AdvanceWorkspaceResponse) {}
+}
+
+message WorkspaceNonce {
+	fixed64 nonce = 1;
+}
+
+message RequestId {
+	uint64 id = 1;
+}
+
+enum ResponseCodes {
+	SUCCESS = 0;
+	WORKSPACE_NOT_FOUND = 1;
+	WORKSPACE_EXISTS = 2;
+	FATAL_DB_ERROR = 3;
+	LOCKED = 4;
+	OUT_OF_DATE = 5;
+}
+
+message Response {
+	RequestId requestId = 1;
+	ResponseCodes err = 2;
+	string errCause = 3;
+}
+
+message ObjectKey {
+	bytes data = 1;
+}
+
+message WorkspaceName {
+	RequestId requestId = 1;
+	string name = 2;
+}
+
+message Void {
+	bool dummy = 1;
+}
+
+// Query Typespaces
+message NumTypespacesResponse {
+	Response header = 1;
+	int64 numTypespaces = 2;
+}
+
+message TypespaceTableResponse {
+	Response header = 1;
+	repeated string typespaces = 2;
+}
+
+// Query Namespaces
+message NamespaceRequest {
+	RequestId requestId = 1;
+	string typespace = 2;
+}
+
+message NumNamespacesResponse {
+	Response header = 1;
+	int64 numNamespaces = 2;
+}
+
+message NamespaceTableResponse {
+	Response header = 1;
+	repeated string namespaces = 2;
+}
+
+// Query Workspaces
+message WorkspaceRequest {
+	RequestId requestId = 1;
+	string typespace = 2;
+	string namespace = 3;
+}
+
+message NumWorkspacesResponse {
+	Response header = 1;
+	int64 numWorkspaces = 2;
+}
+
+message WorkspaceTableResponse {
+	Response header = 1;
+	map<string, WorkspaceNonce> workspaces = 2;
+}
+
+// Subscriptions
+message WorkspaceUpdate {
+	string name = 1;
+	ObjectKey rootId = 2;
+	WorkspaceNonce nonce = 3;
+	bool immutable = 4;
+	bool deleted = 5;
+}
+
+// Work with Workspaces
+message BranchWorkspaceRequest {
+	RequestId requestId = 1;
+	string source = 2; // Workspace name, ie. build/eos-trunk/latestPass
+	string destination = 3; // Workspace name
+}
+
+// No WorkspaceIsImmutable, use FetchWorkspace instead.
+
+message AdvanceWorkspaceRequest {
+	RequestId requestId = 1;
+	string workspaceName = 2;
+	WorkspaceNonce nonce = 3;
+	ObjectKey currentRootId = 4;
+	ObjectKey newRootId = 5;
+}
+
+message AdvanceWorkspaceResponse {
+	Response header = 1;
+	ObjectKey newKey = 2;
+}
+
+message FetchWorkspaceResponse {
+	Response header = 1;
+	ObjectKey key = 2;
+	WorkspaceNonce nonce = 3;
+	bool immutable = 4;
+}
