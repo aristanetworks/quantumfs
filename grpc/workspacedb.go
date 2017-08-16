@@ -45,9 +45,10 @@ func shouldRetry(err error) bool {
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	wsdb := &workspaceDB{
-		config:        conf,
-		subscriptions: map[string]bool{},
-		reconnectChan: make(chan chan struct{}),
+		config:           conf,
+		subscriptions:    map[string]bool{},
+		triggerReconnect: make(chan struct{}),
+		waitForReconnect: make(chan struct{}),
 	}
 
 	go wsdb.reconnector()
@@ -71,18 +72,16 @@ type workspaceDB struct {
 	// replaces the notification channel with a newly instantiated channel and
 	// empties the previous channel of all notifications. This is done to prevent
 	// stale reconnection requests from causing a new connection to be closed.
-	reconnectLock utils.DeferableMutex
-	reconnectChan chan chan struct{}
+	reconnectLock    utils.DeferableMutex
+	triggerReconnect chan struct{}
+	waitForReconnect chan struct{}
 }
 
 // Run in a separate goroutine to trigger reconnection when the connection has failed
 func (wsdb *workspaceDB) reconnector() {
 	for {
 		// Wait for a notification
-		var waiter chan struct{}
-		select {
-		case waiter = <-wsdb.reconnectChan:
-		}
+		<-wsdb.triggerReconnect
 
 		// Reconnect
 		connOptions := []grpc.DialOption{
@@ -109,16 +108,19 @@ func (wsdb *workspaceDB) reconnector() {
 		// one
 		func() {
 			defer wsdb.reconnectLock.Lock().Unlock()
-			oldChan := wsdb.reconnectChan
-			wsdb.reconnectChan = make(chan chan struct{})
+			oldTrigger := wsdb.triggerReconnect
+			wsdb.triggerReconnect = make(chan struct{})
 
-			waiter <- struct{}{}
+			oldWaiter := wsdb.waitForReconnect
+			wsdb.waitForReconnect = make(chan struct{})
 
 			for {
 				select {
-				case <-oldChan:
+				case <-oldTrigger:
+					// Drain other notifications
 				default:
-					close(oldChan)
+					close(oldTrigger)
+					close(oldWaiter)
 					return
 				}
 			}
@@ -130,13 +132,12 @@ func (wsdb *workspaceDB) reconnector() {
 }
 
 func (wsdb *workspaceDB) reconnect() {
-	trigger := func() chan chan struct{} {
+	trigger, wait := func() (chan struct{}, chan struct{}) {
 		defer wsdb.reconnectLock.Lock().Unlock()
-		return wsdb.reconnectChan
+		return wsdb.triggerReconnect, wsdb.waitForReconnect
 	}()
 
-	wait := make(chan struct{})
-	trigger <- wait
+	trigger <- struct{}{}
 	<-wait
 }
 
