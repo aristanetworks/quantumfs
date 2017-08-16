@@ -368,7 +368,7 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	var err error
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		result, err := wsdb.typespaceList(c)
+		result, err = wsdb.typespaceList(c)
 		if !shouldRetry(err) {
 			return result, err
 		}
