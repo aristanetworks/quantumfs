@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -20,7 +19,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func NewApiInode(treeLock *sync.RWMutex, parent InodeId) Inode {
+func NewApiInode(treeLock *TreeLock, parent InodeId) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:        quantumfs.InodeIdApi,
@@ -280,7 +279,7 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
+func newApiHandle(c *ctx, treeLock *TreeLock) *ApiHandle {
 	defer c.funcIn("newApiHandle").Out()
 
 	api := ApiHandle{

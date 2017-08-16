@@ -7,7 +7,6 @@ package daemon
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -528,7 +527,7 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId, treeLock *sync.RWMutex) FileHandle {
+	fileHandleId FileHandleId, treeLock *TreeLock) FileHandle {
 
 	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{

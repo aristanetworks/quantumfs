@@ -95,7 +95,9 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.nonce = nonce
 	wsr.accessList = quantumfs.NewPathsAccessed()
 
-	wsr.treeLock_ = &wsr.realTreeLock
+	treeLock := TreeLock{lock: &wsr.realTreeLock,
+		name: typespace + "/" + namespace + "/" + workspace}
+	wsr.treeLock_ = &treeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
 		defer wsr.linkLock.Lock().Unlock()
@@ -105,7 +107,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	}()
 	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
-		&wsr.realTreeLock)
+		&treeLock)
 
 	return &wsr, uninstantiated
 }
