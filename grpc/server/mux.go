@@ -65,8 +65,7 @@ func startWorkspaceDbdWithBackend(logger *qlog.Qlog, port uint16,
 	backend quantumfs.WorkspaceDB) (*Server, error) {
 
 	logger.Log(qlog.LogWorkspaceDb, 0, 2,
-		"Starting grpc WorkspaceDB Server on port %d against backend %s",
-		port, backend)
+		"Starting grpc WorkspaceDB Server on port %d", port)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
