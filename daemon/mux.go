@@ -178,10 +178,14 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
-	err = qfs.flusher.sync(&qfs.c, false)
+
+	for qfs.flusher.sync(&qfs.c, false) != nil {
+		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
+		time.Sleep(100 * time.Millisecond)
+	}
 	qfs.c.dataStore.shutdown()
 
-	return err
+	return nil
 }
 
 func (qfs *QuantumFs) handleWorkspaceChanges(
