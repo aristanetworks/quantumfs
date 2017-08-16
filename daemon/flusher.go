@@ -80,6 +80,19 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 	return dq.l.PushFront(v)
 }
 
+// Try sending a command to the dirtyqueue, failing immediately
+// if it would have blocked
+// flusher lock must be locked when calling this function
+func (dq *DirtyQueue) TryCommand_(c *ctx, cmd FlushCmd) error {
+	select {
+	case dq.cmd <- cmd:
+		return nil
+	default:
+		c.vlog("sending cmd %d would have blocked", cmd)
+		return fmt.Errorf("sending cmd %d would have blocked", cmd)
+	}
+}
+
 // flusher lock must be locked when calling this function
 func flushCandidate_(c *ctx, dirtyInode dirtyInode) bool {
 	// We must release the flusher lock because when we flush
@@ -94,9 +107,13 @@ func flushCandidate_(c *ctx, dirtyInode dirtyInode) bool {
 }
 
 // flusher lock must be locked when calling this function
-func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (time.Time, bool) {
+func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
+	done bool) {
+
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
 	defer logRequestPanic(c)
+	next, done = time.Now(), false
+
 	for dq.Len_() > 0 {
 		// Should we clean this inode?
 		candidate := dq.Front_().Value.(*dirtyInode)
@@ -186,30 +203,36 @@ func NewFlusher() *Flusher {
 func (flusher *Flusher) sync(c *ctx, force bool) error {
 	defer c.FuncIn("Flusher::sync", "%t", force).Out()
 	doneChannels := make([]chan error, 0)
+	var err error
 	func() {
 		defer flusher.lock.Lock().Unlock()
-		// The cmd channels are buffered, so the fact that we hold the lock
-		// must not cause deadlock.
 		// We cannot close the channel, as we have to distinguish between
 		// ABORT and QUIT commands.
 		c.vlog("Flusher: %d dirty queues should finish off",
 			len(flusher.dqs))
 		for _, dq := range flusher.dqs {
 			if force || !flusher.skip {
-				dq.cmd <- QUIT
+				err = dq.TryCommand_(c, QUIT)
 			} else {
-				dq.cmd <- ABORT
+				err = dq.TryCommand_(c, ABORT)
+			}
+			if err != nil {
+				c.vlog("failed to send cmd to dirtyqueue")
+				return
 			}
 			doneChannels = append(doneChannels, dq.done)
 		}
 	}()
 
-	for _, c := range doneChannels {
-		if err := <-c; err != nil {
-			return err
+	for _, doneChan := range doneChannels {
+		if e := <-doneChan; e != nil {
+			c.vlog("failed to sync dirty queue %s", e.Error())
+			if err == nil {
+				err = e
+			}
 		}
 	}
-	return nil
+	return err
 }
 
 // flusher lock must be locked when calling this function
@@ -262,16 +285,13 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 		go func() {
 			defer flusher.lock.Lock().Unlock()
 			// KICK start the flusher
-			dq.cmd <- KICK
+			dq.TryCommand_(c, KICK)
 			dq.flush_(c)
 			close(dq.done)
 			delete(flusher.dqs, treelock)
 		}()
 	} else {
-		select {
-		case dq.cmd <- KICK:
-		default:
-		}
+		dq.TryCommand_(c, KICK)
 	}
 	return dirtyElement
 }
