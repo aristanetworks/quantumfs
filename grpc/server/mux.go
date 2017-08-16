@@ -98,7 +98,7 @@ func startWorkspaceDbdWithBackend(logger *qlog.Qlog, port uint16,
 
 	go func() {
 		logger.Log(qlog.LogWorkspaceDb, 0, 2, "Serving clients")
-		wait <- struct{}{}
+		close(wait)
 		err := grpcServer.Serve(listener)
 		s.Error <- err
 
