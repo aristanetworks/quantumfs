@@ -141,6 +141,21 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 	return time.Now(), true
 }
 
+func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
+	sleepTime := nextExpiringInode.Sub(time.Now())
+	if sleepTime > flushSanityTimeout {
+		c.elog("Overlong flusher sleepTime %s!", sleepTime)
+		sleepTime = flushSanityTimeout
+	}
+	if sleepTime < time.Millisecond {
+		c.vlog("Do not allow busywaiting in the flusher")
+		sleepTime = time.Millisecond
+	}
+	c.vlog("Waiting until %s, sleepTime %s",
+		nextExpiringInode.String(), sleepTime.String())
+	return sleepTime
+}
+
 // flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flush_(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flush_", "%s", dq.name).Out()
@@ -148,27 +163,19 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	done := false
 	for dq.Len_() > 0 && !done {
-		sleepTime := nextExpiringInode.Sub(time.Now())
-
-		if sleepTime > flushSanityTimeout {
-			c.elog("Overlong flusher sleepTime %s!", sleepTime)
-			sleepTime = flushSanityTimeout
-		}
+		sleepTime := getSleepTime(c, nextExpiringInode)
 		cmd := KICK
-		if sleepTime > 0 {
-			c.vlog("Waiting until %s (%s)...",
-				nextExpiringInode.String(), sleepTime.String())
-			func() {
-				c.qfs.flusher.lock.Unlock()
-				defer c.qfs.flusher.lock.Lock()
-				select {
-				case cmd = <-dq.cmd:
-					c.vlog("dirtyqueue received cmd %d", cmd)
-				case <-time.After(sleepTime):
-					c.vlog("flusher woken up due to timer")
-				}
-			}()
-		}
+		func() {
+			c.qfs.flusher.lock.Unlock()
+			defer c.qfs.flusher.lock.Lock()
+			select {
+			case cmd = <-dq.cmd:
+				c.vlog("dirtyqueue received cmd %d", cmd)
+			case <-time.After(sleepTime):
+				c.vlog("flusher woken up due to timer")
+			}
+		}()
+
 		flushAll := false
 		switch cmd {
 		case KICK:
