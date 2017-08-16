@@ -3,7 +3,8 @@ PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
-PKGS_TO_TEST+=quantumfs/utils/excludespec
+PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
+PKGS_TO_TEST+=quantumfs/grpc/server
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
@@ -15,6 +16,8 @@ clean:
 	rm -f $(COMMANDS)
 
 fetch:
+	go get -u google.golang.org/grpc
+	go get -u github.com/golang/protobuf/protoc-gen-go
 	for cmd in $(COMMANDS); do \
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
@@ -34,13 +37,16 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 		exit 1; \
 	fi
 
+grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
+	protoc -I grpc/rpc/ grpc/rpc/rpc.proto --go_out=plugins=grpc:grpc/rpc
+
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
-$(PKGS_TO_TEST): encoding/metadata.capnp.go
+$(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
 	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' github.com/aristanetworks/$@
 
 quploadRPM: $(COMMANDS)
