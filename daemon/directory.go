@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sync"
 	"syscall"
 	"time"
 
@@ -71,7 +70,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 
 func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent InodeId, treeLock *sync.RWMutex) []InodeId {
+	parent InodeId, treeLock *TreeLock) []InodeId {
 
 	defer c.FuncIn("initDirectory",
 		"baselayer from %s", baseLayerId.String()).Out()
@@ -1833,7 +1832,7 @@ type directoryContents struct {
 type directorySnapshotSource interface {
 	getChildSnapshot(c *ctx) []directoryContents
 	inodeNum() InodeId
-	treeLock() *sync.RWMutex
+	treeLock() *TreeLock
 }
 
 func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapshot {

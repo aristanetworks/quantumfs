@@ -13,7 +13,6 @@ package daemon
 import (
 	"container/list"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -40,9 +39,10 @@ type DirtyQueue struct {
 	l    *list.List
 	cmd  chan FlushCmd
 	done chan error
+	name string
 }
 
-func NewDirtyQueue() *DirtyQueue {
+func NewDirtyQueue(name string) *DirtyQueue {
 	dq := DirtyQueue{
 		l: list.New(),
 		// We would like to allow a large number of
@@ -51,6 +51,7 @@ func NewDirtyQueue() *DirtyQueue {
 		// This should change to consolidate all KICKs into one
 		cmd:  make(chan FlushCmd, 1000),
 		done: make(chan error),
+		name: name,
 	}
 	return &dq
 }
@@ -84,6 +85,7 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 // if it would have blocked
 // flusher lock must be locked when calling this function
 func (dq *DirtyQueue) TryCommand_(c *ctx, cmd FlushCmd) error {
+	c.vlog("Sending cmd %d to dirtyqueue %s", cmd, dq.name)
 	select {
 	case dq.cmd <- cmd:
 		return nil
@@ -141,7 +143,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 
 // flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flush_(c *ctx) {
-	defer c.funcIn("DirtyQueue::flush_").Out()
+	defer c.FuncIn("DirtyQueue::flush_", "%s", dq.name).Out()
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	done := false
@@ -186,7 +188,7 @@ type Flusher struct {
 	// This is a map from the treeLock to a list of dirty inodes. We use the
 	// treelock because every Inode already has the treelock of its workspace so
 	// this is an easy way to sort Inodes by workspace.
-	dqs  map[*sync.RWMutex]*DirtyQueue
+	dqs  map[*TreeLock]*DirtyQueue
 	lock utils.DeferableMutex
 	// Set to true to disable timer based flushing. Use for tests only
 	skip bool
@@ -194,7 +196,7 @@ type Flusher struct {
 
 func NewFlusher() *Flusher {
 	dqs := Flusher{
-		dqs:  make(map[*sync.RWMutex]*DirtyQueue),
+		dqs:  make(map[*TreeLock]*DirtyQueue),
 		skip: false,
 	}
 	return &dqs
@@ -255,7 +257,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 		treelock := inode.treeLock()
 		dq, ok := flusher.dqs[treelock]
 		if !ok {
-			dq = NewDirtyQueue()
+			dq = NewDirtyQueue(treelock.name)
 			flusher.dqs[treelock] = dq
 			launch = true
 		}
