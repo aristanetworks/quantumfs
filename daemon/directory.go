@@ -1650,8 +1650,8 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
-		panic(fmt.Sprintf("Cannot instantiate child with no record: %d",
-			inodeNum))
+		c.elog("Cannot instantiate child with no record: %d", inodeNum)
+		return nil, nil
 	}
 
 	// check if the child is a hardlink
