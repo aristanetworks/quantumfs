@@ -165,8 +165,10 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 			if err == nil {
 				initialUpdates = append(initialUpdates,
 					&rpc.WorkspaceUpdate{
-						Name:   workspace,
-						RootId: &rpc.ObjectKey{Data: key.Value()},
+						Name: workspace,
+						RootId: &rpc.ObjectKey{
+							Data: key.Value(),
+						},
 						Nonce: &rpc.WorkspaceNonce{
 							Nonce: uint64(nonce),
 						},
@@ -190,15 +192,16 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 				case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
 					// Workspace may have been deleted
 					zero := quantumfs.ZeroKey
+					deleted := &rpc.WorkspaceUpdate{
+						Name: workspace,
+						RootId: &rpc.ObjectKey{
+							Data: zero.Value(),
+						},
+						Nonce:   &rpc.WorkspaceNonce{},
+						Deleted: true,
+					}
 					initialUpdates = append(initialUpdates,
-						&rpc.WorkspaceUpdate{
-							Name: workspace,
-							RootId: &rpc.ObjectKey{
-								Data: zero.Value(),
-							},
-							Nonce:   &rpc.WorkspaceNonce{},
-							Deleted: true,
-						})
+						deleted)
 					continue
 				}
 			}
@@ -856,8 +859,8 @@ func (wsdb *workspaceDB) workspaceIsImmutable(c *quantumfs.Ctx, typespace string
 func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, "grps::SetWorkspaceImmutable", "%s/%s/%s",
-		typespace, namespace, workspace).Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, "grps::SetWorkspaceImmutable",
+		"%s/%s/%s", typespace, namespace, workspace).Out()
 
 	var err error
 
