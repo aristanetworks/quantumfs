@@ -116,9 +116,9 @@ func (wsdb *workspaceDB) reconnector() {
 
 			for {
 				select {
-				case waiter := <-oldChan:
-					waiter <- struct{}{}
+				case <-oldChan:
 				default:
+					close(oldChan)
 					return
 				}
 			}
