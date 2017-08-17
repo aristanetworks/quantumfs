@@ -509,8 +509,8 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	c.vlog("Branching %s/%s/%s to %s/%s/%s", src[0], src[1], src[2], dst[0],
 		dst[1], dst[2])
 
-	if err := c.qfs.syncAll(c); err != nil {
-		c.vlog("syncAll failed: %s", err.Error())
+	if err := c.qfs.syncWorkspace(c, cmd.Src); err != nil {
+		c.vlog("syncWorkspace failed: %s", err.Error())
 		return api.queueErrorResponse(
 			quantumfs.ErrorCommandFailed, "%s", err.Error())
 	}
