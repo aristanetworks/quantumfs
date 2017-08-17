@@ -24,6 +24,8 @@ import (
 // will be automatically cleaned up the store.
 const TimeToLive = "cql.TTL"
 
+// cqlBlobStore implements both blobstore.BlobStore interface
+// CqlStore interface.
 type cqlBlobStore struct {
 	store    *cqlStore
 	keyspace string
@@ -199,4 +201,12 @@ func (b *cqlBlobStore) Update(c ether.Ctx, key []byte, metadata map[string]strin
 func (b *cqlBlobStore) ReportAPIStats() {
 	b.insertStats.(stats.OpStatReporter).ReportOpStats()
 	b.getStats.(stats.OpStatReporter).ReportOpStats()
+}
+
+// Keyspace returns the keyspace for this CQL blobstore
+func (b *cqlBlobStore) Keyspace() string {
+	// since we don't support changing keyspace after
+	// the session has established, returning the configured
+	// keyspace is fine
+	return b.keyspace
 }

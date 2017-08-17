@@ -10,3 +10,11 @@ package cql
 type APIStatsReporter interface {
 	ReportAPIStats()
 }
+
+// CqlStore interface is a collection of methods
+// which are specific to a blobstore that supports
+// CQL protocol.
+type CqlStore interface {
+	// Keyspace for the store
+	Keyspace() string
+}
