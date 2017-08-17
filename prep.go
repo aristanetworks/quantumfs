@@ -74,14 +74,21 @@ func showProgress(progress bool, start time.Time, keysWalked uint64) {
 func walkHelper(c *Ctx,
 	qfsds quantumfs.DataStore,
 	qfsdb quantumfs.WorkspaceDB,
-	wsname string,
+	ws string,
 	progress bool,
 	rootIDStatus bool,
 	handler walker.WalkFunc) (err error) {
 
 	var rootID quantumfs.ObjectKey
-	if rootID, _, err = qubitutils.GetWorkspaceRootID(&c.Ctx, qfsdb, wsname); err != nil {
-		return
+
+	// treat ws as rootID first and if that
+	// fails then assume it is a name
+	rootID, err = quantumfs.FromString(ws)
+	if err != nil {
+		if rootID, _, err = qubitutils.GetWorkspaceRootID(&c.Ctx,
+			qfsdb, ws); err != nil {
+			return
+		}
 	}
 
 	if rootIDStatus {
