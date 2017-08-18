@@ -109,8 +109,9 @@ func flushCandidate_(c *ctx, dirtyInode dirtyInode) bool {
 	return c.qfs.flushInode(c, dirtyInode)
 }
 
+// flusher lock must be locked when calling this function
 func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
-	// Release the flusher lock as the caller may not be waiting for it yet
+	// Release the flusher lock as the caller may not be waiting for us yet
 	c.qfs.flusher.lock.Unlock()
 	defer c.qfs.flusher.lock.Lock()
 	// Unblock the waiter with an error message as
@@ -256,6 +257,7 @@ func (flusher *Flusher) sync(c *ctx, force bool, workspace string) error {
 }
 
 func (flusher *Flusher) syncAll(c *ctx, force bool) error {
+	defer c.funcIn("Flusher::syncAll").Out()
 	return flusher.sync(c, force, "")
 }
 

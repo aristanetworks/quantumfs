@@ -307,7 +307,7 @@ type Api interface {
 	// Sync all the active workspaces
 	SyncAll() error
 
-	// Sync an active workspace
+	// Sync a specific workspace
 	SyncWorkspace(workspace string) error
 
 	// Duplicate an object with a given key and path
