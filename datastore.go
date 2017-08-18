@@ -372,6 +372,10 @@ func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 	dir.dir.SetNext(key.key)
 }
 
+func (dir *DirectoryEntry) String() (string, error) {
+	return utils.GetDebugString(dir.dir, "dentry")
+}
+
 // The various types the next referenced object could be
 const (
 	ObjectTypeInvalid           = 0
@@ -1139,6 +1143,10 @@ func (mb *MultiBlockFile) Bytes() []byte {
 	return mb.mb.Segment.Data
 }
 
+func (mb *MultiBlockFile) String() (string, error) {
+	return utils.GetDebugString(mb.mb, "multiblockfile")
+}
+
 func newVeryLargeFile(entryCapacity int) *VeryLargeFile {
 	segment := capn.NewBuffer(nil)
 	vlf := VeryLargeFile{
@@ -1191,6 +1199,10 @@ func (vlf *VeryLargeFile) SetLargeFileKey(i int, key ObjectKey) {
 
 func (vlf *VeryLargeFile) Bytes() []byte {
 	return vlf.vlf.Segment.Data
+}
+
+func (vlf *VeryLargeFile) String() (string, error) {
+	return utils.GetDebugString(vlf.vlf, "verylargefile")
 }
 
 func NewExtendedAttributes() *ExtendedAttributes {
@@ -1253,6 +1265,10 @@ func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {
 
 func (ea *ExtendedAttributes) Bytes() []byte {
 	return ea.ea.Segment.Data
+}
+
+func (ea *ExtendedAttributes) String() (string, error) {
+	return utils.GetDebugString(ea.ea, "xattr")
 }
 
 // Buffer represents a bundle of data from a datastore.
