@@ -373,7 +373,7 @@ func (dir *DirectoryEntry) SetNext(key ObjectKey) {
 }
 
 func (dir *DirectoryEntry) String() (string, error) {
-	return utils.GetDebugString(dir.dir, "direntry")
+	return utils.GetDebugString(dir.dir, "dentry")
 }
 
 // The various types the next referenced object could be
@@ -1268,7 +1268,7 @@ func (ea *ExtendedAttributes) Bytes() []byte {
 }
 
 func (ea *ExtendedAttributes) String() (string, error) {
-	return utils.GetDebugString(ea.ea, "extattr")
+	return utils.GetDebugString(ea.ea, "xattr")
 }
 
 // Buffer represents a bundle of data from a datastore.
