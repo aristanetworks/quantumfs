@@ -80,6 +80,11 @@ const (
 	MinSpecialReqId
 )
 
+const (
+	RefreshRequestIdMin = uint64(0xc) << 48
+	ForgetRequstIdMin   = uint64(0xd) << 48
+)
+
 const TimeFormat = "2006-01-02T15:04:05.000000000"
 
 func SpecialReq(reqId uint64) string {

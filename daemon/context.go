@@ -45,7 +45,7 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 	return c.reqId(header.Unique, &header.Context)
 }
 
-var flusherRequestIdGenerator = uint64(0xc) << 48
+var flusherRequestIdGenerator = qlog.RefreshRequestIdMin
 
 // Assign a unique request id to the context for a flusher goroutine
 func (c *ctx) flusherCtx() *ctx {
@@ -54,7 +54,7 @@ func (c *ctx) flusherCtx() *ctx {
 	return &nc
 }
 
-var forgetRequestIdGenerator = uint64(0xd) << 48
+var forgetRequestIdGenerator = qlog.ForgetRequstIdMin
 
 // Assign a unique request id to the context for a forget goroutine
 func (c *ctx) forgetCtx() *ctx {
