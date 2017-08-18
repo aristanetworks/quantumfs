@@ -25,6 +25,7 @@ func WriteWorkspaceWalkDuration(c *Ctx, ts string, ns string, pass bool,
 		"typeSpace": ts,
 		"nameSpace": ns,
 		"pass":      strconv.FormatBool(pass),
+		"keyspace":  c.keyspace,
 	}
 	fields := map[string]interface{}{
 		"workSpace":   ws,
@@ -57,14 +58,16 @@ func WriteWalkerIteration(c *Ctx, dur time.Duration,
 	numSuccess uint32, numError uint32) {
 
 	measurement := "walkerIteration"
+	tags := map[string]string{
+		"keyspace": c.keyspace,
+	}
 	fields := map[string]interface{}{
 		"walkTimeMin":  uint(dur / time.Minute),
 		"iteration":    c.iteration,
 		"countSuccess": numSuccess,
 		"countError":   numError,
 	}
-
-	err := c.Influx.WritePoint(measurement, nil, fields)
+	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("Writing %s iteration=%v to influxDB err: %v\n",
 			measurement, c.iteration, err)
@@ -83,11 +86,14 @@ func WriteWalkerIteration(c *Ctx, dur time.Duration,
 func WriteWalkerHeartBeat(c *Ctx) {
 
 	measurement := "walkerHeartBeat"
+	tags := map[string]string{
+		"keyspace": c.keyspace,
+	}
 	fields := map[string]interface{}{
 		"alive": 1,
 	}
 
-	err := c.Influx.WritePoint(measurement, nil, fields)
+	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("Error:   Writing %s to influxDB err: %v\n", measurement, err)
 		return

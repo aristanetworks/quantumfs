@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/ether/cql"
 	influxlib "github.com/aristanetworks/influxlib/go"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -33,6 +34,7 @@ type Ctx struct {
 	numError   uint32
 	numWalkers int
 	iteration  uint
+	keyspace   string
 }
 
 func getWalkerDaemonContext(influxServer string, influxPort uint16,
@@ -69,11 +71,22 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 	}
 
 	// Extract blobstore from quantumfs DataStore
-	var cqlDS blobstore.BlobStore
-	if v, ok := quantumfsDS.(*thirdparty_backends.EtherBlobStoreTranslator); ok {
-		cqlDS = v.Blobstore
-		v.ApplyTTLPolicy = false
+	// since we specifically use ether.cql datastore, it must implement
+	// the following interfaces
+	b, ok := quantumfsDS.(*thirdparty_backends.EtherBlobStoreTranslator)
+	if !ok {
+		fmt.Printf("Found unsupported datastore adapter\n")
+		os.Exit(exitBadConfig)
 	}
+	cqlDS := b.Blobstore
+	b.ApplyTTLPolicy = false
+
+	c, isa := cqlDS.(cql.CqlStore)
+	if !isa {
+		fmt.Printf("Found unsupported datastore\n")
+		os.Exit(exitBadConfig)
+	}
+	keyspace := c.Keyspace()
 
 	// Connect to ether.cql WorkSpaceDB
 	quantumfsWSDB, err := thirdparty_backends.ConnectWorkspaceDB("ether.cql", config)
@@ -105,6 +118,7 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 		ttlCfg:     ttlConfig,
 		confFile:   config,
 		numWalkers: numwalkers,
+		keyspace:   keyspace,
 	}
 }
 
