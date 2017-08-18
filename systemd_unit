@@ -13,6 +13,7 @@ ExecStop=/usr/bin/umount -l /qfs
 ExecStop=/usr/bin/killall -SIGUSR1 quantumfsd
 User=root
 KillMode=none
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
