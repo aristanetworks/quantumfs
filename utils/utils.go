@@ -87,8 +87,11 @@ type JSONwriter interface {
 }
 
 func GetDebugString(obj JSONwriter, name string) (string, error) {
-	bs := bytes.NewBufferString(name + ": ")
+	bs := bytes.NewBufferString(fmt.Sprintf("{ %q: ", name))
 	if err := obj.WriteJSON(bs); err != nil {
+		return "", err
+	}
+	if _, err := bs.WriteString("}"); err != nil {
 		return "", err
 	}
 	return bs.String(), nil
