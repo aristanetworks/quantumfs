@@ -504,13 +504,13 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	c.vlog("Inode %d needs to be instantiated", id)
 	var newUninstantiated []InodeId
 
-	for {
-		parentId, uninstantiated := qfs.parentOfUninstantiated[id]
-		if !uninstantiated {
-			// We don't know anything about this Inode
-			return nil
-		}
+	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
+	if !uninstantiated {
+		// We don't know anything about this Inode
+		return nil
+	}
 
+	for {
 		parent := qfs.inode_(c, parentId)
 		if parent == nil {
 			panic(fmt.Sprintf("Unable to instantiate parent %d",
@@ -527,6 +527,16 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		if inode != nil {
 			break
 		}
+		// a nil inode means the dentry has moved or has been removed
+		newParentId, uninstantiated := qfs.parentOfUninstantiated[id]
+		if !uninstantiated {
+			// The dentry has been removed
+			return nil
+		}
+		// The dentry is still there, verify the parent has changed
+		utils.Assert(newParentId != parentId,
+			"parent of inode %d is still %d", id, parentId)
+		parentId = newParentId
 	}
 
 	delete(qfs.parentOfUninstantiated, id)
