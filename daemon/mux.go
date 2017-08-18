@@ -987,7 +987,7 @@ func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
 const ForgetLog = "Mux::Forget"
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
-	c := qfs.c.uniqCtx()
+	c := qfs.c.forgetCtx()
 	defer c.funcIn(ForgetLog).Out()
 	defer logRequestPanic(c)
 

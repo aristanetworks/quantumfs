@@ -292,7 +292,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	dq := flusher.dqs[treelock]
 	if launch {
 		go func() {
-			nc := c.uniqCtx()
+			nc := c.flusherCtx()
 			defer flusher.lock.Lock().Unlock()
 			// KICK start the flusher
 			dq.TryCommand_(nc, KICK)

@@ -4,7 +4,7 @@
 package daemon
 
 import (
-	"math/rand"
+	"sync/atomic"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -45,12 +45,21 @@ func (c *ctx) req(header *fuse.InHeader) *ctx {
 	return c.reqId(header.Unique, &header.Context)
 }
 
-// Assign a unique request id to the context
-// this is useful for threading through goroutines that do not
-// have a corresponding RequestId
-func (c *ctx) uniqCtx() *ctx {
+var flusherRequestIdGenerator = uint64(0xc) << 48
+
+// Assign a unique request id to the context for a flusher goroutine
+func (c *ctx) flusherCtx() *ctx {
 	nc := *c
-	nc.Ctx.RequestId = rand.Uint64()
+	nc.Ctx.RequestId = atomic.AddUint64(&flusherRequestIdGenerator, 1)
+	return &nc
+}
+
+var forgetRequestIdGenerator = uint64(0xd) << 48
+
+// Assign a unique request id to the context for a forget goroutine
+func (c *ctx) forgetCtx() *ctx {
+	nc := *c
+	nc.Ctx.RequestId = atomic.AddUint64(&forgetRequestIdGenerator, 1)
 	return &nc
 }
 
