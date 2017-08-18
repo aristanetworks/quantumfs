@@ -199,10 +199,6 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 		touched[name] = true
 	}
 
-	// We must lock the instantiation lock to ensure no races between when we
-	// check inodeNoInstantiate and when we call setInode/removeUninstantiated
-	defer c.qfs.instantiationLock.Lock().Unlock()
-
 	// Then delete entries which no longer exist
 	for name, id := range *inodeMap {
 		if _, exists := touched[name]; !exists {
@@ -982,26 +978,19 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 		wsl.inodeNum()).Out()
 
 	// First delete any outdated entries
-	func() {
-		// We must lock the instantiation lock to ensure no races between
-		// when we check inodeNoInstantiate and when we call
-		// setInode/removeUninstantiated
-		defer c.qfs.instantiationLock.Lock().Unlock()
+	for name, info := range wsl.workspacesByName {
+		wsdbNonce, exists := names[name]
+		if !exists || wsdbNonce != info.nonce {
+			c.vlog("Removing deleted child %s (%d)", name,
+				info.nonce)
 
-		for name, info := range wsl.workspacesByName {
-			wsdbNonce, exists := names[name]
-			if !exists || wsdbNonce != info.nonce {
-				c.vlog("Removing deleted child %s (%d)", name,
-					info.nonce)
-
-				// Note: do not uninstantiate them now - remove them
-				// from their parents and let the kernel forget them
-				// naturally.
-				delete(wsl.workspacesByName, name)
-				delete(wsl.workspacesById, info.id)
-			}
+			// Note: do not uninstantiate them now - remove them
+			// from their parents and let the kernel forget them
+			// naturally.
+			delete(wsl.workspacesByName, name)
+			delete(wsl.workspacesById, info.id)
 		}
-	}()
+	}
 
 	// Then re-add any new entries
 	for name, nonce := range names {
