@@ -987,25 +987,26 @@ func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
 const ForgetLog = "Mux::Forget"
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
-	defer qfs.c.funcIn(ForgetLog).Out()
-	defer logRequestPanic(&qfs.c)
+	c := qfs.c.forgetCtx()
+	defer c.funcIn(ForgetLog).Out()
+	defer logRequestPanic(c)
 
-	qfs.c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
+	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
 	if !qfs.shouldForget(InodeId(nodeID), nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
-		qfs.c.dlog("inode %d lookup not zero yet", nodeID)
+		c.dlog("inode %d lookup not zero yet", nodeID)
 		return
 	}
 
 	defer qfs.instantiationLock.Lock().Unlock()
 
-	if inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID)); inode != nil {
-		inode.queueToForget(&qfs.c)
+	if inode := qfs.inodeNoInstantiate(c, InodeId(nodeID)); inode != nil {
+		inode.queueToForget(c)
 	} else {
-		qfs.c.dlog("Forgetting uninstantiated Inode %d", nodeID)
-		qfs.uninstantiateInode_(&qfs.c, InodeId(nodeID))
+		c.dlog("Forgetting uninstantiated Inode %d", nodeID)
+		qfs.uninstantiateInode_(c, InodeId(nodeID))
 	}
 }
 
