@@ -102,6 +102,8 @@ type QuantumFs struct {
 	// a large number of ApiHandles.
 	apiFileSize int64
 
+	// This is a leaf lock for protecting the instantiation maps
+	// Do not grab other locks while holding this
 	mapMutex    utils.DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
@@ -492,7 +494,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	return inode
 }
 
-// Must hold the mapMutex for write
+// Must hold the instantiationLock and mapMutex for write
 func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	inode, needsInstantiation := qfs.getInode_(c, id)
 	if !needsInstantiation && inode != nil {
@@ -500,6 +502,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	}
 
 	c.vlog("Inode %d needs to be instantiated", id)
+	var newUninstantiated []InodeId
 
 	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
 	if !uninstantiated {
@@ -507,13 +510,35 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	parent := qfs.inode_(c, parentId)
-	if parent == nil {
-		panic(fmt.Sprintf("Unable to instantiate parent required: %d",
-			parentId))
+	for {
+		parent := qfs.inode_(c, parentId)
+		if parent == nil {
+			panic(fmt.Sprintf("Unable to instantiate parent %d",
+				parentId))
+		}
+
+		func() {
+			qfs.mapMutex.Unlock()
+			defer qfs.mapMutex.Lock()
+			// without mapMutex the child could move underneath this
+			// parent, in such cases, find the new parent
+			inode, newUninstantiated = parent.instantiateChild(c, id)
+		}()
+		if inode != nil {
+			break
+		}
+		// a nil inode means the dentry has moved or has been removed
+		newParentId, uninstantiated := qfs.parentOfUninstantiated[id]
+		if !uninstantiated {
+			// The dentry has been removed
+			return nil
+		}
+		// The dentry is still there, verify the parent has changed
+		utils.Assert(newParentId != parentId,
+			"parent of inode %d is still %d", id, parentId)
+		parentId = newParentId
 	}
 
-	inode, newUninstantiated := parent.instantiateChild(c, id)
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
