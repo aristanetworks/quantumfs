@@ -81,6 +81,7 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 		newQfsExtPair(thirdparty_backends.EtherAdvanceLog,
 			thirdparty_backends.EtherAdvanceDebugLog),
 		newQfsExtPair(daemon.SyncAllLog, ""),
+		newQfsExtPair(daemon.SyncWorkspaceLog, ""),
 		newQfsExtPair(daemon.LookupLog, daemon.InodeNameLog),
 		newQfsExtPair(daemon.ForgetLog, ""),
 		newQfsExtPair(daemon.GetAttrLog, daemon.InodeOnlyLog),
