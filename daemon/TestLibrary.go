@@ -258,10 +258,6 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 		Name: th.TestName,
 	}
 
-	// Ensure that, since we're in a test, we only sync when syncAll is called.
-	// Otherwise, we shouldn't ever need to flush.
-	qfs.flusher.skip = true
-
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
 	th.AssertNoErr(qfs.Serve(mountOptions, startChan))
