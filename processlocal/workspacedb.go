@@ -301,8 +301,8 @@ func deleteWorkspaceRecord_(c *quantumfs.Ctx, cache workspaceMap,
 func (wsdb *WorkspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, "processlocal::DeleteWorkspace %s/%s/%s",
-		typespace, namespace, workspace).Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, "processlocal::DeleteWorkspace",
+		"workspace %s/%s/%s", typespace, namespace, workspace).Out()
 	// Through all these checks, if the workspace could not exist, we return
 	// success. The caller wanted that workspace to not exist and it doesn't.
 	defer wsdb.CacheMutex.Lock().Unlock()

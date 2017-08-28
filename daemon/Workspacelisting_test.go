@@ -168,8 +168,6 @@ func TestRemoteWorkspaceDeletion(t *testing.T) {
 }
 
 func TestRemoteNamespaceDeletion(t *testing.T) {
-	// BUG210390
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
@@ -188,6 +186,9 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
+
+		test.WaitForLogString("Out-- Mux::handleDeletedWorkspace",
+			"handleDeletedWorkspace not finished")
 
 		// Check to ensure that we can't access the namespace inode anymore
 		var stat syscall.Stat_t
