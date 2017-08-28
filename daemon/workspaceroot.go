@@ -249,6 +249,11 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 		return wsr.hardlinks[id].record
 	}()
 	if hardlinkRecord != nil {
+		defer wsr.linkLock.Lock().Unlock()
+		if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+			c.vlog("Someone has already instantiated inode %d", inodeNum)
+			return inode, nil
+		}
 		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
 	}
 
