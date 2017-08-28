@@ -838,6 +838,17 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 
 	workspacePath := cmd.WorkspacePath
 	parts := strings.Split(workspacePath, "/")
+	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, parts[0],
+		parts[1], parts[2])
+	defer cleanup()
+	if !ok {
+		c.vlog("Workspace not found: %s", workspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"Workspace %s does not exist or is not active",
+			workspacePath)
+	}
+	c.qfs.handleMetaInodeRemoval(c, wsr.inodeNum(), parts[2])
+
 	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
 		parts[2]); err != nil {
 

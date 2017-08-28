@@ -197,7 +197,93 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 		len(updates)).Out()
 
 	for name, state := range updates {
-		go qfs.refreshWorkspace(c, name, state)
+		if state.Deleted {
+			go qfs.handleDeletedWorkspace(c, name)
+		} else {
+			go qfs.refreshWorkspace(c, name, state)
+		}
+	}
+}
+
+func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string) {
+	defer c.FuncIn("QuantumFs::handleMetaInodeRemoval", "%s inode %d",
+		name, id).Out()
+	inode := qfs.inodeNoInstantiate(c, id)
+	if inode == nil {
+		return
+	}
+	if inode.isOrphaned() {
+		return
+	}
+	inode.orphan(c, &quantumfs.DirectRecord{})
+}
+
+func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
+	defer c.FuncIn("Mux::handleDeletedWorkspace", "%s", name).Out()
+
+	defer logRequestPanic(c)
+	parts := strings.Split(name, "/")
+
+	// instantiating the workspace has the side effect of querying the
+	// workspaceDB and updating the in-memory datastructures.
+	// We need the current in-memory state though to take
+	// other required actions
+	wsrLineage, err := qfs.getWorkspaceRootLineageNoInstantiate(c,
+		parts[0], parts[1], parts[2])
+	if err != nil {
+		c.elog("getting wsrLineage failed: %s", err.Error())
+		return
+	}
+
+	if len(wsrLineage) < 4 {
+		// Nothing else to do here
+		c.vlog("The lineage is not instantiated.")
+
+		// Rely on the side effects of lookup to update the in-memory
+		// data structures to correctly represent the workspaceDB
+		_, cleanup, _ := qfs.getWorkspaceRoot(c,
+			parts[0], parts[1], parts[2])
+		cleanup()
+		return
+	}
+	c.vlog("The lineage of %s is %d/%d/%d/%d", name,
+		wsrLineage[0], wsrLineage[1], wsrLineage[2], wsrLineage[3])
+
+	// The new lineage will be missing some parts, tell the kernel about
+	// what is missing
+	ids, cleanup := qfs.getWorkspaceRootLineage(c, parts[0], parts[1], parts[2])
+	defer cleanup()
+	switch nIds := len(ids); nIds {
+	default:
+		panic(fmt.Sprintf("There are %d inodes in the wsrLineage", nIds))
+	case 1:
+		fallthrough
+	case 2:
+		// In case the deletion has happened remotely, workspacelisting
+		// does not have the capability of orphaning the workspace if the
+		// namespace or typespace have been removed as well.
+		qfs.handleMetaInodeRemoval(c, wsrLineage[3], parts[2])
+		fallthrough
+	case 3:
+		// The inclusion of the root inode guarantees the parent is valid
+		deletedNodeId := wsrLineage[nIds]
+		deletedNodeName := parts[nIds-1]
+		parentNodeId := wsrLineage[nIds-1]
+
+		c.vlog("noting deletion of node %s (inode %d, parent %d)",
+			deletedNodeName, deletedNodeId, parentNodeId)
+		if e := c.qfs.noteDeletedInode(parentNodeId, deletedNodeId,
+			deletedNodeName); e != fuse.OK {
+
+			c.vlog("noteDeletedInode for wsr with inode %d failed", e)
+		}
+	case 4:
+		c.vlog("The workspace has been re-created.")
+		// invalidating the wsr inode in case it has been deleted and
+		// recreated remotely
+		wsrInode := wsrLineage[3]
+		c.vlog("Invalidating workspace inode %d", wsrInode)
+		c.qfs.invalidateInode(wsrInode)
 	}
 }
 
@@ -867,12 +953,62 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 	}
 }
 
-// The returned cleanup function of workspaceroot should be called at the end of the
-// caller
-func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
-	workspace string) (wsr *WorkspaceRoot, cleanup func(), ok bool) {
+// Returns the inode id of the root, the typespace, the namespace and the workspace
+func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
+	typespace, namespace, workspace string) (ids []InodeId, err error) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWorkspaceRootLineageNoInstantiate", "%s/%s/%s",
+		typespace, namespace, workspace).Out()
+	ids = append(ids, quantumfs.InodeIdRoot)
+	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+	if inode == nil {
+		return nil, fmt.Errorf("root inode not instantiated")
+	}
+	typespacelist, ok := inode.(*TypespaceList)
+	if !ok {
+		return nil, fmt.Errorf("bad typespacelist")
+	}
+	id, exists := typespacelist.typespacesByName[typespace]
+	if !exists {
+		c.vlog("typespace %s does not exist", typespace)
+		return
+	}
+	ids = append(ids, id)
+	inode = qfs.inodeNoInstantiate(c, id)
+	if inode == nil {
+		c.vlog("typespacelist inode %d not instantiated", id)
+		return
+	}
+	namespacelist, ok := inode.(*NamespaceList)
+	if !ok {
+		return nil, fmt.Errorf("bad namespacelist")
+	}
+	id, exists = namespacelist.namespacesByName[namespace]
+	if !exists {
+		return
+	}
+	ids = append(ids, id)
+	inode = qfs.inodeNoInstantiate(c, id)
+	if inode == nil {
+		c.vlog("namespacelist inode %d not instantiated", id)
+		return
+	}
+	workspacelist, ok := inode.(*WorkspaceList)
+	if !ok {
+		return nil, fmt.Errorf("bad workspacelist")
+	}
+	wsrInfo, exists := workspacelist.workspacesByName[workspace]
+	if !exists {
+		return
+	}
+	ids = append(ids, wsrInfo.id)
+	return
+}
+
+func (qfs *QuantumFs) getWorkspaceRootLineage(c *ctx,
+	typespace, namespace, workspace string) (ids []InodeId, cleanup func()) {
+
+	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
 
 	// In order to run getWorkspaceRoot, we must set a proper value for the
@@ -886,39 +1022,68 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	var nLookup uint64 = 1
 	// Before workspace root is successfully instantiated, there is no need to
 	// uninstantiated it, so cleanup() should be a no-op
-	cleanup = func() {}
 	// Get the WorkspaceList Inode number
 	var typespaceAttr fuse.EntryOut
+	ids = append(ids, quantumfs.InodeIdRoot)
+	cleanup = func() {}
+
 	result := qfs.lookupCommon(c, quantumfs.InodeIdRoot, typespace,
 		&typespaceAttr)
 	if result != fuse.OK {
-		return nil, cleanup, false
+		return
 	}
-	defer qfs.Forget(typespaceAttr.NodeId, nLookup)
+	ids = append(ids, InodeId(typespaceAttr.NodeId))
+	cleanup = func() {
+		qfs.Forget(typespaceAttr.NodeId, nLookup)
+	}
 
 	var namespaceAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(typespaceAttr.NodeId), namespace,
 		&namespaceAttr)
 	if result != fuse.OK {
-		return nil, cleanup, false
+		return
 	}
-	defer qfs.Forget(namespaceAttr.NodeId, nLookup)
+	ids = append(ids, InodeId(namespaceAttr.NodeId))
+	cleanup = func() {
+		qfs.Forget(namespaceAttr.NodeId, nLookup)
+		qfs.Forget(typespaceAttr.NodeId, nLookup)
+	}
 
 	// Get the WorkspaceRoot Inode number
 	var workspaceRootAttr fuse.EntryOut
 	result = qfs.lookupCommon(c, InodeId(namespaceAttr.NodeId), workspace,
 		&workspaceRootAttr)
 	if result != fuse.OK {
-		return nil, cleanup, false
+		return
 	}
-	cleanup = func() {
-		qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+	ids = append(ids, InodeId(workspaceRootAttr.NodeId))
+	return
+}
+
+// The returned cleanup function of workspaceroot should be called at the end of the
+// caller
+func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
+	workspace string) (*WorkspaceRoot, func(), bool) {
+
+	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
+		typespace, namespace, workspace).Out()
+	ids, cleanup := qfs.getWorkspaceRootLineage(c,
+		typespace, namespace, workspace)
+	defer cleanup()
+	if len(ids) != 4 {
+		c.vlog("Workspace inode not found")
+		return nil, func() {}, false
 	}
-
-	// Fetch the WorkspaceRoot object itelf
-	wsr = qfs.inode(c, InodeId(workspaceRootAttr.NodeId)).(*WorkspaceRoot)
-
-	return wsr, cleanup, wsr != nil
+	wsrInode := ids[3]
+	c.vlog("Instantiating workspace inode %d", wsrInode)
+	inode := qfs.inode(c, wsrInode)
+	if inode == nil {
+		return nil, func() {}, false
+	}
+	wsrCleanup := func() {
+		qfs.Forget(uint64(wsrInode), 1)
+	}
+	return inode.(*WorkspaceRoot), wsrCleanup, true
 }
 
 func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
