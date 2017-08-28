@@ -106,6 +106,7 @@ func (th *TestHelper) AbortFuse() {
 func (th *TestHelper) EndTest() {
 	exception := recover()
 
+	defer th.ShutdownLogger()
 	th.finishApi()
 	th.putApi()
 
