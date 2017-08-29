@@ -308,6 +308,10 @@ func (th *TestHelper) allTestLogsMatch(logs []TLA) bool {
 	return true
 }
 
+func (th *TestHelper) ShutdownLogger() error {
+	return th.Logger.Close()
+}
+
 func (th *TestHelper) FileSize(filename string) int64 {
 	var stat syscall.Stat_t
 	err := syscall.Stat(filename, &stat)
