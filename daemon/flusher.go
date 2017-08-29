@@ -63,8 +63,8 @@ func (dq *DirtyQueue) Len_() int {
 }
 
 // flusher lock must be locked when calling this function
-func (dq *DirtyQueue) PopFront_() {
-	dq.l.Remove(dq.l.Front())
+func (dq *DirtyQueue) Remove_(element *list.Element) {
+	dq.l.Remove(element)
 }
 
 // flusher lock must be locked when calling this function
@@ -129,7 +129,8 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 
 	for dq.Len_() > 0 {
 		// Should we clean this inode?
-		candidate := dq.Front_().Value.(*dirtyInode)
+		element := dq.Front_()
+		candidate := element.Value.(*dirtyInode)
 
 		now := time.Now()
 		if !flushAll && candidate.expiryTime.After(now) {
@@ -144,7 +145,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 			}
 			return candidate.expiryTime, false
 		}
-		dq.PopFront_()
+		dq.Remove_(element)
 	}
 	return time.Now(), true
 }
