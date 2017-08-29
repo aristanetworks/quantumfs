@@ -112,14 +112,12 @@ type QuantumFs struct {
 
 	// We must prevent instantiation of Inodes while we are uninstantiating an
 	// Inode. This prevents a race between a Directory being uninstantiated as
-	// one of its children is just being instantiated.
-	//
-	// If you are instantiating an Inode you only need to grab this lock for
-	// reading. If you are uninstantiating you must grab it exclusively.
+	// one of its children is just being instantiated. Or the same inode getting
+	// instantiated in multiple threads.
 	//
 	// This lock must always be grabbed before the mapMutex to ensure consistent
 	// lock ordering.
-	instantiationLock utils.DeferableRwMutex
+	instantiationLock utils.DeferableMutex
 
 	// Uninstantiated Inodes are inode numbers which have been reserved for a
 	// particular inode, but the corresponding Inode has not yet been
@@ -483,7 +481,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
-	defer qfs.instantiationLock.RLock().RUnlock()
+	defer qfs.instantiationLock.Lock().Unlock()
 	defer qfs.mapMutex.Lock().Unlock()
 
 	inode = qfs.inode_(c, id)

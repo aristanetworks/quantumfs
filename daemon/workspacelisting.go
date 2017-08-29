@@ -525,8 +525,6 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 	defer c.funcIn("TypespaceList::instantiateChild").Out()
 	defer tsl.Lock().Unlock()
 
-	// Now that we have wsl locked, check to see if someone has already
-	// instantiated this workspace
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode, nil
@@ -854,8 +852,6 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 	defer c.funcIn("NamespaceList::instantiateChild").Out()
 	defer nsl.Lock().Unlock()
 
-	// Now that we have wsl locked, check to see if someone has already
-	// instantiated this workspace
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode, nil
@@ -1247,8 +1243,6 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 	defer c.funcIn("WorkspaceList::instantiateChild").Out()
 	defer wsl.Lock().Unlock()
 
-	// Now that we have wsl locked, check to see if someone has already
-	// instantiated this workspace
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode, nil
