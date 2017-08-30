@@ -824,7 +824,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		}
 
 		// Great, we want to forget this so proceed
-		func() {
+		shouldClean := func() bool {
 			defer qfs.lookupCountLock.Lock().Unlock()
 
 			// With the lookupCountLock and instantiationLock both held
@@ -838,10 +838,16 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				qfs.setInode(c, inodeNum, nil)
 				delete(qfs.lookupCounts, inodeNum)
 				qfs.removeUninstantiated(c, inodeChildren)
+				return true
+			} else {
+				return false
 			}
 		}()
+		if !shouldClean {
+			c.vlog("Not cleaning up inode %d yet", inodeNum)
+			return
+		}
 		inode.cleanup(c)
-
 		c.vlog("Set inode %d to nil", inodeNum)
 
 		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
