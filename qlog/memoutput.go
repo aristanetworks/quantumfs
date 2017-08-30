@@ -308,8 +308,8 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 
 	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
-		panic(fmt.Sprintf("Unable to create shared memory log file: %s/%s",
-			dir, filename))
+		panic(fmt.Sprintf("Unable to create shared memory log file %s: %v",
+			filepath, err))
 	}
 
 	circBufSize := mmapTotalSize - (mmapStrMapSize +
@@ -676,6 +676,13 @@ func (mem *SharedMemory) Sync() int {
 		uintptr(syscall.MS_SYNC))                //flags
 
 	return int(err)
+}
+
+func (mem *SharedMemory) Close() error {
+	mem.errOut = nil
+	mem.buffer = nil
+	mem.mapSize = 0
+	return mem.fd.Close()
 }
 
 func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
