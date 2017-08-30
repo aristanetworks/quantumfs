@@ -670,7 +670,8 @@ func extractStrMapData(filepath string) []byte {
 	// the rest of the potentially giant log file
 	file, err := os.Open(filepath)
 	if err != nil {
-		panic("Unable to open log file for strMapData read")
+		panic(fmt.Sprintf("Opening file strMapData file %s failed: %v",
+			filepath, err))
 	}
 	defer file.Close()
 

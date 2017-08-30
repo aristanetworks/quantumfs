@@ -298,6 +298,10 @@ func (q *Qlog) Sync() int {
 	return q.logBuffer.Sync()
 }
 
+func (q *Qlog) Close() error {
+	return q.logBuffer.Close()
+}
+
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
