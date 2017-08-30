@@ -237,19 +237,20 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	// wsr.refresh(c)
 }
 
-func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) bool {
-	inodeNum := dirtyInode.inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
-		inodeNum, dirtyInode.shouldUninstantiate).Out()
+func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {
 
-	defer dirtyInode.inode.RLockTree().RUnlock()
+	inodeNum := inode.inodeNum()
+	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
+		inodeNum, uninstantiate).Out()
+
+	defer inode.RLockTree().RUnlock()
 
 	flushSuccess := true
-	if !dirtyInode.inode.isOrphaned() {
-		if wsr, isWsr := dirtyInode.inode.(*WorkspaceRoot); isWsr {
+	if !inode.isOrphaned() {
+		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
 			_, flushSuccess = wsr.flushCanFail(c)
 		} else {
-			dirtyInode.inode.flush(c)
+			inode.flush(c)
 		}
 	}
 
@@ -260,12 +261,11 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) bool {
 
 	func() {
 		defer qfs.flusher.lock.Lock().Unlock()
-		dirtyInode.inode.markClean_()
+		inode.markClean_()
 	}()
 
-	if dirtyInode.shouldUninstantiate {
-		defer qfs.instantiationLock.Lock().Unlock()
-		qfs.uninstantiateInode_(c, inodeNum)
+	if uninstantiate {
+		qfs.uninstantiateInode(c, inodeNum)
 	}
 
 	return true
@@ -287,6 +287,12 @@ func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	}
 
 	qfs.uninstantiateChain_(c, inode)
+}
+
+func (qfs *QuantumFs) uninstantiateInode(c *ctx, inodeNum InodeId) {
+	defer c.FuncIn("Mux::uninstantiateInode", "inode %d", inodeNum).Out()
+	defer qfs.instantiationLock.Lock().Unlock()
+	qfs.uninstantiateInode_(c, inodeNum)
 }
 
 // Queue an Inode to be flushed because it is dirty
@@ -765,7 +771,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		c.vlog("Evaluating inode %d for uninstantiation", inodeNum)
 		lookupCount, exists := qfs.lookupCount(inodeNum)
 		if lookupCount != 0 {
-			c.vlog("No forget called on inode %d yet", inodeNum)
+			c.vlog("Inode %d still has %d pending lookups",
+				inodeNum, lookupCount)
 			break
 		}
 
