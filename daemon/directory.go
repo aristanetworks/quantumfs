@@ -1656,6 +1656,11 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
 
+	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+		c.vlog("Someone has already instantiated inode %d", inodeNum)
+		return inode, nil
+	}
+
 	entry := dir.children.record(inodeNum)
 	if entry == nil {
 		c.elog("Cannot instantiate child with no record: %d", inodeNum)
