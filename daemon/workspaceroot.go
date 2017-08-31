@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -450,7 +451,19 @@ func publishHardlinkMap(c *ctx,
 	nextBaseLayerId := quantumfs.EmptyDirKey
 	var err error
 	entryIdx := 0
-	for fileId, entry := range records {
+
+	// Sort the records by fileId so that the derieved ObjectKey is constant
+	// irrespective of the order of the records in the map
+	keys := make([]quantumfs.FileId, 0, len(records))
+	for fileId := range records {
+		keys = append(keys, fileId)
+	}
+	sort.Slice(keys,
+		func(i, j int) bool {
+			return keys[i] < keys[j]
+		})
+	for _, fileId := range keys {
+		entry := records[fileId]
 		record := entry.record
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
