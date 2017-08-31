@@ -228,14 +228,13 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		test.Assert(err == nil, "Failed call the command")
 
 		test.ForceForget()
-		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
 			"Failed to forget file inode")
 
-		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
-		test.Assert(wsrInode == nil,
-			"Failed to forget workspace inode")
+		test.WaitFor("wsr inode to be uninstantiated", func() bool {
+			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+		})
 	})
 }
 
@@ -277,10 +276,9 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.Assert(fileInode == nil,
 			"Failed to forget directory inode")
 
-		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
-		test.Assert(wsrInode == nil,
-			"Failed to forget workspace inode")
-
+		test.WaitFor("wsr inode to be uninstantiated", func() bool {
+			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+		})
 	})
 }
 
