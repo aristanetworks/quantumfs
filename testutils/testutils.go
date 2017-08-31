@@ -243,7 +243,7 @@ type TLA struct {
 
 // Assert the test log contains the given text
 // N.B. This is an expensive call as it parses all of the logs every 20ms
-// Use an alternative instead
+// Try minimizing the usage of this function.
 func (th *TestHelper) WaitForNLogStrings(text string, n int, failMsg string) {
 	th.WaitFor(failMsg, func() bool {
 		contains := th.messagesInTestLog([]TLA{TLA{true, text, failMsg}})
