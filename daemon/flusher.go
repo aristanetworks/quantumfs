@@ -63,8 +63,8 @@ func (dq *DirtyQueue) Len_() int {
 }
 
 // flusher lock must be locked when calling this function
-func (dq *DirtyQueue) PopFront_() {
-	dq.l.Remove(dq.l.Front())
+func (dq *DirtyQueue) Remove_(element *list.Element) {
+	dq.l.Remove(element)
 }
 
 // flusher lock must be locked when calling this function
@@ -97,16 +97,29 @@ func (dq *DirtyQueue) TryCommand_(c *ctx, cmd FlushCmd) error {
 }
 
 // flusher lock must be locked when calling this function
-func flushCandidate_(c *ctx, dirtyInode dirtyInode) bool {
+func flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
 	// parent onto the dirty queue. If we still hold that lock
 	// we'll deadlock. We defer relocking in order to balance
 	// against the deferred unlocking from our caller, even in
 	// the case of a panic.
-	c.qfs.flusher.lock.Unlock()
-	defer c.qfs.flusher.lock.Lock()
-	return c.qfs.flushInode(c, dirtyInode)
+	uninstantiate := dirtyInode.shouldUninstantiate
+	inode := dirtyInode.inode
+	ret := func() bool {
+		c.qfs.flusher.lock.Unlock()
+		defer c.qfs.flusher.lock.Lock()
+		return c.qfs.flushInode(c, inode, uninstantiate)
+	}()
+	if !uninstantiate && dirtyInode.shouldUninstantiate {
+		// we have released and re-acquired the flusher lock, and the
+		// dirtyInode is now up for uninstantiation. This transition
+		// cannot happen again, so it is safe to release the lock again.
+		c.qfs.flusher.lock.Unlock()
+		defer c.qfs.flusher.lock.Lock()
+		c.qfs.uninstantiateInode(c, inode.inodeNum())
+	}
+	return ret
 }
 
 // flusher lock must be locked when calling this function
@@ -129,14 +142,15 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 
 	for dq.Len_() > 0 {
 		// Should we clean this inode?
-		candidate := dq.Front_().Value.(*dirtyInode)
+		element := dq.Front_()
+		candidate := element.Value.(*dirtyInode)
 
 		now := time.Now()
 		if !flushAll && candidate.expiryTime.After(now) {
 			// all expiring inodes have been flushed
 			return candidate.expiryTime, false
 		}
-		if !flushCandidate_(c, *candidate) {
+		if !flushCandidate_(c, candidate) {
 			candidate.expiryTime = time.Now().Add(
 				c.qfs.config.DirtyFlushDelay)
 			if flushAll {
@@ -144,7 +158,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 			}
 			return candidate.expiryTime, false
 		}
-		dq.PopFront_()
+		dq.Remove_(element)
 	}
 	return time.Now(), true
 }
