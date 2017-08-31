@@ -525,6 +525,11 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 	defer c.funcIn("TypespaceList::instantiateChild").Out()
 	defer tsl.Lock().Unlock()
 
+	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+		c.vlog("Someone has already instantiated inode %d", inodeNum)
+		return inode, nil
+	}
+
 	// The api file will never be truly forgotten (see QuantumFs.Forget()) and so
 	// doesn't need to ever be re-instantiated.
 
@@ -846,6 +851,11 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 
 	defer c.funcIn("NamespaceList::instantiateChild").Out()
 	defer nsl.Lock().Unlock()
+
+	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+		c.vlog("Someone has already instantiated inode %d", inodeNum)
+		return inode, nil
+	}
 
 	name, exists := nsl.namespacesById[inodeNum]
 	if exists {
@@ -1232,6 +1242,11 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 
 	defer c.funcIn("WorkspaceList::instantiateChild").Out()
 	defer wsl.Lock().Unlock()
+
+	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+		c.vlog("Someone has already instantiated inode %d", inodeNum)
+		return inode, nil
+	}
 
 	name, exists := wsl.workspacesById[inodeNum]
 	if exists {
