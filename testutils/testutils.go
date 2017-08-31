@@ -242,13 +242,20 @@ type TLA struct {
 }
 
 // Assert the test log contains the given text
-func (th *TestHelper) WaitForLogString(text string, failMsg string) {
+// N.B. This is an expensive call as it parses all of the logs every 20ms
+// Try minimizing the usage of this function.
+func (th *TestHelper) WaitForNLogStrings(text string, n int, failMsg string) {
 	th.WaitFor(failMsg, func() bool {
 		contains := th.messagesInTestLog([]TLA{TLA{true, text, failMsg}})
 
-		return contains[0]
+		return contains[0] >= n
 	})
 	th.AssertTestLog([]TLA{TLA{true, text, failMsg}})
+}
+
+// Assert the test log contains the given text
+func (th *TestHelper) WaitForLogString(text string, failMsg string) {
+	th.WaitForNLogStrings(text, 1, failMsg)
 }
 
 // Assert the test log doesn't contain the given text
@@ -260,11 +267,11 @@ func (th *TestHelper) AssertTestLog(logs []TLA) {
 	contains := th.messagesInTestLog(logs)
 
 	for i, tla := range logs {
-		th.Assert(contains[i] == tla.MustContain, tla.FailMsg)
+		th.Assert(contains[i] > 0 == tla.MustContain, tla.FailMsg)
 	}
 }
 
-func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
+func (th *TestHelper) messagesInTestLog(logs []TLA) []int {
 	err := th.Logger.Sync()
 	th.Assert(err == 0, "Sync failed with errno %d", err)
 
@@ -272,7 +279,7 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
 	logLines := qlog.ParseLogsRaw(logFile)
 
 	nLines := 0
-	containChecker := make([]bool, len(logs))
+	nFound := make([]int, len(logs))
 
 	for _, rawlog := range logLines {
 		nLines++
@@ -280,13 +287,13 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []bool {
 		for idx, tla := range logs {
 			exists := strings.Contains(logOutput, tla.Text)
 			if exists {
-				containChecker[idx] = true
+				nFound[idx] += 1
 			}
 		}
 	}
 	th.Log("Inspected %d log lines looking for patterns", nLines)
 
-	return containChecker
+	return nFound
 }
 
 func (th *TestHelper) TestLogContains(text string) bool {
@@ -301,11 +308,15 @@ func (th *TestHelper) allTestLogsMatch(logs []TLA) bool {
 	contains := th.messagesInTestLog(logs)
 
 	for i, tla := range logs {
-		if contains[i] != tla.MustContain {
+		if contains[i] > 0 != tla.MustContain {
 			return false
 		}
 	}
 	return true
+}
+
+func (th *TestHelper) ShutdownLogger() error {
+	return th.Logger.Close()
 }
 
 func (th *TestHelper) FileSize(filename string) int64 {
