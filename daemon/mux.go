@@ -469,7 +469,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	}
 
 	// First find the Inode under a cheaper lock
-	inode, canBeInstantiated := func() (Inode, bool) {
+	inode, _ := func() (Inode, bool) {
 		defer qfs.mapMutex.RLock().RUnlock()
 		return qfs.getInode_(c, id)
 	}()
@@ -477,25 +477,11 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	if inode != nil {
 		return inode
 	}
-
-	// If we don't have an instantiated Inode and cannot instantiate it, then we
-	// know nothing about that InodeId.
-	if !canBeInstantiated {
-		c.wlog("Instantiation request for inode we don't know about. %d", id)
-		return nil
-	}
-
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
 	defer qfs.instantiationLock.Lock().Unlock()
 	defer qfs.mapMutex.Lock().Unlock()
-
-	inode = qfs.inode_(c, id)
-	if inode == nil {
-		msg := fmt.Sprintf("Unknown inodeId %d", id)
-		panic(msg)
-	}
-	return inode
+	return qfs.inode_(c, id)
 }
 
 // Must hold the instantiationLock and mapMutex for write
