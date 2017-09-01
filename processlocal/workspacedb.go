@@ -374,8 +374,9 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 
-	c.Vlog(qlog.LogWorkspaceDb, "Advanced rootID for %s/%s from %s to %s",
-		namespace, workspace, currentRootId.String(), newRootId.String())
+	c.Vlog(qlog.LogWorkspaceDb, "Advanced rootID for %s/%s/%s from %s to %s",
+		typespace, namespace, workspace, currentRootId.String(),
+		newRootId.String())
 
 	return newRootId, nil
 }
@@ -429,8 +430,8 @@ func (wsdb *WorkspaceDB) UnsubscribeFrom(workspaceName string) {
 func (wsdb *WorkspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, recurse bool) {
 
-	c.FuncIn(qlog.LogWorkspaceDb, "processlocal::notifySubscribers_",
-		"workspace %s/%s/%s", typespace, namespace, workspace)
+	defer c.FuncIn(qlog.LogWorkspaceDb, "processlocal::notifySubscribers_",
+		"workspace %s/%s/%s", typespace, namespace, workspace).Out()
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 

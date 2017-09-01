@@ -78,7 +78,7 @@ func logFuseWaiting(prefix string, th *TestHelper) {
 
 func (th *TestHelper) AbortFuse() {
 	for _, connection := range th.fuseConnections {
-		if connection == 0 {
+		if connection <= 0 {
 			// Nothing to abort
 			continue
 		}
@@ -106,6 +106,7 @@ func (th *TestHelper) AbortFuse() {
 func (th *TestHelper) EndTest() {
 	exception := recover()
 
+	defer th.ShutdownLogger()
 	th.finishApi()
 	th.putApi()
 

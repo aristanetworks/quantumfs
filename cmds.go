@@ -307,6 +307,9 @@ type Api interface {
 	// Sync all the active workspaces
 	SyncAll() error
 
+	// Sync a specific workspace
+	SyncWorkspace(workspace string) error
+
 	// Duplicate an object with a given key and path
 	InsertInode(dst string, key string, permissions uint32, uid uint32,
 		gid uint32) error
@@ -375,6 +378,7 @@ const (
 	CmdEnableRootWrite       = 10
 	CmdSetWorkspaceImmutable = 11
 	CmdMergeWorkspaces       = 12
+	CmdSyncWorkspace         = 13
 
 	// The following commands might be removed in the future versions so we
 	// do not allocate a known id for them
@@ -440,6 +444,11 @@ type AccessedRequest struct {
 
 type SyncAllRequest struct {
 	CommandCommon
+}
+
+type SyncWorkspaceRequest struct {
+	CommandCommon
+	Workspace string
 }
 
 type InsertInodeRequest struct {
@@ -651,6 +660,18 @@ func (api *apiImpl) ClearAccessed(wsr string) error {
 func (api *apiImpl) SyncAll() error {
 	cmd := SyncAllRequest{
 		CommandCommon: CommandCommon{CommandId: CmdSyncAll},
+	}
+	return api.processCmd(cmd, nil)
+}
+
+func (api *apiImpl) SyncWorkspace(workspace string) error {
+	if !isWorkspaceNameValid(workspace) {
+		return fmt.Errorf("\"%s\" must be an empty string or "+
+			"contain precisely two \"/\"\n", workspace)
+	}
+	cmd := SyncWorkspaceRequest{
+		CommandCommon: CommandCommon{CommandId: CmdSyncWorkspace},
+		Workspace:     workspace,
 	}
 	return api.processCmd(cmd, nil)
 }
