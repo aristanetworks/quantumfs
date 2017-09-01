@@ -526,24 +526,27 @@ func ObjectGid(gid uint32, groupId uint32) GID {
 // One of the GID* values
 type GID uint16
 
-// Quantumfs stores time in nanoseconds since the Unix epoch
+// Quantumfs stores time in microseconds since the Unix epoch
 type Time uint64
 
 func (t Time) Seconds() uint64 {
-	return uint64(t / 1000000000)
+	return uint64(t / 1000000)
 }
 
 func (t Time) Nanoseconds() uint32 {
-	return uint32(t % 1000000000)
+	return uint32(t % 1000000) * 1000
 }
 
 func NewTime(instant time.Time) Time {
-	return Time(instant.UnixNano())
+	t := instant.Unix() * 1000000
+	t += int64(instant.Nanosecond() / 1000)
+
+	return Time(t)
 }
 
 func NewTimeSeconds(seconds uint64, nanoseconds uint32) Time {
-	t := seconds * 1000000000
-	t += uint64(nanoseconds)
+	t := seconds * 1000000
+	t += uint64(nanoseconds / 1000)
 
 	return Time(t)
 }
