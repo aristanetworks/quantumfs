@@ -80,6 +80,11 @@ const (
 	MinSpecialReqId
 )
 
+const (
+	RefreshRequestIdMin = uint64(0xc) << 48
+	ForgetRequstIdMin   = uint64(0xd) << 48
+)
+
 const TimeFormat = "2006-01-02T15:04:05.000000000"
 
 func SpecialReq(reqId uint64) string {
@@ -291,6 +296,10 @@ func formatString(idx LogSubsystem, reqId uint64, t time.Time,
 
 func (q *Qlog) Sync() int {
 	return q.logBuffer.Sync()
+}
+
+func (q *Qlog) Close() error {
+	return q.logBuffer.Close()
 }
 
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
