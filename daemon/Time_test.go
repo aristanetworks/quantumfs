@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
@@ -313,16 +314,19 @@ func TestTimeRecord(t *testing.T) {
 
 		record := test.GetRecord(testFile)
 		mTime := record.ModificationTime()
-		cTime := record.ContentTime()
 
 		test.Assert(stat.Mtim.Sec == int64(mTime.Seconds()),
 			"mTime seconds wrong")
 		test.Assert(stat.Mtim.Nsec == int64(mTime.Nanoseconds()),
 			"mTime ns wrong")
 
-		test.Assert(stat.Ctim.Sec == int64(cTime.Seconds()),
-			"mTime seconds wrong")
-		test.Assert(stat.Ctim.Nsec == int64(cTime.Nanoseconds()),
-			"mTime ns wrong")
+		// Ensure that quantumfs.Time preserves the time
+		testTime := quantumfs.NewTimeSeconds(mTime.Seconds(),
+			mTime.Nanoseconds())
+
+		test.Assert(mTime.Seconds() == testTime.Seconds(),
+			"mTime seconds mismatched")
+		test.Assert(mTime.Nanoseconds() == testTime.Nanoseconds(),
+			"mTime nanoseconds mismatched")
 	})
 }
