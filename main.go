@@ -259,6 +259,13 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		return err
 	}
 
+	w := wsDetails{
+		ts:     ts,
+		ns:     ns,
+		ws:     ws,
+		rootID: rootID.String(),
+	}
+
 	// Every call to walker.Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
@@ -272,10 +279,11 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	if err = walker.Walk(c.qctx, c.ds, rootID, walkFunc); err != nil {
 		c.elog("TTL refresh for %s/%s/%s (%s), err(%v)", ts, ns, ws,
 			rootID.String(), err)
-		WriteWorkspaceWalkDuration(c, ts, ns, false, ws, time.Since(start))
+
+		WriteWorkspaceWalkDuration(c, w, false, time.Since(start))
 	} else {
 		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws, rootID.String())
-		WriteWorkspaceWalkDuration(c, ts, ns, true, ws, time.Since(start))
+		WriteWorkspaceWalkDuration(c, w, true, time.Since(start))
 	}
 	return err
 }
