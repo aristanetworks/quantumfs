@@ -299,3 +299,30 @@ func TestTimeHardlinkFile(t *testing.T) {
 		test.Assert(ctimeOrig < ctime, "ctime unchanged")
 	})
 }
+
+func TestTimeRecord(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testFile := workspace + "/fileA"
+
+		test.AssertNoErr(testutils.PrintToFile(testFile, "data"))
+
+		var stat syscall.Stat_t
+		err := syscall.Stat(testFile, &stat)
+		test.AssertNoErr(err)
+
+		record := test.GetRecord(testFile)
+		mTime := record.ModificationTime()
+		cTime := record.ContentTime()
+
+		test.Assert(stat.Mtim.Sec == int64(mTime.Seconds()),
+			"mTime seconds wrong")
+		test.Assert(stat.Mtim.Nsec == int64(mTime.Nanoseconds()),
+			"mTime ns wrong")
+
+		test.Assert(stat.Ctim.Sec == int64(cTime.Seconds()),
+			"mTime seconds wrong")
+		test.Assert(stat.Ctim.Nsec == int64(cTime.Nanoseconds()),
+			"mTime ns wrong")
+	})
+}
