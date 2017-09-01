@@ -30,7 +30,6 @@ const heartBeatInterval = 1 * time.Minute
 const successPrefix = "Success:"
 const eventPrefix = "Event:  "
 const startPrefix = "Start:  "
-const backOffDuration = 30 * time.Minute
 
 const (
 	logInfo  = iota
@@ -131,8 +130,14 @@ func walkFullWSDBLoop(c *Ctx) {
 		c.vlog("Iteration[%v] ended at %v took %v", c.iteration, time.Now(), dur)
 		WriteWalkerIteration(c, dur, c.numSuccess, c.numError)
 
-		// If an error happened, back off and then continue
-		backOff(c)
+		// If the walk iteration completes very quickly
+		// then we can relax a bit before moving onto
+		// the next iteration. This helps reduce unnecessary
+		// load on the system (including stats generation).
+		// If there are errors, then it makes sense to try
+		// after sometime in the hope that errors are being
+		// watched and operator has resolved the failure.
+		backOff(c, dur)
 	}
 }
 
@@ -299,9 +304,38 @@ func heartBeat(c *Ctx, timer <-chan time.Time) {
 	}
 }
 
-func backOff(c *Ctx) {
-	if c.numError == 0 {
+// backOff implements a simple policy as of now -
+//
+// If there are errors during walk iteration then
+// we backoff for 30mins. Workspace errors and
+// database errors are not differentiated.
+// If there are no errors in walk iteration then
+//   After walk iteration of <= 5min duration
+//     we backoff for 10mins
+//   After walk iteration of > 5min duration
+//     we proceed to the next iteration without
+//     any backoff
+const backOffAfterErrors = 30 * time.Minute
+const shortIterationDuration = 5 * time.Minute
+const backOffAfterShortIteration = 10 * time.Minute
+
+func backOff(c *Ctx, iterDur time.Duration) {
+
+	switch {
+	case c.numError != 0:
+		c.vlog("Iteration[%v] ended with errors so sleep for %s until %v",
+			c.iteration, backOffAfterErrors,
+			time.Now().Add(backOffAfterErrors))
+		time.Sleep(backOffAfterErrors)
+	case iterDur <= shortIterationDuration:
+		c.vlog("Iteration[%v] took <= %s so sleep for %s until %v",
+			c.iteration, shortIterationDuration,
+			backOffAfterShortIteration,
+			time.Now().Add(backOffAfterShortIteration))
+		time.Sleep(backOffAfterShortIteration)
+	default:
+		c.vlog("Iteration[%v] took > %s so proceeding to next iteration",
+			c.iteration, shortIterationDuration)
 		return
 	}
-	time.Sleep(backOffDuration)
 }
