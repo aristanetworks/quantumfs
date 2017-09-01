@@ -534,7 +534,7 @@ func (t Time) Seconds() uint64 {
 }
 
 func (t Time) Nanoseconds() uint32 {
-	return uint32(t % 1000000) * 1000
+	return uint32(t%1000000) * 1000
 }
 
 func NewTime(instant time.Time) Time {
