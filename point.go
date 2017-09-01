@@ -19,6 +19,7 @@ type wsDetails struct {
 // tags:   typeSpace - Typespace for the quantumfs workspace
 //         nameSpace - Namespace for the quantumfs workspace
 //         pass      - Walk failed or passed
+//	   keyspace  - Keyspace of the WorkspaceDB
 //
 // fields: workSpace - Name of the workspace (text)
 //         walkTimeSec - Time it took to walk the workspace in

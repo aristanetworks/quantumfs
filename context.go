@@ -134,18 +134,12 @@ func newQCtx(log *qlog.Qlog, id uint64) *quantumfs.Ctx {
 func (c *Ctx) newRequestID() *Ctx {
 
 	id := atomic.AddUint64(&requestID, 1)
-	return &Ctx{
-		Context:    c.Context,
-		Influx:     c.Influx,
-		qctx:       newQCtx(c.qctx.Qlog, id),
-		wsdb:       c.wsdb,
-		ds:         c.ds,
-		cqlds:      c.cqlds,
-		ttlCfg:     c.ttlCfg,
-		confFile:   c.confFile,
-		numSuccess: c.numSuccess,
-		numError:   c.numError,
-		numWalkers: c.numWalkers,
-		iteration:  c.iteration,
-	}
+	// inherit all the fields from base context
+	// so any new information in context is setup
+	// in one place.
+	newCtx := *c
+	// override any info specific to the new context
+	newCtx.qctx = newQCtx(c.qctx.Qlog, id)
+
+	return &newCtx
 }
