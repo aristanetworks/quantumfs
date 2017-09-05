@@ -343,7 +343,12 @@ func newLogSubsystem(sys string) LogSubsystem {
 // TODO: Add support for registering subsystems dynamically,
 //       and record the subsystem in qlog file, for qparse to be able to
 //       parse the logs.
-func NewQlogger(sub LogSubsystem, ramfsPath string) *Qlogger {
+func NewQlogger(subsystem string, ramfsPath string) *Qlogger {
+	sub, err := getSubsystem(subsystem)
+	if err != nil {
+		sub = newLogSubsystem(subsystem)
+	}
+
 	var log *Qlog
 	if ramfsPath != "" {
 		log = NewQlog(ramfsPath)
@@ -356,6 +361,10 @@ func NewQlogger(sub LogSubsystem, ramfsPath string) *Qlogger {
 		subsystem: sub,
 	}
 	return qlogger
+}
+
+func (q *Qlogger) SetWriter(w func(format string, args ...interface{}) error) {
+	q.qlog.SetWriter(w)
 }
 
 func (q *Qlogger) wrapQlog(level uint8, format string, args ...interface{}) {
