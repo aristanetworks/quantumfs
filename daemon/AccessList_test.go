@@ -652,11 +652,6 @@ func TestAccessListInsertInode(t *testing.T) {
 		filename = filename + "clone"
 		path = workspace + filename
 
-		_, cleanup := test.getWorkspaceRoot(workspace)
-		// This will prevent the workspace from getting uninstantiated and
-		// which will lose the accesslist
-		defer cleanup()
-
 		api := test.getApi()
 		err = api.InsertInode(test.RelPath(path), key, 0777, 0, 0)
 		test.AssertNoErr(err)
