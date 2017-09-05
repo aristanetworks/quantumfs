@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
@@ -297,5 +298,35 @@ func TestTimeHardlinkFile(t *testing.T) {
 		mtime, ctime = getTimes(filename)
 		test.Assert(mtimeOrig == mtime, "mtime changed")
 		test.Assert(ctimeOrig < ctime, "ctime unchanged")
+	})
+}
+
+func TestTimeRecord(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testFile := workspace + "/fileA"
+
+		test.AssertNoErr(testutils.PrintToFile(testFile, "data"))
+
+		var stat syscall.Stat_t
+		err := syscall.Stat(testFile, &stat)
+		test.AssertNoErr(err)
+
+		record := test.GetRecord(testFile)
+		mTime := record.ModificationTime()
+
+		test.Assert(stat.Mtim.Sec == int64(mTime.Seconds()),
+			"mTime seconds wrong")
+		test.Assert(stat.Mtim.Nsec == int64(mTime.Nanoseconds()),
+			"mTime ns wrong")
+
+		// Ensure that quantumfs.Time preserves the time
+		testTime := quantumfs.NewTimeSeconds(mTime.Seconds(),
+			mTime.Nanoseconds())
+
+		test.Assert(mTime.Seconds() == testTime.Seconds(),
+			"mTime seconds mismatched")
+		test.Assert(mTime.Nanoseconds() == testTime.Nanoseconds(),
+			"mTime nanoseconds mismatched")
 	})
 }
