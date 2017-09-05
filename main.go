@@ -173,6 +173,17 @@ func walkFullWSDBSetup(c *Ctx) error {
 	return group.Wait()
 }
 
+// exitNoRestart causes the walker daemon to exit and since exit code is zero
+// the daemon manager/launcher (eg: systemd) will not restart the daemon. The
+// expectation is that operator will intervene since walker down alert will be
+// raised.
+func exitNoRestart(c *Ctx, exitMsg string, trueCond bool) {
+	if !trueCond {
+		c.elog("Daemon exiting due to: %s", exitMsg)
+		os.Exit(0)
+	}
+}
+
 // walkFullWSDB will iterate through all the TS/NS/WS once.
 func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 
@@ -181,12 +192,15 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 		c.elog("Not able to get list of Typespaces")
 		return err
 	}
+	exitNoRestart(c, "Typespace list should not be empty", len(tsl) != 0)
+
 	for _, ts := range tsl {
 		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
 			c.elog("Not able to get list of Namespaces for TS: %s", ts)
 			continue
 		}
+		exitNoRestart(c, "Namespace list should not be empty", len(nsl) != 0)
 		for _, ns := range nsl {
 			wsMap, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
@@ -194,6 +208,8 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 					"for TS:%s NS:%s", ts, ns)
 				continue
 			}
+			exitNoRestart(c, "Workspace map should not be empty",
+				len(wsMap) != 0)
 			for ws := range wsMap {
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
 					c.elog("walkFullWSDB: %v", err)
