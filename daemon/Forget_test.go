@@ -94,15 +94,13 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		fileId := test.getInodeNum(fileName)
 
 		test.ForceForget()
-
-		// Make sure that the workspace has already been uninstantiated
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
 			"Failed to forget file inode")
 
-		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
-		test.Assert(wsrInode == nil,
-			"Failed to forget workspace inode")
+		test.WaitFor("wsr inode to be uninstantiated", func() bool {
+			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+		})
 
 		// Verify the mutability is preserved
 		fd, err := syscall.Creat(workspace+"/file1", 0124)
