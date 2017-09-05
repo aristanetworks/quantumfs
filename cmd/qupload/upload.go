@@ -126,9 +126,36 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 	}
 }
 
+func processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecord, error) {
+	if !msg.info.IsDir() {
+		// WriteFile() will detect the file type based on
+		// stat information and setup appropriate data
+		// and metadata for the file in storage
+		c.Vlog("Writing %s", msg.path)
+		record, err := qwr.WriteFile(c.Qctx, dataStore, msg.info, msg.path)
+
+		return record, err
+	} else {
+		// walker walks non-empty directories to generate
+		// worker handles empty directory
+		stat := msg.info.Sys().(*syscall.Stat_t)
+		record := qwr.CreateNewDirRecord(msg.info.Name(),
+			stat.Mode, uint32(stat.Rdev), 0,
+			quantumfs.ObjectUid(stat.Uid, stat.Uid),
+			quantumfs.ObjectGid(stat.Gid, stat.Gid),
+			quantumfs.ObjectTypeDirectory,
+			// retain time of the input directory
+			quantumfs.NewTime(time.Unix(stat.Mtim.Sec,
+				stat.Mtim.Nsec)),
+			quantumfs.NewTime(time.Unix(stat.Ctim.Sec,
+				stat.Ctim.Nsec)),
+			quantumfs.EmptyDirKey)
+
+		return record, nil
+	}
+}
+
 func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
-	var record quantumfs.DirectoryRecord
-	var err error
 	var msg *pathInfo
 
 	for {
@@ -141,31 +168,9 @@ func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 			}
 		}
 
-		if !msg.info.IsDir() {
-			// WriteFile() will detect the file type based on
-			// stat information and setup appropriate data
-			// and metadata for the file in storage
-			c.Vlog("Writing %s", msg.path)
-			record, err = qwr.WriteFile(c.Qctx, dataStore,
-				msg.info, msg.path)
-			if err != nil {
-				return err
-			}
-		} else {
-			// walker walks non-empty directories to generate
-			// worker handles empty directory
-			stat := msg.info.Sys().(*syscall.Stat_t)
-			record = qwr.CreateNewDirRecord(msg.info.Name(),
-				stat.Mode, uint32(stat.Rdev), 0,
-				quantumfs.ObjectUid(stat.Uid, stat.Uid),
-				quantumfs.ObjectGid(stat.Gid, stat.Gid),
-				quantumfs.ObjectTypeDirectory,
-				// retain time of the input directory
-				quantumfs.NewTime(time.Unix(stat.Mtim.Sec,
-					stat.Mtim.Nsec)),
-				quantumfs.NewTime(time.Unix(stat.Ctim.Sec,
-					stat.Ctim.Nsec)),
-				quantumfs.EmptyDirKey)
+		record, err := processPath(c, msg)
+		if err != nil {
+			return err
 		}
 
 		err = handleDirRecord(c.Qctx, record, filepath.Dir(msg.path))

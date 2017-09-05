@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -42,6 +43,37 @@ type TestHelper struct {
 	api             quantumfs.Api
 	apiMutex        utils.DeferableMutex
 	finished        bool
+}
+
+// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
+func (th *TestHelper) getInodeNum(path string) InodeId {
+	var stat syscall.Stat_t
+	err := syscall.Stat(path, &stat)
+	th.Assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
+
+	return InodeId(stat.Ino)
+}
+
+// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
+func (th *TestHelper) getInode(path string) Inode {
+	inodeNum := th.getInodeNum(path)
+	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
+}
+
+func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
+	inode := th.getInode(path)
+
+	parentId := func() InodeId {
+		lock := inode.getParentLock()
+		defer (*lock).RLock().RUnlock()
+		return inode.parentId_()
+	}()
+
+	parent := th.qfs.inodeNoInstantiate(&th.qfs.c, parentId)
+	parentDir := asDirectory(parent)
+
+	defer parentDir.childRecordLock.Lock().Unlock()
+	return parentDir.children.record(inode.inodeNum()).Clone()
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {

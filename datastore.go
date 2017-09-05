@@ -1055,6 +1055,10 @@ func (record *DirectRecord) Clone() DirectoryRecord {
 	return newEntry
 }
 
+func (record *DirectRecord) MarshalJSON() ([]byte, error) {
+	return record.record.MarshalJSON()
+}
+
 func EncodeExtendedKey(key ObjectKey, type_ ObjectType,
 	size uint64) []byte {
 
