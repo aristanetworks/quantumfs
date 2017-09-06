@@ -271,21 +271,6 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 	})
 }
 
-// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
-func (th *testHelper) getInodeNum(path string) InodeId {
-	var stat syscall.Stat_t
-	err := syscall.Stat(path, &stat)
-	th.Assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
-
-	return InodeId(stat.Ino)
-}
-
-// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
-func (th *testHelper) getInode(path string) Inode {
-	inodeNum := th.getInodeNum(path)
-	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-}
-
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 

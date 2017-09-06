@@ -39,7 +39,7 @@ func computeEmptyDirectory() [hash.HashSize]byte {
 }
 
 func computeEmptyWorkspace(emptyDir [hash.HashSize]byte) {
-	emptyDirKey := quantumfs.NewObjectKey(quantumfs.KeyTypeConstant, emptyDir)
+	emptyDirKey := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, emptyDir)
 
 	emptyWorkspace := quantumfs.NewWorkspaceRoot()
 	emptyWorkspace.SetBaseLayer(emptyDirKey)
