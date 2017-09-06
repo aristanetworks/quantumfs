@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -14,18 +15,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func (th *testHelper) ForceForget() {
+func (th *testHelper) ForceForget(inodeId InodeId) {
 	// Now force the kernel to drop all cached inodes
 	th.remountFilesystem()
 	th.SyncAllWorkspaces()
-
-	th.WaitForLogString("Forget called",
-		"No inode forget triggered during dentry drop.")
+	forgetMsg := "Forget called"
+	if inodeId != quantumfs.InodeIdInvalid {
+		forgetMsg = fmt.Sprintf("Forget called on inode %d", inodeId)
+	}
+	failMsg := fmt.Sprintf("Waiting for inode %d to get uninstantiated")
+	th.WaitForLogString(forgetMsg, failMsg)
 }
 
 func TestForgetOnDirectory(t *testing.T) {
@@ -41,7 +46,7 @@ func TestForgetOnDirectory(t *testing.T) {
 				workspace+"/dir/file"+strconv.Itoa(i), string(data))
 			test.Assert(err == nil, "Error creating small file")
 		}
-		test.ForceForget()
+		test.ForceForget(quantumfs.InodeIdInvalid)
 		// Now read all the files back to make sure we still can
 		for i := 0; i < numFiles; i++ {
 			var readBack []byte
@@ -66,7 +71,7 @@ func TestForgetOnWorkspaceRoot(t *testing.T) {
 				workspace+"/file"+strconv.Itoa(i), string(data))
 			test.Assert(err == nil, "Error creating small file")
 		}
-		test.ForceForget()
+		test.ForceForget(quantumfs.InodeIdInvalid)
 
 		// Now read all the files back to make sure we still can
 		for i := 0; i < numFiles; i++ {
@@ -93,16 +98,15 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		wsrId := test.getInodeNum(workspace)
 		fileId := test.getInodeNum(fileName)
 
-		test.ForceForget()
-
-		// Make sure that the workspace has already been uninstantiated
+		test.ForceForget(fileId)
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
 			"Failed to forget file inode")
 
-		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
-		test.Assert(wsrInode == nil,
-			"Failed to forget workspace inode")
+		test.WaitFor("wsr inode to be uninstantiated", func() bool {
+			test.SyncWorkspace(test.RelPath(workspace))
+			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+		})
 
 		// Verify the mutability is preserved
 		fd, err := syscall.Creat(workspace+"/file1", 0124)
@@ -157,7 +161,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
-		test.ForceForget()
+		test.ForceForget(quantumfs.InodeIdInvalid)
 
 		test.qfs.mapMutex.Lock()
 		//BUG: Between remountFilesystem and here, the kernel can and does
@@ -227,15 +231,15 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		_, err = api.GetAccessed(relpath)
 		test.Assert(err == nil, "Failed call the command")
 
-		test.ForceForget()
-		// Make sure that the workspace has already been uninstantiated
+		test.ForceForget(fileId)
 		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
 		test.Assert(fileInode == nil,
 			"Failed to forget file inode")
 
-		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
-		test.Assert(wsrInode == nil,
-			"Failed to forget workspace inode")
+		test.WaitFor("wsr inode to be uninstantiated", func() bool {
+			test.SyncWorkspace(test.RelPath(workspace))
+			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+		})
 	})
 }
 
@@ -277,10 +281,10 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.Assert(fileInode == nil,
 			"Failed to forget directory inode")
 
-		wsrInode := test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId)
-		test.Assert(wsrInode == nil,
-			"Failed to forget workspace inode")
-
+		test.WaitFor("wsr inode to be uninstantiated", func() bool {
+			test.SyncWorkspace(test.RelPath(dstWorkspace))
+			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+		})
 	})
 }
 
