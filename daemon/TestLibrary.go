@@ -447,6 +447,10 @@ func (th *TestHelper) SyncAllWorkspaces() {
 	th.Assert(err == nil, "Error when syncing all workspaces: %v", err)
 }
 
+func (th *TestHelper) SyncWorkspace(workspace string) {
+	th.AssertNoErr(th.getApi().SyncWorkspace(workspace))
+}
+
 func (th *TestHelper) GetWorkspaceDB() quantumfs.WorkspaceDB {
 	return th.qfs.config.WorkspaceDB
 }
