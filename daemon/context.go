@@ -4,6 +4,8 @@
 package daemon
 
 import (
+	"sync/atomic"
+
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/hanwen/go-fuse/fuse"
@@ -41,6 +43,24 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
 	return c.reqId(header.Unique, &header.Context)
+}
+
+var flusherRequestIdGenerator = qlog.RefreshRequestIdMin
+
+// Assign a unique request id to the context for a flusher goroutine
+func (c *ctx) flusherCtx() *ctx {
+	nc := *c
+	nc.Ctx.RequestId = atomic.AddUint64(&flusherRequestIdGenerator, 1)
+	return &nc
+}
+
+var forgetRequestIdGenerator = qlog.ForgetRequstIdMin
+
+// Assign a unique request id to the context for a forget goroutine
+func (c *ctx) forgetCtx() *ctx {
+	nc := *c
+	nc.Ctx.RequestId = atomic.AddUint64(&forgetRequestIdGenerator, 1)
+	return &nc
 }
 
 // local daemon package specific log wrappers

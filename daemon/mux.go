@@ -17,7 +17,6 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -33,14 +32,6 @@ const InodeOnlyLog = "Inode %d"
 const FileHandleLog = "Fh: %d"
 const FileOffsetLog = "Fh: %d offset %d"
 
-const flushSanityTimeout = time.Minute
-
-type dirtyInode struct {
-	inode               Inode
-	shouldUninstantiate bool
-	expiryTime          time.Time
-}
-
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
@@ -49,11 +40,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          quantumfs.InodeIdReservedEnd,
-		skipFlush:              false,
-		dirtyQueue:             make(map[*sync.RWMutex]*list.List),
-		kickFlush:              make(chan struct{}, 1),
-		flushAll:               make(chan *ctx),
-		flushComplete:          make(chan struct{}),
+		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
@@ -115,40 +102,22 @@ type QuantumFs struct {
 	// a large number of ApiHandles.
 	apiFileSize int64
 
+	// This is a leaf lock for protecting the instantiation maps
+	// Do not grab other locks while holding this
 	mapMutex    utils.DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
 
-	// Set to true to disable timer based flushing. Use for tests only
-	skipFlush bool
-
-	// This is a map from the treeLock to a list of dirty inodes. We use the
-	// treelock because every Inode already has the treelock of its workspace so
-	// this is an easy way to sort Inodes by workspace.
-	//
-	// The Front of the list are the Inodes next in line to flush.
-	dirtyQueueLock utils.DeferableMutex
-	dirtyQueue     map[*sync.RWMutex]*list.List
-
-	// Notify the flusher that there is a new entry in the dirty queue
-	kickFlush chan struct{}
-
-	// Notify the flusher that all dirty inodes should be flushed
-	flushAll chan *ctx
-
-	// Notify whoever used flushAll that flushing is complete
-	flushComplete chan struct{}
+	flusher *Flusher
 
 	// We must prevent instantiation of Inodes while we are uninstantiating an
 	// Inode. This prevents a race between a Directory being uninstantiated as
-	// one of its children is just being instantiated.
-	//
-	// If you are instantiating an Inode you only need to grab this lock for
-	// reading. If you are uninstantiating you must grab it exclusively.
+	// one of its children is just being instantiated. Or the same inode getting
+	// instantiated in multiple threads.
 	//
 	// This lock must always be grabbed before the mapMutex to ensure consistent
 	// lock ordering.
-	instantiationLock utils.DeferableRwMutex
+	instantiationLock utils.DeferableMutex
 
 	// Uninstantiated Inodes are inode numbers which have been reserved for a
 	// particular inode, but the corresponding Inode has not yet been
@@ -196,10 +165,6 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 		return err
 	}
 
-	stopFlushTimer := make(chan bool)
-	flushTimerStopped := make(chan bool)
-
-	go qfs.flusher(stopFlushTimer, flushTimerStopped)
 	go qfs.adjustKernelKnobs()
 
 	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
@@ -213,9 +178,11 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
-	stopFlushTimer <- true
-	<-flushTimerStopped
 
+	for qfs.flusher.syncAll(&qfs.c, false) != nil {
+		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
+		time.Sleep(100 * time.Millisecond)
+	}
 	qfs.c.dataStore.shutdown()
 
 	return nil
@@ -268,158 +235,20 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	// wsr.refresh(c)
 }
 
-func (qfs *QuantumFs) flusher(quit chan bool, finished chan bool) {
-	flusherContext := qfs.c.reqId(qlog.FlushReqId, nil)
+func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {
 
-	c := flusherContext
-
-	// When we think we have no inodes try periodically anyways to ensure sanity
-	nextExpiringInode := time.Now().Add(flushSanityTimeout)
-	stop := false
-
-	for {
-		flushAll := false
-		sleepTime := nextExpiringInode.Sub(time.Now())
-
-		if sleepTime > flushSanityTimeout {
-			c.elog("Overlong flusher sleepTime %s!", sleepTime)
-			sleepTime = flushSanityTimeout
-		}
-		if sleepTime > 0 {
-			c.vlog("Waiting until %s (%s)...",
-				nextExpiringInode.String(), sleepTime.String())
-
-			// If we've been directed to flushAll, use that caller's
-			// context
-			c = flusherContext
-
-			stop = false
-			flushAll = false
-
-			select {
-			case stop = <-quit:
-				c.vlog("flusher woken up due to stop")
-			case <-qfs.kickFlush:
-				c.vlog("flusher woken up due to kick")
-			case c = <-qfs.flushAll:
-				flushAll = true
-				c.vlog("flusher woken up due to syncAll")
-			case <-time.After(sleepTime):
-				c.vlog("flusher woken up due to timer")
-			}
-		}
-
-		if !flushAll && qfs.skipFlush {
-			// We still want to allow someone to manually flush,
-			// but we want to skip timer based flushes
-			nextExpiringInode = time.Now().Add(flushSanityTimeout)
-
-			// If we're skipping flushes and someone tries to stop the
-			// flusher, we can stop without ever flushing to save time
-			if stop {
-				finished <- true
-				return
-			}
-
-			continue
-		}
-
-		nextExpiringInode = func() time.Time {
-			defer logRequestPanic(c)
-			return qfs.flushDirtyLists(c, flushAll || stop)
-		}()
-
-		if flushAll {
-			qfs.flushComplete <- struct{}{}
-		}
-
-		if stop {
-			finished <- true
-			return
-		}
-	}
-}
-
-func (qfs *QuantumFs) flushDirtyLists(c *ctx, flushAll bool) time.Time {
-	defer c.FuncIn("Mux::flushDirtyLists", "flushAll %t", flushAll).Out()
-
-	defer qfs.dirtyQueueLock.Lock().Unlock()
-	nextExpiringInode := time.Now().Add(flushSanityTimeout)
-
-	for key, dirtyList := range qfs.dirtyQueue {
-		func() {
-			earliestNext := qfs.flushDirtyList_(c, dirtyList, flushAll)
-			if earliestNext.Before(nextExpiringInode) {
-				c.vlog("changing next time from %s to %s",
-					nextExpiringInode.String(),
-					earliestNext.String())
-				nextExpiringInode = earliestNext
-			}
-		}()
-
-		if dirtyList.Len() == 0 {
-			delete(qfs.dirtyQueue, key)
-		}
-	}
-
-	return nextExpiringInode
-}
-
-// Requires dirtyQueueLock
-func (qfs *QuantumFs) flushDirtyList_(c *ctx, dirtyList *list.List,
-	flushAll bool) time.Time {
-
-	defer c.funcIn("Mux::flushDirtyList").Out()
-
-	for dirtyList.Len() > 0 {
-		// Should we clean this inode?
-		candidate := dirtyList.Front().Value.(*dirtyInode)
-
-		now := time.Now()
-		if !flushAll && candidate.expiryTime.After(now) {
-			// We are up to date with this list
-			return candidate.expiryTime
-		}
-
-		success := func() (flushed bool) {
-			// We must release the dirtyQueueLock because when we flush
-			// an Inode it will modify its parent and likely place that
-			// parent onto the dirty queue. If we still hold that lock
-			// we'll deadlock. We defer relocking in order to balance
-			// against the deferred unlocking from our caller, even in
-			// the case of a panic.
-			qfs.dirtyQueueLock.Unlock()
-			defer qfs.dirtyQueueLock.Lock()
-			return qfs.flushInode(c, *candidate)
-		}()
-
-		if !success {
-			// Stop trying to flush on failure and retry later
-			candidate.expiryTime =
-				time.Now().Add(qfs.config.DirtyFlushDelay)
-			return candidate.expiryTime
-		}
-
-		dirtyList.Remove(dirtyList.Front())
-	}
-
-	// If we get here then we've emptied the dirtyList out entirely.
-	return time.Now().Add(flushSanityTimeout)
-}
-
-func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) bool {
-	inodeNum := dirtyInode.inode.inodeNum()
+	inodeNum := inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
-		inodeNum, dirtyInode.shouldUninstantiate).Out()
+		inodeNum, uninstantiate).Out()
 
-	defer dirtyInode.inode.RLockTree().RUnlock()
+	defer inode.RLockTree().RUnlock()
 
 	flushSuccess := true
-	if !dirtyInode.inode.isOrphaned() {
-		if wsr, isWsr := dirtyInode.inode.(*WorkspaceRoot); isWsr {
+	if !inode.isOrphaned() {
+		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
 			_, flushSuccess = wsr.flushCanFail(c)
 		} else {
-			dirtyInode.inode.flush(c)
+			inode.flush(c)
 		}
 	}
 
@@ -429,13 +258,12 @@ func (qfs *QuantumFs) flushInode(c *ctx, dirtyInode dirtyInode) bool {
 	}
 
 	func() {
-		defer qfs.dirtyQueueLock.Lock().Unlock()
-		dirtyInode.inode.markClean_()
+		defer qfs.flusher.lock.Lock().Unlock()
+		inode.markClean_()
 	}()
 
-	if dirtyInode.shouldUninstantiate {
-		defer qfs.instantiationLock.Lock().Unlock()
-		qfs.uninstantiateInode_(c, inodeNum)
+	if uninstantiate {
+		qfs.uninstantiateInode(c, inodeNum)
 	}
 
 	return true
@@ -459,71 +287,22 @@ func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	qfs.uninstantiateChain_(c, inode)
 }
 
-// Don't use this method directly, use one of the semantically specific variants
-// instead.
-// dirtyQueueLock must be locked when calling this function
-func (qfs *QuantumFs) _queueDirtyInode_(c *ctx, inode Inode,
-	shouldUninstantiate bool, shouldWait bool) *list.Element {
-
-	defer c.FuncIn("Mux::_queueDirtyInode_", "inode %d uninstantiate %t wait %t",
-		inode.inodeNum(), shouldUninstantiate, shouldWait).Out()
-
-	var dirtyNode *dirtyInode
-	dirtyElement := inode.dirtyElement_()
-	if dirtyElement == nil {
-		// This inode wasn't in the dirtyQueue so add it now
-		dirtyNode = &dirtyInode{
-			inode:               inode,
-			shouldUninstantiate: shouldUninstantiate,
-		}
-
-		treelock := inode.treeLock()
-		dirtyList, ok := qfs.dirtyQueue[treelock]
-		if !ok {
-			dirtyList = list.New()
-			qfs.dirtyQueue[treelock] = dirtyList
-		}
-
-		if shouldWait {
-			dirtyNode.expiryTime =
-				time.Now().Add(qfs.config.DirtyFlushDelay)
-
-			dirtyElement = dirtyList.PushBack(dirtyNode)
-		} else {
-			// dirtyInode.expiryTime will be the epoch
-			dirtyElement = dirtyList.PushFront(dirtyNode)
-		}
-	} else {
-		dirtyNode = dirtyElement.Value.(*dirtyInode)
-		c.vlog("Inode was already in the dirty queue %s",
-			dirtyNode.expiryTime.String())
-		dirtyNode.expiryTime = time.Now()
-	}
-
-	if shouldUninstantiate {
-		dirtyNode.shouldUninstantiate = true
-	}
-
-	select {
-	case qfs.kickFlush <- struct{}{}:
-		// We have successfully kicked the flusher
-	default:
-		// Somebody else had kicked the flusher already
-	}
-
-	return dirtyElement
+func (qfs *QuantumFs) uninstantiateInode(c *ctx, inodeNum InodeId) {
+	defer c.FuncIn("Mux::uninstantiateInode", "inode %d", inodeNum).Out()
+	defer qfs.instantiationLock.Lock().Unlock()
+	qfs.uninstantiateInode_(c, inodeNum)
 }
 
 // Queue an Inode to be flushed because it is dirty
-// dirtyQueueLock must be locked when calling this function
+// flusher lock must be locked when calling this function
 func (qfs *QuantumFs) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
-	return qfs._queueDirtyInode_(c, inode, false, true)
+	return qfs.flusher.queue_(c, inode, false, true)
 }
 
 // Queue an Inode because the kernel has forgotten about it
-// dirtyQueueLock must be locked when calling this function
+// flusher lock must be locked when calling this function
 func (qfs *QuantumFs) queueInodeToForget_(c *ctx, inode Inode) *list.Element {
-	return qfs._queueDirtyInode_(c, inode, true, false)
+	return qfs.flusher.queue_(c, inode, true, false)
 }
 
 // There are several configuration knobs in the kernel which can affect FUSE
@@ -690,7 +469,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	}
 
 	// First find the Inode under a cheaper lock
-	inode, canBeInstantiated := func() (Inode, bool) {
+	inode, _ := func() (Inode, bool) {
 		defer qfs.mapMutex.RLock().RUnlock()
 		return qfs.getInode_(c, id)
 	}()
@@ -698,28 +477,14 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	if inode != nil {
 		return inode
 	}
-
-	// If we don't have an instantiated Inode and cannot instantiate it, then we
-	// know nothing about that InodeId.
-	if !canBeInstantiated {
-		c.wlog("Instantiation request for inode we don't know about. %d", id)
-		return nil
-	}
-
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
-	defer qfs.instantiationLock.RLock().RUnlock()
+	defer qfs.instantiationLock.Lock().Unlock()
 	defer qfs.mapMutex.Lock().Unlock()
-
-	inode = qfs.inode_(c, id)
-	if inode == nil {
-		msg := fmt.Sprintf("Unknown inodeId %d", id)
-		panic(msg)
-	}
-	return inode
+	return qfs.inode_(c, id)
 }
 
-// Must hold the mapMutex for write
+// Must hold the instantiationLock and mapMutex for write
 func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	inode, needsInstantiation := qfs.getInode_(c, id)
 	if !needsInstantiation && inode != nil {
@@ -727,6 +492,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 	}
 
 	c.vlog("Inode %d needs to be instantiated", id)
+	var newUninstantiated []InodeId
 
 	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
 	if !uninstantiated {
@@ -734,13 +500,35 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		return nil
 	}
 
-	parent := qfs.inode_(c, parentId)
-	if parent == nil {
-		panic(fmt.Sprintf("Unable to instantiate parent required: %d",
-			parentId))
+	for {
+		parent := qfs.inode_(c, parentId)
+		if parent == nil {
+			panic(fmt.Sprintf("Unable to instantiate parent %d",
+				parentId))
+		}
+
+		func() {
+			qfs.mapMutex.Unlock()
+			defer qfs.mapMutex.Lock()
+			// without mapMutex the child could move underneath this
+			// parent, in such cases, find the new parent
+			inode, newUninstantiated = parent.instantiateChild(c, id)
+		}()
+		if inode != nil {
+			break
+		}
+		// a nil inode means the dentry has moved or has been removed
+		newParentId, uninstantiated := qfs.parentOfUninstantiated[id]
+		if !uninstantiated {
+			// The dentry has been removed
+			return nil
+		}
+		// The dentry is still there, verify the parent has changed
+		utils.Assert(newParentId != parentId,
+			"parent of inode %d is still %d", id, parentId)
+		parentId = newParentId
 	}
 
-	inode, newUninstantiated := parent.instantiateChild(c, id)
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
@@ -901,13 +689,17 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 // Trigger all active workspaces to sync
 const SyncAllLog = "Mux::syncAll"
 
-func (qfs *QuantumFs) syncAll(c *ctx) {
+func (qfs *QuantumFs) syncAll(c *ctx) error {
 	defer c.funcIn(SyncAllLog).Out()
+	return qfs.flusher.syncAll(c, true)
+}
 
-	// Trigger the flusher goroutine to flush everything
-	qfs.flushAll <- c
+// Sync the workspace keyed with key
+const SyncWorkspaceLog = "Mux::syncWorkspace"
 
-	<-qfs.flushComplete
+func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
+	defer c.funcIn(SyncWorkspaceLog).Out()
+	return qfs.flusher.syncWorkspace(c, workspace)
 }
 
 func logRequestPanic(c *ctx) {
@@ -963,12 +755,13 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		c.vlog("Evaluating inode %d for uninstantiation", inodeNum)
 		lookupCount, exists := qfs.lookupCount(inodeNum)
 		if lookupCount != 0 {
-			c.vlog("No forget called on inode %d yet", inodeNum)
+			c.vlog("Inode %d still has %d pending lookups",
+				inodeNum, lookupCount)
 			break
 		}
 
 		shouldBreak := func() bool {
-			defer qfs.dirtyQueueLock.Lock().Unlock()
+			defer qfs.flusher.lock.Lock().Unlock()
 			if de := inode.dirtyElement_(); de != nil {
 				c.vlog("Inode %d dirty, not uninstantiating yet",
 					inodeNum)
@@ -1015,7 +808,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		}
 
 		// Great, we want to forget this so proceed
-		func() {
+		shouldClean := func() bool {
 			defer qfs.lookupCountLock.Lock().Unlock()
 
 			// With the lookupCountLock and instantiationLock both held
@@ -1029,10 +822,16 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				qfs.setInode(c, inodeNum, nil)
 				delete(qfs.lookupCounts, inodeNum)
 				qfs.removeUninstantiated(c, inodeChildren)
+				return true
+			} else {
+				return false
 			}
 		}()
+		if !shouldClean {
+			c.vlog("Not cleaning up inode %d yet", inodeNum)
+			return
+		}
 		inode.cleanup(c)
-
 		c.vlog("Set inode %d to nil", inodeNum)
 
 		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
@@ -1218,25 +1017,26 @@ func (qfs *QuantumFs) workspaceIsMutableAtOpen(c *ctx, inode Inode,
 const ForgetLog = "Mux::Forget"
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
-	defer qfs.c.funcIn(ForgetLog).Out()
-	defer logRequestPanic(&qfs.c)
+	c := qfs.c.forgetCtx()
+	defer c.funcIn(ForgetLog).Out()
+	defer logRequestPanic(c)
 
-	qfs.c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
+	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
 	if !qfs.shouldForget(InodeId(nodeID), nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
-		qfs.c.dlog("inode %d lookup not zero yet", nodeID)
+		c.dlog("inode %d lookup not zero yet", nodeID)
 		return
 	}
 
 	defer qfs.instantiationLock.Lock().Unlock()
 
-	if inode := qfs.inodeNoInstantiate(&qfs.c, InodeId(nodeID)); inode != nil {
-		inode.queueToForget(&qfs.c)
+	if inode := qfs.inodeNoInstantiate(c, InodeId(nodeID)); inode != nil {
+		inode.queueToForget(c)
 	} else {
-		qfs.c.dlog("Forgetting uninstantiated Inode %d", nodeID)
-		qfs.uninstantiateInode_(&qfs.c, InodeId(nodeID))
+		c.dlog("Forgetting uninstantiated Inode %d", nodeID)
+		qfs.uninstantiateInode_(c, InodeId(nodeID))
 	}
 }
 

@@ -178,9 +178,9 @@ type Inode interface {
 
 	Lock() utils.NeedWriteUnlock
 
-	treeLock() *sync.RWMutex
-	LockTree() *sync.RWMutex
-	RLockTree() *sync.RWMutex
+	treeLock() *TreeLock
+	LockTree() *TreeLock
+	RLockTree() *TreeLock
 
 	isWorkspaceRoot() bool
 
@@ -193,6 +193,19 @@ type Inode interface {
 
 type inodeHolder interface {
 	directChildInodes() []InodeId
+}
+
+type TreeLock struct {
+	lock *sync.RWMutex
+	name string
+}
+
+func (treelock *TreeLock) Unlock() {
+	treelock.lock.Unlock()
+}
+
+func (treelock *TreeLock) RUnlock() {
+	treelock.lock.RUnlock()
 }
 
 type InodeCommon struct {
@@ -215,9 +228,9 @@ type InodeCommon struct {
 	// tree-wide operations are being performed. Primarily this is done with all
 	// requests which call downward (parent to child) in the tree. This is done
 	// to ensure that all Inode locks are only acquired child to parent.
-	treeLock_ *sync.RWMutex
+	treeLock_ *TreeLock
 
-	// This element is protected by the DirtyQueueLock
+	// This element is protected by the flusher lock
 	dirtyElement__ *list.Element
 
 	unlinkRecord quantumfs.DirectoryRecord
@@ -462,7 +475,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 		return
 	}
 
-	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock().Unlock()
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
 		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
@@ -470,7 +483,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 }
 
 // Mark this Inode as having been cleaned
-// dirtyQueueLock must be locked when calling this function
+// flusher lock must be locked when calling this function
 func (inode *InodeCommon) markClean_() {
 	inode.dirtyElement__ = nil
 }
@@ -484,12 +497,12 @@ func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 func (inode *InodeCommon) queueToForget(c *ctx) {
 	defer c.funcIn("InodeCommon::queueToForget").Out()
 
-	defer c.qfs.dirtyQueueLock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock().Unlock()
 	de := c.qfs.queueInodeToForget_(c, inode.self)
 	inode.dirtyElement__ = de
 }
 
-// dirtyQueueLock must be locked when calling this function
+// flusher lock must be locked when calling this function
 func (inode *InodeCommon) dirtyElement_() *list.Element {
 	return inode.dirtyElement__
 }
@@ -525,17 +538,17 @@ func (inode *InodeCommon) clearAccessedCache() {
 	atomic.StoreUint32(&(inode.accessed_), 0)
 }
 
-func (inode *InodeCommon) treeLock() *sync.RWMutex {
+func (inode *InodeCommon) treeLock() *TreeLock {
 	return inode.treeLock_
 }
 
-func (inode *InodeCommon) LockTree() *sync.RWMutex {
-	inode.treeLock_.Lock()
+func (inode *InodeCommon) LockTree() *TreeLock {
+	inode.treeLock_.lock.Lock()
 	return inode.treeLock_
 }
 
-func (inode *InodeCommon) RLockTree() *sync.RWMutex {
-	inode.treeLock_.RLock()
+func (inode *InodeCommon) RLockTree() *TreeLock {
+	inode.treeLock_.lock.RLock()
 	return inode.treeLock_
 }
 
@@ -701,9 +714,9 @@ type FileHandle interface {
 
 	Sync_DOWN(c *ctx) fuse.Status
 
-	treeLock() *sync.RWMutex
-	LockTree() *sync.RWMutex
-	RLockTree() *sync.RWMutex
+	treeLock() *TreeLock
+	LockTree() *TreeLock
+	RLockTree() *TreeLock
 }
 
 type FileHandleId uint64
@@ -711,19 +724,19 @@ type FileHandleId uint64
 type FileHandleCommon struct {
 	id        FileHandleId
 	inodeNum  InodeId
-	treeLock_ *sync.RWMutex
+	treeLock_ *TreeLock
 }
 
-func (file *FileHandleCommon) treeLock() *sync.RWMutex {
+func (file *FileHandleCommon) treeLock() *TreeLock {
 	return file.treeLock_
 }
 
-func (file *FileHandleCommon) LockTree() *sync.RWMutex {
-	file.treeLock_.Lock()
+func (file *FileHandleCommon) LockTree() *TreeLock {
+	file.treeLock_.lock.Lock()
 	return file.treeLock_
 }
 
-func (file *FileHandleCommon) RLockTree() *sync.RWMutex {
-	file.treeLock_.RLock()
+func (file *FileHandleCommon) RLockTree() *TreeLock {
+	file.treeLock_.lock.RLock()
 	return file.treeLock_
 }
