@@ -86,6 +86,12 @@ const (
 	workspaceImmutableUntilRestart
 )
 
+type MetaInodeDeletionRecord struct {
+	inodeId  InodeId
+	parentId InodeId
+	name     string
+}
+
 type QuantumFs struct {
 	fuse.RawFileSystem
 	server        *fuse.Server
@@ -107,6 +113,8 @@ type QuantumFs struct {
 	mapMutex    utils.DeferableRwMutex
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
+
+	metaInodeDeletionRecords []MetaInodeDeletionRecord
 
 	flusher *Flusher
 
@@ -205,9 +213,18 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 	}
 }
 
-func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string) {
+func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
+	parentId InodeId) {
+
 	defer c.FuncIn("QuantumFs::handleMetaInodeRemoval", "%s inode %d",
 		name, id).Out()
+
+	// This function might have been called as a result of a lookup.
+	// Therefore, it is not safe to call back into the kernel, telling it
+	// about the deletion. Schedule this call for later.
+	qfs.metaInodeDeletionRecords = append(qfs.metaInodeDeletionRecords,
+		MetaInodeDeletionRecord{inodeId: id, name: name, parentId: parentId})
+
 	inode := qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
 		return
@@ -224,67 +241,36 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
 
-	// instantiating the workspace has the side effect of querying the
-	// workspaceDB and updating the in-memory datastructures.
-	// We need the current in-memory state though to take
-	// other required actions
 	wsrLineage, err := qfs.getWorkspaceRootLineageNoInstantiate(c,
 		parts[0], parts[1], parts[2])
 	if err != nil {
 		c.elog("getting wsrLineage failed: %s", err.Error())
-		return
-	}
-
-	if len(wsrLineage) < 4 {
-		// Nothing else to do here
-		c.vlog("The lineage is not instantiated.")
-
-		// Rely on the side effects of lookup to update the in-memory
-		// data structures to correctly represent the workspaceDB
-		_, cleanup, _ := qfs.getWorkspaceRoot(c,
-			parts[0], parts[1], parts[2])
-		cleanup()
-		return
-	}
-	c.vlog("The lineage of %s is %d/%d/%d/%d", name,
-		wsrLineage[0], wsrLineage[1], wsrLineage[2], wsrLineage[3])
-
-	// The new lineage will be missing some parts, tell the kernel about
-	// what is missing
-	ids, cleanup := qfs.getWorkspaceRootLineage(c, parts[0], parts[1], parts[2])
-	defer cleanup()
-	switch nIds := len(ids); nIds {
-	default:
-		panic(fmt.Sprintf("There are %d inodes in the wsrLineage", nIds))
-	case 1:
-		fallthrough
-	case 2:
+	} else {
 		// In case the deletion has happened remotely, workspacelisting
 		// does not have the capability of orphaning the workspace if the
 		// namespace or typespace have been removed as well.
-		qfs.handleMetaInodeRemoval(c, wsrLineage[3], parts[2])
-		fallthrough
-	case 3:
-		// The inclusion of the root inode guarantees the parent is valid
-		deletedNodeId := wsrLineage[nIds]
-		deletedNodeName := parts[nIds-1]
-		parentNodeId := wsrLineage[nIds-1]
+		if len(wsrLineage) == 4 {
+			qfs.handleMetaInodeRemoval(c,
+				wsrLineage[3], parts[2], wsrLineage[2])
+		}
+	}
 
-		c.vlog("noting deletion of node %s (inode %d, parent %d)",
-			deletedNodeName, deletedNodeId, parentNodeId)
-		if e := c.qfs.noteDeletedInode(parentNodeId, deletedNodeId,
-			deletedNodeName); e != fuse.OK {
+	// Instantiating the workspace has the side effect of querying the
+	// workspaceDB and updating the in-memory data structures.
+	// We need the current in-memory state though to take
+	// other required actions
+	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	cleanup()
 
+	for _, record := range c.qfs.metaInodeDeletionRecords {
+		c.vlog("Noting deletion of %s inode %d (parent %d)",
+			record.name, record.inodeId, record.parentId)
+		if e := c.qfs.noteDeletedInode(record.parentId, record.inodeId,
+			record.name); e != fuse.OK {
 			c.vlog("noteDeletedInode for wsr with inode %d failed", e)
 		}
-	case 4:
-		c.vlog("The workspace has been re-created.")
-		// invalidating the wsr inode in case it has been deleted and
-		// recreated remotely
-		wsrInode := wsrLineage[3]
-		c.vlog("Invalidating workspace inode %d", wsrInode)
-		c.qfs.invalidateInode(wsrInode)
 	}
+	c.qfs.metaInodeDeletionRecords = nil
 }
 
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
