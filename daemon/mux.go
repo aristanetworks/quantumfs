@@ -114,6 +114,7 @@ type QuantumFs struct {
 	inodes      map[InodeId]Inode
 	fileHandles map[FileHandleId]FileHandle
 
+	metaInodeMutex           utils.DeferableMutex
 	metaInodeDeletionRecords []MetaInodeDeletionRecord
 
 	flusher *Flusher
@@ -222,8 +223,14 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	// This function might have been called as a result of a lookup.
 	// Therefore, it is not safe to call back into the kernel, telling it
 	// about the deletion. Schedule this call for later.
-	qfs.metaInodeDeletionRecords = append(qfs.metaInodeDeletionRecords,
-		MetaInodeDeletionRecord{inodeId: id, name: name, parentId: parentId})
+	func() {
+		defer qfs.metaInodeMutex.Lock().Unlock()
+		qfs.metaInodeDeletionRecords = append(qfs.metaInodeDeletionRecords,
+			MetaInodeDeletionRecord{
+				inodeId:  id,
+				name:     name,
+				parentId: parentId})
+	}()
 
 	inode := qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -262,6 +269,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	cleanup()
 
+	defer qfs.metaInodeMutex.Lock().Unlock()
 	for _, record := range c.qfs.metaInodeDeletionRecords {
 		c.vlog("Noting deletion of %s inode %d (parent %d)",
 			record.name, record.inodeId, record.parentId)
