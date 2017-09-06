@@ -717,6 +717,11 @@ func (test *testHelper) assertFileIsOfSize(fullname string, size int64) {
 		"Incorrect file size. Expected: %d", stat.Size)
 }
 
+func (test *testHelper) assertFileExists(fullname string) {
+	var stat syscall.Stat_t
+	test.AssertNoErr(syscall.Stat(fullname, &stat))
+}
+
 func (test *testHelper) assertNoFile(fullname string) {
 	var stat syscall.Stat_t
 	err := syscall.Stat(fullname, &stat)
