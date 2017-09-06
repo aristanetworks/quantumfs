@@ -34,9 +34,15 @@ func trimToStr(test *testHelper, logs []string, boundary string) []string {
 			boundaryCount++
 		}
 	}
-	test.Assert(boundaryCount == 2, "Miscount of boundary markers %d",
-		boundaryCount)
+	test.Assert(boundaryCount == 2,
+		"Only found %d boundary markers in %d log lines",
+		boundaryCount, len(logs))
 	return logs[boundaryStart : boundaryEnd+1]
+}
+
+func (test *testHelper) parseLogs() string {
+	test.qfs.c.Qlog.Sync()
+	return qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
 }
 
 func TestMaxStringLast_test(t *testing.T) {
@@ -46,7 +52,7 @@ func TestMaxStringLast_test(t *testing.T) {
 		test.qfs.c.wlog("%s", longStr)
 		test.qfs.c.vlog("Second log to confirm continuity")
 
-		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+		testLogs := test.parseLogs()
 		test.Assert(strings.Contains(testLogs,
 			"Log data exceeds allowable length"),
 			"Over length string doesn't trigger warning")
@@ -102,8 +108,8 @@ func TestQParse(t *testing.T) {
 		testMutex.Lock()
 		logOutCopy := string(logOut.Bytes())
 		testMutex.Unlock()
-		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
 
+		testLogs := test.parseLogs()
 		// There's nothing ensuring the order is the same, so we have to sort
 		testLogLines := strings.Split(testLogs, "\n")
 		logOutLines := strings.Split(logOutCopy, "\n")
@@ -180,8 +186,7 @@ func TestQParsePartials_test(t *testing.T) {
 		_, err = ioutil.ReadFile(testFilename)
 		test.Assert(err == nil, "Unable to read file contents")
 
-		// Now grab the log file
-		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+		testLogs := test.parseLogs()
 
 		testLogLines := strings.Split(testLogs, "\n")
 		droppedEntry := false
@@ -210,8 +215,7 @@ func TestBooleanLogType(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		test.qfs.c.wlog("booleans %t %t", true, false)
-
-		testLogs := qlog.ParseLogs(test.qfs.config.CachePath + "/qlog")
+		testLogs := test.parseLogs()
 		test.Assert(strings.Contains(testLogs, "booleans true false"),
 			"boolean log types incorrectly output: %s", testLogs)
 	})
