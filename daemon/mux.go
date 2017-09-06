@@ -997,11 +997,11 @@ func (qfs *QuantumFs) getWorkspaceRootLineage(c *ctx,
 	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
 
-	// In order to run getWorkspaceRoot, we must set a proper value for the
-	// variable nLookup. If the function is called internally, it needs to reduce
-	// the increased lookupCount, so set nLookup to 1. Only if it is triggered by
-	// kernel, should lookupCount be increased by one, and nLookup should be 0.
-	// Therefore, lookupCount's in QuantumFS and kernel can match.
+	// In order to run getWorkspaceRootLineage, we must set a proper value for
+	// the variable nLookup. If the function is called internally, it needs to
+	// reduce the increased lookupCount, so set nLookup to 1. Only if it is
+	// triggered by kernel, should lookupCount be increased by one, and nLookup
+	// should be 0. Therefore, lookupCount's in QuantumFS and kernel can match.
 	//
 	// For now, all getWorkspaceRoot() are called from internal functions, so
 	// nLookup is always 1.
