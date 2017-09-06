@@ -122,7 +122,7 @@ func TestWorkspaceReplacement(t *testing.T) {
 	})
 }
 
-func TestRemoteWorkspaceDeletion(t *testing.T) {
+func TestWorkspaceDeletionManualForget(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 
@@ -142,7 +142,6 @@ func TestRemoteWorkspaceDeletion(t *testing.T) {
 		defer fileHandle.Close()
 
 		workspaceInodeId := test.getInodeNum(test.AbsPath(workspaceName))
-		// Now simulate the workspace being remotely removed
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)

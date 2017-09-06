@@ -209,7 +209,7 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 			// naturally.
 			delete(*inodeMap, name)
 			delete(*nameMap, id)
-			c.qfs.handleMetaInodeRemoval(c, id, name)
+			c.qfs.handleMetaInodeRemoval(c, id, name, parent.inodeNum())
 		}
 	}
 }
@@ -997,7 +997,8 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 			// from their parents
 			delete(wsl.workspacesByName, name)
 			delete(wsl.workspacesById, info.id)
-			c.qfs.handleMetaInodeRemoval(c, info.id, name)
+			c.qfs.handleMetaInodeRemoval(c, info.id, name,
+				wsl.inodeNum())
 		}
 	}
 

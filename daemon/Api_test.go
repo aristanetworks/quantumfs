@@ -508,8 +508,8 @@ func TestWorkspaceDeletion(t *testing.T) {
 	})
 }
 
-func TestWorkspaceDeletionSameNameSpace(t *testing.T) {
-	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
+func TestWorkspaceDeletionSameNamespaceInstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
 		api := test.getApi()
 		ws0 := test.NewWorkspace()
 		wsName0 := test.RelPath(ws0)
@@ -518,10 +518,34 @@ func TestWorkspaceDeletionSameNameSpace(t *testing.T) {
 		test.AssertNoErr(api.Branch(wsName0, wsName1))
 		ws1 := test.AbsPath(wsName1)
 		test.assertFileExists(ws1)
+
+		_, cleanup := test.getWorkspaceRoot(wsName1)
+		// The workspace is instantiated, so handleDeletedWorkspace
+		// will be called
+		defer cleanup()
+
 		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(ws1)))
 		test.assertFileExists(ws0)
 		test.WaitForLogString("Out-- Mux::handleDeletedWorkspace",
-			"handleDeletedWorkspace not finished")
+			"handleDeletedWorkspace to finish")
+		test.assertNoFile(ws1)
+	})
+}
+
+func TestWorkspaceDeletionSameNamespaceUninstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+		ws0 := test.NewWorkspace()
+		wsName0 := test.RelPath(ws0)
+		parts := strings.Split(wsName0, "/")
+		wsName1 := parts[0] + "/" + parts[1] + "/_branched"
+		test.AssertNoErr(api.Branch(wsName0, wsName1))
+		ws1 := test.AbsPath(wsName1)
+		test.assertFileExists(ws1)
+		test.remountFilesystem()
+		api = test.getApi()
+		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(ws1)))
+		test.assertFileExists(ws0)
 		test.assertNoFile(ws1)
 	})
 }
