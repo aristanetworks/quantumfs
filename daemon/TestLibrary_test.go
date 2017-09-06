@@ -271,21 +271,6 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 	})
 }
 
-// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
-func (th *testHelper) getInodeNum(path string) InodeId {
-	var stat syscall.Stat_t
-	err := syscall.Stat(path, &stat)
-	th.Assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
-
-	return InodeId(stat.Ino)
-}
-
-// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
-func (th *testHelper) getInode(path string) Inode {
-	inodeNum := th.getInodeNum(path)
-	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-}
-
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 
@@ -369,13 +354,20 @@ func (th *testHelper) newCtx() *ctx {
 func (th *testHelper) remountFilesystem() {
 	th.Log("Remounting filesystem")
 	th.putApi()
+	sleep := time.Millisecond
+	maxSleep := 10 * time.Millisecond
 	for i := 0; i < 100; i++ {
 		err := syscall.Mount("", th.TempDir+"/mnt", "",
 			syscall.MS_REMOUNT|syscall.MS_RDONLY, "")
 		if err != nil {
 			th.Log("Remount failed with " + err.Error() + " retrying...")
-			time.Sleep(time.Millisecond)
+			time.Sleep(sleep)
+			sleep *= 2
+			if sleep > maxSleep {
+				sleep = maxSleep
+			}
 		} else {
+			th.Log("Remounting succeeded after %d tries", i+1)
 			break
 		}
 		th.Assert(i < 99, "Cannot remount readonly %v", err)

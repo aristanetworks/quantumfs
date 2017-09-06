@@ -349,7 +349,7 @@ func TestWorkspaceRootChecker(t *testing.T) {
 // Test to ensure that non "out of date" workspaceDB don't prematurely make
 // workspaces immutable
 func TestWorkspaceErrorHandling(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		workspaceB := "testA/testB/testC"
 		workspaceD := "testA/testB/testD"
@@ -389,7 +389,8 @@ func TestWorkspaceErrorHandling(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// Try to publish, causing an error on Advance
-		test.SyncAllWorkspaces()
+		test.AssertErr(api.SyncAll())
+
 		test.WaitForLogString("Unable to AdvanceWorkspace",
 			"AdvanceWorkspace wasn't triggered by SyncAllWorkspaces")
 

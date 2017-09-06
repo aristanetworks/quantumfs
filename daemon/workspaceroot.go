@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -95,7 +96,9 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.nonce = nonce
 	wsr.accessList = quantumfs.NewPathsAccessed()
 
-	wsr.treeLock_ = &wsr.realTreeLock
+	treeLock := TreeLock{lock: &wsr.realTreeLock,
+		name: typespace + "/" + namespace + "/" + workspace}
+	wsr.treeLock_ = &treeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 	func() {
 		defer wsr.linkLock.Lock().Unlock()
@@ -105,7 +108,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	}()
 	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
-		&wsr.realTreeLock)
+		&treeLock)
 
 	return &wsr, uninstantiated
 }
@@ -247,6 +250,10 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 		return wsr.hardlinks[id].record
 	}()
 	if hardlinkRecord != nil {
+		if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+			c.vlog("Someone has already instantiated inode %d", inodeNum)
+			return inode, nil
+		}
 		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
 	}
 
@@ -444,7 +451,19 @@ func publishHardlinkMap(c *ctx,
 	nextBaseLayerId := quantumfs.EmptyDirKey
 	var err error
 	entryIdx := 0
-	for fileId, entry := range records {
+
+	// Sort the records by fileId so that the derieved ObjectKey is constant
+	// irrespective of the order of the records in the map
+	keys := make([]quantumfs.FileId, 0, len(records))
+	for fileId := range records {
+		keys = append(keys, fileId)
+	}
+	sort.Slice(keys,
+		func(i, j int) bool {
+			return keys[i] < keys[j]
+		})
+	for _, fileId := range keys {
+		entry := records[fileId]
 		record := entry.record
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
