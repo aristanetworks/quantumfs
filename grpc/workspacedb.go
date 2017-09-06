@@ -324,22 +324,31 @@ func logRetry(c *quantumfs.Ctx, attemptNum int, cmd string, err error) {
 	}
 }
 
+func retry(c *quantumfs.Ctx, opName string, op func(c *quantumfs.Ctx) error) error {
+	var err error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err = op(c)
+		if !shouldRetry(err) {
+			return err
+		}
+		logRetry(c, attempt, opName, err)
+	}
+	c.Dlog(qlog.LogWorkspaceDb, "%s failed, not retrying: %s", opName,
+		err.Error())
+	return err
+}
+
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumTypespaces").Out()
 
-	var err error
 	var result int
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "NumTypespaces", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.numTypespaces(c)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "NumTypespaces", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "NumTypespaces failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -365,18 +374,13 @@ func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::TypespaceList").Out()
 
 	var result []string
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "TypespaceList", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.typespaceList(c)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "TypespaceList", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "TypespaceList failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -404,18 +408,13 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumNamespaces").Out()
 
 	var result int
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "NumNamespaces", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.numNamespaces(c, typespace)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "NumNamespaces", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "NumNamespaces failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -448,18 +447,13 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NamespaceList").Out()
 
 	var result []string
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "NamespaceList", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.namespaceList(c, typespace)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "NamespaceList", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "NamespaceList failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -492,18 +486,13 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumWorkspaces").Out()
 
 	var result int
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "NumWorkspaces", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.numWorkspaces(c, typespace, namespace)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "NumWorkspaces", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "NumWorkspaces failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -537,18 +526,13 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::WorkspaceList").Out()
 
 	var result map[string]quantumfs.WorkspaceNonce
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "WorkspaceList", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.workspaceList(c, typespace, namespace)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "WorkspaceList", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "WorkspaceList failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -588,18 +572,11 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::BranchWorkspace").Out()
 
-	var err error
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		err = wsdb.branchWorkspace(c, srcTypespace, srcNamespace,
+	err := retry(c, "BranchWorkspace", func(c *quantumfs.Ctx) error {
+		return wsdb.branchWorkspace(c, srcTypespace, srcNamespace,
 			srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
-		if !shouldRetry(err) {
-			return err
-		}
-		logRetry(c, attempt, "BranchWorkspace", err)
-	}
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "BranchWorkspace failed, not retrying: %s",
-		err.Error())
 	return err
 }
 
@@ -633,18 +610,10 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::DeleteWorkspace").Out()
 
-	var err error
+	err := retry(c, "DeleteWorkspace", func(c *quantumfs.Ctx) error {
+		return wsdb.deleteWorkspace(c, typespace, namespace, workspace)
+	})
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		err = wsdb.deleteWorkspace(c, typespace, namespace, workspace)
-		if !shouldRetry(err) {
-			return err
-		}
-		logRetry(c, attempt, "DeleteWorkspace", err)
-	}
-
-	c.Dlog(qlog.LogWorkspaceDb, "DeleteWorkspace failed, not retrying: %s",
-		err.Error())
 	return err
 }
 
@@ -678,17 +647,12 @@ func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) 
 	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::fetchWorkspace", "%s",
 		workspaceName).Out()
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		key, nonce, immutable, err = wsdb._fetchWorkspace(c,
-			workspaceName)
-		if !shouldRetry(err) {
-			return key, nonce, immutable, err
-		}
-		logRetry(c, attempt, "fetchWorkspace", err)
-	}
+	err = retry(c, "fetchWorkspace", func(c *quantumfs.Ctx) error {
+		var err error
+		key, nonce, immutable, err = wsdb._fetchWorkspace(c, workspaceName)
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "fetchWorkspace failed, not retrying: %s",
-		err.Error())
 	return key, nonce, immutable, err
 }
 
@@ -728,19 +692,14 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 
 	var resKey quantumfs.ObjectKey
 	var resNonce quantumfs.WorkspaceNonce
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "Workspace", func(c *quantumfs.Ctx) error {
+		var err error
 		resKey, resNonce, err = wsdb.workspace(c, typespace, namespace,
 			workspace)
-		if !shouldRetry(err) {
-			return resKey, resNonce, err
-		}
-		logRetry(c, attempt, "Workspace", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "Workspace failed, not retrying: %s",
-		err.Error())
 	return resKey, resNonce, err
 }
 
@@ -778,19 +737,14 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		newRootId.String()).Out()
 
 	var result quantumfs.ObjectKey
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "AdvanceWorkspace", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.advanceWorkspace(c, typespace, namespace,
 			workspace, nonce, currentRootId, newRootId)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "AdvanceWorkspace", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "AdvanceWorkspace failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -832,19 +786,14 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::WorkspaceIsImmutable").Out()
 
 	var result bool
-	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	err := retry(c, "WorkspaceIsImmutable", func(c *quantumfs.Ctx) error {
+		var err error
 		result, err = wsdb.workspaceIsImmutable(c, typespace, namespace,
 			workspace)
-		if !shouldRetry(err) {
-			return result, err
-		}
-		logRetry(c, attempt, "WorkspaceIsImmutable", err)
-	}
+		return err
+	})
 
-	c.Dlog(qlog.LogWorkspaceDb, "WorkspaceIsImmutable failed, not retrying: %s",
-		err.Error())
 	return result, err
 }
 
@@ -863,18 +812,10 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 	defer c.FuncIn(qlog.LogWorkspaceDb, "grps::SetWorkspaceImmutable",
 		"%s/%s/%s", typespace, namespace, workspace).Out()
 
-	var err error
+	err := retry(c, "SetWorkspaceImmutable", func(c *quantumfs.Ctx) error {
+		return wsdb.setWorkspaceImmutable(c, typespace, namespace, workspace)
+	})
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		err = wsdb.setWorkspaceImmutable(c, typespace, namespace, workspace)
-		if !shouldRetry(err) {
-			return err
-		}
-		logRetry(c, attempt, "SetWorkspaceImmutable", err)
-	}
-
-	c.Dlog(qlog.LogWorkspaceDb, "SetWorkspaceImmutable failed, not retrying: %s",
-		err.Error())
 	return err
 }
 
