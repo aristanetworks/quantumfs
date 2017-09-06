@@ -22,7 +22,7 @@ import (
 )
 
 func TestWorkspaceBranchNoOtherSyncs(t *testing.T) {
-	// Make sure branching a workpsace does not result in any unrelated workspace
+	// Make sure branching a workspace does not result in any unrelated workspace
 	// getting flushed unnecessarily
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()
