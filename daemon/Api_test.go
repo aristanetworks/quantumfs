@@ -21,6 +21,31 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
+func TestWorkspaceBranchNoOtherSyncs(t *testing.T) {
+	// Make sure branching a workspace does not result in any unrelated workspace
+	// getting flushed unnecessarily
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		workspace0 := test.NewWorkspace()
+		workspaceName0 := test.RelPath(workspace0)
+		workspace1 := test.NewWorkspace()
+		workspaceName1 := test.RelPath(workspace1)
+
+		test.createFile(workspace0, "testFile0", 1000)
+		test.createFile(workspace1, "testFile1", 1000)
+
+		dst := "work/apitest/target_wsr"
+		test.AssertNoErr(api.Branch(workspaceName0, dst))
+
+		advanceMsg := "Advanced rootID for "
+		test.Assert(test.TestLogContains(advanceMsg+workspaceName0),
+			"workspace %s must have advanced", workspaceName0)
+		test.Assert(!test.TestLogContains(advanceMsg+workspaceName1),
+			"workspace %s must not have advanced", workspaceName1)
+	})
+}
+
 func TestWorkspaceBranching(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api := test.getApi()

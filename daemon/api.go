@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -20,7 +19,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func NewApiInode(treeLock *sync.RWMutex, parent InodeId) Inode {
+func NewApiInode(treeLock *TreeLock, parent InodeId) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:        quantumfs.InodeIdApi,
@@ -280,7 +279,7 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func newApiHandle(c *ctx, treeLock *sync.RWMutex) *ApiHandle {
+func newApiHandle(c *ctx, treeLock *TreeLock) *ApiHandle {
 	defer c.funcIn("newApiHandle").Out()
 
 	api := ApiHandle{
@@ -456,6 +455,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdSyncAll:
 		c.vlog("Received all workspace sync request")
 		responseSize = api.syncAll(c)
+	case quantumfs.CmdSyncWorkspace:
+		c.vlog("Received workspace sync request")
+		responseSize = api.syncWorkspace(c, buf)
 	// create an object with a given ObjectKey and path
 	case quantumfs.CmdInsertInode:
 		c.vlog("Received InsertInode request")
@@ -507,7 +509,11 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 	c.vlog("Branching %s/%s/%s to %s/%s/%s", src[0], src[1], src[2], dst[0],
 		dst[1], dst[2])
 
-	c.qfs.syncAll(c)
+	if err := c.qfs.syncWorkspace(c, cmd.Src); err != nil {
+		c.vlog("syncWorkspace failed: %s", err.Error())
+		return api.queueErrorResponse(
+			quantumfs.ErrorCommandFailed, "%s", err.Error())
+	}
 
 	if err := c.workspaceDB.BranchWorkspace(&c.Ctx, src[0], src[1], src[2],
 		dst[0], dst[1], dst[2]); err != nil {
@@ -710,8 +716,33 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 func (api *ApiHandle) syncAll(c *ctx) int {
 	defer c.funcIn("ApiHandle::syncAll").Out()
 
-	c.qfs.syncAll(c)
+	if err := c.qfs.syncAll(c); err != nil {
+		c.vlog("Error syncAll %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, "%s",
+			err.Error())
+
+	}
 	return api.queueErrorResponse(quantumfs.ErrorOK, "SyncAll Succeeded")
+}
+
+func (api *ApiHandle) syncWorkspace(c *ctx, buf []byte) int {
+	defer c.funcIn("ApiHandle::syncWorkspace").Out()
+
+	var cmd quantumfs.SyncWorkspaceRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		c.vlog("Error unmarshaling JSON: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
+	}
+	c.vlog("Syncing workspace %s", cmd.Workspace)
+
+	if err := c.qfs.syncWorkspace(c, cmd.Workspace); err != nil {
+		c.vlog("Error sync %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, "%s",
+			err.Error())
+
+	}
+	return api.queueErrorResponse(quantumfs.ErrorOK, "SyncWorkspace Succeeded")
 }
 
 func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
