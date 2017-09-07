@@ -271,21 +271,6 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 	})
 }
 
-// Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
-func (th *testHelper) getInodeNum(path string) InodeId {
-	var stat syscall.Stat_t
-	err := syscall.Stat(path, &stat)
-	th.Assert(err == nil, "Error grabbing file inode (%s): %v", path, err)
-
-	return InodeId(stat.Ino)
-}
-
-// Retrieve the Inode from Quantumfs. Returns nil is not instantiated
-func (th *testHelper) getInode(path string) Inode {
-	inodeNum := th.getInodeNum(path)
-	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
-}
-
 func (th *testHelper) workspaceRootId(typespace string, namespace string,
 	workspace string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce) {
 
@@ -546,11 +531,6 @@ func (test *testHelper) advanceWorkspace(workspace string,
 	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 		wsNamespaceName, wsWorkspaceName, nonce, src, dst)
 	test.AssertNoErr(err)
-
-	wsr, cleanup := test.getWorkspaceRoot(workspace)
-	defer cleanup()
-	test.Assert(wsr != nil, "workspace root does not exist")
-	wsr.publishedRootId = dst
 }
 
 // Sync the workspace, perform the nosync_op, then sync the workspace again,
@@ -730,6 +710,11 @@ func (test *testHelper) assertFileIsOfSize(fullname string, size int64) {
 	test.AssertNoErr(err)
 	test.Assert(stat.Size == size,
 		"Incorrect file size. Expected: %d", stat.Size)
+}
+
+func (test *testHelper) assertFileExists(fullname string) {
+	var stat syscall.Stat_t
+	test.AssertNoErr(syscall.Stat(fullname, &stat))
 }
 
 func (test *testHelper) assertNoFile(fullname string) {
