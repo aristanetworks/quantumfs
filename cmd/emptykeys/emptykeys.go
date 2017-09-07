@@ -8,13 +8,14 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/aristanetworks/quantumfs/hash"
 	"github.com/aristanetworks/quantumfs/utils/keycompute"
 )
 
 func main() {
 	printHash(keycompute.ComputeEmptyBlock(), "block")
 	printHash(keycompute.ComputeEmptyDirectory(), "directory")
-	printHash(keycompute.ComputeEmptyWorkspace(emptyDir), "workspace")
+	printHash(keycompute.ComputeEmptyWorkspace(), "workspace")
 }
 
 func printHash(hash [hash.HashSize]byte, name string) {
