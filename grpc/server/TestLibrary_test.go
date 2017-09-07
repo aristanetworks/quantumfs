@@ -7,12 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -26,19 +28,37 @@ func init() {
 const initialPort = uint16(22222)
 
 func runTest(t *testing.T, test serverTest) {
+	runTestCommon(t, test, false)
+}
+
+// Run a server where the backend is erased when the server dies
+func runTestWithEphemeralBackend(t *testing.T, test serverTest) {
+	runTestCommon(t, test, true)
+}
+
+func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
 	t.Parallel()
 
 	// the stack depth of test name for all callers of runTest
-	// is 1. Since the stack looks as follows:
-	// 1 <testname>
-	// 0 runTest
-	testName := testutils.TestName(1)
+	// is 2. Since the stack looks as follows:
+	// 2 <testname>
+	// 1 runTest
+	// 0 runTestCommon
+	testName := testutils.TestName(2)
 
 	th := &testHelper{
 		TestHelper: testutils.NewTestHelper(testName,
 			testutils.TestRunDir, t),
 	}
 	th.ctx = newCtx(th.Logger)
+
+	if ephemeral {
+		th.backendType = "processlocal"
+		th.backendConfig = ""
+	} else {
+		th.backendType = "systemlocal"
+		th.backendConfig = th.TempDir + "/workspacedb"
+	}
 
 	func() {
 		defer serversLock.Lock().Unlock()
@@ -50,7 +70,9 @@ func runTest(t *testing.T, test serverTest) {
 			port++
 		}
 
-		server, err := StartWorkspaceDbd(th.Logger, port, "processlocal", "")
+		th.Log("Starting server with path %s", th.backendConfig)
+		server, err := StartWorkspaceDbd(th.Logger, port, th.backendType,
+			th.backendConfig)
 		if err != nil {
 			t.Fatalf(fmt.Sprintf("Failed to initialize wsdb server: %s",
 				err.Error()))
@@ -59,6 +81,10 @@ func runTest(t *testing.T, test serverTest) {
 		servers[port] = server
 		th.server = server
 		th.port = port
+
+		if !ephemeral {
+			th.backend = server.backend
+		}
 	}()
 
 	defer th.EndTest()
@@ -68,9 +94,12 @@ func runTest(t *testing.T, test serverTest) {
 
 type testHelper struct {
 	testutils.TestHelper
-	ctx    *quantumfs.Ctx
-	server *Server
-	port   uint16
+	ctx           *quantumfs.Ctx
+	server        *Server
+	port          uint16
+	backendType   string
+	backendConfig string
+	backend       quantumfs.WorkspaceDB
 }
 
 type serverTest func(test *testHelper)
@@ -95,8 +124,20 @@ func (th *testHelper) testHelperUpcast(
 	}
 }
 
+func (th *testHelper) stopServer() {
+	if th.server != nil {
+		err := th.server.Stop()
+		if err != nil && !strings.Contains(err.Error(),
+			"use of closed network connection") {
+
+			th.AssertNoErr(err)
+		}
+	}
+	th.server = nil
+}
+
 func (th *testHelper) EndTest() {
-	th.AssertNoErr(th.server.Stop())
+	th.stopServer()
 
 	func() {
 		defer serversLock.Lock().Unlock()
@@ -121,4 +162,24 @@ func (th *testHelper) newClient() quantumfs.WorkspaceDB {
 	client := grpc.NewWorkspaceDB(config)
 
 	return client
+}
+
+func (th *testHelper) restartServer() {
+	backend := th.backend
+	if backend == nil {
+		wsdb, err := thirdparty_backends.ConnectWorkspaceDB(
+			th.backendType, th.backendConfig)
+		th.AssertNoErr(err)
+		backend = wsdb
+	}
+
+	th.stopServer()
+
+	defer serversLock.Lock().Unlock()
+	th.Log("Starting server with path %s", th.backendConfig)
+	server, err := startWorkspaceDbdWithBackend(th.Logger, th.port, backend)
+	th.AssertNoErr(err)
+
+	th.server = server
+	servers[th.port] = th.server
 }
