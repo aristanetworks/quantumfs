@@ -515,29 +515,3 @@ func TestExtendedAttributesiAddRemoveWalk(t *testing.T) {
 		test.readWalkCompare(workspace, false)
 	})
 }
-
-func TestKeysMatch(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		targetHash := keycompute.ComputeEmptyDirectory()
-		emptyDirHash := quantumfs.CreateEmptyDirectory()
-		emptyHash := emptyDirHash.Hash()
-		test.Assert(targetHash == emptyHash,
-			"EmptyDirKey has changed without datastore hash: %s vs %s",
-			hex.EncodeToString(targetHash[:]),
-			hex.EncodeToString(emptyHash[:]))
-
-		targetHash = keycompute.ComputeEmptyBlock()
-		emptyHash = quantumfs.CreateEmptyBlock().Hash()
-		test.Assert(targetHash == emptyHash,
-			"EmptyBlockKey has changed without datastore hash: %s vs %s",
-			hex.EncodeToString(targetHash[:]),
-			hex.EncodeToString(emptyHash[:]))
-
-		targetHash = keycompute.ComputeEmptyWorkspace()
-		emptyHash = quantumfs.CreateEmptyWorkspace(emptyDirHash).Hash()
-		test.Assert(targetHash == emptyHash,
-			"EmptyWorkspaceKey has changed without datastore hash: "+
-				"%s vs %s", hex.EncodeToString(targetHash[:]),
-			hex.EncodeToString(emptyHash[:]))
-	})
-}

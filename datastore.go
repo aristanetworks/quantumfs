@@ -572,7 +572,7 @@ func decodeHashConstant(hash string) [ObjectKeyLength - 1]byte {
 // The key of the directory with no entries
 var EmptyDirKey ObjectKey
 
-func CreateEmptyDirectory() ObjectKey {
+func createEmptyDirectory() ObjectKey {
 	_, emptyDir := NewDirectoryEntry(MaxDirectoryRecords())
 
 	bytes := emptyDir.Bytes()
@@ -586,7 +586,7 @@ func CreateEmptyDirectory() ObjectKey {
 // The key of the datablock with zero length
 var EmptyBlockKey ObjectKey
 
-func CreateEmptyBlock() ObjectKey {
+func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
 	hash := decodeHashConstant("30f9a5e6242f1695e006ebf1f4bd0868824d627b")
@@ -783,7 +783,7 @@ func (wsr *WorkspaceRoot) SetUserLayer(key ObjectKey) {
 // The key of the workspace with no contents
 var EmptyWorkspaceKey ObjectKey
 
-func CreateEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
+func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 	emptyWorkspace := NewWorkspaceRoot()
 	emptyWorkspace.SetBaseLayer(emptyDirKey)
 	emptyWorkspace.SetVcsLayer(emptyDirKey)
@@ -1335,7 +1335,7 @@ func calcMaxNumExtendedAttributes(maxSize int) int {
 	attrs1 := newExtendedAttributesAttrs(1)
 	// setup the pointers in ExtendedAttribute to practical max values
 	attrs1.SetAttribute(0, string(make([]byte, MaxXAttrnameLength)),
-		CreateEmptyBlock())
+		createEmptyBlock())
 	size1attrs := len(attrs1.Bytes())
 
 	return (maxSize - size0attrs) / (size1attrs - size0attrs)
@@ -1348,7 +1348,7 @@ func calcMaxDirectoryRecords(maxSize int) int {
 	// setup the pointers in DirectRecord to practical max values
 	record := NewDirectoryRecord()
 	record.SetFilename(string(make([]byte, MaxFilenameLength)))
-	record.SetExtendedAttributes(CreateEmptyBlock())
+	record.SetExtendedAttributes(createEmptyBlock())
 
 	dir1 := newDirectoryEntryRecords(1)
 	dir1.dir.Entries().Set(0, record.record)
@@ -1363,7 +1363,7 @@ func calcMaxBlocksLargeFile(maxSize int) int {
 
 	mb1 := NewMultiBlockFile(1)
 	// all keys are of same size so use any key
-	mb1.SetListOfBlocks([]ObjectKey{CreateEmptyBlock()})
+	mb1.SetListOfBlocks([]ObjectKey{createEmptyBlock()})
 	size1keys := len(mb1.Bytes())
 
 	return (maxSize - size0keys) / (size1keys - size0keys)
@@ -1406,9 +1406,9 @@ func init() {
 			MaxBlockSize))
 	}
 
-	emptyDirKey := CreateEmptyDirectory()
-	emptyBlockKey := CreateEmptyBlock()
-	emptyWorkspaceKey := CreateEmptyWorkspace(emptyDirKey)
+	emptyDirKey := createEmptyDirectory()
+	emptyBlockKey := createEmptyBlock()
+	emptyWorkspaceKey := createEmptyWorkspace(emptyDirKey)
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
