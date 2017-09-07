@@ -1595,5 +1595,12 @@ func TestRefreshDualInstances(t *testing.T) {
 		test.waitForNRefresh(workspaceName, 2)
 		test.verifyContentStartsWith(file, content)
 		file.Close()
+
+		// Now delete the file in workspace1 and make sure it
+		// is reflected in workspace0
+		test.removeFile(workspace1, name)
+		test.AssertNoErr(api1.SyncAll())
+		test.waitForNRefresh(workspaceName, 3)
+		test.assertNoFile(workspace0 + "/" + name)
 	})
 }
