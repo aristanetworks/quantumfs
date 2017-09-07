@@ -77,8 +77,8 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	rootId, nonce, err := c.workspaceDB.FetchAndSubscribeWorkspace(&c.Ctx,
 		typespace, namespace, workspace)
 	if err != nil {
-		utils.Assert(err == nil, "Failed to fetch workspace rootId: %s",
-			err.Error())
+		c.vlog("workspace %s is removed remotely", workspaceName)
+		return nil, nil
 	}
 
 	c.vlog("Workspace Loading %s %s", workspaceName, rootId.String())
@@ -518,27 +518,32 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 func (wsr *WorkspaceRoot) refresh(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
+	// Lock the tree while acquiring the publishedRootId to prevent
+	// working with a stale publishedRootId
+	defer wsr.LockTree().Unlock()
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
+	workspaceName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
 	if nonce != wsr.nonce {
-		c.dlog("Not refreshing workspace %s/%s/%s due to mismatching "+
-			"nonces %d vs %d", wsr.typespace, wsr.namespace,
-			wsr.workspace, wsr.nonce, nonce)
+		c.dlog("Not refreshing workspace %s due to mismatching "+
+			"nonces %d vs %d", workspaceName, wsr.nonce, nonce)
 		return
 	}
-	func() {
-		defer c.qfs.mutabilityLock.Lock().Unlock()
-		utils.Assert(c.qfs.workspaceMutability[wsr.workspace] !=
-			workspaceMutable,
-			"Cannot handle mutable workspaces yet")
-	}()
 
-	c.vlog("Workspace Refreshing %s/%s/%s rootid: %s -> %s",
-		wsr.typespace, wsr.namespace, wsr.workspace,
+	if wsr.publishedRootId.IsEqualTo(publishedRootId) {
+		c.dlog("Not refreshing workspace %s as there has been no updates",
+			workspaceName)
+		return
+	}
+
+	if c.qfs.workspaceIsMutable(c, wsr) {
+		c.vlog("Workspace %s mutable", workspaceName)
+		return
+	}
+	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
-	defer wsr.LockTree().Unlock()
 	wsr.refreshTo_(c, publishedRootId)
 	wsr.publishedRootId = publishedRootId
 }

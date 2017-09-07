@@ -531,11 +531,6 @@ func (test *testHelper) advanceWorkspace(workspace string,
 	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 		wsNamespaceName, wsWorkspaceName, nonce, src, dst)
 	test.AssertNoErr(err)
-
-	wsr, cleanup := test.getWorkspaceRoot(workspace)
-	defer cleanup()
-	test.Assert(wsr != nil, "workspace root does not exist")
-	wsr.publishedRootId = dst
 }
 
 // Sync the workspace, perform the nosync_op, then sync the workspace again,
