@@ -4,7 +4,6 @@
 package walker
 
 import (
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
-	"github.com/aristanetworks/quantumfs/utils/keycompute"
 )
 
 // The steps followed are the same in all the tests:
