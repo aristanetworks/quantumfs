@@ -248,6 +248,10 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		// Hardlink itself cannot be.
 		test.WaitToBeUninstantiated(dirInode)
 
+		// Now that dirInode is uninstantiated, retry syncing to make
+		// sure this time the linkInode will prevent the uninstantiation
+		test.SyncWorkspace(test.RelPath(workspace))
+
 		// Even though the directory "parent" should have been
 		// uninstantiated, the WorkspaceRoot must not have been
 		// uninstantiated because the hardlink is instantiated.
