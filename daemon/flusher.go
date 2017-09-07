@@ -320,14 +320,13 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 		go func() {
 			nc := c.flusherCtx()
 			defer flusher.lock.Lock().Unlock()
-			// KICK start the flusher
-			dq.TryCommand_(nc, KICK)
 			dq.flush_(nc)
 			close(dq.done)
 			delete(flusher.dqs, treelock)
 		}()
-	} else {
-		dq.TryCommand_(c, KICK)
 	}
+	// N.B. dq might be nil if the flusher goroutines are ABORTed,
+	// ABORT is not currently used anywhere, therefore dq must not be nil
+	dq.TryCommand_(c, KICK)
 	return dirtyElement
 }
