@@ -16,24 +16,38 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-func markImmutable(ctx *ctx, workspace string) {
+func (test *testHelper) markImmutable(ctx *ctx, workspace string) {
+	defer ctx.FuncIn("markImmutable", "%s", workspace).Out()
 	defer ctx.qfs.mutabilityLock.Lock().Unlock()
+	_, exists := ctx.qfs.workspaceMutability[workspace]
+	test.Assert(exists, "bad workspace name %s", workspace)
 	ctx.qfs.workspaceMutability[workspace] = workspaceImmutable
 }
 
-func markMutable(ctx *ctx, workspace string) {
+func (test *testHelper) markMutable(ctx *ctx, workspace string) {
+	defer ctx.FuncIn("markMutable", "%s", workspace).Out()
 	defer ctx.qfs.mutabilityLock.Lock().Unlock()
+	_, exists := ctx.qfs.workspaceMutability[workspace]
+	test.Assert(exists, "bad workspace name %s", workspace)
 	ctx.qfs.workspaceMutability[workspace] = workspaceMutable
 }
 
-// The caller must hold the tree lock
-func refreshTo_(c *ctx, test *testHelper, workspace string,
-	dst quantumfs.ObjectKey) {
+func (th *testHelper) waitForNRefresh(workspace string, n int) {
+	th.WaitForNLogStrings(fmt.Sprintf("Workspace Refreshing %s", workspace), n,
+		"Workspace not refreshed")
+	th.WaitForNLogStrings("Out-- WorkspaceRoot::refresh", n,
+		"Workspace refresh not finished")
+}
 
-	wsr, cleanup := test.getWorkspaceRoot(workspace)
-	defer cleanup()
-	test.Assert(wsr != nil, "workspace root does not exist")
-	wsr.refreshTo_(c, dst)
+func (th *testHelper) waitForRefreshTo(workspace string, dst quantumfs.ObjectKey) {
+	msg := fmt.Sprintf("Refresh to %s", dst.String())
+	th.WaitFor(msg, func() bool {
+		wsr, cleanup := th.getWorkspaceRoot(workspace)
+		defer cleanup()
+		th.Assert(wsr != nil, "workspace root does not exist")
+		th.Log("Published root is %s", wsr.publishedRootId.String())
+		return wsr.publishedRootId.IsEqualTo(dst)
+	})
 }
 
 func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
@@ -41,14 +55,17 @@ func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 
 	ts, ns, ws := test.getWorkspaceComponents(workspace)
 	_, nonce := test.workspaceRootId(ts, ns, ws)
+	workspaceName := ts + "/" + ns + "/" + ws
 
-	markImmutable(ctx, workspace)
-	wsr, cleanup := test.getWorkspaceRoot(workspace)
+	_, cleanup := test.getWorkspaceRoot(workspace)
+	// This will prevent the workspace from getting uninstantiated and
+	// losing the updates
 	defer cleanup()
-	defer wsr.LockTree().Unlock()
+
+	test.markImmutable(ctx, workspaceName)
 	test.advanceWorkspace(workspace, nonce, src, dst)
-	refreshTo_(ctx, test, workspace, dst)
-	markMutable(ctx, workspace)
+	test.waitForRefreshTo(workspaceName, dst)
+	test.markMutable(ctx, workspaceName)
 }
 
 func refreshTest(ctx *ctx, test *testHelper, workspace string,
@@ -57,14 +74,12 @@ func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	ts, ns, ws := test.getWorkspaceComponents(workspace)
 	_, nonce := test.workspaceRootId(ts, ns, ws)
 
-	markImmutable(ctx, workspace)
-	wsr, cleanup := test.getWorkspaceRoot(workspace)
-	defer cleanup()
-	defer wsr.LockTree().Unlock()
+	workspaceName := ts + "/" + ns + "/" + ws
+	test.markImmutable(ctx, workspaceName)
 	test.remountFilesystem()
-	test.advanceWorkspace(workspace, nonce, src, dst)
-	refreshTo_(ctx, test, workspace, dst)
-	markMutable(ctx, workspace)
+	test.advanceWorkspace(workspaceName, nonce, src, dst)
+	test.waitForRefreshTo(workspaceName, dst)
+	test.markMutable(ctx, workspaceName)
 }
 
 func TestRefreshFileAddition(t *testing.T) {
@@ -79,28 +94,6 @@ func TestRefreshFileAddition(t *testing.T) {
 		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
 
 		test.removeFile(workspace, name)
-	})
-}
-
-func TestRefreshUnchanged(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-		name := "testFile"
-		ctx := test.TestCtx()
-
-		newRootId1 := test.createFileSync(workspace, name, 1000)
-
-		markImmutable(ctx, workspace)
-		wsr, cleanup := test.getWorkspaceRoot(workspace)
-		defer cleanup()
-		defer wsr.LockTree().Unlock()
-		test.remountFilesystem()
-		refreshTo_(ctx, test, workspace, newRootId1)
-		markMutable(ctx, workspace)
-
-		newRootId2 := test.getRootId(workspace)
-		test.Assert(newRootId2.IsEqualTo(newRootId1),
-			"Refresh to current rootId must be a noop")
 	})
 }
 
@@ -241,6 +234,7 @@ func TestRefreshOrphanedHardlinkContentCheck(t *testing.T) {
 
 		newRootId1 := test.createFileSync(workspace, "otherfile", 1000)
 		CreateHardlink(fullName, content)
+		test.SyncAllWorkspaces()
 		newRootId2 := test.getRootId(workspace)
 
 		file, err := os.OpenFile(fullName, os.O_RDWR, 0777)
@@ -965,8 +959,7 @@ func GenTestRefreshType_HardlinkToSmall2MediumAndLarge(
 		test.AssertNoErr(err)
 		test.verifyContentStartsWith(file2, content1)
 
-		refreshTestNoRemount(ctx, test, workspace, newRootId1,
-			newRootId2)
+		refreshTestNoRemount(ctx, test, workspace, newRootId1, newRootId2)
 
 		// The hardlink inode must be claimed by file1
 		test.verifyContentStartsWith(file1, content2)
@@ -1299,8 +1292,7 @@ func GenTestRefresh_Hardlink2HardlinkWithFileIdChange(
 		file2, err := os.OpenFile(fullLinkName, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
 
-		refreshTestNoRemount(ctx, test, workspace, newRootId2,
-			newRootId1)
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 
 		// The orphan files must have the old content
 		test.verifyContentStartsWith(file1, content2)
@@ -1393,8 +1385,7 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		file2, err := os.OpenFile(fullLinkName, os.O_RDWR, 0777)
 		test.AssertNoErr(err)
 
-		refreshTestNoRemount(ctx, test, workspace, newRootId2,
-			newRootId1)
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
 
 		test.verifyContentStartsWith(file1, content1)
 		test.AssertNoErr(file1.Close())
@@ -1566,5 +1557,50 @@ func TestRefreshMoveSmallFileToHardlinkToSmallFileAndBack(t *testing.T) {
 
 		test.assertNoFile(fullName)
 		test.removeFile(workspace, name+".tmp")
+	})
+}
+
+func TestRefreshDualInstances(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0 := test.NewWorkspace()
+		c := test.TestCtx()
+		mnt1 := test.qfsInstances[1].config.MountPath + "/"
+		workspaceName := test.RelPath(workspace0)
+		workspace1 := mnt1 + workspaceName
+		name := "testFile"
+
+		test.markImmutable(c, workspaceName)
+		api1, err := quantumfs.NewApiWithPath(mnt1 + "api")
+		test.AssertNoErr(err)
+		defer api1.Close()
+		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+		test.assertNoFile(workspace0 + "/" + name)
+
+		// create a file in the second instance
+		test.createFile(workspace1, name, 1000)
+		test.AssertNoErr(api1.SyncAll())
+
+		test.waitForNRefresh(workspaceName, 1)
+
+		// the file should appear in the first instance now
+		file, err := os.OpenFile(workspace0+"/"+name, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+
+		// overwrite the content of the file in workspace1
+		content := "content to be verified"
+		test.AssertNoErr(CreateSmallFile(workspace1+"/"+name, content))
+		test.AssertNoErr(api1.SyncAll())
+
+		test.waitForNRefresh(workspaceName, 2)
+		test.verifyContentStartsWith(file, content)
+		file.Close()
+
+		// Now delete the file in workspace1 and make sure it
+		// is reflected in workspace0
+		test.removeFile(workspace1, name)
+		test.AssertNoErr(api1.SyncAll())
+		test.waitForNRefresh(workspaceName, 3)
+		test.assertNoFile(workspace0 + "/" + name)
 	})
 }
