@@ -12,10 +12,10 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -498,21 +498,55 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 func TestWorkspaceDeletion(t *testing.T) {
 	runTestCustomConfig(t, cacheTimeout100Ms, func(test *testHelper) {
 		api := test.getApi()
-
 		ws1 := test.NewWorkspace()
 		ws2 := test.NewWorkspace()
 
-		err := api.DeleteWorkspace(test.RelPath(ws1))
-		test.Assert(err == nil, "Failed to delete workspace: %v", err)
+		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(ws1)))
 
-		time.Sleep(200 * time.Millisecond)
+		test.assertNoFile(ws1)
+		test.assertFileExists(ws2)
+	})
+}
 
-		var stat syscall.Stat_t
-		err = syscall.Stat(ws1, &stat)
-		test.Assert(err != nil, "Workspace1 not deleted")
+func TestWorkspaceDeletionSameNamespaceInstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+		ws0 := test.NewWorkspace()
+		wsName0 := test.RelPath(ws0)
+		parts := strings.Split(wsName0, "/")
+		wsName1 := parts[0] + "/" + parts[1] + "/_branched"
+		test.AssertNoErr(api.Branch(wsName0, wsName1))
+		ws1 := test.AbsPath(wsName1)
+		test.assertFileExists(ws1)
 
-		err = syscall.Stat(ws2, &stat)
-		test.Assert(err == nil, "Workspace2 deleted: %v", err)
+		_, cleanup := test.getWorkspaceRoot(wsName1)
+		// The workspace is instantiated, so handleDeletedWorkspace
+		// will be called
+		defer cleanup()
+
+		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(ws1)))
+		test.assertFileExists(ws0)
+		test.WaitForLogString("Out-- Mux::handleDeletedWorkspace",
+			"handleDeletedWorkspace to finish")
+		test.assertNoFile(ws1)
+	})
+}
+
+func TestWorkspaceDeletionSameNamespaceUninstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+		ws0 := test.NewWorkspace()
+		wsName0 := test.RelPath(ws0)
+		parts := strings.Split(wsName0, "/")
+		wsName1 := parts[0] + "/" + parts[1] + "/_branched"
+		test.AssertNoErr(api.Branch(wsName0, wsName1))
+		ws1 := test.AbsPath(wsName1)
+		test.assertFileExists(ws1)
+		test.remountFilesystem()
+		api = test.getApi()
+		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(ws1)))
+		test.assertFileExists(ws0)
+		test.assertNoFile(ws1)
 	})
 }
 

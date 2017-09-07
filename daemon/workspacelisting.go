@@ -209,6 +209,7 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 			// naturally.
 			delete(*inodeMap, name)
 			delete(*nameMap, id)
+			c.qfs.handleMetaInodeRemoval(c, id, name, parent.inodeNum())
 		}
 	}
 }
@@ -352,14 +353,14 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 			break
 		}
 	}
+
+	defer tsl.Lock().Unlock()
+	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
+
 	if !exists {
 		return fuse.ENOENT
 	}
-
 	c.vlog("Typespace exists")
-	defer tsl.Lock().Unlock()
-
-	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
 
 	inodeNum := tsl.typespacesByName[name]
 	c.qfs.increaseLookupCount(c, inodeNum)
@@ -678,14 +679,13 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 			break
 		}
 	}
+	defer nsl.Lock().Unlock()
+	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
+
 	if !exists {
 		return fuse.ENOENT
 	}
-
 	c.vlog("Namespace exists")
-	defer nsl.Lock().Unlock()
-
-	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
 
 	inodeNum := nsl.namespacesByName[name]
 	c.qfs.increaseLookupCount(c, inodeNum)
@@ -991,14 +991,14 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 	for name, info := range wsl.workspacesByName {
 		wsdbNonce, exists := names[name]
 		if !exists || wsdbNonce != info.nonce {
-			c.vlog("Removing deleted child %s (%d)", name,
-				info.nonce)
+			c.vlog("Removing deleted child %s (%d)", name, info.nonce)
 
 			// Note: do not uninstantiate them now - remove them
-			// from their parents and let the kernel forget them
-			// naturally.
+			// from their parents
 			delete(wsl.workspacesByName, name)
 			delete(wsl.workspacesById, info.id)
+			c.qfs.handleMetaInodeRemoval(c, info.id, name,
+				wsl.inodeNum())
 		}
 	}
 
@@ -1069,14 +1069,13 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 			break
 		}
 	}
+	defer wsl.Lock().Unlock()
+	wsl.updateChildren(c, workspaces)
+
 	if !exists {
 		return fuse.ENOENT
 	}
-
 	c.vlog("Workspace exists")
-	defer wsl.Lock().Unlock()
-
-	wsl.updateChildren(c, workspaces)
 
 	inodeInfo := wsl.workspacesByName[name]
 	c.qfs.increaseLookupCount(c, inodeInfo.id)
