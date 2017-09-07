@@ -537,7 +537,7 @@ func TestKeysMatch(t *testing.T) {
 		emptyHash = quantumfs.CreateEmptyWorkspace(emptyDirHash).Hash()
 		test.Assert(targetHash == emptyHash,
 			"EmptyWorkspaceKey has changed without datastore hash: "+
-			"%s vs %s", hex.EncodeToString(targetHash[:]),
+				"%s vs %s", hex.EncodeToString(targetHash[:]),
 			hex.EncodeToString(emptyHash[:]))
 	})
 }
