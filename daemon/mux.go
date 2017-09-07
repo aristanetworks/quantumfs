@@ -287,9 +287,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
 		state.Nonce).Out()
 
-	// Due to BUG210141 this code is disabled.
-	return
-
+	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	defer cleanup()
@@ -303,16 +301,13 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		// TODO At this point the workpace should be locked, flushed/synced
 		// and finally have the newly produced local RootID merged with the
 		// remote incoming RootID.
-		c.elog("Refreshing mutable workspaces is not supported")
+		c.vlog("Refreshing mutable workspaces is not supported")
 		return
 	}
 
 	// TODO This should probably call wsr.refreshTo() and provide the new rootId
-	// instead of refetching from the workspaceDB. Also, calling a plain refresh
-	// here causes many tests to fail due to a divide by zero error in
-	// MultiBlockFile.blockIdxInfo().
-	//
-	// wsr.refresh(c)
+	// instead of refetching from the workspaceDB.
+	wsr.refresh(c)
 }
 
 func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {

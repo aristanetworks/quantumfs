@@ -249,6 +249,10 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
 			if inode != nil {
 				reload(c, wsr, rc, inode, loadRecord.remoteRecord)
+				status := c.qfs.invalidateInode(loadRecord.inodeId)
+				utils.Assert(status == fuse.OK,
+					"invalidating %d failed with %d",
+					loadRecord.inodeId, status)
 			}
 		}
 	}
