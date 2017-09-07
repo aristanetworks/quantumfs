@@ -5,6 +5,7 @@ PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
 PKGS_TO_TEST+=quantumfs/grpc/server
+PKGS_TO_TEST+=quantumfs/cmd/qupload
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 

@@ -32,7 +32,7 @@ type FlushCmd int
 const (
 	KICK = FlushCmd(iota)
 	QUIT
-	ABORT
+	ABORT // N.B. ABORT is unused at the moment
 )
 
 type DirtyQueue struct {
@@ -201,9 +201,6 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 		flushAll := false
 		switch cmd {
 		case KICK:
-			if c.qfs.flusher.skip {
-				continue
-			}
 		case QUIT:
 			flushAll = true
 		case ABORT:
@@ -219,14 +216,11 @@ type Flusher struct {
 	// this is an easy way to sort Inodes by workspace.
 	dqs  map[*TreeLock]*DirtyQueue
 	lock utils.DeferableMutex
-	// Set to true to disable timer based flushing. Use for tests only
-	skip bool
 }
 
 func NewFlusher() *Flusher {
 	dqs := Flusher{
-		dqs:  make(map[*TreeLock]*DirtyQueue),
-		skip: false,
+		dqs: make(map[*TreeLock]*DirtyQueue),
 	}
 	return &dqs
 }
@@ -246,11 +240,7 @@ func (flusher *Flusher) sync(c *ctx, force bool, workspace string) error {
 				!strings.HasPrefix(workspace, dq.name) {
 				continue
 			}
-			if force || !flusher.skip {
-				err = dq.TryCommand_(c, QUIT)
-			} else {
-				err = dq.TryCommand_(c, ABORT)
-			}
+			err = dq.TryCommand_(c, QUIT)
 			if err != nil {
 				c.vlog("failed to send cmd to dirtyqueue")
 				return

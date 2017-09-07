@@ -24,13 +24,16 @@ import (
 )
 
 type Server struct {
-	server *grpc.Server
-	Error  chan error // Error after serving ceases
+	server  *grpc.Server
+	backend quantumfs.WorkspaceDB
+	Error   chan error // Error after serving ceases
 }
 
 func (server *Server) Stop() error {
 	server.server.Stop()
-	return <-server.Error
+	err := <-server.Error
+	close(server.Error)
+	return err
 }
 
 type workspaceState struct {
@@ -48,9 +51,21 @@ type workspaceState struct {
 func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 	config string) (*Server, error) {
 
+	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
+	if err != nil {
+		logger.Log(qlog.LogWorkspaceDb, 0, 0,
+			"Failed to instantiate backend: %s", err.Error())
+		return nil, err
+	}
+
+	return startWorkspaceDbdWithBackend(logger, port, wsdb)
+}
+
+func startWorkspaceDbdWithBackend(logger *qlog.Qlog, port uint16,
+	backend quantumfs.WorkspaceDB) (*Server, error) {
+
 	logger.Log(qlog.LogWorkspaceDb, 0, 2,
-		"Starting grpc WorkspaceDB Server on port %d against backend %s",
-		port, backend)
+		"Starting grpc WorkspaceDB Server on port %d", port)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -68,25 +83,22 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 		}),
 	}
 
-	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
-	if err != nil {
-		logger.Log(qlog.LogWorkspaceDb, 0, 0,
-			"Failed to instantiate backend: %s", err.Error())
-		return nil, err
-	}
-
-	m := newMux(wsdb, logger)
+	m := newMux(backend, logger)
 
 	grpcServer := grpc.NewServer(connOptions...)
 	rpc.RegisterWorkspaceDbServer(grpcServer, m)
 
 	s := &Server{
-		server: grpcServer,
-		Error:  make(chan error),
+		server:  grpcServer,
+		backend: backend,
+		Error:   make(chan error),
 	}
+
+	wait := make(chan struct{})
 
 	go func() {
 		logger.Log(qlog.LogWorkspaceDb, 0, 2, "Serving clients")
+		close(wait)
 		err := grpcServer.Serve(listener)
 		s.Error <- err
 
@@ -99,6 +111,8 @@ func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 				err.Error())
 		}
 	}()
+
+	<-wait
 
 	return s, nil
 }
@@ -419,6 +433,9 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 
 	for {
 		select {
+		case <-stream.Context().Done():
+			c.vlog("Client cancelled")
+			return nil
 		case change := <-changes:
 			c.vlog("Received update for %s", change.name)
 			update := rpc.WorkspaceUpdate{
@@ -434,7 +451,7 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 			}
 			err := stream.Send(&update)
 			if err != nil {
-				c.vlog("Recevied stream send error: %s", err.Error())
+				c.vlog("Received stream send error: %s", err.Error())
 				return err
 			}
 		}
@@ -480,7 +497,7 @@ func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestI
 
 	for clientName, _ := range subscriptions {
 		if client, ok := m.clients[clientName]; ok {
-			c.vlog("Sending update to client %s", clientName)
+			c.vlog("Sending update to client %s", string(clientName))
 			client <- update
 		}
 	}
