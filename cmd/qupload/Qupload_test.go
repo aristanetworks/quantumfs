@@ -11,6 +11,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils/excludespec"
 	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 )
@@ -105,6 +106,14 @@ func TestHardlinks(t *testing.T) {
 		// create files to compare
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 
+		// setup exclude to ignore the api file
+		test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
+			"api"))
+		var err error
+		exInfo, err = excludespec.LoadExcludeInfo(workspace,
+			test.TempDir+"/exInfo")
+		test.AssertNoErr(err)
+
 		// upload them
 		dataStore = test.GetDataStore()
 		wsDB = test.GetWorkspaceDB()
@@ -114,8 +123,7 @@ func TestHardlinks(t *testing.T) {
 		cliParams.ws = "test/test/quploaded"
 		cliParams.conc = 10
 		cliParams.baseDir = workspace
-		test.AssertNoErr(upload(ctx, &cliParams, "",
-			exInfo))
+		test.AssertNoErr(upload(ctx, &cliParams, "", exInfo))
 
 		// now check that the uploaded workspace is the same
 	})
