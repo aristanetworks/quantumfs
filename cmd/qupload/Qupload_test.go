@@ -96,3 +96,27 @@ func TestFileMatches(t *testing.T) {
 			})
 	})
 }
+
+func TestHardlinks(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		directory := workspace + "/dirA/dirB"
+
+		// create files to compare
+		test.AssertNoErr(os.MkdirAll(directory, 0777))
+
+		// upload them
+		dataStore = test.GetDataStore()
+		wsDB = test.GetWorkspaceDB()
+		ctx := newCtx("")
+		ctx.Qctx = &test.TestCtx().Ctx
+		var cliParams params
+		cliParams.ws = "test/test/quploaded"
+		cliParams.conc = 10
+		cliParams.baseDir = workspace
+		test.AssertNoErr(upload(ctx, &cliParams, "",
+			exInfo))
+
+		// now check that the uploaded workspace is the same
+	})
+}

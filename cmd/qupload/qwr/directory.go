@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
