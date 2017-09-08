@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"math/rand"
 	"reflect"
 	"runtime/debug"
 	"strings"
@@ -56,9 +55,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		},
 	}
 
-	randSeed := time.Now().UnixNano()
-	qfs.c.vlog("Random seed: %d", randSeed)
-	rand.Seed(randSeed)
+	qfs.c.vlog("Random seed: %d", quantumfs.RandomSeed)
 
 	qfs.c.qfs = qfs
 
