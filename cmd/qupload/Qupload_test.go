@@ -6,7 +6,9 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -98,33 +100,54 @@ func TestFileMatches(t *testing.T) {
 	})
 }
 
+func (test *testHelper) checkQuploadMatches(workspace string) {
+	workspaceB := "test/test/quploaded"
+
+	// setup exclude to ignore the api file
+	test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
+		"api"))
+	var err error
+	exInfo, err = excludespec.LoadExcludeInfo(workspace,
+		test.TempDir+"/exInfo")
+	test.AssertNoErr(err)
+
+	// trigger upload
+	dataStore = test.GetDataStore()
+	wsDB = test.GetWorkspaceDB()
+	ctx := newCtx("")
+	ctx.Qctx = &test.TestCtx().Ctx
+	var cliParams params
+	cliParams.ws = workspaceB
+	cliParams.conc = 10
+	cliParams.baseDir = workspace
+	test.AssertNoErr(upload(ctx, &cliParams, "", exInfo))
+
+	// now check that the uploaded workspace is the same
+	checkCmd := exec.Command("rsync", "-nHvrc", "--delete",
+		workspace+"/", test.TempDir+"/mnt/"+workspaceB+"/")
+
+	output, err := checkCmd.CombinedOutput()
+	test.AssertNoErr(err)
+	outputLines := strings.Split(string(output), "\n")
+
+	// If there are no differences, the output will be only 5 lines long
+	test.Assert(len(outputLines) == 5, "Difference in qupload: %s",
+		output)
+}
+
 func TestHardlinks(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		directory := workspace + "/dirA/dirB"
 
 		// create files to compare
+		directory := workspace + "/dirA/dirB"
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 
-		// setup exclude to ignore the api file
-		test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
-			"api"))
-		var err error
-		exInfo, err = excludespec.LoadExcludeInfo(workspace,
-			test.TempDir+"/exInfo")
-		test.AssertNoErr(err)
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/linkA",
+			"sample data"))
+		//test.AssertNoErr(os.Link(workspace+"/dirA/linkA",
+	//		workspace+"/dirA/dirB/linkB"))
 
-		// upload them
-		dataStore = test.GetDataStore()
-		wsDB = test.GetWorkspaceDB()
-		ctx := newCtx("")
-		ctx.Qctx = &test.TestCtx().Ctx
-		var cliParams params
-		cliParams.ws = "test/test/quploaded"
-		cliParams.conc = 10
-		cliParams.baseDir = workspace
-		test.AssertNoErr(upload(ctx, &cliParams, "", exInfo))
-
-		// now check that the uploaded workspace is the same
+		test.checkQuploadMatches(workspace)
 	})
 }
