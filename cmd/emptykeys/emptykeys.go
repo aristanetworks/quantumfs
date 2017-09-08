@@ -8,47 +8,16 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/hash"
+	"github.com/aristanetworks/quantumfs/utils/keycompute"
 )
 
 func main() {
-	computeEmptyBlock()
-	emptyDir := computeEmptyDirectory()
-	computeEmptyWorkspace(emptyDir)
+	printHash(keycompute.ComputeEmptyBlock(), "block")
+	printHash(keycompute.ComputeEmptyDirectory(), "directory")
+	printHash(keycompute.ComputeEmptyWorkspace(), "workspace")
 }
 
 func printHash(hash [hash.HashSize]byte, name string) {
 	fmt.Printf("Empty %s hash: %s\n", name, hex.EncodeToString(hash[:]))
-}
-
-func computeEmptyBlock() {
-	var bytes []byte
-
-	hash := hash.Hash(bytes)
-	printHash(hash, "block")
-}
-
-func computeEmptyDirectory() [hash.HashSize]byte {
-	_, emptyDir := quantumfs.NewDirectoryEntry(quantumfs.MaxDirectoryRecords())
-	data := emptyDir.Bytes()
-	hash := hash.Hash(data)
-
-	printHash(hash, "directory")
-	return hash
-}
-
-func computeEmptyWorkspace(emptyDir [hash.HashSize]byte) {
-	emptyDirKey := quantumfs.NewObjectKey(quantumfs.KeyTypeMetadata, emptyDir)
-
-	emptyWorkspace := quantumfs.NewWorkspaceRoot()
-	emptyWorkspace.SetBaseLayer(emptyDirKey)
-	emptyWorkspace.SetVcsLayer(emptyDirKey)
-	emptyWorkspace.SetBuildLayer(emptyDirKey)
-	emptyWorkspace.SetUserLayer(emptyDirKey)
-
-	bytes := emptyWorkspace.Bytes()
-	hash := hash.Hash(bytes)
-
-	printHash(hash, "workspace")
 }
