@@ -236,10 +236,11 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	if inode == nil {
 		return
 	}
-	if inode.isOrphaned() {
+	defer inode.getParentLock().Lock().Unlock()
+	if inode.isOrphaned_() {
 		return
 	}
-	inode.orphan(c, &quantumfs.DirectRecord{})
+	inode.orphan_(c, &quantumfs.DirectRecord{})
 }
 
 func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
