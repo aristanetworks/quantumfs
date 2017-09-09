@@ -135,7 +135,7 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 		output)
 }
 
-func TestHardlinks(t *testing.T) {
+func TestFilesAndDir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
@@ -143,10 +143,8 @@ func TestHardlinks(t *testing.T) {
 		directory := workspace + "/dirA/dirB"
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 
-		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/linkA",
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
 			"sample data"))
-		//test.AssertNoErr(os.Link(workspace+"/dirA/linkA",
-	//		workspace+"/dirA/dirB/linkB"))
 
 		test.checkQuploadMatches(workspace)
 	})
