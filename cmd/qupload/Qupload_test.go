@@ -29,10 +29,12 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 	_, c.eCtx = errgroup.WithContext(context.Background())
 
 	fromWalker := make(chan *pathInfo, 100)
+	up := NewUploader()
 
 	err = filepath.Walk(checkPath,
 		func(path string, info os.FileInfo, err error) error {
-			return pathWalker(&c, fromWalker, path, checkPath, info, err)
+			return up.pathWalker(&c, fromWalker, path, workspace, info,
+				err)
 		})
 	th.AssertNoErr(err)
 
