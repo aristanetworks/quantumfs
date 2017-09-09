@@ -58,26 +58,34 @@ type dirEntryTracker struct {
 	root    bool
 }
 
-var dirEntryTrackers = make(map[string]*dirEntryTracker)
-var dirStateMutex utils.DeferableMutex
-var topDirRecord quantumfs.DirectoryRecord
-var rootTracker = true
-
-func setupDirEntryTracker(path string, info os.FileInfo, recordCount int) {
-	defer dirStateMutex.Lock().Unlock()
-	dirEntryTrackers[path] = &dirEntryTracker{
-		records: make([]quantumfs.DirectoryRecord, 0, recordCount),
-		info:    info,
-		root:    rootTracker,
-	}
-	rootTracker = false
+type Uploader struct {
+	dirEntryTrackers map[string]*dirEntryTracker
+	dirStateMutex    utils.DeferableMutex
+	topDirRecord     quantumfs.DirectoryRecord
 }
 
-func dumpUploadState() {
+func NewUploader() Uploader {
+	return Uploader{
+		dirEntryTrackers: make(map[string]*dirEntryTracker),
+	}
+}
+
+func (up *Uploader) setupDirEntryTracker(path string, root_ string, info os.FileInfo,
+	recordCount int) {
+
+	defer up.dirStateMutex.Lock().Unlock()
+	up.dirEntryTrackers[path] = &dirEntryTracker{
+		records: make([]quantumfs.DirectoryRecord, 0, recordCount),
+		info:    info,
+		root:    path == root_,
+	}
+}
+
+func (up *Uploader) dumpUploadState() {
 	// exclude info
 	fmt.Println(exInfo)
 	// dump paths which have pending writes
-	for path, tracker := range dirEntryTrackers {
+	for path, tracker := range up.dirEntryTrackers {
 		if len(tracker.records) != cap(tracker.records) {
 			fmt.Printf("%q (root: %v) is pending writes\n",
 				path, tracker.root)
@@ -91,16 +99,18 @@ func dumpUploadState() {
 	}
 }
 
-func handleDirRecord(qctx *quantumfs.Ctx,
-	record quantumfs.DirectoryRecord, path string) error {
+func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
+	record quantumfs.DirectoryRecord, path string,
+	handler func(string, *dirEntryTracker) (quantumfs.DirectoryRecord,
+		error)) error {
 
 	var err error
-	defer dirStateMutex.Lock().Unlock()
+	defer up.dirStateMutex.Lock().Unlock()
 
 	for {
-		tracker, ok := dirEntryTrackers[path]
+		tracker, ok := up.dirEntryTrackers[path]
 		if !ok {
-			dumpUploadState()
+			up.dumpUploadState()
 			panic(fmt.Sprintf("Directory state tracker must "+
 				"exist for %q", path))
 		}
@@ -117,7 +127,7 @@ func handleDirRecord(qctx *quantumfs.Ctx,
 		}
 
 		if tracker.root {
-			topDirRecord = record
+			up.topDirRecord = record
 			return nil
 		}
 		// we flushed current dir which could be the last
@@ -155,7 +165,7 @@ func processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecord, error) {
 	}
 }
 
-func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
+func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 	var msg *pathInfo
 
 	for {
@@ -173,7 +183,14 @@ func pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 			return err
 		}
 
-		err = handleDirRecord(c.Qctx, record, filepath.Dir(msg.path))
+		err = up.handleDirRecord(c.Qctx, record, filepath.Dir(msg.path),
+			func(path string,
+				tracker *dirEntryTracker) (quantumfs.DirectoryRecord,
+				error) {
+
+				return qwr.WriteDirectory(c.Qctx, path, tracker.info,
+					tracker.records, dataStore)
+			})
 		if err != nil {
 			return err
 		}
@@ -194,7 +211,7 @@ func relativePath(path string, base string) (string, error) {
 	return checkPath, nil
 }
 
-func pathWalker(c *Ctx, piChan chan<- *pathInfo,
+func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	path string, root string, info os.FileInfo, err error) error {
 
 	// when basedir is "./somebase" or "/somebase" or "somebase" then
@@ -236,7 +253,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		// setup. Hence empty directory is handled by worker to maintain
 		// separation of concerns between walker and worker
 		if expectedDirRecords > 0 {
-			setupDirEntryTracker(path, info, expectedDirRecords)
+			up.setupDirEntryTracker(path, root, info, expectedDirRecords)
 			return nil
 		}
 	}
@@ -260,7 +277,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		}
 		// parentInfo helps in setting up the directory entry
 		// under workspace root
-		setupDirEntryTracker(parent, parentInfo, 1)
+		up.setupDirEntryTracker(parent, root, parentInfo, 1)
 	}
 
 	// send pathInfo to workers
@@ -273,7 +290,7 @@ func pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	return nil
 }
 
-func upload(c *Ctx, cli *params, relpath string,
+func (up *Uploader) upload(c *Ctx, cli *params, relpath string,
 	exInfo *exs.ExcludeInfo) error {
 
 	ws := cli.ws
@@ -291,14 +308,14 @@ func upload(c *Ctx, cli *params, relpath string,
 	// workers
 	for i := uint(0); i < conc; i++ {
 		group.Go(func() error {
-			return pathWorker(c, piChan)
+			return up.pathWorker(c, piChan)
 		})
 	}
 	// walker
 	group.Go(func() error {
 		err := filepath.Walk(root,
 			func(path string, info os.FileInfo, err error) error {
-				return pathWalker(c, piChan, path,
+				return up.pathWalker(c, piChan, path,
 					root, info, err)
 			})
 		close(piChan)
@@ -310,14 +327,14 @@ func upload(c *Ctx, cli *params, relpath string,
 		return err
 	}
 
-	if topDirRecord == nil {
-		dumpUploadState()
+	if up.topDirRecord == nil {
+		up.dumpUploadState()
 		panic("workspace root dir not written yet but all " +
 			"writes to workspace completed. This is unexpected. " +
 			"Use debug dump to diagnose.")
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, topDirRecord.ID(),
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
 		dataStore)
 	if wsrErr != nil {
 		return wsrErr
