@@ -67,11 +67,14 @@ type Uploader struct {
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
+
+	hardlinks *qwr.Hardlinks
 }
 
 func NewUploader() Uploader {
 	return Uploader{
 		dirEntryTrackers: make(map[string]*dirEntryTracker),
+		hardlinks:        qwr.NewHardlinks(),
 	}
 }
 
@@ -150,7 +153,7 @@ func (up *Uploader) processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecor
 		// and metadata for the file in storage
 		c.Vlog("Writing %s", msg.path)
 		record, err := qwr.WriteFile(c.Qctx, up.dataStore, msg.info,
-			msg.path)
+			msg.path, up.hardlinks)
 
 		return record, err
 	} else {
@@ -343,7 +346,7 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 	}
 
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
-		up.dataStore)
+		up.dataStore, up.hardlinks)
 	if wsrErr != nil {
 		return quantumfs.ObjectKey{}, wsrErr
 	}
