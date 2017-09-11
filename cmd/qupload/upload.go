@@ -59,9 +59,14 @@ type dirEntryTracker struct {
 }
 
 type Uploader struct {
+	dataStore	quantumfs.DataStore
+	wsDB		quantumfs.WorkspaceDB
+	exInfo		*exs.ExcludeInfo
+
+	topDirRecord     quantumfs.DirectoryRecord
+
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
-	topDirRecord     quantumfs.DirectoryRecord
 }
 
 func NewUploader() Uploader {
@@ -83,7 +88,7 @@ func (up *Uploader) setupDirEntryTracker(path string, root_ string, info os.File
 
 func (up *Uploader) dumpUploadState() {
 	// exclude info
-	fmt.Println(exInfo)
+	fmt.Println(up.exInfo)
 	// dump paths which have pending writes
 	for path, tracker := range up.dirEntryTrackers {
 		if len(tracker.records) != cap(tracker.records) {
@@ -121,7 +126,7 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 		}
 		qctx.Vlog(qlog.LogTool, "Writing %s", path)
 		record, err = qwr.WriteDirectory(qctx, path, tracker.info,
-			tracker.records, dataStore)
+			tracker.records, up.dataStore)
 		if err != nil {
 			return err
 		}
@@ -136,13 +141,16 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 	}
 }
 
-func processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecord, error) {
+func (up *Uploader) processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecord,
+	error) {
+
 	if !msg.info.IsDir() {
 		// WriteFile() will detect the file type based on
 		// stat information and setup appropriate data
 		// and metadata for the file in storage
 		c.Vlog("Writing %s", msg.path)
-		record, err := qwr.WriteFile(c.Qctx, dataStore, msg.info, msg.path)
+		record, err := qwr.WriteFile(c.Qctx, up.dataStore, msg.info,
+			msg.path)
 
 		return record, err
 	} else {
@@ -178,7 +186,7 @@ func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 			}
 		}
 
-		record, err := processPath(c, msg)
+		record, err := up.processPath(c, msg)
 		if err != nil {
 			return err
 		}
@@ -189,7 +197,7 @@ func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 				error) {
 
 				return qwr.WriteDirectory(c.Qctx, path, tracker.info,
-					tracker.records, dataStore)
+					tracker.records, up.dataStore)
 			})
 		if err != nil {
 			return err
@@ -227,7 +235,7 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	if relErr != nil {
 		return relErr
 	}
-	if exInfo != nil && exInfo.PathExcluded(checkPath) {
+	if up.exInfo != nil && up.exInfo.PathExcluded(checkPath) {
 		if info.IsDir() {
 			return filepath.SkipDir
 		}
@@ -244,8 +252,8 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 			return fmt.Errorf("pathWalker ReadDir error: %v", dirErr)
 		}
 		expectedDirRecords := len(dirEnts)
-		if exInfo != nil {
-			expectedDirRecords = exInfo.RecordCount(checkPath,
+		if up.exInfo != nil {
+			expectedDirRecords = up.exInfo.RecordCount(checkPath,
 				expectedDirRecords)
 		}
 		// Empty directory is like a file with no content
@@ -290,8 +298,7 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	return nil
 }
 
-func (up *Uploader) upload(c *Ctx, cli *params, relpath string,
-	exInfo *exs.ExcludeInfo) error {
+func (up *Uploader) upload(c *Ctx, cli *params, relpath string) error {
 
 	ws := cli.ws
 	aliasWS := cli.alias
@@ -335,11 +342,11 @@ func (up *Uploader) upload(c *Ctx, cli *params, relpath string,
 	}
 
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
-		dataStore)
+		up.dataStore)
 	if wsrErr != nil {
 		return wsrErr
 	}
-	err = uploadCompleted(c.Qctx, wsDB, ws, aliasWS, wsrKey)
+	err = uploadCompleted(c.Qctx, up.wsDB, ws, aliasWS, wsrKey)
 	if err != nil {
 		return err
 	}
@@ -418,20 +425,20 @@ func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
 	return nil
 }
 
-func byPass(c *Ctx, cli *params) error {
+func (up *Uploader) byPass(c *Ctx, cli *params) error {
 
 	ws := cli.ws
 	aliasWS := cli.alias
 	referenceWS := cli.referenceWS
 	refWSParts := strings.Split(referenceWS, "/")
 
-	refKey, _, err := wsDB.Workspace(c.Qctx,
+	refKey, _, err := up.wsDB.Workspace(c.Qctx,
 		refWSParts[0], refWSParts[1], refWSParts[2])
 	if err != nil {
 		return err
 	}
 
-	err = uploadCompleted(c.Qctx, wsDB, ws, aliasWS, refKey)
+	err = uploadCompleted(c.Qctx, up.wsDB, ws, aliasWS, refKey)
 	if err != nil {
 		return err
 	}
