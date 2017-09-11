@@ -122,7 +122,8 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 	cliParams.ws = workspaceB
 	cliParams.conc = 10
 	cliParams.baseDir = workspace
-	test.AssertNoErr(upload(ctx, &cliParams, "", exInfo))
+	up := NewUploader()
+	test.AssertNoErr(up.upload(ctx, &cliParams, "", exInfo))
 
 	// now check that the uploaded workspace is the same
 	checkCmd := exec.Command("rsync", "-nHvrc", "--delete",
