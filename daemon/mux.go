@@ -154,8 +154,8 @@ type QuantumFs struct {
 	workspaceMutability map[string]workspaceState
 }
 
-func (qfs *QuantumFs) SetupServer(mountOptions fuse.MountOptions) error {
-	qfs.c.dlog("QuantumFs::SetupServer Initializing server")
+func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
+	qfs.c.dlog("QuantumFs::Mount Initializing server")
 
 	// Set the common set of required options
 	mountOptions.AllowOther = true
