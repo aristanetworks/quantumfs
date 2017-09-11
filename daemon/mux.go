@@ -166,6 +166,7 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
 	if err != nil {
+		qfs.c.elog("Failed to create new server %s", err.Error())
 		return err
 	}
 
