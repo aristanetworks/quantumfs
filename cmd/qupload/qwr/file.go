@@ -48,7 +48,7 @@ func fileObjectInfo(path string,
 
 func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	finfo os.FileInfo,
-	path string) (quantumfs.DirectoryRecord, error) {
+	path string, hl *Hardlinks) (quantumfs.DirectoryRecord, error) {
 
 	stat := finfo.Sys().(*syscall.Stat_t)
 
@@ -57,7 +57,7 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	// content already exists
 	setHardLink := false
 	if finfo.Mode().IsRegular() && stat.Nlink > 1 {
-		dirRecord, exists := HardLink(finfo)
+		dirRecord, exists := hl.HardLink(finfo)
 		if exists {
 			// return a new thin record
 			// representing the path for existing
@@ -112,7 +112,7 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	// directory record based on file content
 	if setHardLink {
 		// returned dir record
-		dirRecord = SetHardLink(finfo,
+		dirRecord = hl.SetHardLink(finfo,
 			dirRecord.(*quantumfs.DirectRecord))
 	}
 
