@@ -459,6 +459,31 @@ func (th *TestHelper) GetDataStore() quantumfs.DataStore {
 	return th.qfs.c.dataStore.durableStore
 }
 
+// Convert an absolute workspace path to the matching WorkspaceRoot object. The same
+// as MUX::getWorkspaceRoot(), the caller of this function should run Forget function
+// at the end.
+func (th *TestHelper) GetWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
+	cleanup func()) {
+
+	parts := strings.Split(th.RelPath(workspace), "/")
+	wsr, cleanup, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
+		parts[0], parts[1], parts[2])
+	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
+
+	return wsr, cleanup
+}
+
+func (th *TestHelper) WaitForRefreshTo(workspace string, dst quantumfs.ObjectKey) {
+	msg := fmt.Sprintf("Refresh to %s", dst.String())
+	th.WaitFor(msg, func() bool {
+		wsr, cleanup := th.GetWorkspaceRoot(workspace)
+		defer cleanup()
+		th.Assert(wsr != nil, "workspace root does not exist")
+		th.Log("Published root is %s", wsr.publishedRootId.String())
+		return wsr.publishedRootId.IsEqualTo(dst)
+	})
+}
+
 // CreateTestDirs makes the required directories for the test.
 // These directories are inside TestRunDir
 

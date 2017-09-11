@@ -339,7 +339,7 @@ func main() {
 		}
 		c.Vlog("Bypass completed")
 	} else {
-		err = up.upload(c, &cliParams, relpath)
+		_, err = up.upload(c, &cliParams, relpath)
 		if err != nil {
 			c.Elog("Upload failed: %v", err)
 			os.Exit(exitErrUpload)
