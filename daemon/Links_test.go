@@ -43,7 +43,7 @@ func TestHardlink(t *testing.T) {
 		test.Assert(err == nil, "Error reading linked file: %v", err)
 		test.Assert(bytes.Equal(data, testData), "Data corrupt!")
 
-		wsrB, cleanup := test.getWorkspaceRoot(workspace)
+		wsrB, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 		test.Assert(len(wsrB.hardlinks) == 1, "Wsr hardlink link len is %d",
 			len(wsrB.hardlinks))
