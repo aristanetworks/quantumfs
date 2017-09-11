@@ -35,14 +35,17 @@ type QuantumFsTest func(test *TestHelper)
 // need to be embedded in that package's testHelper.
 type TestHelper struct {
 	testutils.TestHelper
-	qfs               *QuantumFs
+	qfs             *QuantumFs
+	qfsWait         sync.WaitGroup
+	fuseConnections []int
+
 	qfsInstances      []*QuantumFs
 	qfsInstancesMutex utils.DeferableMutex
-	qfsWait           sync.WaitGroup
-	fuseConnections   []int
-	api               quantumfs.Api
-	apiMutex          utils.DeferableMutex
-	finished          bool
+
+	// runtimeMutex protects api and finished fields
+	runtimeMutex utils.DeferableMutex
+	api          quantumfs.Api
+	finished     bool
 }
 
 // Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
@@ -273,7 +276,7 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 			th.Log("Test already finished. Not starting qfs.")
 			panic("Test has finished")
 		}
-		th.AssertNoErr(qfs.SetupServer(mountOptions))
+		th.AssertNoErr(qfs.Mount(mountOptions))
 		if startChan != nil {
 			close(startChan)
 		}
@@ -365,12 +368,12 @@ func (th *TestHelper) RestartQuantumFs() error {
 }
 
 func (th *TestHelper) isFinished() bool {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	return th.finished
 }
 
 func (th *TestHelper) getApi() quantumfs.Api {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	if th.finished {
 		// the test has finished, accessing the api file
 		// is not safe. The caller shall panic
@@ -388,12 +391,12 @@ func (th *TestHelper) getApi() quantumfs.Api {
 
 // Prevent any further api files to get opened
 func (th *TestHelper) finishApi() {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	th.finished = true
 }
 
 func (th *TestHelper) putApi() {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	if th.api != nil {
 		th.api.Close()
 	}
