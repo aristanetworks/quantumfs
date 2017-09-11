@@ -59,11 +59,11 @@ type dirEntryTracker struct {
 }
 
 type Uploader struct {
-	dataStore	quantumfs.DataStore
-	wsDB		quantumfs.WorkspaceDB
-	exInfo		*exs.ExcludeInfo
+	dataStore quantumfs.DataStore
+	wsDB      quantumfs.WorkspaceDB
+	exInfo    *exs.ExcludeInfo
 
-	topDirRecord     quantumfs.DirectoryRecord
+	topDirRecord quantumfs.DirectoryRecord
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
