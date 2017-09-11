@@ -74,7 +74,7 @@ type Uploader struct {
 func NewUploader() Uploader {
 	return Uploader{
 		dirEntryTrackers: make(map[string]*dirEntryTracker),
-		hardlinks: qwr.NewHardlinks(),
+		hardlinks:        qwr.NewHardlinks(),
 	}
 }
 

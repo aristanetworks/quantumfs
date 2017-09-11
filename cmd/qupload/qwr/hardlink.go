@@ -21,12 +21,12 @@ type Hardlinks struct {
 	// stat.Ino -> hardLinkInfo mapping
 	// assumes that the inodes being checked
 	// belong to the same filesystem
-	hardLinkInfoMap	map[uint64]*HardLinkInfo
+	hardLinkInfoMap   map[uint64]*HardLinkInfo
 	hardLinkInfoMutex utils.DeferableMutex
 }
 
 func NewHardlinks() *Hardlinks {
-	return &Hardlinks {
+	return &Hardlinks{
 		hardLinkInfoMap: make(map[uint64]*HardLinkInfo),
 	}
 }
