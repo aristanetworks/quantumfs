@@ -369,8 +369,7 @@ func randomNamespaceName(size int) string {
 
 	result := ""
 	for i := 0; i < size; i++ {
-		result += string(
-			chars[quantumfs.RandomNumberGenerator.Intn(len(chars))])
+		result += string(chars[utils.RandomNumberGenerator.Intn(len(chars))])
 	}
 
 	return result
