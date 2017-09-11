@@ -11,10 +11,10 @@ import (
 )
 
 func WriteWorkspaceRoot(qctx *quantumfs.Ctx, rootDirKey quantumfs.ObjectKey,
-	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
+	ds quantumfs.DataStore, hl *Hardlinks) (quantumfs.ObjectKey, error) {
 
 	// publish all the hardlinks for this wsr
-	hardLinkEntry, herr := writeHardLinkInfo(qctx, ds)
+	hardLinkEntry, herr := hl.writeHardLinkInfo(qctx, ds)
 	if herr != nil {
 		return quantumfs.ZeroKey,
 			fmt.Errorf("Write hard info inf failed: %v", herr)
