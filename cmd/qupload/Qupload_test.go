@@ -33,6 +33,7 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 
 	fromWalker := make(chan *pathInfo, 100)
 	up := NewUploader()
+	up.dataStore = th.GetDataStore()
 
 	err = filepath.Walk(checkPath,
 		func(path string, info os.FileInfo, err error) error {
@@ -51,7 +52,7 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 				continue
 			}
 
-			record, err := processPath(&c, msg)
+			record, err := up.processPath(&c, msg)
 			th.AssertNoErr(err)
 
 			checkedRoot = true
@@ -105,25 +106,26 @@ func TestFileMatches(t *testing.T) {
 func (test *testHelper) checkQuploadMatches(workspace string) {
 	workspaceB := "test/test/quploaded"
 
+	up := NewUploader()
+
 	// setup exclude to ignore the api file
 	test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
 		"api"))
 	var err error
-	exInfo, err = excludespec.LoadExcludeInfo(workspace,
+	up.exInfo, err = excludespec.LoadExcludeInfo(workspace,
 		test.TempDir+"/exInfo")
 	test.AssertNoErr(err)
 
 	// trigger upload
-	dataStore = test.GetDataStore()
-	wsDB = test.GetWorkspaceDB()
+	up.dataStore = test.GetDataStore()
+	up.wsDB = test.GetWorkspaceDB()
 	ctx := newCtx("")
 	ctx.Qctx = &test.TestCtx().Ctx
 	var cliParams params
 	cliParams.ws = workspaceB
 	cliParams.conc = 10
 	cliParams.baseDir = workspace
-	up := NewUploader()
-	test.AssertNoErr(up.upload(ctx, &cliParams, "", exInfo))
+	test.AssertNoErr(up.upload(ctx, &cliParams, ""))
 
 	// now check that the uploaded workspace is the same
 	checkCmd := exec.Command("rsync", "-nHvrc", "--delete",
