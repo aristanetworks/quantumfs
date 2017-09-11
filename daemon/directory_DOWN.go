@@ -296,7 +296,7 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
 		}
 		c.wlog("Child %s already exists", hiddenName)
 		hiddenName = fmt.Sprintf(".hidden.%d",
-			quantumfs.RandomNumberGenerator.Uint64())
+			utils.RandomNumberGenerator.Uint64())
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
 	c.qfs.noteDeletedInode(dir.inodeNum(), childId, oldName)

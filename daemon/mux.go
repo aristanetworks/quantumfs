@@ -55,7 +55,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		},
 	}
 
-	qfs.c.vlog("Random seed: %d", quantumfs.RandomSeed)
+	qfs.c.vlog("Random seed: %d", utils.RandomSeed)
 
 	qfs.c.qfs = qfs
 
