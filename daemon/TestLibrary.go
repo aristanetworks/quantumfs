@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -37,12 +36,16 @@ type QuantumFsTest func(test *TestHelper)
 type TestHelper struct {
 	testutils.TestHelper
 	qfs             *QuantumFs
-	qfsInstances    []*QuantumFs
 	qfsWait         sync.WaitGroup
 	fuseConnections []int
-	api             quantumfs.Api
-	apiMutex        utils.DeferableMutex
-	finished        bool
+
+	qfsInstances      []*QuantumFs
+	qfsInstancesMutex utils.DeferableMutex
+
+	// runtimeMutex protects api and finished fields
+	runtimeMutex utils.DeferableMutex
+	api          quantumfs.Api
+	finished     bool
 }
 
 // Return the inode number from QuantumFS. Fails if the absolute path doesn't exist.
@@ -142,7 +145,13 @@ func (th *TestHelper) EndTest() {
 	th.finishApi()
 	th.putApi()
 
-	for _, qfs := range th.qfsInstances {
+	var qfsInstances []*QuantumFs
+	func() {
+		defer th.qfsInstancesMutex.Lock().Unlock()
+		qfsInstances, th.qfsInstances = th.qfsInstances, nil
+	}()
+
+	for _, qfs := range qfsInstances {
 		if qfs != nil && qfs.server != nil {
 			if exception != nil {
 				th.T.Logf("Failed with exception, forcefully "+
@@ -234,7 +243,7 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 }
 
 // StartDefaultQuantumFs start the qfs daemon with default config.
-func (th *TestHelper) StartDefaultQuantumFs(startChan chan<- struct{}) {
+func (th *TestHelper) StartDefaultQuantumFs(startChan chan struct{}) {
 	config := th.defaultConfig()
 	th.startQuantumFs(config, startChan)
 }
@@ -260,30 +269,60 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 
 	th.qfsWait.Add(1)
 	defer th.qfsWait.Done()
-	th.AssertNoErr(qfs.Serve(mountOptions, startChan))
+
+	func() {
+		defer th.qfsInstancesMutex.Lock().Unlock()
+		if th.isFinished() {
+			th.Log("Test already finished. Not starting qfs.")
+			panic("Test has finished")
+		}
+		th.AssertNoErr(qfs.Mount(mountOptions))
+		if startChan != nil {
+			close(startChan)
+		}
+	}()
+	qfs.Serve()
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
-	startChan chan<- struct{}) {
+	startChan chan struct{}) {
 
 	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
 	}
 
-	instanceNum := len(th.qfsInstances) + 1
+	var qfs *QuantumFs
+	var instanceNum int
+	func() {
+		defer th.qfsInstancesMutex.Lock().Unlock()
+		instanceNum = len(th.qfsInstances) + 1
 
-	th.Log("Instantiating quantumfs instance %d...", instanceNum)
-	qfs := NewQuantumFsLogs(config, th.Logger)
-	th.qfsInstances = append(th.qfsInstances, qfs)
+		th.Log("Instantiating quantumfs instance %d...", instanceNum)
+		qfs = NewQuantumFsLogs(config, th.Logger)
+		th.qfsInstances = append(th.qfsInstances, qfs)
+	}()
 
-	th.Log("Waiting for QuantumFs instance to start...")
+	if th.isFinished() {
+		th.Log("Test already finished. Not starting qfs.")
+		return
+	}
 
 	go th.serveSafely(qfs, startChan)
 
+	th.Log("Waiting for QuantumFs instance to start...")
 	connection := findFuseConnection(th.TestCtx(), config.MountPath)
 	th.fuseConnections = append(th.fuseConnections, connection)
 	th.Assert(connection != -1, "Failed to find mount")
 	th.Log("QuantumFs instance started")
+
+	if startChan != nil {
+		select {
+		case <-time.After(3 * time.Second):
+			panic("ERROR: Timed out starting the qfs server")
+		case <-startChan:
+		}
+	}
+	qfs.server.WaitMount()
 
 	if instanceNum == 1 {
 		th.qfs = qfs
@@ -295,26 +334,46 @@ func (th *TestHelper) waitForQuantumFsToFinish() {
 }
 
 func (th *TestHelper) RestartQuantumFs() error {
-	config := th.qfsInstances[0].config
 
-	th.putApi()
+	var config QuantumFsConfig
+	err := func() error {
 
-	for _, qfs := range th.qfsInstances {
-		err := qfs.server.Unmount()
-		if err != nil {
-			return err
+		defer th.qfsInstancesMutex.Lock().Unlock()
+
+		if th.finished {
+			th.Log("Test already finished. Not restarting qfs.")
+			return fmt.Errorf("Test has finished")
 		}
-	}
+		config = th.qfsInstances[0].config
 
-	th.waitForQuantumFsToFinish()
-	th.qfsInstances = nil
+		th.putApi()
+
+		for _, qfs := range th.qfsInstances {
+			err := qfs.server.Unmount()
+			if err != nil {
+				return err
+			}
+		}
+
+		th.waitForQuantumFsToFinish()
+		th.qfsInstances = nil
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
 	th.fuseConnections = nil
 	th.startQuantumFs(config, nil)
 	return nil
 }
 
+func (th *TestHelper) isFinished() bool {
+	defer th.runtimeMutex.Lock().Unlock()
+	return th.finished
+}
+
 func (th *TestHelper) getApi() quantumfs.Api {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	if th.finished {
 		// the test has finished, accessing the api file
 		// is not safe. The caller shall panic
@@ -332,12 +391,12 @@ func (th *TestHelper) getApi() quantumfs.Api {
 
 // Prevent any further api files to get opened
 func (th *TestHelper) finishApi() {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	th.finished = true
 }
 
 func (th *TestHelper) putApi() {
-	defer th.apiMutex.Lock().Unlock()
+	defer th.runtimeMutex.Lock().Unlock()
 	if th.api != nil {
 		th.api.Close()
 	}
@@ -361,7 +420,7 @@ func randomNamespaceName(size int) string {
 
 	result := ""
 	for i := 0; i < size; i++ {
-		result += string(chars[rand.Intn(len(chars))])
+		result += string(chars[utils.RandomNumberGenerator.Intn(len(chars))])
 	}
 
 	return result
