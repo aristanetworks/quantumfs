@@ -167,10 +167,10 @@ func TestHardlinks(t *testing.T) {
 		directory := workspace + "/dirA/dirB"
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 
-		fileA := workspace+"/dirA/fileA"
-		linkA := workspace+"/linkA"
-		linkB := workspace+"/dirA/dirB/linkB"
-		linkC := workspace+"/dirA/dirB/linkC"
+		fileA := workspace + "/dirA/fileA"
+		linkA := workspace + "/linkA"
+		linkB := workspace + "/dirA/dirB/linkB"
+		linkC := workspace + "/dirA/dirB/linkC"
 		test.AssertNoErr(testutils.PrintToFile(fileA, "sample data"))
 		test.AssertNoErr(os.Link(fileA, linkA))
 		test.AssertNoErr(os.Link(linkA, linkB))
