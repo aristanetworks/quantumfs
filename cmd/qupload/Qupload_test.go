@@ -104,7 +104,7 @@ func TestFileMatches(t *testing.T) {
 	})
 }
 
-func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func ()) {
+func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func()) {
 	workspaceB := "test/test/quploaded"
 
 	up := NewUploader()
@@ -167,7 +167,7 @@ func TestFilesAndDir(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
 			"sample data"))
 
-		test.checkQuploadMatches(workspace, func () {
+		test.checkQuploadMatches(workspace, func() {
 			test.AssertNoErr(testutils.PrintToFile(
 				workspace+"/dirA/fileA",
 				"sample data changed"))
@@ -194,7 +194,7 @@ func TestHardlinks(t *testing.T) {
 		test.AssertNoErr(os.Link(linkA, linkB))
 		test.AssertNoErr(os.Link(fileA, linkC))
 
-		test.checkQuploadMatches(workspace, func () {
+		test.checkQuploadMatches(workspace, func() {
 			test.AssertNoErr(os.Remove(linkA))
 			test.AssertNoErr(os.Link(fileB, linkA))
 		})
@@ -226,9 +226,9 @@ func TestExtAttr(t *testing.T) {
 		test.AssertNoErr(syscall.Setxattr(linkA, "user.linkData",
 			[]byte("link"), 0))
 
-		test.checkQuploadMatches(workspace, func () {
+		test.checkQuploadMatches(workspace, func() {
 			test.AssertNoErr(syscall.Setxattr(linkA, "user.diffData",
-			[]byte("something"), 0))
+				[]byte("something"), 0))
 		})
 	})
 }
