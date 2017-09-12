@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -370,7 +369,7 @@ func randomNamespaceName(size int) string {
 
 	result := ""
 	for i := 0; i < size; i++ {
-		result += string(chars[rand.Intn(len(chars))])
+		result += string(chars[utils.RandomNumberGenerator.Intn(len(chars))])
 	}
 
 	return result
