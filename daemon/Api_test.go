@@ -191,6 +191,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 }
 
 func TestApiAccessListConcurrent(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		size := 100
 		filename := "samplesamplesamplesamplesample" +
@@ -468,6 +469,7 @@ func TestApiNoRequestBlockingRead(t *testing.T) {
 }
 
 func TestApiNoRequestNonBlockingRead(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
 			syscall.O_DIRECT|syscall.O_NONBLOCK, 0)
