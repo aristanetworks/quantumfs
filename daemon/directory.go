@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sort"
 	"syscall"
 	"time"
@@ -1759,16 +1758,6 @@ func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
 	return inodeNum, record, nil
 }
 
-func GenerateUniqueFileId() quantumfs.FileId {
-	for {
-		newId := quantumfs.FileId(rand.Uint64())
-		if newId == quantumfs.InvalidFileId {
-			continue
-		}
-		return newId
-	}
-}
-
 func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	umask uint32, rdev uint32, size uint64, uid quantumfs.UID,
 	gid quantumfs.GID, type_ quantumfs.ObjectType,
@@ -1791,7 +1780,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	entry.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
-	entry.SetFileId(GenerateUniqueFileId())
+	entry.SetFileId(quantumfs.GenerateUniqueFileId())
 
 	return entry
 }
