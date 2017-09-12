@@ -75,7 +75,7 @@ func (syncpoint *SyncPoint) WaitFor(expected SyncState) bool {
 			syncpoint.logger("waiting for state %d, currently at %d",
 				expected, state)
 			continue
-		case <-time.After(time.Millisecond):
+		case <-time.After(5 * time.Millisecond):
 			// Poll the state in case we missed an update
 			npolls++
 			if npolls > 100 {
