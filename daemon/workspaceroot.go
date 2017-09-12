@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -672,6 +673,35 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 	}
 
 	return wsr.Directory.Lookup(c, name, out)
+}
+
+func (wsr *WorkspaceRoot) GetXAttrSize(c *ctx,
+	attr string) (size int, result fuse.Status) {
+
+	c.vlog("Invalid GetXAttrSize on WorkspaceRoot")
+	return 0, fuse.ENODATA
+}
+
+func (wsr *WorkspaceRoot) GetXAttrData(c *ctx,
+	attr string) (data []byte, result fuse.Status) {
+
+	c.vlog("Invalid GetXAttrData on WorkspaceRoot")
+	return nil, fuse.ENODATA
+}
+
+func (wsr *WorkspaceRoot) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
+	c.vlog("Invalid ListXAttr on WorkspaceRoot")
+	return []byte{}, fuse.OK
+}
+
+func (wsr *WorkspaceRoot) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
+	c.vlog("Invalid SetXAttr on WorkspaceRoot")
+	return fuse.Status(syscall.ENOSPC)
+}
+
+func (wsr *WorkspaceRoot) RemoveXAttr(c *ctx, attr string) fuse.Status {
+	c.vlog("Invalid RemoveXAttr on WorkspaceRoot")
+	return fuse.ENODATA
 }
 
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
