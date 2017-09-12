@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -64,7 +63,10 @@ func (hl *Hardlinks) HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, boo
 	newDirRecord := quantumfs.NewDirectoryRecord()
 	newDirRecord.SetType(quantumfs.ObjectTypeHardlink)
 	newDirRecord.SetFilename(finfo.Name())
-	newDirRecord.SetFileId(hlinfo.record.FileId())
+	rec := hlinfo.record
+	if rec != nil {
+		newDirRecord.SetFileId(rec.FileId())
+	}
 
 	return newDirRecord, true
 }
