@@ -335,7 +335,7 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 
 	err := group.Wait()
 	if err != nil {
-		return quantumfs.ObjectKey{} , err
+		return quantumfs.ObjectKey{}, err
 	}
 
 	if up.topDirRecord == nil {
