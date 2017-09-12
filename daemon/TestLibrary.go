@@ -234,7 +234,7 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 }
 
 // StartDefaultQuantumFs start the qfs daemon with default config.
-func (th *TestHelper) StartDefaultQuantumFs(startChan chan<- struct{}) {
+func (th *TestHelper) StartDefaultQuantumFs(startChan chan struct{}) {
 	config := th.defaultConfig()
 	th.startQuantumFs(config, startChan)
 }
@@ -264,7 +264,7 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
-	startChan chan<- struct{}) {
+	startChan chan struct{}) {
 
 	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
@@ -284,6 +284,15 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
 	th.fuseConnections = append(th.fuseConnections, connection)
 	th.Assert(connection != -1, "Failed to find mount")
 	th.Log("QuantumFs instance started")
+
+	if startChan != nil {
+		select {
+		case <-time.After(3 * time.Second):
+			panic("ERROR: Timed out starting the qfs server")
+		case <-startChan:
+		}
+	}
+	qfs.server.WaitMount()
 
 	if instanceNum == 1 {
 		th.qfs = qfs
