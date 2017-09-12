@@ -128,7 +128,6 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 	newWsr, err := up.upload(ctx, &cliParams, "")
 	test.AssertNoErr(err)
 
-	// Wait for the workspace to refresh
 	test.WaitForRefreshTo(workspaceB, newWsr)
 
 	// now check that the uploaded workspace is the same
