@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"math/rand"
 	"reflect"
 	"runtime/debug"
 	"strings"
@@ -56,9 +55,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		},
 	}
 
-	randSeed := time.Now().UnixNano()
-	qfs.c.vlog("Random seed: %d", randSeed)
-	rand.Seed(randSeed)
+	qfs.c.vlog("Random seed: %d", utils.RandomSeed)
 
 	qfs.c.qfs = qfs
 
@@ -157,10 +154,8 @@ type QuantumFs struct {
 	workspaceMutability map[string]workspaceState
 }
 
-func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
-	startChan chan<- struct{}) error {
-
-	qfs.c.dlog("QuantumFs::Serve Initializing server")
+func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
+	qfs.c.dlog("QuantumFs::Mount Initializing server")
 
 	// Set the common set of required options
 	mountOptions.AllowOther = true
@@ -171,6 +166,7 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
 	if err != nil {
+		qfs.c.elog("Failed to create new server %s", err.Error())
 		return err
 	}
 
@@ -179,10 +175,11 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
 
 	qfs.server = server
+	return nil
+}
+
+func (qfs *QuantumFs) Serve() {
 	qfs.c.dlog("QuantumFs::Serve Serving")
-	if startChan != nil {
-		close(startChan)
-	}
 	qfs.server.Serve()
 	qfs.c.dlog("QuantumFs::Serve Finished serving")
 
@@ -193,8 +190,6 @@ func (qfs *QuantumFs) Serve(mountOptions fuse.MountOptions,
 		time.Sleep(100 * time.Millisecond)
 	}
 	qfs.c.dataStore.shutdown()
-
-	return nil
 }
 
 func (qfs *QuantumFs) handleWorkspaceChanges(
