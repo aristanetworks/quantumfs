@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -103,7 +102,7 @@ func CreateNewDirRecord(name string, mode uint32,
 	// QFS doesn't store Atime since it's too expensive
 	entry.SetContentTime(ctime)
 	entry.SetModificationTime(mtime)
-	entry.SetFileId(daemon.GenerateUniqueFileId())
+	entry.SetFileId(quantumfs.GenerateUniqueFileId())
 
 	return entry
 }
