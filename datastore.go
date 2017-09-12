@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"sort"
 	"time"
 
@@ -633,6 +634,16 @@ func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
 		record: r,
 	}
 	return &record
+}
+
+func GenerateUniqueFileId() FileId {
+	for {
+		newId := FileId(rand.Uint64())
+		if newId == InvalidFileId {
+			continue
+		}
+		return newId
+	}
 }
 
 func (r *HardlinkRecord) FileId() uint64 {
