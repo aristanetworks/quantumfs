@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -174,6 +175,35 @@ func TestHardlinks(t *testing.T) {
 		test.AssertNoErr(os.Link(fileA, linkA))
 		test.AssertNoErr(os.Link(linkA, linkB))
 		test.AssertNoErr(os.Link(fileA, linkC))
+
+		test.checkQuploadMatches(workspace)
+	})
+}
+
+func TestExtAttr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		directory := workspace + "/dirA/dirB"
+		test.AssertNoErr(os.MkdirAll(directory, 0777))
+
+		fileA := workspace + "/dirA/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "fileA has data"))
+		test.AssertNoErr(testutils.PrintToFile(fileB, "fileB as well"))
+
+		test.AssertNoErr(syscall.Setxattr(fileA, "user.noData", []byte{}, 0))
+		test.AssertNoErr(syscall.Setxattr(fileB, "user.data", []byte("abc"),
+			0))
+
+		test.AssertNoErr(syscall.Setxattr(directory, "user.dirData",
+			[]byte("dir data"), 0))
+
+		linkA := workspace + "/linkA"
+		test.AssertNoErr(os.Link(fileA, linkA))
+		test.AssertNoErr(syscall.Setxattr(linkA, "user.linkData",
+			[]byte("link"), 0))
 
 		test.checkQuploadMatches(workspace)
 	})
