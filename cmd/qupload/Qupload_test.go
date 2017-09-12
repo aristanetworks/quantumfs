@@ -104,7 +104,7 @@ func TestFileMatches(t *testing.T) {
 	})
 }
 
-func (test *testHelper) checkQuploadMatches(workspace string) {
+func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func ()) {
 	workspaceB := "test/test/quploaded"
 
 	up := NewUploader()
@@ -131,17 +131,29 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 
 	test.WaitForRefreshTo(workspaceB, newWsr)
 
-	// now check that the uploaded workspace is the same
-	checkCmd := exec.Command("rsync", "-nHvrc", "--delete",
-		workspace+"/", test.TempDir+"/mnt/"+workspaceB+"/")
+	for i := 0; i < 2; i++ {
+		// now check that the uploaded workspace is the same
+		checkCmd := exec.Command("rsync", "-nHXvrc", "--delete",
+			workspace+"/", test.TempDir+"/mnt/"+workspaceB+"/")
 
-	output, err := checkCmd.CombinedOutput()
-	test.AssertNoErr(err)
-	outputLines := strings.Split(string(output), "\n")
+		output, err := checkCmd.CombinedOutput()
+		test.AssertNoErr(err)
+		outputLines := strings.Split(string(output), "\n")
 
-	// If there are no differences, the output will be only 5 lines long
-	test.Assert(len(outputLines) == 5, "Difference in qupload: %s",
-		output)
+		if i == 0 {
+			// If there are no differences, the output will be only 5
+			// lines long
+			test.Assert(len(outputLines) == 5, "Diff in qupload: %s",
+				output)
+
+			triggerErr()
+		} else {
+			// On this iteration, the check should fail. Doing this
+			// ensures that the test is always actually testing
+			test.Assert(len(outputLines) != 5, "No diff found:\n%s",
+				output)
+		}
+	}
 }
 
 func TestFilesAndDir(t *testing.T) {
@@ -155,7 +167,11 @@ func TestFilesAndDir(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
 			"sample data"))
 
-		test.checkQuploadMatches(workspace)
+		test.checkQuploadMatches(workspace, func () {
+			test.AssertNoErr(testutils.PrintToFile(
+				workspace+"/dirA/fileA",
+				"sample data changed"))
+		})
 	})
 }
 
@@ -168,15 +184,20 @@ func TestHardlinks(t *testing.T) {
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 
 		fileA := workspace + "/dirA/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
 		linkA := workspace + "/linkA"
 		linkB := workspace + "/dirA/dirB/linkB"
 		linkC := workspace + "/dirA/dirB/linkC"
 		test.AssertNoErr(testutils.PrintToFile(fileA, "sample data"))
+		test.AssertNoErr(testutils.PrintToFile(fileB, "sample data"))
 		test.AssertNoErr(os.Link(fileA, linkA))
 		test.AssertNoErr(os.Link(linkA, linkB))
 		test.AssertNoErr(os.Link(fileA, linkC))
 
-		test.checkQuploadMatches(workspace)
+		test.checkQuploadMatches(workspace, func () {
+			test.AssertNoErr(os.Remove(linkA))
+			test.AssertNoErr(os.Link(fileB, linkA))
+		})
 	})
 }
 
@@ -205,6 +226,9 @@ func TestExtAttr(t *testing.T) {
 		test.AssertNoErr(syscall.Setxattr(linkA, "user.linkData",
 			[]byte("link"), 0))
 
-		test.checkQuploadMatches(workspace)
+		test.checkQuploadMatches(workspace, func () {
+			test.AssertNoErr(syscall.Setxattr(linkA, "user.diffData",
+			[]byte("something"), 0))
+		})
 	})
 }
