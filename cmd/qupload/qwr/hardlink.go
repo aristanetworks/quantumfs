@@ -31,7 +31,7 @@ func NewHardlinks() *Hardlinks {
 	}
 }
 
-// hardlinkInfoMutex must be held
+// hardLinkInfoMutex must be held
 func (hl *Hardlinks) getHardlink_(finfo os.FileInfo) quantumfs.DirectoryRecord {
 	stat := finfo.Sys().(*syscall.Stat_t)
 	hlinfo, exists := hl.hardLinkInfoMap[stat.Ino]
