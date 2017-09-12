@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sort"
 	"syscall"
 	"time"
@@ -1761,7 +1760,7 @@ func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
 
 func generateUniqueFileId() quantumfs.FileId {
 	for {
-		newId := quantumfs.FileId(rand.Uint64())
+		newId := quantumfs.FileId(utils.RandomNumberGenerator.Uint64())
 		if newId == quantumfs.InvalidFileId {
 			continue
 		}
