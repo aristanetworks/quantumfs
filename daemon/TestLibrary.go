@@ -460,7 +460,7 @@ func (th *TestHelper) GetDataStore() quantumfs.DataStore {
 }
 
 // Convert an absolute workspace path to the matching WorkspaceRoot object. The same
-// as MUX::getWorkspaceRoot(), the caller of this function should run Forget function
+// as Mux::getWorkspaceRoot(), the caller of this function should run Forget function
 // at the end.
 func (th *TestHelper) GetWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
 	cleanup func()) {
