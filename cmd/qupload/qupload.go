@@ -47,10 +47,7 @@ type params struct {
 	referenceWS string
 }
 
-var dataStore quantumfs.DataStore
-var wsDB quantumfs.WorkspaceDB
 var version string
-var exInfo *exs.ExcludeInfo
 
 type Ctx struct {
 	Qctx *quantumfs.Ctx
@@ -137,7 +134,7 @@ The exclude file should be formatted based on following rules:
 	qFlags.PrintDefaults()
 }
 
-func validateParams(p *params) error {
+func (up *Uploader) validateParams(p *params) error {
 	var err error
 
 	// check mandatory flags
@@ -203,11 +200,13 @@ func validateParams(p *params) error {
 		return errors.New("Concurrency must be > 0")
 	}
 
-	dataStore, err = thirdparty_backends.ConnectDatastore(p.dsName, p.dsConf)
+	up.dataStore, err = thirdparty_backends.ConnectDatastore(p.dsName, p.dsConf)
 	if err != nil {
 		return err
 	}
-	wsDB, err = thirdparty_backends.ConnectWorkspaceDB(p.wsdbName, p.wsdbConf)
+
+	up.wsDB, err = thirdparty_backends.ConnectWorkspaceDB(p.wsdbName,
+		p.wsdbConf)
 	if err != nil {
 		return err
 	}
@@ -263,7 +262,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	perr := validateParams(&cliParams)
+	up := NewUploader()
+	perr := up.validateParams(&cliParams)
 	if perr != nil {
 		fmt.Println("Flag validation failed: ", perr)
 		os.Exit(exitErrArgs)
@@ -275,7 +275,7 @@ func main() {
 	// check forced upload into workspace
 	if !cliParams.wsforce {
 		wsParts := strings.Split(cliParams.ws, "/")
-		_, _, err := wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
+		_, _, err := up.wsDB.Workspace(c.Qctx, wsParts[0], wsParts[1],
 			wsParts[2])
 		if err != nil {
 			wE, ok := err.(quantumfs.WorkspaceDbErr)
@@ -297,7 +297,7 @@ func main() {
 	// setup exclude information
 	relpath := ""
 	if cliParams.excludeFile != "" {
-		exInfo, err = exs.LoadExcludeInfo(cliParams.baseDir,
+		up.exInfo, err = exs.LoadExcludeInfo(cliParams.baseDir,
 			cliParams.excludeFile)
 		if err != nil {
 			fmt.Println("Exclude file processing failed: ", err)
@@ -332,15 +332,14 @@ func main() {
 	}
 
 	if cliParams.referenceWS != "" {
-		err = byPass(c, &cliParams)
+		err = up.byPass(c, &cliParams)
 		if err != nil {
 			c.Elog("Bypass failed: %v", err)
 			os.Exit(exitErrUpload)
 		}
 		c.Vlog("Bypass completed")
 	} else {
-		up := NewUploader()
-		err = up.upload(c, &cliParams, relpath, exInfo)
+		err = up.upload(c, &cliParams, relpath)
 		if err != nil {
 			c.Elog("Upload failed: %v", err)
 			os.Exit(exitErrUpload)
