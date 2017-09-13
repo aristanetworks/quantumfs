@@ -62,7 +62,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 
 	stat := info.Sys().(*syscall.Stat_t)
 	dirRecord := CreateNewDirRecord(info.Name(), stat.Mode,
-		uint32(stat.Rdev), 0,
+		uint32(stat.Rdev), uint64(cap(childRecords)),
 		quantumfs.ObjectUid(stat.Uid, stat.Uid),
 		quantumfs.ObjectGid(stat.Gid, stat.Gid),
 		quantumfs.ObjectTypeDirectory,
@@ -102,6 +102,7 @@ func CreateNewDirRecord(name string, mode uint32,
 	// QFS doesn't store Atime since it's too expensive
 	entry.SetContentTime(ctime)
 	entry.SetModificationTime(mtime)
+	entry.SetFileId(quantumfs.GenerateUniqueFileId())
 
 	return entry
 }
