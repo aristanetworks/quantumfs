@@ -133,9 +133,18 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 	test.AssertNoErr(err)
 	outputLines := strings.Split(string(output), "\n")
 
-	// If there are no differences, the output will be only 5 lines long
-	test.Assert(len(outputLines) == 5, "Difference in qupload: %s",
+	// Check that we only have rsync boilerplate
+	diffMsg := "Difference in qupload: %s"
+	test.Assert(strings.Index(outputLines[0], "sending incremental file") == 0,
+		diffMsg, output)
+	test.Assert(len(outputLines[1]) == 0, diffMsg, output)
+	test.Assert(strings.Index(outputLines[2], "sent") == 0, diffMsg, output)
+	test.Assert(strings.Index(outputLines[3], "total size") == 0, diffMsg,
 		output)
+	test.Assert(len(outputLines[4]) == 0, diffMsg, output)
+	
+	// If there are no differences, the output will be only 5 lines long
+	test.Assert(len(outputLines) == 5, diffMsg, output)
 }
 
 func TestFilesAndDir(t *testing.T) {
