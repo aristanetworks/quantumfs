@@ -133,7 +133,7 @@ func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func())
 
 	for i := 0; i < 2; i++ {
 		// now check that the uploaded workspace is the same
-		checkCmd := exec.Command("rsync", "-nHXvrc", "--delete",
+		checkCmd := exec.Command("rsync", "-nHXvrc", "--delete", "--links",
 			workspace+"/", test.TempDir+"/mnt/"+workspaceB+"/")
 
 		output, err := checkCmd.CombinedOutput()
@@ -229,6 +229,33 @@ func TestExtAttr(t *testing.T) {
 		test.checkQuploadMatches(workspace, func() {
 			test.AssertNoErr(syscall.Setxattr(linkA, "user.diffData",
 				[]byte("something"), 0))
+		})
+	})
+}
+
+func TestSymlinks(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		directory := workspace + "/dirA/dirB"
+		test.AssertNoErr(os.MkdirAll(directory, 0777))
+
+		fileA := workspace + "/dirA/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
+
+		linkA := workspace + "/linkA"
+		linkB := workspace + "/dirA/linkB"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "fileA has data"))
+		test.AssertNoErr(testutils.PrintToFile(fileB, "fileB has data"))
+
+		test.AssertNoErr(os.Symlink(fileA, linkA))
+		test.AssertNoErr(os.Symlink(fileB, linkB))
+
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(os.Remove(linkB))
+			test.AssertNoErr(testutils.PrintToFile(linkB,
+				"fileB has data"))
 		})
 	})
 }
