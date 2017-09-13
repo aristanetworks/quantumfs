@@ -143,15 +143,16 @@ func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func())
 		if i == 0 {
 			// Check that we only have rsync boilerplate
 			diffMsg := "Difference in qupload: %s"
-			test.Assert(strings.Index(outputLines[0], "sending incremental file") == 0,
-				diffMsg, output)
+			test.Assert(strings.Index(outputLines[0],
+				"sending incremental file") == 0, diffMsg, output)
 			test.Assert(len(outputLines[1]) == 0, diffMsg, output)
-			test.Assert(strings.Index(outputLines[2], "sent") == 0, diffMsg, output)
-			test.Assert(strings.Index(outputLines[3], "total size") == 0, diffMsg,
-				output)
+			test.Assert(strings.Index(outputLines[2], "sent") == 0,
+				diffMsg, output)
+			test.Assert(strings.Index(outputLines[3], "total size") == 0,
+				diffMsg, output)
 			test.Assert(len(outputLines[4]) == 0, diffMsg, output)
 
-			// If there are no differences, the output will be only 5 lines long
+			// If there are no differences, the output will be 5 lines
 			test.Assert(len(outputLines) == 5, diffMsg, output)
 
 			triggerErr()
