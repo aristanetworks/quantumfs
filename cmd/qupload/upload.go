@@ -301,7 +301,8 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 	return nil
 }
 
-func (up *Uploader) upload(c *Ctx, cli *params, relpath string) error {
+func (up *Uploader) upload(c *Ctx, cli *params,
+	relpath string) (wsrKey quantumfs.ObjectKey, rtn error) {
 
 	ws := cli.ws
 	aliasWS := cli.alias
@@ -334,7 +335,7 @@ func (up *Uploader) upload(c *Ctx, cli *params, relpath string) error {
 
 	err := group.Wait()
 	if err != nil {
-		return err
+		return quantumfs.ObjectKey{}, err
 	}
 
 	if up.topDirRecord == nil {
@@ -347,11 +348,11 @@ func (up *Uploader) upload(c *Ctx, cli *params, relpath string) error {
 	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
 		up.dataStore, up.hardlinks)
 	if wsrErr != nil {
-		return wsrErr
+		return quantumfs.ObjectKey{}, wsrErr
 	}
 	err = uploadCompleted(c.Qctx, up.wsDB, ws, aliasWS, wsrKey)
 	if err != nil {
-		return err
+		return quantumfs.ObjectKey{}, err
 	}
 
 	fmt.Printf("\nUpload completed. Total: %d bytes "+
@@ -364,7 +365,7 @@ func (up *Uploader) upload(c *Ctx, cli *params, relpath string) error {
 		(qwr.MetadataBytesWritten*100)/
 			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
 		time.Since(start).Seconds(), ws)
-	return nil
+	return wsrKey, nil
 }
 
 // Uploads to existing workspaces should be supported.

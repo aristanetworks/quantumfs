@@ -521,7 +521,7 @@ func TestWorkspaceDeletionSameNamespaceInstantiated(t *testing.T) {
 		ws1 := test.AbsPath(wsName1)
 		test.assertFileExists(ws1)
 
-		_, cleanup := test.getWorkspaceRoot(wsName1)
+		_, cleanup := test.GetWorkspaceRoot(wsName1)
 		// The workspace is instantiated, so handleDeletedWorkspace
 		// will be called
 		defer cleanup()

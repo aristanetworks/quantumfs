@@ -274,6 +274,7 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
 	if !exists {
 		// It should be possible, via races, that someone could check
 		// on a link which has *just* been deleted
+		c.vlog("no hardlink entry for %d", fileId)
 		return inodeId
 	}
 

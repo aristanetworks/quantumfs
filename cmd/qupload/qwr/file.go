@@ -55,20 +55,15 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	// process hardlink first since we can
 	// skip the content write if the hardlink
 	// content already exists
-	setHardLink := false
-	if finfo.Mode().IsRegular() && stat.Nlink > 1 {
-		dirRecord, exists := hl.HardLink(finfo)
+	isHardlink := (finfo.Mode().IsRegular() && stat.Nlink > 1)
+	if isHardlink {
+		exists, dirRecord := hl.IncrementHardLink(finfo)
 		if exists {
 			// return a new thin record
 			// representing the path for existing
 			// hardlink
 			return dirRecord, nil
 		}
-		// this path is a hardlink
-		// WriteFile should write the file and then
-		// setup hardlink record
-		// only one thread will write the file
-		setHardLink = true
 	}
 
 	// detect object type specific writer
@@ -110,7 +105,7 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	// initialize hardlink info from dirRecord
 	// must be last step as it needs a fully setup
 	// directory record based on file content
-	if setHardLink {
+	if isHardlink {
 		// returned dir record
 		dirRecord = hl.SetHardLink(finfo,
 			dirRecord.(*quantumfs.DirectRecord))
