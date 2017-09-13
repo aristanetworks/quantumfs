@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -103,7 +104,7 @@ func TestFileMatches(t *testing.T) {
 	})
 }
 
-func (test *testHelper) checkQuploadMatches(workspace string) {
+func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func()) {
 	workspaceB := "test/test/quploaded"
 
 	up := NewUploader()
@@ -130,26 +131,38 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 
 	test.WaitForRefreshTo(workspaceB, newWsr)
 
-	// now check that the uploaded workspace is the same
-	checkCmd := exec.Command("rsync", "-nHvrc", "--delete",
-		workspace+"/", test.TempDir+"/mnt/"+workspaceB+"/")
+	for i := 0; i < 2; i++ {
+		// now check that the uploaded workspace is the same
+		checkCmd := exec.Command("rsync", "-nHXvrc", "--delete",
+			workspace+"/", test.TempDir+"/mnt/"+workspaceB+"/")
 
-	output, err := checkCmd.CombinedOutput()
-	test.AssertNoErr(err)
-	outputLines := strings.Split(string(output), "\n")
+		output, err := checkCmd.CombinedOutput()
+		test.AssertNoErr(err)
+		outputLines := strings.Split(string(output), "\n")
 
-	// Check that we only have rsync boilerplate
-	diffMsg := "Difference in qupload: %s"
-	test.Assert(strings.Index(outputLines[0], "sending incremental file") == 0,
-		diffMsg, output)
-	test.Assert(len(outputLines[1]) == 0, diffMsg, output)
-	test.Assert(strings.Index(outputLines[2], "sent") == 0, diffMsg, output)
-	test.Assert(strings.Index(outputLines[3], "total size") == 0, diffMsg,
-		output)
-	test.Assert(len(outputLines[4]) == 0, diffMsg, output)
+		if i == 0 {
+			// Check that we only have rsync boilerplate
+			diffMsg := "Difference in qupload: %s"
+			test.Assert(strings.Index(outputLines[0],
+				"sending incremental file") == 0, diffMsg, output)
+			test.Assert(len(outputLines[1]) == 0, diffMsg, output)
+			test.Assert(strings.Index(outputLines[2], "sent") == 0,
+				diffMsg, output)
+			test.Assert(strings.Index(outputLines[3], "total size") == 0,
+				diffMsg, output)
+			test.Assert(len(outputLines[4]) == 0, diffMsg, output)
 
-	// If there are no differences, the output will be only 5 lines long
-	test.Assert(len(outputLines) == 5, diffMsg, output)
+			// If there are no differences, the output will be 5 lines
+			test.Assert(len(outputLines) == 5, diffMsg, output)
+
+			triggerErr()
+		} else {
+			// On this iteration, the check should fail. Doing this
+			// ensures that the test is always actually testing
+			test.Assert(len(outputLines) != 5, "No diff found:\n%s",
+				output)
+		}
+	}
 }
 
 func TestFilesAndDir(t *testing.T) {
@@ -163,7 +176,11 @@ func TestFilesAndDir(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
 			"sample data"))
 
-		test.checkQuploadMatches(workspace)
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(testutils.PrintToFile(
+				workspace+"/dirA/fileA",
+				"sample data changed"))
+		})
 	})
 }
 
@@ -176,14 +193,51 @@ func TestHardlinks(t *testing.T) {
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 
 		fileA := workspace + "/dirA/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
 		linkA := workspace + "/linkA"
 		linkB := workspace + "/dirA/dirB/linkB"
 		linkC := workspace + "/dirA/dirB/linkC"
 		test.AssertNoErr(testutils.PrintToFile(fileA, "sample data"))
+		test.AssertNoErr(testutils.PrintToFile(fileB, "sample data"))
 		test.AssertNoErr(os.Link(fileA, linkA))
 		test.AssertNoErr(os.Link(linkA, linkB))
 		test.AssertNoErr(os.Link(fileA, linkC))
 
-		test.checkQuploadMatches(workspace)
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(os.Remove(linkA))
+			test.AssertNoErr(os.Link(fileB, linkA))
+		})
+	})
+}
+
+func TestExtAttr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		directory := workspace + "/dirA/dirB"
+		test.AssertNoErr(os.MkdirAll(directory, 0777))
+
+		fileA := workspace + "/dirA/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "fileA has data"))
+		test.AssertNoErr(testutils.PrintToFile(fileB, "fileB as well"))
+
+		test.AssertNoErr(syscall.Setxattr(fileA, "user.noData", []byte{}, 0))
+		test.AssertNoErr(syscall.Setxattr(fileB, "user.data", []byte("abc"),
+			0))
+
+		test.AssertNoErr(syscall.Setxattr(directory, "user.dirData",
+			[]byte("dir data"), 0))
+
+		linkA := workspace + "/linkA"
+		test.AssertNoErr(os.Link(fileA, linkA))
+		test.AssertNoErr(syscall.Setxattr(linkA, "user.linkData",
+			[]byte("link"), 0))
+
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(syscall.Setxattr(linkA, "user.diffData",
+				[]byte("something"), 0))
+		})
 	})
 }
