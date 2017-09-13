@@ -41,7 +41,6 @@ func runTestCommon(t *testing.T, test quploadTest) {
 
 	startChan := make(chan struct{}, 0)
 	th.StartDefaultQuantumFs(startChan)
-	dataStore = th.GetDataStore()
 
 	th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
 		startChan, th.AbortFuse)
