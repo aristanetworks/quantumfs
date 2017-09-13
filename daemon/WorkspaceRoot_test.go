@@ -329,7 +329,7 @@ func TestSetRemoteWorkspaceImmutable(t *testing.T) {
 func TestWorkspaceRootChecker(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 
 		var inode Inode

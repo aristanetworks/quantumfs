@@ -39,17 +39,6 @@ func (th *testHelper) waitForNRefresh(workspace string, n int) {
 		"Workspace refresh not finished")
 }
 
-func (th *testHelper) waitForRefreshTo(workspace string, dst quantumfs.ObjectKey) {
-	msg := fmt.Sprintf("Refresh to %s", dst.String())
-	th.WaitFor(msg, func() bool {
-		wsr, cleanup := th.getWorkspaceRoot(workspace)
-		defer cleanup()
-		th.Assert(wsr != nil, "workspace root does not exist")
-		th.Log("Published root is %s", wsr.publishedRootId.String())
-		return wsr.publishedRootId.IsEqualTo(dst)
-	})
-}
-
 func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 	src quantumfs.ObjectKey, dst quantumfs.ObjectKey) {
 
@@ -57,14 +46,14 @@ func refreshTestNoRemount(ctx *ctx, test *testHelper, workspace string,
 	_, nonce := test.workspaceRootId(ts, ns, ws)
 	workspaceName := ts + "/" + ns + "/" + ws
 
-	_, cleanup := test.getWorkspaceRoot(workspace)
+	_, cleanup := test.GetWorkspaceRoot(workspace)
 	// This will prevent the workspace from getting uninstantiated and
 	// losing the updates
 	defer cleanup()
 
 	test.markImmutable(ctx, workspaceName)
 	test.advanceWorkspace(workspace, nonce, src, dst)
-	test.waitForRefreshTo(workspaceName, dst)
+	test.WaitForRefreshTo(workspaceName, dst)
 	test.markMutable(ctx, workspaceName)
 }
 
@@ -78,7 +67,7 @@ func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	test.markImmutable(ctx, workspaceName)
 	test.remountFilesystem()
 	test.advanceWorkspace(workspaceName, nonce, src, dst)
-	test.waitForRefreshTo(workspaceName, dst)
+	test.WaitForRefreshTo(workspaceName, dst)
 	test.markMutable(ctx, workspaceName)
 }
 
@@ -1354,7 +1343,7 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		test.SyncAllWorkspaces()
 		newRootId1 := test.getRootId(workspace)
 
-		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 
 		inode := test.getInode(fullName)

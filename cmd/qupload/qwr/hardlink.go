@@ -31,38 +31,45 @@ func NewHardlinks() *Hardlinks {
 	}
 }
 
-func (hl *Hardlinks) HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
-	defer hl.hardLinkInfoMutex.Lock().Unlock()
-
+// hardLinkInfoMutex must be held
+func (hl *Hardlinks) getHardlink_(finfo os.FileInfo) quantumfs.DirectoryRecord {
 	stat := finfo.Sys().(*syscall.Stat_t)
 	hlinfo, exists := hl.hardLinkInfoMap[stat.Ino]
 	if !exists {
-
-		// the FileInfo.Stat already indicates the
-		// final link count for path but we start with 1
-		// since its possible that a writer selects only
-		// directories for upload and so the link count
-		// should reflect the entries written to QFS
-		// datastore
-		hlinfo := &HardLinkInfo{
-			record: nil,
-			nlinks: 1,
-		}
-		// actual record is stored in SetHardLink
-		// its ok until then since all other callers
-		// don't need that information
-		hl.hardLinkInfoMap[stat.Ino] = hlinfo
-		return nil, false
+		return nil
 	}
 
-	hlinfo.nlinks++
 	// construct a thin directory record to represent
 	// source of the hard link
 	newDirRecord := quantumfs.NewDirectoryRecord()
 	newDirRecord.SetType(quantumfs.ObjectTypeHardlink)
 	newDirRecord.SetFilename(finfo.Name())
+	rec := hlinfo.record
+	if rec == nil {
+		panic("Nil record should never happen for hardlink")
+	}
+	newDirRecord.SetFileId(rec.FileId())
 
-	return newDirRecord, true
+	return newDirRecord
+}
+
+// This function is to increment an existing hardlink only
+func (hl *Hardlinks) IncrementHardLink(finfo os.FileInfo) (incSuccess bool,
+	record quantumfs.DirectoryRecord) {
+
+	defer hl.hardLinkInfoMutex.Lock().Unlock()
+
+	stat := finfo.Sys().(*syscall.Stat_t)
+	hlrec := hl.getHardlink_(finfo)
+	if hlrec == nil {
+		return false, nil
+	}
+
+	hlinfo := hl.hardLinkInfoMap[stat.Ino]
+	hlinfo.nlinks++
+	hl.hardLinkInfoMap[stat.Ino] = hlinfo
+
+	return true, hlrec
 }
 
 func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
@@ -71,17 +78,30 @@ func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
 	// need locks to protect the map
 	defer hl.hardLinkInfoMutex.Lock().Unlock()
 
-	// only one caller will do a SetHardLink
 	stat := finfo.Sys().(*syscall.Stat_t)
-	hlinfo := hl.hardLinkInfoMap[stat.Ino]
 
-	hlinfo.record = record
+	// now that we have the lock, check to ensure nobody has created it already
+	existingHl := hl.getHardlink_(finfo)
+	if existingHl != nil {
+		// ensure we increment the hardlink count
+		hlinfo := hl.hardLinkInfoMap[stat.Ino]
+		hlinfo.nlinks++
+		hl.hardLinkInfoMap[stat.Ino] = hlinfo
+
+		return existingHl
+	}
+
+	hl.hardLinkInfoMap[stat.Ino] = &HardLinkInfo{
+		record: record,
+		nlinks: 1,
+	}
 
 	// construct a thin directory record to represent
 	// source of the hard link
 	newDirRecord := quantumfs.NewDirectoryRecord()
 	newDirRecord.SetType(quantumfs.ObjectTypeHardlink)
 	newDirRecord.SetFilename(record.Filename())
+	newDirRecord.SetFileId(record.FileId())
 
 	return newDirRecord
 }

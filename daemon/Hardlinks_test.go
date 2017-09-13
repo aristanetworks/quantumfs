@@ -35,7 +35,7 @@ func TestHardlinkReload(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// artificially insert some hardlinks into the map
-		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 
 		err = syscall.Link(testFileA, workspace+"/subdir/linkFileA")
@@ -76,7 +76,7 @@ func TestHardlinkReload(t *testing.T) {
 		err = api.Branch(test.RelPath(workspace), workspaceB)
 		test.Assert(err == nil, "Unable to branch")
 
-		wsrB, cleanup := test.getWorkspaceRoot(workspaceB)
+		wsrB, cleanup := test.GetWorkspaceRoot(workspaceB)
 		defer cleanup()
 
 		// ensure that the hardlink was able to sync
@@ -282,7 +282,7 @@ func TestHardlinkConversion(t *testing.T) {
 
 		linkInode := test.getInodeNum(linkFile)
 
-		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 		fileId := func() quantumfs.FileId {
 			defer wsr.linkLock.Lock().Unlock()
@@ -309,7 +309,7 @@ func TestHardlinkConversion(t *testing.T) {
 		test.Assert(bytes.Equal(output, data),
 			"File not working after conversion from hardlink")
 
-		wsrB, cleanup := test.getWorkspaceRoot(workspace)
+		wsrB, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 		defer wsrB.linkLock.Lock().Unlock()
 		_, exists := wsrB.hardlinks[fileId]
@@ -480,7 +480,7 @@ func TestHardlinkExtraction(t *testing.T) {
 			"Error getting the file key: %v with a size of %d",
 			err, sz)
 
-		wsr, cleanup := test.getWorkspaceRoot(workspace)
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 		matchXAttrHardlinkExtendedKey(filename, dst, test,
 			quantumfs.ObjectTypeSmallFile, wsr)
