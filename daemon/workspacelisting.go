@@ -446,29 +446,29 @@ func (tsl *TypespaceList) MvChild(c *ctx, dstInode Inode, oldName string,
 func (tsl *TypespaceList) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on TypespaceList")
+	c.vlog("Invalid GetXAttrSize on TypespaceList")
 	return 0, fuse.ENODATA
 }
 
 func (tsl *TypespaceList) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on TypespaceList")
+	c.vlog("Invalid GetXAttrData on TypespaceList")
 	return nil, fuse.ENODATA
 }
 
 func (tsl *TypespaceList) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on TypespaceList")
+	c.vlog("Invalid ListXAttr on TypespaceList")
 	return []byte{}, fuse.OK
 }
 
 func (tsl *TypespaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on TypespaceList")
+	c.vlog("Invalid SetXAttr on TypespaceList")
 	return fuse.Status(syscall.ENOSPC)
 }
 
 func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on TypespaceList")
+	c.vlog("Invalid RemoveXAttr on TypespaceList")
 	return fuse.ENODATA
 }
 
@@ -771,29 +771,29 @@ func (nsl *NamespaceList) MvChild(c *ctx, dstInode Inode, oldName string,
 func (nsl *NamespaceList) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on NamespaceList")
+	c.vlog("Invalid GetXAttrSize on NamespaceList")
 	return 0, fuse.ENODATA
 }
 
 func (nsl *NamespaceList) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on NamespaceList")
+	c.vlog("Invalid GetXAttrData on NamespaceList")
 	return nil, fuse.ENODATA
 }
 
 func (nsl *NamespaceList) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on NamespaceList")
+	c.vlog("Invalid ListXAttr on NamespaceList")
 	return []byte{}, fuse.OK
 }
 
 func (nsl *NamespaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on NamespaceList")
+	c.vlog("Invalid SetXAttr on NamespaceList")
 	return fuse.Status(syscall.ENOSPC)
 }
 
 func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on NamespaceList")
+	c.vlog("Invalid RemoveXAttr on NamespaceList")
 	return fuse.ENODATA
 }
 
@@ -1161,29 +1161,29 @@ func (wsl *WorkspaceList) MvChild(c *ctx, dstInode Inode, oldName string,
 func (wsl *WorkspaceList) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on WorkspaceList")
+	c.vlog("Invalid GetXAttrSize on WorkspaceList")
 	return 0, fuse.ENODATA
 }
 
 func (wsl *WorkspaceList) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on WorkspaceList")
+	c.vlog("Invalid GetXAttrData on WorkspaceList")
 	return nil, fuse.ENODATA
 }
 
 func (wsl *WorkspaceList) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on WorkspaceList")
+	c.vlog("Invalid ListXAttr on WorkspaceList")
 	return []byte{}, fuse.OK
 }
 
 func (wsl *WorkspaceList) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on WorkspaceList")
+	c.vlog("Invalid SetXAttr on WorkspaceList")
 	return fuse.Status(syscall.ENOSPC)
 }
 
 func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on WorkspaceList")
+	c.vlog("Invalid RemoveXAttr on WorkspaceList")
 	return fuse.ENODATA
 }
 

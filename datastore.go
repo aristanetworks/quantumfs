@@ -635,6 +635,16 @@ func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
 	return &record
 }
 
+func GenerateUniqueFileId() FileId {
+	for {
+		newId := FileId(utils.RandomNumberGenerator.Uint64())
+		if newId == InvalidFileId {
+			continue
+		}
+		return newId
+	}
+}
+
 func (r *HardlinkRecord) FileId() uint64 {
 	return r.record.Record().FileId()
 }
