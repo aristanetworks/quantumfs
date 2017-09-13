@@ -4,8 +4,10 @@
 package cql
 
 import (
-	"github.com/gocql/gocql"
+	"os"
 	"time"
+
+	"github.com/gocql/gocql"
 )
 
 // RealCluster is a wrapper around gocql.ClusterConfig
@@ -19,6 +21,13 @@ func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 	c := gocql.NewCluster(clusterCfg.Nodes...)
 	c.ProtoVersion = 3
 	c.Consistency = gocql.Quorum
+	// ConsistencyLevel CL is an undocumented/developer-only/internal
+	// setting hence it is not provided in ClusterConfig
+	cl := os.Getenv("CQL_CL")
+	if cl != "" {
+		// ParseConsistency will panic if illegal values are used
+		c.Consistency = gocql.ParseConsistency(cl)
+	}
 	c.PoolConfig.HostSelectionPolicy =
 		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
 	c.Events.DisableSchemaEvents = true
