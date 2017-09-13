@@ -142,7 +142,7 @@ func (test *testHelper) checkQuploadMatches(workspace string) {
 	test.Assert(strings.Index(outputLines[3], "total size") == 0, diffMsg,
 		output)
 	test.Assert(len(outputLines[4]) == 0, diffMsg, output)
-	
+
 	// If there are no differences, the output will be only 5 lines long
 	test.Assert(len(outputLines) == 5, diffMsg, output)
 }
