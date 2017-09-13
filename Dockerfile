@@ -1,4 +1,4 @@
-FROM fedora:rawhide
+FROM fedora:latest
 
 MAINTAINER shayan@arista.com
 
