@@ -17,19 +17,25 @@ type HardLinkInfo struct {
 	nlinks uint32
 }
 
-// stat.Ino -> hardLinkInfo mapping
-// assumes that the inodes being checked
-// belong to the same filesystem
-var hardLinkInfoMap = make(map[uint64]*HardLinkInfo)
+type Hardlinks struct {
+	// stat.Ino -> hardLinkInfo mapping
+	// assumes that the inodes being checked
+	// belong to the same filesystem
+	hardLinkInfoMap   map[uint64]*HardLinkInfo
+	hardLinkInfoMutex utils.DeferableMutex
+}
 
-// needed for a concurrent client of qwr
-var hardLinkInfoMutex utils.DeferableMutex
+func NewHardlinks() *Hardlinks {
+	return &Hardlinks{
+		hardLinkInfoMap: make(map[uint64]*HardLinkInfo),
+	}
+}
 
-func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
-	defer hardLinkInfoMutex.Lock().Unlock()
+func (hl *Hardlinks) HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
+	defer hl.hardLinkInfoMutex.Lock().Unlock()
 
 	stat := finfo.Sys().(*syscall.Stat_t)
-	hlinfo, exists := hardLinkInfoMap[stat.Ino]
+	hlinfo, exists := hl.hardLinkInfoMap[stat.Ino]
 	if !exists {
 
 		// the FileInfo.Stat already indicates the
@@ -45,7 +51,7 @@ func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
 		// actual record is stored in SetHardLink
 		// its ok until then since all other callers
 		// don't need that information
-		hardLinkInfoMap[stat.Ino] = hlinfo
+		hl.hardLinkInfoMap[stat.Ino] = hlinfo
 		return nil, false
 	}
 
@@ -59,15 +65,15 @@ func HardLink(finfo os.FileInfo) (quantumfs.DirectoryRecord, bool) {
 	return newDirRecord, true
 }
 
-func SetHardLink(finfo os.FileInfo,
+func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
 	record *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
 
 	// need locks to protect the map
-	defer hardLinkInfoMutex.Lock().Unlock()
+	defer hl.hardLinkInfoMutex.Lock().Unlock()
 
 	// only one caller will do a SetHardLink
 	stat := finfo.Sys().(*syscall.Stat_t)
-	hlinfo := hardLinkInfoMap[stat.Ino]
+	hlinfo := hl.hardLinkInfoMap[stat.Ino]
 
 	hlinfo.record = record
 
@@ -80,16 +86,16 @@ func SetHardLink(finfo os.FileInfo,
 	return newDirRecord
 }
 
-func writeHardLinkInfo(qctx *quantumfs.Ctx,
+func (hl *Hardlinks) writeHardLinkInfo(qctx *quantumfs.Ctx,
 	ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error) {
 
 	// entryIdx indexes into the metadata block
-	entryNum := len(hardLinkInfoMap)
+	entryNum := len(hl.hardLinkInfoMap)
 	entryNum, hle := quantumfs.NewHardlinkEntry(entryNum)
 	hleKey := quantumfs.EmptyDirKey
 	entryIdx := 0
 	var err error
-	for _, hlinfo := range hardLinkInfoMap {
+	for _, hlinfo := range hl.hardLinkInfoMap {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			hle.SetNumEntries(entryIdx)
