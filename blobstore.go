@@ -100,7 +100,8 @@ USING TTL %s`, b.keyspace, ttl)
 
 	err := query.Exec()
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in Insert %s", err.Error())
+		return blobstore.NewError(blobstore.ErrOperationFailed,
+			"error in Insert[%s] %s", keyHex, err.Error())
 	}
 	return nil
 }
@@ -130,11 +131,11 @@ WHERE key = ?`, b.keyspace)
 	err := query.Scan(&value, &ttl)
 	if err != nil {
 		if err == gocql.ErrNotFound {
-			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get %s",
-				err.Error())
+			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get[%s] %s",
+				keyHex, err.Error())
 		}
-		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get %s",
-			err.Error())
+		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get[%s] %s",
+			keyHex, err.Error())
 	}
 
 	mdata := make(map[string]string)
@@ -176,11 +177,11 @@ WHERE key = ?`, b.keyspace)
 	err := query.Scan(&ttl)
 	if err != nil {
 		if err == gocql.ErrNotFound {
-			return nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Metadata %s",
-				err.Error())
+			return nil, blobstore.NewError(blobstore.ErrKeyNotFound,
+				"error Metadata[%s] %s", keyHex, err.Error())
 		}
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Metadata %s",
-			err.Error())
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+			"error in Metadata[%s] %s", keyHex, err.Error())
 	}
 	mdata := make(map[string]string)
 	mdata[TimeToLive] = strconv.Itoa(ttl)
