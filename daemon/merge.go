@@ -9,6 +9,93 @@ import (
 	"github.com/aristanetworks/quantumfs"
 )
 
+type hardlinkTracker struct {
+	remote	map[quantumfs.FileId]linkEntry
+	local	map[quantumfs.FileId]linkEntry
+
+	final	map[quantumfs.FileId]linkEntry
+}
+
+func newHardlinkTracker(base_ map[quantumfs.FileId]linkEntry,
+	remote_ map[quantumfs.FileId]linkEntry,
+	local_ map[quantumfs.FileId]linkEntry) *hardlinkTracker {
+
+	rtn := hardlinkTracker {
+		remote: remote_,
+		local: local_,
+		final: make(map[quantumfs.FileId]linkEntry),
+	}
+
+	// make sure final has the newest available record versions
+	for k, v := range base_ {
+		rtn.final[k] = rtn.newestEntry(k)
+	}
+
+	return &rtn
+}
+
+func (ht *hardlinkTracker) checkLinkChg(base quantumfs.DirectoryRecord,
+	final quantumfs.DirectoryRecord) {
+
+	if base.Nlinks() <= 1 && final.Nlinks() <= 1 {
+		// not a hardlink to anyone
+		return
+	}
+
+	baseId := base.FileId()
+	newId := final.FileId()
+
+	if baseId.IsEqualTo(newId) {
+		// no change, so nothing to account for
+		return
+	}
+
+	if final.Nlinks() > 1 {
+		// This is now a new hardlink instance in the system
+		hl.increment(newId)
+	}
+
+	hl.decrement(baseId)
+}
+
+func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
+	link := hl.newestEntry(id)
+	link.nlinks++
+
+	ht.final[id] = link
+}
+
+func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
+	link := hl.newestEntry(id)
+
+	if link <= 1 {
+		delete(hl.final, id)
+		return
+	}
+
+	link.nlinks--
+	ht.final[id] = link
+}
+
+func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) {
+	link, _ := hl.final[id]
+	if remoteLink, exists := hl.remote[id]; link == nil || (exists &&
+		link.ModificationTime() < remoteLink.ModificationTime()) {
+
+		link = remoteLink
+	}
+
+	if localLink, exists := hl.local[id]; link == nil || (exists &&
+		link.ModificationTime() < localLink.ModificationTime()) {
+
+		link = localLink
+	}
+
+	utils.Assert(link != nil, "Unable to find entry for fileId")
+
+	return link
+}
+
 func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]linkEntry,
 	directory quantumfs.ObjectKey, err error) {
