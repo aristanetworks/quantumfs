@@ -5,6 +5,7 @@
 /qupload
 /qwalker
 /emptykeys
+/wsdbservice
 /contentcheck
 /QuantumFS*.rpm
 .*.swp
