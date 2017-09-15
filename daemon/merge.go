@@ -13,6 +13,7 @@ import (
 // hardlinkTracker used to track and compute the final hardlink versions and ref
 // counts. Assumes local will be taken and then compensates when remote is chosen.
 // This allows merge to skip traversing local subtrees as an optimization.
+// Note: We assume that FileId is universally unique and will never collide
 type hardlinkTracker struct {
 	remote	map[quantumfs.FileId]linkEntry
 	local	map[quantumfs.FileId]linkEntry
@@ -165,33 +166,6 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	// We assume that local and remote are newer versions of base
-	for k, v := range remoteHardlinks {
-		_, baseExists := baseHardlinks[k]
-		localLink, localExists := localHardlinks[k]
-
-		if localExists {
-			toSet, getNewId := mergeLink(c, baseExists, v, localLink, k)
-			idToUse := k
-			if getNewId {
-				idToUse = quantumfs.GenerateUniqueFileId()
-			}
-
-			localHardlinks[idToUse] = toSet
-		} else {
-			localHardlinks[k] = v
-		}
-	}
-
-	for k, _ := range baseHardlinks {
-		_, remoteExists := remoteHardlinks[k]
-
-		// We assume that removal takes precedence over modification
-		if !remoteExists {
-			delete(localHardlinks, k)
-		}
-	}
-
 	localDirectory, err = mergeDirectory(c, baseDirectory,
 		remoteDirectory, localDirectory, true)
 	if err != nil {
@@ -199,36 +173,6 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	}
 
 	return publishWorkspaceRoot(c, localDirectory, localHardlinks), nil
-}
-
-func mergeLink(c *ctx, baseExists bool, remote linkEntry, local linkEntry,
-	localId quantumfs.FileId) (toSet linkEntry, generateNewId bool) {
-
-	// If there is no base entry, that means that these hardlinks were
-	// both created independently and aren't related. Separate them by setting
-	// the remote with a new hardlink id
-	if !baseExists {
-		return remote, true
-	}
-
-	rtn := local
-
-	// TODO: Replace with a set of hashes to fix duplicates and miscounts
-	if remote.nlink > local.nlink {
-		rtn.nlink = remote.nlink
-	}
-
-	localModTime := local.record.ModificationTime()
-	if remote.record.ModificationTime() > localModTime {
-		rtn.record = remote.record
-		c.vlog("taking remote record for %s",
-			local.record.Filename())
-	} else {
-		c.vlog("keeping local record for %s",
-			local.record.Filename())
-	}
-
-	return rtn, false
 }
 
 func loadRecords(c *ctx,
