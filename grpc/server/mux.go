@@ -456,9 +456,6 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 			}
 		}
 	}
-
-	panic("ListenForUpdates terminated unexpectedly")
-	return nil
 }
 
 func (m *mux) notifyChange(c *ctx, workspaceName string, requestId *rpc.RequestId,
