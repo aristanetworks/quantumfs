@@ -9,9 +9,9 @@ PKGS_TO_TEST+=quantumfs/cmd/qupload
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
-.PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
+.PHONY: all vet $(COMMANDS) $(PKGS_TO_TEST)
 
-all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck cppstyle vet $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
 	rm -f $(COMMANDS) qfs-386 quantumfsd-static
@@ -23,6 +23,9 @@ fetch:
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
+
+vet:
+	go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]]; then eval $$line || exit 1; fi; done
 
 lockcheck:
 	./lockcheck.sh
