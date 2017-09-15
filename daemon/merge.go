@@ -7,8 +7,12 @@ import (
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
+// hardlinkTracker used to track and compute the final hardlink versions and ref
+// counts. Assumes local will be taken and then compensates when remote is chosen.
+// This allows merge to skip traversing local subtrees as an optimization.
 type hardlinkTracker struct {
 	remote	map[quantumfs.FileId]linkEntry
 	local	map[quantumfs.FileId]linkEntry
@@ -16,8 +20,7 @@ type hardlinkTracker struct {
 	final	map[quantumfs.FileId]linkEntry
 }
 
-func newHardlinkTracker(base_ map[quantumfs.FileId]linkEntry,
-	remote_ map[quantumfs.FileId]linkEntry,
+func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
 	local_ map[quantumfs.FileId]linkEntry) *hardlinkTracker {
 
 	rtn := hardlinkTracker {
@@ -26,72 +29,103 @@ func newHardlinkTracker(base_ map[quantumfs.FileId]linkEntry,
 		final: make(map[quantumfs.FileId]linkEntry),
 	}
 
-	// make sure final has the newest available record versions
-	for k, v := range base_ {
-		rtn.final[k] = rtn.newestEntry(k)
+	// make sure final has the newest available record versions based off local
+	for k, v := range local_ {
+		if remoteEntry, exists := rtn.remote[k]; exists &&
+			v.record.ModificationTime() <
+				remoteEntry.record.ModificationTime() {
+
+			// only take the newer record, not nlink
+			v.record = remoteEntry.record
+		}
+
+		rtn.final[k] = v
 	}
 
 	return &rtn
 }
 
-func (ht *hardlinkTracker) checkLinkChg(base quantumfs.DirectoryRecord,
+// Compares the local record against merge product and tracks any changes
+func (ht *hardlinkTracker) checkLinkChg(local quantumfs.DirectoryRecord,
 	final quantumfs.DirectoryRecord) {
 
-	if base.Nlinks() <= 1 && final.Nlinks() <= 1 {
-		// not a hardlink to anyone
-		return
+	if final != nil {
+		if local != nil {
+			if local.Nlinks() <= 1 && final.Nlinks() <= 1 {
+				// not a hardlink to anyone
+				return
+			}
+
+			if local.FileId() == final.FileId() {
+				// no change, so nothing to account for
+				return
+			}
+		}
+
+		// Execution only reaches here if local is nil or different
+		if final.Nlinks() > 1 {
+			// This is now a new hardlink instance in the system
+			ht.increment(final.FileId())
+		}
 	}
 
-	baseId := base.FileId()
-	newId := final.FileId()
-
-	if baseId.IsEqualTo(newId) {
-		// no change, so nothing to account for
-		return
+	// Execution only reaches here if final is nil or different
+	if local != nil {
+		ht.decrement(local.FileId())
 	}
-
-	if final.Nlinks() > 1 {
-		// This is now a new hardlink instance in the system
-		hl.increment(newId)
-	}
-
-	hl.decrement(baseId)
 }
 
 func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
-	link := hl.newestEntry(id)
-	link.nlinks++
+	link := ht.newestEntry(id)
+	link.nlink++
 
 	ht.final[id] = link
 }
 
 func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
-	link := hl.newestEntry(id)
+	link := ht.newestEntry(id)
 
-	if link <= 1 {
-		delete(hl.final, id)
+	if link.nlink <= 1 {
+		delete(ht.final, id)
 		return
 	}
 
-	link.nlinks--
+	link.nlink--
 	ht.final[id] = link
 }
 
-func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) {
-	link, _ := hl.final[id]
-	if remoteLink, exists := hl.remote[id]; link == nil || (exists &&
-		link.ModificationTime() < remoteLink.ModificationTime()) {
+// Returns the newest linkEntry version available, while preserving nlink from final
+func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
+	link, finalExists := ht.final[id]
+	finalSet := false
+
+	// track nlinks separately so we can preserve it
+	nlinks := uint32(0)
+	if !finalExists {
+		nlinks = link.nlink
+		finalSet = true
+	}
+
+	if remoteLink, exists := ht.remote[id]; !finalSet || (exists &&
+		link.record.ModificationTime() <
+			remoteLink.record.ModificationTime()) {
 
 		link = remoteLink
+		finalSet = true
 	}
 
-	if localLink, exists := hl.local[id]; link == nil || (exists &&
-		link.ModificationTime() < localLink.ModificationTime()) {
+	if localLink, exists := ht.local[id]; !finalSet || (exists &&
+		link.record.ModificationTime() <
+			localLink.record.ModificationTime()) {
 
 		link = localLink
+		finalSet = true
 	}
 
-	utils.Assert(link != nil, "Unable to find entry for fileId")
+	utils.Assert(!finalSet, "Unable to find entry for fileId")
+
+	// restore the preserved nlinks - we only want the newest linkEntry.record
+	link.nlink = nlinks
 
 	return link
 }
