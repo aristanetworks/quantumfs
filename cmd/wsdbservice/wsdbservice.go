@@ -12,6 +12,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 
+	"github.com/aristanetworks/quantumfs/grpc/rpc"
 	"github.com/aristanetworks/quantumfs/grpc/server"
 	"github.com/aristanetworks/quantumfs/qlog"
 )
@@ -33,7 +34,7 @@ func init() {
 
 	flag.StringVar(&logPath, "logPath", "", "Path to place qlog file")
 
-	flag.UintVar(&port, "port", 2222, "Port to listen on")
+	flag.UintVar(&port, "port", uint(rpc.Ports_Default), "Port to listen on")
 
 	flag.StringVar(&wsdbName, "workspaceDB", "processlocal",
 		"Name of the WorkspaceDB to use")
