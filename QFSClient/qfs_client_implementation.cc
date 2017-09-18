@@ -156,7 +156,7 @@ Error ApiImpl::OpenCommon(bool directIo) {
 	}
 
 	if (this->fd == -1) {
-		int flags = O_RDWR;
+		int flags = O_RDWR | O_CLOEXEC;
 		if (directIo) {
 			flags |= O_DIRECT;
 		}
