@@ -11,15 +11,29 @@ set -ex
 qfshostdir=/share/cqfs
 workspaceName=x/y/z
 workdir=wsr
+docker_run_flags="--shm-size 8589934592 --privileged"
 
 docker build -t qfs .
 sudo mkdir -p $qfshostdir
-make
 
-cid=$(docker run -d --shm-size 8589934592 --privileged \
-   -v $GOPATH/bin/:/root/go/bin:rw \
+cid=$(docker run -d $docker_run_flags \
+   qfs rm /root/go/src/github.com/aristanetworks/quantumfs/cmd/qfs/QfsChroot_test.go)
+docker wait $cid
+docker commit $cid qfs:rm
+
+cid=$(docker run -d $docker_run_flags \
+   -w /root/go/src/github.com/aristanetworks/quantumfs \
+   qfs:rm make)
+docker wait $cid
+# Even when make fails, we are going to proceed to the next step
+# This will prevent unittest failures from interfering with running
+# the integration test as long as the quantumfsd binary can be built
+
+docker commit $cid qfs:make
+
+cid=$(docker run -d $docker_run_flags \
    -v ${qfshostdir}:/qfs:shared \
-   qfs /root/go/bin/quantumfsd)
+   qfs:make /root/go/bin/quantumfsd)
 
 docker exec $cid qfs branch _/_/_ $workspaceName
 docker exec $cid qfs enableRootWrite $workspaceName
