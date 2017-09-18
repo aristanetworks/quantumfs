@@ -76,6 +76,10 @@ func NewTestHelper(testName string, testRunDir string,
 	t *testing.T) TestHelper {
 
 	cachePath := testRunDir + "/" + testName
+	logger, err := qlog.NewQlogExt(cachePath+"/ramfs",
+		60*10000*24, "noVersion", NoStdOut)
+	utils.AssertNoErr(err)
+
 	return TestHelper{
 		T:          t,
 		TestName:   testName,
@@ -83,10 +87,9 @@ func NewTestHelper(testName string, testRunDir string,
 		Failed:     make(chan struct{}, 0),
 		StartTime:  time.Now(),
 		CachePath:  cachePath,
-		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-			60*10000*24, "noVersion", NoStdOut),
-		TempDir: TestRunDir + "/" + testName,
-		Timeout: 1500 * time.Millisecond,
+		Logger:     logger,
+		TempDir:    TestRunDir + "/" + testName,
+		Timeout:    1500 * time.Millisecond,
 	}
 }
 

@@ -11,10 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func TestLogSet(t *testing.T) {
-	qlog := NewQlogTiny()
+	qlog, err := NewQlog("")
+	utils.AssertNoErr(err)
 	// let's redirect the log writer in qfs
 	var logs string
 	qlog.SetWriter(ioPipe(&logs))
@@ -57,7 +60,8 @@ func TestLogSet(t *testing.T) {
 }
 
 func TestLogLevels(t *testing.T) {
-	qlog := NewQlogTiny()
+	qlog, err := NewQlog("")
+	utils.AssertNoErr(err)
 
 	qlog.SetLogLevels("")
 	defaultLevels := qlog.LogLevels

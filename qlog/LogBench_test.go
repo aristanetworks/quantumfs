@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 var a uint32
@@ -31,7 +33,8 @@ func tmpDir() string {
 }
 
 func BenchmarkBigStdLog(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	qlog.SetLogLevels("Daemon/*")
 	for i := 0; i < test.N; i++ {
@@ -43,7 +46,8 @@ func BenchmarkBigStdLog(test *testing.B) {
 }
 
 func BenchmarkQuick0Params(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -52,7 +56,8 @@ func BenchmarkQuick0Params(test *testing.B) {
 }
 
 func BenchmarkQuick1Params(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -61,7 +66,8 @@ func BenchmarkQuick1Params(test *testing.B) {
 }
 
 func BenchmarkQuick2Params(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -70,7 +76,8 @@ func BenchmarkQuick2Params(test *testing.B) {
 }
 
 func BenchmarkQuick3Params(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -79,7 +86,8 @@ func BenchmarkQuick3Params(test *testing.B) {
 }
 
 func BenchmarkQuickString(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
@@ -90,7 +98,8 @@ func BenchmarkQuickString(test *testing.B) {
 func BenchmarkBigLogArgsArray(test *testing.B) {
 	// This benchmark is to illustrate that most of the time consumed is in
 	// golang taking variadic params and sticking them into the args... slice
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	var args []interface{}
 	args = append(args, a)
@@ -104,7 +113,8 @@ func BenchmarkBigLogArgsArray(test *testing.B) {
 }
 
 func BenchmarkBigLog(test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 
 	for i := 0; i < test.N; i++ {
 		qlog.Log(LogDaemon, MuxReqId, 1,
