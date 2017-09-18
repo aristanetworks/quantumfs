@@ -276,7 +276,7 @@ func newCircBuf(mapHeader *circBufHeader,
 	return rtn
 }
 
-func newIdStrMap(buf []byte, offset int) IdStrMap {
+func newIdStrMap(buf []byte, offset int) *IdStrMap {
 	var rtn IdStrMap
 	ids := make(map[string]uint16)
 	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
@@ -284,7 +284,7 @@ func newIdStrMap(buf []byte, offset int) IdStrMap {
 	rtn.buffer = (*[mmapStrMapSize /
 		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
 
-	return rtn
+	return &rtn
 }
 
 func newSharedMemory(dir string, filename string, mmapTotalSize int,
@@ -358,7 +358,7 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,
 		mmap[headerOffset:headerOffset+circBufSize])
-	rtn.strIdMap = newIdStrMap(mmap, headerOffset+circBufSize)
+	rtn.strIdMap = *newIdStrMap(mmap, headerOffset+circBufSize)
 	rtn.errOut = errOut
 
 	return &rtn
