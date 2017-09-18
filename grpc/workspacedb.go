@@ -5,6 +5,7 @@ package grpc
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -43,7 +44,26 @@ func shouldRetry(err error) bool {
 	return false
 }
 
+func maybeAddPort(conf string) string {
+	lastColon := strings.LastIndex(conf, ":")
+	lastBracket := strings.LastIndex(conf, "]")
+
+	if lastBracket != -1 { // IPv6
+		if lastColon == -1 || lastColon < lastBracket {
+			conf = fmt.Sprintf("%s:%d", conf, rpc.Ports_Default)
+		}
+	} else { // IPv4 or hostname
+		if lastColon == -1 {
+			conf = fmt.Sprintf("%s:%d", conf, rpc.Ports_Default)
+		}
+	}
+
+	return conf
+}
+
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
+	conf = maybeAddPort(conf)
+
 	wsdb := &workspaceDB{
 		config:           conf,
 		subscriptions:    map[string]bool{},
