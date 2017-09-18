@@ -333,7 +333,7 @@ func setWorkspaceInfo_(tx *bolt.Tx, typespace string, namespace string,
 	typeBucket, err := typespaces.CreateBucketIfNotExists([]byte("" +
 		typespace))
 	if err != nil {
-		return fmt.Errorf("Unable to create typespace: %s", typespace,
+		return fmt.Errorf("Unable to create typespace: %s: %s", typespace,
 			err.Error())
 	}
 
