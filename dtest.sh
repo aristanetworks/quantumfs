@@ -35,14 +35,15 @@ cid=$(docker run -d $docker_run_flags \
    -v ${qfshostdir}:/qfs:shared \
    qfs:make /root/go/bin/quantumfsd)
 
-docker exec $cid qfs branch _/_/_ $workspaceName
-docker exec $cid qfs enableRootWrite $workspaceName
-
-if [ ! -f "${qfshostdir}/api" ]
-then
+while [ ! -f "${qfshostdir}/api" ]
+do
    echo "did not find api file on the host"
-   exit 1
-fi
+   sleep 1
+done
+
+
+docker exec $cid bash -c "cd /qfs && qfs branch _/_/_ $workspaceName"
+docker exec $cid bash -c "cd /qfs && qfs enableRootWrite $workspaceName"
 
 pushd .
 
