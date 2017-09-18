@@ -3,7 +3,7 @@
 # Arista Networks, Inc. Confidential and Proprietary.
 
 # This script builds quantumfs, starts quantumfsd daemon inside a
-# container and does a newtree of a eos-trunc clone and then
+# container and does a newtree of a eos-trunk clone and then
 # runs a4 configure and a4 make on the EosKernel package
 set -ex
 
@@ -37,8 +37,7 @@ a4 newtree $workdir eos-trunk
 cd $workdir
 
 function testPkg() {
-   a4 chroot a4 configure $1
-   a4 chroot a4 make -p $1
+   a4 chroot a4 rpmbuild $1
 }
 
 testPkg EosKernel
