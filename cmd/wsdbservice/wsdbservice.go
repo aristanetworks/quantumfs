@@ -61,7 +61,8 @@ func main() {
 			qlog.PrintToStdout)
 	}
 
-	_, err := server.StartWorkspaceDbd(logger, uint16(port), wsdbName, wsdbConfig)
+	_, err := server.StartWorkspaceDbd(logger, uint16(port), wsdbName,
+		wsdbConfig)
 	if err != nil {
 		fmt.Printf("Failed to initialize: %s", err.Error())
 		os.Exit(exitFailed)
