@@ -168,6 +168,7 @@ func (link *Hardlink) Record() quantumfs.DirectRecord {
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
 	rtn.SetFilename(link.name)
 	rtn.SetFileId(link.fileId)
+	rtn.SetContentTime(link.created)
 	rtn.SetID(link.ID())
 
 	// we only need to return a thin record - just enough information to
