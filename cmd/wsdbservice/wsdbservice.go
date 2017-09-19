@@ -1,7 +1,7 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// wsdbservice is the daemon which implement pub-sub support for all the quantumfsd
+// wsdbservice is the daemon which implements pub-sub support for all the quantumfsd
 // instances on top of an existing persistent workspace DB implementation.
 package main
 
@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	exitOK     = iota
-	exitFailed = iota
+	exitOK = iota
+	exitFailed
 )
 
 var version string
