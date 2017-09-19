@@ -703,3 +703,97 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func (th *TestHelper) getHardlinkLeaf(parentPath string,
+	leaf string) *Hardlink {
+
+	parent := th.getInode(parentPath)
+	parentDir := asDirectory(parent)
+
+	defer parentDir.childRecordLock.Lock().Unlock()
+	record := parentDir.children.recordByName(&th.qfs.c, leaf).Clone()
+	return record.(*Hardlink)
+}
+
+func TestHardlinkCreatedTime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/dirA", 0777))
+
+		dirA := workspace + "/dirA"
+		fileA := dirA + "/fileA"
+		fileB := dirA + "/fileB"
+		fileC := workspace + "/fileC"
+		fileD := workspace + "/fileD"
+		fileE := dirA + "/fileE"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
+		test.AssertNoErr(syscall.Link(fileA, fileB))
+
+		test.AssertNoErr(testutils.PrintToFile(fileC, "dataC"))
+		test.AssertNoErr(syscall.Link(fileC, fileD))
+		test.AssertNoErr(syscall.Link(fileD, fileE))
+
+		recordA := test.getHardlinkLeaf(dirA, "fileA")
+		recordB := test.getHardlinkLeaf(dirA, "fileB")
+		recordC := test.getHardlinkLeaf(workspace, "fileC")
+		recordD := test.getHardlinkLeaf(workspace, "fileD")
+		recordE := test.getHardlinkLeaf(dirA, "fileE")
+
+		var statA, statB, statC, statD, statE syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(fileA, &statA))
+		test.AssertNoErr(syscall.Stat(fileB, &statB))
+		test.AssertNoErr(syscall.Stat(fileC, &statC))
+		test.AssertNoErr(syscall.Stat(fileD, &statD))
+		test.AssertNoErr(syscall.Stat(fileE, &statE))
+
+		test.Assert(statA.Ctim == statB.Ctim, "First link time changed")
+		test.Assert(statC.Ctim == statD.Ctim && statD.Ctim == statE.Ctim,
+			"Second link time changed")
+
+		test.Assert(recordA.created < recordB.created &&
+			recordB.created != recordC.created &&
+			recordC.created < recordD.created &&
+			recordD.created < recordE.created,
+			"Records not all different: %d %d %d %d %d", recordA.created,
+			recordB.created, recordC.created, recordD.created,
+			recordE.created)
+
+		test.Assert(recordA.created != quantumfs.Time(0) &&
+			recordB.created != quantumfs.Time(0) &&
+			recordC.created != quantumfs.Time(0) &&
+			recordD.created != quantumfs.Time(0) &&
+			recordE.created != quantumfs.Time(0),
+			"hardlink instance created time not set")
+
+		// ensure created field is preserved across branching
+		workspaceB := "branch/copyWorkspace/test"
+		api := test.getApi()
+		test.AssertNoErr(api.Branch(test.RelPath(workspace), workspaceB))
+		workspaceB = test.AbsPath(workspaceB)
+
+		dirA = workspaceB + "/dirA"
+		// Read a file from the branched workspace to ensure they instantiate
+		_, err := ioutil.ReadFile(dirA + "/fileA")
+		test.AssertNoErr(err)
+
+		recordA2 := test.getHardlinkLeaf(dirA, "fileA")
+		recordB2 := test.getHardlinkLeaf(dirA, "fileB")
+		recordC2 := test.getHardlinkLeaf(workspaceB, "fileC")
+		recordD2 := test.getHardlinkLeaf(workspaceB, "fileD")
+		recordE2 := test.getHardlinkLeaf(dirA, "fileE")
+
+		test.Assert(recordA.created == recordA2.created &&
+			recordB.created == recordB2.created &&
+			recordC.created == recordC2.created &&
+			recordD.created == recordD2.created &&
+			recordE.created == recordE2.created,
+			"created field not preserved across branching, "+
+				"%d %d, %d %d, %d %d, %d %d, %d %d",
+			recordA.created, recordA2.created, recordB.created,
+			recordB2.created, recordC.created, recordC2.created,
+			recordD.created, recordD2.created, recordE.created,
+			recordE2.created)
+	})
+}
