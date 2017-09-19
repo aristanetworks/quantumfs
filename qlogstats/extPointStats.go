@@ -32,7 +32,7 @@ func (ext *extPointStats) TriggerStrings() []string {
 
 func (ext *extPointStats) ProcessRequest(request []indentedLog) {
 	for _, v := range request {
-		ext.stats.NewPoint(uint64(v.log.T))
+		ext.stats.NewPoint(int64(v.log.T))
 	}
 }
 
