@@ -194,12 +194,16 @@ func TestHardLink(t *testing.T) {
 			filename, err)
 
 		// Mark Hard Link 1
-		link := workspace + "/filelink"
+		fname := "/filelink"
+		link := workspace + fname
+		hlmaps := make(map[string]struct{})
+		hlmaps[fname] = struct{}{}
 		err = os.Link(filename, link)
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
 		test.readWalkCompare(workspace, false)
+		test.checkSmallFileHardlinkKey(workspace, hlmaps)
 	})
 }
 
@@ -215,9 +219,12 @@ func TestChainedHardLinkEntries(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
+		hlmaps := make(map[string]struct{})
 		// Mark Hard Link 1
 		for i := 0; i < quantumfs.MaxDirectoryRecords()+100; i++ {
-			link := workspace + "/filelink_" + strconv.Itoa(i)
+			fname := "/filelink_" + strconv.Itoa(i)
+			hlmaps[fname] = struct{}{}
+			link := workspace + fname
 			err = os.Link(filename, link)
 			test.Assert(err == nil, "Link failed (%s): %s",
 				link, err)
