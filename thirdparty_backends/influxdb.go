@@ -10,7 +10,9 @@ package thirdparty_backends
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/aristanetworks/influxlib/go"
@@ -70,6 +72,10 @@ func (inf *influxlibAdapter) Store(measurement string, tags []quantumfs.Tag,
 	fieldMap := make(map[string]interface{})
 	for _, v := range fields {
 		fieldMap[v.Name] = v.Data
+		kind := reflect.TypeOf(v.Data).Kind()
+		if kind != reflect.Int64 {
+			panic(fmt.Sprintf("name: %s kind: %d", v.Name, kind))
+		}
 	}
 
 	err = inf.connector.WritePoint(measurement, tagMap, fieldMap)
