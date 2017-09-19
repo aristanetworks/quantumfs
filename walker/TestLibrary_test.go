@@ -5,6 +5,7 @@ package walker
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -102,6 +103,40 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
 	return store.datastore.Set(c, key, buf)
+}
+
+// checks that keys for the small files provided in hlpaths are
+// present in WSR's hardlink map
+func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
+	hlpaths map[string]struct{}) {
+
+	db := th.GetWorkspaceDB()
+	ds := th.GetDataStore()
+
+	// Use Walker to walk all the blocks in the workspace.
+	c := &th.TestCtx().Ctx
+	root := strings.Split(th.RelPath(workspace), "/")
+	rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
+	th.Assert(err == nil, "Error getting rootID for %v: %v",
+		root, err)
+
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+		size uint64, isDir bool) error {
+
+		// this check works for small files (1 block) only
+		if _, exists := hlpaths[path]; exists {
+			if !th.HardlinkKeyExists(workspace, key) {
+				return fmt.Errorf(
+					"Key %s Path: %s for single block "+
+						"file absent in hardlink table",
+					key, path)
+			}
+		}
+		return nil
+	}
+
+	err = Walk(c, ds, rootID, wf)
+	th.Assert(err == nil, "Error in walk: %v", err)
 }
 
 func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
