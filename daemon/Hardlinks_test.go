@@ -703,3 +703,45 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func TestHardlinkCreatedTime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/dirA", 0777))
+
+		fileA := workspace + "/dirA/fileA"
+		fileB := workspace + "/dirA/fileB"
+		fileC := workspace + "/fileC"
+		fileD := workspace + "/fileD"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
+		test.AssertNoErr(syscall.Link(fileA, fileB))
+
+		test.AssertNoErr(testutils.PrintToFile(fileC, "dataC"))
+		test.AssertNoErr(syscall.Link(fileC, fileD))
+
+		recordA := test.GetRecord(fileA).(*Hardlink)
+		recordB := test.GetRecord(fileB).(*Hardlink)
+		recordC := test.GetRecord(fileC).(*Hardlink)
+		recordD := test.GetRecord(fileD).(*Hardlink)
+
+		var statA, statB, statC, statD syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(fileA, &statA))
+		test.AssertNoErr(syscall.Stat(fileB, &statB))
+		test.AssertNoErr(syscall.Stat(fileC, &statC))
+		test.AssertNoErr(syscall.Stat(fileD, &statD))
+
+		test.Assert(statA.Ctim == statB.Ctim, "First link time changed")
+		test.Assert(statC.Ctim == statD.Ctim, "Second link time changed")
+
+		test.Assert(recordA.created != recordB.created &&
+			recordB.created != recordC.created &&
+			recordC.created != recordD.created,
+			"Records not all different: %d %d %d %d", recordA.created,
+			recordB.created, recordC.created, recordD.created)
+
+		test.Assert(recordA.created != quantumfs.Time(0),
+			"hardlink instance created time not set")
+	})
+}
