@@ -10,7 +10,6 @@ package thirdparty_backends
 // You will need to do the same in daemon/Ether_test.go as well.
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -312,22 +311,16 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 		wsdb: cql.NewWorkspaceDB(path),
 	}
 
-	// since generic wsdb API sets up _null/null with nil key
+	// CreateWorkspace is safe to be called 2 by clients of eWsdb in parallel,
+	// since both will write the same end value.
 	// TODO(sid): Since qfs does not provide a context here, used
 	// ether.DefaultCtx. If the higher layers init the Ctx before
 	// initializing the backends, this can be solved.
-	key, err := eWsdb.wsdb.AdvanceWorkspace(ether.DefaultCtx,
+	err := eWsdb.wsdb.CreateWorkspace(ether.DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, []byte(nil),
-		quantumfs.EmptyWorkspaceKey.Value())
+		quantumfs.NullSpaceName, quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
-		// an existing workspaceDB will have currentRootID as
-		// EmptyWorkspaceKey
-		wE, _ := err.(*wsdb.Error)
-		if wE.Code != wsdb.ErrWorkspaceOutOfDate ||
-			!bytes.Equal(key, quantumfs.EmptyWorkspaceKey.Value()) {
-			panic(fmt.Sprintf("Failed wsdb setup: %s", err.Error()))
-		}
+		panic(fmt.Sprintf("Failed wsdb setup: %s", err.Error()))
 	}
 
 	return eWsdb
