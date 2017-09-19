@@ -790,7 +790,7 @@ func TestHardlinkCreatedTime(t *testing.T) {
 			recordD.created == recordD2.created &&
 			recordE.created == recordE2.created,
 			"created field not preserved across branching, "+
-			"%d %d, %d %d, %d %d, %d %d, %d %d",
+				"%d %d, %d %d, %d %d, %d %d, %d %d",
 			recordA.created, recordA2.created, recordB.created,
 			recordB2.created, recordC.created, recordC2.created,
 			recordD.created, recordD2.created, recordE.created,
