@@ -18,7 +18,7 @@ type Hardlink struct {
 	// hidden field only used for merging
 	created quantumfs.Time
 
-	wsr    *WorkspaceRoot
+	wsr *WorkspaceRoot
 }
 
 func newHardlink(name string, fileId quantumfs.FileId, created quantumfs.Time,
