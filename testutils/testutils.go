@@ -141,9 +141,7 @@ func (th *TestHelper) Assert(condition bool, format string, args ...interface{})
 // A lot of times you're trying to do a test and you get error codes. The errors
 // often describe the problem better than any th.Assert message, so use them
 func (th *TestHelper) AssertNoErr(err error) {
-	if err != nil {
-		th.Assert(false, err.Error())
-	}
+	utils.AssertNoErr(err)
 }
 
 func (th *TestHelper) AssertErr(err error) {
