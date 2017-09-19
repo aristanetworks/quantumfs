@@ -230,6 +230,7 @@ func TestChainedHardLinkEntries(t *testing.T) {
 				link, err)
 		}
 		test.readWalkCompare(workspace, false)
+		test.checkSmallFileHardlinkKey(workspace, hlmaps)
 	})
 }
 
