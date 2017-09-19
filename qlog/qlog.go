@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type LogSubsystem uint8
@@ -231,40 +233,42 @@ func PrintToStdout(format string, args ...interface{}) error {
 	return err
 }
 
-func NewQlogTiny() *Qlog {
-	return NewQlogExt("", uint64(DefaultMmapSize), "noVersion", PrintToStdout)
-}
-
-func NewQlog(ramfsPath string) *Qlog {
+func NewQlog(ramfsPath string) (*Qlog, error) {
 	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), "noVersion",
 		PrintToStdout)
 }
 
 func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
-	outLog func(format string, args ...interface{}) error) *Qlog {
+	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
 
 	if sharedMemLen == 0 {
-		panic(fmt.Sprintf("Invalid shared memory length provided: %d\n",
-			sharedMemLen))
+		return nil, fmt.Errorf("Invalid shared memory length provided: %d\n",
+			sharedMemLen)
 	}
 
 	q := Qlog{
 		LogLevels: 0,
 		Write:     outLog,
 	}
-	q.logBuffer = newSharedMemory(ramfsPath, defaultMmapFile, int(sharedMemLen),
-		daemonVersion, &q)
+	var err error
+	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
+		int(sharedMemLen), daemonVersion, &q)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// check that our logLevel container is large enough for our subsystems
 	if (uint8(logSubsystemMax) * maxLogLevels) >
 		uint8(unsafe.Sizeof(q.LogLevels))*8 {
 
-		panic("Log level structure not large enough for given subsystems")
+		return nil, fmt.Errorf("Log level structure not large enough " +
+			"for given subsystems")
 	}
 
 	q.SetLogLevels(os.Getenv(logEnvTag))
 
-	return &q
+	return &q, nil
 }
 
 func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
@@ -349,12 +353,8 @@ func NewQlogger(subsystem string, ramfsPath string) *Qlogger {
 		sub = newLogSubsystem(subsystem)
 	}
 
-	var log *Qlog
-	if ramfsPath != "" {
-		log = NewQlog(ramfsPath)
-	} else {
-		log = NewQlogTiny()
-	}
+	log, err := NewQlog(ramfsPath)
+	utils.AssertNoErr(err)
 	qlogger := &Qlogger{
 		RequestId: 0,
 		qlog:      log,

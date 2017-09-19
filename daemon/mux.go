@@ -70,9 +70,13 @@ func NewQuantumFsLogs(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	return NewQuantumFs_(config, qlogIn)
 }
 
-func NewQuantumFs(config QuantumFsConfig, version string) *QuantumFs {
-	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
-		config.MemLogBytes, version, qlog.PrintToStdout))
+func NewQuantumFs(config QuantumFsConfig, version string) (*QuantumFs, error) {
+	logger, err := qlog.NewQlogExt(config.CachePath,
+		config.MemLogBytes, version, qlog.PrintToStdout)
+	if err != nil {
+		return nil, err
+	}
+	return NewQuantumFs_(config, logger), nil
 }
 
 type workspaceState int
