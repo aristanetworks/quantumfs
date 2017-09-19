@@ -10,9 +10,7 @@ package thirdparty_backends
 
 import (
 	"flag"
-	"fmt"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/aristanetworks/influxlib/go"
