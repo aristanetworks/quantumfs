@@ -8,7 +8,7 @@ package cql
 import (
 	"testing"
 
-	"github.com/aristanetworks/ether/qubit/wsdb"
+	qwsdb "github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -24,6 +24,9 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	suite.Require().NoError(err, "SetupSchema returned an error")
 
 	wsdb := NewWorkspaceDB(confFile)
+
+	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName, []byte(nil))
+	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
 		req: suite.Require(),
@@ -56,8 +59,8 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceLastWriteTime() {
 }
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
-	err := suite.common.db.BranchWorkspace(integTestEtherCtx, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, wsdb.NullSpaceName,
+	err := suite.common.db.BranchWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
+		qwsdb.NullSpaceName, qwsdb.NullSpaceName,
 		"ts1", "ns1", "ws1")
 	suite.Require().NoError(err,
 		"Error branching null workspace: %v", err)

@@ -38,12 +38,6 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 		keyspace: cfg.Cluster.KeySpace,
 	}
 
-	err = wsdbInst.wsdbKeyPut(ether.DefaultCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, []byte(nil))
-	if err != nil {
-		return nil, err
-	}
-
 	return wsdbInst, nil
 }
 
@@ -171,6 +165,22 @@ func (nc *noCacheWsdb) WorkspaceExists(c ether.Ctx, typespace string, namespace 
 // of branch operation
 func isTypespaceLocked(typespace string) bool {
 	return typespace == wsdb.NullSpaceName
+}
+
+func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
+	workspace string, wsKey wsdb.ObjectKey) error {
+
+	defer c.FuncIn("noCacheWsdb::CreateWorkspace", "%s/%s/%s(%s)", typespace, namespace,
+		workspace, wsKey).Out()
+
+	err := nc.wsdbKeyPut(ether.DefaultCtx, typespace, namespace, workspace, wsKey)
+	if err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Put in CreateWorkspace %s/%s/%s(%s) : %s",
+			typespace, namespace, workspace, wsKey, err.Error())
+	}
+
+	return nil
 }
 
 func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,

@@ -8,7 +8,7 @@ package cql
 import (
 	"testing"
 
-	"github.com/aristanetworks/ether/qubit/wsdb"
+	qwsdb "github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -26,10 +26,13 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	err = SetupTestSchema(confFile)
 	suite.Require().NoError(err, "SetupSchema returned an error")
 
-	var wsdb wsdb.WorkspaceDB
+	var wsdb qwsdb.WorkspaceDB
 	cluster := NewRealCluster(cfg.Cluster)
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
+
+	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName, []byte(nil))
+	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
 		req: suite.Require(),

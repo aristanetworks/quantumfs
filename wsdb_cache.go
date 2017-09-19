@@ -152,6 +152,19 @@ func (cw *cacheWsdb) WorkspaceExists(c ether.Ctx, typespace string,
 	return exist, nil
 }
 
+func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
+	workspace string, wsKey wsdb.ObjectKey) error {
+
+	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)", typespace, namespace,
+		workspace, wsKey).Out()
+
+	err := cw.base.CreateWorkspace(c, typespace, namespace, workspace, wsKey)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cw *cacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamespace string,
 	srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
