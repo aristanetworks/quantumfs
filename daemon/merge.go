@@ -152,7 +152,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 
 	defer c.funcIn("mergeWorkspaceRoot").Out()
 
-	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
+	_, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
 		return local, err
 	}
@@ -166,8 +166,10 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
+	tracker := newHardlinkTracker(remoteHardlinks, localHardlinks)
+
 	localDirectory, err = mergeDirectory(c, baseDirectory,
-		remoteDirectory, localDirectory, true)
+		remoteDirectory, localDirectory, true, tracker)
 	if err != nil {
 		return local, err
 	}
@@ -205,7 +207,7 @@ func loadRecords(c *ctx,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht hardlinkTracker) (quantumfs.ObjectKey, error) {
+	baseExists bool, ht *hardlinkTracker) (quantumfs.ObjectKey, error) {
 
 	defer c.funcIn("mergeDirectory").Out()
 
@@ -239,7 +241,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		if inLocal {
 			// We have at least a local and remote, must merge
 			finalRecords[k], err = mergeRecord(c, baseChild, v,
-				localChild)
+				localChild, ht)
 			if err != nil {
 				return local, err
 			}
@@ -269,7 +271,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 	// turn finalRecords into a publish-able format
 	localRecordsList := make([]quantumfs.DirectoryRecord, 0, len(finalRecords))
-	for k, v := range finalRecords {
+	for _, v := range finalRecords {
 		localRecordsList = append(localRecordsList, v)
 	}
 
@@ -300,8 +302,8 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 }
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
+	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
+	ht *hardlinkTracker) (quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
 
@@ -325,7 +327,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 			}
 
 			mergedKey, err = mergeDirectory(c, baseId,
-				remote.ID(), local.ID(), (base != nil))
+				remote.ID(), local.ID(), (base != nil), ht)
 			if err != nil {
 				return local, err
 			}
@@ -334,12 +336,13 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 		}
 	case quantumfs.ObjectTypeHardlink:
 		if bothSameType {
-			mergedKey, err = mergeLink(c, remote, local)
-			if err != nil {
-				return local, err
+			// hardlinks use ContentTime to store their created timestamp
+			if remote.ContentTime() > local.ContentTime() {
+				c.vlog("taking remote copy of %s", remote.Filename())
+				return remote, nil
 			}
 
-			updatedKey = true
+			return local, nil
 		}
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
@@ -390,11 +393,4 @@ func mergeFile(c *ctx, remote quantumfs.DirectoryRecord,
 
 	// support intra-file merges here later
 	return takeNewest(c, remote, local), nil
-}
-
-func mergeLink(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) (quantumfs.ObjectKey, error) {
-
-	// TODO: add per link pointer times
-	return local, nil
 }
