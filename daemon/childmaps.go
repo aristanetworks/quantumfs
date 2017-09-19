@@ -147,7 +147,8 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
-		entry = newHardlink(entry.Filename(), fileId, cmap.wsr)
+		entry = newHardlink(entry.Filename(), fileId, entry.ContentTime(),
+			cmap.wsr)
 		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, fileId, inodeId)
 
 		// If you try to load a hardlink and provide a real inodeId, it

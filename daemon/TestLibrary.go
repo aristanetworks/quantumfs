@@ -76,7 +76,7 @@ func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	return parentDir.children.record(inode.inodeNum()).Clone()
+	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum()).Clone()
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {
