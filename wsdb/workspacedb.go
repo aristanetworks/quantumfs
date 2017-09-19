@@ -115,6 +115,16 @@ type WorkspaceDB interface {
 
 	// These methods need to be atomic, but may retry internally
 
+	// CreateWorkspace creates typespace/namespace/workspace workspace
+	// with the key as wsKey. There are no checks to see if the workspace
+	// already exists. To be used from only inside init functions of clients of
+	// etherWorkspaceDB.
+	//
+	// Possible errors are:
+	//  ErrWorkspaceExists
+	CreateWorkspace(c ether.Ctx, typespace string, namespace string,
+		workspace string, wsKey ObjectKey) error
+
 	// BranchWorkspace branches srcNamespace/srcWorkspace to create
 	// dstNamespace/dstWorkspace
 	//
