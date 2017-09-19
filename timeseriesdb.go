@@ -6,10 +6,10 @@ package quantumfs
 
 type Field struct {
 	Name string
-	Data uint64
+	Data int64
 }
 
-func NewField(name_ string, data_ uint64) Field {
+func NewField(name_ string, data_ int64) Field {
 	return Field{
 		Name: name_,
 		Data: data_,
