@@ -704,44 +704,67 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 	})
 }
 
+func (th *TestHelper) getHardlinkLeaf(parentPath string,
+	leaf string) *Hardlink {
+
+	parent := th.getInode(parentPath)
+	parentDir := asDirectory(parent)
+
+	defer parentDir.childRecordLock.Lock().Unlock()
+	record := parentDir.children.recordByName(&th.qfs.c, leaf).Clone()
+	return record.(*Hardlink)
+}
+
 func TestHardlinkCreatedTime(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
 		test.AssertNoErr(utils.MkdirAll(workspace+"/dirA", 0777))
 
-		fileA := workspace + "/dirA/fileA"
-		fileB := workspace + "/dirA/fileB"
+		dirA := workspace + "/dirA"
+		fileA := dirA + "/fileA"
+		fileB := dirA + "/fileB"
 		fileC := workspace + "/fileC"
 		fileD := workspace + "/fileD"
+		fileE := dirA + "/fileE"
 
 		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
 		test.AssertNoErr(syscall.Link(fileA, fileB))
 
 		test.AssertNoErr(testutils.PrintToFile(fileC, "dataC"))
 		test.AssertNoErr(syscall.Link(fileC, fileD))
+		test.AssertNoErr(syscall.Link(fileD, fileE))
 
-		recordA := test.GetRecord(fileA).(*Hardlink)
-		recordB := test.GetRecord(fileB).(*Hardlink)
-		recordC := test.GetRecord(fileC).(*Hardlink)
-		recordD := test.GetRecord(fileD).(*Hardlink)
+		recordA := test.getHardlinkLeaf(dirA, "fileA")
+		recordB := test.getHardlinkLeaf(dirA, "fileB")
+		recordC := test.getHardlinkLeaf(workspace, "fileC")
+		recordD := test.getHardlinkLeaf(workspace, "fileD")
+		recordE := test.getHardlinkLeaf(dirA, "fileE")
 
-		var statA, statB, statC, statD syscall.Stat_t
+		var statA, statB, statC, statD, statE syscall.Stat_t
 		test.AssertNoErr(syscall.Stat(fileA, &statA))
 		test.AssertNoErr(syscall.Stat(fileB, &statB))
 		test.AssertNoErr(syscall.Stat(fileC, &statC))
 		test.AssertNoErr(syscall.Stat(fileD, &statD))
+		test.AssertNoErr(syscall.Stat(fileE, &statE))
 
 		test.Assert(statA.Ctim == statB.Ctim, "First link time changed")
-		test.Assert(statC.Ctim == statD.Ctim, "Second link time changed")
+		test.Assert(statC.Ctim == statD.Ctim && statD.Ctim == statE.Ctim,
+			"Second link time changed")
 
 		test.Assert(recordA.created != recordB.created &&
 			recordB.created != recordC.created &&
-			recordC.created != recordD.created,
-			"Records not all different: %d %d %d %d", recordA.created,
-			recordB.created, recordC.created, recordD.created)
+			recordC.created != recordD.created &&
+			recordD.created != recordE.created,
+			"Records not all different: %d %d %d %d %d", recordA.created,
+			recordB.created, recordC.created, recordD.created,
+			recordE.created)
 
-		test.Assert(recordA.created != quantumfs.Time(0),
+		test.Assert(recordA.created != quantumfs.Time(0) &&
+			recordB.created != quantumfs.Time(0) &&
+			recordC.created != quantumfs.Time(0) &&
+			recordD.created != quantumfs.Time(0) &&
+			recordE.created != quantumfs.Time(0),
 			"hardlink instance created time not set")
 	})
 }
