@@ -766,5 +766,34 @@ func TestHardlinkCreatedTime(t *testing.T) {
 			recordD.created != quantumfs.Time(0) &&
 			recordE.created != quantumfs.Time(0),
 			"hardlink instance created time not set")
+
+		// ensure created field is preserved across branching
+		workspaceB := "branch/copyWorkspace/test"
+		api := test.getApi()
+		test.AssertNoErr(api.Branch(test.RelPath(workspace), workspaceB))
+		workspaceB = test.AbsPath(workspaceB)
+
+		dirA = workspaceB + "/dirA"
+		// Read a file from the branched workspace to ensure they instantiate
+		_, err := ioutil.ReadFile(dirA + "/fileA")
+		test.AssertNoErr(err)
+
+		recordA2 := test.getHardlinkLeaf(dirA, "fileA")
+		recordB2 := test.getHardlinkLeaf(dirA, "fileB")
+		recordC2 := test.getHardlinkLeaf(workspaceB, "fileC")
+		recordD2 := test.getHardlinkLeaf(workspaceB, "fileD")
+		recordE2 := test.getHardlinkLeaf(dirA, "fileE")
+
+		test.Assert(recordA.created == recordA2.created &&
+			recordB.created == recordB2.created &&
+			recordC.created == recordC2.created &&
+			recordD.created == recordD2.created &&
+			recordE.created == recordE2.created,
+			"created field not preserved across branching, "+
+			"%d %d, %d %d, %d %d, %d %d, %d %d",
+			recordA.created, recordA2.created, recordB.created,
+			recordB2.created, recordC.created, recordC2.created,
+			recordD.created, recordD2.created, recordE.created,
+			recordE2.created)
 	})
 }
