@@ -29,6 +29,7 @@ const (
 	exitProfileFail         = iota
 	exitDataStoreInitFail   = iota
 	exitWorkspaceDbInitFail = iota
+	exitInitFailed          = iota
 )
 
 var version string
@@ -200,7 +201,13 @@ func main() {
 		Name: "QuantumFS",
 	}
 
-	quantumfs := daemon.NewQuantumFs(config, "QuantumFs "+version)
+	quantumfs, err := daemon.NewQuantumFs(config, "QuantumFs "+version)
+
+	if err != nil {
+		fmt.Printf("Could not initilize quantumfs: %s\n", err.Error())
+		os.Exit(exitInitFailed)
+
+	}
 
 	if quantumfs.Mount(mountOptions) != nil {
 		os.Exit(exitMountFail)
