@@ -381,13 +381,11 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	c.vlog("Converting %s into a hardlink", childname)
 	newLink := cmap.wsr.newHardlink(c, childId, child)
 
-	linkCopy := *newLink
-	linkCopy.created = quantumfs.NewTime(time.Now())
-
-	linkSrcCopy := *newLink
-
+	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
-	cmap.setRecord(childId, &linkSrcCopy)
+	cmap.setRecord(childId, linkSrcCopy)
 
-	return &linkCopy, fuse.OK
+	newLink.created = quantumfs.NewTime(time.Now())
+	newLink.SetContentTime(newLink.created)
+	return newLink, fuse.OK
 }

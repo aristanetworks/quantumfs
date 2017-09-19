@@ -752,10 +752,10 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		test.Assert(statC.Ctim == statD.Ctim && statD.Ctim == statE.Ctim,
 			"Second link time changed")
 
-		test.Assert(recordA.created != recordB.created &&
+		test.Assert(recordA.created < recordB.created &&
 			recordB.created != recordC.created &&
-			recordC.created != recordD.created &&
-			recordD.created != recordE.created,
+			recordC.created < recordD.created &&
+			recordD.created < recordE.created,
 			"Records not all different: %d %d %d %d %d", recordA.created,
 			recordB.created, recordC.created, recordD.created,
 			recordE.created)
