@@ -334,7 +334,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		// this ObjectType will only be seen when
 		// looking at a directoryRecord reached from
 		// directoryEntry and not when walking from
-		// hardlinkEntry
+		// hardlinkEntry table
 
 		// hence use key from hardlinkRecord
 		hldr, exists := c.hlkeys[dr.FileId()]

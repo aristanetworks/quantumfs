@@ -303,6 +303,8 @@ func TestLargeFileLinkWalk(t *testing.T) {
 			link, err)
 		test.readWalkCompare(workspace, false)
 		// can't use test.checkSmallFileHardlinkKey
+		// TODO(kthommandra): add support for checking key in
+		// directoryRecord of an object and it's other keys.
 	})
 }
 
