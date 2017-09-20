@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -53,10 +54,14 @@ func (c *Ctx) FuncInName(funcName string) ether.FuncOut {
 func newCtx() *Ctx {
 	var c Ctx
 	// Create  Ctx with random RequestId
-	Qlog := qlog.NewQlogTiny()
+	logger, err := qlog.NewQlog("")
+	if err != nil {
+		fmt.Printf("Error in initializing NewQlog: %v\n", err)
+		os.Exit(1)
+	}
 	requestID := uint64(1)
 	c.Ctx = quantumfs.Ctx{
-		Qlog:      Qlog,
+		Qlog:      logger,
 		RequestId: requestID,
 	}
 
