@@ -10,7 +10,6 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type indentedLog struct {
@@ -85,8 +84,7 @@ type Aggregator struct {
 	statTriggers    map[string][]extractorIdx
 	requestEndAfter time.Duration
 
-	queueMutex utils.DeferableMutex
-	queueLogs  []qlog.LogOutput
+	logQueue chan *qlog.LogOutput
 }
 
 const errorStr = "ERROR: "
@@ -102,7 +100,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
-		queueLogs:       make([]qlog.LogOutput, 0),
+		logQueue:        make(chan *qlog.LogOutput, 1000000),
 	}
 
 	// Sync all extractors and setup their triggers
@@ -130,24 +128,8 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 func (agg *Aggregator) ProcessThread() {
 	for {
-		logs := func() []qlog.LogOutput {
-			defer agg.queueMutex.Lock().Unlock()
-
-			// nothing to do
-			if len(agg.queueLogs) == 0 {
-				return []qlog.LogOutput{}
-			}
-
-			// Take a small performance hit in creating a new array,
-			// but gain a much quicker mutex unlock
-			rtn := agg.queueLogs
-			agg.queueLogs = make([]qlog.LogOutput, 0)
-			return rtn
-		}()
-
-		for _, log := range logs {
-			agg.processLog(log)
-		}
+		log := <-agg.logQueue
+		agg.processLog(*log)
 
 		// Now check if any requests are old and ready to go to extractors
 		now := time.Now()
@@ -191,8 +173,6 @@ func (agg *Aggregator) ProcessThread() {
 				agg.statExtractors[i] = extractor
 			}
 		}
-
-		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -251,9 +231,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 }
 
 func (agg *Aggregator) ProcessLog(v qlog.LogOutput) {
-	defer agg.queueMutex.Lock().Unlock()
-
-	agg.queueLogs = append(agg.queueLogs, v)
+	agg.logQueue <- &v
 }
 
 func (agg *Aggregator) processLog(v qlog.LogOutput) {
