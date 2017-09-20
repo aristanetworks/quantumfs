@@ -15,13 +15,13 @@ type Hardlink struct {
 	name   string
 	fileId quantumfs.FileId
 
-	// hidden field only used for merging
-	created quantumfs.Time
+	// hidden field only used for merging. Stored in the ContentTime field.
+	creationTime quantumfs.Time
 
 	wsr *WorkspaceRoot
 }
 
-func newHardlink(name string, fileId quantumfs.FileId, created quantumfs.Time,
+func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Time,
 	wsr *WorkspaceRoot) *Hardlink {
 
 	utils.Assert(fileId != quantumfs.InvalidFileId,
@@ -30,7 +30,7 @@ func newHardlink(name string, fileId quantumfs.FileId, created quantumfs.Time,
 	newLink.name = name
 	newLink.wsr = wsr
 	newLink.fileId = fileId
-	newLink.created = created
+	newLink.creationTime = creationTime
 
 	return &newLink
 }
@@ -168,7 +168,7 @@ func (link *Hardlink) Record() quantumfs.DirectRecord {
 	rtn.SetType(quantumfs.ObjectTypeHardlink)
 	rtn.SetFilename(link.name)
 	rtn.SetFileId(link.fileId)
-	rtn.SetContentTime(link.created)
+	rtn.SetContentTime(link.creationTime)
 	rtn.SetID(link.ID())
 
 	// we only need to return a thin record - just enough information to
@@ -221,5 +221,5 @@ func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryReco
 }
 
 func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
-	return newHardlink(link.name, link.fileId, link.created, link.wsr)
+	return newHardlink(link.name, link.fileId, link.creationTime, link.wsr)
 }
