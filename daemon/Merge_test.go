@@ -9,6 +9,8 @@ import (
 	"os"
 	"syscall"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs/testutils"
 )
 
 type mergeTestCheck func(merged string)
@@ -145,6 +147,38 @@ func TestMergeDifferentTypes(t *testing.T) {
 			return func(merged string) {
 				test.CheckData(merged+"/fileA", dataB)
 				test.CheckData(merged+"/fileB", dataA2)
+			}
+		})
+	})
+}
+
+func TestMergeHardlinksOverlap(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "A data contents"
+			test.AssertNoErr(os.MkdirAll(branchA + "/dirA", 0777))
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/dirA/fileA",
+				dataA))
+			test.AssertNoErr(syscall.Link(branchA+"/dirA/fileA",
+				branchA+"/fileB"))
+
+			dataC := "C data contents"
+			test.AssertNoErr(os.MkdirAll(branchB + "/dirA", 0777))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/dirA/fileC",
+				dataC))
+			test.AssertNoErr(syscall.Link(branchB+"/dirA/fileC",
+				branchB+"/fileB"))
+			test.AssertNoErr(syscall.Link(branchB+"/dirA/fileC",
+				branchB+"/fileD"))
+
+			test.AssertNoErr(syscall.Link(branchA+"/dirA/fileA",
+				branchA+"/fileD"))
+
+			return func(merged string) {
+				test.CheckData(merged+"/fileB", []byte(dataC))
+				test.CheckData(merged+"/fileD", []byte(dataA))
 			}
 		})
 	})
