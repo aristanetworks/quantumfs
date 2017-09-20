@@ -191,7 +191,9 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 		}
 
 		// Check for partial matching for errors
-		if curlog.Format[:len(errorStr)] == errorStr {
+		if len(curlog.Format) > len(errorStr) &&
+			curlog.Format[:len(errorStr)] == errorStr {
+
 			agg.errorCount.ProcessRequest([]indentedLog{
 				indentedLog{
 					log:    curlog,
@@ -214,6 +216,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 					log:    curlog,
 					indent: indentCount,
 				})
+
 				filteredRequests[triggered] = filtered
 			}
 		}
