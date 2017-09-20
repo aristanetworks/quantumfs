@@ -797,3 +797,37 @@ func TestHardlinkCreatedTime(t *testing.T) {
 			recordE2.created)
 	})
 }
+
+// test to ensure that renaming a hardlink resets its creationTime
+func TestHardlinkRenameCreation(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		dirA := workspace + "/dirA"
+		dirB := workspace + "/dirA/dirB"
+		test.AssertNoErr(utils.MkdirAll(dirB, 0777))
+
+		fileA := dirA + "/fileA"
+		fileB := dirA + "/fileB"
+		fileC := dirA + "/fileC"
+		fileD := dirB + "/fileD"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
+		test.AssertNoErr(syscall.Link(fileA, fileB))
+
+		recordA := test.getHardlinkLeaf(dirA, "fileA")
+		recordB := test.getHardlinkLeaf(dirA, "fileB")
+
+		test.AssertNoErr(os.Rename(fileA, fileC))
+		recordC := test.getHardlinkLeaf(dirA, "fileC")
+
+		test.AssertNoErr(os.Rename(fileB, fileD))
+		recordD := test.getHardlinkLeaf(dirB, "fileD")
+
+		// test both rename and mvchild
+		test.Assert(recordA.creationTime < recordC.creationTime,
+			"Rename of hardlink doesn't reset creationTime")
+		test.Assert(recordB.creationTime < recordD.creationTime,
+			"Mvchild of hardlink doesn't reset creationTime")
+	})
+}
