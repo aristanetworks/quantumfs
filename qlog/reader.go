@@ -163,7 +163,7 @@ func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 	haveReadTo uint64) {
 
-	rtn := make([]LogOutput, 0)
+	logs = make([]LogOutput, 0, 1000000)
 
 	distanceToEnd := read.circBufSize - 1
 	lastReadyIdx := pastEndIdx
@@ -210,16 +210,24 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 		distanceToEnd = newDistanceToEnd
 
 		if ready {
-			rtn = append([]LogOutput{logOutput}, rtn...)
+			logs = append(logs, logOutput)
 		} else {
-			rtn = make([]LogOutput, 0)
+			logs = make([]LogOutput, 0, 1000000)
 			lastReadyIdx = readTo
 			wrapMinusEquals(&lastReadyIdx, uint64(packetLen),
 				read.circBufSize)
 		}
 	}
 
-	return rtn, lastReadyIdx
+	// Reverse logs into chronological order
+	numEntries := len(logs)
+	backwardsLogs := logs
+	logs = make([]LogOutput, numEntries)
+	for i, val := range backwardsLogs {
+		logs[numEntries-1-i] = val
+	}
+
+	return logs, lastReadyIdx
 }
 
 func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
