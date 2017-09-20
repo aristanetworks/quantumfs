@@ -44,7 +44,7 @@ type Ctx struct {
 	Qctx   *quantumfs.Ctx
 	rootID quantumfs.ObjectKey
 
-	hlkeys map[quantumfs.FileId]quantumfs.ObjectKey
+	hlkeys map[quantumfs.FileId]*quantumfs.DirectRecord
 }
 
 type workerData struct {
@@ -106,7 +106,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		Context: groupCtx,
 		Qctx:    cq,
 		rootID:  rootID,
-		hlkeys:  make(map[quantumfs.FileId]quantumfs.ObjectKey),
+		hlkeys:  make(map[quantumfs.FileId]*quantumfs.DirectRecord),
 	}
 
 	// Start Workers
@@ -164,11 +164,11 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			dr := hlr.Record()
 			linkPath := dr.Filename()
 			if err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
-				keyChan, true); err != nil {
+				keyChan); err != nil {
 				return err
 			}
 			// add an entry to enable lookup based on FileId
-			c.hlkeys[dr.FileId()] = dr.ID()
+			c.hlkeys[dr.FileId()] = dr
 		}
 		if !hle.HasNext() {
 			break
@@ -282,7 +282,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		de := buf.AsDirectoryEntry()
 		for i := 0; i < de.NumEntries(); i++ {
 			if err := handleDirectoryRecord(c, path, ds,
-				de.Entry(i), wf, keyChan, false); err != nil {
+				de.Entry(i), wf, keyChan); err != nil {
 				return err
 			}
 		}
@@ -295,12 +295,18 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-// directoryRecord can be present in a directoryEntry or a hardlinkRecord
-// inHardlinkEntry is true when walking the directoryRecord from a hardlinkRecord
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	dr *quantumfs.DirectRecord, wf WalkFunc,
-	keyChan chan<- *workerData, inHardlinkRecord bool) error {
+	keyChan chan<- *workerData) error {
 
+	// NOTE: some of the DirectRecord accesses eg: Filename, Size etc
+	//       may not be meaningful for some DirectRecords. For example -
+	//       Filename for DirectRecord in hardlinkRecord is  meaningless
+	//       Size for DirectRecord in special file is meaningless
+	//
+	//       This information is eventually sent to the walk handler
+	//       function. Current use-cases don't need to filter such
+	//       meaningless info, the default values work fine.
 	fpath := filepath.Join(path, dr.Filename())
 
 	if err := handleExtendedAttributes(c, fpath, ds, dr, keyChan); err != nil {
@@ -325,15 +331,24 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		// quantumfs.ObjectTypeSmallFile:
 		// quantumfs.ObjectTypeSymlink:
 	case quantumfs.ObjectTypeHardlink:
-		if !inHardlinkRecord {
-			// use key from hardlinkRecord
-			var exists bool
-			key, exists = c.hlkeys[dr.FileId()]
-			utils.Assert(exists, "Key for hardlink Path: %s "+
-				"FileId: %d missing in hardlinkEntries",
-				fpath, dr.FileId())
-		}
-		fallthrough
+		// this ObjectType will only be seen when
+		// looking at a directoryRecord reached from
+		// directoryEntry and not when walking from
+		// hardlinkEntry
+
+		// hence use key from hardlinkRecord
+		hldr, exists := c.hlkeys[dr.FileId()]
+		utils.Assert(exists, "Key for hardlink Path: %s "+
+			"FileId: %d missing in WSR hardlink info",
+			fpath, dr.FileId())
+		utils.Assert(hldr.Type() != quantumfs.ObjectTypeHardlink,
+			"Hardlink object type found in WSR hardlink info "+
+				"for path: %s fileID: %d",
+			fpath, dr.FileId())
+		// hldr could be of any of the supported ObjectTypes so
+		// handle the directoryRecord accordingly
+		return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
+
 	default:
 		return writeToChan(c, keyChan, fpath, key, dr.Size())
 	}

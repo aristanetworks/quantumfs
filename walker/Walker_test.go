@@ -207,6 +207,40 @@ func TestHardLink(t *testing.T) {
 	})
 }
 
+func TestHardLinkHardLink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(50)
+		workspace := test.NewWorkspace()
+
+		// Write File 1
+		filename := workspace + "/file"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		hlmaps := make(map[string]struct{})
+
+		// Mark Hard Link 1
+		fname := "/filelink1"
+		link1 := workspace + fname
+		hlmaps[fname] = struct{}{}
+		err = os.Link(filename, link1)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link1, err)
+
+		// Mark Hard Link 2 to hard link 1
+		fname = "/filelink2"
+		link2 := workspace + fname
+		hlmaps[fname] = struct{}{}
+		err = os.Link(link1, link2)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link2, err)
+
+		test.readWalkCompare(workspace, false)
+		test.checkSmallFileHardlinkKey(workspace, hlmaps)
+	})
+}
 func TestChainedHardLinkEntries(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -268,6 +302,7 @@ func TestLargeFileLinkWalk(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 		test.readWalkCompare(workspace, false)
+		// can't use test.checkSmallFileHardlinkKey
 	})
 }
 
