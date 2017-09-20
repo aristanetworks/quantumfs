@@ -84,7 +84,7 @@ type Aggregator struct {
 	statTriggers    map[string][]extractorIdx
 	requestEndAfter time.Duration
 
-	logQueue chan qlog.LogOutput
+	logQueue chan *qlog.LogOutput
 }
 
 const errorStr = "ERROR: "
@@ -100,7 +100,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		statExtractors:  extractors,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
-		logQueue:        make(chan qlog.LogOutput, 1000000),
+		logQueue:        make(chan *qlog.LogOutput, 1000000),
 	}
 
 	// Sync all extractors and setup their triggers
@@ -129,7 +129,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 func (agg *Aggregator) ProcessThread() {
 	for {
 		log := <-agg.logQueue
-		agg.processLog(log)
+		agg.processLog(*log)
 
 		// Now check if any requests are old and ready to go to extractors
 		now := time.Now()
@@ -231,7 +231,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 }
 
 func (agg *Aggregator) ProcessLog(v qlog.LogOutput) {
-	agg.logQueue <- v
+	agg.logQueue <- &v
 }
 
 func (agg *Aggregator) processLog(v qlog.LogOutput) {
