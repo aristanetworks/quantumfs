@@ -102,10 +102,10 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 		os.Exit(exitBadConfig)
 	}
 
-	// Obtain a qlog instance
-	log := qlog.NewQlogTiny()
-	if logdir != "" {
-		log = qlog.NewQlog(logdir)
+	log, err := qlog.NewQlog(logdir)
+	if err != nil {
+		fmt.Printf("Error in initializing NewQlog: %v\n", err)
+		os.Exit(1)
 	}
 
 	id := atomic.AddUint64(&requestID, 1)
