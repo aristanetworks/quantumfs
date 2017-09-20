@@ -9,12 +9,12 @@ PKGS_TO_TEST+=quantumfs/cmd/qupload
 
 version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
-.PHONY: all $(COMMANDS) $(PKGS_TO_TEST)
+.PHONY: all vet $(COMMANDS) $(PKGS_TO_TEST)
 
-all: lockcheck cppstyle $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck cppstyle vet $(COMMANDS) $(PKGS_TO_TEST)
 
 clean:
-	rm -f $(COMMANDS)
+	rm -f $(COMMANDS) qfs-386 quantumfsd-static
 
 fetch:
 	go get -u google.golang.org/grpc
@@ -23,6 +23,9 @@ fetch:
 		echo "Fetching $$cmd"; \
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
+
+vet:
+	go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]]; then eval $$line || exit 1; fi; done
 
 lockcheck:
 	./lockcheck.sh
@@ -46,6 +49,12 @@ $(COMMANDS): encoding/metadata.capnp.go
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
+
+quantumfsd-static: quantumfsd
+	go build -gcflags '-e' -o quantumfsd-static -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/quantumfsd
+
+qfs-386: qfs
+	GOARCH=386 go build -gcflags '-e' -o qfs-386 -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/qfs
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
 	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' github.com/aristanetworks/$@
