@@ -817,14 +817,14 @@ func TestHardlinkRenameCreation(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
 		test.AssertNoErr(syscall.Link(fileA, fileB))
 
-		recordA := test.getHardlinkLeaf(dirA, "fileA")
-		recordB := test.getHardlinkLeaf(dirA, "fileB")
+		recordA := test.getHardlinkLeg(dirA, "fileA")
+		recordB := test.getHardlinkLeg(dirA, "fileB")
 
 		test.AssertNoErr(os.Rename(fileA, fileC))
-		recordC := test.getHardlinkLeaf(dirA, "fileC")
+		recordC := test.getHardlinkLeg(dirA, "fileC")
 
 		test.AssertNoErr(os.Rename(fileB, fileD))
-		recordD := test.getHardlinkLeaf(dirB, "fileD")
+		recordD := test.getHardlinkLeg(dirB, "fileD")
 
 		// test both rename and mvchild
 		test.Assert(recordA.creationTime < recordC.creationTime,
