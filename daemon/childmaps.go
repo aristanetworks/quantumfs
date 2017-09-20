@@ -280,6 +280,11 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	cmap.children[newName] = inodeId
 	record.SetFilename(newName)
 
+	// if this is a hardlink, we must update its creationTim
+	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
+		hardlink.creationTime = quantumfs.NewTime(time.Now())
+	}
+
 	if needCleanup {
 		c.vlog("cleanupInodeId %d", cleanupInodeId)
 		return cleanupInodeId, cleanupRecord
