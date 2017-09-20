@@ -15,19 +15,19 @@ import (
 // This allows merge to skip traversing local subtrees as an optimization.
 // Note: We assume that FileId is universally unique and will never collide
 type hardlinkTracker struct {
-	remote	map[quantumfs.FileId]linkEntry
-	local	map[quantumfs.FileId]linkEntry
+	remote map[quantumfs.FileId]linkEntry
+	local  map[quantumfs.FileId]linkEntry
 
-	final	map[quantumfs.FileId]linkEntry
+	final map[quantumfs.FileId]linkEntry
 }
 
 func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
 	local_ map[quantumfs.FileId]linkEntry) *hardlinkTracker {
 
-	rtn := hardlinkTracker {
+	rtn := hardlinkTracker{
 		remote: remote_,
-		local: local_,
-		final: make(map[quantumfs.FileId]linkEntry),
+		local:  local_,
+		final:  make(map[quantumfs.FileId]linkEntry),
 	}
 
 	// make sure final has the newest available record versions based off local

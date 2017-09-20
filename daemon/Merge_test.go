@@ -158,14 +158,14 @@ func TestMergeHardlinksOverlap(t *testing.T) {
 			branchB string) mergeTestCheck {
 
 			dataA := "A data contents"
-			test.AssertNoErr(os.MkdirAll(branchA + "/dirA", 0777))
+			test.AssertNoErr(os.MkdirAll(branchA+"/dirA", 0777))
 			test.AssertNoErr(testutils.PrintToFile(branchA+"/dirA/fileA",
 				dataA))
 			test.AssertNoErr(syscall.Link(branchA+"/dirA/fileA",
 				branchA+"/fileB"))
 
 			dataC := "C data contents"
-			test.AssertNoErr(os.MkdirAll(branchB + "/dirA", 0777))
+			test.AssertNoErr(os.MkdirAll(branchB+"/dirA", 0777))
 			test.AssertNoErr(testutils.PrintToFile(branchB+"/dirA/fileC",
 				dataC))
 			test.AssertNoErr(syscall.Link(branchB+"/dirA/fileC",
