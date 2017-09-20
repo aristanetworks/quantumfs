@@ -220,12 +220,14 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 	}
 
 	// Reverse logs into chronological order
-	rtn := make([]LogOutput, len(logs))
-	for i, val := range logs {
-		rtn[len(rtn)-1-i] = val
+	numEntries := len(logs)
+	backwardsLogs := logs
+	logs = make([]LogOutput, numEntries)
+	for i, val := range backwardsLogs {
+		logs[numEntries-1-i] = val
 	}
 
-	return rtn, lastReadyIdx
+	return logs, lastReadyIdx
 }
 
 func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
