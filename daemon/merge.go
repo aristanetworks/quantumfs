@@ -47,12 +47,14 @@ func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
 }
 
 // Compares the local record against merge product and tracks any changes
-func (ht *hardlinkTracker) checkLinkChg(local quantumfs.DirectoryRecord,
+func (ht *hardlinkTracker) checkLinkChg(c *ctx, local quantumfs.DirectoryRecord,
 	final quantumfs.DirectoryRecord) {
 
 	if final != nil {
 		if local != nil {
-			if local.Nlinks() <= 1 && final.Nlinks() <= 1 {
+			if local.Type() != quantumfs.ObjectTypeHardlink &&
+				final.Type() != quantumfs.ObjectTypeHardlink {
+
 				// not a hardlink to anyone
 				return
 			}
@@ -64,14 +66,14 @@ func (ht *hardlinkTracker) checkLinkChg(local quantumfs.DirectoryRecord,
 		}
 
 		// Execution only reaches here if local is nil or different
-		if final.Nlinks() > 1 {
+		if final.Type() == quantumfs.ObjectTypeHardlink {
 			// This is now a new hardlink instance in the system
 			ht.increment(final.FileId())
 		}
 	}
 
 	// Execution only reaches here if final is nil or different
-	if local != nil {
+	if local != nil && local.Type() == quantumfs.ObjectTypeHardlink {
 		ht.decrement(local.FileId())
 	}
 }
@@ -102,12 +104,11 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 
 	// track nlinks separately so we can preserve it
 	nlinks := uint32(0)
-	if !finalExists {
+	if finalExists {
 		nlinks = link.nlink
-		finalSet = true
 	}
 
-	if remoteLink, exists := ht.remote[id]; !finalSet || (exists &&
+	if remoteLink, exists := ht.remote[id]; exists && (!finalSet ||
 		link.record.ModificationTime() <
 			remoteLink.record.ModificationTime()) {
 
@@ -115,7 +116,7 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 		finalSet = true
 	}
 
-	if localLink, exists := ht.local[id]; !finalSet || (exists &&
+	if localLink, exists := ht.local[id]; exists && (!finalSet ||
 		link.record.ModificationTime() <
 			localLink.record.ModificationTime()) {
 
@@ -123,7 +124,7 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 		finalSet = true
 	}
 
-	utils.Assert(!finalSet, "Unable to find entry for fileId")
+	utils.Assert(finalSet, "Unable to find entry for fileId %d, %s", id)
 
 	// restore the preserved nlinks - we only want the newest linkEntry.record
 	link.nlink = nlinks
@@ -174,7 +175,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	return publishWorkspaceRoot(c, localDirectory, localHardlinks), nil
+	return publishWorkspaceRoot(c, localDirectory, tracker.final), nil
 }
 
 func loadRecords(c *ctx,
@@ -252,19 +253,20 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 		// check for hardlink addition or update
 		finalRecord, _ := finalRecords[k]
-		ht.checkLinkChg(localChild, finalRecord)
+		ht.checkLinkChg(c, localChild, finalRecord)
 	}
 
 	if baseExists {
 		for k, _ := range baseRecords {
 			_, inRemote := remoteRecords[k]
+			localRecord, inLocal := localRecords[k]
 
-			if !inRemote {
+			// Delete iff remote only deleted (otherwise already deleted)
+			if !inRemote && inLocal {
 				delete(finalRecords, k)
 
 				// check for hardlink deletion
-				localRecord, _ := localRecords[k]
-				ht.checkLinkChg(localRecord, nil)
+				ht.checkLinkChg(c, localRecord, nil)
 			}
 		}
 	}
@@ -342,6 +344,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 				return remote, nil
 			}
 
+			c.vlog("keeping local copy of %s", remote.Filename())
 			return local, nil
 		}
 	case quantumfs.ObjectTypeSmallFile:
