@@ -183,3 +183,35 @@ func TestMergeHardlinksOverlap(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeTraverse(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "A data contents"
+			dataB := "B data"
+			dirA := "/dirA"
+			dirD := dirA + "/dirB/dirC/dirD"
+
+			test.AssertNoErr(os.MkdirAll(branchB+dirD, 0777))
+			test.AssertNoErr(testutils.PrintToFile(branchB+dirD+"/fileA",
+				dataA))
+
+			test.AssertNoErr(os.MkdirAll(branchA+dirA, 0777))
+			test.AssertNoErr(testutils.PrintToFile(branchA+dirA+"/fileB",
+				dataB))
+			test.AssertNoErr(syscall.Link(branchA+dirA+"/fileB",
+				branchA+dirA+"/linKA"))
+
+			test.AssertNoErr(syscall.Link(branchB+dirD+"/fileA",
+				branchB+dirA+"/linkA"))
+
+			return func(merged string) {
+				test.CheckData(merged+dirD+"/fileA", []byte(dataA))
+				test.CheckData(merged+dirA+"/linkA", []byte(dataA))
+				test.CheckData(merged+dirA+"/fileB", []byte(dataB))
+			}
+		})
+	})
+}
