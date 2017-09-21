@@ -219,7 +219,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 
-	special.parentSyncChild(c, special.inodeNum(), func() quantumfs.ObjectKey {
+	special.parentSyncChild(c, func() quantumfs.ObjectKey {
 		return key
 	})
 

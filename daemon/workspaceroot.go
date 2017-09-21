@@ -231,7 +231,8 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	// parent lock
 	wsr.dirty(c)
 
-	return newHardlink(record.Filename(), fileId, wsr)
+	return newHardlink(record.Filename(), fileId, quantumfs.NewTime(time.Now()),
+		wsr)
 }
 
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
@@ -312,7 +313,8 @@ func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 		return false, nil
 	}
 
-	return true, newHardlink(link.record.Filename(), fileId, wsr)
+	return true, newHardlink(link.record.Filename(), fileId, quantumfs.Time(0),
+		wsr)
 }
 
 // Return a snapshot / instance so that it's concurrency safe
