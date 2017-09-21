@@ -46,10 +46,46 @@ func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
 	return &rtn
 }
 
+// if treeIsLocal is false, then it's assumed to be remote
+func (ht *hardlinkTracker) traverseSubtreeLinks(c *ctx, treeIsLocal bool,
+	dirKey quantumfs.ObjectKey) error {
+
+	records, err := loadRecords(c, dirKey)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range records {
+		if v.Type() == quantumfs.ObjectTypeDirectory {
+			err = ht.traverseSubtreeLinks(c, treeIsLocal, v.ID())
+			if err != nil {
+				return err
+			}
+		}
+
+		if treeIsLocal {
+			ht.checkLinkChg(c, v, nil)
+		} else {
+			ht.checkLinkChg(c, nil, v)
+		}
+	}
+
+	return nil
+}
+
 // Compares the local record against merge product and tracks any changes
 func (ht *hardlinkTracker) checkLinkChg(c *ctx, local quantumfs.DirectoryRecord,
 	final quantumfs.DirectoryRecord) {
 
+for k, v := range ht.final {
+name := ""
+if local != nil {
+	name = local.Filename()
+} else {
+	name = final.Filename()
+}
+c.vlog("BCHECK %s %d %d", name, k, v.nlink)
+}
 	if final != nil {
 		if local != nil {
 			if local.Type() != quantumfs.ObjectTypeHardlink &&
@@ -76,6 +112,9 @@ func (ht *hardlinkTracker) checkLinkChg(c *ctx, local quantumfs.DirectoryRecord,
 	if local != nil && local.Type() == quantumfs.ObjectTypeHardlink {
 		ht.decrement(local.FileId())
 	}
+for k, v := range ht.final {
+c.vlog("CHECK %d %d", k, v.nlink)
+}
 }
 
 func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
@@ -249,6 +288,12 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		} else {
 			// just take remote since it's known newer than base
 			finalRecords[k] = v
+
+			// Add new links
+			err = ht.traverseSubtreeLinks(c, false, v.ID())
+			if err != nil {
+				return local, err
+			}
 		}
 
 		// check for hardlink addition or update
@@ -371,6 +416,24 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 	if !updatedKey {
 		mergedKey = takeNewest(c, remote, local)
+
+		// if we took remote for a directory, we have to accommodate its
+		// hardlinks in the hardlink tracker
+		if mergedKey == remote.ID() &&
+			remote.Type() == quantumfs.ObjectTypeDirectory {
+
+			// Add new links
+			err = ht.traverseSubtreeLinks(c, false, remote.ID())
+			if err != nil {
+				return nil, err
+			}
+
+			// Remove old links
+			err = ht.traverseSubtreeLinks(c, true, local.ID())
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	rtnRecord.SetID(mergedKey)
 

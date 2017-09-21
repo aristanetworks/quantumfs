@@ -197,12 +197,16 @@ func TestMergeTraverse(t *testing.T) {
 			test.AssertNoErr(os.MkdirAll(branchB+dirD, 0777))
 			test.AssertNoErr(testutils.PrintToFile(branchB+dirD+"/fileA",
 				dataA))
+			test.AssertNoErr(syscall.Link(branchB+dirD+"/fileA",
+				branchB+dirD+"/linkB"))
 
 			test.AssertNoErr(os.MkdirAll(branchA+dirA, 0777))
 			test.AssertNoErr(testutils.PrintToFile(branchA+dirA+"/fileB",
 				dataB))
 			test.AssertNoErr(syscall.Link(branchA+dirA+"/fileB",
-				branchA+dirA+"/linKA"))
+				branchA+dirA+"/linkA"))
+			test.AssertNoErr(syscall.Link(branchA+dirA+"/fileB",
+				branchA+dirA+"/linkC"))
 
 			test.AssertNoErr(syscall.Link(branchB+dirD+"/fileA",
 				branchB+dirA+"/linkA"))
