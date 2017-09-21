@@ -70,9 +70,13 @@ func NewQuantumFsLogs(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	return NewQuantumFs_(config, qlogIn)
 }
 
-func NewQuantumFs(config QuantumFsConfig, version string) *QuantumFs {
-	return NewQuantumFs_(config, qlog.NewQlogExt(config.CachePath,
-		config.MemLogBytes, version, qlog.PrintToStdout))
+func NewQuantumFs(config QuantumFsConfig, version string) (*QuantumFs, error) {
+	logger, err := qlog.NewQlogExt(config.CachePath,
+		config.MemLogBytes, version, qlog.PrintToStdout)
+	if err != nil {
+		return nil, err
+	}
+	return NewQuantumFs_(config, logger), nil
 }
 
 type workspaceState int
@@ -185,7 +189,7 @@ func (qfs *QuantumFs) Serve() {
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	for qfs.flusher.syncAll(&qfs.c, false) != nil {
+	for qfs.flusher.syncAll(&qfs.c) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -762,7 +766,7 @@ const SyncAllLog = "Mux::syncAll"
 
 func (qfs *QuantumFs) syncAll(c *ctx) error {
 	defer c.funcIn(SyncAllLog).Out()
-	return qfs.flusher.syncAll(c, true)
+	return qfs.flusher.syncAll(c)
 }
 
 // Sync the workspace keyed with key

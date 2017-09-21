@@ -8,6 +8,8 @@ package qlog
 import (
 	"sync"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func DoBench(qlog *Qlog, n int, wg *sync.WaitGroup) {
@@ -26,7 +28,8 @@ func DoBench(qlog *Qlog, n int, wg *sync.WaitGroup) {
 }
 
 func ConcurrentLog(cores int, test *testing.B) {
-	qlog := NewQlog(tmpDir())
+	qlog, err := NewQlog(tmpDir())
+	utils.AssertNoErr(err)
 	var wg sync.WaitGroup
 
 	for i := 0; i < cores; i++ {
