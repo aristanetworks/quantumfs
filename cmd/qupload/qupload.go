@@ -72,9 +72,12 @@ func (c Ctx) Vlog(format string, args ...interface{}) {
 
 func newCtx(logdir string) *Ctx {
 	var c Ctx
-	log := qlog.NewQlogTiny()
-	if logdir != "" {
-		log = qlog.NewQlog(logdir)
+
+	log, err := qlog.NewQlog(logdir)
+	if err != nil {
+		fmt.Printf("Error creating qlog %s, logdir %s\n",
+			err.Error(), logdir)
+		return nil
 	}
 
 	c.Qctx = &quantumfs.Ctx{

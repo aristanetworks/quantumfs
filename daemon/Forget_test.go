@@ -29,7 +29,8 @@ func (th *testHelper) ForceForget(inodeId InodeId) {
 	if inodeId != quantumfs.InodeIdInvalid {
 		forgetMsg = fmt.Sprintf("Forget called on inode %d", inodeId)
 	}
-	failMsg := fmt.Sprintf("Waiting for inode %d to get uninstantiated")
+	failMsg := fmt.Sprintf("Waiting for inode %d to get uninstantiated",
+		inodeId)
 	th.WaitForLogString(forgetMsg, failMsg)
 }
 
@@ -202,12 +203,15 @@ func TestMultipleLookupCount(t *testing.T) {
 		test.remountFilesystem()
 		test.SyncAllWorkspaces()
 
-		test.AssertTestLog([]testutils.TLA{
-			testutils.TLA{true, "Looked up 2 Times",
-				"Failed to cause a second lookup"},
-			testutils.TLA{true, "Forgetting inode with lookupCount of 2",
-				"Inode with second lookup not forgotten"},
-		})
+		tla1 := testutils.TLA{
+			MustContain: true,
+			Text:        "Looked up 2 Times",
+			FailMsg:     "Failed to cause a second lookup"}
+		tla2 := testutils.TLA{
+			MustContain: true,
+			Text:        "Forgetting inode with lookupCount of 2",
+			FailMsg:     "Inode with second lookup not forgotten"}
+		test.AssertTestLog([]testutils.TLA{tla1, tla2})
 	})
 }
 
