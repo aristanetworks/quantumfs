@@ -27,7 +27,7 @@ func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
 	rtn := hardlinkTracker{
 		remote: remote_,
 		local:  local_,
-		merged:  make(map[quantumfs.FileId]linkEntry),
+		merged: make(map[quantumfs.FileId]linkEntry),
 	}
 
 	// make sure merged has the newest available record versions based off local
