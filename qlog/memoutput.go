@@ -276,7 +276,7 @@ func newCircBuf(mapHeader *circBufHeader,
 	return rtn
 }
 
-func newIdStrMap(buf []byte, offset int) IdStrMap {
+func newIdStrMap(buf []byte, offset int) *IdStrMap {
 	var rtn IdStrMap
 	ids := make(map[string]uint16)
 	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
@@ -284,20 +284,21 @@ func newIdStrMap(buf []byte, offset int) IdStrMap {
 	rtn.buffer = (*[mmapStrMapSize /
 		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
 
-	return rtn
+	return &rtn
 }
 
 func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	daemonVersion string, errOut *Qlog) *SharedMemory {
+	daemonVersion string, errOut *Qlog) (*SharedMemory, error) {
 
 	if dir == "" || filename == "" {
-		return nil
+		return nil, nil
 	}
 
 	// Create a file and its path to be mmap'd
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
-		panic(fmt.Sprintf("Unable to ensure log file path exists: %s", dir))
+		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
+			dir)
 	}
 
 	filepath := dir + string(os.PathSeparator) + filename
@@ -308,8 +309,9 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 
 	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if mapFile == nil || err != nil {
-		panic(fmt.Sprintf("Unable to create shared memory log file %s: %v",
-			filepath, err))
+		return nil,
+			fmt.Errorf("Unable to create shared memory log file %s: %v",
+				filepath, err)
 	}
 
 	circBufSize := mmapTotalSize - (mmapStrMapSize +
@@ -317,12 +319,14 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	// Size the file to fit the shared memory requirements
 	_, err = mapFile.Seek(int64(mmapTotalSize-1), 0)
 	if err != nil {
-		panic("Unable to seek to shared memory end in file")
+		mapFile.Close()
+		return nil, fmt.Errorf("Unable to seek to shared memory end in file")
 	}
 
 	_, err = mapFile.Write([]byte(" "))
 	if err != nil {
-		panic("Unable to expand file to fit shared memory requirement")
+		return nil, fmt.Errorf("Unable to expand file to fit " +
+			"shared memory requirement")
 	}
 
 	// Map the file to memory
@@ -330,7 +334,8 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 
 	if err != nil {
-		panic("Unable to map shared memory file for logging")
+		return nil,
+			fmt.Errorf("Unable to map shared memory file for logging")
 	}
 
 	// Make sure we touch every byte to ensure that the mmap isn't sparse
@@ -358,10 +363,10 @@ func newSharedMemory(dir string, filename string, mmapTotalSize int,
 	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
 	rtn.circBuf = newCircBuf(&header.CircBuf,
 		mmap[headerOffset:headerOffset+circBufSize])
-	rtn.strIdMap = newIdStrMap(mmap, headerOffset+circBufSize)
+	rtn.strIdMap = *newIdStrMap(mmap, headerOffset+circBufSize)
 	rtn.errOut = errOut
 
-	return &rtn
+	return &rtn, nil
 }
 
 func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {

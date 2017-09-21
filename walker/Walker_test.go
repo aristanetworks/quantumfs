@@ -194,15 +194,53 @@ func TestHardLink(t *testing.T) {
 			filename, err)
 
 		// Mark Hard Link 1
-		link := workspace + "/filelink"
+		fname := "/filelink"
+		link := workspace + fname
+		hlmaps := make(map[string]struct{})
+		hlmaps[fname] = struct{}{}
 		err = os.Link(filename, link)
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 
 		test.readWalkCompare(workspace, false)
+		test.checkSmallFileHardlinkKey(workspace, hlmaps)
 	})
 }
 
+func TestHardLinkHardLink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		data := daemon.GenData(50)
+		workspace := test.NewWorkspace()
+
+		// Write File 1
+		filename := workspace + "/file"
+		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+		test.Assert(err == nil, "Write failed (%s): %s",
+			filename, err)
+
+		hlmaps := make(map[string]struct{})
+
+		// Mark Hard Link 1
+		fname := "/filelink1"
+		link1 := workspace + fname
+		hlmaps[fname] = struct{}{}
+		err = os.Link(filename, link1)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link1, err)
+
+		// Mark Hard Link 2 to hard link 1
+		fname = "/filelink2"
+		link2 := workspace + fname
+		hlmaps[fname] = struct{}{}
+		err = os.Link(link1, link2)
+		test.Assert(err == nil, "Link failed (%s): %s",
+			link2, err)
+
+		test.readWalkCompare(workspace, false)
+		test.checkSmallFileHardlinkKey(workspace, hlmaps)
+	})
+}
 func TestChainedHardLinkEntries(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -215,14 +253,18 @@ func TestChainedHardLinkEntries(t *testing.T) {
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
 
+		hlmaps := make(map[string]struct{})
 		// Mark Hard Link 1
 		for i := 0; i < quantumfs.MaxDirectoryRecords()+100; i++ {
-			link := workspace + "/filelink_" + strconv.Itoa(i)
+			fname := "/filelink_" + strconv.Itoa(i)
+			hlmaps[fname] = struct{}{}
+			link := workspace + fname
 			err = os.Link(filename, link)
 			test.Assert(err == nil, "Link failed (%s): %s",
 				link, err)
 		}
 		test.readWalkCompare(workspace, false)
+		test.checkSmallFileHardlinkKey(workspace, hlmaps)
 	})
 }
 
@@ -260,6 +302,9 @@ func TestLargeFileLinkWalk(t *testing.T) {
 		test.Assert(err == nil, "Link failed (%s): %s",
 			link, err)
 		test.readWalkCompare(workspace, false)
+		// can't use test.checkSmallFileHardlinkKey
+		// TODO(kthommandra): add support for checking key in
+		// directoryRecord of an object and it's other keys.
 	})
 }
 

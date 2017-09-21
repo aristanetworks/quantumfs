@@ -82,6 +82,12 @@ func Assert(condition bool, format string, args ...interface{}) {
 	}
 }
 
+func AssertNoErr(err error) {
+	if err != nil {
+		Assert(false, err.Error())
+	}
+}
+
 type JSONwriter interface {
 	WriteJSON(w io.Writer) error
 }
