@@ -4,6 +4,7 @@
 package cql
 
 import (
+	"encoding/hex"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -155,8 +156,9 @@ func (cw *cacheWsdb) WorkspaceExists(c ether.Ctx, typespace string,
 func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
 	workspace string, wsKey wsdb.ObjectKey) error {
 
+	keyHex := hex.EncodeToString(wsKey)
 	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)", typespace, namespace,
-		workspace, wsKey).Out()
+		workspace, keyHex).Out()
 
 	err := cw.base.CreateWorkspace(c, typespace, namespace, workspace, wsKey)
 	if err != nil {
@@ -234,8 +236,11 @@ func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
+	currentKeyHex := hex.EncodeToString(currentRootID)
+	newKeyHex := hex.EncodeToString(newRootID)
+
 	defer c.FuncIn("cacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s)", typespace, namespace,
-		workspace, currentRootID, newRootID).Out()
+		workspace, currentKeyHex, newKeyHex).Out()
 
 	start := time.Now()
 	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()

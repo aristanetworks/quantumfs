@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -125,7 +126,7 @@ func newEntityCache(levels int, expiryDuration time.Duration,
 // InsertEntities() - Invalid
 // InsertEntities(workspace) - Invalid
 func (ec *entityCache) InsertEntities(c ether.Ctx, entityPath ...string) {
-	defer c.FuncIn("entityCache::InsertEntities", "%s",
+	defer c.FuncIn("cache::InsertEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	if len(entityPath) == 0 {
@@ -148,7 +149,7 @@ func (ec *entityCache) InsertEntities(c ether.Ctx, entityPath ...string) {
 // DeleteEntities() - Invalid
 // DeleteEntities(workspace) - Invalid
 func (ec *entityCache) DeleteEntities(c ether.Ctx, entityPath ...string) {
-	defer c.FuncIn("entityCache::DeleteEntities", "%s",
+	defer c.FuncIn("cache::DeleteEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	if len(entityPath) == 0 {
@@ -170,7 +171,7 @@ func (ec *entityCache) DeleteEntities(c ether.Ctx, entityPath ...string) {
 // CountEntities(namespace) - Valid
 // CountEntities(workspace) - Invalid
 func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) int {
-	defer c.FuncIn("entityCache::CountEntities", "%s",
+	defer c.FuncIn("cache::CountEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	var count int
@@ -190,7 +191,7 @@ func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) int {
 
 // same constraints on entityPath argument as CountEntities
 func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) []string {
-	defer c.FuncIn("entityCache::ListEntities", "%s",
+	defer c.FuncIn("cache::ListEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	var list []string
@@ -211,7 +212,7 @@ func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) []string 
 // used by unit tests to simulate different conditions
 // same constraints on entityPath argument as CountEntities
 func (ec *entityCache) enableCqlRefresh(c ether.Ctx, entityPath ...string) {
-	defer c.FuncIn("entityCache::enableCqlRefresh", "%s",
+	defer c.FuncIn("cache::enableCqlRefresh", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	ec.rwMutex.Lock()
@@ -230,8 +231,8 @@ func (ec *entityCache) enableCqlRefresh(c ether.Ctx, entityPath ...string) {
 func (ec *entityCache) disableCqlRefresh(c ether.Ctx, maxDelay time.Duration,
 	entityPath ...string) {
 
-	defer c.FuncIn("entityCache::disableCqlRefresh", "delay: %v %s", maxDelay,
-		strings.Join(entityPath, "/")).Out()
+	defer c.FuncIn("cache::disableCqlRefresh", "delay: %s %s",
+		maxDelay.String(), strings.Join(entityPath, "/")).Out()
 
 	ec.rwMutex.Lock()
 	defer ec.rwMutex.Unlock()
@@ -253,7 +254,7 @@ func (ec *entityCache) disableCqlRefresh(c ether.Ctx, maxDelay time.Duration,
 func (ec *entityCache) getLastEntityGroup(c ether.Ctx, group *entityGroup,
 	entityPath ...string) *entityGroup {
 
-	defer c.FuncIn("entityCache::getLastEntityGroup", "%s",
+	defer c.FuncIn("cache::getLastEntityGroup", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	for _, entity := range entityPath {
@@ -274,7 +275,7 @@ func (ec *entityCache) getLastEntityGroup(c ether.Ctx, group *entityGroup,
 func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local bool,
 	entityPath ...string) {
 
-	defer c.FuncIn("entityCache::checkDeleteEntity", "%s local:%s",
+	defer c.FuncIn("cache::checkDeleteEntity", "%s local:%s",
 		strings.Join(entityPath, "/"), local).Out()
 
 	// Its possible to specify only some leading portion
@@ -340,7 +341,7 @@ func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local 
 func (ec *entityCache) markChildEntityGroupsDetached(c ether.Ctx,
 	group *entityGroup) {
 
-	defer c.FuncIn("entityCache::markChildEntityGroupsDetached", "").Out()
+	defer c.FuncIn("cache::markChildEntityGroupsDetached", "").Out()
 	// we don't need to maintain any concLocalDeletes logs since
 	// the entire group is being deleted
 	if group != nil {
@@ -359,7 +360,7 @@ func (ec *entityCache) markChildEntityGroupsDetached(c ether.Ctx,
 func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 	entityPath ...string) *entityGroup {
 
-	defer c.FuncIn("entityCache::getEntityCountListGroup", "%s",
+	defer c.FuncIn("cache::getEntityCountListGroup", "%s",
 		strings.Join(entityPath, "/")).Out()
 
 	detachOccured := false
@@ -490,8 +491,11 @@ func newEntityGroup(parent *entityGroup, parentEntity string,
 
 // called under rwMutex read lock
 func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
-	defer c.FuncIn("entityGroup::refreshNeeded", "parent:%s count:%d expiresAt:%v "+
-		"detached:%v", g.parentEntity, g.entityCount, g.expiresAt, g.detached).Out()
+	defer c.FuncIn("cache::refreshNeeded",
+		"p:%s c:%d e:%s d:%s",
+		g.parentEntity, g.entityCount,
+		g.expiresAt.Format(time.UnixDate),
+		strconv.FormatBool(g.detached)).Out()
 
 	duration := time.Now().Sub(g.expiresAt)
 	if duration >= 0 {
@@ -517,9 +521,10 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
 
 // called under rwMutex held in write mode
 func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) {
-	defer c.FuncIn("entityGroup::checkInsertEntity",
-		"entity:%s local:%s parent:%s count:%d detached:%v",
-		entity, local, g.parentEntity, g.entityCount, g.detached).Out()
+	defer c.FuncIn("cache::checkInsertEntity",
+		"e:%s l:%s p:%s c:%d d:%s",
+		entity, strconv.FormatBool(local), g.parentEntity,
+		g.entityCount, strconv.FormatBool(g.detached)).Out()
 
 	_, exists := g.entities[entity]
 
@@ -545,8 +550,9 @@ func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) 
 
 // called under rwMutex read lock
 func (g *entityGroup) getListCopy(c ether.Ctx) []string {
-	defer c.FuncIn("entityGroup::getListCopy", "parent:%s count:%d detached:%v",
-		g.parentEntity, g.entityCount, g.detached).Out()
+	defer c.FuncIn("cache::getListCopy", "p:%s c:%d d:%s",
+		g.parentEntity, g.entityCount,
+		strconv.FormatBool(g.detached)).Out()
 
 	count := g.entityCount
 	newList := make([]string, 0, count)
@@ -564,9 +570,10 @@ func (g *entityGroup) getListCopy(c ether.Ctx) []string {
 
 // invoked under rwMutex write lock
 func (g *entityGroup) mergeLocalUpdates(c ether.Ctx, fetchData map[string]bool) {
-	defer c.FuncIn("entityGroup::mergeLocalUpdates", "parent:%s count:%d "+
-		"detached:%v lenLocalInserts:%d lenLocalDeletes:%d", g.parentEntity, g.entityCount,
-		g.detached, len(g.concLocalInserts), len(g.concLocalDeletes)).Out()
+	defer c.FuncIn("cache::mergeLocalUpdates", "p:%s c:%d "+
+		"d:%s lI:%d lD:%d", g.parentEntity, g.entityCount,
+		strconv.FormatBool(g.detached), len(g.concLocalInserts),
+		len(g.concLocalDeletes)).Out()
 
 	mergedInserts := false
 	mergedDeletes := false
@@ -604,8 +611,9 @@ func (g *entityGroup) mergeLocalUpdates(c ether.Ctx, fetchData map[string]bool) 
 }
 
 func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool) {
-	defer c.FuncIn("entityGroup::refresh", "parent:%s count:%d detached:%v",
-		g.parentEntity, g.entityCount, g.detached).Out()
+	defer c.FuncIn("cache::refresh", "p:%s c:%d d:%s",
+		g.parentEntity, g.entityCount,
+		strconv.FormatBool(g.detached)).Out()
 
 	// takes the fetchList and merges it to group.entities under write lock
 	g.cache.rwMutex.Lock()

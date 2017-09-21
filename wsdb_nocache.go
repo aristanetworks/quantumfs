@@ -170,14 +170,15 @@ func isTypespaceLocked(typespace string) bool {
 func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
 	workspace string, wsKey wsdb.ObjectKey) error {
 
+	keyHex := hex.EncodeToString(wsKey)
 	defer c.FuncIn("noCacheWsdb::CreateWorkspace", "%s/%s/%s(%s)", typespace, namespace,
-		workspace, wsKey).Out()
+		workspace, keyHex).Out()
 
 	err := nc.wsdbKeyPut(ether.DefaultCtx, typespace, namespace, workspace, wsKey)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Put in CreateWorkspace %s/%s/%s(%s) : %s",
-			typespace, namespace, workspace, wsKey, err.Error())
+			typespace, namespace, workspace, keyHex, err.Error())
 	}
 
 	return nil
@@ -282,8 +283,11 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	namespace string, workspace string, currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
+	currentKeyHex := hex.EncodeToString(currentRootID)
+	newKeyHex := hex.EncodeToString(newRootID)
+
 	defer c.FuncIn("noCacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s)", typespace,
-		namespace, workspace, currentRootID, newRootID).Out()
+		namespace, workspace, currentKeyHex, newKeyHex).Out()
 
 	if isTypespaceLocked(typespace) && currentRootID != nil {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrLocked,
@@ -306,7 +310,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	if !bytes.Equal(currentRootID, key) {
 		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
 			"cannot advance workspace expected:%s found:%s",
-			currentRootID, key)
+			currentKeyHex, hex.EncodeToString(key))
 	}
 
 	if err := nc.wsdbKeyPut(c, typespace, namespace, workspace,
@@ -330,7 +334,7 @@ func (nc *noCacheWsdb) WorkspaceLastWriteTime(c ether.Ctx, typespace string,
 	if err != nil {
 		return time.Time{}, wsdb.NewError(wsdb.ErrFatal,
 			"during getting WorkspaceLastWriteTime %s/%s/%s : %s",
-			typespace, namespace, workspace, err)
+			typespace, namespace, workspace, err.Error())
 	}
 
 	// CQL's write time is time in micro-second from epoch. Below we
