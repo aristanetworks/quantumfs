@@ -163,7 +163,7 @@ func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 	haveReadTo uint64) {
 
-	rtn := make([]LogOutput, 0)
+	logs = make([]LogOutput, 0, 1000000)
 
 	distanceToEnd := read.circBufSize - 1
 	lastReadyIdx := pastEndIdx
@@ -210,22 +210,36 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 		distanceToEnd = newDistanceToEnd
 
 		if ready {
-			rtn = append([]LogOutput{logOutput}, rtn...)
+			logs = append(logs, logOutput)
 		} else {
-			rtn = make([]LogOutput, 0)
+			logs = make([]LogOutput, 0, 1000000)
 			lastReadyIdx = readTo
 			wrapMinusEquals(&lastReadyIdx, uint64(packetLen),
 				read.circBufSize)
 		}
 	}
 
-	return rtn, lastReadyIdx
+	// Reverse logs into chronological order
+	logs = reverseLogSlice(logs)
+
+	return logs, lastReadyIdx
+}
+
+func reverseLogSlice(in []LogOutput) []LogOutput {
+	numEntries := len(in)
+	backwardsLogs := in
+	logs := make([]LogOutput, numEntries)
+	for i, val := range backwardsLogs {
+		logs[numEntries-1-i] = val
+	}
+
+	return logs
 }
 
 func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
 	haveReadTo uint64) {
 
-	rtn := make([]LogOutput, 0)
+	logs = make([]LogOutput, 1000)
 
 	pastEndIdx := readTo
 	readLen := wrapMinus(readTo, readFrom, read.circBufSize)
@@ -243,20 +257,20 @@ func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
 
 		if !ready {
 			// throw away the logs we've seen so far because of this hole
-			rtn = make([]LogOutput, 0)
+			logs = make([]LogOutput, 1000)
 		}
 
 		if int64(readLen) > pastDataIdx {
 			errorLog := newLog(LogQlog, QlogReqId, 0,
 				"ERROR: Packet over-read error", nil)
-			rtn = append([]LogOutput{errorLog}, rtn...)
+			logs = append(logs, errorLog)
 			break
 		}
 
 		pastDataIdx -= int64(readLen)
 
 		if ready {
-			rtn = append([]LogOutput{logOutput}, rtn...)
+			logs = append(logs, logOutput)
 		} else {
 			pastEndIdx = readFrom
 			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),
@@ -268,7 +282,9 @@ func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
 		}
 	}
 
-	return rtn, pastEndIdx
+	logs = reverseLogSlice(logs)
+
+	return logs, pastEndIdx
 }
 
 func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,

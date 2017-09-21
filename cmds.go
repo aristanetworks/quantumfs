@@ -159,8 +159,6 @@ func findApiPathUpwards() (string, error) {
 			}
 		}
 	}
-
-	return "", nil
 }
 
 func findApiPath() (string, error) {
