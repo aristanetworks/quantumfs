@@ -10,4 +10,4 @@ ADD ether.conf /ether.conf
 EXPOSE 2222
 
 # It is assumed ether.conf will be injected by Kubernetes
-#ENTRYPOINT ["/wsdbservice", "-logPath", "/", "-workspaceDB", "ether.cql", "-workspaceDBconf", "ether.conf"]
+ENTRYPOINT ["/wsdbservice", "-logPath", "/", "-workspaceDB", "ether.cql", "-workspaceDBconf", "ether.conf"]
