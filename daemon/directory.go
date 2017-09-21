@@ -1219,7 +1219,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// fix the name on the copy
 			newEntry.SetFilename(newName)
 
-			isHardlink, _ := dir.wsr.checkHardlink(oldInodeId)
+			hardlink, isHardlink := newEntry.(*Hardlink)
 			var childInode Inode
 			if !isHardlink {
 				// Update the inode to point to the new name and
@@ -1230,6 +1230,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 					childInode.setName(newName)
 					childInode.clearAccessedCache()
 				}
+			} else {
+				hardlink.creationTime = quantumfs.NewTime(time.Now())
+				newEntry.SetContentTime(hardlink.creationTime)
 			}
 
 			func() {

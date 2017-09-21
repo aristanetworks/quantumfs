@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -174,7 +175,8 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 		// Update the reference count
 		dir.wsr.hardlinkInc(id)
 
-		linkCopy := newHardlink(toLink.name(), id, dir.wsr)
+		linkCopy := newHardlink(toLink.name(), id,
+			quantumfs.NewTime(time.Now()), dir.wsr)
 		return linkCopy, fuse.OK
 	}
 
@@ -207,7 +209,8 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	if inode != nil {
 		inode.setParent(dir.wsr.inodeNum())
 	}
-	return newHardlink(localRecord.Filename(), fileId, dir.wsr)
+	return newHardlink(localRecord.Filename(), fileId,
+		remoteRecord.ContentTime(), dir.wsr)
 }
 
 // The caller must hold the childRecordLock
