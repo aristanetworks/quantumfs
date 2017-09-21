@@ -187,7 +187,7 @@ func (special *Special) GetXAttrData(c *ctx,
 }
 
 func (special *Special) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on Special")
+	c.wlog("Invalid ListXAttr on Special")
 	return []byte{}, fuse.OK
 }
 
