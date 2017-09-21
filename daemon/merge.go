@@ -77,15 +77,6 @@ func (ht *hardlinkTracker) traverseSubtreeLinks(c *ctx, treeIsLocal bool,
 func (ht *hardlinkTracker) checkLinkChg(c *ctx, local quantumfs.DirectoryRecord,
 	final quantumfs.DirectoryRecord) {
 
-for k, v := range ht.final {
-name := ""
-if local != nil {
-	name = local.Filename()
-} else {
-	name = final.Filename()
-}
-c.vlog("BCHECK %s %d %d", name, k, v.nlink)
-}
 	if final != nil {
 		if local != nil {
 			if local.Type() != quantumfs.ObjectTypeHardlink &&
@@ -112,9 +103,6 @@ c.vlog("BCHECK %s %d %d", name, k, v.nlink)
 	if local != nil && local.Type() == quantumfs.ObjectTypeHardlink {
 		ht.decrement(local.FileId())
 	}
-for k, v := range ht.final {
-c.vlog("CHECK %d %d", k, v.nlink)
-}
 }
 
 func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
