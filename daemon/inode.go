@@ -135,8 +135,7 @@ type Inode interface {
 			err fuse.Status)) fuse.Status
 
 	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
-	parentSyncChild(c *ctx, childId InodeId,
-		publishFn func() quantumfs.ObjectKey)
+	parentSyncChild(c *ctx, publishFn func() quantumfs.ObjectKey)
 	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
@@ -268,11 +267,10 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 	inode.parent_(c).markAccessed(c, path, op)
 }
 
-func (inode *InodeCommon) parentSyncChild(c *ctx, childId InodeId,
+func (inode *InodeCommon) parentSyncChild(c *ctx,
 	publishFn func() quantumfs.ObjectKey) {
 
-	defer c.FuncIn("InodeCommon::parentSyncChild", "%d of %d", childId,
-		inode.id).Out()
+	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 
@@ -286,7 +284,7 @@ func (inode *InodeCommon) parentSyncChild(c *ctx, childId InodeId,
 	// publish before we sync, once we know it's safe
 	baseLayerId := publishFn()
 
-	inode.parent_(c).syncChild(c, childId, baseLayerId)
+	inode.parent_(c).syncChild(c, inode.id, baseLayerId)
 }
 
 func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
