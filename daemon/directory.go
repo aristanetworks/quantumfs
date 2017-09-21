@@ -1353,7 +1353,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
+	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d %s",
 		dir.inodeNum(), inodeNum, newKey.String()).Out()
 
 	defer dir.Lock().Unlock()
@@ -1818,7 +1818,7 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 
 	defer dir.Lock().Unlock()
 
-	dir.parentSyncChild(c, dir.inodeNum(), func() quantumfs.ObjectKey {
+	dir.parentSyncChild(c, func() quantumfs.ObjectKey {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
 		return dir.baseLayerId
