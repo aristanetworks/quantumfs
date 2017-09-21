@@ -54,5 +54,4 @@ func SetupTestspace(testName string) string {
 	}
 
 	panic(fmt.Sprintf("Unable to create test directory: %v", err))
-	return testRunDir
 }
