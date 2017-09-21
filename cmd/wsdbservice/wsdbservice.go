@@ -20,6 +20,7 @@ import (
 const (
 	exitOK = iota
 	exitFailed
+	exitInitFailed
 )
 
 var version string
@@ -54,17 +55,23 @@ func main() {
 	}()
 
 	var logger *qlog.Qlog
+	var err error
 	if logPath == "" {
-		logger = qlog.NewQlogTiny()
+		logger, err = qlog.NewQlog("")
 	} else {
-		logger = qlog.NewQlogExt(logPath, 100*1024*1024, version,
+		logger, err = qlog.NewQlogExt(logPath, 100*1024*1024, version,
 			qlog.PrintToStdout)
 	}
 
-	_, err := server.StartWorkspaceDbd(logger, uint16(port), wsdbName,
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %s\n", err.Error())
+		os.Exit(exitInitFailed)
+	}
+
+	_, err = server.StartWorkspaceDbd(logger, uint16(port), wsdbName,
 		wsdbConfig)
 	if err != nil {
-		fmt.Printf("Failed to initialize: %s", err.Error())
+		fmt.Printf("Failed to initialize: %s\n", err.Error())
 		os.Exit(exitFailed)
 	}
 
