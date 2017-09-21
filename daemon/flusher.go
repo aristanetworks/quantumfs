@@ -225,8 +225,8 @@ func NewFlusher() *Flusher {
 	return &dqs
 }
 
-func (flusher *Flusher) sync(c *ctx, force bool, workspace string) error {
-	defer c.FuncIn("Flusher::sync", "%t", force).Out()
+func (flusher *Flusher) sync(c *ctx, workspace string) error {
+	defer c.FuncIn("Flusher::sync", "%s", workspace).Out()
 	doneChannels := make([]chan error, 0)
 	var err error
 	func() {
@@ -260,14 +260,14 @@ func (flusher *Flusher) sync(c *ctx, force bool, workspace string) error {
 	return err
 }
 
-func (flusher *Flusher) syncAll(c *ctx, force bool) error {
+func (flusher *Flusher) syncAll(c *ctx) error {
 	defer c.funcIn("Flusher::syncAll").Out()
-	return flusher.sync(c, force, "")
+	return flusher.sync(c, "")
 }
 
 func (flusher *Flusher) syncWorkspace(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::syncWorkspace", "%s", workspace).Out()
-	return flusher.sync(c, true, workspace)
+	return flusher.sync(c, workspace)
 }
 
 // flusher lock must be locked when calling this function
