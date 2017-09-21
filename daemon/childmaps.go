@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -147,7 +148,9 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
-		entry = newHardlink(entry.Filename(), fileId, cmap.wsr)
+		// hardlink leg creation time is stored in its ContentTime
+		entry = newHardlink(entry.Filename(), fileId, entry.ContentTime(),
+			cmap.wsr)
 		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, fileId, inodeId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
@@ -378,11 +381,11 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	c.vlog("Converting %s into a hardlink", childname)
 	newLink := cmap.wsr.newHardlink(c, childId, child)
 
-	linkCopy := *newLink
-	linkSrcCopy := *newLink
-
+	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
-	cmap.setRecord(childId, &linkSrcCopy)
+	cmap.setRecord(childId, linkSrcCopy)
 
-	return &linkCopy, fuse.OK
+	newLink.creationTime = quantumfs.NewTime(time.Now())
+	newLink.SetContentTime(newLink.creationTime)
+	return newLink, fuse.OK
 }
