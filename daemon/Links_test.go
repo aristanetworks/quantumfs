@@ -53,7 +53,7 @@ func TestHardlink(t *testing.T) {
 		file2InodeNum := test.getInodeNum(file2)
 
 		parentInode := test.getInode(workspace)
-		parentDir := parentInode.(*WorkspaceRoot).Directory
+		parentDir := &parentInode.(*WorkspaceRoot).Directory
 		defer parentDir.childRecordLock.Lock().Unlock()
 		test.Assert(parentDir.children.record(file1InodeNum).Type() ==
 			quantumfs.ObjectTypeHardlink,

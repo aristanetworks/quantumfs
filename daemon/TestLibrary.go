@@ -555,6 +555,20 @@ func (th *TestHelper) CreateTestDirs() {
 	utils.MkdirAll(th.TempDir+"/ether", 0777)
 }
 
+func (th *TestHelper) HardlinkKeyExists(workspace string,
+	key quantumfs.ObjectKey) bool {
+
+	wsr, cleanup := th.GetWorkspaceRoot(workspace)
+	defer cleanup()
+
+	for _, hardkey := range wsr.hardlinks {
+		if key.IsEqualTo(hardkey.record.ID()) {
+			return true
+		}
+	}
+	return false
+}
+
 var genDataMutex utils.DeferableMutex
 var precompGenData []byte
 var genDataLast int
