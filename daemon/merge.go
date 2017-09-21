@@ -108,10 +108,7 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 		nlinks = link.nlink
 	}
 
-	if remoteLink, exists := ht.remote[id]; exists && (!finalSet ||
-		link.record.ModificationTime() <
-			remoteLink.record.ModificationTime()) {
-
+	if remoteLink, exists := ht.remote[id]; exists {
 		link = remoteLink
 		finalSet = true
 	}
@@ -124,7 +121,7 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 		finalSet = true
 	}
 
-	utils.Assert(finalSet, "Unable to find entry for fileId %d, %s", id)
+	utils.Assert(finalSet, "Unable to find entry for fileId %d", id)
 
 	// restore the preserved nlinks - we only want the newest linkEntry.record
 	link.nlink = nlinks
@@ -261,7 +258,9 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 			_, inRemote := remoteRecords[k]
 			localRecord, inLocal := localRecords[k]
 
-			// Delete iff remote only deleted (otherwise already deleted)
+			// Delete iff the file was deleted in remote only,
+			// (otherwise local, our reference, already deleted it and
+			// we don't want to doulbly delete)
 			if !inRemote && inLocal {
 				delete(finalRecords, k)
 
@@ -271,7 +270,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		}
 	}
 
-	// turn finalRecords into a publish-able format
+	// turn finalRecords into a publishable format
 	localRecordsList := make([]quantumfs.DirectoryRecord, 0, len(finalRecords))
 	for _, v := range finalRecords {
 		localRecordsList = append(localRecordsList, v)
