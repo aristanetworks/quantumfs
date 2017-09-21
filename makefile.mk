@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbservice
+COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
@@ -11,7 +11,7 @@ version:=$(shell git describe || echo "dev-`git rev-parse HEAD`")
 
 .PHONY: all vet $(COMMANDS) $(PKGS_TO_TEST)
 
-all: lockcheck cppstyle vet $(COMMANDS) $(PKGS_TO_TEST)
+all: lockcheck cppstyle vet $(COMMANDS) $(PKGS_TO_TEST) wsdbservice
 
 clean:
 	rm -f $(COMMANDS) qfs-386 quantumfsd-static
@@ -55,6 +55,9 @@ quantumfsd-static: quantumfsd
 
 qfs-386: qfs
 	GOARCH=386 go build -gcflags '-e' -o qfs-386 -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/qfs
+
+wsdbservice:
+	go build -gcflags '-e' -o cmd/wsdbservice/wsdbservice -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/wsdbservice
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
 	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' github.com/aristanetworks/$@
