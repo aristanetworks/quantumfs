@@ -76,7 +76,7 @@ func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	return parentDir.children.record(inode.inodeNum()).Clone()
+	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum()).Clone()
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {
@@ -553,6 +553,20 @@ func (th *TestHelper) CreateTestDirs() {
 
 	utils.MkdirAll(th.TempDir+"/mnt2", 0777)
 	utils.MkdirAll(th.TempDir+"/ether", 0777)
+}
+
+func (th *TestHelper) HardlinkKeyExists(workspace string,
+	key quantumfs.ObjectKey) bool {
+
+	wsr, cleanup := th.GetWorkspaceRoot(workspace)
+	defer cleanup()
+
+	for _, hardkey := range wsr.hardlinks {
+		if key.IsEqualTo(hardkey.record.ID()) {
+			return true
+		}
+	}
+	return false
 }
 
 var genDataMutex utils.DeferableMutex

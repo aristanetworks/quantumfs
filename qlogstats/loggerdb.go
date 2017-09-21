@@ -277,7 +277,7 @@ func (agg *Aggregator) processLog(v qlog.LogOutput) {
 	tracker.listElement.Value = trackerElem
 }
 
-type byIncreasing []uint64
+type byIncreasing []int64
 
 func (a byIncreasing) Len() int           { return len(a) }
 func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -286,12 +286,12 @@ func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 // A data aggregator that outputs basic statistics such as the average
 // Intended to be used by data extractors.
 type basicStats struct {
-	sum    uint64
-	points []uint64
-	max    uint64
+	sum    int64
+	points []int64
+	max    int64
 }
 
-func (bs *basicStats) NewPoint(data uint64) {
+func (bs *basicStats) NewPoint(data int64) {
 	bs.sum += data
 	bs.points = append(bs.points, data)
 
@@ -300,24 +300,24 @@ func (bs *basicStats) NewPoint(data uint64) {
 	}
 }
 
-func (bs *basicStats) Max() uint64 {
+func (bs *basicStats) Max() int64 {
 	return bs.max
 }
 
-func (bs *basicStats) Average() uint64 {
+func (bs *basicStats) Average() int64 {
 	if len(bs.points) == 0 {
 		return 0
 	}
 
-	return bs.sum / uint64(len(bs.points))
+	return bs.sum / int64(len(bs.points))
 }
 
-func (bs *basicStats) Count() uint64 {
-	return uint64(len(bs.points))
+func (bs *basicStats) Count() int64 {
+	return int64(len(bs.points))
 }
 
-func (bs *basicStats) Percentiles() map[string]uint64 {
-	rtn := make(map[string]uint64)
+func (bs *basicStats) Percentiles() map[string]int64 {
+	rtn := make(map[string]int64)
 	points := bs.points
 
 	if len(points) == 0 {
