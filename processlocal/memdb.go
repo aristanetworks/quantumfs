@@ -41,8 +41,8 @@ func (db *Memdb) Store(measurement string, tags_ []quantumfs.Tag,
 	})
 }
 
-func (db *Memdb) Fetch(withTags []quantumfs.Tag, field string, lastN int) []uint64 {
-	rtn := make([]uint64, 0)
+func (db *Memdb) Fetch(withTags []quantumfs.Tag, field string, lastN int) []int64 {
+	rtn := make([]int64, 0)
 
 	for _, entry := range db.Data {
 		// check if the data has all the tags we need

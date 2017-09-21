@@ -76,6 +76,10 @@ func NewTestHelper(testName string, testRunDir string,
 	t *testing.T) TestHelper {
 
 	cachePath := testRunDir + "/" + testName
+	logger, err := qlog.NewQlogExt(cachePath+"/ramfs",
+		60*10000*24, "noVersion", NoStdOut)
+	utils.AssertNoErr(err)
+
 	return TestHelper{
 		T:          t,
 		TestName:   testName,
@@ -83,10 +87,9 @@ func NewTestHelper(testName string, testRunDir string,
 		Failed:     make(chan struct{}, 0),
 		StartTime:  time.Now(),
 		CachePath:  cachePath,
-		Logger: qlog.NewQlogExt(cachePath+"/ramfs",
-			60*10000*24, "noVersion", NoStdOut),
-		TempDir: TestRunDir + "/" + testName,
-		Timeout: 1500 * time.Millisecond,
+		Logger:     logger,
+		TempDir:    TestRunDir + "/" + testName,
+		Timeout:    1500 * time.Millisecond,
 	}
 }
 
@@ -138,9 +141,7 @@ func (th *TestHelper) Assert(condition bool, format string, args ...interface{})
 // A lot of times you're trying to do a test and you get error codes. The errors
 // often describe the problem better than any th.Assert message, so use them
 func (th *TestHelper) AssertNoErr(err error) {
-	if err != nil {
-		th.Assert(false, err.Error())
-	}
+	utils.AssertNoErr(err)
 }
 
 func (th *TestHelper) AssertErr(err error) {

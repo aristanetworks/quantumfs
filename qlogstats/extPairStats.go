@@ -46,7 +46,7 @@ func (ext *extPairStats) ExtractStatFrom(request []indentedLog, idx int) {
 				fmt.Printf("Negative delta (%d): |%s| to |%s|\n",
 					delta, ext.fmtStart, ext.fmtStop)
 			} else {
-				ext.stats.NewPoint(uint64(delta))
+				ext.stats.NewPoint(int64(delta))
 			}
 			return
 		}
