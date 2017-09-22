@@ -219,3 +219,42 @@ func TestMergeTraverse(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeOneLeft(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "dataA contents"
+			dataB := "B data"
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+				dataA))
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/linkA"))
+
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileB",
+				dataB))
+			test.AssertNoErr(syscall.Link(branchB+"/fileB", branchB+
+				"/linkB"))
+
+			dataC := "CCCC"
+			dataD := "DDDD"
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileA",
+				dataC))
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileB",
+				dataD))
+
+			return func(merged string) {
+				test.CheckData(merged+"/fileA", []byte(dataC))
+				test.CheckData(merged+"/fileB", []byte(dataD))
+				test.CheckData(merged+"/linkA", []byte(dataA))
+				test.CheckData(merged+"/linkB", []byte(dataB))
+			}
+		})
+	})
+}
+
+//func TestRename
+
+//func TestNotHardlinked
