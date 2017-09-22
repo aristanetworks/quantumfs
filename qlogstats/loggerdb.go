@@ -6,6 +6,7 @@ package qlogstats
 import (
 	"container/list"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -213,7 +214,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 		}
 
 		// Check for partial matching for errors
-		if curlog.Format[:len(errorStr)] == errorStr {
+		if strings.HasPrefix(curlog.Format, errorStr) {
 			agg.errorCount.ProcessRequest([]indentedLog{
 				indentedLog{
 					log:    curlog,
@@ -236,6 +237,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 					log:    curlog,
 					indent: indentCount,
 				})
+
 				filteredRequests[triggered] = filtered
 			}
 		}
