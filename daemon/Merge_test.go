@@ -255,6 +255,35 @@ func TestMergeOneLeft(t *testing.T) {
 	})
 }
 
-//func TestRename
+func TestMergeRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "dataA contents"
+			dataB := "B data"
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+				dataA))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileB",
+				dataB))
+
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/fileC"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileB", branchB+
+				"/fileD"))
+
+			test.AssertNoErr(syscall.Rename(branchA+"/fileC", branchA+
+				"/fileB"))
+			test.AssertNoErr(syscall.Rename(branchB+"/fileD", branchB+
+				"/fileA"))
+
+			return func(merged string) {
+				test.CheckData(merged+"/fileA", []byte(dataB))
+				test.CheckData(merged+"/fileB", []byte(dataA))
+			}
+		})
+	})
+}
 
 //func TestNotHardlinked
