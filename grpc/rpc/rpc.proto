@@ -32,6 +32,11 @@ message RequestId {
 	uint64 id = 1;
 }
 
+enum Ports {
+        Unknown = 0;
+        Default = 2222;
+}
+
 enum ReservedRequestIds {
         RESERVED = 0;
         RESYNC = 1;
