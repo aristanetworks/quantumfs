@@ -715,8 +715,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
-		attr.Size).Out()
+	defer c.funcIn("Directory::SetAttr").Out()
 
 	return dir.parentSetChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
@@ -1219,7 +1218,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			// fix the name on the copy
 			newEntry.SetFilename(newName)
 
-			isHardlink, _ := dir.wsr.checkHardlink(oldInodeId)
+			hardlink, isHardlink := newEntry.(*Hardlink)
 			var childInode Inode
 			if !isHardlink {
 				// Update the inode to point to the new name and
@@ -1230,6 +1229,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 					childInode.setName(newName)
 					childInode.clearAccessedCache()
 				}
+			} else {
+				hardlink.creationTime = quantumfs.NewTime(time.Now())
+				newEntry.SetContentTime(hardlink.creationTime)
 			}
 
 			func() {
@@ -1350,7 +1352,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	newKey quantumfs.ObjectKey) {
 
-	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d) %s",
+	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d %s",
 		dir.inodeNum(), inodeNum, newKey.String()).Out()
 
 	defer dir.Lock().Unlock()
@@ -1815,7 +1817,7 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 
 	defer dir.Lock().Unlock()
 
-	dir.parentSyncChild(c, dir.inodeNum(), func() quantumfs.ObjectKey {
+	dir.parentSyncChild(c, func() quantumfs.ObjectKey {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
 		return dir.baseLayerId
