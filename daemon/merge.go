@@ -64,9 +64,9 @@ func (ht *hardlinkTracker) traverseSubtreeLinks(c *ctx, treeIsLocal bool,
 		}
 
 		if treeIsLocal {
-			ht.checkLinkChg(c, v, nil)
+			ht.checkLinkChanged(c, v, nil)
 		} else {
-			ht.checkLinkChg(c, nil, v)
+			ht.checkLinkChanged(c, nil, v)
 		}
 	}
 
