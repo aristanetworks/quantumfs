@@ -187,7 +187,7 @@ func (special *Special) GetXAttrData(c *ctx,
 }
 
 func (special *Special) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.elog("Invalid ListXAttr on Special")
+	c.vlog("Invalid ListXAttr on Special")
 	return []byte{}, fuse.OK
 }
 
@@ -219,7 +219,7 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 
-	special.parentSyncChild(c, special.inodeNum(), func() quantumfs.ObjectKey {
+	special.parentSyncChild(c, func() quantumfs.ObjectKey {
 		return key
 	})
 
