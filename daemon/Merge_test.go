@@ -311,7 +311,7 @@ func TestMergeSameFileId(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		dataA := "dataA contents"
 
-		MergeTester(test, func (baseWorkspace string) {
+		MergeTester(test, func(baseWorkspace string) {
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
 				"/fileA", dataA))
 
@@ -326,7 +326,7 @@ func TestMergeSameFileId(t *testing.T) {
 				branchA+"/fileB"))
 
 			return func(merged string) {
-				_, err := os.Stat(merged+"/fileA")
+				_, err := os.Stat(merged + "/fileA")
 				test.Assert(os.IsNotExist(err),
 					"fileA deletion not preserved in merge")
 
