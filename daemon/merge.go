@@ -46,9 +46,8 @@ func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
 	return &rtn
 }
 
-// if treeIsLocal is false, then it's assumed to be remote
-func (ht *hardlinkTracker) traverseSubtreeLinks(c *ctx, treeIsLocal bool,
-	dirKey quantumfs.ObjectKey) error {
+func traverseSubtree(c *ctx, dirKey quantumfs.ObjectKey,
+	fn func(quantumfs.DirectoryRecord)) error {
 
 	records, err := loadRecords(c, dirKey)
 	if err != nil {
@@ -57,17 +56,13 @@ func (ht *hardlinkTracker) traverseSubtreeLinks(c *ctx, treeIsLocal bool,
 
 	for _, v := range records {
 		if v.Type() == quantumfs.ObjectTypeDirectory {
-			err = ht.traverseSubtreeLinks(c, treeIsLocal, v.ID())
+			err = traverseSubtree(c, v.ID(), fn)
 			if err != nil {
 				return err
 			}
 		}
 
-		if treeIsLocal {
-			ht.checkLinkChanged(c, v, nil)
-		} else {
-			ht.checkLinkChanged(c, nil, v)
-		}
+		fn(v)
 	}
 
 	return nil
@@ -259,7 +254,11 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 			if v.Type() == quantumfs.ObjectTypeDirectory {
 				// Add new links
-				err = ht.traverseSubtreeLinks(c, false, v.ID())
+				err = traverseSubtree(c, v.ID(),
+					func (v quantumfs.DirectoryRecord) {
+
+					ht.checkLinkChanged(c, nil, v)
+				})
 				if err != nil {
 					return local, err
 				}
@@ -424,13 +423,21 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 			remote.Type() == quantumfs.ObjectTypeDirectory {
 
 			// Add new links
-			err = ht.traverseSubtreeLinks(c, false, remote.ID())
+			err = traverseSubtree(c, remote.ID(),
+				func (v quantumfs.DirectoryRecord) {
+
+				ht.checkLinkChanged(c, nil, v)
+			})
 			if err != nil {
 				return nil, err
 			}
 
 			// Remove old links
-			err = ht.traverseSubtreeLinks(c, true, local.ID())
+			err = traverseSubtree(c, local.ID(),
+				func (v quantumfs.DirectoryRecord) {
+
+				ht.checkLinkChanged(c, v, nil)
+			})
 			if err != nil {
 				return nil, err
 			}
