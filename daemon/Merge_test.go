@@ -326,9 +326,7 @@ func TestMergeSameFileId(t *testing.T) {
 				branchA+"/fileB"))
 
 			return func(merged string) {
-				_, err := os.Stat(merged + "/fileA")
-				test.Assert(os.IsNotExist(err),
-					"fileA deletion not preserved in merge")
+				test.assertNoFile(merged + "/fileA")
 
 				testutils.PrintToFile(merged+"/fileC", "extra data")
 				dataA += "extra data"
