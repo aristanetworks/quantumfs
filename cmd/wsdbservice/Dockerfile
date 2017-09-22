@@ -6,7 +6,6 @@ FROM scratch
 MAINTAINER quantumfs-dev@arista.com
 
 ADD wsdbservice /wsdbservice
-ADD ether.conf /ether.conf
 EXPOSE 2222
 
 # It is assumed ether.conf will be injected by Kubernetes
