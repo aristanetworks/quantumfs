@@ -343,16 +343,35 @@ func TestMergeSameFileId(t *testing.T) {
 
 func TestMergeDeletions(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, nil, func(branchA string,
+		dirA := "/dirA3/dirA2/dirA"
+		dirB := "/dirB3/dirB2/dirB"
+		fileA := "/fileA"
+		fileB := "/fileB"
+
+		var dataA, dataB []byte
+
+		MergeTester(test, func (baseWorkspace string) {
+			dataA = test.MakeFile(baseWorkspace+dirA+fileA)
+			dataB = test.MakeFile(baseWorkspace+dirB+fileB)
+		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
-			dataA := "fileA data"
+			test.AssertNoErr(syscall.Link(branchA+dirA+fileA,
+				branchA+fileA))
+			test.AssertNoErr(syscall.Link(branchA+fileA, branchA+fileB))
+			test.AssertNoErr(os.RemoveAll(branchA+dirA))
 
-			dirA := "/dirA3/dirA2/dirA"
-			dirB := "/dirB3/dirB2/dirB"
-			fileA := "/fileA"
-			fileB := "/fileB"
+			test.AssertNoErr(syscall.Link(branchB+dirB+fileB,
+				branchB+fileB))
+			test.AssertNoErr(syscall.Link(branchB+fileB, branchB+fileA))
+			test.AssertNoErr(os.RemoveAll(branchB+dirB))
 
+			return func(merged string) {
+				test.assertNoFile(merged+dirA)
+				test.assertNoFile(merged+dirB)
+				test.CheckData(merged+fileA, dataB)
+				test.CheckData(merged+fileB, dataB)
+			}
 		})
 	})
-})
+}
