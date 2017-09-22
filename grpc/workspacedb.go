@@ -273,7 +273,8 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 			wsdb.updates[update.Name] = quantumfs.WorkspaceState{
 				RootId: quantumfs.NewObjectKeyFromBytes(
 					update.RootId.Data),
-				Nonce:     quantumfs.WorkspaceNonce(update.Nonce.Nonce),
+				Nonce: quantumfs.WorkspaceNonce(
+					update.Nonce.Nonce),
 				Immutable: update.Immutable,
 				Deleted:   update.Deleted,
 			}
