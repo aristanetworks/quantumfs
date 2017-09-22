@@ -30,6 +30,7 @@ const InodeNameLog = "Inode %d Name %s"
 const InodeOnlyLog = "Inode %d"
 const FileHandleLog = "Fh: %d"
 const FileOffsetLog = "Fh: %d offset %d"
+const SetAttrArgLog = "Inode %d valid 0x%x size %d"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
@@ -189,7 +190,7 @@ func (qfs *QuantumFs) Serve() {
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	for qfs.flusher.syncAll(&qfs.c, false) != nil {
+	for qfs.flusher.syncAll(&qfs.c) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -766,7 +767,7 @@ const SyncAllLog = "Mux::syncAll"
 
 func (qfs *QuantumFs) syncAll(c *ctx) error {
 	defer c.funcIn(SyncAllLog).Out()
-	return qfs.flusher.syncAll(c, true)
+	return qfs.flusher.syncAll(c)
 }
 
 // Sync the workspace keyed with key
@@ -1224,7 +1225,8 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(SetAttrLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.FuncIn(SetAttrLog, SetAttrArgLog, input.NodeId,
+		input.Valid, input.Size).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()

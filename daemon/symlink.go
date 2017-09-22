@@ -203,7 +203,7 @@ func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeI
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Symlink::flush").Out()
-	link.parentSyncChild(c, link.inodeNum(), func() quantumfs.ObjectKey {
+	link.parentSyncChild(c, func() quantumfs.ObjectKey {
 		return link.key
 	})
 
