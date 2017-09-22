@@ -61,6 +61,7 @@ wsdbservice:
 
 dockerWsdb: wsdbservice
 	cd cmd/wsdbservice; docker build -t registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version) .
+	cd cmd/wsdbservice; docker push registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version)
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
 	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' github.com/aristanetworks/$@
