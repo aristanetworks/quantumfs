@@ -462,9 +462,40 @@ func takeNewest(c *ctx, remote quantumfs.DirectoryRecord,
 	return local.ID()
 }
 
+func loadAccessor(c *ctx, record quantumfs.DirectoryRecord) blockAccessor {
+	switch record.Type() {
+	case quantumfs.ObjectTypeSmallFile:
+		return newSmallAccessor(c, record.Size(), record.ID())
+	case quantumfs.ObjectTypeMediumFile:
+		return newMediumAccessor(c, record.ID())
+	case quantumfs.ObjectTypeLargeFile:
+		return newLargeAccessor(c, record.ID())
+	case quantumfs.ObjectTypeVeryLargeFile:
+		return newVeryLargeAccessor(c, record.ID())
+	}
+
+	return nil
+}
+
 func mergeFile(c *ctx, remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.ObjectKey, error) {
 
-	// support intra-file merges here later
+	localAccessor := loadAccessor(c, local)
+	remoteAccessor := loadAccessor(c, remote)
+
+	if localAccessor != nil && remoteAccessor != nil {
+		// Perform an intra-file merge, using the largest file as a base
+		base := localAccessor
+		other := remoteAccessor
+		if localAccessor.fileLength(c) < remoteAccessor.fileLength(c) {
+			base = remoteAccessor
+			other = localAccessor
+		}
+if base == nil || other == nil {
+
+}
+		//operateOnBlocks(c, base, 0, other.fileLength(c), ??, func(c *ctx, blockIdx int, offset uint64) (int, error))
+	}
+
 	return takeNewest(c, remote, local), nil
 }
