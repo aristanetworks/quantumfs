@@ -399,7 +399,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 				return remote, nil
 			}
-			
+
 			if local.Type() != quantumfs.ObjectTypeHardlink &&
 				remote.ContentTime() < local.ModificationTime() {
 
@@ -409,7 +409,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 		return hardlink, nil
 	}
-	
+
 	rtnRecord := local
 	if remote.ModificationTime() > local.ModificationTime() {
 		rtnRecord = remote
