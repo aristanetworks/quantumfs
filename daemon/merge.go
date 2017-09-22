@@ -227,9 +227,9 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	// make a copy to preserve localRecords
-	finalRecords := make(map[string]quantumfs.DirectoryRecord)
+	mergedRecords := make(map[string]quantumfs.DirectoryRecord)
 	for k, v := range localRecords {
-		finalRecords[k] = v
+		mergedRecords[k] = v
 	}
 
 	for k, v := range remoteRecords {
@@ -238,18 +238,18 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 		if inLocal {
 			// We have at least a local and remote, must merge
-			finalRecords[k], err = mergeRecord(c, baseChild, v,
+			mergedRecords[k], err = mergeRecord(c, baseChild, v,
 				localChild, ht)
 			if err != nil {
 				return local, err
 			}
 		} else {
 			// just take remote since it's known newer than base
-			finalRecords[k] = v
+			mergedRecords[k] = v
 		}
 
 		// check for hardlink addition or update
-		finalRecord, _ := finalRecords[k]
+		finalRecord, _ := mergedRecords[k]
 		ht.checkLinkChanged(c, localChild, finalRecord)
 	}
 
@@ -262,7 +262,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 			// (otherwise local, our reference, already deleted it and
 			// we don't want to doulbly delete)
 			if !inRemote && inLocal {
-				delete(finalRecords, k)
+				delete(mergedRecords, k)
 
 				// check for hardlink deletion
 				ht.checkLinkChanged(c, localRecord, nil)
@@ -270,9 +270,9 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		}
 	}
 
-	// turn finalRecords into a publishable format
-	localRecordsList := make([]quantumfs.DirectoryRecord, 0, len(finalRecords))
-	for _, v := range finalRecords {
+	// turn mergedRecords into a publishable format
+	localRecordsList := make([]quantumfs.DirectoryRecord, 0, len(mergedRecords))
+	for _, v := range mergedRecords {
 		localRecordsList = append(localRecordsList, v)
 	}
 
