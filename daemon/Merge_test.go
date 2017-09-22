@@ -340,3 +340,19 @@ func TestMergeSameFileId(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeDeletions(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, nil, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "fileA data"
+
+			dirA := "/dirA3/dirA2/dirA"
+			dirB := "/dirB3/dirB2/dirB"
+			fileA := "/fileA"
+			fileB := "/fileB"
+
+		})
+	})
+})
