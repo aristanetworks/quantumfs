@@ -77,29 +77,11 @@ func (ht *hardlinkTracker) traverseSubtreeLinks(c *ctx, treeIsLocal bool,
 func (ht *hardlinkTracker) checkLinkChanged(c *ctx, local quantumfs.DirectoryRecord,
 	final quantumfs.DirectoryRecord) {
 
-	if final != nil {
-		if local != nil {
-			if local.Type() != quantumfs.ObjectTypeHardlink &&
-				final.Type() != quantumfs.ObjectTypeHardlink {
-
-				// not a hardlink to anyone
-				return
-			}
-
-			if local.FileId() == final.FileId() {
-				// no change, so nothing to account for
-				return
-			}
-		}
-
-		// Execution only reaches here if local is nil or different
-		if final.Type() == quantumfs.ObjectTypeHardlink {
-			// This is now a new hardlink instance in the system
-			ht.increment(final.FileId())
-		}
+	if final != nil && final.Type() == quantumfs.ObjectTypeHardlink {
+		// This is now a new hardlink instance in the system
+		ht.increment(final.FileId())
 	}
 
-	// Execution only reaches here if final is nil or different
 	if local != nil && local.Type() == quantumfs.ObjectTypeHardlink {
 		ht.decrement(local.FileId())
 	}
@@ -260,7 +242,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	for k, v := range remoteRecords {
-		baseChild, _ := baseRecords[k]
+		baseChild, inBase := baseRecords[k]
 		localChild, inLocal := localRecords[k]
 
 		if inLocal {
@@ -270,8 +252,9 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 			if err != nil {
 				return local, err
 			}
-		} else {
-			// just take remote since it's known newer than base
+		} else if !inBase {
+			// just take remote since it's known newer than base, but
+			// only if local didn't delete it from base
 			mergedRecords[k] = v
 
 			if v.Type() == quantumfs.ObjectTypeDirectory {
@@ -297,6 +280,7 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 			// (otherwise local, our reference, already deleted it and
 			// we don't want to doulbly delete)
 			if !inRemote && inLocal {
+				c.vlog("Remote deleted %s", k)
 				delete(mergedRecords, k)
 
 				// check for hardlink deletion
@@ -398,6 +382,34 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 		}
 	}
 
+	// If one of them is a hardlink, we have to handle the situation differently
+	if local.Type() == quantumfs.ObjectTypeHardlink ||
+		remote.Type() == quantumfs.ObjectTypeHardlink {
+
+		hardlink := local
+		if remote.Type() == quantumfs.ObjectTypeHardlink {
+			hardlink = remote
+		}
+
+		// If the FileIds match, just take the hardlink to "convert" the file
+		if local.FileId() != remote.FileId() {
+			// Check in case this hardlink leg was overwritten
+			if remote.Type() != quantumfs.ObjectTypeHardlink &&
+				local.ContentTime() < remote.ModificationTime() {
+
+				return remote, nil
+			}
+			
+			if local.Type() != quantumfs.ObjectTypeHardlink &&
+				remote.ContentTime() < local.ModificationTime() {
+
+				return local, nil
+			}
+		}
+
+		return hardlink, nil
+	}
+	
 	rtnRecord := local
 	if remote.ModificationTime() > local.ModificationTime() {
 		rtnRecord = remote
