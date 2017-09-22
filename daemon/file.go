@@ -178,7 +178,6 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	defer c.funcIn("File::SetAttr").Out()
-	c.vlog("SetAttr valid %x size %d", attr.Valid, attr.Size)
 
 	var updateMtime bool
 
@@ -519,7 +518,7 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	defer fi.Lock().Unlock()
 
 	key := quantumfs.EmptyBlockKey
-	fi.parentSyncChild(c, fi.inodeNum(), func() quantumfs.ObjectKey {
+	fi.parentSyncChild(c, func() quantumfs.ObjectKey {
 		key = fi.accessor.sync(c)
 		return key
 	})

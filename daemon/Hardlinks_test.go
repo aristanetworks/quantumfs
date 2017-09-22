@@ -703,3 +703,133 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func (th *TestHelper) getHardlinkLeg(parentPath string,
+	leg string) *Hardlink {
+
+	parent := th.getInode(parentPath)
+	parentDir := asDirectory(parent)
+
+	defer parentDir.childRecordLock.Lock().Unlock()
+	record := parentDir.children.recordByName(&th.qfs.c, leg).Clone()
+	return record.(*Hardlink)
+}
+
+func TestHardlinkCreatedTime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/dirA", 0777))
+
+		dirA := workspace + "/dirA"
+		fileA := dirA + "/fileA"
+		fileB := dirA + "/fileB"
+		fileC := workspace + "/fileC"
+		fileD := workspace + "/fileD"
+		fileE := dirA + "/fileE"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
+		test.AssertNoErr(syscall.Link(fileA, fileB))
+
+		test.AssertNoErr(testutils.PrintToFile(fileC, "dataC"))
+		test.AssertNoErr(syscall.Link(fileC, fileD))
+		test.AssertNoErr(syscall.Link(fileD, fileE))
+
+		recordA := test.getHardlinkLeg(dirA, "fileA")
+		recordB := test.getHardlinkLeg(dirA, "fileB")
+		recordC := test.getHardlinkLeg(workspace, "fileC")
+		recordD := test.getHardlinkLeg(workspace, "fileD")
+		recordE := test.getHardlinkLeg(dirA, "fileE")
+
+		var statA, statB, statC, statD, statE syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(fileA, &statA))
+		test.AssertNoErr(syscall.Stat(fileB, &statB))
+		test.AssertNoErr(syscall.Stat(fileC, &statC))
+		test.AssertNoErr(syscall.Stat(fileD, &statD))
+		test.AssertNoErr(syscall.Stat(fileE, &statE))
+
+		test.Assert(statA.Ctim == statB.Ctim, "First link time changed")
+		test.Assert(statC.Ctim == statD.Ctim && statD.Ctim == statE.Ctim,
+			"Second link time changed")
+
+		test.Assert(recordA.creationTime < recordB.creationTime &&
+			recordB.creationTime != recordC.creationTime &&
+			recordC.creationTime < recordD.creationTime &&
+			recordD.creationTime < recordE.creationTime,
+			"Records not all different: %d %d %d %d %d",
+			recordA.creationTime, recordB.creationTime,
+			recordC.creationTime, recordD.creationTime,
+			recordE.creationTime)
+
+		test.Assert(recordA.creationTime != quantumfs.Time(0) &&
+			recordB.creationTime != quantumfs.Time(0) &&
+			recordC.creationTime != quantumfs.Time(0) &&
+			recordD.creationTime != quantumfs.Time(0) &&
+			recordE.creationTime != quantumfs.Time(0),
+			"hardlink instance creationTime time not set")
+
+		// ensure creationTime field is preserved across branching
+		workspaceB := "branch/copyWorkspace/test"
+		api := test.getApi()
+		test.AssertNoErr(api.Branch(test.RelPath(workspace), workspaceB))
+		workspaceB = test.AbsPath(workspaceB)
+
+		dirA = workspaceB + "/dirA"
+		// Read a file from the branched workspace to ensure they instantiate
+		_, err := ioutil.ReadFile(dirA + "/fileA")
+		test.AssertNoErr(err)
+
+		recordA2 := test.getHardlinkLeg(dirA, "fileA")
+		recordB2 := test.getHardlinkLeg(dirA, "fileB")
+		recordC2 := test.getHardlinkLeg(workspaceB, "fileC")
+		recordD2 := test.getHardlinkLeg(workspaceB, "fileD")
+		recordE2 := test.getHardlinkLeg(dirA, "fileE")
+
+		test.Assert(recordA.creationTime == recordA2.creationTime &&
+			recordB.creationTime == recordB2.creationTime &&
+			recordC.creationTime == recordC2.creationTime &&
+			recordD.creationTime == recordD2.creationTime &&
+			recordE.creationTime == recordE2.creationTime,
+			"creationTime field not preserved across branching, "+
+				"%d %d, %d %d, %d %d, %d %d, %d %d",
+			recordA.creationTime, recordA2.creationTime,
+			recordB.creationTime, recordB2.creationTime,
+			recordC.creationTime, recordC2.creationTime,
+			recordD.creationTime, recordD2.creationTime,
+			recordE.creationTime, recordE2.creationTime)
+	})
+}
+
+// test to ensure that renaming a hardlink resets its creationTime
+func TestHardlinkRenameCreation(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		dirA := workspace + "/dirA"
+		dirB := workspace + "/dirA/dirB"
+		test.AssertNoErr(utils.MkdirAll(dirB, 0777))
+
+		fileA := dirA + "/fileA"
+		fileB := dirA + "/fileB"
+		fileC := dirA + "/fileC"
+		fileD := dirB + "/fileD"
+
+		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
+		test.AssertNoErr(syscall.Link(fileA, fileB))
+
+		recordA := test.getHardlinkLeg(dirA, "fileA")
+		recordB := test.getHardlinkLeg(dirA, "fileB")
+
+		test.AssertNoErr(os.Rename(fileA, fileC))
+		recordC := test.getHardlinkLeg(dirA, "fileC")
+
+		test.AssertNoErr(os.Rename(fileB, fileD))
+		recordD := test.getHardlinkLeg(dirB, "fileD")
+
+		// test both rename and mvchild
+		test.Assert(recordA.creationTime < recordC.creationTime,
+			"Rename of hardlink doesn't reset creationTime")
+		test.Assert(recordB.creationTime < recordD.creationTime,
+			"Mvchild of hardlink doesn't reset creationTime")
+	})
+}
