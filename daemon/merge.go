@@ -510,58 +510,58 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		operateOnBlocks(c, iterator, 0, uint32(other.fileLength(c)),
 			func(c *ctx, blockIdx int, offset uint64) (int, error) {
 
-			var err error
-			baseRead := 0
-			if base != nil {
-				baseRead, err = baseAccessor.readBlock(c, blockIdx,
-					offset, baseBuf)
+				var err error
+				baseRead := 0
+				if base != nil {
+					baseRead, err = baseAccessor.readBlock(c, blockIdx,
+						offset, baseBuf)
+					if err != nil {
+						return 0, err
+					}
+				}
+
+				iteratorRead, err := iterator.readBlock(c, blockIdx, offset,
+					iteratorBuf)
 				if err != nil {
 					return 0, err
 				}
-			}
 
-			iteratorRead, err := iterator.readBlock(c, blockIdx, offset,
-				iteratorBuf)
-			if err != nil {
-				return 0, err
-			}
-
-			otherRead, err := other.readBlock(c, blockIdx, offset,
-				otherBuf)
-			if err != nil {
-				return 0, err
-			}
-
-			utils.Assert(iteratorRead <= otherRead,
-				"smaller file has more data somehow")
-
-			// merge each buffer byte by byte, depending on if we have
-			// base as a reference and which record is newer
-			for i := 0; i < iteratorRead; i++ {
-				// we take the iterator byte if either:
-				// 1) there is no base reference and other is older
-				// 2) there is a base reference and other matches it
-				// 3) there is a base ref, but it matches neither and
-				//    other is older
-				if (i >= baseRead && otherIsOlder) ||
-					(i < baseRead &&
-						otherBuf[i] == baseBuf[i]) ||
-					(i < baseRead && otherIsOlder &&
-						otherBuf[i] != baseBuf[i] &&
-						iteratorBuf[i] != baseBuf[i]) {
-
-					otherBuf[i] = iteratorBuf[i]
+				otherRead, err := other.readBlock(c, blockIdx, offset,
+					otherBuf)
+				if err != nil {
+					return 0, err
 				}
-			}
 
-			written_, err := other.writeBlock(c, blockIdx, offset,
-				otherBuf[:otherRead])
-			if err != nil {
-				return 0, err
-			}
+				utils.Assert(iteratorRead <= otherRead,
+					"smaller file has more data somehow")
 
-			return written_, nil
-		})
+				// merge each buffer byte by byte, depending on if we have
+				// base as a reference and which record is newer
+				for i := 0; i < iteratorRead; i++ {
+					// we take the iterator byte if either:
+					// 1) there is no base reference and other is older
+					// 2) there is a base reference and other matches it
+					// 3) there is a base ref, but it matches neither and
+					//    other is older
+					if (i >= baseRead && otherIsOlder) ||
+						(i < baseRead &&
+							otherBuf[i] == baseBuf[i]) ||
+						(i < baseRead && otherIsOlder &&
+							otherBuf[i] != baseBuf[i] &&
+							iteratorBuf[i] != baseBuf[i]) {
+
+						otherBuf[i] = iteratorBuf[i]
+					}
+				}
+
+				written_, err := other.writeBlock(c, blockIdx, offset,
+					otherBuf[:otherRead])
+				if err != nil {
+					return 0, err
+				}
+
+				return written_, nil
+			})
 
 		// Use the newest record as a base, and update its size and ID
 		rtnRecord := local
