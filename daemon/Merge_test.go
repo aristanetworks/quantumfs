@@ -177,8 +177,8 @@ func TestMergeHardlinksOverlap(t *testing.T) {
 				branchA+"/fileD"))
 
 			return func(merged string) {
-				test.CheckLink(merged+"/fileB", []byte(dataC), 3)
-				test.CheckLink(merged+"/fileD", []byte(dataA), 3)
+				test.CheckLink(merged+"/fileB", []byte(dataC), 2)
+				test.CheckLink(merged+"/fileD", []byte(dataA), 2)
 			}
 		})
 	})
