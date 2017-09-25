@@ -178,7 +178,6 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	defer c.funcIn("File::SetAttr").Out()
-	c.vlog("SetAttr valid %x size %d", attr.Valid, attr.Size)
 
 	var updateMtime bool
 
