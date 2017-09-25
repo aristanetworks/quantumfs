@@ -270,10 +270,10 @@ func TestMergeOneLeft(t *testing.T) {
 				dataD))
 
 			return func(merged string) {
-				test.CheckData(merged+"/fileA", []byte(dataC))
-				test.CheckData(merged+"/fileB", []byte(dataD))
-				test.CheckData(merged+"/linkA", []byte(dataA))
-				test.CheckData(merged+"/linkB", []byte(dataB))
+				test.CheckLink(merged+"/fileA", []byte(dataC), 1)
+				test.CheckLink(merged+"/fileB", []byte(dataD), 1)
+				test.CheckLink(merged+"/linkA", []byte(dataA), 1)
+				test.CheckLink(merged+"/linkB", []byte(dataB), 1)
 			}
 		})
 	})
@@ -303,8 +303,8 @@ func TestMergeRename(t *testing.T) {
 				"/fileA"))
 
 			return func(merged string) {
-				test.CheckData(merged+"/fileA", []byte(dataB))
-				test.CheckData(merged+"/fileB", []byte(dataA))
+				test.CheckLink(merged+"/fileA", []byte(dataB), 1)
+				test.CheckLink(merged+"/fileB", []byte(dataA), 1)
 			}
 		})
 	})
@@ -335,8 +335,8 @@ func TestMergeSameFileId(t *testing.T) {
 				dataA += "extra data"
 
 				// ensure the hardlinks are preserved
-				test.CheckData(merged+"/fileC", []byte(dataA))
-				test.CheckData(merged+"/fileB", []byte(dataA))
+				test.CheckLink(merged+"/fileC", []byte(dataA), 2)
+				test.CheckLink(merged+"/fileB", []byte(dataA), 2)
 			}
 		})
 	})
