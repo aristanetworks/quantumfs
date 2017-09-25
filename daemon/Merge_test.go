@@ -373,3 +373,11 @@ func TestMergeDeletions(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeIntraFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(baseWorkspace string) {
+
+		})
+	})
+}
