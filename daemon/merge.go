@@ -272,10 +272,10 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 			// Add new links
 			if v.Type() == quantumfs.ObjectTypeDirectory {
 				err = traverseSubtree(c, v.ID(),
-					func (v quantumfs.DirectoryRecord) {
+					func(v quantumfs.DirectoryRecord) {
 
-					ht.checkLinkChanged(c, nil, v)
-				})
+						ht.checkLinkChanged(c, nil, v)
+					})
 				if err != nil {
 					return local, err
 				}
@@ -412,20 +412,20 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 
 			// Add new links
 			err = traverseSubtree(c, remote.ID(),
-				func (v quantumfs.DirectoryRecord) {
+				func(v quantumfs.DirectoryRecord) {
 
-				ht.checkLinkChanged(c, nil, v)
-			})
+					ht.checkLinkChanged(c, nil, v)
+				})
 			if err != nil {
 				return nil, err
 			}
 
 			// Remove old links
 			err = traverseSubtree(c, local.ID(),
-				func (v quantumfs.DirectoryRecord) {
+				func(v quantumfs.DirectoryRecord) {
 
-				ht.checkLinkChanged(c, v, nil)
-			})
+					ht.checkLinkChanged(c, v, nil)
+				})
 			if err != nil {
 				return nil, err
 			}
