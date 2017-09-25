@@ -198,8 +198,8 @@ func TestMergeHardlinksOverlap(t *testing.T) {
 				branchA+"/fileD"))
 
 			return func(merged string) {
-				test.CheckData(merged+"/fileB", []byte(dataC))
-				test.CheckData(merged+"/fileD", []byte(dataA))
+				test.CheckLink(merged+"/fileB", []byte(dataC), 2)
+				test.CheckLink(merged+"/fileD", []byte(dataA), 2)
 			}
 		})
 	})
@@ -233,9 +233,12 @@ func TestMergeTraverse(t *testing.T) {
 				branchB+dirA+"/linkA"))
 
 			return func(merged string) {
-				test.CheckData(merged+dirD+"/fileA", []byte(dataA))
-				test.CheckData(merged+dirA+"/linkA", []byte(dataA))
-				test.CheckData(merged+dirA+"/fileB", []byte(dataB))
+				test.CheckLink(merged+dirD+"/fileA", []byte(dataA),
+					3)
+				test.CheckLink(merged+dirA+"/linkA", []byte(dataA),
+					3)
+				test.CheckLink(merged+dirA+"/fileB", []byte(dataB),
+					2)
 			}
 		})
 	})

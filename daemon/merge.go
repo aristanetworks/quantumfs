@@ -252,8 +252,8 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 			// only if local didn't delete it from base
 			mergedRecords[k] = v
 
+			// Add new links
 			if v.Type() == quantumfs.ObjectTypeDirectory {
-				// Add new links
 				err = traverseSubtree(c, v.ID(),
 					func(v quantumfs.DirectoryRecord) {
 
@@ -266,8 +266,8 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		}
 
 		// check for hardlink addition or update
-		finalRecord, _ := mergedRecords[k]
-		ht.checkLinkChanged(c, localChild, finalRecord)
+		mergedRecord, _ := mergedRecords[k]
+		ht.checkLinkChanged(c, localChild, mergedRecord)
 	}
 
 	if baseExists {
