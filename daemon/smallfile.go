@@ -56,10 +56,13 @@ func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 		return 0, errors.New("Attempt to read past end of block")
 	}
 
-	backingData := fi.getBuffer(c)
+	if blockIdx > 0 {
+		return 0, nil
+	}
 
+	backingData := fi.getBuffer(c)
 	// If we try to read too far, there's nothing to read here
-	if blockIdx > 0 || offset > uint64(backingData.Size()) {
+	if offset > uint64(backingData.Size()) {
 		return 0, nil
 	}
 
