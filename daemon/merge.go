@@ -498,51 +498,57 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 			other = localAccessor
 		}
 
-		takeOther := (iteratorRecord.ModificationTime() <
+		otherIsOlder := (iteratorRecord.ModificationTime() >
 			otherRecord.ModificationTime())
 
 		baseBuf := make([]byte, quantumfs.MaxBlockSize)
 		iteratorBuf := make([]byte, quantumfs.MaxBlockSize)
 		otherBuf := make([]byte, quantumfs.MaxBlockSize)
-		count := 0
 
 		// iterate through the smaller accessor so we don't have to handle
 		// reconciling the accessor type - the size won't change this way
-		operateOnBlocks(c, iterator, 0, other.fileLength(c), func(c *ctx,
-			blockIdx int, offset uint64) (int, error) {
+		operateOnBlocks(c, iterator, 0, uint32(other.fileLength(c)),
+			func(c *ctx, blockIdx int, offset uint64) (int, error) {
 
+			var err error
 			baseRead := 0
 			if base != nil {
-				baseRead, err := base.readBlock(c, blockIdx, offset,
-					baseBuf)
+				baseRead, err = baseAccessor.readBlock(c, blockIdx,
+					offset, baseBuf)
 				if err != nil {
-					return nil, err
+					return 0, err
 				}
 			}
 
 			iteratorRead, err := iterator.readBlock(c, blockIdx, offset,
 				iteratorBuf)
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 
 			otherRead, err := other.readBlock(c, blockIdx, offset,
 				otherBuf)
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 
-			test.Assert(iteratorRead <= otherRead,
+			utils.Assert(iteratorRead <= otherRead,
 				"smaller file has more data somehow")
 
 			// merge each buffer byte by byte, depending on if we have
 			// base as a reference and which record is newer
-			for i := 0; i < len(iteratorRead); i++ {
+			for i := 0; i < iteratorRead; i++ {
 				// we take the iterator byte if either:
 				// 1) there is no base reference and other is older
-				// 2) there is a base reference and other is the same
-				if (i >= baseRead && !takeOther) ||
-					(i < baseRead && otherBuf[i] == baseBuf[i]) {
+				// 2) there is a base reference and other matches it
+				// 3) there is a base ref, but it matches neither and
+				//    other is older
+				if (i >= baseRead && otherIsOlder) ||
+					(i < baseRead &&
+						otherBuf[i] == baseBuf[i]) ||
+					(i < baseRead && otherIsOlder &&
+						otherBuf[i] != baseBuf[i] &&
+						iteratorBuf[i] != baseBuf[i]) {
 
 					otherBuf[i] = iteratorBuf[i]
 				}
@@ -551,8 +557,10 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 			written_, err := other.writeBlock(c, blockIdx, offset,
 				otherBuf[:otherRead])
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
+
+			return written_, nil
 		})
 
 		// Use the newest record as a base, and update its size and ID
@@ -562,9 +570,15 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		}
 
 		rtnRecord.SetSize(other.fileLength(c))
-		rtnRecord.SetId(other.sync(c))
-		return rtnRecord
+		rtnRecord.SetID(other.sync(c))
+		return rtnRecord, nil
 	}
 
-	return takeNewest(c, remote, local), nil
+	rtnRecord := local
+	if remote.ModificationTime() > local.ModificationTime() {
+		rtnRecord = remote
+	}
+	rtnRecord.SetID(takeNewest(c, remote, local))
+
+	return rtnRecord, nil
 }
