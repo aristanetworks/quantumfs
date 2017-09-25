@@ -715,8 +715,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	defer c.FuncIn("Directory::SetAttr", "valid %x size %d", attr.Valid,
-		attr.Size).Out()
+	defer c.funcIn("Directory::SetAttr").Out()
 
 	return dir.parentSetChildAttr(c, dir.InodeCommon.id, nil, attr, out,
 		false)
