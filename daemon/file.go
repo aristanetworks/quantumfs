@@ -464,7 +464,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	readCount := 0
 	err := operateOnBlocks(c, fi.accessor, offset, size,
-		func (c *ctx, blockIdx int, offset uint64) (int, error) {
+		func(c *ctx, blockIdx int, offset uint64) (int, error) {
 			read, err := fi.accessor.readBlock(c, blockIdx, offset,
 				buf[readCount:])
 
@@ -497,7 +497,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 		writeCount_ := 0
 		err := operateOnBlocks(c, fi.accessor, offset, size,
-			func (c *ctx, blockIdx int, offset uint64) (int, error) {
+			func(c *ctx, blockIdx int, offset uint64) (int, error) {
 				written, err := fi.writeBlock(c, blockIdx,
 					offset, buf[writeCount_:])
 
