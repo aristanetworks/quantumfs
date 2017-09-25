@@ -6,6 +6,7 @@ package qlogstats
 import (
 	"container/list"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -85,8 +86,9 @@ type Aggregator struct {
 	statTriggers    map[string][]extractorIdx
 	requestEndAfter time.Duration
 
-	queueMutex utils.DeferableMutex
-	queueLogs  []qlog.LogOutput
+	queueMutex   utils.DeferableMutex
+	queueLogs    []qlog.LogOutput
+	notification chan struct{}
 }
 
 const errorStr = "ERROR: "
@@ -103,6 +105,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		statTriggers:    make(map[string][]extractorIdx),
 		requestEndAfter: time.Second * 30,
 		queueLogs:       make([]qlog.LogOutput, 0),
+		notification:    make(chan struct{}, 1),
 	}
 
 	// Sync all extractors and setup their triggers
@@ -131,6 +134,8 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 func (agg *Aggregator) ProcessThread() {
 	for {
 		logs := func() []qlog.LogOutput {
+			<-agg.notification
+
 			defer agg.queueMutex.Lock().Unlock()
 
 			// nothing to do
@@ -191,8 +196,6 @@ func (agg *Aggregator) ProcessThread() {
 				agg.statExtractors[i] = extractor
 			}
 		}
-
-		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -211,7 +214,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 		}
 
 		// Check for partial matching for errors
-		if curlog.Format[:len(errorStr)] == errorStr {
+		if strings.HasPrefix(curlog.Format, errorStr) {
 			agg.errorCount.ProcessRequest([]indentedLog{
 				indentedLog{
 					log:    curlog,
@@ -234,6 +237,7 @@ func (agg *Aggregator) FilterRequest(logs []qlog.LogOutput) {
 					log:    curlog,
 					indent: indentCount,
 				})
+
 				filteredRequests[triggered] = filtered
 			}
 		}
@@ -254,6 +258,11 @@ func (agg *Aggregator) ProcessLog(v qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, v)
+
+	select {
+	case agg.notification <- struct{}{}:
+	default:
+	}
 }
 
 func (agg *Aggregator) processLog(v qlog.LogOutput) {
