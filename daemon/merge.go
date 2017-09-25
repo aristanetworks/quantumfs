@@ -502,7 +502,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 			otherRecord.ModificationTime())
 
 		baseBuf := make([]byte, quantumfs.MaxBlockSize)
-		iteratorBuf := make([]byte, quantumfs.MaxBlockSize)
+		iterBuf := make([]byte, quantumfs.MaxBlockSize)
 		otherBuf := make([]byte, quantumfs.MaxBlockSize)
 
 		// iterate through the smaller accessor so we don't have to handle
@@ -513,21 +513,21 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 				var err error
 				baseRead := 0
 				if base != nil {
-					baseRead, err = baseAccessor.readBlock(c, blockIdx,
-						offset, baseBuf)
+					baseRead, err = baseAccessor.readBlock(c,
+						blockIdx, offset, baseBuf)
 					if err != nil {
 						return 0, err
 					}
 				}
 
-				iteratorRead, err := iterator.readBlock(c, blockIdx, offset,
-					iteratorBuf)
+				iteratorRead, err := iterator.readBlock(c, blockIdx,
+					offset, iterBuf)
 				if err != nil {
 					return 0, err
 				}
 
-				otherRead, err := other.readBlock(c, blockIdx, offset,
-					otherBuf)
+				otherRead, err := other.readBlock(c, blockIdx,
+					offset, otherBuf)
 				if err != nil {
 					return 0, err
 				}
@@ -535,27 +535,26 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 				utils.Assert(iteratorRead <= otherRead,
 					"smaller file has more data somehow")
 
-				// merge each buffer byte by byte, depending on if we have
-				// base as a reference and which record is newer
+				// merge each buffer byte by byte, where
+				// we take the iterator byte if either:
+				// 1) there is no base reference and other is older
+				// 2) there is a base reference and other matches it
+				// 3) there is a base ref, but it matches neither and
+				//    other is older
 				for i := 0; i < iteratorRead; i++ {
-					// we take the iterator byte if either:
-					// 1) there is no base reference and other is older
-					// 2) there is a base reference and other matches it
-					// 3) there is a base ref, but it matches neither and
-					//    other is older
 					if (i >= baseRead && otherIsOlder) ||
 						(i < baseRead &&
 							otherBuf[i] == baseBuf[i]) ||
 						(i < baseRead && otherIsOlder &&
 							otherBuf[i] != baseBuf[i] &&
-							iteratorBuf[i] != baseBuf[i]) {
+							iterBuf[i] != baseBuf[i]) {
 
-						otherBuf[i] = iteratorBuf[i]
+						otherBuf[i] = iterBuf[i]
 					}
 				}
 
-				written_, err := other.writeBlock(c, blockIdx, offset,
-					otherBuf[:otherRead])
+				written_, err := other.writeBlock(c, blockIdx,
+					offset, otherBuf[:otherRead])
 				if err != nil {
 					return 0, err
 				}
