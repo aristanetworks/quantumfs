@@ -177,8 +177,47 @@ func TestMergeHardlinksOverlap(t *testing.T) {
 				branchA+"/fileD"))
 
 			return func(merged string) {
-				test.CheckData(merged+"/fileB", []byte(dataC))
-				test.CheckData(merged+"/fileD", []byte(dataA))
+				test.CheckLink(merged+"/fileB", []byte(dataC), 2)
+				test.CheckLink(merged+"/fileD", []byte(dataA), 2)
+			}
+		})
+	})
+}
+
+func TestMergeTraverse(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "A data contents"
+			dataB := "B data"
+			dirA := "/dirA"
+			dirD := dirA + "/dirB/dirC/dirD"
+
+			test.AssertNoErr(os.MkdirAll(branchB+dirD, 0777))
+			test.AssertNoErr(testutils.PrintToFile(branchB+dirD+"/fileA",
+				dataA))
+			test.AssertNoErr(syscall.Link(branchB+dirD+"/fileA",
+				branchB+dirD+"/linkB"))
+
+			test.AssertNoErr(os.MkdirAll(branchA+dirA, 0777))
+			test.AssertNoErr(testutils.PrintToFile(branchA+dirA+"/fileB",
+				dataB))
+			test.AssertNoErr(syscall.Link(branchA+dirA+"/fileB",
+				branchA+dirA+"/linkA"))
+			test.AssertNoErr(syscall.Link(branchA+dirA+"/fileB",
+				branchA+dirA+"/linkC"))
+
+			test.AssertNoErr(syscall.Link(branchB+dirD+"/fileA",
+				branchB+dirA+"/linkA"))
+
+			return func(merged string) {
+				test.CheckLink(merged+dirD+"/fileA", []byte(dataA),
+					3)
+				test.CheckLink(merged+dirA+"/linkA", []byte(dataA),
+					3)
+				test.CheckLink(merged+dirA+"/fileB", []byte(dataB),
+					2)
 			}
 		})
 	})
