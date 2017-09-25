@@ -372,12 +372,8 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 		fallthrough
 	case quantumfs.ObjectTypeVeryLargeFile:
 		if bothSameType {
-			mergedKey, err = mergeFile(c, remote, local)
-			if err != nil {
-				return nil, err
-			}
-
-			updatedKey = true
+			// We can potentially do an intra-file merge
+			return mergeFile(c, base, remote, local)
 		}
 	}
 
@@ -477,24 +473,97 @@ func loadAccessor(c *ctx, record quantumfs.DirectoryRecord) blockAccessor {
 	return nil
 }
 
-func mergeFile(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) (quantumfs.ObjectKey, error) {
+func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
+	var baseAccessor blockAccessor
+	if base != nil {
+		baseAccessor = loadAccessor(c, base)
+	}
 	localAccessor := loadAccessor(c, local)
 	remoteAccessor := loadAccessor(c, remote)
 
 	if localAccessor != nil && remoteAccessor != nil {
-		// Perform an intra-file merge, using the largest file as a base
-		base := localAccessor
+		// Perform an intra-file merge by iterating through the small file,
+		// writing its changes to other, and then keeping other
+		iteratorRecord := local
+		iterator := localAccessor
+		otherRecord := remote
 		other := remoteAccessor
-		if localAccessor.fileLength(c) < remoteAccessor.fileLength(c) {
-			base = remoteAccessor
+		if localAccessor.fileLength(c) > remoteAccessor.fileLength(c) {
+			iteratorRecord = remote
+			iterator = remoteAccessor
+			otherRecord = local
 			other = localAccessor
 		}
-if base == nil || other == nil {
 
-}
-		//operateOnBlocks(c, base, 0, other.fileLength(c), ??, func(c *ctx, blockIdx int, offset uint64) (int, error))
+		takeOther := (iteratorRecord.ModificationTime() <
+			otherRecord.ModificationTime())
+
+		baseBuf := make([]byte, quantumfs.MaxBlockSize)
+		iteratorBuf := make([]byte, quantumfs.MaxBlockSize)
+		otherBuf := make([]byte, quantumfs.MaxBlockSize)
+		count := 0
+
+		// iterate through the smaller accessor so we don't have to handle
+		// reconciling the accessor type - the size won't change this way
+		operateOnBlocks(c, iterator, 0, other.fileLength(c), func(c *ctx,
+			blockIdx int, offset uint64) (int, error) {
+
+			baseRead := 0
+			if base != nil {
+				baseRead, err := base.readBlock(c, blockIdx, offset,
+					baseBuf)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			iteratorRead, err := iterator.readBlock(c, blockIdx, offset,
+				iteratorBuf)
+			if err != nil {
+				return nil, err
+			}
+
+			otherRead, err := other.readBlock(c, blockIdx, offset,
+				otherBuf)
+			if err != nil {
+				return nil, err
+			}
+
+			test.Assert(iteratorRead <= otherRead,
+				"smaller file has more data somehow")
+
+			// merge each buffer byte by byte, depending on if we have
+			// base as a reference and which record is newer
+			for i := 0; i < len(iteratorRead); i++ {
+				// we take the iterator byte if either:
+				// 1) there is no base reference and other is older
+				// 2) there is a base reference and other is the same
+				if (i >= baseRead && !takeOther) ||
+					(i < baseRead && otherBuf[i] == baseBuf[i]) {
+
+					otherBuf[i] = iteratorBuf[i]
+				}
+			}
+
+			written_, err := other.writeBlock(c, blockIdx, offset,
+				otherBuf[:otherRead])
+			if err != nil {
+				return nil, err
+			}
+		})
+
+		// Use the newest record as a base, and update its size and ID
+		rtnRecord := local
+		if remote.ModificationTime() > local.ModificationTime() {
+			rtnRecord = remote
+		}
+
+		rtnRecord.SetSize(other.fileLength(c))
+		rtnRecord.SetId(other.sync(c))
+		return rtnRecord
 	}
 
 	return takeNewest(c, remote, local), nil
