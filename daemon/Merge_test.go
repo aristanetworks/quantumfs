@@ -66,33 +66,21 @@ func MergeTester(test *testHelper, base baseSetup, setup mergeTestSetup) {
 	check(newBranch)
 }
 
-func TestMergePlainFile(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		MergeTester(test, nil, func(branchA string,
-			branchB string) mergeTestCheck {
-
-			test.MakeFile(branchA + "/fileA")
-			dataB := test.MakeFile(branchB + "/fileA")
-			test.MakeFile(branchB + "/fileB")
-			dataA2 := test.MakeFile(branchA + "/fileB")
-
-			return func(merged string) {
-				test.CheckData(merged+"/fileA", dataB)
-				test.CheckData(merged+"/fileB", dataA2)
-			}
-		})
-	})
-}
-
 func TestMergePlainSubdir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			test.MakeFile(branchA + "/subdir/fileA")
-			dataB := test.MakeFile(branchB + "/subdir/fileA")
+			dataB := test.MakeFile(branchB + "/subdir/fileC")
+			// Files are only ignorantly overwritten if one isn't the
+			// same regular file type
+			test.AssertNoErr(syscall.Symlink(branchB+"/subdir/fileC",
+				branchB+"/subdir/fileA"))
 			test.MakeFile(branchB + "/subdir/fileB")
-			dataA2 := test.MakeFile(branchA + "/subdir/fileB")
+			dataA2 := test.MakeFile(branchA + "/subdir/fileD")
+			test.AssertNoErr(syscall.Symlink(branchA+"/subdir/fileD",
+				branchA+"/subdir/fileB"))
 
 			return func(merged string) {
 				test.CheckData(merged+"/subdir/fileA", dataB)
