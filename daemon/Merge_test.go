@@ -13,18 +13,32 @@ import (
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
+type baseSetup func(base string)
 type mergeTestCheck func(merged string)
 type mergeTestSetup func(branchA string, branchB string) mergeTestCheck
 
-func MergeTester(test *testHelper, setup mergeTestSetup) {
-	workspaceA := test.NewWorkspace()
-	workspaceB := test.NewWorkspace()
+func MergeTester(test *testHelper, base baseSetup, setup mergeTestSetup) {
+	workspaceBase := test.NewWorkspace()
+
+	if base != nil {
+		base(workspaceBase)
+	}
+
+	api := test.getApi()
+	workspaceA := test.AbsPath("test/workspaceA/test")
+	workspaceB := test.AbsPath("test/workspaceB/test")
+
+	test.AssertNoErr(api.Branch(test.RelPath(workspaceBase),
+		test.RelPath(workspaceA)))
+	test.AssertNoErr(api.Branch(test.RelPath(workspaceBase),
+		test.RelPath(workspaceB)))
+	test.AssertNoErr(api.EnableRootWrite(test.RelPath(workspaceA)))
+	test.AssertNoErr(api.EnableRootWrite(test.RelPath(workspaceB)))
 
 	check := setup(workspaceA, workspaceB)
 
 	// merge and create a new branch
 	test.SyncAllWorkspaces()
-	api := test.getApi()
 
 	// Because of the buggy state of DeleteWorkspace and the fact that
 	// we can't rely on workspace inodes to update when the rootId
@@ -33,21 +47,28 @@ func MergeTester(test *testHelper, setup mergeTestSetup) {
 	err := api.Branch(test.RelPath(workspaceA), test.RelPath(tempBranch))
 	test.AssertNoErr(err)
 
-	err = api.Merge(test.RelPath(workspaceB), test.RelPath(tempBranch))
-	test.AssertNoErr(err)
+	if base != nil {
+		err = api.Merge3Way(test.RelPath(workspaceBase),
+			test.RelPath(workspaceB), test.RelPath(tempBranch))
+		test.AssertNoErr(err)
+	} else {
+		err = api.Merge(test.RelPath(workspaceB), test.RelPath(tempBranch))
+		test.AssertNoErr(err)
+	}
 
 	// Now we have to branch again so that the rootId change is
 	// actually reflected in our local workspace instance
 	newBranch := test.AbsPath("branch/basic/test")
 	err = api.Branch(test.RelPath(tempBranch), test.RelPath(newBranch))
 	test.AssertNoErr(err)
+	test.AssertNoErr(api.EnableRootWrite(test.RelPath(newBranch)))
 
 	check(newBranch)
 }
 
 func TestMergePlainFile(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			test.MakeFile(branchA + "/fileA")
@@ -65,7 +86,7 @@ func TestMergePlainFile(t *testing.T) {
 
 func TestMergePlainSubdir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			test.MakeFile(branchA + "/subdir/fileA")
@@ -83,7 +104,7 @@ func TestMergePlainSubdir(t *testing.T) {
 
 func TestMergeSymlink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			test.MakeFile(branchA + "/subdir/fileA")
@@ -103,7 +124,7 @@ func TestMergeSymlink(t *testing.T) {
 
 func TestMergeSpecial(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			err := syscall.Mknod(branchA+"/special",
@@ -133,7 +154,7 @@ func TestMergeSpecial(t *testing.T) {
 
 func TestMergeDifferentTypes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			err := os.MkdirAll(branchA+"/fileA/fileisadir", 0777)
@@ -154,7 +175,7 @@ func TestMergeDifferentTypes(t *testing.T) {
 
 func TestMergeHardlinksOverlap(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			dataA := "A data contents"
@@ -186,7 +207,7 @@ func TestMergeHardlinksOverlap(t *testing.T) {
 
 func TestMergeTraverse(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func(branchA string,
+		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			dataA := "A data contents"
@@ -218,6 +239,104 @@ func TestMergeTraverse(t *testing.T) {
 					3)
 				test.CheckLink(merged+dirA+"/fileB", []byte(dataB),
 					2)
+			}
+		})
+	})
+}
+
+func TestMergeOneLeft(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, nil, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "dataA contents"
+			dataB := "B data"
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+				dataA))
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/linkA"))
+
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileB",
+				dataB))
+			test.AssertNoErr(syscall.Link(branchB+"/fileB", branchB+
+				"/linkB"))
+
+			dataC := "CCCC"
+			dataD := "DDDD"
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileA",
+				dataC))
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileB",
+				dataD))
+
+			return func(merged string) {
+				test.CheckLink(merged+"/fileA", []byte(dataC), 1)
+				test.CheckLink(merged+"/fileB", []byte(dataD), 1)
+				test.CheckLink(merged+"/linkA", []byte(dataA), 1)
+				test.CheckLink(merged+"/linkB", []byte(dataB), 1)
+			}
+		})
+	})
+}
+
+func TestMergeRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, nil, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			dataA := "dataA contents"
+			dataB := "B data"
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+				dataA))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileB",
+				dataB))
+
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/fileC"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileB", branchB+
+				"/fileD"))
+
+			test.AssertNoErr(syscall.Rename(branchA+"/fileC", branchA+
+				"/fileB"))
+			test.AssertNoErr(syscall.Rename(branchB+"/fileD", branchB+
+				"/fileA"))
+
+			return func(merged string) {
+				test.CheckLink(merged+"/fileA", []byte(dataB), 1)
+				test.CheckLink(merged+"/fileB", []byte(dataA), 1)
+			}
+		})
+	})
+}
+
+func TestMergeSameFileId(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		dataA := "dataA contents"
+
+		MergeTester(test, func(baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileA", dataA))
+
+		}, func(branchA string, branchB string) mergeTestCheck {
+			// fileB will exist in both local and remote, different from
+			// base, but with the same FileId
+			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
+				"/fileB"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
+				"/fileC"))
+			test.AssertNoErr(os.Rename(branchA+"/fileA",
+				branchA+"/fileB"))
+
+			return func(merged string) {
+				test.assertNoFile(merged + "/fileA")
+
+				testutils.PrintToFile(merged+"/fileC", "extra data")
+				dataA += "extra data"
+
+				// ensure the hardlinks are preserved
+				test.CheckLink(merged+"/fileC", []byte(dataA), 2)
+				test.CheckLink(merged+"/fileB", []byte(dataA), 2)
 			}
 		})
 	})
