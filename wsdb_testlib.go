@@ -317,3 +317,36 @@ func (s *wsdbCommonUnitTest) TestWorkspaceLastWriteTime() {
 		ts.Equal(time.Unix(microSecs/int64(time.Second/time.Microsecond), 0).UTC()),
 		"Expected and received time stamp mismatch")
 }
+
+func (s *wsdbCommonUnitTest) TestCreateWorkspaceNoKey() {
+	mockWsdbKeyGet(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, nil, gocql.ErrNotFound)
+	mockWsdbKeyPut(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3}, nil)
+	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3})
+	s.req.NoError(err, "Failed in creating workspace")
+}
+
+func (s *wsdbCommonUnitTest) TestCreateWorkspaceDiffKey() {
+	mockWsdbKeyGet(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{4, 5, 6}, nil)
+	mockWsdbKeyPut(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3}, nil)
+
+	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3})
+	s.req.Error(err,
+		"Succeeded in creating workspace even though different key exists")
+}
+
+func (s *wsdbCommonUnitTest) TestCreateWorkspaceSameKey() {
+	mockWsdbKeyGet(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3}, nil)
+	mockWsdbKeyPut(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3}, nil)
+
+	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, []byte{1, 2, 3})
+	s.req.NoError(err, "Failed in creating workspace")
+}

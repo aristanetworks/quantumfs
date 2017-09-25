@@ -174,6 +174,18 @@ func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace 
 	defer c.FuncIn("noCacheWsdb::CreateWorkspace", "%s/%s/%s(%s)", typespace, namespace,
 		workspace, keyHex).Out()
 
+	// if the typespace/namespace/workspace already exists with a key
+	// different than wsKey then raise error
+	existKey, present, _ := nc.wsdbKeyGet(c, typespace, namespace, workspace)
+	if present && !bytes.Equal([]byte(wsKey), existKey) {
+		existKeyHex := hex.EncodeToString(existKey)
+		return wsdb.NewError(wsdb.ErrWorkspaceExists,
+			"Cannot CreateWorkspace since different key exists for %s/%s/%s "+
+				"want: %s found: %s", typespace, namespace, workspace,
+			keyHex, existKeyHex)
+
+	}
+
 	err := nc.wsdbKeyPut(ether.DefaultCtx, typespace, namespace, workspace, wsKey)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,

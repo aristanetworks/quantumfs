@@ -762,6 +762,18 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
 
 // TODO: once the APIs return errors, add appropriate test cases
 
+func (suite *wsdbCacheTestSuite) TestCacheCreateWorkspaceNoKey() {
+	suite.common.TestCreateWorkspaceNoKey()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheCreateWorkspaceDiffKey() {
+	suite.common.TestCreateWorkspaceDiffKey()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheCreateWorkspaceSameKey() {
+	suite.common.TestCreateWorkspaceSameKey()
+}
+
 func (suite *wsdbCacheTestSuite) TearDownTest() {
 	resetCqlStore()
 }

@@ -97,6 +97,18 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheWorkspaceLastWriteTime() {
 	suite.common.TestWorkspaceLastWriteTime()
 }
 
+func (suite *wsdbNoCacheTestSuite) TestNoCacheCreateWorkspaceNoKey() {
+	suite.common.TestCreateWorkspaceNoKey()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheCreateWorkspaceDiffKey() {
+	suite.common.TestCreateWorkspaceDiffKey()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheCreateWorkspaceSameKey() {
+	suite.common.TestCreateWorkspaceSameKey()
+}
+
 func (suite *wsdbNoCacheTestSuite) TearDownTest() {
 	resetCqlStore()
 }
