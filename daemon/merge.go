@@ -249,8 +249,8 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		}
 
 		// check for hardlink addition or update
-		finalRecord, _ := mergedRecords[k]
-		ht.checkLinkChanged(c, localChild, finalRecord)
+		mergedRecord, _ := mergedRecords[k]
+		ht.checkLinkChanged(c, localChild, , mergedRecord)
 	}
 
 	if baseExists {
