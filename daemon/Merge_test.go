@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
@@ -414,19 +415,35 @@ func TestMergeIntraFileDiffTypes(t *testing.T) {
 
 			// create a small file and a large file and ensure that they
 			// merge contents correctly
-			dataA := GenData(2 * 1000000)
-			dataB := "Small file data"
+			dataC := GenData(1000 + quantumfs.MaxBlocksMediumFile())
+			mediumLen := 2 * quantumfs.MaxBlockSize
+			dataB := GenData(3 * quantumfs.MaxBlockSize)[:mediumLen]
+			dataA := "Small file data"
 
+			// test small file merged with a medium file
 			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
-				string(dataA)))
+				string(dataB)))
 			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileA",
-				dataB))
+				dataA))
+
+			// test a medium file merged with a large file
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileB",
+				string(dataB)))
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileB",
+				string(dataC)))
 
 			return func(merged string) {
-				copy(dataA, dataB)
+				resultA := make([]byte, len(dataB))
+				copy(resultA, dataB)
+				copy(resultA, dataA)
+
+				resultB := make([]byte, len(dataC))
+				copy(resultB, dataB)
+				copy(resultB, dataC)
 
 				// the merge result should be a simple combination
-				test.CheckData(merged+"/fileA", dataA)
+				test.CheckData(merged+"/fileA", resultA)
+				test.CheckData(merged+"/fileB", resultB)
 			}
 		})
 	})
