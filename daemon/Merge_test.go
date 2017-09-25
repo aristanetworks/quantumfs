@@ -406,3 +406,28 @@ func TestMergeIntraFileNoBase(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeIntraFileDiffTypes(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, nil, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			// create a small file and a large file and ensure that they
+			// merge contents correctly
+			dataA := GenData(2 * 1000000)
+			dataB := "Small file data"
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+				string(dataA)))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileA",
+				dataB))
+
+			return func(merged string) {
+				copy(dataA, dataB)
+
+				// the merge result should be a simple combination
+				test.CheckData(merged+"/fileA", dataA)
+			}
+		})
+	})
+}

@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"container/list"
+	"fmt"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -407,7 +408,8 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 func (buf *buffer) SetSize(size int) {
 	switch {
 	case size > quantumfs.MaxBlockSize:
-		panic("New block size greater than maximum")
+		panic(fmt.Sprintf("New block size greater than maximum: %d",
+			size))
 	case size > len(buf.data):
 		// We have to increase our capacity first
 		buf.padWithZeros(size)

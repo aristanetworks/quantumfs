@@ -569,6 +569,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 			rtnRecord = remote
 		}
 
+		rtnRecord.SetType(otherRecord.Type())
 		rtnRecord.SetSize(other.fileLength(c))
 		rtnRecord.SetID(other.sync(c))
 		return rtnRecord, nil
