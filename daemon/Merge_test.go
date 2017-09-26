@@ -387,7 +387,12 @@ func TestMergeDeletions(t *testing.T) {
 
 func TestMergeIntraFileNoBase(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, nil, func(branchA string,
+		MergeTester(test, func (baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileA", ""))
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileB", ""))
+		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			sharedDataA := string(GenData(1000000))
@@ -414,14 +419,11 @@ func TestMergeIntraFileNoBase(t *testing.T) {
 			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileB",
 				dataB))
 
-			checkDataOtherNewer := dataB + extendedDataE
-			checkDataLocalNewer := dataA
+			checkData := dataB + extendedDataE
 
 			return func(merged string) {
-				test.CheckData(merged+"/fileA",
-					[]byte(checkDataOtherNewer))
-				test.CheckData(merged+"/fileB",
-					[]byte(checkDataLocalNewer))
+				test.CheckData(merged+"/fileA", []byte(checkData))
+				test.CheckData(merged+"/fileB", []byte(checkData))
 			}
 		})
 	})

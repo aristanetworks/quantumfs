@@ -335,7 +335,8 @@ func (th *testHelper) CheckData(filepath string, data []byte) {
 	}
 
 	th.Assert(bytes.Equal(readData, data),
-		"Data changed in CheckData: %v... vs %v...", debugData, debugRead)
+		"Data changed in CheckData for %s (%d %d): %v... vs %v...",
+		filepath, len(data), len(readData), debugData, debugRead)
 }
 
 func (th *testHelper) SysStat(filepath string) syscall.Stat_t {
