@@ -324,8 +324,18 @@ func (th *testHelper) CheckLink(filepath string, data []byte, nlink uint64) {
 func (th *testHelper) CheckData(filepath string, data []byte) {
 	readData, err := ioutil.ReadFile(filepath)
 	th.AssertNoErr(err)
-	th.Assert(bytes.Equal(readData, data), "Data changed in CheckData: %s\n%s",
-		data, readData)
+
+	debugData := data
+	if len(debugData) > 10 {
+		debugData = data[:10]
+	}
+	debugRead := readData
+	if len(debugRead) > 10 {
+		debugRead = readData[:10]
+	}
+
+	th.Assert(bytes.Equal(readData, data),
+		"Data changed in CheckData: %v... vs %v...", debugData, debugRead)
 }
 
 func (th *testHelper) SysStat(filepath string) syscall.Stat_t {
