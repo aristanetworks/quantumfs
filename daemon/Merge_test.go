@@ -67,6 +67,24 @@ func MergeTester(test *testHelper, base baseSetup, setup mergeTestSetup) {
 	check(newBranch)
 }
 
+func TestMergePlainFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, nil, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.MakeFile(branchA + "/fileA")
+			dataB := test.MakeFile(branchB + "/fileA")
+			test.MakeFile(branchB + "/fileB")
+			dataA2 := test.MakeFile(branchA + "/fileB")
+
+			return func(merged string) {
+				test.CheckData(merged+"/fileA", dataB)
+				test.CheckData(merged+"/fileB", dataA2)
+			}
+		})
+	})
+}
+
 func TestMergePlainSubdir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		MergeTester(test, nil, func(branchA string,
