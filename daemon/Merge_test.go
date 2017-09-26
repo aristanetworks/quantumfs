@@ -387,7 +387,7 @@ func TestMergeDeletions(t *testing.T) {
 
 func TestMergeIntraFileNoBase(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func (baseWorkspace string) {
+		MergeTester(test, func(baseWorkspace string) {
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
 				"/fileA", ""))
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
@@ -431,7 +431,7 @@ func TestMergeIntraFileNoBase(t *testing.T) {
 
 func TestMergeIntraFileDiffTypes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, func (baseWorkspace string) {
+		MergeTester(test, func(baseWorkspace string) {
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
 				"/fileA", ""))
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
