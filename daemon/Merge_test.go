@@ -78,6 +78,7 @@ func TestMergePlainFile(t *testing.T) {
 			dataA2 := test.MakeFile(branchA + "/fileB")
 
 			return func(merged string) {
+				// intra file shouldn't happen with diff FileIds
 				test.CheckData(merged+"/fileA", dataB)
 				test.CheckData(merged+"/fileB", dataA2)
 			}
