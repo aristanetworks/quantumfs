@@ -44,7 +44,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
-		releaseChan:            make(chan FileHandleId, 1000000),
+		toBeReleased:           make(chan FileHandleId, 1000000),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -159,7 +159,7 @@ type QuantumFs struct {
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]workspaceState
 
-	releaseChan chan FileHandleId
+	toBeReleased chan FileHandleId
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
@@ -188,25 +188,27 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	return nil
 }
 
+const ReleaseFileHandleLog = "Mux::fileHandlerReleaser"
+
 func (qfs *QuantumFs) fileHandleReleaser() {
-	end := 1000
+	const maxReleasesPerCycle = 1000
 	i := 0
 	for {
 		func() {
+			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
 			defer qfs.mapMutex.Lock().Unlock()
-			for i = 0; i < end; i++ {
+			for i = 0; i < maxReleasesPerCycle; i++ {
 				select {
-				case fh := <-qfs.releaseChan:
+				case fh := <-qfs.toBeReleased:
 					qfs.setFileHandle_(&qfs.c, fh, nil)
 				default:
 					return
 				}
 			}
 		}()
-		if i < end {
+		if i < maxReleasesPerCycle {
 			// If we didn't need our full allocation, sleep to accumulate
-			// more work. If we did need our full allocation, release the
-			// lock to allow others a chance to use it.
+			// more work with minimal mapMutex contention.
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
@@ -1801,8 +1803,7 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(ReleaseLog, FileHandleLog, input.Fh).Out()
 
-	qfs.releaseChan <- FileHandleId(input.Fh)
-	//qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
+	qfs.toBeReleased <- FileHandleId(input.Fh)
 }
 
 const WriteLog = "Mux::Write"
@@ -1942,8 +1943,7 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(ReleaseDirLog, FileHandleLog, input.Fh).Out()
 
-	qfs.releaseChan <- FileHandleId(input.Fh)
-	//qfs.setFileHandle(&qfs.c, FileHandleId(input.Fh), nil)
+	qfs.toBeReleased <- FileHandleId(input.Fh)
 }
 
 const FsyncDirLog = "Mux::FsyncDir"
