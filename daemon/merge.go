@@ -484,7 +484,9 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	localAccessor := loadAccessor(c, local)
 	remoteAccessor := loadAccessor(c, remote)
 
-	if localAccessor != nil && remoteAccessor != nil {
+	if localAccessor != nil && remoteAccessor != nil &&
+		local.FileId() == remote.FileId() {
+
 		// Perform an intra-file merge by iterating through the small file,
 		// writing its changes to other, and then keeping other
 		iteratorRecord := local
