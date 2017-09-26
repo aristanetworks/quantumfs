@@ -112,6 +112,7 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 		newQfsExtPair(daemon.ReadDirLog, daemon.FileOffsetLog),
 		newQfsExtPair(daemon.ReadDirPlusLog, daemon.FileOffsetLog),
 		newQfsExtPair(daemon.ReleaseDirLog, daemon.FileHandleLog),
+		newQfsExtPair(daemon.ReleaseFileHandleLog, ""),
 		newQfsExtPair(daemon.FsyncDirLog, daemon.FileHandleLog),
 		newQfsExtPair(daemon.StatFsLog, ""),
 		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
