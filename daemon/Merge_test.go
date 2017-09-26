@@ -471,3 +471,41 @@ func TestMergeIntraFileDiffTypes(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeIntraFileBase(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		sharedDataA := string(GenData(1000000))
+		conflictDataB0 := "00000000000000000"
+		conflictDataB1 := "This is some data"
+		conflictDataB2 := "And..is this not?"
+		sharedDataC := string(GenData(300000))
+		conflictDataD0 := "0000AAAAA0000BBBBB0000"
+		conflictDataD1 := "0000AAAAA0000FOODS0000"
+		conflictDataD2 := "0000BEEFS0000BBBBB0000"
+		extendedDataE := "Extra data on one file"
+
+		MergeTester(test, func (baseWorkspace string) {
+			baseData := sharedDataA + conflictDataB0 + sharedDataC +
+				conflictDataD0
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+"/file",
+				baseData))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(testutils.OverWriteFile(branchA+"/file",
+				sharedDataA+conflictDataB1+sharedDataC+
+				conflictDataD1+extendedDataE))
+			test.AssertNoErr(testutils.OverWriteFile(branchB+"/file",
+				sharedDataA+conflictDataB2+sharedDataC+
+				conflictDataD2))
+
+			return func(merged string) {
+				resultD := conflictDataD2[:10] + conflictDataD1[10:]
+
+				test.CheckData(merged+"/file", []byte(sharedDataA+
+					conflictDataB2+sharedDataC+resultD+
+					extendedDataE))
+			}
+		})
+	})
+}
