@@ -578,8 +578,8 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		return rtnRecord, nil
 	}
 
-	c.vlog("File conflict for %s resulting in overwrite. %d %d", local.Filename(),
-		local.FileId(), remote.FileId())
+	c.vlog("File conflict for %s resulting in overwrite. %d %d",
+		local.Filename(), local.FileId(), remote.FileId())
 	rtnRecord := local
 	if remote.ModificationTime() > local.ModificationTime() {
 		rtnRecord = remote
