@@ -431,12 +431,18 @@ func TestMergeIntraFileNoBase(t *testing.T) {
 
 func TestMergeIntraFileDiffTypes(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTester(test, nil, func(branchA string,
+		MergeTester(test, func (baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileA", ""))
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileB", ""))
+		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
 			// create a small file and a large file and ensure that they
 			// merge contents correctly
-			dataC := GenData(1000 + quantumfs.MaxBlocksMediumFile())
+			dataC := GenData(1000 + (quantumfs.MaxBlockSize *
+				quantumfs.MaxBlocksMediumFile()))
 			mediumLen := 2 * quantumfs.MaxBlockSize
 			dataB := GenData(3 * quantumfs.MaxBlockSize)[:mediumLen]
 			dataA := "Small file data"
@@ -454,17 +460,13 @@ func TestMergeIntraFileDiffTypes(t *testing.T) {
 				string(dataC)))
 
 			return func(merged string) {
-				resultA := make([]byte, len(dataB))
+				resultA := make([]byte, len(dataB), len(dataB))
 				copy(resultA, dataB)
 				copy(resultA, dataA)
 
-				resultB := make([]byte, len(dataC))
-				copy(resultB, dataB)
-				copy(resultB, dataC)
-
 				// the merge result should be a simple combination
 				test.CheckData(merged+"/fileA", resultA)
-				test.CheckData(merged+"/fileB", resultB)
+				test.CheckData(merged+"/fileB", dataC)
 			}
 		})
 	})
