@@ -1816,14 +1816,18 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(FsyncLog, FileHandleLog, input.Fh).Out()
 
-	fileHandle, unlock := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
-	defer unlock.Unlock()
-	if fileHandle == nil {
-		c.elog("Fsync failed")
-		return fuse.EIO
-	}
+	return fuse.OK
+	/*
 
-	return fileHandle.Sync_DOWN(c)
+		fileHandle, unlock := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
+		defer unlock.Unlock()
+		if fileHandle == nil {
+			c.elog("Fsync failed")
+			return fuse.EIO
+		}
+
+		return fileHandle.Sync_DOWN(c)
+	*/
 }
 
 const FallocateLog = "Mux::Fallocate"
