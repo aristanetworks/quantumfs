@@ -22,6 +22,8 @@ import (
 func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 	compare func(quantumfs.DirectoryRecord, quantumfs.DirectoryRecord)) {
 
+	th.SyncWorkspace(th.RelPath(workspace))
+
 	fd, err := os.Open(checkPath)
 	th.AssertNoErr(err)
 	fd.Sync()
