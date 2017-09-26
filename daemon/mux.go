@@ -774,7 +774,9 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 }
 
 // Must hold mapMutex exclusively
-func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId, fileHandle FileHandle) {
+func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
+	fileHandle FileHandle) {
+
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
 	} else {
