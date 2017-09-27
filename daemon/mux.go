@@ -44,6 +44,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
+		toBeReleased:           make(chan FileHandleId, 1000000),
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -157,6 +158,8 @@ type QuantumFs struct {
 	// delete the entry from the map
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]workspaceState
+
+	toBeReleased chan FileHandleId
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
@@ -177,10 +180,47 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 	go qfs.adjustKernelKnobs()
 
+	go qfs.fileHandleReleaser()
+
 	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
 
 	qfs.server = server
 	return nil
+}
+
+const ReleaseFileHandleLog = "Mux::fileHandlerReleaser"
+
+func (qfs *QuantumFs) fileHandleReleaser() {
+	const maxReleasesPerCycle = 1000
+	i := 0
+	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
+	for {
+		func() {
+			ids = ids[:0]
+			fh := <-qfs.toBeReleased
+			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
+
+			ids = append(ids, fh)
+
+			for i = 1; i < maxReleasesPerCycle; i++ {
+				select {
+				case fh := <-qfs.toBeReleased:
+					ids = append(ids, fh)
+				default:
+					defer qfs.mapMutex.Lock().Unlock()
+					for _, fh := range ids {
+						qfs.setFileHandle_(&qfs.c, fh, nil)
+					}
+					return
+				}
+			}
+		}()
+		if i < maxReleasesPerCycle {
+			// If we didn't need our full allocation, sleep to accumulate
+			// more work with minimal mapMutex contention.
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func (qfs *QuantumFs) Serve() {
@@ -739,6 +779,13 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 	defer c.funcIn("Mux::setFileHandle").Out()
 
 	defer qfs.mapMutex.Lock().Unlock()
+	qfs.setFileHandle_(c, id, fileHandle)
+}
+
+// Must hold mapMutex exclusively
+func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
+	fileHandle FileHandle) {
+
 	if fileHandle != nil {
 		qfs.fileHandles[id] = fileHandle
 	} else {
@@ -1767,7 +1814,7 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(ReleaseLog, FileHandleLog, input.Fh).Out()
 
-	qfs.setFileHandle(c, FileHandleId(input.Fh), nil)
+	qfs.toBeReleased <- FileHandleId(input.Fh)
 }
 
 const WriteLog = "Mux::Write"
@@ -1896,7 +1943,7 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(ReleaseDirLog, FileHandleLog, input.Fh).Out()
 
-	qfs.setFileHandle(&qfs.c, FileHandleId(input.Fh), nil)
+	qfs.toBeReleased <- FileHandleId(input.Fh)
 }
 
 const FsyncDirLog = "Mux::FsyncDir"
