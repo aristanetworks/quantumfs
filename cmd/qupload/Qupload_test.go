@@ -22,10 +22,7 @@ import (
 func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 	compare func(quantumfs.DirectoryRecord, quantumfs.DirectoryRecord)) {
 
-	fd, err := os.Open(checkPath)
-	th.AssertNoErr(err)
-	fd.Sync()
-	fd.Close()
+	th.SyncWorkspace(th.RelPath(workspace))
 
 	c := Ctx{
 		Qctx: &(th.TestCtx().Ctx),
@@ -36,7 +33,7 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 	up := NewUploader()
 	up.dataStore = th.GetDataStore()
 
-	err = filepath.Walk(checkPath,
+	err := filepath.Walk(checkPath,
 		func(path string, info os.FileInfo, err error) error {
 			return up.pathWalker(&c, fromWalker, path, workspace, info,
 				err)

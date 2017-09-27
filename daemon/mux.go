@@ -30,6 +30,7 @@ const InodeNameLog = "Inode %d Name %s"
 const InodeOnlyLog = "Inode %d"
 const FileHandleLog = "Fh: %d"
 const FileOffsetLog = "Fh: %d offset %d"
+const SetAttrArgLog = "Inode %d valid 0x%x size %d"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
@@ -1224,7 +1225,8 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(SetAttrLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.FuncIn(SetAttrLog, SetAttrArgLog, input.NodeId,
+		input.Valid, input.Size).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -1814,14 +1816,7 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(FsyncLog, FileHandleLog, input.Fh).Out()
 
-	fileHandle, unlock := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
-	defer unlock.Unlock()
-	if fileHandle == nil {
-		c.elog("Fsync failed")
-		return fuse.EIO
-	}
-
-	return fileHandle.Sync_DOWN(c)
+	return fuse.ENOSYS
 }
 
 const FallocateLog = "Mux::Fallocate"
@@ -1913,14 +1908,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(FsyncDirLog, FileHandleLog, input.Fh).Out()
 
-	fileHandle, unlock := qfs.LockTreeGetHandle(c, FileHandleId(input.Fh))
-	defer unlock.Unlock()
-	if fileHandle == nil {
-		c.elog("FsyncDir failed")
-		return fuse.EIO
-	}
-
-	return fileHandle.Sync_DOWN(c)
+	return fuse.ENOSYS
 }
 
 const StatFsLog = "Mux::StatFs"
