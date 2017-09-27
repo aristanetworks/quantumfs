@@ -548,12 +548,12 @@ func TestMergeIntraFileMissingBase(t *testing.T) {
 				"/fileD"))
 			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
 				"/fileE"))
-			test.AssertNoErr(os.Remove(branchA+"/fileA"))
+			test.AssertNoErr(os.Remove(branchA + "/fileA"))
 			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
 				"/fileD"))
 			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
 				"/fileF"))
-			test.AssertNoErr(os.Remove(branchB+"/fileA"))
+			test.AssertNoErr(os.Remove(branchB + "/fileA"))
 
 			test.AssertNoErr(os.Rename(branchA+"/fileB",
 				branchA+"/fileC"))
