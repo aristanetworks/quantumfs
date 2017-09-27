@@ -335,7 +335,7 @@ func mergeAttrs(c *ctx, base quantumfs.DirectoryRecord,
 	olderRecord := remote
 	if remote.ContentTime() > local.ContentTime() {
 		newerRecord = remote
-		olderRecord := local
+		olderRecord = local
 	}
 
 	rtnRecord := newerRecord.Clone()
@@ -494,19 +494,6 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	return rtnRecord, nil
 }
 
-func takeNewestRecord(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
-
-	rtnRecord := local
-	if remote.ModificationTime() > local.ModificationTime() {
-		c.vlog("taking remote record of %s", remote.Filename())
-		rtnRecord = remote
-	}
-
-	c.vlog("keeping local record of %s", local.Filename())
-	return rtnRecord
-}
-
 func loadAccessor(c *ctx, record quantumfs.DirectoryRecord) blockAccessor {
 	switch record.Type() {
 	case quantumfs.ObjectTypeSmallFile:
@@ -553,6 +540,11 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	if base != nil && base.Type().IsRegularFile() {
 		baseAccessor = loadAccessor(c, base)
 		baseAvailable = true
+	}
+
+	rtnRecord, err := mergeAttrs(c, base, remote, local)
+	if err != nil {
+		return nil, err
 	}
 
 	iterator, iteratorRecord, other, otherRecord := chooseAccessors(c, remote,
@@ -637,20 +629,16 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 			})
 
 		// Use the newest record as a base, and update its size and ID
-		rtnRecord := takeNewestRecord(c, remote, local)
 		rtnRecord.SetType(otherRecord.Type())
 		rtnRecord.SetSize(other.fileLength(c))
 		rtnRecord.SetID(other.sync(c))
 
 		c.vlog("Merging file contents for %d %s", local.FileId(),
 			local.Filename())
-		return rtnRecord, nil
 	}
 
 	c.vlog("File conflict for %s resulting in overwrite. %d %d",
 		local.Filename(), local.FileId(), remote.FileId())
-	rtnRecord := takeNewestRecord(c, remote, local)
-	rtnRecord.SetID(takeNewest(c, remote, local))
 
 	return rtnRecord, nil
 }
