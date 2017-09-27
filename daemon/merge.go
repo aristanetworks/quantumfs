@@ -575,8 +575,8 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 				for i := 0; i < baseRefCount; i++ {
 					if otherBuf[i] == baseBuf[i] ||
 						(otherIsOlder &&
-						otherBuf[i] != baseBuf[i] &&
-						iterBuf[i] != baseBuf[i]) {
+							otherBuf[i] != baseBuf[i] &&
+							iterBuf[i] != baseBuf[i]) {
 
 						otherBuf[i] = iterBuf[i]
 					}
