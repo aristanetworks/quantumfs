@@ -27,7 +27,7 @@ func newHardlinkTracker(c *ctx, base_ map[quantumfs.FileId]linkEntry,
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
-		merged: make(map[quantumfs.FileId]linkEntry),
+		merged:     make(map[quantumfs.FileId]linkEntry),
 	}
 
 	// Merge all records together and do intra-file merges
