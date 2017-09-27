@@ -318,6 +318,67 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	return publishDirectoryEntry(c, baseLayer, newBaseLayerId), nil
 }
 
+func mergeExtendedAttrs(c *ctx, base quantumfs.DirectoryRecord,
+	newer quantumfs.DirectoryRecord,
+	older quantumfs.DirectoryRecord) (quantumfs.ObjectKey, error) {
+
+	// TODO: Merge extended attributes
+	return newer.ExtendedAttributes(), nil
+}
+
+// Merge record attributes based on ContentTime
+func mergeAttrs(c *ctx, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
+
+	newerRecord := local
+	olderRecord := remote
+	if remote.ContentTime() > local.ContentTime() {
+		newerRecord = remote
+		olderRecord := local
+	}
+
+	rtnRecord := newerRecord.Clone()
+
+	// We only take fields from the older record when the newer record and base
+	// have the same value, indicating no change from that branch
+	if base != nil && local.FileId() == remote.FileId() {
+		if base.ID() == newerRecord.ID() {
+			rtnRecord.SetID(olderRecord.ID())
+			// type and size must match the content set via ID
+			rtnRecord.SetSize(olderRecord.Size())
+			rtnRecord.SetType(olderRecord.Type())
+		}
+		if base.Permissions() == newerRecord.Permission() {
+			rtnRecord.SetPermissions(olderRecord.Permissions())
+		}
+		if base.Owner() == newerRecord.Owner() {
+			rtnRecord.SetOwner(olderRecord.Owner())
+		}
+		if base.Group() == newerRecord.Group() {
+			rtnRecord.SetGroup(olderRecord.Group())
+		}
+
+		newKey, err := mergeExtendedAttrs(c, base.ExtendedAttributtes(),
+			newerRecord.ExtendedAttributes(),
+			olderRecord.ExtendedAttributes()))
+		if err != nil {
+			return nil, err
+		}
+		rtnRecord.SetExtendedAttributes(newKey)
+
+		if base.ContentTime() == newerRecord.ContentTime() {
+			rtnRecord.SetContentTime(olderRecord.ContentTime())
+		}
+		if base.ModificationTime() == newerRecord.ModificationTime() {
+			rtnRecord.SetModificationTime(0+
+				olderRecord.ModificationTime())
+		}
+	}
+
+	return rtnRecord, nil
+}
+
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	ht *hardlinkTracker) (quantumfs.DirectoryRecord, error) {
