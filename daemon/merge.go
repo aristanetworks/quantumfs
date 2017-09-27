@@ -38,8 +38,13 @@ func newHardlinkTracker(c *ctx, base_ map[quantumfs.FileId]linkEntry,
 	// make sure merged has the newest available record versions based off local
 	for k, localEntry := range local_ {
 		if remoteEntry, exists := remote_[k]; exists {
-			baseEntry, _ := base_[k]
-			mergedRecord, err := mergeFile(c, baseEntry.record,
+			var baseRecord quantumfs.DirectoryRecord
+			baseEntry, baseExists := base_[k]
+			if baseExists {
+				baseRecord = baseEntry.record
+			}
+
+			mergedRecord, err := mergeFile(c, baseRecord,
 				remoteEntry.record, localEntry.record)
 			if err != nil {
 				panic(err)
