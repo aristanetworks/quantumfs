@@ -410,9 +410,8 @@ func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int
 	return written, nil
 }
 
-type blockFn func(*ctx, int, uint64) (int, error)
+type blockFn func(*ctx, int, uint64) error
 
-// Returns the number of bytes operated on, and any error code
 func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	fn blockFn) error {
 
@@ -431,7 +430,7 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 
 	// Handle the first block a little specially (with offset)
 	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
-	_, err := fn(c, startBlkIdx, offset)
+	err := fn(c, startBlkIdx, offset)
 	if err != nil {
 		c.elog("Unable to operate on first data block: %s", err.Error())
 		return errors.New("Unable to operate on first data block")
@@ -440,10 +439,11 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
 	// Loop through the blocks, operating on them
 	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
-		_, err = fn(c, i, 0)
+		err = fn(c, i, 0)
 		if err != nil {
 			// We couldn't do more, but that's okay we've done some
 			// already so just return early and report what we've done
+			c.elog("Block operation stopped early: %s", err)
 			break
 		}
 	}
@@ -463,12 +463,12 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	readCount := 0
 	err := operateOnBlocks(c, fi.accessor, offset, size,
-		func(c *ctx, blockIdx int, offset uint64) (int, error) {
+		func(c *ctx, blockIdx int, offset uint64) error {
 			read, err := fi.accessor.readBlock(c, blockIdx, offset,
 				buf[readCount:])
 
 			readCount += read
-			return read, err
+			return err
 		})
 
 	if err != nil {
@@ -496,12 +496,12 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 
 		writeCount_ := 0
 		err := operateOnBlocks(c, fi.accessor, offset, size,
-			func(c *ctx, blockIdx int, offset uint64) (int, error) {
+			func(c *ctx, blockIdx int, offset uint64) error {
 				written, err := fi.writeBlock(c, blockIdx,
 					offset, buf[writeCount_:])
 
 				writeCount_ += written
-				return written, err
+				return err
 			})
 
 		if err != nil {
