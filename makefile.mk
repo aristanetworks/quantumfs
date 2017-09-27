@@ -24,7 +24,7 @@ fetch:
 		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
 	done
 
-vet:
+vet: $(PKGS_TO_TEST) $(COMMANDS)
 	go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]]; then eval $$line || exit 1; fi; done
 
 lockcheck:
