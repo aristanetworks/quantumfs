@@ -61,6 +61,8 @@ wsdbservice:
 
 dockerWsdb: wsdbservice
 	cd cmd/wsdbservice; docker build -t registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version) .
+
+uploadDocker: dockerWsdb
 	cd cmd/wsdbservice; docker push registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version)
 
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go

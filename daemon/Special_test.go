@@ -99,3 +99,20 @@ func TestSymlinkMknodCreation(t *testing.T) {
 		specialCreateFail(test, syscall.S_IFLNK)
 	})
 }
+
+func TestCharDevXattrs(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		testfile := "test"
+		attr := "user.data"
+
+		workspace := test.NewWorkspace()
+		fullname := workspace + "/" + "test"
+		test.AssertNoErr(syscall.Mknod(fullname,
+			syscall.S_IFCHR|syscall.S_IRWXU, 0x12345678))
+		test.verifyNoXattr(workspace, testfile, attr)
+		var data []byte
+		sz, err := syscall.Listxattr(workspace+"/test", data)
+		test.AssertNoErr(err)
+		test.Assert(sz == 0, "size of xattrs is %d", sz)
+	})
+}
