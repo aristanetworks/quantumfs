@@ -15,32 +15,43 @@ import (
 // This allows merge to skip traversing local subtrees as an optimization.
 // Note: We assume that FileId is universally unique and will never collide
 type hardlinkTracker struct {
-	remote map[quantumfs.FileId]linkEntry
-	local  map[quantumfs.FileId]linkEntry
+	// contains all local and remote records, with their contents merged
+	allRecords map[quantumfs.FileId]*quantumfs.DirectRecord
 
 	merged map[quantumfs.FileId]linkEntry
 }
 
-func newHardlinkTracker(remote_ map[quantumfs.FileId]linkEntry,
+func newHardlinkTracker(c *ctx, base_ map[quantumfs.FileId]linkEntry,
+	remote_ map[quantumfs.FileId]linkEntry,
 	local_ map[quantumfs.FileId]linkEntry) *hardlinkTracker {
 
 	rtn := hardlinkTracker{
-		remote: remote_,
-		local:  local_,
+		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
 		merged: make(map[quantumfs.FileId]linkEntry),
 	}
 
-	// make sure merged has the newest available record versions based off local
-	for k, v := range local_ {
-		if remoteEntry, exists := rtn.remote[k]; exists &&
-			v.record.ModificationTime() <
-				remoteEntry.record.ModificationTime() {
+	// Merge all records together and do intra-file merges
+	for k, remoteEntry := range remote_ {
+		rtn.allRecords[k] = remoteEntry.record
+	}
 
-			// only take the newer record, not nlink
-			v.record = remoteEntry.record
+	// make sure merged has the newest available record versions based off local
+	for k, localEntry := range local_ {
+		if remoteEntry, exists := remote_[k]; exists {
+			baseEntry, _ := base_[k]
+			mergedRecord, err := mergeFile(c, baseEntry.record,
+				remoteEntry.record, localEntry.record)
+			if err != nil {
+				panic(err)
+			}
+
+			rtn.allRecords[k] = mergedRecord.(*quantumfs.DirectRecord)
+		} else {
+			rtn.allRecords[k] = localEntry.record
 		}
 
-		rtn.merged[k] = v
+		localEntry.record = rtn.allRecords[k]
+		rtn.merged[k] = localEntry
 	}
 
 	return &rtn
@@ -103,32 +114,13 @@ func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
 
 // Returns the newest linkEntry version available, while preserving nlink from merged
 func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
-	link, mergedExists := ht.merged[id]
-	mergedSet := false
+	link, _ := ht.merged[id]
 
-	// track nlinks separately so we can preserve it
-	nlinks := uint32(0)
-	if mergedExists {
-		nlinks = link.nlink
-	}
+	// Use the latest record, but preserve the nlink count from merged
+	record, exists := ht.allRecords[id]
+	link.record = record
 
-	if remoteLink, exists := ht.remote[id]; exists {
-		link = remoteLink
-		mergedSet = true
-	}
-
-	if localLink, exists := ht.local[id]; exists && (!mergedSet ||
-		link.record.ModificationTime() <
-			localLink.record.ModificationTime()) {
-
-		link = localLink
-		mergedSet = true
-	}
-
-	utils.Assert(mergedSet, "Unable to find entry for fileId %d", id)
-
-	// restore the preserved nlinks - we only want the newest linkEntry.record
-	link.nlink = nlinks
+	utils.Assert(exists, "Unable to find entry for fileId %d", id)
 
 	return link
 }
@@ -154,7 +146,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 
 	defer c.funcIn("mergeWorkspaceRoot").Out()
 
-	_, baseDirectory, err := loadWorkspaceRoot(c, base)
+	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
 		return local, err
 	}
@@ -168,7 +160,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	tracker := newHardlinkTracker(remoteHardlinks, localHardlinks)
+	tracker := newHardlinkTracker(c, baseHardlinks, remoteHardlinks,
+		localHardlinks)
 
 	localDirectory, err = mergeDirectory(c, baseDirectory,
 		remoteDirectory, localDirectory, true, tracker)
@@ -478,14 +471,17 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
 	var baseAccessor blockAccessor
-	if base != nil {
+	baseAvailable := false
+	if base != nil && base.Type().IsRegularFile() {
 		baseAccessor = loadAccessor(c, base)
+		baseAvailable = true
 	}
 	localAccessor := loadAccessor(c, local)
 	remoteAccessor := loadAccessor(c, remote)
 
 	if localAccessor != nil && remoteAccessor != nil &&
-		local.FileId() == remote.FileId() {
+		local.FileId() == remote.FileId() &&
+		local.Type().IsRegularFile() && remote.Type().IsRegularFile() {
 
 		// Perform an intra-file merge by iterating through the small file,
 		// writing its changes to other, and then keeping other
@@ -514,7 +510,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 
 				var err error
 				baseRead := 0
-				if base != nil {
+				if baseAvailable {
 					baseRead, err = baseAccessor.readBlock(c,
 						blockIdx, offset, baseBuf)
 					if err != nil {
