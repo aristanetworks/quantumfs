@@ -513,7 +513,8 @@ func TestMergeIntraFileBase(t *testing.T) {
 // Test cases where conflicting files matchin in FileId, but have no base ref
 func TestMergeIntraFileMissingBase(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		data1 := "0000AAAA00000000"
+		extension := "12345"
+		data1 := "0000AAAA00000000" + extension
 		data2 := "000000000000BBBB"
 
 		MergeTester(test, func(baseWorkspace string) {
@@ -525,18 +526,24 @@ func TestMergeIntraFileMissingBase(t *testing.T) {
 			branchB string) mergeTestCheck {
 
 			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
-				"/link"))
+				"/fileD"))
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/fileE"))
+			test.AssertNoErr(os.Remove(branchA+"/fileA"))
 			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
-				"/link"))
+				"/fileD"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
+				"/fileF"))
+			test.AssertNoErr(os.Remove(branchB+"/fileA"))
 
 			test.AssertNoErr(os.Rename(branchA+"/fileB",
 				branchA+"/fileC"))
 			test.AssertNoErr(os.Rename(branchB+"/fileB",
 				branchB+"/fileC"))
 
-			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileD",
 				data1))
-			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileA",
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileD",
 				data2))
 
 			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileC",
@@ -545,8 +552,10 @@ func TestMergeIntraFileMissingBase(t *testing.T) {
 				data2))
 
 			return func(merged string) {
-				result := []byte(data1[:10] + data2[10:])
-				test.CheckData(merged+"/fileA", result)
+				// Without a base reference, most of data1 is lost
+				result := []byte(data2 + extension)
+
+				test.CheckData(merged+"/fileD", result)
 				test.CheckData(merged+"/fileC", result)
 			}
 		})
