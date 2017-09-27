@@ -312,10 +312,20 @@ func (th *testHelper) MakeFile(filepath string) (data []byte) {
 
 }
 
+func (th *testHelper) CheckLink(filepath string, data []byte, nlink uint64) {
+	th.CheckData(filepath, data)
+
+	var stat syscall.Stat_t
+	th.AssertNoErr(syscall.Stat(filepath, &stat))
+	th.Assert(stat.Nlink == nlink, "Nlink mismatch for %s, %d vs %d", filepath,
+		stat.Nlink, nlink)
+}
+
 func (th *testHelper) CheckData(filepath string, data []byte) {
 	readData, err := ioutil.ReadFile(filepath)
 	th.AssertNoErr(err)
-	th.Assert(bytes.Equal(readData, data), "Data changed in CheckData")
+	th.Assert(bytes.Equal(readData, data), "Data changed in CheckData: %s\n%s",
+		data, readData)
 }
 
 func (th *testHelper) SysStat(filepath string) syscall.Stat_t {
