@@ -489,6 +489,9 @@ func TestMergeIntraFileBase(t *testing.T) {
 				conflictDataD0
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+"/file",
 				baseData))
+
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/linkA", baseData))
 		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
@@ -499,10 +502,27 @@ func TestMergeIntraFileBase(t *testing.T) {
 				sharedDataA+conflictDataB2+sharedDataC+
 					conflictDataD2))
 
+			test.AssertNoErr(syscall.Link(branchA+"/linkA", branchA+
+				"/linkB"))
+			test.AssertNoErr(syscall.Link(branchB+"/linkA", branchB+
+				"/linkC"))
+			test.AssertNoErr(testutils.OverWriteFile(branchA+"/linkB",
+				sharedDataA+conflictDataB1+sharedDataC+
+					conflictDataD1+extendedDataE))
+			test.AssertNoErr(testutils.OverWriteFile(branchB+"/linkC",
+				sharedDataA+conflictDataB2+sharedDataC+
+					conflictDataD2))
+
 			return func(merged string) {
 				resultD := conflictDataD2[:10] + conflictDataD1[10:]
 
 				test.CheckData(merged+"/file", []byte(sharedDataA+
+					conflictDataB2+sharedDataC+resultD+
+					extendedDataE))
+
+				// Regular hardlinks with a base should merge the
+				// same way
+				test.CheckData(merged+"/linkA", []byte(sharedDataA+
 					conflictDataB2+sharedDataC+resultD+
 					extendedDataE))
 			}
