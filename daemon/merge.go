@@ -575,7 +575,8 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		rtnRecord.SetSize(other.fileLength(c))
 		rtnRecord.SetID(other.sync(c))
 
-		c.vlog("Merging file contents for %s", local.Filename())
+		c.vlog("Merging file contents for %d %s", local.FileId(),
+			local.Filename())
 		return rtnRecord, nil
 	}
 

@@ -492,6 +492,9 @@ func TestMergeIntraFileBase(t *testing.T) {
 
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
 				"/linkA", baseData))
+			// Link it so base has a hardlink table entry for it
+			test.AssertNoErr(syscall.Link(baseWorkspace+"/linkA",
+				baseWorkspace+"/baseLinked"))
 		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
@@ -502,14 +505,10 @@ func TestMergeIntraFileBase(t *testing.T) {
 				sharedDataA+conflictDataB2+sharedDataC+
 					conflictDataD2))
 
-			test.AssertNoErr(syscall.Link(branchA+"/linkA", branchA+
-				"/linkB"))
-			test.AssertNoErr(syscall.Link(branchB+"/linkA", branchB+
-				"/linkC"))
-			test.AssertNoErr(testutils.OverWriteFile(branchA+"/linkB",
+			test.AssertNoErr(testutils.OverWriteFile(branchA+"/linkA",
 				sharedDataA+conflictDataB1+sharedDataC+
 					conflictDataD1+extendedDataE))
-			test.AssertNoErr(testutils.OverWriteFile(branchB+"/linkC",
+			test.AssertNoErr(testutils.OverWriteFile(branchB+"/linkA",
 				sharedDataA+conflictDataB2+sharedDataC+
 					conflictDataD2))
 
