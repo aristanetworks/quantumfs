@@ -509,3 +509,46 @@ func TestMergeIntraFileBase(t *testing.T) {
 		})
 	})
 }
+
+// Test cases where conflicting files matchin in FileId, but have no base ref
+func TestMergeIntraFileMissingBase(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		data1 := "0000AAAA00000000"
+		data2 := "000000000000BBBB"
+
+		MergeTester(test, func(baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileA", ""))
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileB", ""))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/link"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
+				"/link"))
+
+			test.AssertNoErr(os.Rename(branchA+"/fileB",
+				branchA+"/fileC"))
+			test.AssertNoErr(os.Rename(branchB+"/fileB",
+				branchB+"/fileC"))
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileA",
+				data1))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileA",
+				data2))
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileC",
+				data1))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileC",
+				data2))
+
+			return func(merged string) {
+				result := []byte(data1[:10] + data2[10:])
+				test.CheckData(merged+"/fileA", result)
+				test.CheckData(merged+"/fileC", result)
+			}
+		})
+	})
+}
