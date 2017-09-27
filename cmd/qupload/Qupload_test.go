@@ -24,11 +24,6 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 
 	th.SyncWorkspace(th.RelPath(workspace))
 
-	fd, err := os.Open(checkPath)
-	th.AssertNoErr(err)
-	fd.Sync()
-	fd.Close()
-
 	c := Ctx{
 		Qctx: &(th.TestCtx().Ctx),
 	}
@@ -38,7 +33,7 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 	up := NewUploader()
 	up.dataStore = th.GetDataStore()
 
-	err = filepath.Walk(checkPath,
+	err := filepath.Walk(checkPath,
 		func(path string, info os.FileInfo, err error) error {
 			return up.pathWalker(&c, fromWalker, path, workspace, info,
 				err)
