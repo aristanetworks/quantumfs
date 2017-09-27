@@ -33,7 +33,8 @@ RUN dnf install -y make go \
        capnproto \
        fuse \
        which \
-       protobuf-devel
+       protobuf-devel \
+       rsync
 
 RUN go get github.com/google/cityhash || ls $GOPATH/src/github.com/google/cityhash
 
