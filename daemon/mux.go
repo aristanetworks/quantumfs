@@ -193,15 +193,24 @@ const ReleaseFileHandleLog = "Mux::fileHandlerReleaser"
 func (qfs *QuantumFs) fileHandleReleaser() {
 	const maxReleasesPerCycle = 1000
 	i := 0
+	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
 	for {
 		func() {
+			ids = ids[:0]
+			fh := <-qfs.toBeReleased
 			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
-			defer qfs.mapMutex.Lock().Unlock()
-			for i = 0; i < maxReleasesPerCycle; i++ {
+
+			ids = append(ids, fh)
+
+			for i = 1; i < maxReleasesPerCycle; i++ {
 				select {
 				case fh := <-qfs.toBeReleased:
-					qfs.setFileHandle_(&qfs.c, fh, nil)
+					ids = append(ids, fh)
 				default:
+					defer qfs.mapMutex.Lock().Unlock()
+					for _, fh := range ids {
+						qfs.setFileHandle_(&qfs.c, fh, nil)
+					}
 					return
 				}
 			}
