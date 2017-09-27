@@ -282,19 +282,9 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 			return true
 		}()
 
-		if !subscribed {
-			continue
+		if subscribed && startTransmission {
+			go wsdb.sendNotifications()
 		}
-
-		if !startTransmission {
-			// There is already an update in progress and we need to wait
-			// for that to complete. The goroutine which is running the
-			// callback will find these new updates and send them when it
-			// completes.
-			continue
-		}
-
-		go wsdb.sendNotifications()
 	}
 
 }
