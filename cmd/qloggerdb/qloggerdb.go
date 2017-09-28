@@ -66,10 +66,12 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 				"readcache_miss"), statPeriod),
 
 		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(daemon.CacheHitLog,
+			qlogstats.NewExtPointStats(
+				thirdparty_backends.EtherTtlCacheHit,
 				"ether_setcache_hit"), statPeriod),
 		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(daemon.CacheMissLog,
+			qlogstats.NewExtPointStats(
+				thirdparty_backends.EtherTtlCacheMiss,
 				"ether_setcache_miss"), statPeriod),
 
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
