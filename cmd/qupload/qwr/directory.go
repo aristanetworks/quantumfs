@@ -18,21 +18,23 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,
 	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
 
-	entryNum := len(childRecords)
-	entryNum, dirEntry := quantumfs.NewDirectoryEntry(entryNum)
-	dirEntry.SetNext(quantumfs.EmptyDirKey)
-	entryIdx := 0
 	// To promote dedupe, sort the directory
 	// records by Filename before writing DirectoryEntry.
 	// Sorting ensures that, for a given set of records in
 	// childRecords, even in the presence of parallelism,
 	// the DirectoryEntry object will be same.
 	// Note: This is not same as source directory but thats ok.
+
+	quantumfs.SortDirectoryRecordsByName(childRecords)
+
+	entryNum := len(childRecords)
+	entryNum, dirEntry := quantumfs.NewDirectoryEntry(entryNum)
+	dirEntry.SetNext(quantumfs.EmptyDirKey)
+	entryIdx := 0
 	for _, child := range childRecords {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			dirEntry.SetNumEntries(entryIdx)
-			dirEntry.SortRecordsByName()
 			key, err := writeBlock(qctx, dirEntry.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
@@ -51,7 +53,6 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	}
 
 	dirEntry.SetNumEntries(entryIdx)
-	dirEntry.SortRecordsByName()
 	key, err := writeBlock(qctx, dirEntry.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
