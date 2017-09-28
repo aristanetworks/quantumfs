@@ -135,36 +135,43 @@ func GetWorkspaceRootID(c *quantumfs.Ctx, db quantumfs.WorkspaceDB,
 
 // Histogram is a simple Histogram impl.
 type Histogram struct {
-	mapLock   utils.DeferableMutex
-	keysMap   map[int64]int
-	totalKeys uint64
+	mapLock     utils.DeferableMutex
+	buckets     map[string]uint64
+	totalValues uint64
 }
 
 // NewHistogram return a new Histogram object.
 func NewHistogram() *Histogram {
 	return &Histogram{
-		keysMap: make(map[int64]int),
+		buckets: make(map[string]uint64),
 	}
 }
 
 // Increment the count in the given index.
-func (h *Histogram) Increment(idx int64) {
+func (h *Histogram) Increment(bucket string) {
 	defer h.mapLock.Lock().Unlock()
-	h.keysMap[idx]++
-	h.totalKeys++
+	h.buckets[bucket]++
+	h.totalValues++
+}
+
+// Add to the count in the given index.
+func (h *Histogram) Add(bucket string, delta uint64) {
+	defer h.mapLock.Lock().Unlock()
+	h.buckets[bucket] += delta
+	h.totalValues += delta
 }
 
 // Print the given Histogram
 func (h *Histogram) Print() {
 
-	m := h.keysMap
-	var keys []int
-	for k := range m {
-		keys = append(keys, int(k))
+	m := h.buckets
+	var bucketNames []string
+	for name := range m {
+		bucketNames = append(bucketNames, name)
 	}
-	sort.Ints(keys)
-	for _, k := range keys {
-		fmt.Printf("%3v: %10v\n", k, m[int64(k)])
+	sort.Strings(bucketNames)
+	for _, name := range bucketNames {
+		fmt.Printf("%-10s : %d\n", name, m[name])
 	}
-	fmt.Printf("%v : %v\n", "Total Keys", h.totalKeys)
+	fmt.Printf("Total Values : %d\n", h.totalValues)
 }
