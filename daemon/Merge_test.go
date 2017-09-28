@@ -618,7 +618,7 @@ func TestMergeIntraFileMissingBaseHardlink(t *testing.T) {
 				// Without a base reference, most of data1 is lost
 				result := []byte(data2 + extension)
 
-				test.CheckLink(merged+"/fileD", result, 2)
+				test.CheckLink(merged+"/fileD", result, 3)
 			}
 		})
 	})
