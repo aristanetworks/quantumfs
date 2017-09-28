@@ -623,3 +623,28 @@ func TestMergeIntraFileMissingBaseHardlink(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeIntraRecordThreeWay(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/file", "sample data"))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(os.Chmod(branchA+"/file", 0444))
+			test.AssertNoErr(os.Chown(branchB+"/file", 123, 456))
+
+			return func(merged string) {
+				var stat syscall.Stat_t
+				test.AssertNoErr(syscall.Stat(merged+"/file", &stat))
+
+				test.Assert(stat.Uid == 123, "Uid not merged")
+				test.Assert(stat.Gid == 456, "Gid not merged")
+				test.Assert(stat.Mode & 0777 == 0444,
+					"Mode not merged")
+			}
+		})
+	})
+}
+
