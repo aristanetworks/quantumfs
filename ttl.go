@@ -164,7 +164,7 @@ func handleTTLHistogram(args []string) error {
 
 		oneDaySecs := int64((24 * time.Hour) / time.Second)
 		bucket := ttlVal / oneDaySecs
-		hist.Increment(bucket)
+		hist.Increment(fmt.Sprintf("%d", bucket))
 		return nil
 	}
 
