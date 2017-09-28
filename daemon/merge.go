@@ -21,9 +21,9 @@ type hardlinkTracker struct {
 	merged map[quantumfs.FileId]linkEntry
 }
 
-func newHardlinkTracker(c *ctx, base_ map[quantumfs.FileId]linkEntry,
-	remote_ map[quantumfs.FileId]linkEntry,
-	local_ map[quantumfs.FileId]linkEntry) *hardlinkTracker {
+func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
+	remote map[quantumfs.FileId]linkEntry,
+	local map[quantumfs.FileId]linkEntry) *hardlinkTracker {
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
@@ -31,15 +31,15 @@ func newHardlinkTracker(c *ctx, base_ map[quantumfs.FileId]linkEntry,
 	}
 
 	// Merge all records together and do intra-file merges
-	for k, remoteEntry := range remote_ {
+	for k, remoteEntry := range remote {
 		rtn.allRecords[k] = remoteEntry.record
 	}
 
 	// make sure merged has the newest available record versions based off local
-	for k, localEntry := range local_ {
-		if remoteEntry, exists := remote_[k]; exists {
+	for k, localEntry := range local {
+		if remoteEntry, exists := remote[k]; exists {
 			var baseRecord quantumfs.DirectoryRecord
-			baseEntry, baseExists := base_[k]
+			baseEntry, baseExists := base[k]
 			if baseExists {
 				baseRecord = baseEntry.record
 			}
@@ -123,9 +123,10 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 
 	// Use the latest record, but preserve the nlink count from merged
 	record, exists := ht.allRecords[id]
-	link.record = record
 
 	utils.Assert(exists, "Unable to find entry for fileId %d", id)
+
+	link.record = record
 
 	return link
 }
