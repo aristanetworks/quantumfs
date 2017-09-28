@@ -554,7 +554,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		local.FileId() == remote.FileId() &&
 		local.Type().IsRegularFile() && remote.Type().IsRegularFile() {
 
-		// Perform an intra-file merge by iterating through the small file,
+		// Perform an intra-file merge by iterating through the shorter file,
 		// writing its changes to other, and then keeping other
 		otherIsOlder := (iteratorRecord.ModificationTime() >
 			otherRecord.ModificationTime())
@@ -567,7 +567,6 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		// reconciling the accessor type - the size won't change this way
 		operateOnBlocks(c, iterator, 0, uint32(other.fileLength(c)),
 			func(c *ctx, blockIdx int, offset uint64) error {
-
 				var err error
 				baseRead := 0
 				if baseAvailable {
