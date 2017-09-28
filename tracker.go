@@ -9,15 +9,20 @@ package main
 import "encoding/hex"
 import "fmt"
 
-import "github.com/aristanetworks/quantumfs"
+import (
+	"github.com/aristanetworks/quantumfs"
+	qubitutils "github.com/aristanetworks/qubit/tools/utils"
+)
 
 // a set of paths
 type pathSet map[string]bool
 
 // sharing information for a key
 type sharedInfo struct {
-	// size shared with other paths
+	// size for this key's value
 	size uint64
+	// size shared with other paths
+	totalsize uint64
 	// count of keys shared with other paths
 	count uint64
 	// content is shared with these set of paths
@@ -37,15 +42,16 @@ func newTracker() *tracker {
 func (t *tracker) addKey(key string, path string, size uint64) {
 	if _, found := t.keys[key]; !found {
 		t.keys[key] = &sharedInfo{
-			count: 1,
-			size:  size,
+			count:     1,
+			totalsize: size,
+			size:      size,
 		}
 		t.keys[key].otherPaths = pathSet{path: true}
 		return
 	}
 	s := t.keys[key]
 	s.count++
-	s.size += size
+	s.totalsize += size
 	s.otherPaths[path] = true
 }
 
@@ -137,4 +143,39 @@ func (t *tracker) totalSize() uint64 {
 		size += info.size
 	}
 	return size
+}
+
+func sizeBucket(buckets []int64, size uint64) int64 {
+	for i, b := range buckets {
+		if size <= uint64(b) {
+			return int64(i)
+		}
+	}
+	return -1
+}
+
+func (t *tracker) printSizeHistogram() {
+	buckets := []int64{0, 512, 1024, 4096, 8 * 1024, 16 * 1024,
+		32 * 1024, 64 * 1024, 128 * 1024,
+		256 * 1024, 512 * 1024, 1024 * 1024}
+	tooBig := uint64(0)
+	hist := qubitutils.NewHistogram()
+
+	for _, info := range t.keys {
+		idx := sizeBucket(buckets, info.size)
+		if idx < 0 {
+			tooBig++
+			continue
+		}
+		hist.Add(fmt.Sprintf("Bucket%2d [<= %s]", idx,
+			qubitutils.HumanizeBytes(uint64(buckets[idx]))),
+			info.count)
+	}
+
+	fmt.Println()
+	fmt.Println("Key counts per byte range")
+	hist.Print()
+	if tooBig != 0 {
+		fmt.Printf("ERROR: %d keys have unsupported block size")
+	}
 }

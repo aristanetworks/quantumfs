@@ -18,13 +18,15 @@ func init() {
 func registerKeyCountCmd() {
 	var cmd cmdproc.CommandInfo
 	cmd.Name = "keycount"
-	cmd.Usage = "workspace [dedupe]"
-	cmd.Short = "shows total and unique keys and size within a workspace"
+	cmd.Usage = "workspace [dedupe | sizehist]"
+	cmd.Short = "shows keycount information along with dedupe or size histogram for a workspace"
 	cmd.Details = `
 workspace
 	name of the workspace
 dedupe
 	prints dedupe information
+sizehist
+	prints a histogram of block sizes
 `
 	cmd.Run = handleKeyCount
 
@@ -33,7 +35,8 @@ dedupe
 
 func handleKeyCount(args []string) error {
 	wsopts := map[string]func(t *tracker){
-		"dedupe": func(t *tracker) { t.printDedupeReport() },
+		"dedupe":   func(t *tracker) { t.printDedupeReport() },
+		"sizehist": func(t *tracker) { t.printSizeHistogram() },
 	}
 
 	var wsname, wsoption string
