@@ -155,6 +155,7 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 	translator := EtherBlobStoreTranslator{
 		Blobstore:      blobstore,
 		ApplyTTLPolicy: true,
+		ttlCache:       make(map[string]time.Time),
 	}
 	return &translator
 }
@@ -169,6 +170,8 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
+	ttlCacheLock   utils.DeferableRwMutex
+	ttlCache       map[string]time.Time
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
@@ -220,6 +223,18 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 const EtherGetLog = "EtherBlobStoreTranslator::Get"
 const KeyLog = "key %s"
 
+func (ebt *EtherBlobStoreTranslator) cacheTtl(key string) {
+	if refreshTTLTimeSecs <= 0 {
+		return
+	}
+
+	defer ebt.ttlCacheLock.Lock().Unlock()
+
+	cacheDuration := time.Duration(refreshTTLTimeSecs / 2)
+	expiry := time.Now().Add(cacheDuration * time.Second)
+	ebt.ttlCache[key] = expiry
+}
+
 // Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
@@ -238,6 +253,8 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 		}
 	}
 
+	ebt.cacheTtl(key.String())
+
 	newData := make([]byte, len(data))
 	copy(newData, data)
 	buf.Set(newData, key.Type())
@@ -245,6 +262,8 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 }
 
 const EtherSetLog = "EtherBlobStoreTranslator::Set"
+const EtherTtlCacheHit = "EtherBlobStoreTranslator TTL cache hit"
+const EtherTtlCacheMiss = "EtherBlobStoreTranslator TTL cache miss"
 
 // Set adpats quantumfs.DataStore's Set API to ether.BlobStore.Insert
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
@@ -255,14 +274,36 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 
 	defer c.FuncIn(qlog.LogDatastore, EtherSetLog, KeyLog, ks).Out()
 
+	cached := func() bool {
+		defer ebt.ttlCacheLock.RLock().RUnlock()
+		expiry, cached := ebt.ttlCache[ks]
+		if cached && time.Now().Before(expiry) {
+			c.Vlog(qlog.LogDatastore, EtherTtlCacheHit)
+			return true
+		}
+		c.Vlog(qlog.LogDatastore, EtherTtlCacheMiss)
+		return false
+	}()
+	if cached {
+		return nil
+	}
+
 	metadata, err := ebt.Blobstore.Metadata((*dsApiCtx)(c), kv)
 
 	switch {
 	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
-		return refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get())
+		err = refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get())
+		if err == nil {
+			ebt.cacheTtl(ks)
+		}
+		return err
 
 	case err == nil:
-		return refreshTTL(c, ebt.Blobstore, true, kv, metadata, buf.Get())
+		err = refreshTTL(c, ebt.Blobstore, true, kv, metadata, buf.Get())
+		if err == nil {
+			ebt.cacheTtl(ks)
+		}
+		return err
 
 	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
 		// if metadata error other than ErrKeyNotFound then fail
