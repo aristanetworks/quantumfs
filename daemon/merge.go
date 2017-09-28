@@ -409,7 +409,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	}
 
 	if !updatedKey {
-		mergedKey = takeNewest(c, remote, local)
+		mergedKey = takeNewest(c, remote, local).ID()
 
 		// if we took remote for a directory, we have to accommodate its
 		// hardlinks in the hardlink tracker
@@ -442,31 +442,16 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	return rtnRecord, nil
 }
 
-func takeNewestRecord(c *ctx, remote quantumfs.DirectoryRecord,
+func takeNewest(c *ctx, remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	rtnRecord := local
 	if remote.ModificationTime() > local.ModificationTime() {
 		c.vlog("taking remote record of %s", remote.Filename())
-		rtnRecord = remote
+		return remote
 	}
 
 	c.vlog("keeping local record of %s", local.Filename())
-	return rtnRecord
-}
-
-func takeNewest(c *ctx, remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) quantumfs.ObjectKey {
-
-	defer c.FuncIn("mergeFile", "%s", local.Filename()).Out()
-
-	if remote.ModificationTime() > local.ModificationTime() {
-		c.vlog("taking remote data of %s", remote.Filename())
-		return remote.ID()
-	}
-
-	c.vlog("keeping local data of %s", local.Filename())
-	return local.ID()
+	return local
 }
 
 func loadAccessor(c *ctx, record quantumfs.DirectoryRecord) blockAccessor {
@@ -599,7 +584,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 			})
 
 		// Use the newest record as a base, and update its size and ID
-		rtnRecord := takeNewestRecord(c, remote, local)
+		rtnRecord := takeNewest(c, remote, local)
 		rtnRecord.SetType(otherRecord.Type())
 		rtnRecord.SetSize(other.fileLength(c))
 		rtnRecord.SetID(other.sync(c))
@@ -611,8 +596,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 
 	c.vlog("File conflict for %s resulting in overwrite. %d %d",
 		local.Filename(), local.FileId(), remote.FileId())
-	rtnRecord := takeNewestRecord(c, remote, local)
-	rtnRecord.SetID(takeNewest(c, remote, local))
+	rtnRecord := takeNewest(c, remote, local)
 
 	return rtnRecord, nil
 }
