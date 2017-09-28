@@ -92,13 +92,11 @@ const (
 
 // Special reserved inode numbers
 const (
-	InodeIdInvalid     = 0 // Invalid
-	InodeIdRoot        = 1 // Same as fuse.FUSE_ROOT_ID
-	InodeIdApi         = 2 // /api file
-	InodeId_nullType   = 3 // /_typespace
-	InodeId_nullName   = 4 // /_/_namespace
-	InodeId_nullWork   = 5 // /_/_/_ workspace
-	InodeIdReservedEnd = 6 // End of the reserved range
+	InodeIdInvalid = 0 // Invalid
+	InodeIdRoot    = 1 // Same as fuse.FUSE_ROOT_ID
+	InodeIdApi     = 2 // /api file
+
+	InodeIdReservedEnd = 2 // End of the reserved range
 )
 
 // Object key types, possibly used for datastore routing
