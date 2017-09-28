@@ -171,7 +171,8 @@ func (h *Histogram) Print() {
 	}
 	sort.Strings(bucketNames)
 	for _, name := range bucketNames {
-		fmt.Printf("%-10s : %d\n", name, m[name])
+		fmt.Printf("%s\t: %d (%.1f %%)\n", name, m[name],
+			(float64(m[name])/float64(h.totalValues))*100.0)
 	}
 	fmt.Printf("Total Values : %d\n", h.totalValues)
 }
