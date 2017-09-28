@@ -609,7 +609,6 @@ func TestMergeIntraFileMissingBaseHardlink(t *testing.T) {
 				"/fileF"))
 			test.AssertNoErr(os.Remove(branchB + "/fileA"))
 
-
 			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileD",
 				data1))
 			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileD",
