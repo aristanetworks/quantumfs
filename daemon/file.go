@@ -443,7 +443,7 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 		if err != nil {
 			// We couldn't do more, but that's okay we've done some
 			// already so just return early and report what we've done
-			c.elog("Block operation stopped early: %s", err)
+			c.elog("Block operation stopped early: %s", err.Error())
 			break
 		}
 	}
