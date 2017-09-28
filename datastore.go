@@ -312,28 +312,14 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 	return dir
 }
 
-type sortDirRecordsByName struct {
-	de *DirectoryEntry
-}
-
-func (s sortDirRecordsByName) Len() int {
-	return int(s.de.dir.NumEntries())
-}
-
-func (s sortDirRecordsByName) Swap(i, j int) {
-	oldi := overlayDirectoryRecord(s.de.dir.Entries().At(i)).Clone()
-	curj := overlayDirectoryRecord(s.de.dir.Entries().At(j)).Clone()
-	s.de.dir.Entries().Set(i, curj.Record().record)
-	s.de.dir.Entries().Set(j, oldi.Record().record)
-}
-
-func (s sortDirRecordsByName) Less(i, j int) bool {
-	return s.de.dir.Entries().At(i).Filename() <
-		s.de.dir.Entries().At(j).Filename()
-}
-
-func (dir *DirectoryEntry) SortRecordsByName() {
-	sort.Sort(sortDirRecordsByName{de: dir})
+func SortDirectoryRecordsByName(records []DirectoryRecord) {
+	sort.Slice(records,
+		func(i, j int) bool {
+			// Note that we cannot use the fileId for sorting the entries
+			// as there might be more than one dentry with the same
+			// fileId in a directory which results in unpredictable order
+			return records[i].Filename() < records[j].Filename()
+		})
 }
 
 func (dir *DirectoryEntry) Bytes() []byte {
