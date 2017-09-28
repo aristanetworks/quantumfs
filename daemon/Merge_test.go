@@ -644,7 +644,7 @@ func TestMergeIntraRecordThreeWay(t *testing.T) {
 
 				test.Assert(stat.Uid == 123, "Uid not merged")
 				test.Assert(stat.Gid == 456, "Gid not merged")
-				test.Assert(stat.Mode & 0777 == 0444,
+				test.Assert(stat.Mode&0777 == 0444,
 					"Mode not merged")
 				test.Assert(stat.Ctim == statB.Ctim,
 					"Ctime not chosen correctly")
@@ -677,7 +677,7 @@ func TestMergeIntraRecordBaseMismatch(t *testing.T) {
 
 				test.Assert(stat.Uid == 234, "Uid not merged")
 				test.Assert(stat.Gid == 345, "Gid not merged")
-				test.Assert(stat.Mode & 0777 == 0444,
+				test.Assert(stat.Mode&0777 == 0444,
 					"Mode not merged")
 				test.Assert(stat.Ctim == statA.Ctim,
 					"Ctime not chosen correctly")
@@ -687,4 +687,3 @@ func TestMergeIntraRecordBaseMismatch(t *testing.T) {
 		})
 	})
 }
-

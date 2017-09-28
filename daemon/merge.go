@@ -372,7 +372,7 @@ func mergeAttrs(c *ctx, base quantumfs.DirectoryRecord,
 			rtnRecord.SetContentTime(olderRecord.ContentTime())
 		}
 		if base.ModificationTime() == newerRecord.ModificationTime() {
-			rtnRecord.SetModificationTime(0+
+			rtnRecord.SetModificationTime(0 +
 				olderRecord.ModificationTime())
 		}
 	}
