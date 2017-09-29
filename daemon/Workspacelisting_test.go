@@ -204,3 +204,57 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func TestMetaDeleteNoResidual(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+		workspaceName := "a/b/c"
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+
+		test.AssertNoErr(api.EnableRootWrite(workspaceName))
+		fileName := test.AbsPath(workspaceName + "/testFile")
+		test.AssertNoErr(testutils.PrintToFile(fileName, "test data"))
+		fileHandle, err := os.Open(fileName)
+		test.AssertNoErr(err)
+		fileHandle.Close()
+
+		wsInodeId1 := test.getInodeNum(test.AbsPath(workspaceName))
+		nsInodeId1 := test.getInodeNum(test.AbsPath("a/b"))
+		tsInodeId1 := test.getInodeNum(test.AbsPath("a"))
+		rootInodeId := test.getInodeNum(test.AbsPath(""))
+
+		test.Log("inodes of %s are %d/%d/%d/%d", workspaceName,
+			rootInodeId, tsInodeId1, nsInodeId1, wsInodeId1)
+		f, err := os.Open(test.AbsPath(""))
+		test.AssertNoErr(err)
+		test.AssertNoErr(api.DeleteWorkspace(workspaceName))
+
+		test.WaitForLogString("Out-- Mux::handleDeletedWorkspace",
+			"handleDeletedWorkspace not finished")
+
+		_, err = syscall.Openat(int(f.Fd()), "a",
+			syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_DIRECTORY, 0)
+		test.AssertErr(err)
+		test.Assert(err == syscall.ENOENT, "Expected ENOENT, got %d", err)
+		test.AssertNoErr(f.Close())
+
+		test.SyncAllWorkspaces()
+
+		workspaceName = "a/b/c"
+		api = test.getApi()
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+
+		wsInodeId2 := test.getInodeNum(test.AbsPath(workspaceName))
+		nsInodeId2 := test.getInodeNum(test.AbsPath("a/b"))
+		tsInodeId2 := test.getInodeNum(test.AbsPath("a"))
+
+		test.Log("inodes of %s are %d/%d/%d", workspaceName,
+			tsInodeId2, nsInodeId2, wsInodeId2)
+		test.Assert(wsInodeId1 != wsInodeId2,
+			"workspace inode (%d) did not change", wsInodeId1)
+		test.Assert(nsInodeId1 != nsInodeId2,
+			"namespace inode (%d) did not change", wsInodeId1)
+		test.Assert(tsInodeId1 != tsInodeId2,
+			"typespace inode (%d) did not change", wsInodeId1)
+	})
+}
