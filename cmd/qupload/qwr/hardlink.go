@@ -44,6 +44,7 @@ func (hl *Hardlinks) getHardlink_(finfo os.FileInfo) quantumfs.DirectoryRecord {
 	newDirRecord := quantumfs.NewDirectoryRecord()
 	newDirRecord.SetType(quantumfs.ObjectTypeHardlink)
 	newDirRecord.SetFilename(finfo.Name())
+	newDirRecord.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 	rec := hlinfo.record
 	if rec == nil {
 		panic("Nil record should never happen for hardlink")
@@ -102,6 +103,7 @@ func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
 	newDirRecord.SetType(quantumfs.ObjectTypeHardlink)
 	newDirRecord.SetFilename(record.Filename())
 	newDirRecord.SetFileId(record.FileId())
+	newDirRecord.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 
 	return newDirRecord
 }
