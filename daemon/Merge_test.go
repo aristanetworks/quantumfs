@@ -687,3 +687,52 @@ func TestMergeIntraRecordBaseMismatch(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeExtendedAttrs(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		dataSource := GenData(60)
+		dataA := dataSource[:10]
+		dataB := dataSource[10:20]
+		dataC := dataSource[20:30]
+		dataD := dataSource[30:40]
+		dataE := dataSource[40:50]
+		dataF := dataSource[50:]
+
+		MergeTester(test, func(baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/file", "sample data"))
+
+			test.AssertNoErr(syscall.Setxattr(baseWorkspace+"/file",
+				"user.conflict", dataA, 0))
+			test.AssertNoErr(syscall.Setxattr(baseWorkspace+"/file",
+				"user.todelete", dataD, 0))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(syscall.Setxattr(branchA+"/file",
+				"user.conflict", dataE, 0))
+			test.AssertNoErr(syscall.Setxattr(branchB+"/file",
+				"user.conflict", dataF, 0))
+
+			test.AssertNoErr(syscall.Setxattr(branchA+"/file",
+				"user.todelete", []byte("throw away data"), 0))
+			test.AssertNoErr(syscall.Removexattr(branchB+"/file",
+				"user.todelete"))
+
+			test.AssertNoErr(syscall.Setxattr(branchA+"/file",
+				"user.branchA", dataB, 0))
+			test.AssertNoErr(syscall.Setxattr(branchB+"/file",
+				"user.branchB", dataC, 0))
+
+			return func(merged string) {
+				test.verifyXattr(merged, "file", "user.conflict",
+					dataF)
+				test.verifyXattr(merged, "file", "user.branchA",
+					dataB)
+				test.verifyXattr(merged, "file", "user.branchB",
+					dataC)
+				test.verifyNoXattr(merged, "file", "user.todelete")
+			}
+		})
+	})
+}

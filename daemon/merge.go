@@ -4,10 +4,12 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 // hardlinkTracker used to track and compute the final hardlink versions and ref
@@ -319,23 +321,37 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	return publishDirectoryEntry(c, baseLayer, newBaseLayerId), nil
 }
 
+var emptyAttrs *quantumfs.ExtendedAttributes
+func init() {
+	emptyAttrs = quantumfs.NewExtendedAttributes()
+}
+
 func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	newer quantumfs.ObjectKey, older quantumfs.ObjectKey) (quantumfs.ObjectKey,
 	error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
-	if err != nil && err != fuse.ENOENT {
-		return quantumfs.EmptyBlockKey, err
+	if err == fuse.ENOENT {
+		baseAttrs = emptyAttrs
+	} else if err != fuse.OK {
+		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr base: "+
+			err.String())
 	}
 
 	newerAttrs, err := getRecordExtendedAttributes(c, newer)
-	if err != nil {
-		return quantumfs.EmptyBlockKey, err
+	if err == fuse.ENOENT {
+		newerAttrs = emptyAttrs
+	} else if err != fuse.OK {
+		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr new: "+
+			err.String())
 	}
 
 	olderAttrs, err := getRecordExtendedAttributes(c, older)
-	if err != nil {
-		return quantumfs.EmptyBlockKey, err
+	if err == fuse.ENOENT {
+		olderAttrs = emptyAttrs
+	} else if err != fuse.OK {
+		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr old: "+
+			err.String())
 	}
 
 	rtnAttrs := quantumfs.NewExtendedAttributes()
@@ -385,10 +401,10 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	
 	// Publish the result
 	buffer := newBuffer(c, rtnAttrs.Bytes(), quantumfs.KeyTypeMetadata)
-	rtnKey, err := buffer.Key(&c.Ctx)
-	if err != nil {
-		c.elog("Error computing extended attribute key: %v", err)
-		return nil, err
+	rtnKey, bufErr := buffer.Key(&c.Ctx)
+	if bufErr != nil {
+		c.elog("Error computing extended attribute key: %v", bufErr)
+		return quantumfs.EmptyBlockKey, bufErr
 	}
 
 	return rtnKey, nil
@@ -452,7 +468,11 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	ht *hardlinkTracker) (quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
-
+baseAttr := "-1"
+if base != nil {
+	baseAttr = fmt.Sprintf("%d", base.ExtendedAttributes())
+}
+c.vlog("CHECK %s %s", baseAttr, fmt.Sprintf("%d %d", remote.ExtendedAttributes(), local.ExtendedAttributes()))
 	// Merge differently depending on if the type is preserved
 	localTypeChanged := base == nil || !local.Type().Matches(base.Type())
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
