@@ -331,7 +331,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
-	if err == fuse.ENOENT {
+	if err == fuse.ENOENT || base == quantumfs.NullKey {
 		baseAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr base: "+
@@ -339,7 +339,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	newerAttrs, err := getRecordExtendedAttributes(c, newer)
-	if err == fuse.ENOENT {
+	if err == fuse.ENOENT || newer == quantumfs.NullKey {
 		newerAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr new: "+
@@ -347,7 +347,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	olderAttrs, err := getRecordExtendedAttributes(c, older)
-	if err == fuse.ENOENT {
+	if err == fuse.ENOENT || older == quantumfs.NullKey {
 		olderAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr old: "+
