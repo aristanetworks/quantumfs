@@ -227,8 +227,9 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 }
 
 const maxTtlCacheSize = 100000
+const EtherTtlCacheEvict = "Expiring ttl cache entry"
 
-func (ebt *EtherBlobStoreTranslator) cacheTtl(key string) {
+func (ebt *EtherBlobStoreTranslator) cacheTtl(c *quantumfs.Ctx, key string) {
 	if refreshTTLTimeSecs <= 0 {
 		return
 	}
@@ -236,6 +237,7 @@ func (ebt *EtherBlobStoreTranslator) cacheTtl(key string) {
 	defer ebt.ttlCacheLock.Lock().Unlock()
 
 	for ebt.ttlFifo.Len() >= maxTtlCacheSize {
+		c.Vlog(qlog.LogDatastore, EtherTtlCacheEvict)
 		toRemove := ebt.ttlFifo.Remove(ebt.ttlFifo.Front()).(string)
 		delete(ebt.ttlCache, toRemove)
 	}
@@ -267,7 +269,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 		}
 	}
 
-	ebt.cacheTtl(key.String())
+	ebt.cacheTtl(c, key.String())
 
 	newData := make([]byte, len(data))
 	copy(newData, data)
@@ -308,14 +310,14 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
 		err = refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get())
 		if err == nil {
-			ebt.cacheTtl(ks)
+			ebt.cacheTtl(c, ks)
 		}
 		return err
 
 	case err == nil:
 		err = refreshTTL(c, ebt.Blobstore, true, kv, metadata, buf.Get())
 		if err == nil {
-			ebt.cacheTtl(ks)
+			ebt.cacheTtl(c, ks)
 		}
 		return err
 

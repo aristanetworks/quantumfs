@@ -73,6 +73,10 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 			qlogstats.NewExtPointStats(
 				thirdparty_backends.EtherTtlCacheMiss,
 				"ether_setcache_miss"), statPeriod),
+		*qlogstats.NewStatExtractorConfig(
+			qlogstats.NewExtPointStats(
+				thirdparty_backends.EtherTtlCacheEvict,
+				"ether_setcache_evict"), statPeriod),
 
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
 			thirdparty_backends.KeyLog),
