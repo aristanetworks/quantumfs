@@ -43,8 +43,7 @@ func handleDiskUsage(args []string) error {
 
 	filter := func(path string) bool { return !strings.HasPrefix(path, searchPath) }
 
-	showDedupeInfo := false
-	tracker, sizer := getTrackerHandler(showDedupeInfo, filter)
+	tracker, sizer := getTrackerHandler(filter)
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, sizer); err != nil {

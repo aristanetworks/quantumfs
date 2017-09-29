@@ -136,10 +136,9 @@ func walkHelper(c *Ctx,
 // getTrackerHandler returns a handler that can walk a workspace and uses
 // the filter function to decide if information should be collected for a path.
 // The tracker object where information is collected is also returned.
-func getTrackerHandler(collectDedupeInfo bool,
-	filter func(path string) bool) (*tracker, walker.WalkFunc) {
+func getTrackerHandler(filter func(path string) bool) (*tracker, walker.WalkFunc) {
 
-	tracker := newTracker(collectDedupeInfo)
+	tracker := newTracker()
 	var mapLock utils.DeferableMutex
 	handler := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, isDir bool) error {

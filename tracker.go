@@ -25,15 +25,12 @@ type sharedInfo struct {
 }
 
 type tracker struct {
-	// track path information only when explicitly requested
-	trackPathInfo bool
-	keys          map[string]*sharedInfo
+	keys map[string]*sharedInfo
 }
 
-func newTracker(trackPathInfo bool) *tracker {
+func newTracker() *tracker {
 	return &tracker{
-		trackPathInfo: trackPathInfo,
-		keys:          make(map[string]*sharedInfo),
+		keys: make(map[string]*sharedInfo),
 	}
 }
 
@@ -43,17 +40,13 @@ func (t *tracker) addKey(key string, path string, size uint64) {
 			count: 1,
 			size:  size,
 		}
-		if t.trackPathInfo {
-			t.keys[key].otherPaths = pathSet{path: true}
-		}
+		t.keys[key].otherPaths = pathSet{path: true}
 		return
 	}
 	s := t.keys[key]
 	s.count++
 	s.size += size
-	if t.trackPathInfo {
-		s.otherPaths[path] = true
-	}
+	s.otherPaths[path] = true
 }
 
 // printDedupeReport outputs in following format
@@ -65,9 +58,6 @@ func (t *tracker) addKey(key string, path string, size uint64) {
 // X4: total shared count
 // X5: list of paths which share this key
 func (t *tracker) printDedupeReport() {
-	if !t.trackPathInfo {
-		return
-	}
 	fmt.Println("Dedupe report:")
 	fmt.Println("----------------------")
 	for k, info := range t.keys {
@@ -89,9 +79,6 @@ func (t *tracker) printDedupeReport() {
 }
 
 func (t *tracker) printKeyPathInfo(keys []string) {
-	if !t.trackPathInfo {
-		return
-	}
 	for _, k := range keys {
 		data, err := hex.DecodeString(k)
 		if err != nil {

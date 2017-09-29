@@ -32,16 +32,27 @@ dedupe
 }
 
 func handleKeyCount(args []string) error {
-	if len(args) != 1 && len(args) != 2 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
-	}
-	wsname := args[0]
-	showDedupeInfo := false
-	if len(args) == 2 && args[1] == "dedupe" {
-		showDedupeInfo = true
+	wsopts := map[string]func(t *tracker){
+		"dedupe": func(t *tracker) { t.printDedupeReport() },
 	}
 
-	tracker, keyCounter := getTrackerHandler(showDedupeInfo, nil)
+	var wsname, wsoption string
+	switch len(args) {
+	case 1:
+		wsname = args[0]
+	case 2:
+		wsname = args[0]
+		wsoption = args[1]
+	default:
+		return cmdproc.NewBadArgExitErr("incorrect arguments")
+	}
+	if wsoption != "" {
+		if _, exist := wsopts[wsoption]; !exist {
+			return cmdproc.NewBadArgExitErr("unsupported argument")
+		}
+	}
+
+	tracker, keyCounter := getTrackerHandler(nil)
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, keyCounter); err != nil {
@@ -51,7 +62,9 @@ func handleKeyCount(args []string) error {
 	fmt.Println("Unique Size = ", qubitutils.HumanizeBytes(tracker.uniqueSize()))
 	fmt.Println("Total Keys = ", tracker.totalKeys())
 	fmt.Println("Total Size = ", qubitutils.HumanizeBytes(tracker.totalSize()))
-	tracker.printDedupeReport()
+	if wsoption != "" {
+		wsopts[wsoption](tracker)
+	}
 	return nil
 }
 
@@ -72,25 +85,39 @@ keys
 }
 
 func handleKeyDiffCount(args []string) error {
-	if len(args) != 2 && len(args) != 3 {
+
+	wsopts := map[string]func(t *tracker, d []string){
+		"keys": func(t *tracker, d []string) { t.printKeyPathInfo(d) },
+	}
+
+	var wsname1, wsname2, wsoption string
+	switch len(args) {
+	case 1:
+		wsname1 = args[0]
+	case 2:
+		wsname1 = args[0]
+		wsname2 = args[1]
+	case 3:
+		wsname1 = args[0]
+		wsname2 = args[1]
+		wsoption = args[2]
+	default:
 		return cmdproc.NewBadArgExitErr("incorrect arguments")
 	}
 
-	// Get RootIDs
-	wsname1 := args[0]
-	wsname2 := args[1]
-	showKeys := false
-	if len(args) == 3 && args[2] == "keys" {
-		showKeys = true
+	if wsoption != "" {
+		if _, exist := wsopts[wsoption]; !exist {
+			return cmdproc.NewBadArgExitErr("unsupported argument")
+		}
 	}
 
-	tracker1, keyCounter1 := getTrackerHandler(showKeys, nil)
+	tracker1, keyCounter1 := getTrackerHandler(nil)
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname1, co.progress,
 		showRootIDStatus, keyCounter1); err != nil {
 		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
-	tracker2, keyCounter2 := getTrackerHandler(showKeys, nil)
+	tracker2, keyCounter2 := getTrackerHandler(nil)
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname2,
 		co.progress, showRootIDStatus, keyCounter2); err != nil {
 		return cmdproc.NewBadCmdExitErr("%s", err)
@@ -100,11 +127,18 @@ func handleKeyDiffCount(args []string) error {
 	diffKeys, diffSize := tracker1.trackerKeyDiff(tracker2)
 	fmt.Printf("%v\t\t%v in %v\n",
 		len(diffKeys), qubitutils.HumanizeBytes(diffSize), wsname1)
-	tracker1.printKeyPathInfo(diffKeys)
+
+	if wsoption != "" {
+		wsopts[wsoption](tracker1, diffKeys)
+	}
 
 	diffKeys, diffSize = tracker2.trackerKeyDiff(tracker1)
 	fmt.Printf("%v\t\t%v in %v\n",
 		len(diffKeys), qubitutils.HumanizeBytes(diffSize), wsname2)
-	tracker2.printKeyPathInfo(diffKeys)
+
+	if wsoption != "" {
+		wsopts[wsoption](tracker2, diffKeys)
+	}
+
 	return nil
 }
