@@ -324,7 +324,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
-	if err != nil {
+	if err != nil && err != fuse.ENOENT {
 		return quantumfs.EmptyBlockKey, err
 	}
 
@@ -343,14 +343,16 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	// Add new attrs, but only if they weren't removed in the older branch
 	for i := 0; i < newerAttrs.NumAttributes(); i++ {
 		key, newerId := newerAttrs.Attribute(i)
-		baseId := baseAttrs.AttributeByKey(key)
 		olderId := olderAttrs.AttributeByKey(key)
 
-		// skip this attribute since it was removed
-		if baseId != quantumfs.EmptyBlockKey &&
-			olderId == quantumfs.EmptyBlockKey {
+		if baseAttrs != nil {
+			baseId := baseAttrs.AttributeByKey(key)
+			// skip this attribute since it was removed
+			if baseId != quantumfs.EmptyBlockKey &&
+				olderId == quantumfs.EmptyBlockKey {
 
-			continue
+				continue
+			}
 		}
 
 		rtnAttrs.SetAttribute(rtnAttrs.NumAttributes(), key, newerId)
@@ -359,13 +361,23 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	// Add attrs that were added or only changed by the older branch
 	for i := 0; i < olderAttrs.NumAttributes(); i++ {
 		key, olderId := olderAttrs.Attribute(i)
-		baseId := baseAttrs.AttributeByKey(key)
 		newerId := newerAttrs.AttributeByKey(key)
 
-		if (baseId == quantumfs.EmptyBlockKey &&
-			newerId == quantumfs.EmptyBlockKey) ||
-			(baseId == newerId) {
+		setId := false
 
+		if baseAttrs != nil {
+			baseId := baseAttrs.AttributeByKey(key)
+			if (baseId == quantumfs.EmptyBlockKey &&
+				newerId == quantumfs.EmptyBlockKey) ||
+				(baseId == newerId) {
+
+				setId = true
+			}
+		} else if newerId == quantumfs.EmptyBlockKey {
+			setId = true
+		}
+
+		if setId {
 			// Take the diff from older
 			rtnAttrs.SetAttribute(rtnAttrs.NumAttributes(), key, olderId)
 		}
