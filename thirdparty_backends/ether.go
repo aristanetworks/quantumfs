@@ -226,7 +226,7 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 	return b.Insert((*dsApiCtx)(c), key, buf, newmetadata)
 }
 
-const maxTtlCacheSize = 100000
+const maxTtlCacheSize = 1000000
 const EtherTtlCacheEvict = "Expiring ttl cache entry"
 
 func (ebt *EtherBlobStoreTranslator) cacheTtl(c *quantumfs.Ctx, key string) {
