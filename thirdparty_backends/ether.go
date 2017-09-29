@@ -10,6 +10,7 @@ package thirdparty_backends
 // You will need to do the same in daemon/Ether_test.go as well.
 
 import (
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -170,8 +171,13 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 type EtherBlobStoreTranslator struct {
 	Blobstore      blobstore.BlobStore
 	ApplyTTLPolicy bool
-	ttlCacheLock   utils.DeferableRwMutex
-	ttlCache       map[string]time.Time
+
+	// The TTL cache uses a FIFO eviction policy in an attempt to keep the TTLs
+	// updated. The average cost of resetting unnecessarily is low so little
+	// efficiency will be lost.
+	ttlCacheLock utils.DeferableRwMutex
+	ttlCache     map[string]time.Time
+	ttlFifo      list.List // Back is most recently added
 }
 
 // asserts that metadata is !nil and it contains cql.TimeToLive
@@ -220,8 +226,7 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 	return b.Insert((*dsApiCtx)(c), key, buf, newmetadata)
 }
 
-const EtherGetLog = "EtherBlobStoreTranslator::Get"
-const KeyLog = "key %s"
+const maxTtlCacheSize = 100000
 
 func (ebt *EtherBlobStoreTranslator) cacheTtl(key string) {
 	if refreshTTLTimeSecs <= 0 {
@@ -230,10 +235,19 @@ func (ebt *EtherBlobStoreTranslator) cacheTtl(key string) {
 
 	defer ebt.ttlCacheLock.Lock().Unlock()
 
+	for ebt.ttlFifo.Len() >= maxTtlCacheSize {
+		toRemove := ebt.ttlFifo.Remove(ebt.ttlFifo.Front()).(string)
+		delete(ebt.ttlCache, toRemove)
+	}
+
 	cacheDuration := time.Duration(refreshTTLTimeSecs / 2)
 	expiry := time.Now().Add(cacheDuration * time.Second)
 	ebt.ttlCache[key] = expiry
+	ebt.ttlFifo.PushBack(key)
 }
+
+const EtherGetLog = "EtherBlobStoreTranslator::Get"
+const KeyLog = "key %s"
 
 // Get adpats quantumfs.DataStore's Get API to ether.BlobStore.Get
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
