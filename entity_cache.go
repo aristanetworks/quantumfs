@@ -77,7 +77,7 @@ import (
 */
 
 // arg is registered and interpreted by the consumer of entityCache
-type fetchEntities func(c ether.Ctx, arg interface{}, entityPath ...string) map[string]bool
+type fetchEntities func(c ether.Ctx, arg interface{}, entityPath ...string) (map[string]bool, error)
 
 // entityCache maintains global cache state (eg: lock etc)
 type entityCache struct {
@@ -170,7 +170,7 @@ func (ec *entityCache) DeleteEntities(c ether.Ctx, entityPath ...string) {
 // CountEntities() - Valid
 // CountEntities(namespace) - Valid
 // CountEntities(workspace) - Invalid
-func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) int {
+func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) (int, error) {
 	defer c.FuncIn("cache::CountEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -181,16 +181,19 @@ func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) int {
 	// read lock is held upon return from getEntityCountListGroup
 	defer ec.rwMutex.RUnlock()
 
-	group := ec.getEntityCountListGroup(c, entityPath...)
+	group, err := ec.getEntityCountListGroup(c, entityPath...)
+	if err != nil {
+		return count, err
+	}
 	if group != nil {
 		count = group.entityCount
 	}
 
-	return count
+	return count, nil
 }
 
 // same constraints on entityPath argument as CountEntities
-func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) []string {
+func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) ([]string, error) {
 	defer c.FuncIn("cache::ListEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -201,12 +204,15 @@ func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) []string 
 	// read lock is held upon return from getEntityCountListGroup
 	defer ec.rwMutex.RUnlock()
 
-	group := ec.getEntityCountListGroup(c, entityPath...)
+	group, err := ec.getEntityCountListGroup(c, entityPath...)
+	if err != nil {
+		return list, err
+	}
 	if group != nil {
 		list = group.getListCopy(c)
 	}
 
-	return list
+	return list, nil
 }
 
 // used by unit tests to simulate different conditions
@@ -358,7 +364,7 @@ func (ec *entityCache) markChildEntityGroupsDetached(c ether.Ctx,
 // after doing a refresh if needed.
 // returns nil entityGroup if there are detachments in entityPath
 func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
-	entityPath ...string) *entityGroup {
+	entityPath ...string) (*entityGroup, error) {
 
 	defer c.FuncIn("cache::getEntityCountListGroup", "%s",
 		strings.Join(entityPath, "/")).Out()
@@ -375,18 +381,26 @@ func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 		needed := group.refreshNeeded(c)
 		if needed {
 
-			func() {
+			err := func() error {
 				ec.rwMutex.RUnlock()
 				defer ec.rwMutex.RLock()
 
 				// fetch data from CQL without locking cache
-				fetchList := ec.fetcher(c, ec.fetcherArg, entityPath[:i]...)
-
+				fetchList, err := ec.fetcher(c, ec.fetcherArg, entityPath[:i]...)
+				if err != nil {
+					c.Elog("Ether cache refresh (%s) failed: %s",
+						strings.Join(entityPath[:i], "/"), err.Error())
+				}
 				// update the group under write lock unless the fetched
 				// data has been invalidated by a local insert/delete
-				group.refresh(c, fetchList)
+				// the error from fetcher is passed into refresh
+				// so that proper clean ups can be done
+				return group.refresh(c, fetchList, err)
 			}()
 
+			if err != nil {
+				return nil, err
+			}
 			// in between the release of write lock in group.refresh()
 			// and acquire of read lock, there can be many local inserts
 			// or deletes that may happen. Since each local update also
@@ -431,9 +445,9 @@ func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 	}
 
 	if detachOccured {
-		return nil
+		return nil, nil
 	}
-	return group
+	return group, nil
 }
 
 // --- entityGroup ---
@@ -610,7 +624,8 @@ func (g *entityGroup) mergeLocalUpdates(c ether.Ctx, fetchData map[string]bool) 
 	}
 }
 
-func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool) {
+func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool,
+	err error) error {
 	defer c.FuncIn("cache::refresh", "p:%s c:%d d:%s",
 		g.parentEntity, g.entityCount,
 		strconv.FormatBool(g.detached)).Out()
@@ -624,6 +639,9 @@ func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool) {
 		panic("BUG: EntityGroup can only have 1 refresh scheduled at any time")
 	}
 
+	if err != nil {
+		return err
+	}
 	// its ok to proceed if this group has been detached from parent (implies
 	// all entities deleted and hence parent entity also deleted). The List or
 	// Count implementation will handle this correctly
@@ -648,5 +666,5 @@ func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool) {
 	}
 
 	g.expiresAt = time.Now().Add(g.cache.expiryDuration)
-	return
+	return nil
 }

@@ -474,9 +474,9 @@ func newMockIterScan(fetchPause chan bool,
 
 func setupMockWsdbCacheCqlFetch(sess *MockSession, iter *MockIter,
 	stmt string, rows mockDbRows, vals []interface{},
-	fetchPause chan bool) {
+	fetchPause chan bool, err error) {
 
-	iter.On("Close").Return(nil)
+	iter.On("Close").Return(err)
 	iter.SetRows(rows)
 	iterateRows := newMockIterScan(fetchPause, iter)
 	iter.On("Scan", mock.AnythingOfType("*string")).Return(iterateRows)
@@ -501,34 +501,60 @@ FROM ether.workspacedb`, []interface{}(nil)).Return(fetchQuery)
 
 }
 
+const cacheTypespaceFetchQuery = `
+SELECT distinct typespace
+FROM ether.workspacedb`
+
+const cacheNamespaceFetchQuery = `
+SELECT namespace
+FROM ether.workspacedb
+WHERE typespace = ?`
+
+const cacheWorkspaceFetchQuery = `
+SELECT workspace
+FROM ether.workspacedb
+WHERE typespace = ? AND namespace = ?`
+
 func mockWsdbCacheTypespaceFetch(sess *MockSession,
 	rows mockDbRows, vals []interface{},
 	iter *MockIter, fetchPause chan bool) {
 
-	setupMockWsdbCacheCqlFetch(sess, iter, `
-SELECT distinct typespace
-FROM ether.workspacedb`, rows, vals, fetchPause)
+	setupMockWsdbCacheCqlFetch(sess, iter, cacheTypespaceFetchQuery,
+		rows, vals, fetchPause, nil)
 }
 
 func mockWsdbCacheNamespaceFetch(sess *MockSession,
 	rows mockDbRows, vals []interface{},
 	iter *MockIter, fetchPause chan bool) {
 
-	setupMockWsdbCacheCqlFetch(sess, iter, `
-SELECT namespace
-FROM ether.workspacedb
-WHERE typespace = ?`, rows, vals, fetchPause)
+	setupMockWsdbCacheCqlFetch(sess, iter, cacheNamespaceFetchQuery,
+		rows, vals, fetchPause, nil)
 }
 
 func mockWsdbCacheWorkspaceFetch(sess *MockSession,
 	rows mockDbRows, vals []interface{},
 	iter *MockIter, fetchPause chan bool) {
 
-	setupMockWsdbCacheCqlFetch(sess, iter, `
-SELECT workspace
-FROM ether.workspacedb
-WHERE typespace = ? AND namespace = ?`, rows, vals, fetchPause)
+	setupMockWsdbCacheCqlFetch(sess, iter, cacheWorkspaceFetchQuery,
+		rows, vals, fetchPause, nil)
+}
 
+func mockWsdbCacheTypespaceFetchErr(sess *MockSession, err error) {
+	iter := new(MockIter)
+	setupMockWsdbCacheCqlFetch(sess, iter, cacheTypespaceFetchQuery,
+		nil, nil, nil, err)
+}
+
+func mockWsdbCacheNamespaceFetchErr(sess *MockSession, err error) {
+	iter := new(MockIter)
+	setupMockWsdbCacheCqlFetch(sess, iter, cacheNamespaceFetchQuery,
+		nil, nil, nil, err)
+}
+
+func mockWsdbCacheWorkspaceFetchErr(sess *MockSession, err error) {
+	iter := new(MockIter)
+	setupMockWsdbCacheCqlFetch(sess, iter, cacheWorkspaceFetchQuery,
+		nil, nil, nil, err)
 }
 
 func mockBranchWorkspace(sess *MockSession, srcTypespace string,

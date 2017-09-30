@@ -4,6 +4,7 @@
 package cql
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -721,6 +722,35 @@ func (suite *wsdbCacheTestSuite) TestPanicDuringFetch() {
 			"actual panic: %v", ex)
 	}()
 	suite.common.wsdb.NumTypespaces(unitTestEtherCtx)
+}
+
+// TestRefreshFailure tests if the error in DB refresh
+// is properly passed on to the WSDB API
+func (suite *wsdbCacheTestSuite) TestRefreshFailure() {
+	expectedErr := errors.New("DB error")
+
+	suite.cache.enableCqlRefresh(unitTestEtherCtx)
+	mockWsdbCacheTypespaceFetchErr(suite.common.mockSess, expectedErr)
+	mockWsdbCacheNamespaceFetchErr(suite.common.mockSess, expectedErr)
+	mockWsdbCacheWorkspaceFetchErr(suite.common.mockSess, expectedErr)
+
+	_, err := suite.common.wsdb.NumTypespaces(unitTestEtherCtx)
+	suite.Require().Error(err)
+
+	_, err = suite.common.wsdb.TypespaceList(unitTestEtherCtx)
+	suite.Require().Error(err)
+
+	_, err = suite.common.wsdb.NumNamespaces(unitTestEtherCtx, "t1")
+	suite.Require().Error(err)
+
+	_, err = suite.common.wsdb.NamespaceList(unitTestEtherCtx, "t1")
+	suite.Require().Error(err)
+
+	_, err = suite.common.wsdb.NumWorkspaces(unitTestEtherCtx, "t1", "n1")
+	suite.Require().Error(err)
+
+	_, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "t1", "n1")
+	suite.Require().Error(err)
 }
 
 // TestCacheDeleteWorkspaceNumOK tests if the cache is updated

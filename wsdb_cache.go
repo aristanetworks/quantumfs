@@ -57,19 +57,19 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 func (cw *cacheWsdb) NumTypespaces(c ether.Ctx) (int, error) {
 	defer c.FuncInName("cacheWsdb::NumTypespaces").Out()
 
-	return cw.cache.CountEntities(c), nil
+	return cw.cache.CountEntities(c)
 }
 
 func (cw *cacheWsdb) TypespaceList(c ether.Ctx) ([]string, error) {
 	defer c.FuncInName("cacheWsdb::TypespaceList").Out()
 
-	return cw.cache.ListEntities(c), nil
+	return cw.cache.ListEntities(c)
 }
 
 func (cw *cacheWsdb) NumNamespaces(c ether.Ctx, typespace string) (int, error) {
 	defer c.FuncIn("cacheWsdb::NumNamespaces", "%s", typespace).Out()
 
-	return cw.cache.CountEntities(c, typespace), nil
+	return cw.cache.CountEntities(c, typespace)
 }
 
 func (cw *cacheWsdb) NamespaceList(c ether.Ctx,
@@ -77,14 +77,14 @@ func (cw *cacheWsdb) NamespaceList(c ether.Ctx,
 
 	defer c.FuncIn("cacheWsdb::NamespaceList", "%s", typespace).Out()
 
-	return cw.cache.ListEntities(c, typespace), nil
+	return cw.cache.ListEntities(c, typespace)
 }
 
 func (cw *cacheWsdb) NumWorkspaces(c ether.Ctx, typespace,
 	namespace string) (int, error) {
 	defer c.FuncIn("cacheWsdb::NumWorkspaces", "%s/%s", typespace, namespace).Out()
 
-	return cw.cache.CountEntities(c, typespace, namespace), nil
+	return cw.cache.CountEntities(c, typespace, namespace)
 }
 
 func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
@@ -92,7 +92,7 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 
 	defer c.FuncIn("cacheWsdb::WorkspaceList", "%s/%s", typespace, namespace).Out()
 
-	return cw.cache.ListEntities(c, typespace, namespace), nil
+	return cw.cache.ListEntities(c, typespace, namespace)
 }
 
 func (cw *cacheWsdb) TypespaceExists(c ether.Ctx,
@@ -259,30 +259,37 @@ func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 // wsdbFetcherImpl implements fetcher interface in entity cache
 // the returned map contains entities inserted on local node or
 // insertions from other nodes in the CQL cluster
-func wsdbFetcherImpl(c ether.Ctx, arg interface{}, entityPath ...string) map[string]bool {
+func wsdbFetcherImpl(c ether.Ctx, arg interface{},
+	entityPath ...string) (map[string]bool, error) {
+
 	cw, ok := arg.(*cacheWsdb)
 	if !ok {
 		panic("unsupported type of arg")
 	}
 
 	var list []string
+	var err error
 	switch len(entityPath) {
 	case 0:
-		list, _ = cw.base.TypespaceList(c)
+		list, err = cw.base.TypespaceList(c)
 	case 1:
-		list, _ = cw.base.NamespaceList(c, entityPath[0])
+		list, err = cw.base.NamespaceList(c, entityPath[0])
 	case 2:
-		list, _ = cw.base.WorkspaceList(c, entityPath[0], entityPath[1])
+		list, err = cw.base.WorkspaceList(c, entityPath[0], entityPath[1])
 	default:
 		panic("unsupported entityPath depth")
 	}
 
 	m := make(map[string]bool)
+	if err != nil {
+		return m, err
+	}
+
 	for _, val := range list {
 		m[val] = true
 	}
 
-	return m
+	return m, nil
 }
 
 func (cw *cacheWsdb) ReportAPIStats(c ether.Ctx) {
