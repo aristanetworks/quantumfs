@@ -188,8 +188,8 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 	// First add any new entries
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
-			c.vlog("Adding new child %s", name)
 			inodeId := c.qfs.newInodeId()
+			c.vlog("Adding new child %s inodeId %d", name, inodeId)
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
 
