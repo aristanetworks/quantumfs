@@ -509,3 +509,117 @@ func TestMergeIntraFileBase(t *testing.T) {
 		})
 	})
 }
+
+// Test cases where conflicting files matching in FileId, but have no base ref
+func TestMergeIntraFileMissingBase(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		extension := "12345"
+		data1 := "0000AAAA00000000" + extension
+		data2 := "000000000000BBBB"
+
+		MergeTester(test, func(baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileB", ""))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(os.Rename(branchA+"/fileB",
+				branchA+"/fileC"))
+			test.AssertNoErr(os.Rename(branchB+"/fileB",
+				branchB+"/fileC"))
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileC",
+				data1))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileC",
+				data2))
+
+			return func(merged string) {
+				// Without a base reference, most of data1 is lost
+				result := []byte(data2 + extension)
+
+				test.CheckData(merged+"/fileC", result)
+			}
+		})
+	})
+}
+
+func TestMergeIntraFileBaseHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		sharedDataA := string(GenData(1000000))
+		conflictDataB0 := "00000000000000000"
+		conflictDataB1 := "This is some data"
+		conflictDataB2 := "And..is this not?"
+		sharedDataC := string(GenData(300000))
+		conflictDataD0 := "0000AAAAA0000BBBBB0000"
+		conflictDataD1 := "0000AAAAA0000FOODS0000"
+		conflictDataD2 := "0000BEEFS0000BBBBB0000"
+		extendedDataE := "Extra data on one file"
+
+		MergeTester(test, func(baseWorkspace string) {
+			baseData := sharedDataA + conflictDataB0 + sharedDataC +
+				conflictDataD0
+
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/linkA", baseData))
+			// Link it so base has a hardlink table entry for it
+			test.AssertNoErr(syscall.Link(baseWorkspace+"/linkA",
+				baseWorkspace+"/baseLinked"))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(testutils.OverWriteFile(branchA+"/linkA",
+				sharedDataA+conflictDataB1+sharedDataC+
+					conflictDataD1+extendedDataE))
+			test.AssertNoErr(testutils.OverWriteFile(branchB+"/linkA",
+				sharedDataA+conflictDataB2+sharedDataC+
+					conflictDataD2))
+
+			return func(merged string) {
+				resultD := conflictDataD2[:10] + conflictDataD1[10:]
+
+				test.CheckLink(merged+"/linkA", []byte(sharedDataA+
+					conflictDataB2+sharedDataC+resultD+
+					extendedDataE), 2)
+			}
+		})
+	})
+}
+
+// Test cases where conflicting files matchin in FileId, but have no base ref
+func TestMergeIntraFileMissingBaseHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		extension := "12345"
+		data1 := "0000AAAA00000000" + extension
+		data2 := "000000000000BBBB"
+
+		MergeTester(test, func(baseWorkspace string) {
+			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
+				"/fileA", ""))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/fileD"))
+			test.AssertNoErr(syscall.Link(branchA+"/fileA", branchA+
+				"/fileE"))
+			test.AssertNoErr(os.Remove(branchA + "/fileA"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
+				"/fileD"))
+			test.AssertNoErr(syscall.Link(branchB+"/fileA", branchB+
+				"/fileF"))
+			test.AssertNoErr(os.Remove(branchB + "/fileA"))
+
+			test.AssertNoErr(testutils.PrintToFile(branchA+"/fileD",
+				data1))
+			test.AssertNoErr(testutils.PrintToFile(branchB+"/fileD",
+				data2))
+
+			return func(merged string) {
+				// Without a base reference, most of data1 is lost
+				result := []byte(data2 + extension)
+
+				test.CheckLink(merged+"/fileD", result, 3)
+			}
+		})
+	})
+}
