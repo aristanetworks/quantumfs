@@ -372,6 +372,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 		}
 
 		rtnAttrs.SetAttribute(rtnAttrs.NumAttributes(), key, newerId)
+		rtnAttrs.SetNumAttributes(rtnAttrs.NumAttributes() + 1)
 	}
 
 	// Add attrs that were added or only changed by the older branch
@@ -396,6 +397,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 		if setId {
 			// Take the diff from older
 			rtnAttrs.SetAttribute(rtnAttrs.NumAttributes(), key, olderId)
+			rtnAttrs.SetNumAttributes(rtnAttrs.NumAttributes() + 1)
 		}
 	}
 	
@@ -468,11 +470,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	ht *hardlinkTracker) (quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
-baseAttr := "-1"
-if base != nil {
-	baseAttr = fmt.Sprintf("%d", base.ExtendedAttributes())
-}
-c.vlog("CHECK %s %s", baseAttr, fmt.Sprintf("%d %d", remote.ExtendedAttributes(), local.ExtendedAttributes()))
+
 	// Merge differently depending on if the type is preserved
 	localTypeChanged := base == nil || !local.Type().Matches(base.Type())
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
