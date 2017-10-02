@@ -410,53 +410,45 @@ func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int
 	return written, nil
 }
 
-type blockFn func(*ctx, int, uint64, []byte) (int, error)
+type blockFn func(*ctx, int, uint64) error
 
-// Returns the number of bytes operated on, and any error code
-func (fi *File) operateOnBlocks(c *ctx, offset uint64, size uint32, buf []byte,
-	fn blockFn) (uint64, error) {
+func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
+	fn blockFn) error {
 
 	defer c.funcIn("File::operateOnBlocks").Out()
 	c.vlog("operateOnBlocks offset %d size %d", offset, size)
 
-	count := uint64(0)
-
-	// Ensure size and buf are consistent
-	buf = buf[:size]
-	size = uint32(len(buf))
-
 	if size == 0 {
 		c.vlog("block operation with zero size or buf")
-		return 0, nil
+		return nil
 	}
 
 	// Determine the block to start in
-	startBlkIdx, newOffset := fi.accessor.blockIdxInfo(c, offset)
-	endBlkIdx, _ := fi.accessor.blockIdxInfo(c, offset+uint64(size)-1)
+	startBlkIdx, newOffset := accessor.blockIdxInfo(c, offset)
+	endBlkIdx, _ := accessor.blockIdxInfo(c, offset+uint64(size)-1)
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
 	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
-	iterCount, err := fn(c, startBlkIdx, offset, buf[count:])
+	err := fn(c, startBlkIdx, offset)
 	if err != nil {
-		c.elog("Unable to operate on first data block")
-		return 0, errors.New("Unable to operate on first data block")
+		c.elog("Unable to operate on first data block: %s", err.Error())
+		return errors.New("Unable to operate on first data block")
 	}
-	count += uint64(iterCount)
 
 	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
 	// Loop through the blocks, operating on them
 	for i := startBlkIdx + 1; i <= endBlkIdx; i++ {
-		iterCount, err = fn(c, i, 0, buf[count:])
+		err = fn(c, i, 0)
 		if err != nil {
 			// We couldn't do more, but that's okay we've done some
 			// already so just return early and report what we've done
+			c.elog("Block operation stopped early: %s", err.Error())
 			break
 		}
-		count += uint64(iterCount)
 	}
 
-	return count, nil
+	return nil
 }
 
 func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
@@ -465,8 +457,19 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	defer c.funcIn("File::Read").Out()
 	defer fi.Lock().Unlock()
 
-	readCount, err := fi.operateOnBlocks(c, offset, size, buf,
-		fi.accessor.readBlock)
+	// Ensure size and buf are consistent
+	buf = buf[:size]
+	size = uint32(len(buf))
+
+	readCount := 0
+	err := operateOnBlocks(c, fi.accessor, offset, size,
+		func(c *ctx, blockIdx int, offset uint64) error {
+			read, err := fi.accessor.readBlock(c, blockIdx, offset,
+				buf[readCount:])
+
+			readCount += read
+			return err
+		})
 
 	if err != nil {
 		return fuse.ReadResult(nil), fuse.EIO
@@ -487,14 +490,25 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	writeCount, result := func() (uint32, fuse.Status) {
 		defer fi.Lock().Unlock()
 
-		writeCount, err := fi.operateOnBlocks(c, offset, size, buf,
-			fi.writeBlock)
+		// Ensure size and buf are consistent
+		buf = buf[:size]
+		size = uint32(len(buf))
+
+		writeCount_ := 0
+		err := operateOnBlocks(c, fi.accessor, offset, size,
+			func(c *ctx, blockIdx int, offset uint64) error {
+				written, err := fi.writeBlock(c, blockIdx,
+					offset, buf[writeCount_:])
+
+				writeCount_ += written
+				return err
+			})
 
 		if err != nil {
 			return 0, fuse.EIO
 		}
 		fi.self.dirty(c)
-		return uint32(writeCount), fuse.OK
+		return uint32(writeCount_), fuse.OK
 	}()
 
 	if result != fuse.OK {
