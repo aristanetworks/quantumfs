@@ -573,7 +573,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 }
 
 func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey, err error) {
+	newRootId quantumfs.ObjectKey, err error) (doneWithWorkspace bool) {
 
 	switch err := err.(type) {
 	default:
@@ -581,7 +581,10 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 
 		// return so that we can try again later
 	case quantumfs.WorkspaceDbErr:
-		if err.Code == quantumfs.WSDB_OUT_OF_DATE {
+		if err.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+			c.vlog("Workspace is deleted. Will not retry flushing.")
+			return true
+		} else if err.Code == quantumfs.WSDB_OUT_OF_DATE {
 			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
 				wsr.workspace
 
@@ -602,6 +605,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 		}
 	}
+	return false
 }
 
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
@@ -622,9 +626,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 			newRootId)
 
 		if err != nil {
-			handleAdvanceError(c, wsr, rootId, newRootId, err)
-			// Try again later
-			return false
+			return handleAdvanceError(c, wsr, rootId, newRootId, err)
 		}
 
 		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
