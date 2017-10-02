@@ -65,6 +65,7 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 
 // InsertLog can be used in external tool for log parsing
 const InsertLog = "Cql::Insert"
+const GoCqlInsertLog = "GoCql::Insert"
 
 // KeyTTLLog can be used in external tool for log parsing
 const KeyTTLLog = "Key: %s TTL: %s"
@@ -98,7 +99,11 @@ USING TTL %s`, b.keyspace, ttl)
 	start := time.Now()
 	defer func() { b.insertStats.RecordOp(time.Since(start)) }()
 
-	err := query.Exec()
+	var err error
+	func() {
+		defer c.FuncIn(GoCqlInsertLog, KeyTTLLog, keyHex, ttl).Out()
+		err = query.Exec()
+	}()
 	if err != nil {
 		return blobstore.NewError(blobstore.ErrOperationFailed,
 			"error in Insert[%s] %s", keyHex, err.Error())
@@ -108,6 +113,7 @@ USING TTL %s`, b.keyspace, ttl)
 
 // GetLog can be used in external tool for log parsing
 const GetLog = "Cql::Get"
+const GoCqlGetLog = "GoCql::Get"
 
 // KeyLog can be used in external tool for log parsing
 const KeyLog = "Key: %s"
@@ -128,7 +134,12 @@ WHERE key = ?`, b.keyspace)
 	start := time.Now()
 	defer func() { b.getStats.RecordOp(time.Since(start)) }()
 
-	err := query.Scan(&value, &ttl)
+	var err error
+	func() {
+		defer c.FuncIn(GoCqlGetLog, KeyLog, keyHex).Out()
+		err = query.Scan(&value, &ttl)
+
+	}()
 	if err != nil {
 		if err == gocql.ErrNotFound {
 			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get[%s] %s",
@@ -156,6 +167,7 @@ func (b *cqlBlobStore) Delete(c ether.Ctx, key []byte) error {
 
 // MetadataLog can be used in external tool for log parsing
 const MetadataLog = "Cql::Metadata"
+const GoCqlMetadataLog = "GoCql::Metadata"
 
 // Metadata is the CQL implementation of blobstore.Metadata()
 func (b *cqlBlobStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error) {
@@ -174,7 +186,11 @@ WHERE key = ?`, b.keyspace)
 	// getStats includes both get and metadata API stats
 	defer func() { b.getStats.RecordOp(time.Since(start)) }()
 
-	err := query.Scan(&ttl)
+	var err error
+	func() {
+		defer c.FuncIn(GoCqlMetadataLog, KeyLog, keyHex).Out()
+		err = query.Scan(&ttl)
+	}()
 	if err != nil {
 		if err == gocql.ErrNotFound {
 			return nil, blobstore.NewError(blobstore.ErrKeyNotFound,
