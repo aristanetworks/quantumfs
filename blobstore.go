@@ -151,6 +151,7 @@ WHERE key = ?`, b.keyspace)
 
 	mdata := make(map[string]string)
 	mdata[TimeToLive] = strconv.Itoa(ttl)
+	c.Vlog(GetLog+" "+KeyTTLLog, keyHex, mdata[TimeToLive])
 	return value, mdata, nil
 }
 
@@ -201,6 +202,7 @@ WHERE key = ?`, b.keyspace)
 	}
 	mdata := make(map[string]string)
 	mdata[TimeToLive] = strconv.Itoa(ttl)
+	c.Vlog(MetadataLog+" "+KeyTTLLog, keyHex, mdata[TimeToLive])
 	return mdata, nil
 }
 
