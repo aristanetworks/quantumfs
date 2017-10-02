@@ -330,3 +330,35 @@ func TestTimeRecord(t *testing.T) {
 			"mTime nanoseconds mismatched")
 	})
 }
+
+func TestTimeExtAttrs(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testFile := workspace + "/fileA"
+
+		test.AssertNoErr(testutils.PrintToFile(testFile, "data"))
+
+		mTimeA, cTimeA := getTimes(testFile)
+
+		test.AssertNoErr(syscall.Setxattr(testFile, "user.test",
+			[]byte("abc"), 0))
+
+		mTimeB, cTimeB := getTimes(testFile)
+		test.Assert(mTimeA == mTimeB, "Mtimes changed by Setxattr")
+		test.Assert(cTimeA < cTimeB, "Ctimes not changed by Setxattr")
+
+		data := make([]byte, 100)
+		_, err := syscall.Getxattr(testFile, "user.test", data)
+		test.AssertNoErr(err)
+
+		mTimeC, cTimeC := getTimes(testFile)
+		test.Assert(mTimeB == mTimeC, "Mtimes changed by Getxattr")
+		test.Assert(cTimeB == cTimeC, "Ctimes changed by Getxattr")
+
+		test.AssertNoErr(syscall.Removexattr(testFile, "user.test"))
+
+		mTimeD, cTimeD := getTimes(testFile)
+		test.Assert(mTimeC == mTimeD, "Mtimes changed by Removexattr")
+		test.Assert(cTimeC < cTimeD, "Ctimes not changed by Removexattr")
+	})
+}

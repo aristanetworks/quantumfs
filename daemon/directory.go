@@ -1579,7 +1579,9 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.getRecordChildCall_(c, inodeNum).SetExtendedAttributes(key)
+		record := dir.getRecordChildCall_(c, inodeNum)
+		record.SetExtendedAttributes(key)
+		record.SetContentTime(quantumfs.NewTime(time.Now()))
 	}()
 	dir.self.dirty(c)
 
@@ -1644,7 +1646,9 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.getRecordChildCall_(c, inodeNum).SetExtendedAttributes(key)
+		record := dir.getRecordChildCall_(c, inodeNum)
+		record.SetExtendedAttributes(key)
+		record.SetContentTime(quantumfs.NewTime(time.Now()))
 	}()
 	dir.self.dirty(c)
 
