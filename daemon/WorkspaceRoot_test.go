@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -340,5 +341,16 @@ func TestWorkspaceRootChecker(t *testing.T) {
 		test.Assert(wsr.isWorkspaceRoot() == true, "wsr not recognized")
 		test.Assert(wsr.Directory.isWorkspaceRoot() == true,
 			"wsr dir not routing")
+	})
+}
+
+func TestWorkspaceDeleteThenSyncAll(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+		workspace := test.NewWorkspace()
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/f", "test data"))
+		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(workspace)))
+		test.remountFilesystem()
+		test.SyncAllWorkspaces()
 	})
 }

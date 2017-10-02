@@ -27,7 +27,8 @@ README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 4) Install protobufs:
 	sudo yum install protobuf-devel
 
-5) Ensure your /etc/fuse.conf has the "user_allow_other" line uncommented
+5) Install some other necessary libraries:
+        sudo yum install glibc-static libstdc++-static
 
 6) Follow the instructions in QFSClient/README to install the prerequisites for
 building QFSClient.

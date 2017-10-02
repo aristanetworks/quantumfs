@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"syscall"
 	"time"
 
@@ -360,13 +359,8 @@ func publishDirectoryRecords(c *ctx,
 	// metadata block
 	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
-	sort.Slice(records,
-		func(i, j int) bool {
-			// Note that we cannot use the fileId for sorting the entries
-			// as there might be more than one dentry with the same
-			// fileId in a directory which results in unpredictable order
-			return records[i].Filename() < records[j].Filename()
-		})
+	quantumfs.SortDirectoryRecordsByName(records)
+
 	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
