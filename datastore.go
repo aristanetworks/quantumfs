@@ -159,6 +159,7 @@ const (
 )
 
 var NullKey ObjectKey
+
 type ObjectKey struct {
 	key encoding.ObjectKey
 }
