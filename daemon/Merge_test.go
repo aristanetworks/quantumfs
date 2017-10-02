@@ -690,13 +690,12 @@ func TestMergeIntraRecordBaseMismatch(t *testing.T) {
 
 func TestMergeExtendedAttrs(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		dataSource := GenData(60)
-		dataA := dataSource[:10]
-		dataB := dataSource[10:20]
-		dataC := dataSource[20:30]
-		dataD := dataSource[30:40]
-		dataE := dataSource[40:50]
-		dataF := dataSource[50:]
+		dataA := []byte("AAA")
+		dataB := []byte("BBB")
+		dataC := []byte("CCC")
+		dataD := []byte("DDD")
+		dataE := []byte("EEE")
+		dataF := []byte("FFF")
 
 		MergeTester(test, func(baseWorkspace string) {
 			test.AssertNoErr(testutils.PrintToFile(baseWorkspace+
