@@ -721,6 +721,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 
 		c.vlog("Merging file contents for %d %s", local.FileId(),
 			local.Filename())
+		return rtnRecord, nil
 	}
 
 	c.vlog("File conflict for %s resulting in overwrite. %d %d",
