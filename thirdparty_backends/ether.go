@@ -229,6 +229,8 @@ func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
 const maxTtlCacheSize = 1000000
 const EtherTtlCacheEvict = "Expiring ttl cache entry"
 
+// This function must be called after any possible refreshTTL() call to ensure the
+// block will not expire for the period it is alive in the cache.
 func (ebt *EtherBlobStoreTranslator) cacheTtl(c *quantumfs.Ctx, key string) {
 	if refreshTTLTimeSecs <= 0 {
 		return
