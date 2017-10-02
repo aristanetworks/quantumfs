@@ -714,7 +714,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 				return nil
 			})
 
-		// Use the newest record as a base, and update its size and ID
+		// Use the merged record as a base and update content relevant fields
 		rtnRecord.SetType(otherRecord.Type())
 		rtnRecord.SetSize(other.fileLength(c))
 		rtnRecord.SetID(other.sync(c))
