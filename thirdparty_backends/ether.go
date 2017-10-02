@@ -278,6 +278,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 
 type etherWsdbTranslator struct {
 	wsdb wsdb.WorkspaceDB
+	lock utils.DeferableRwMutex
 }
 
 // convert wsdb.Error to quantumfs.WorkspaceDbErr
@@ -329,6 +330,7 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 func (w *etherWsdbTranslator) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::NumTypespaces").Out()
+	defer w.lock.RLock().RUnlock()
 
 	count, err := w.wsdb.NumTypespaces((*wsApiCtx)(c))
 	if err != nil {
@@ -343,6 +345,7 @@ func (w *etherWsdbTranslator) TypespaceList(
 	c *quantumfs.Ctx) ([]string, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, EtherTypespaceLog).Out()
+	defer w.lock.RLock().RUnlock()
 
 	list, err := w.wsdb.TypespaceList((*wsApiCtx)(c))
 	if err != nil {
@@ -357,6 +360,7 @@ func (w *etherWsdbTranslator) NumNamespaces(c *quantumfs.Ctx,
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::NumNamespaces",
 		"typespace: %s", typespace).Out()
+	defer w.lock.RLock().RUnlock()
 
 	count, err := w.wsdb.NumNamespaces((*wsApiCtx)(c), typespace)
 	if err != nil {
@@ -373,6 +377,7 @@ func (w *etherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherNamespaceLog,
 		EtherNamespaceDebugLog, typespace).Out()
+	defer w.lock.RLock().RUnlock()
 
 	list, err := w.wsdb.NamespaceList((*wsApiCtx)(c), typespace)
 	if err != nil {
@@ -387,6 +392,7 @@ func (w *etherWsdbTranslator) NumWorkspaces(c *quantumfs.Ctx,
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::NumWorkspaces",
 		"%s/%s", typespace, namespace).Out()
+	defer w.lock.RLock().RUnlock()
 
 	count, err := w.wsdb.NumWorkspaces((*wsApiCtx)(c), typespace, namespace)
 	if err != nil {
@@ -404,6 +410,7 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceListLog,
 		EtherWorkspaceListDebugLog, typespace, namespace).Out()
+	defer w.lock.RLock().RUnlock()
 
 	list, err := w.wsdb.WorkspaceList((*wsApiCtx)(c), typespace, namespace)
 	if err != nil {
@@ -425,6 +432,7 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceLog,
 		EtherWorkspaceDebugLog, typespace, namespace, workspace).Out()
+	defer w.lock.RLock().RUnlock()
 
 	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
 	if err != nil {
@@ -456,6 +464,7 @@ func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherBranchLog, EtherBranchDebugLog,
 		srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace).Out()
+	defer w.lock.Lock().Unlock()
 
 	err := w.wsdb.BranchWorkspace((*wsApiCtx)(c), srcTypespace, srcNamespace,
 		srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
@@ -471,6 +480,7 @@ func (w *etherWsdbTranslator) DeleteWorkspace(c *quantumfs.Ctx, typespace string
 	defer c.FuncIn(qlog.LogWorkspaceDb,
 		"EtherWsdbTranslator::DeleteWorkspace",
 		"%s/%s/%s", typespace, namespace, workspace).Out()
+	defer w.lock.Lock().Unlock()
 
 	err := w.wsdb.DeleteWorkspace((*wsApiCtx)(c), typespace, namespace,
 		workspace)
@@ -492,6 +502,7 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		typespace, namespace, workspace,
 		currentRootId.String(),
 		newRootId.String()).Out()
+	defer w.lock.Lock().Unlock()
 
 	utils.Assert(newRootId.IsValid(), "Tried advancing to an invalid rootID. "+
 		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
@@ -509,6 +520,7 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 func (w *etherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) error {
 
+	defer w.lock.Lock().Unlock()
 	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 		"Ether does not support setting workspaces immutable")
 }
@@ -516,6 +528,7 @@ func (w *etherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
 func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (bool, error) {
 
+	defer w.lock.RLock().RUnlock()
 	return false, nil
 }
 
