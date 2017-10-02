@@ -119,15 +119,11 @@ func walkFullWSDBLoop(c *Ctx) {
 		startTimeOuter := time.Now()
 		c.vlog("Iteration[%v] started at %v", c.iteration, startTimeOuter)
 
-		if err := walkFullWSDBSetup(c); err != nil {
-			dur := time.Since(startTimeOuter)
-			c.vlog("Iteration[%v] ended at %v err(%v) took %v",
-				c.iteration, time.Now(), err, dur)
-			break
-		}
+		err := walkFullWSDBSetup(c)
 
 		dur := time.Since(startTimeOuter)
-		c.vlog("Iteration[%v] ended at %v took %v", c.iteration, time.Now(), dur)
+		c.vlog("Iteration[%v] ended at %v took %v numError %d (err %v)",
+			c.iteration, time.Now(), dur, c.numError, err)
 		WriteWalkerIteration(c, dur, c.numSuccess, c.numError)
 
 		// If the walk iteration completes very quickly
@@ -189,7 +185,8 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 
 	tsl, err := c.wsdb.TypespaceList(c.qctx)
 	if err != nil {
-		c.elog("Not able to get list of Typespaces")
+		c.elog("TypespaceList failed: %v", err)
+		atomic.AddUint32(&c.numError, 1)
 		return err
 	}
 	exitNoRestart(c, "Typespace list should not be empty", len(tsl) != 0)
@@ -197,22 +194,23 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 	for _, ts := range tsl {
 		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
-			c.elog("Not able to get list of Namespaces for TS: %s", ts)
+			c.elog("NamespaceList(%s) failed: %v", ts, err)
 			continue
 		}
 		exitNoRestart(c, "Namespace list should not be empty", len(nsl) != 0)
 		for _, ns := range nsl {
 			wsMap, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
-				c.elog("Not able to get list of Workspaces "+
-					"for TS:%s NS:%s", ts, ns)
+				c.elog("WorkspaceList(%s/%s) failed: %v ",
+					ts, ns, err)
 				continue
 			}
 			exitNoRestart(c, "Workspace map should not be empty",
 				len(wsMap) != 0)
 			for ws := range wsMap {
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
-					c.elog("walkFullWSDB: %v", err)
+					c.elog("Error from queueWorkspace (%s/%s/%s): %v",
+						ts, ns, ws, err)
 					return err
 				}
 			}
