@@ -332,7 +332,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
-	if err == fuse.ENOENT || base == quantumfs.NullKey {
+	if err == fuse.ENOENT || base == quantumfs.ZeroKey {
 		baseAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr base: " +
@@ -340,7 +340,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	newerAttrs, err := getRecordExtendedAttributes(c, newer)
-	if err == fuse.ENOENT || newer == quantumfs.NullKey {
+	if err == fuse.ENOENT || newer == quantumfs.ZeroKey {
 		newerAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr new: " +
@@ -348,14 +348,14 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	olderAttrs, err := getRecordExtendedAttributes(c, older)
-	if err == fuse.ENOENT || older == quantumfs.NullKey {
+	if err == fuse.ENOENT || older == quantumfs.ZeroKey {
 		olderAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr old: " +
 			err.String())
 	}
 
-	rtnAttrs := quantumfs.NewExtendedAttributes()
+	mergeAttrs := quantumfs.NewExtendedAttributes()
 
 	// Add new attrs, but only if they weren't removed in the older branch
 	for i := 0; i < newerAttrs.NumAttributes(); i++ {
@@ -372,8 +372,8 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 			}
 		}
 
-		rtnAttrs.SetAttribute(rtnAttrs.NumAttributes(), key, newerId)
-		rtnAttrs.SetNumAttributes(rtnAttrs.NumAttributes() + 1)
+		mergeAttrs.SetAttribute(mergeAttrs.NumAttributes(), key, newerId)
+		mergeAttrs.SetNumAttributes(mergeAttrs.NumAttributes() + 1)
 	}
 
 	// Add attrs that were added or only changed by the older branch
@@ -397,13 +397,14 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 
 		if setId {
 			// Take the diff from older
-			rtnAttrs.SetAttribute(rtnAttrs.NumAttributes(), key, olderId)
-			rtnAttrs.SetNumAttributes(rtnAttrs.NumAttributes() + 1)
+			mergeAttrs.SetAttribute(mergeAttrs.NumAttributes(), key,
+				olderId)
+			mergeAttrs.SetNumAttributes(mergeAttrs.NumAttributes() + 1)
 		}
 	}
 
 	// Publish the result
-	buffer := newBuffer(c, rtnAttrs.Bytes(), quantumfs.KeyTypeMetadata)
+	buffer := newBuffer(c, mergeAttrs.Bytes(), quantumfs.KeyTypeMetadata)
 	rtnKey, bufErr := buffer.Key(&c.Ctx)
 	if bufErr != nil {
 		c.elog("Error computing extended attribute key: %v", bufErr)
@@ -414,7 +415,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 }
 
 // Merge record attributes based on ContentTime
-func mergeAttrs(c *ctx, base quantumfs.DirectoryRecord,
+func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
@@ -477,7 +478,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
 	bothSameType := local.Type().Matches(remote.Type())
 
-	rtnRecord, err := mergeAttrs(c, base, remote, local)
+	rtnRecord, err := mergeAttributes(c, base, remote, local)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +630,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		baseAvailable = true
 	}
 
-	rtnRecord, err := mergeAttrs(c, base, remote, local)
+	rtnRecord, err := mergeAttributes(c, base, remote, local)
 	if err != nil {
 		return nil, err
 	}
