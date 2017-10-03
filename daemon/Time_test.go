@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
@@ -358,6 +359,43 @@ func TestTimeExtAttrs(t *testing.T) {
 		test.AssertNoErr(syscall.Removexattr(testFile, "user.test"))
 
 		mTimeD, cTimeD := getTimes(testFile)
+		test.Assert(mTimeC == mTimeD, "Mtimes changed by Removexattr")
+		test.Assert(cTimeC < cTimeD, "Ctimes not changed by Removexattr")
+	})
+}
+
+func TestTimeExtAttrsOrphan(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		testFile := workspace + "/fileA"
+
+		test.AssertNoErr(testutils.PrintToFile(testFile, "data"))
+		handle, err := os.Open(testFile)
+		defer handle.Close()
+		fd := int(handle.Fd())
+		test.AssertNoErr(err)
+		// Orphan the file
+		os.Remove(testFile)
+
+		mTimeA, cTimeA := getTimeFromFile(handle)
+
+		test.AssertNoErr(utils.FSetXattr(fd, "user.test",
+			[]byte("abc"), 0))
+
+		mTimeB, cTimeB := getTimeFromFile(handle)
+		test.Assert(mTimeA == mTimeB, "Mtimes changed by Setxattr")
+		test.Assert(cTimeA < cTimeB, "Ctimes not changed by Setxattr")
+
+		_, err, _ = utils.FGetXattr(fd, "user.test", 100)
+		test.AssertNoErr(err)
+
+		mTimeC, cTimeC := getTimeFromFile(handle)
+		test.Assert(mTimeB == mTimeC, "Mtimes changed by Getxattr")
+		test.Assert(cTimeB == cTimeC, "Ctimes changed by Getxattr")
+
+		test.AssertNoErr(utils.FRemoveXattr(fd, "user.test"))
+
+		mTimeD, cTimeD := getTimeFromFile(handle)
 		test.Assert(mTimeC == mTimeD, "Mtimes changed by Removexattr")
 		test.Assert(cTimeC < cTimeD, "Ctimes not changed by Removexattr")
 	})
