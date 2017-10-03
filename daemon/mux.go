@@ -334,6 +334,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		state.Nonce).Out()
 
 	defer logRequestPanic(c)
+
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	defer cleanup()
@@ -343,17 +344,41 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		return
 	}
 
-	if qfs.workspaceIsMutable(c, wsr) {
-		// TODO At this point the workpace should be locked, flushed/synced
-		// and finally have the newly produced local RootID merged with the
-		// remote incoming RootID.
-		c.vlog("Refreshing mutable workspaces is not supported")
+	// ensure our local wsr is synced
+	qfs.flusher.syncWorkspace(c, name)
+
+	defer wsr.LockTree().Unlock()
+	defer wsr.lock.RLock().RUnlock()
+	defer wsr.linkLock.RLock().RUnlock()
+
+	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
+
+	if nonce != wsr.nonce {
+		c.dlog("Not refreshing workspace %s due to mismatching "+
+			"nonces %d vs %d", name, wsr.nonce, nonce)
 		return
 	}
 
-	// TODO This should probably call wsr.refreshTo() and provide the new rootId
-	// instead of refetching from the workspaceDB.
-	wsr.refresh(c)
+	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+
+	toRefreshId := publishedRootId
+	// local changes need to be merged
+	if !newRootId.IsEqualTo(wsr.publishedRootId) {
+		mergedRootId, err := mergeWorkspaceRoot(c, wsr.publishedRootId,
+			publishedRootId, newRootId)
+		if err != nil {
+			c.elog("Unable to merge local and remote workspaces: %s",
+				err)
+			return
+		}
+
+		toRefreshId = mergedRootId
+	}
+
+	wsr.refreshTo_(c, toRefreshId)
+	wsr.publishedRootId = toRefreshId
 }
 
 func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {
