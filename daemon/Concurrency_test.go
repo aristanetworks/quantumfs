@@ -31,9 +31,14 @@ func TestConcurrentReadWrite(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace0 + testFile,
 			string(data)))
 
-		readData, err := ioutil.ReadFile(workspace1 + testFile)
-		test.AssertNoErr(err)
-		test.Assert(bytes.Equal(readData, data),
-			"concurrent read/write broken")
+
+		test.WaitFor("write to propagate through workspaceDbd", func() bool {
+			readData, err := ioutil.ReadFile(workspace1 + testFile)
+			if err != nil {
+				return false
+			}
+
+			return bytes.Equal(readData, data)
+		})
 	})
 }
