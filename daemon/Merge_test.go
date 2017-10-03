@@ -705,6 +705,8 @@ func TestMergeExtendedAttrs(t *testing.T) {
 				"user.conflict", dataA, 0))
 			test.AssertNoErr(syscall.Setxattr(baseWorkspace+"/file",
 				"user.todelete", dataD, 0))
+			test.AssertNoErr(syscall.Setxattr(baseWorkspace+"/file",
+				"user.todelete2", dataD, 0))
 		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
@@ -717,6 +719,11 @@ func TestMergeExtendedAttrs(t *testing.T) {
 				"user.todelete", []byte("throw away data"), 0))
 			test.AssertNoErr(syscall.Removexattr(branchB+"/file",
 				"user.todelete"))
+
+			test.AssertNoErr(syscall.Removexattr(branchB+"/file",
+				"user.todelete2"))
+			test.AssertNoErr(syscall.Setxattr(branchA+"/file",
+				"user.todelete2", []byte("throw away data2"), 0))
 
 			test.AssertNoErr(syscall.Setxattr(branchA+"/file",
 				"user.branchA", dataB, 0))
@@ -731,6 +738,7 @@ func TestMergeExtendedAttrs(t *testing.T) {
 				test.verifyXattr(merged, "file", "user.branchB",
 					dataC)
 				test.verifyNoXattr(merged, "file", "user.todelete")
+				test.verifyNoXattr(merged, "file", "user.todelete2")
 			}
 		})
 	})
