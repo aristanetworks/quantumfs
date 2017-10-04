@@ -69,9 +69,8 @@ type Inode interface {
 	RemoveXAttr(c *ctx, attr string) fuse.Status
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-		attr *fuse.SetAttrIn, out *fuse.AttrOut,
-		updateMtime bool) fuse.Status
+	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+		out *fuse.AttrOut, updateMtime bool) fuse.Status
 
 	getChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
@@ -138,9 +137,8 @@ type Inode interface {
 	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
 	parentSyncChild(c *ctx, publishFn func() (quantumfs.ObjectKey,
 		quantumfs.ObjectType))
-	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-		attr *fuse.SetAttrIn, out *fuse.AttrOut,
-		updateMtime bool) fuse.Status
+	parentSetChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+		out *fuse.AttrOut, updateMtime bool) fuse.Status
 	parentGetChildXAttrSize(c *ctx, inodeNum InodeId, attr string) (size int,
 		result fuse.Status)
 	parentGetChildXAttrData(c *ctx, inodeNum InodeId, attr string) (data []byte,
@@ -290,14 +288,12 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 }
 
 func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
-		updateMtime)
+	return inode.parent_(c).setChildAttr(c, inodeNum, attr, out, updateMtime)
 }
 
 func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,

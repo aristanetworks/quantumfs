@@ -228,8 +228,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
-	return fi.parentSetChildAttr(c, fi.InodeCommon.id, nil, attr, out,
-		updateMtime)
+	return fi.parentSetChildAttr(c, fi.InodeCommon.id, attr, out, updateMtime)
 }
 
 func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -527,7 +526,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = uint64(fi.accessor.fileLength(c))
-	fi.parentSetChildAttr(c, fi.id, nil, &attr, nil, true)
+	fi.parentSetChildAttr(c, fi.id, &attr, nil, true)
 	fi.dirty(c)
 	fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 

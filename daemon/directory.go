@@ -135,7 +135,7 @@ func (dir *Directory) updateSize_(c *ctx) {
 			return dir.children.count()
 		}()
 
-		dir.parentSetChildAttr(c, dir.id, nil, &attr, nil, true)
+		dir.parentSetChildAttr(c, dir.id, &attr, nil, true)
 	}
 }
 
@@ -395,15 +395,13 @@ func (dir *Directory) publish_(c *ctx) {
 		dir.baseLayerId.String())
 }
 
-func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.funcIn("Directory::setChildAttr").Out()
 
 	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.setOrphanChildAttr(c, inodeNum, newType, attr, out,
-			updateMtime)
+		return dir.setOrphanChildAttr(c, inodeNum, attr, out, updateMtime)
 	}
 
 	result := func() fuse.Status {
@@ -415,7 +413,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			return fuse.ENOENT
 		}
 
-		modifyEntryWithAttr(c, newType, attr, entry, updateMtime)
+		modifyEntryWithAttr(c, attr, entry, updateMtime)
 
 		if out != nil {
 			fillAttrOutCacheData(c, out)
@@ -711,8 +709,7 @@ func (dir *Directory) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	defer c.funcIn("Directory::SetAttr").Out()
 
-	return dir.parentSetChildAttr(c, dir.InodeCommon.id, nil, attr, out,
-		false)
+	return dir.parentSetChildAttr(c, dir.InodeCommon.id, attr, out, false)
 }
 
 func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
