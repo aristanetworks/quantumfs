@@ -202,7 +202,7 @@ func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	c.elog("Invalid syncChild on Special")
 }
@@ -219,8 +219,10 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 
-	special.parentSyncChild(c, func() quantumfs.ObjectKey {
-		return key
+	special.parentSyncChild(c, func() (quantumfs.ObjectKey,
+		quantumfs.ObjectType) {
+
+		return key, quantumfs.ObjectTypeSpecial
 	})
 
 	return key
