@@ -21,6 +21,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 		workspaceName := test.RelPath(workspace0)
 		workspace1 := mnt1 + "/" +  workspaceName
 
+		api0 := test.getApi()
 		api1, err := quantumfs.NewApiWithPath(mnt1 + "/api")
 		test.AssertNoErr(err)
 		defer api1.Close()
@@ -31,6 +32,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace0 + testFile,
 			string(data)))
 
+		test.AssertNoErr(api0.SyncAll())
 
 		test.WaitFor("write to propagate through workspaceDbd", func() bool {
 			readData, err := ioutil.ReadFile(workspace1 + testFile)
