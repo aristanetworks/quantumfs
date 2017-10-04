@@ -348,8 +348,6 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	qfs.flusher.syncWorkspace(c, name)
 
 	defer wsr.LockTree().Unlock()
-	defer wsr.lock.RLock().RUnlock()
-	defer wsr.linkLock.RLock().RUnlock()
 
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
@@ -361,11 +359,22 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		return
 	}
 
-	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+	if wsr.publishedRootId.IsEqualTo(publishedRootId) {
+		c.dlog("Not refreshing workspace %s as there has been no updates",
+			name)
+		return
+	}
+
+	newRootId := func () quantumfs.ObjectKey {
+		defer wsr.lock.RLock().RUnlock()
+		defer wsr.linkLock.RLock().RUnlock()
+
+		return publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+	} ()
 
 	toRefreshId := publishedRootId
 	// local changes need to be merged
-	if !newRootId.IsEqualTo(wsr.publishedRootId) {
+	if !newRootId.IsEqualTo(wsr.publishedRootId) && false{
 		mergedRootId, err := mergeWorkspaceRoot(c, wsr.publishedRootId,
 			publishedRootId, newRootId)
 		if err != nil {
@@ -376,6 +385,9 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 
 		toRefreshId = mergedRootId
 	}
+
+	c.vlog("Workspace Refreshing %s rootid: %s -> %s", name,
+		wsr.publishedRootId.String(), toRefreshId.String())
 
 	wsr.refreshTo_(c, toRefreshId)
 	wsr.publishedRootId = toRefreshId
