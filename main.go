@@ -124,7 +124,7 @@ func walkFullWSDBLoop(c *Ctx) {
 		dur := time.Since(startTimeOuter)
 		c.vlog("Iteration[%v] ended at %v took %v numError %d (err %v)",
 			c.iteration, time.Now(), dur, c.numError, err)
-		WriteWalkerIteration(c, dur, c.numSuccess, c.numError)
+		AddPointWalkerIteration(c, dur, c.numSuccess, c.numError)
 
 		// If the walk iteration completes very quickly
 		// then we can relax a bit before moving onto
@@ -299,21 +299,21 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		c.elog("TTL refresh for %s/%s/%s (%s), err(%v)", ts, ns, ws,
 			rootID.String(), err)
 
-		WriteWorkspaceWalkDuration(c, w, false, time.Since(start))
+		AddPointWalkerWorkspace(c, w, false, time.Since(start))
 	} else {
 		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws, rootID.String())
-		WriteWorkspaceWalkDuration(c, w, true, time.Since(start))
+		AddPointWalkerWorkspace(c, w, true, time.Since(start))
 	}
 	return err
 }
 
 // Send out a heartbeat whenever the timer ticks.
 func heartBeat(c *Ctx, timer <-chan time.Time) {
-	WriteWalkerHeartBeat(c)
+	AddPointWalkerHeartBeat(c)
 	for {
 		select {
 		case <-timer:
-			WriteWalkerHeartBeat(c)
+			AddPointWalkerHeartBeat(c)
 		}
 	}
 }

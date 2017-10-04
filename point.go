@@ -15,21 +15,22 @@ type wsDetails struct {
 	rootID string
 }
 
-// WriteWorkspaceWalkDuration is a measurement point writer
+// AddPointWalkerWorkspace is a measurement point writer
 // tags:   typeSpace - Typespace for the quantumfs workspace
 //         nameSpace - Namespace for the quantumfs workspace
 //         pass      - Walk failed or passed
-//	   keyspace  - Keyspace of the WorkspaceDB
+//         keyspace  - Keyspace of the WorkspaceDB
 //
-// fields: workSpace - Name of the workspace (text)
+// fields: workSpace   - Name of the workspace (text)
 //         walkTimeSec - Time it took to walk the workspace in
 //                       seconds (uint)
-//         rootID    - rootID for the workSpace
+//         iteration   - The iteration number for this walk
+//         rootID      - rootID for the workSpace
 ///
-func WriteWorkspaceWalkDuration(c *Ctx, w wsDetails, pass bool,
+func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 	dur time.Duration) {
 
-	measurement := "workspaceWalkDuration"
+	measurement := "walkerWorkspace"
 	tags := map[string]string{
 		"typeSpace": w.ts,
 		"nameSpace": w.ns,
@@ -58,16 +59,17 @@ func WriteWorkspaceWalkDuration(c *Ctx, w wsDetails, pass bool,
 		c.iteration, pass)
 }
 
-// WriteWalkerIteration is a measurement point writer
+// AddPointWalkerIteration is a measurement point writer
 //
-// tags:   none
+// tags:   keyspace    - Keyspace of the WorkspaceDB
 //
-// fields: walkTimeMin - Time it took to walk all the workspace in
-//                       minutes (uint)
+// fields: walkTimeMin  - Time it took to walk all the workspace in
+//                        minutes (uint)
+//         iteration    - The iteration number for this walk
 //         countSuccess - Num successful walks
 //         countError   - Num failed walks
 //
-func WriteWalkerIteration(c *Ctx, dur time.Duration,
+func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 	numSuccess uint32, numError uint32) {
 
 	measurement := "walkerIteration"
@@ -92,11 +94,11 @@ func WriteWalkerIteration(c *Ctx, dur time.Duration,
 
 // Write point to indicate that walker is alive.
 //
-// tags:   none
+// tags:   keyspace    - Keyspace of the WorkspaceDB
 //
 // fields: alive - a place holder. Since, we have to have a field.
 //
-func WriteWalkerHeartBeat(c *Ctx) {
+func AddPointWalkerHeartBeat(c *Ctx) {
 
 	measurement := "walkerHeartBeat"
 	tags := map[string]string{
