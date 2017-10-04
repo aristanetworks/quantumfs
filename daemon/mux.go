@@ -272,6 +272,11 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 				parentId: parentId})
 	}()
 
+	// This is a no-op if the inode is instantiated. This check should happen
+	// before checking whether id is instantiated to avoid racing with someone
+	// instantiating this inode
+	c.qfs.removeUninstantiated(c, []InodeId{id})
+
 	inode := qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
 		return

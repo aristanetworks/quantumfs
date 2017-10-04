@@ -133,6 +133,9 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 		newQfsExtPair(cql.InsertLog, cql.KeyTTLLog),
 		newQfsExtPair(cql.UpdateLog, cql.KeyLog),
 		newQfsExtPair(cql.MetadataLog, cql.KeyLog),
+		newQfsExtPair(cql.GoCqlGetLog, cql.KeyLog),
+		newQfsExtPair(cql.GoCqlInsertLog, cql.KeyTTLLog),
+		newQfsExtPair(cql.GoCqlMetadataLog, cql.KeyLog),
 	}
 }
 
