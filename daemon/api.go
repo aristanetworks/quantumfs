@@ -221,7 +221,7 @@ func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	c.elog("Invalid syncChild on ApiInode")
 }
