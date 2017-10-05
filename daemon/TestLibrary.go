@@ -299,6 +299,9 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
 
 		th.Log("Instantiating quantumfs instance %d...", instanceNum)
 		qfs = NewQuantumFsLogs(config, th.Logger)
+		if len(th.qfsInstances) >= 1 {
+			qfs.c.Ctx.Qlog.Prefix = fmt.Sprintf("[%d]: ", instanceNum)
+		}
 		th.qfsInstances = append(th.qfsInstances, qfs)
 	}()
 
