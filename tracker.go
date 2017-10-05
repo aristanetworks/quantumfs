@@ -176,6 +176,6 @@ func (t *tracker) printSizeHistogram() {
 	fmt.Println("Key counts per byte range")
 	hist.Print()
 	if tooBig != 0 {
-		fmt.Printf("ERROR: %d keys have unsupported block size")
+		fmt.Printf("ERROR: %d keys have unsupported block size", tooBig)
 	}
 }

@@ -67,7 +67,7 @@ func printPath2Key(args []string) error {
 		return cmdproc.NewBadCmdExitErr("%s", err)
 	}
 	if len(keyList) == 0 {
-		fmt.Println("Key not found for path %s", searchPath)
+		fmt.Println("Key not found for path ", searchPath)
 	}
 
 	fmt.Printf("Search path: %s\n", searchPath)
