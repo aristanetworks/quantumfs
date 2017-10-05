@@ -8,27 +8,28 @@ import "github.com/aristanetworks/quantumfs/qlog"
 // Generic request context object
 type Ctx struct {
 	Qlog      *qlog.Qlog
+	Prefix    string
 	RequestId uint64
 }
 
 // Log an Error message
 func (c Ctx) Elog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
-	c.Qlog.Log(subsystem, c.RequestId, 0, format, args...)
+	c.Qlog.Log(subsystem, c.RequestId, 0, c.Prefix+"ERROR: "+format, args...)
 }
 
 // Log a Warning message
 func (c Ctx) Wlog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
-	c.Qlog.Log(subsystem, c.RequestId, 1, format, args...)
+	c.Qlog.Log(subsystem, c.RequestId, 1, c.Prefix+format, args...)
 }
 
 // Log a Debug message
 func (c Ctx) Dlog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
-	c.Qlog.Log(subsystem, c.RequestId, 2, format, args...)
+	c.Qlog.Log(subsystem, c.RequestId, 2, c.Prefix+format, args...)
 }
 
 // Log a Verbose tracing message
 func (c Ctx) Vlog(subsystem qlog.LogSubsystem, format string, args ...interface{}) {
-	c.Qlog.Log(subsystem, c.RequestId, 3, format, args...)
+	c.Qlog.Log(subsystem, c.RequestId, 3, c.Prefix+format, args...)
 }
 
 type ExitFuncLog struct {
@@ -38,7 +39,7 @@ type ExitFuncLog struct {
 }
 
 func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
-	c.Qlog.Log(subsystem, c.RequestId, 3, qlog.FnEnterStr+funcName)
+	c.Qlog.Log(subsystem, c.RequestId, 3, c.Prefix+qlog.FnEnterStr+funcName)
 	return ExitFuncLog{
 		c:         &c,
 		subsystem: subsystem,
@@ -49,7 +50,7 @@ func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLo
 func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	extraFmtStr string, args ...interface{}) ExitFuncLog {
 
-	c.Qlog.Log(subsystem, c.RequestId, 3, qlog.FnEnterStr+
+	c.Qlog.Log(subsystem, c.RequestId, 3, c.Prefix+qlog.FnEnterStr+
 		funcName+" "+extraFmtStr, args...)
 	return ExitFuncLog{
 		c:         &c,
@@ -59,6 +60,6 @@ func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 }
 
 func (e ExitFuncLog) Out() {
-	e.c.Qlog.Log(e.subsystem, e.c.RequestId, 3, qlog.FnExitStr+
+	e.c.Qlog.Log(e.subsystem, e.c.RequestId, 3, e.c.Prefix+qlog.FnExitStr+
 		e.funcName)
 }
