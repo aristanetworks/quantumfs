@@ -473,13 +473,13 @@ func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
+
 	c.vlog("TypespaceList::syncChild doing nothing")
 }
 
 func (tsl *TypespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on TypespaceList")
 	return fuse.ENOSYS
@@ -798,14 +798,13 @@ func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	c.vlog("NamespaceList::syncChild doing nothing")
 }
 
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on NamespaceList")
 	return fuse.ENOSYS
@@ -1188,14 +1187,13 @@ func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	c.vlog("WorkspaceList::syncChild doing nothing")
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS
