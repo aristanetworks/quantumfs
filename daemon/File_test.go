@@ -13,6 +13,7 @@ import (
 	"os"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
@@ -677,5 +678,67 @@ func TestFileOwnership(t *testing.T) {
 		// but shouldn't be able to remove it
 		err = os.Remove(testFileB)
 		test.Assert(err != nil, "Removable file from dir without permission")
+	})
+}
+
+func TestChangeFileTypeBeforeSync(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay400Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		dirName := workspace + "/dir"
+		fileName := dirName + "/file"
+		data := GenData(int(quantumfs.MaxSmallFileSize()) +
+			quantumfs.MaxBlockSize)
+
+		test.AssertNoErr(utils.MkdirAll(dirName, 0777))
+		dirInode := test.getInodeNum(dirName)
+
+		// The dirty timeout is 400ms and we need to create a dirty queue
+		// with some space between the directory syncing and the file syncing
+		// so we can confirm the file ObjectType between those two events.
+		// Therefore we sleep 100ms before writing data to the file so the
+		// dirty queue will be:
+		//
+		// dirName
+		// <100ms gap>
+		// fileName
+		time.Sleep(100 * time.Millisecond)
+
+		file, err := os.Create(fileName)
+		test.AssertNoErr(err)
+		file.Close()
+		fileInode := test.getInodeNum(fileName)
+
+		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
+
+		msg := fmt.Sprintf("Mux::flushInode inode %d", dirInode)
+		test.WaitForLogString(msg, "Directory to flush")
+
+		// Confirm the directory is consistent with a small file
+		inode := test.getInode(dirName)
+		dir := inode.(*Directory)
+		record, err := dir.getChildRecordCopy(test.TestCtx(),
+			fileInode)
+		test.AssertNoErr(err)
+
+		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+			"ID isn't empty block: %s", record.ID().String())
+		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
+			"File isn't small file: %s", record.Type())
+
+		msg = fmt.Sprintf("Mux::flushInode inode %d", fileInode)
+		test.WaitForLogString(msg, "File to flush")
+
+		// Confirm the directory is consistent with a medium file
+		inode = test.getInode(dirName)
+		dir = inode.(*Directory)
+		record, err = dir.getChildRecordCopy(test.TestCtx(),
+			fileInode)
+		test.AssertNoErr(err)
+
+		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+			"ID is empty block: %s", record.ID().String())
+		test.Assert(record.Type() == quantumfs.ObjectTypeMediumFile,
+			"File isn't medium file: %s", record.Type())
 	})
 }
