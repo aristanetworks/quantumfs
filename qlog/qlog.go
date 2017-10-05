@@ -222,6 +222,7 @@ func (q *Qlog) SetLogLevels(levels string) {
 type Qlog struct {
 	// This is the logging system level store. Increase size as the number of
 	// LogSubsystems increases past your capacity
+	Prefix    string
 	LogLevels uint32
 	Write     func(format string, args ...interface{}) error
 	logBuffer *SharedMemory
@@ -316,6 +317,11 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 // Should only be used by tests
 func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	format string, args ...interface{}) {
+
+	// Append a string prefix, if available
+	if len(q.Prefix) > 0 {
+		format = q.Prefix + format
+	}
 
 	// Put into the shared circular buffer, UnixNano will work until year 2262
 	unixNano := t.UnixNano()
