@@ -409,6 +409,11 @@ func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
 	config.DirtyFlushDelay = 100 * time.Millisecond
 }
 
+// Modify the QuantumFS flush delay to 400 milliseconds
+func dirtyDelay400Ms(test *testHelper, config *QuantumFsConfig) {
+	config.DirtyFlushDelay = 400 * time.Millisecond
+}
+
 // Extract namespace and workspace path from the absolute path of
 // a workspaceroot
 func (th *testHelper) getWorkspaceComponents(abspath string) (string,
