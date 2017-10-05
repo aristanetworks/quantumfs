@@ -170,6 +170,8 @@ func (link *Hardlink) Record() quantumfs.DirectRecord {
 	rtn.SetFileId(link.fileId)
 	rtn.SetContentTime(link.creationTime)
 	rtn.SetID(link.ID())
+	// Ensure we have a valid empty extended attrs
+	rtn.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 
 	// we only need to return a thin record - just enough information to
 	// create the hardlink. The rest is stored in workspaceroot.
