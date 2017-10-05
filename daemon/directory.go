@@ -1364,16 +1364,16 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}
 }
 
-func (dir *Directory) getRecordExtendedAttributes(c *ctx,
-	record quantumfs.DirectoryRecord) (*quantumfs.ExtendedAttributes,
+func getRecordExtendedAttributes(c *ctx,
+	attrKey quantumfs.ObjectKey) (*quantumfs.ExtendedAttributes,
 	fuse.Status) {
 
-	if record.ExtendedAttributes().IsEqualTo(quantumfs.EmptyBlockKey) {
+	if attrKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		c.vlog("Directory::getRecordExtendedAttributes returning new object")
 		return nil, fuse.ENOENT
 	}
 
-	buffer := c.dataStore.Get(&c.Ctx, record.ExtendedAttributes())
+	buffer := c.dataStore.Get(&c.Ctx, attrKey)
 	if buffer == nil {
 		c.dlog("Failed to retrieve attribute list")
 		return nil, fuse.EIO
@@ -1397,7 +1397,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	return dir.getRecordExtendedAttributes(c, record)
+	return getRecordExtendedAttributes(c, record.ExtendedAttributes())
 }
 
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
@@ -1574,7 +1574,9 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.getRecordChildCall_(c, inodeNum).SetExtendedAttributes(key)
+		record := dir.getRecordChildCall_(c, inodeNum)
+		record.SetExtendedAttributes(key)
+		record.SetContentTime(quantumfs.NewTime(time.Now()))
 	}()
 	dir.self.dirty(c)
 
@@ -1639,7 +1641,9 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.getRecordChildCall_(c, inodeNum).SetExtendedAttributes(key)
+		record := dir.getRecordChildCall_(c, inodeNum)
+		record.SetExtendedAttributes(key)
+		record.SetContentTime(quantumfs.NewTime(time.Now()))
 	}()
 	dir.self.dirty(c)
 
