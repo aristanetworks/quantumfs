@@ -4,10 +4,12 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 // hardlinkTracker used to track and compute the final hardlink versions and ref
@@ -319,16 +321,101 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	return publishDirectoryEntry(c, baseLayer, newBaseLayerId), nil
 }
 
+var emptyAttrs *quantumfs.ExtendedAttributes
+
+func init() {
+	emptyAttrs = quantumfs.NewExtendedAttributes()
+}
+
 func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	newer quantumfs.ObjectKey, older quantumfs.ObjectKey) (quantumfs.ObjectKey,
 	error) {
 
-	// TODO: Merge extended attributes
-	return newer, nil
+	baseAttrs, err := getRecordExtendedAttributes(c, base)
+	if err == fuse.ENOENT || base == quantumfs.ZeroKey {
+		baseAttrs = emptyAttrs
+	} else if err != fuse.OK {
+		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr base: " +
+			err.String())
+	}
+
+	newerAttrs, err := getRecordExtendedAttributes(c, newer)
+	if err == fuse.ENOENT || newer == quantumfs.ZeroKey {
+		newerAttrs = emptyAttrs
+	} else if err != fuse.OK {
+		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr new: " +
+			err.String())
+	}
+
+	olderAttrs, err := getRecordExtendedAttributes(c, older)
+	if err == fuse.ENOENT || older == quantumfs.ZeroKey {
+		olderAttrs = emptyAttrs
+	} else if err != fuse.OK {
+		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr old: " +
+			err.String())
+	}
+
+	mergeAttrs := quantumfs.NewExtendedAttributes()
+
+	// Add new attrs, but only if they weren't removed in the older branch
+	for i := 0; i < newerAttrs.NumAttributes(); i++ {
+		key, newerId := newerAttrs.Attribute(i)
+		olderId := olderAttrs.AttributeByKey(key)
+
+		if baseAttrs != nil {
+			baseId := baseAttrs.AttributeByKey(key)
+			// skip this attribute since it was removed
+			if baseId != quantumfs.EmptyBlockKey &&
+				olderId == quantumfs.EmptyBlockKey {
+
+				continue
+			}
+		}
+
+		mergeAttrs.SetAttribute(mergeAttrs.NumAttributes(), key, newerId)
+		mergeAttrs.SetNumAttributes(mergeAttrs.NumAttributes() + 1)
+	}
+
+	// Add attrs that were added or only changed by the older branch
+	for i := 0; i < olderAttrs.NumAttributes(); i++ {
+		key, olderId := olderAttrs.Attribute(i)
+		newerId := newerAttrs.AttributeByKey(key)
+
+		setId := false
+
+		if baseAttrs != nil {
+			baseId := baseAttrs.AttributeByKey(key)
+			if (baseId == quantumfs.EmptyBlockKey &&
+				newerId == quantumfs.EmptyBlockKey) ||
+				(baseId == newerId) {
+
+				setId = true
+			}
+		} else if newerId == quantumfs.EmptyBlockKey {
+			setId = true
+		}
+
+		if setId {
+			// Take the diff from older
+			mergeAttrs.SetAttribute(mergeAttrs.NumAttributes(), key,
+				olderId)
+			mergeAttrs.SetNumAttributes(mergeAttrs.NumAttributes() + 1)
+		}
+	}
+
+	// Publish the result
+	buffer := newBuffer(c, mergeAttrs.Bytes(), quantumfs.KeyTypeMetadata)
+	rtnKey, bufErr := buffer.Key(&c.Ctx)
+	if bufErr != nil {
+		c.elog("Error computing extended attribute key: %v", bufErr.Error())
+		return quantumfs.EmptyBlockKey, bufErr
+	}
+
+	return rtnKey, nil
 }
 
 // Merge record attributes based on ContentTime
-func mergeAttrs(c *ctx, base quantumfs.DirectoryRecord,
+func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
@@ -391,7 +478,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
 	bothSameType := local.Type().Matches(remote.Type())
 
-	rtnRecord, err := mergeAttrs(c, base, remote, local)
+	rtnRecord, err := mergeAttributes(c, base, remote, local)
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +630,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		baseAvailable = true
 	}
 
-	rtnRecord, err := mergeAttrs(c, base, remote, local)
+	rtnRecord, err := mergeAttributes(c, base, remote, local)
 	if err != nil {
 		return nil, err
 	}
