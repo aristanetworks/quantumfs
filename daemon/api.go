@@ -319,12 +319,6 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	// 2. Buffer api.currentResponse finishes reading.
 	if (offset == 0 && len(api.responses) == 0) ||
 		(offset > 0 && offset >= uint64(len(api.currentResponse))) {
-
-		if nonblocking {
-			c.vlog("No outstanding requests on nonblocking")
-			return nil, fuse.Status(syscall.EAGAIN)
-		}
-
 		c.vlog("No outstanding requests, returning early")
 		return nil, fuse.OK
 	}
