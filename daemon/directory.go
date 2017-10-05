@@ -1004,6 +1004,25 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	return result
 }
 
+func handleDetachedChild(c *ctx, name string, inodeId InodeId,
+	record quantumfs.DirectoryRecord) {
+	defer c.FuncIn("handleDetachedChild", "%s", name).Out()
+
+	if inodeId == quantumfs.InodeIdInvalid {
+		return
+	}
+	if record.Type() == quantumfs.ObjectTypeHardlink {
+		c.vlog("nothing to do for the detached leg of hardlink")
+		return
+	}
+	overwrittenInode := c.qfs.inodeNoInstantiate(c, inodeId)
+	if overwrittenInode == nil {
+		c.qfs.removeUninstantiated(c, []InodeId{inodeId})
+	} else {
+		overwrittenInode.orphan(c, record)
+	}
+}
+
 func (dir *Directory) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
@@ -1012,8 +1031,8 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
-		oldInodeId, oldRemoved, err := func() (InodeId, InodeId,
-			fuse.Status) {
+		oldInodeId, oldRemoved, oldRemovedRecord, err := func() (InodeId,
+			InodeId, quantumfs.DirectoryRecord, fuse.Status) {
 
 			defer dir.childRecordLock.Lock().Unlock()
 
@@ -1025,24 +1044,25 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 				// We can not overwrite a non-empty directory
 				return quantumfs.InodeIdInvalid,
 					quantumfs.InodeIdInvalid,
+					nil,
 					fuse.Status(syscall.ENOTEMPTY)
 			}
 
 			record := dir.children.recordByName(c, oldName)
 			if record == nil {
 				return quantumfs.InodeIdInvalid,
-					quantumfs.InodeIdInvalid, fuse.ENOENT
+					quantumfs.InodeIdInvalid, nil, fuse.ENOENT
 			}
 
 			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
 			if err != fuse.OK {
 				return quantumfs.InodeIdInvalid,
-					quantumfs.InodeIdInvalid, err
+					quantumfs.InodeIdInvalid, nil, err
 			}
 
 			if oldName == newName {
 				return quantumfs.InodeIdInvalid,
-					quantumfs.InodeIdInvalid, fuse.OK
+					quantumfs.InodeIdInvalid, nil, fuse.OK
 			}
 			oldInodeId_ := dir.children.inodeNum(oldName)
 			oldRemovedId_, oldRemovedRecord_ :=
@@ -1067,7 +1087,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			dir.self.markAccessed(c, newName,
 				markType(record.Type(), quantumfs.PathCreated))
 
-			return oldInodeId_, oldRemovedId_, fuse.OK
+			return oldInodeId_, oldRemovedId_, oldRemovedRecord_, fuse.OK
 		}()
 		if oldName == newName || err != fuse.OK {
 			return err
@@ -1078,11 +1098,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			child.setName(newName)
 			child.clearAccessedCache()
 		}
-
-		if oldRemoved != quantumfs.InodeIdInvalid {
-			c.qfs.removeUninstantiated(c, []InodeId{oldRemoved})
-		}
-
+		handleDetachedChild(c, oldName, oldRemoved, oldRemovedRecord)
 		dir.updateSize_(c)
 
 		return fuse.OK
@@ -1103,6 +1119,23 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	// If b isn't an ancestor of a, then either a is an ancestor of b or there's
 	// no relationship in which case we can return the same result
 	return a, b
+}
+
+func (dir *Directory) whiteOut(c *ctx, name string) {
+	defer c.FuncIn("Directory::whiteOut", "%s", name).Out()
+	deletedRecord := dir.children.recordByName(c, name)
+	if deletedRecord != nil {
+		dir.self.markAccessed(c, name,
+			markType(deletedRecord.Type(),
+				quantumfs.PathDeleted))
+	}
+
+	overwrittenRecord := dir.children.recordByName(c, name)
+	overwrittenId := dir.children.inodeNum(name)
+	if overwrittenRecord != nil {
+		dir.deleteEntry_(c, name)
+		handleDetachedChild(c, name, overwrittenId, overwrittenRecord)
+	}
 }
 
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
@@ -1227,27 +1260,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
-
-				deletedRecord := dst.children.recordByName(c,
-					newName)
-				if deletedRecord != nil {
-					dst.self.markAccessed(c, newName,
-						markType(deletedRecord.Type(),
-							quantumfs.PathDeleted))
-				}
-
-				// Delete the target InodeId, before (possibly)
-				// overwriting it.
-				dst.deleteEntry_(c, newName)
-
-				overwrittenRecord := dst.children.recordByName(c,
-					newName)
-				overwrittenId := dst.children.inodeNum(newName)
-				if overwrittenRecord != nil {
-					c.qfs.removeUninstantiated(c,
-						[]InodeId{overwrittenId})
-				}
-
+				dst.whiteOut(c, newName)
 				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
 
 				// Remove entry in old directory
@@ -1352,7 +1365,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	entry := dir.getRecordChildCall_(c, inodeNum)
 	if entry == nil {
-		c.wlog("Directory::syncChild inode %d not a valid child",
+		c.elog("Directory::syncChild inode %d not a valid child",
 			inodeNum)
 		return
 	}

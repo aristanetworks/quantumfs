@@ -1025,6 +1025,24 @@ func TestDirectoryMvChildFileOntoDir(t *testing.T) {
 	})
 }
 
+func TestDirectoryMvChildOntoOpenFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+		file1 := dir + "/file1"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(syscall.Rename(file1, file2))
+	})
+}
+
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
