@@ -479,8 +479,7 @@ func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
 }
 
 func (tsl *TypespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on TypespaceList")
 	return fuse.ENOSYS
@@ -805,8 +804,7 @@ func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
 }
 
 func (nsl *NamespaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on NamespaceList")
 	return fuse.ENOSYS
@@ -1195,8 +1193,7 @@ func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
 }
 
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on WorkspaceList")
 	return fuse.ENOSYS
