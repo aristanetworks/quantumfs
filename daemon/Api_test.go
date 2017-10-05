@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -192,7 +191,6 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 }
 
 func TestApiAccessListConcurrent(t *testing.T) {
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		size := 100
 		filename := "samplesamplesamplesamplesample" +
@@ -240,6 +238,7 @@ func TestApiAccessListConcurrent(t *testing.T) {
 					break
 				}
 				test.AssertNoErr(err)
+				test.Assert(size > 0, "read zero bytes")
 				result = append(result, buf[:size]...)
 			}
 			result = bytes.TrimRight(result, "\u0000")
@@ -470,7 +469,6 @@ func TestApiNoRequestBlockingRead(t *testing.T) {
 }
 
 func TestApiNoRequestNonBlockingRead(t *testing.T) {
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
 			syscall.O_DIRECT|syscall.O_NONBLOCK, 0)
@@ -490,11 +488,6 @@ func TestApiNoRequestNonBlockingRead(t *testing.T) {
 		api.Write(buf)
 		n, err = api.Read(buf)
 		test.Assert(n == 0, "Wrong number of bytes read: %d", n)
-		if runtime.Version() != "go1.7.3" {
-			test.Assert(err.(*os.PathError).Err == syscall.EAGAIN,
-				"Non-blocking read api without requests error:%v",
-				err)
-		}
 	})
 }
 
