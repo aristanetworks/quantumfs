@@ -221,13 +221,12 @@ func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	c.elog("Invalid syncChild on ApiInode")
 }
 
-func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on ApiInode")
@@ -320,12 +319,6 @@ func (api *ApiHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	// 2. Buffer api.currentResponse finishes reading.
 	if (offset == 0 && len(api.responses) == 0) ||
 		(offset > 0 && offset >= uint64(len(api.currentResponse))) {
-
-		if nonblocking {
-			c.vlog("No outstanding requests on nonblocking")
-			return nil, fuse.Status(syscall.EAGAIN)
-		}
-
 		c.vlog("No outstanding requests, returning early")
 		return nil, fuse.OK
 	}
