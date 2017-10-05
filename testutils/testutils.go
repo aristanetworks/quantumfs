@@ -395,7 +395,7 @@ func (th *TestHelper) WaitFor(description string, condition func() bool) {
 		}
 		th.Log("Condition not satisfied")
 
-		if time.Since(start) > th.Timeout * 3/4 {
+		if time.Since(start) > th.Timeout*3/4 {
 			th.Assert(false, "WaitFor '%s' failed.", description)
 		}
 
