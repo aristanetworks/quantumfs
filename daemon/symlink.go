@@ -191,7 +191,7 @@ func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (link *Symlink) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	c.elog("Invalid syncChild on Symlink")
 }
@@ -203,8 +203,8 @@ func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeI
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Symlink::flush").Out()
-	link.parentSyncChild(c, func() quantumfs.ObjectKey {
-		return link.key
+	link.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
+		return link.key, quantumfs.ObjectTypeSymlink
 	})
 
 	return link.key
