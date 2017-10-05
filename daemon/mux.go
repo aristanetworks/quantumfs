@@ -237,6 +237,13 @@ func (qfs *QuantumFs) Serve() {
 	qfs.c.dataStore.shutdown()
 }
 
+func (qfs *QuantumFs) Shutdown() error {
+	if err := qfs.c.Qlog.Sync(); err != 0 {
+		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
+	}
+	return qfs.c.Qlog.Close()
+}
+
 func (qfs *QuantumFs) handleWorkspaceChanges(
 	updates map[string]quantumfs.WorkspaceState) {
 
