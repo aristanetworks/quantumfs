@@ -382,7 +382,7 @@ func (th *TestHelper) ReadTo(file *os.File, offset int, num int) []byte {
 // Repeatedly check the condition by calling the function until that function returns
 // true.
 //
-// Wait for most of the test timeout before asserting - so that we can actually tell
+// Wait for half the test timeout before asserting - so that we can actually tell
 // which WaitFor is triggering in more complicated tests
 func (th *TestHelper) WaitFor(description string, condition func() bool) {
 	th.Log("Started waiting for %s", description)
@@ -395,7 +395,7 @@ func (th *TestHelper) WaitFor(description string, condition func() bool) {
 		}
 		th.Log("Condition not satisfied")
 
-		if time.Since(start) > th.Timeout - time.Millisecond {
+		if time.Since(start) > th.Timeout/2 {
 			th.Assert(false, "WaitFor '%s' failed.", description)
 		}
 
