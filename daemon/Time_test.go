@@ -375,7 +375,7 @@ func TestTimeExtAttrsOrphan(t *testing.T) {
 		fd := int(handle.Fd())
 		test.AssertNoErr(err)
 		// Orphan the file
-		os.Remove(testFile)
+		test.AssertNoErr(os.Remove(testFile))
 
 		mTimeA, cTimeA := getTimeFromFile(handle)
 
