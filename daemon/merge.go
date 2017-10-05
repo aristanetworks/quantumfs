@@ -407,7 +407,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	buffer := newBuffer(c, mergeAttrs.Bytes(), quantumfs.KeyTypeMetadata)
 	rtnKey, bufErr := buffer.Key(&c.Ctx)
 	if bufErr != nil {
-		c.elog("Error computing extended attribute key: %v", bufErr)
+		c.elog("Error computing extended attribute key: %v", bufErr.Error())
 		return quantumfs.EmptyBlockKey, bufErr
 	}
 
