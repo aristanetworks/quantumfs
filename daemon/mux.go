@@ -389,6 +389,13 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 				return
 			}
 
+			// do a check
+	checkId := func () quantumfs.ObjectKey {
+	defer wsr.linkLock.RLock().RUnlock()
+	return publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+	} ()
+	utils.Assert(checkId.IsEqualTo(wsr.publishedRootId), "WTF %s %s", checkId.String(), wsr.publishedRootId.String())
+
 			dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
 			if dirtyQueueLen == 0 {
 				break
@@ -396,7 +403,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		}
 	}
 
-	c.vlog("Workspace Refreshing %s rootid: %s -> %s", name,
+	c.vlog("Refreshing %s rootid: %s -> %s", name,
 		oldRootId.String(), wsr.publishedRootId.String())
 
 	wsr.refreshTo_(c, wsr.publishedRootId)

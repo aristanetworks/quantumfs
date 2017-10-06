@@ -569,6 +569,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 		panic("Failed to upload new workspace root")
 	}
 
+	c.vlog("Publish: %s", newRootId.String())
 	return newRootId
 }
 
