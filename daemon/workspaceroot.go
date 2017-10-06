@@ -585,22 +585,15 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 			c.vlog("Workspace is deleted. Will not retry flushing.")
 			return true
 		} else if err.Code == quantumfs.WSDB_OUT_OF_DATE {
-			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
-				wsr.workspace
+			// Attempt to merge
+			mergedRootId, err := mergeWorkspaceRoot(c,
+				wsr.publishedRootId, rootId, newRootId)
+			if err != nil {
+				c.elog("Unable to merge workspaces: %s", err)
+				return false
+			}
 
-			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.String(), newRootId.String(),
-				wsr.publishedRootId.String(), err.Error())
-			c.wlog("Another quantumfs instance is writing to %s, %s",
-				workspacePath,
-				"your changes will be lost. "+
-					"Unable to sync to datastore - save your"+
-					" work somewhere else.")
-
-			// Lock the user out of the workspace
-			defer c.qfs.mutabilityLock.Lock().Unlock()
-			c.qfs.workspaceMutability[workspacePath] = 0 +
-				workspaceImmutableUntilRestart
+			wsr.publishedRootId = mergedRootId
 		} else {
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 		}
