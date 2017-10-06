@@ -344,53 +344,45 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		return
 	}
 
-	// ensure our local wsr is synced
-	qfs.flusher.syncWorkspace(c, name)
-
 	defer wsr.LockTree().Unlock()
 
-	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
-		wsr.typespace, wsr.namespace, wsr.workspace)
-	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
-
-	if nonce != wsr.nonce {
-		c.dlog("Not refreshing workspace %s due to mismatching "+
-			"nonces %d vs %d", name, wsr.nonce, nonce)
-		return
-	}
-
-	if wsr.publishedRootId.IsEqualTo(publishedRootId) {
-		c.dlog("Not refreshing workspace %s as there has been no updates",
-			name)
-		return
-	}
-
-	newRootId := func () quantumfs.ObjectKey {
-		defer wsr.lock.RLock().RUnlock()
-		defer wsr.linkLock.RLock().RUnlock()
-
-		return publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
+	dirtyQueueLen := func () int {
+		defer qfs.flusher.lock.Lock().Unlock()
+		return qfs.flusher.dqs[wsr.treeLock()].Len_()
 	} ()
 
-	toRefreshId := publishedRootId
-	// local changes need to be merged
-	if !newRootId.IsEqualTo(wsr.publishedRootId) && false{
-		mergedRootId, err := mergeWorkspaceRoot(c, wsr.publishedRootId,
-			publishedRootId, newRootId)
-		if err != nil {
-			c.elog("Unable to merge local and remote workspaces: %s",
-				err)
+	// If there are no local changes, then we can just refresh
+	if dirtyQueueLen == 0 {
+		publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+			wsr.typespace, wsr.namespace, wsr.workspace)
+		utils.Assert(err == nil, "Failed to get rootId of the workspace.")
+
+		if nonce != wsr.nonce {
+			c.dlog("Not refreshing workspace %s due to mismatching "+
+				"nonces %d vs %d", name, wsr.nonce, nonce)
 			return
 		}
 
-		toRefreshId = mergedRootId
+		if wsr.publishedRootId.IsEqualTo(publishedRootId) {
+			c.dlog("Not refreshing workspace %s - there are no updates",
+				name)
+			return
+		}
+
+		c.vlog("Workspace Refreshing %s rootid: %s -> %s", name,
+			wsr.publishedRootId.String(), publishedRootId.String())
+
+		wsr.publishedRootId = publishedRootId
+	} else {
+		// ensure our local wsr is synced
+		err := qfs.flusher.syncWorkspace(c, name)
+		if err != nil {
+			c.elog("Unable to syncWorkspace - ignoring update")
+			return
+		}
 	}
 
-	c.vlog("Workspace Refreshing %s rootid: %s -> %s", name,
-		wsr.publishedRootId.String(), toRefreshId.String())
-
-	wsr.refreshTo_(c, toRefreshId)
-	wsr.publishedRootId = toRefreshId
+	wsr.refreshTo_(c, wsr.publishedRootId)
 }
 
 func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {
@@ -756,7 +748,7 @@ func (qfs *QuantumFs) increaseLookupCountWithNum(c *ctx, inodeId InodeId,
 	num uint64) {
 
 	defer c.FuncIn("Mux::increaseLookupCountWithNum",
-		"inode %d with value %d", inodeId, num).Out()
+		"inode %d, val %d", inodeId, num).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
@@ -1088,7 +1080,7 @@ func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
 func (qfs *QuantumFs) getWorkspaceRootLineage(c *ctx,
 	typespace, namespace, workspace string) (ids []InodeId, cleanup func()) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "Workspace %s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
 
 	// In order to run getWorkspaceRootLineage, we must set a proper value for

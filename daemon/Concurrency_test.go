@@ -27,20 +27,35 @@ func TestConcurrentReadWrite(t *testing.T) {
 		defer api1.Close()
 		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
 
-		data := []byte("abc")
-		testFile := "/file"
-		test.AssertNoErr(testutils.PrintToFile(workspace0 + testFile,
-			string(data)))
+		dataA := []byte("abc")
+		dataB := []byte("def")
+		fileA := "/fileA"
+		fileB := "/fileB"
+		test.AssertNoErr(testutils.PrintToFile(workspace0 + fileA,
+			string(dataA)))
+		test.AssertNoErr(testutils.PrintToFile(workspace1 + fileB,
+			string(dataB)))
 
 		test.AssertNoErr(api0.SyncAll())
+		test.AssertNoErr(api1.SyncAll())
+		test.waitForNRefresh(workspaceName, 2)
 
-		test.WaitFor("write to propagate through workspaceDbd", func() bool {
-			readData, err := ioutil.ReadFile(workspace1 + testFile)
+		test.WaitFor("fileA to propagate through workspaceDbd", func() bool {
+			readData, err := ioutil.ReadFile(workspace1 + fileA)
 			if err != nil {
 				return false
 			}
 
-			return bytes.Equal(readData, data)
+			return bytes.Equal(readData, dataA)
+		})
+
+		test.WaitFor("fileB to propagate through workspaceDbd", func() bool {
+			readData, err := ioutil.ReadFile(workspace0 + fileB)
+			if err != nil {
+				return false
+			}
+
+			return bytes.Equal(readData, dataB)
 		})
 	})
 }
