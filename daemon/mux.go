@@ -891,7 +891,7 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("ERROR: PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
+	c.elog("PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
 		fmt.Sprintf("%v", exception), utils.BytesToString(stackTrace))
 }
 
@@ -2052,7 +2052,7 @@ func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
 	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
 	c.vlog("QuantumFs::APIFileSize subtract %d downto %d", offset, result)
 	if result < 0 {
-		c.elog("ERROR: PANIC Global variable %d should"+
+		c.elog("PANIC Global variable %d should"+
 			" be greater than zero", result)
 		atomic.StoreInt64(&qfs.apiFileSize, 0)
 	}
