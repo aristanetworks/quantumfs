@@ -1,6 +1,8 @@
+# Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
+# Arista Networks, Inc. Confidential and Proprietary.
 FROM fedora:20
 
-MAINTAINER clr@arista.com
+LABEL maintainer="clr@arista.com"
 
 ENV USER root
 ENV QFSVERSION v0.8
