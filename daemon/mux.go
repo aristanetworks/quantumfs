@@ -372,36 +372,18 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		wsr.publishedRootId = publishedRootId
 	} else {
 		c.vlog("Merging local changes")
-		for retries := 0; retries < MaxMergeTries; retries++ {
-			err := func () error {
-				wsr.treeLock().Unlock()
-				defer wsr.LockTree()
 
-				// ensure our local wsr is synced
-				err := qfs.flusher.syncWorkspace(c, name)
-				if err != nil {
-					c.elog("Unable to syncWorkspace - "+
-						"ignoring update")
-					return err
-				}
+		// ensure our local wsr is synced
+		err := qfs.flusher.syncWorkspace_(c, name)
+		if err != nil {
+			c.elog("Unable to syncWorkspace - ignoring update")
+			return
+		}
 
-				return nil
-			} ()
-
-			if err != nil {
-				c.elog("Couldn't merge: %s", err)
-				return
-			}
-
-			dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
-			if dirtyQueueLen == 0 {
-				break
-			}
-
-			if retries == MaxMergeTries-1 {
-				c.elog("Unable to syncWorkspace for merge")
-				return
-			}
+		dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
+		if dirtyQueueLen == 0 {
+			// Fail gracefully in this error case
+			c.elog("Flusher has inodes for workspace that will be lost")
 		}
 	}
 
