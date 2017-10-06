@@ -26,6 +26,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
+const MaxMergeTries = 5
 const InodeNameLog = "Inode %d Name %s"
 const InodeOnlyLog = "Inode %d"
 const FileHandleLog = "Fh: %d"
@@ -371,7 +372,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		wsr.publishedRootId = publishedRootId
 	} else {
 		c.vlog("Merging local changes")
-		for {
+		for retries := 0; retries < MaxMergeTries; retries++ {
 			err := func () error {
 				wsr.treeLock().Unlock()
 				defer wsr.LockTree()
@@ -388,12 +389,18 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 			} ()
 
 			if err != nil {
+				c.elog("Couldn't merge: %s", err)
 				return
 			}
 
 			dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
 			if dirtyQueueLen == 0 {
 				break
+			}
+
+			if retries == MaxMergeTries-1 {
+				c.elog("Unable to syncWorkspace for merge")
+				return
 			}
 		}
 	}
