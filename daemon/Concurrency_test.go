@@ -33,12 +33,8 @@ func TestConcurrentReadWrite(t *testing.T) {
 		fileB := "/fileB"
 		test.AssertNoErr(testutils.PrintToFile(workspace0 + fileA,
 			string(dataA)))
-		test.AssertNoErr(testutils.PrintToFile(workspace1 + fileB,
-			string(dataB)))
 
 		test.AssertNoErr(api0.SyncAll())
-		test.AssertNoErr(api1.SyncAll())
-		test.waitForNRefresh(workspaceName, 2)
 
 		test.WaitFor("fileA to propagate", func() bool {
 			readData, err := ioutil.ReadFile(workspace1 + fileA)
@@ -48,6 +44,12 @@ func TestConcurrentReadWrite(t *testing.T) {
 
 			return bytes.Equal(readData, dataA)
 		})
+
+		test.AssertNoErr(testutils.PrintToFile(workspace0 + fileB,
+			string(dataA)))
+		test.AssertNoErr(testutils.PrintToFile(workspace1 + fileB,
+			string(dataB)))
+		test.AssertNoErr(api1.SyncAll())
 
 		test.WaitFor("fileB to propagate", func() bool {
 			readData, err := ioutil.ReadFile(workspace0 + fileB)

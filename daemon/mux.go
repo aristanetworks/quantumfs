@@ -351,6 +351,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 
 	// If there are no local changes, then we can just refresh
 	if dirtyQueueLen == 0 {
+		c.vlog("No local changes - just refreshing")
 		publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 			wsr.typespace, wsr.namespace, wsr.workspace)
 		utils.Assert(err == nil, "Failed to get rootId of the workspace.")
@@ -369,6 +370,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 
 		wsr.publishedRootId = publishedRootId
 	} else {
+		c.vlog("Merging local changes")
 		for {
 			err := func () error {
 				wsr.treeLock().Unlock()
@@ -388,13 +390,6 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 			if err != nil {
 				return
 			}
-
-			// do a check
-	checkId := func () quantumfs.ObjectKey {
-	defer wsr.linkLock.RLock().RUnlock()
-	return publishWorkspaceRoot(c, wsr.baseLayerId, wsr.hardlinks)
-	} ()
-	utils.Assert(checkId.IsEqualTo(wsr.publishedRootId), "WTF %s %s", checkId.String(), wsr.publishedRootId.String())
 
 			dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
 			if dirtyQueueLen == 0 {
