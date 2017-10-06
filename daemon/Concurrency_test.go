@@ -40,7 +40,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 		test.AssertNoErr(api1.SyncAll())
 		test.waitForNRefresh(workspaceName, 2)
 
-		test.WaitFor("fileA to propagate through workspaceDbd", func() bool {
+		test.WaitFor("fileA to propagate", func() bool {
 			readData, err := ioutil.ReadFile(workspace1 + fileA)
 			if err != nil {
 				return false
@@ -49,7 +49,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 			return bytes.Equal(readData, dataA)
 		})
 
-		test.WaitFor("fileB to propagate through workspaceDbd", func() bool {
+		test.WaitFor("fileB to propagate", func() bool {
 			readData, err := ioutil.ReadFile(workspace0 + fileB)
 			if err != nil {
 				return false
