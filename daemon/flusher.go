@@ -330,3 +330,14 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	dq.TryCommand_(c, KICK)
 	return dirtyElement
 }
+
+func (flusher *Flusher) dirtyQueueLength(wsr *WorkspaceRoot) int {
+	defer flusher.lock.Lock().Unlock()
+
+	dq := flusher.dqs[wsr.treeLock()]
+	if dq == nil {
+		return 0
+	}
+
+	return dq.Len_()
+}
