@@ -1025,7 +1025,25 @@ func TestDirectoryMvChildFileOntoDir(t *testing.T) {
 	})
 }
 
-func TestDirectoryMvChildOntoOpenFile(t *testing.T) {
+func TestDirectoryMvChildOntoOpenFileSameDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+		file1 := dir + "/file1"
+		file2 := dir + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(syscall.Rename(file1, file2))
+	})
+}
+
+func TestDirectoryMvChildOntoOpenFileInParentDir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir := workspace + "/dir"
@@ -1033,6 +1051,26 @@ func TestDirectoryMvChildOntoOpenFile(t *testing.T) {
 		file2 := workspace + "/file2"
 
 		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(syscall.Rename(file1, file2))
+	})
+}
+
+func TestDirectoryMvChildOntoOpenFileInSibling(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := workspace + "/dir2"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir1, 0124))
+		test.AssertNoErr(utils.MkdirAll(dir2, 0124))
 		test.AssertNoErr(testutils.PrintToFile(file1, ""))
 		test.AssertNoErr(testutils.PrintToFile(file2, ""))
 
