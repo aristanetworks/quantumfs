@@ -345,11 +345,9 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	}
 
 	defer wsr.LockTree().Unlock()
+	oldRootId := wsr.publishedRootId
 
-	dirtyQueueLen := func () int {
-		defer qfs.flusher.lock.Lock().Unlock()
-		return qfs.flusher.dqs[wsr.treeLock()].Len_()
-	} ()
+	dirtyQueueLen := qfs.flusher.dirtyQueueLength(wsr)
 
 	// If there are no local changes, then we can just refresh
 	if dirtyQueueLen == 0 {
@@ -369,18 +367,37 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 			return
 		}
 
-		c.vlog("Workspace Refreshing %s rootid: %s -> %s", name,
-			wsr.publishedRootId.String(), publishedRootId.String())
-
 		wsr.publishedRootId = publishedRootId
 	} else {
-		// ensure our local wsr is synced
-		err := qfs.flusher.syncWorkspace(c, name)
-		if err != nil {
-			c.elog("Unable to syncWorkspace - ignoring update")
-			return
+		for {
+			err := func () error {
+				wsr.treeLock().Unlock()
+				defer wsr.LockTree()
+
+				// ensure our local wsr is synced
+				err := qfs.flusher.syncWorkspace(c, name)
+				if err != nil {
+					c.elog("Unable to syncWorkspace - "+
+						"ignoring update")
+					return err
+				}
+
+				return nil
+			} ()
+
+			if err != nil {
+				return
+			}
+
+			dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
+			if dirtyQueueLen == 0 {
+				break
+			}
 		}
 	}
+
+	c.vlog("Workspace Refreshing %s rootid: %s -> %s", name,
+		oldRootId.String(), wsr.publishedRootId.String())
 
 	wsr.refreshTo_(c, wsr.publishedRootId)
 }

@@ -594,6 +594,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 			}
 
 			wsr.publishedRootId = mergedRootId
+			return true
 		} else {
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 		}
