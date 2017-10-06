@@ -499,7 +499,7 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 
 	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, convertWsdbError(err)
+		return quantumfs.ZeroKey, 0, convertWsdbError(err)
 	}
 
 	return quantumfs.NewObjectKeyFromBytes(key), 0, nil
@@ -511,7 +511,7 @@ func (w *etherWsdbTranslator) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := w.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, err
+		return quantumfs.ZeroKey, 0, err
 	}
 
 	return w.Workspace(c, typespace, namespace, workspace)
@@ -574,7 +574,7 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
 		workspace, currentRootId.Value(), newRootId.Value())
 	if err != nil {
-		return quantumfs.ObjectKey{}, convertWsdbError(err)
+		return quantumfs.ZeroKey, convertWsdbError(err)
 	}
 
 	return quantumfs.NewObjectKeyFromBytes(key), nil
