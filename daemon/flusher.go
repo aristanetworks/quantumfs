@@ -32,6 +32,7 @@ type FlushCmd int
 const (
 	KICK = FlushCmd(iota)
 	QUIT
+	QUITANDLOCK
 	ABORT // N.B. ABORT is unused at the moment
 )
 
@@ -41,9 +42,10 @@ type DirtyQueue struct {
 	cmd  chan FlushCmd
 	done chan error
 	name string
+	treelock *TreeLock
 }
 
-func NewDirtyQueue(name string) *DirtyQueue {
+func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 	dq := DirtyQueue{
 		l: list.New(),
 		// We would like to allow a large number of
@@ -52,7 +54,8 @@ func NewDirtyQueue(name string) *DirtyQueue {
 		// This should change to consolidate all KICKs into one
 		cmd:  make(chan FlushCmd, 1000),
 		done: make(chan error),
-		name: name,
+		name: treelock.name,
+		treelock: treelock,
 	}
 	return &dq
 }
@@ -96,7 +99,7 @@ func (dq *DirtyQueue) TryCommand_(c *ctx, cmd FlushCmd) error {
 	}
 }
 
-// flusher lock must be locked when calling this function
+// treeLock and flusher lock must be locked when calling this function
 func flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
@@ -109,7 +112,7 @@ func flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	ret := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode(c, inode, uninstantiate)
+		return c.qfs.flushInode_(c, inode, uninstantiate)
 	}()
 	if !uninstantiate && dirtyInode.shouldUninstantiate {
 		// we have released and re-acquired the flusher lock, and the
@@ -132,7 +135,7 @@ func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
 	dq.done <- fmt.Errorf("Flushing inode %d failed", inodeId)
 }
 
-// flusher lock must be locked when calling this function
+// treeLock and flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 	done bool) {
 
@@ -201,6 +204,9 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 		flushAll := false
 		switch cmd {
 		case KICK:
+		case QUITANDLOCK:
+			dq.treelock.lock.Lock()
+			defer dq.treelock.lock.Unlock()
 		case QUIT:
 			flushAll = true
 		case ABORT:
@@ -225,7 +231,9 @@ func NewFlusher() *Flusher {
 	return &dqs
 }
 
-func (flusher *Flusher) sync(c *ctx, workspace string) error {
+// If a workspace is specified, the treelock must already be locked.
+// If sync all is specified, no treelock should be locked already
+func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::sync", "%s", workspace).Out()
 	doneChannels := make([]chan error, 0)
 	var err error
@@ -240,6 +248,14 @@ func (flusher *Flusher) sync(c *ctx, workspace string) error {
 				!strings.HasPrefix(workspace, dq.name) {
 				continue
 			}
+
+			cmd := QUIT
+			// If you specify a workspace, we assume the tree is already
+			// locked before calling this function
+			if workspace == "" {
+				cmd = QUITANDLOCK
+			}
+
 			err = dq.TryCommand_(c, QUIT)
 			if err != nil {
 				c.vlog("failed to send cmd to dirtyqueue")
@@ -262,12 +278,12 @@ func (flusher *Flusher) sync(c *ctx, workspace string) error {
 
 func (flusher *Flusher) syncAll(c *ctx) error {
 	defer c.funcIn("Flusher::syncAll").Out()
-	return flusher.sync(c, "")
+	return flusher.sync_(c, "")
 }
 
-func (flusher *Flusher) syncWorkspace(c *ctx, workspace string) error {
-	defer c.FuncIn("Flusher::syncWorkspace", "%s", workspace).Out()
-	return flusher.sync(c, workspace)
+func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
+	defer c.FuncIn("Flusher::syncWorkspace_", "%s", workspace).Out()
+	return flusher.sync_(c, workspace)
 }
 
 // flusher lock must be locked when calling this function
@@ -290,7 +306,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 		treelock := inode.treeLock()
 		dq, ok := flusher.dqs[treelock]
 		if !ok {
-			dq = NewDirtyQueue(treelock.name)
+			dq = NewDirtyQueue(treelock)
 			flusher.dqs[treelock] = dq
 			launch = true
 		}

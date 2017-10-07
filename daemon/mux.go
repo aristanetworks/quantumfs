@@ -393,7 +393,8 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	wsr.refreshTo_(c, wsr.publishedRootId)
 }
 
-func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {
+// Should be called with the tree locked for read or write
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool {
 
 	inodeNum := inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
@@ -864,7 +865,16 @@ const SyncWorkspaceLog = "Mux::syncWorkspace"
 
 func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	defer c.funcIn(SyncWorkspaceLog).Out()
-	return qfs.flusher.syncWorkspace(c, workspace)
+
+	workspace, exists := qfs.getWorkspaceRoot(c, src[0], src[1], src[2])
+	if !exists {
+		return errors.New("Unable to WorkspaceRoot for Sync")
+	}
+
+	defer workspace.cleanup()
+	defer workspace.RLockTree().RUnlock()
+
+	return qfs.flusher.syncWorkspace_(c, workspace)
 }
 
 func logRequestPanic(c *ctx) {
