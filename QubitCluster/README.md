@@ -8,8 +8,8 @@ on QFS outside of a production environment.
 To build an image with the default QFS version run `docker build -t qfs .`.
 This will create an image tagged as `qfs:latest`.
 
-If you would like to use a different version then edit the `QFSVERSION`
-variable in the Dockerfile.
+If you would like to use a different version then change the `QFS_RPM_NAME`
+build arg. E.g. `docker build -t qfs --build-arg QFS_RPM_NAME=v0.6-1 .`.
 The version you are trying to run must be available in
 http://dist/storage/QuantumFS/.
 
