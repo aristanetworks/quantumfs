@@ -493,7 +493,7 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, err
+		return quantumfs.ZeroKey, 0, err
 	}
 
 	return wsdb.Workspace(c, typespace, namespace, workspace)
