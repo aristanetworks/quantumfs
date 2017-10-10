@@ -5,6 +5,7 @@ package cql
 
 import (
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -28,6 +29,8 @@ type cacheWsdb struct {
 	advanceStats stats.OpStats
 }
 
+const defaultCacheTimeoutSecs = 1
+
 // this wsdb implementation wraps any wsdb (base) implementation
 // with entity cache
 func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
@@ -38,8 +41,15 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 		advanceStats: inmem.NewOpStatsInMem("advanceWorkspace"),
 	}
 
-	// TODO: default max cache age can be a configuration parameter?
-	ce := newEntityCache(3, 1*time.Second, cwsdb, wsdbFetcherImpl)
+	cacheTimeout := cfg.CacheTimeoutSecs
+	if cacheTimeout == 0 {
+		cacheTimeout = defaultCacheTimeoutSecs
+	} else if cacheTimeout < 0 && cacheTimeout != DontExpireWsdbCache {
+		panic(fmt.Sprintf("Unsupported CacheTimeoutSecs value: %d in wsdb configuration\n",
+			cacheTimeout))
+	}
+
+	ce := newEntityCache(3, cacheTimeout, cwsdb, wsdbFetcherImpl)
 
 	// QFS requires an empty workspaceDB to contain null namespace
 	// and null workspace

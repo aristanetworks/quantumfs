@@ -5,6 +5,8 @@ package cql
 
 import (
 	"errors"
+	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -53,6 +55,182 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 		wsdb:     wsdb,
 		mockSess: mockSession,
 	}
+}
+
+func (suite *wsdbCacheTestSuite) TestWsdbConfigDefault() {
+	var config Config
+	var config2 *Config
+
+	config.Cluster.Nodes = []string{"node1", "node2"}
+	// no wsdb configuration
+
+	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	suite.Require().NoError(err, "Tempfile creation failed")
+	name := file.Name()
+	file.Close()
+	defer os.Remove(name)
+
+	err = writeCqlConfig(name, &config)
+	suite.Require().NoError(err, "CQL config file write failed")
+
+	config2, err = readCqlConfig(name)
+	suite.Require().NoError(err, "CQL config file read failed")
+
+	mockCluster := new(MockCluster)
+	mockCluster.On("CreateSession").Return(suite.common.mockSess, nil)
+
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, config2)
+	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
+
+	wdb := newCacheWsdb(noCacheWsdb, config2.WsDB)
+	cwsdb, ok := wdb.(*cacheWsdb)
+	suite.Require().True(ok, "Incorrect type from newCacheWsdb")
+	suite.Require().True(cwsdb.cache.expiryDuration ==
+		time.Duration(defaultCacheTimeoutSecs)*time.Second,
+		"bad default found %s", cwsdb.cache.expiryDuration)
+
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheBadConfig() {
+	timeout := -100
+
+	mockCfg := &Config{
+		Cluster: ClusterConfig{
+			KeySpace: "ether",
+		},
+		WsDB: WsDBConfig{
+			CacheTimeoutSecs: timeout,
+		},
+
+	}
+
+	mockCluster := new(MockCluster)
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
+	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
+
+	suite.Require().Panics(func() {
+		newCacheWsdb(noCacheWsdb, mockCfg.WsDB)
+	})
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
+	timeout := DontExpireWsdbCache
+
+	mockCluster := new(MockCluster)
+	mockCluster.On("CreateSession").Return(suite.common.mockSess, nil)
+
+	mockCfg := &Config{
+		Cluster: ClusterConfig{
+			KeySpace: "ether",
+		},
+		WsDB: WsDBConfig{
+			CacheTimeoutSecs: timeout,
+		},
+
+	}
+
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
+	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
+
+	wdb := newCacheWsdb(noCacheWsdb, mockCfg.WsDB)
+	cwsdb, ok := wdb.(*cacheWsdb)
+	suite.Require().True(ok, "Incorrect type from newCacheWsdb")
+
+	// check that cache refresh is disabled
+	suite.Require().True(cwsdb.cache.neverExpires,
+		"Cache expiry enabled even when explicity disabled")
+	cwsdb.cache.InsertEntities(unitTestEtherCtx, "ts1")
+	group := cwsdb.cache.getLastEntityGroup(unitTestEtherCtx, cwsdb.cache.root)
+	suite.Require().True(group != nil, "group not found after insert")
+
+	// check that refresh is not needed for this group
+	suite.Require().False(group.refreshNeeded(unitTestEtherCtx),
+		"group need refresh when cache expiry disabled")
+
+	time1 := group.expiresAt
+
+	// in this test we check refresh of typespaces only
+	// so disable refresh of workspace and namespace
+	// namespaces and workspaces are also entityGroups and hence
+	// separate test isn't needed to test for their expiry
+	cwsdb.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
+
+	cwsdb.cache.CountEntities(unitTestEtherCtx)
+	group = cwsdb.cache.getLastEntityGroup(unitTestEtherCtx, cwsdb.cache.root)
+	suite.Require().True(group != nil, "group not found after Count")
+
+	// check that refresh is not needed for this group
+	suite.Require().False(group.refreshNeeded(unitTestEtherCtx),
+		"group need refresh when cache expiry disabled")
+
+	time2 := group.expiresAt
+
+	// check that there is no change in expiryTime of the group
+	suite.Require().Equal(time1, time2,
+		"unexpected expiry times, time1: %s time2: %s", time1, time2)
+
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheTimeout() {
+
+	timeout := 120
+	timeoutSecs := time.Duration(timeout) * time.Second
+
+	mockCluster := new(MockCluster)
+	mockCluster.On("CreateSession").Return(suite.common.mockSess, nil)
+
+	// setup typespace info in mockDB
+	tsRows := mockDbRows{[]interface{}{"ts1"}, []interface{}{wsdb.NullSpaceName}}
+	tsIter := new(MockIter)
+	tsVals := []interface{}(nil)
+	mockWsdbCacheTypespaceFetch(suite.common.mockSess, tsRows, tsVals,
+		tsIter, nil)
+
+	mockCfg := &Config{
+		Cluster: ClusterConfig{
+			KeySpace: "ether",
+		},
+		WsDB: WsDBConfig{
+			CacheTimeoutSecs: timeout,
+		},
+
+	}
+
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
+	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
+
+	wdb := newCacheWsdb(noCacheWsdb, mockCfg.WsDB)
+	cwsdb, ok := wdb.(*cacheWsdb)
+	suite.Require().True(ok, "Incorrect type from newCacheWsdb")
+
+	// check that cache is setup with expiry as per configuration
+	suite.Require().True(cwsdb.cache.expiryDuration == timeoutSecs,
+		"Configured timeout %s, actual %s", timeoutSecs, cwsdb.cache.expiryDuration)
+
+	var time1, time2 time.Time
+	// create an entity group with expired entity
+	cwsdb.cache.InsertEntities(unitTestEtherCtx, "ts1")
+	group := cwsdb.cache.getLastEntityGroup(unitTestEtherCtx, cwsdb.cache.root)
+	suite.Require().True(group != nil, "group not found after insert")
+	time1 = group.expiresAt
+
+	// in this test we check refresh of typespaces only
+	// so disable refresh of workspace and namespace
+	// namespaces and workspaces are also entityGroups and hence
+	// separate test isn't needed to test for their expiry
+	cwsdb.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, wsdb.NullSpaceName,
+		wsdb.NullSpaceName)
+
+	// causes refresh and next expiry to be setup based on cache timeout
+	cwsdb.cache.CountEntities(unitTestEtherCtx)
+	group = cwsdb.cache.getLastEntityGroup(unitTestEtherCtx, cwsdb.cache.root)
+	suite.Require().True(group != nil, "group not found after Count")
+	time2 = group.expiresAt
+
+	// check that the expiry setup during refresh is >= timeout
+	expiry := time2.Sub(time1)
+	suite.Require().True(expiry >= timeoutSecs, "unexpected expiry %s found", expiry)
 }
 
 func (suite *wsdbCacheTestSuite) TestCacheEmptyDB() {

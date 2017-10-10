@@ -93,21 +93,27 @@ type entityCache struct {
 	fetcherArg interface{}
 	fetcher    fetchEntities
 
+	// used when cache refresh/timeouts are disabled
+	neverExpires bool
+
 	// used to setup/update expiresAt of entityGroup
 	expiryDuration time.Duration
 }
 
 // -- implementation of entityCache API ---
 
-func newEntityCache(levels int, expiryDuration time.Duration,
+func newEntityCache(levels int, cacheTimeout int,
 	fetcherArg interface{}, fetcher fetchEntities) *entityCache {
 
 	ec := &entityCache{}
 	ec.levels = levels
 	ec.fetcher = fetcher
 	ec.fetcherArg = fetcherArg
-	ec.expiryDuration = expiryDuration
-
+	ec.neverExpires = false
+	ec.expiryDuration = time.Duration(cacheTimeout)*time.Second
+	if cacheTimeout == DontExpireWsdbCache {
+		ec.neverExpires = true
+	}
 	ec.root = newEntityGroup(nil, "", ec)
 	return ec
 }
@@ -510,6 +516,10 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
 		g.parentEntity, g.entityCount,
 		g.expiresAt.Format(time.UnixDate),
 		strconv.FormatBool(g.detached)).Out()
+
+	if g.cache.neverExpires {
+		return false
+	}
 
 	duration := time.Now().Sub(g.expiresAt)
 	if duration >= 0 {

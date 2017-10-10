@@ -34,7 +34,7 @@ func (s *setupTests) TestValidConfig() {
 	var config2 *Config
 
 	config.Cluster.Nodes = []string{"node1", "node2"}
-	config.WsDB.SomeConfig = "Some String"
+	config.WsDB.CacheTimeoutSecs = 99
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
 	s.Require().NoError(err, "Tempfile creation failed")
