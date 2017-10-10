@@ -38,10 +38,10 @@ const (
 
 type DirtyQueue struct {
 	// The Front of the list are the Inodes next in line to flush.
-	l    *list.List
-	cmd  chan FlushCmd
-	done chan error
-	name string
+	l        *list.List
+	cmd      chan FlushCmd
+	done     chan error
+	name     string
 	treelock *TreeLock
 }
 
@@ -52,9 +52,9 @@ func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
 		// This should change to consolidate all KICKs into one
-		cmd:  make(chan FlushCmd, 1000),
-		done: make(chan error),
-		name: treelock.name,
+		cmd:      make(chan FlushCmd, 1000),
+		done:     make(chan error),
+		name:     treelock.name,
 		treelock: treelock,
 	}
 	return &dq
