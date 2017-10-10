@@ -836,14 +836,23 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	defer c.funcIn(SyncWorkspaceLog).Out()
 
 	parts := strings.Split(workspace, "/")
-	wsr, cleanup, exists := qfs.getWorkspaceRoot(c, parts[0], parts[1],
+	ids, err := qfs.getWorkspaceRootLineageNoInstantiate(c, parts[0], parts[1],
 		parts[2])
-	if !exists {
+	if err != nil {
 		return errors.New("Unable to get WorkspaceRoot for Sync")
 	}
 
-	defer cleanup()
+	if len(ids) < 4 {
+		// not instantiated yet, so nothing to sync
+		return nil
+	}
 
+	inode := qfs.inodeNoInstantiate(c, ids[3])
+	if inode == nil {
+		return fmt.Errorf("Unable to get workspaceroot")
+	}
+
+	wsr := inode.(*WorkspaceRoot)
 	wsr.realTreeLock.Lock()
 	defer wsr.realTreeLock.Unlock()
 
