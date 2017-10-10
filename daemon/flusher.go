@@ -207,6 +207,7 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 		case QUITANDLOCK:
 			dq.treelock.lock.Lock()
 			defer dq.treelock.lock.Unlock()
+			fallthrough
 		case QUIT:
 			flushAll = true
 		case ABORT:
@@ -256,7 +257,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 				cmd = QUITANDLOCK
 			}
 
-			err = dq.TryCommand_(c, QUIT)
+			err = dq.TryCommand_(c, cmd)
 			if err != nil {
 				c.vlog("failed to send cmd to dirtyqueue")
 				return

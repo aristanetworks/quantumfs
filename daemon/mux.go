@@ -10,6 +10,7 @@ package daemon
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -360,10 +361,8 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool {
 
 	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
+	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
 		inodeNum, uninstantiate).Out()
-
-	defer inode.RLockTree().RUnlock()
 
 	flushSuccess := true
 	if !inode.isOrphaned() {
@@ -829,13 +828,17 @@ const SyncWorkspaceLog = "Mux::syncWorkspace"
 func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	defer c.funcIn(SyncWorkspaceLog).Out()
 
-	workspace, exists := qfs.getWorkspaceRoot(c, src[0], src[1], src[2])
+	parts := strings.Split(workspace, "/")
+	wsr, cleanup, exists := qfs.getWorkspaceRoot(c, parts[0], parts[1],
+		parts[2])
 	if !exists {
 		return errors.New("Unable to WorkspaceRoot for Sync")
 	}
 
-	defer workspace.cleanup()
-	defer workspace.RLockTree().RUnlock()
+	defer cleanup()
+
+	wsr.realTreeLock.Lock()
+	defer wsr.realTreeLock.Unlock()
 
 	return qfs.flusher.syncWorkspace_(c, workspace)
 }
