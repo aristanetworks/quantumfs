@@ -849,7 +849,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 
 	inode := qfs.inodeNoInstantiate(c, ids[3])
 	if inode == nil {
-		return fmt.Errorf("Unable to get workspaceroot")
+		return nil
 	}
 
 	wsr := inode.(*WorkspaceRoot)
