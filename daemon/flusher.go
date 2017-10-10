@@ -282,6 +282,7 @@ func (flusher *Flusher) syncAll(c *ctx) error {
 	return flusher.sync_(c, "")
 }
 
+// Must be called with the tree locked
 func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::syncWorkspace_", "%s", workspace).Out()
 	return flusher.sync_(c, workspace)

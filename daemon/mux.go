@@ -832,7 +832,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	wsr, cleanup, exists := qfs.getWorkspaceRoot(c, parts[0], parts[1],
 		parts[2])
 	if !exists {
-		return errors.New("Unable to WorkspaceRoot for Sync")
+		return errors.New("Unable to get WorkspaceRoot for Sync")
 	}
 
 	defer cleanup()
