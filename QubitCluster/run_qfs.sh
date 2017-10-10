@@ -9,7 +9,7 @@ QFSCONFIG=/etc/quantumfsd.conf
 if [ ! -f /.dockerenv ]; then
   echo "ERROR: This file should only be run in a docker environment"
   exit 1
-elif [ ! ip link add dummy0 type dummy ]; then
+elif ! ip link add dummy0 type dummy; then
   echo "ERROR: Container must be run in privileged mode (--privileged)"
   exit 1
 elif [ ! -f $QFSCONFIG ]; then
