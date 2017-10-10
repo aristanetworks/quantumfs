@@ -1234,11 +1234,11 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			func() {
 				defer dst.childRecordLock.Lock().Unlock()
 				dst.orphanChild_(c, newName)
+				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
 			}()
 
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()
-				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
 				dir.children.deleteChild(c, oldName, true)
 			}()
 
