@@ -711,7 +711,7 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 
 		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
 
-		msg := fmt.Sprintf("Mux::flushInode inode %d", dirInode)
+		msg := fmt.Sprintf("Mux::flushInode_ inode %d", dirInode)
 		test.WaitForLogString(msg, "Directory to flush")
 
 		// Confirm the directory is consistent with a small file
@@ -726,7 +726,7 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
 			"File isn't small file: %s", record.Type())
 
-		msg = fmt.Sprintf("Mux::flushInode inode %d", fileInode)
+		msg = fmt.Sprintf("Mux::flushInode_ inode %d", fileInode)
 		test.WaitForLogString(msg, "File to flush")
 
 		// Confirm the directory is consistent with a medium file
