@@ -1623,3 +1623,48 @@ func TestDeleteOpenDirWithChild(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func TestDirectorySeekMiddle(t *testing.T) {
+	t.Skip()
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fullname := workspace + "/" + "testdir"
+		test.AssertNoErr(syscall.Mkdir(fullname, 0777))
+		test.AssertNoErr(CreateSmallFile(fullname+"/f0", ""))
+		test.AssertNoErr(CreateSmallFile(fullname+"/f1", ""))
+
+		f, err := os.Open(fullname)
+		test.AssertNoErr(err)
+		defer f.Close()
+
+		_, err = f.Seek(0, os.SEEK_SET)
+		buf := make([]byte, 1000)
+		n, err := syscall.Getdents(int(f.Fd()), buf)
+		test.AssertNoErr(err)
+		_, count, offs := utils.ParseDirentOffsets(buf, n, nil)
+		// There should be an entry for each file
+		test.Assert(count == 2, "Bad number of directory entries %d", count)
+		_, _, names := syscall.ParseDirent(buf, n, nil)
+		for i, off := range offs {
+			test.Log("Offset of entry %s is %d", names[i], off)
+		}
+
+		off1, off2 := offs[0], offs[1]
+		name1, name2 := names[0], names[1]
+		if off1 > off2 {
+			off1, off2 = off2, off1
+			name1, name2 = name2, name1
+		}
+		test.Log("off1 %d, off2 %d", off1, off2)
+
+		test.Log("Now seeking to offset %d", off2)
+		_, err = syscall.Seek(int(f.Fd()), off2, os.SEEK_SET)
+		test.AssertNoErr(err)
+
+		n, err = syscall.Getdents(int(f.Fd()), buf)
+		test.AssertNoErr(err)
+		_, count, _ = syscall.ParseDirent(buf, n, nil)
+		test.Assert(count == 1, "Read %d entries. Should have read one.",
+			count)
+	})
+}
