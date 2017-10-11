@@ -1681,7 +1681,6 @@ func TestDeleteOpenDirWithChild(t *testing.T) {
 }
 
 func TestDirectorySeekMiddle(t *testing.T) {
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		fullname := workspace + "/" + "testdir"
@@ -1705,22 +1704,24 @@ func TestDirectorySeekMiddle(t *testing.T) {
 			test.Log("Offset of entry %s is %d", names[i], off)
 		}
 
-		off1, off2 := offs[0], offs[1]
-		name1, name2 := names[0], names[1]
-		if off1 > off2 {
-			off1, off2 = off2, off1
-			name1, name2 = name2, name1
+		getNDirents := func(offset int64) int {
+			test.Log("Seeking to offset %d", offset)
+			_, err = syscall.Seek(int(f.Fd()), offset, os.SEEK_SET)
+			test.AssertNoErr(err)
+			buf := make([]byte, 1000)
+			n, err = syscall.Getdents(int(f.Fd()), buf)
+			test.AssertNoErr(err)
+			_, count, names = syscall.ParseDirent(buf, n, nil)
+			for i, name := range names {
+				test.Log("Name %d is %s", i, name)
+			}
+			return count
 		}
-		test.Log("off1 %d, off2 %d", off1, off2)
 
-		test.Log("Now seeking to offset %d", off2)
-		_, err = syscall.Seek(int(f.Fd()), off2, os.SEEK_SET)
-		test.AssertNoErr(err)
-
-		n, err = syscall.Getdents(int(f.Fd()), buf)
-		test.AssertNoErr(err)
-		_, count, _ = syscall.ParseDirent(buf, n, nil)
-		test.Assert(count == 1, "Read %d entries. Should have read one.",
-			count)
+		res0 := getNDirents(offs[0])
+		res1 := getNDirents(offs[1])
+		test.Assert(res0+res1 == 1,
+			"The offsets should result in 0 or 1. Got %d and %d.",
+			res0, res1)
 	})
 }
