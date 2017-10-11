@@ -23,13 +23,14 @@ import (
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (
-	exitOk                  = iota
-	exitBadCacheSize        = iota
-	exitMountFail           = iota
-	exitProfileFail         = iota
-	exitDataStoreInitFail   = iota
-	exitWorkspaceDbInitFail = iota
-	exitInitFailed          = iota
+	exitOk = iota
+	exitBadCacheSize
+	exitMountFail
+	exitProfileFail
+	exitDataStoreInitFail
+	exitWorkspaceDbInitFail
+	exitInitFail
+	exitShutdownFail
 )
 
 var version string
@@ -205,7 +206,7 @@ func main() {
 
 	if err != nil {
 		fmt.Printf("Could not initilize quantumfs: %s\n", err.Error())
-		os.Exit(exitInitFailed)
+		os.Exit(exitInitFail)
 
 	}
 
@@ -213,4 +214,7 @@ func main() {
 		os.Exit(exitMountFail)
 	}
 	quantumfs.Serve()
+	if err := quantumfs.Shutdown(); err != nil {
+		os.Exit(exitShutdownFail)
+	}
 }
