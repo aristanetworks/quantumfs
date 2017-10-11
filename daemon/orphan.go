@@ -6,6 +6,7 @@ package daemon
 import (
 	"bytes"
 	"errors"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/hanwen/go-fuse/fuse"
@@ -144,6 +145,7 @@ func (inode *InodeCommon) setOrphanChildXAttr(c *ctx, inodeNum InodeId, attr str
 	// copy the data as the memory backing it will
 	// be reused once this function returns
 	inode.unlinkXAttr[attr] = append([]byte(nil), data...)
+	inode.unlinkRecord.SetContentTime(quantumfs.NewTime(time.Now()))
 
 	return fuse.OK
 }
@@ -161,6 +163,7 @@ func (inode *InodeCommon) removeOrphanChildXAttr(c *ctx, inodeNum InodeId,
 	}
 
 	delete(inode.unlinkXAttr, attr)
+	inode.unlinkRecord.SetContentTime(quantumfs.NewTime(time.Now()))
 
 	return fuse.OK
 }
