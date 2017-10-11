@@ -1082,18 +1082,14 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 // Must hold dir and dir.childRecordLock
 func (dir *Directory) orphanChild_(c *ctx, name string) {
 	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
-	deletedRecord := dir.children.recordByName(c, name)
-	if deletedRecord != nil {
-		dir.self.markAccessed(c, name,
-			markType(deletedRecord.Type(),
-				quantumfs.PathDeleted))
-	}
-
 	removedRecord := dir.children.recordByName(c, name)
-	removedId := dir.children.inodeNum(name)
 	if removedRecord == nil {
 		return
 	}
+	dir.self.markAccessed(c, name,
+		markType(removedRecord.Type(),
+			quantumfs.PathDeleted))
+	removedId := dir.children.inodeNum(name)
 	dir.children.deleteChild(c, name, true)
 	if removedId == quantumfs.InodeIdInvalid {
 		return
