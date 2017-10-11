@@ -38,10 +38,10 @@ const (
 
 type DirtyQueue struct {
 	// The Front of the list are the Inodes next in line to flush.
-	l    *list.List
-	cmd  chan FlushCmd
-	done chan error
-	name string
+	l        *list.List
+	cmd      chan FlushCmd
+	done     chan error
+	name     string
 	treelock *TreeLock
 }
 
@@ -52,9 +52,9 @@ func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
 		// This should change to consolidate all KICKs into one
-		cmd:  make(chan FlushCmd, 1000),
-		done: make(chan error),
-		name: treelock.name,
+		cmd:      make(chan FlushCmd, 1000),
+		done:     make(chan error),
+		name:     treelock.name,
 		treelock: treelock,
 	}
 	return &dq
@@ -207,6 +207,7 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 		case QUITANDLOCK:
 			dq.treelock.lock.Lock()
 			defer dq.treelock.lock.Unlock()
+			fallthrough
 		case QUIT:
 			flushAll = true
 		case ABORT:
@@ -256,7 +257,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 				cmd = QUITANDLOCK
 			}
 
-			err = dq.TryCommand_(c, QUIT)
+			err = dq.TryCommand_(c, cmd)
 			if err != nil {
 				c.vlog("failed to send cmd to dirtyqueue")
 				return
@@ -281,6 +282,7 @@ func (flusher *Flusher) syncAll(c *ctx) error {
 	return flusher.sync_(c, "")
 }
 
+// Must be called with the tree locked
 func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::syncWorkspace_", "%s", workspace).Out()
 	return flusher.sync_(c, workspace)
