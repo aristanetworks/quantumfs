@@ -11,13 +11,13 @@ if [ ! -f /.dockerenv ]; then
   exit 1
 elif ! ip link add dummy0 type dummy; then
   echo "ERROR: Container must be run in privileged mode (--privileged)"
-  exit 1
+  exit 2
 elif [ ! -f $QFSCONFIG ]; then
   echo "ERROR: A config file must be mounted at $QFSCONFIG"
-  exit 1
+  exit 3
 elif [ $(df -k --output=avail /dev/shm | tail -n 1) -lt 8388608 ]; then
   echo "ERROR: Minimum of 8GB shared memory required (--shm-size=8g)"
-  exit 1
+  exit 4
 fi
 
 # Start the QuantumFS daemon in the background.

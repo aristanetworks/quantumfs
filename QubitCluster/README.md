@@ -1,8 +1,8 @@
 # QuantumFS Docker Container
 This directory contains an image designed to be able to quickly get a
-QuantumFS-enabled environment up and running.
-It will hopefully aid developers who would like to test things that depend
-on QFS outside of a production environment.
+QuantumFS-enabled environment up and running. It will hopefully aid developers
+who would like to test things that depend on QFS outside of a production
+environment.
 
 ## Building The Image
 To build an image with the default QFS version run `docker build -t qfs .`.
