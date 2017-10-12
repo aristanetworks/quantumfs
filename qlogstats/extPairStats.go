@@ -77,8 +77,9 @@ func (ext *extPairStats) process() {
 func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 	defer ext.reqLock.Lock().Unlock()
 
-	if _, exists := ext.requests[log.ReqId]; exists {
-		panic("Nested indent not supported")
+	if previous, exists := ext.requests[log.ReqId]; exists {
+		fmt.Printf("%s: nested start %d at %d and %d\n",
+			ext.name, log.ReqId, previous.log.T, log.T)
 	}
 
 	ext.requests[log.ReqId] = request{
