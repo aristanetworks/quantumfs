@@ -212,58 +212,6 @@ func TestPointCount(t *testing.T) {
 	})
 }
 
-func TestIndentation(t *testing.T) {
-	t.Skip()
-	runTest(t, func(test *testHelper) {
-		qlogHandle := test.Logger
-
-		// Artificially insert matching logs at different scopes
-		durationReal := int64(10000)
-		qlogHandle.Log_(time.Unix(0, 20000), qlog.LogTest, 12345, 2,
-			qlog.FnEnterStr+"TestMatch")
-
-		// Go up in scope and place a matching string there
-		qlogHandle.Log_(time.Unix(0, 20100), qlog.LogTest, 12345, 2,
-			qlog.FnEnterStr+"Other Function")
-		qlogHandle.Log_(time.Unix(0, 20200), qlog.LogTest,
-			12345, 3, qlog.FnEnterStr+"Mismatching funcIn")
-		qlogHandle.Log_(time.Unix(0, 20300), qlog.LogTest,
-			12345, 3, qlog.FnExitStr+"TestMatch")
-		qlogHandle.Log_(time.Unix(0, 20400), qlog.LogTest, 12345, 2,
-			qlog.FnExitStr+"Other Function")
-
-		qlogHandle.Log_(time.Unix(0, 20000+durationReal), qlog.LogTest,
-			12345, 3, qlog.FnExitStr+"TestMatch")
-
-		checkedAvg := false
-		checkedSamples := false
-		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 7,
-				"%d fields produced from one matching log",
-				len(memdb.Data[0].Fields))
-
-			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "average_ns" {
-					test.Assert(v.Data == int64(durationReal),
-						"incorrect delta %d", v.Data)
-					checkedAvg = true
-				} else if v.Name == "samples" {
-					test.Assert(v.Data == 1,
-						"incorrect samples %d", v.Data)
-					checkedSamples = true
-				}
-			}
-		}
-
-		test.runExtractorTest(qlogHandle,
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", "TestMatch"), checker)
-
-		test.Assert(checkedAvg, "test not checking average")
-		test.Assert(checkedSamples, "test not checking samples")
-	})
-}
-
 func TestErrorCounting(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.ShouldFailLogscan = true
@@ -288,6 +236,5 @@ func TestErrorCounting(t *testing.T) {
 
 		test.runExtractorTest(qlogHandle, nil, checker)
 		test.Assert(checked, "test not checking count")
-
 	})
 }
