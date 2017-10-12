@@ -7,9 +7,7 @@ LABEL maintainer="clr@arista.com"
 ENV USER root
 ARG QFS_RPM_NAME=latest
 
-RUN yum install -y \
-      fuse \
-      wget && \
+RUN yum install -y fuse wget && \
     wget -q http://dist/storage/QuantumFS/QuantumFS-$QFS_RPM_NAME.x86_64.rpm && \
     yum --nogpgcheck -y localinstall QuantumFS-$QFS_RPM_NAME.x86_64.rpm && \
     mkdir /qfs
