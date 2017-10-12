@@ -104,6 +104,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 	} else {
 		ext.stats.NewPoint(int64(delta))
 	}
+	delete(ext.requests, log.ReqId)
 }
 
 func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
@@ -133,7 +134,7 @@ func (ext *extPairStats) GC() {
 	ext.currentGeneration++
 
 	for reqId, request := range ext.requests {
-		if request.lastUpdateGeneration-2 < ext.currentGeneration {
+		if request.lastUpdateGeneration+2 < ext.currentGeneration {
 			fmt.Printf("%s: Deleting stale request %d (%d/%d)\n",
 				ext.name, reqId, request.lastUpdateGeneration,
 				ext.currentGeneration)
