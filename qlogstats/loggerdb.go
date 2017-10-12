@@ -78,7 +78,7 @@ type Aggregator struct {
 	requestSequence list.List
 
 	// Uses a prefix (slower) system to extract data
-	errorCount *extPointStats
+	//errorCount *extPointStats
 
 	extractors             []StatExtractor
 	triggerByFormat        map[string][]chan *qlog.LogOutput
@@ -100,10 +100,10 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	publishInterval time.Duration) *Aggregator {
 
 	agg := Aggregator{
-		db:                     db_,
-		logsByRequest:          make(map[uint64]logTrack),
-		daemonVersion:          daemonVersion_,
-		errorCount:             NewExtPointStats(errorStr, "SystemErrors"),
+		db:            db_,
+		logsByRequest: make(map[uint64]logTrack),
+		daemonVersion: daemonVersion_,
+		//errorCount:             NewExtPointStats(errorStr, "SystemErrors"),
 		extractors:             extractors,
 		triggerByFormat:        make(map[string][]chan *qlog.LogOutput),
 		triggerByPartialFormat: make(map[string][]chan *qlog.LogOutput),

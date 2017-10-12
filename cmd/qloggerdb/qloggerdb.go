@@ -8,6 +8,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -52,7 +54,7 @@ func newQfsExtPair(common string,
 
 	return qlogstats.NewExtPairStats(
 		qlog.FnEnterStr+common+" "+startPostfix,
-		qlog.FnExitStr+common, true, common)
+		qlog.FnExitStr+common, common)
 }
 
 func createExtractors() []qlogstats.StatExtractor {
@@ -140,6 +142,10 @@ func main() {
 		fmt.Printf("Last parameter must be qlog file.\n")
 		return
 	}
+
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:6061", nil))
+	}()
 
 	db := loadTimeSeriesDB()
 

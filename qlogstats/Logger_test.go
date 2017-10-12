@@ -15,8 +15,7 @@ func runReader(qlogFile string,
 	extractors []StatExtractor) *processlocal.Memdb {
 
 	db := processlocal.NewMemdb("").(*processlocal.Memdb)
-	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors,
-		100*time.Millisecond)
+	AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors, 100*time.Millisecond)
 
 	return db
 }
@@ -207,8 +206,7 @@ func TestPointCount(t *testing.T) {
 		}
 
 		test.runExtractorTest(qlogHandle,
-			&NewExtPointStats("TestLog", "TestLog Name Tag"),
-			checker)
+			NewExtPointStats("TestLog", "TestLog Name Tag"), checker)
 
 		test.Assert(checked, "test not checking anything")
 	})
