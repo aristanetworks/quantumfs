@@ -11,7 +11,13 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
+
+type request struct {
+	lastUpdateGeneration uint64
+	log                  *qlog.LogOutput
+}
 
 type extPairStats struct {
 	fmtStart  string
@@ -19,6 +25,10 @@ type extPairStats struct {
 	sameScope bool
 	name      string
 	messages  chan *qlog.LogOutput
+
+	reqLock           utils.DeferableMutex
+	requests          map[uint64]request
+	currentGeneration uint64
 
 	stats basicStats
 }
@@ -28,35 +38,18 @@ type extPairStats struct {
 func NewExtPairStats(start string, stop string, matchingIndent bool,
 	nametag string) *extPairStats {
 
-	return &extPairStats{
+	ext := &extPairStats{
 		fmtStart:  start + "\n",
 		fmtStop:   stop + "\n",
 		sameScope: matchingIndent,
 		name:      nametag,
 		messages:  make(chan *qlog.LogOutput, 10000),
-	}
-}
-
-func (ext *extPairStats) ExtractStatFrom(request []indentedLog, idx int) {
-	for i := idx; i < len(request); i++ {
-		if request[i].log.Format == ext.fmtStop &&
-			(!ext.sameScope ||
-				request[idx].indent == request[i].indent) {
-
-			// found a match
-			delta := request[i].log.T - request[idx].log.T
-			if delta < 0 {
-				fmt.Printf("Negative delta (%d): |%s| to |%s|\n",
-					delta, ext.fmtStart, ext.fmtStop)
-			} else {
-				ext.stats.NewPoint(int64(delta))
-			}
-			return
-		}
+		requests:  make(map[uint64]request),
 	}
 
-	fmt.Printf("Broken function pair: '%s' without '%s'\n", ext.fmtStart,
-		ext.fmtStop)
+	go ext.process()
+
+	return ext
 }
 
 func (ext *extPairStats) TriggerStrings() []string {
@@ -75,11 +68,47 @@ func (ext *extPairStats) Type() TriggerType {
 	return OnFormat
 }
 
-func (ext *extPairStats) ProcessRequest(request []indentedLog) {
-	for i, v := range request {
-		if v.log.Format == ext.fmtStart {
-			ext.ExtractStatFrom(request, i)
+func (ext *extPairStats) process() {
+	for {
+		log := <-ext.messages
+
+		if log.Format == ext.fmtStart {
+			ext.startRequest(log)
+		} else if log.Format == ext.fmtStop {
+			ext.stopRequest(log)
 		}
+	}
+}
+
+func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
+	defer ext.reqLock.Lock().Unlock()
+
+	if _, exists := ext.requests[log.ReqId]; exists {
+		panic("Nested indent not supported")
+	}
+
+	ext.requests[log.ReqId] = request{
+		lastUpdateGeneration: ext.currentGeneration,
+		log:                  log,
+	}
+}
+
+func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
+	defer ext.reqLock.Lock().Unlock()
+
+	start, exists := ext.requests[log.ReqId]
+	if !exists {
+		fmt.Printf("%s: end with start %s at %d\n", ext.name,
+			log.Format, log.T)
+		return
+	}
+
+	delta := log.T - start.log.T
+	if delta < 0 {
+		fmt.Printf("Negative delta (%d): |%s| to |%s|\n",
+			delta, ext.fmtStart, ext.fmtStop)
+	} else {
+		ext.stats.NewPoint(int64(delta))
 	}
 }
 
@@ -105,4 +134,16 @@ func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 }
 
 func (ext *extPairStats) GC() {
+	defer ext.reqLock.Lock().Unlock()
+
+	ext.currentGeneration++
+
+	for reqId, request := range ext.requests {
+		if request.lastUpdateGeneration-2 < ext.currentGeneration {
+			fmt.Printf("%s: Deleting stale request %d (%d/%d)\n",
+				ext.name, reqId, request.lastUpdateGeneration,
+				ext.currentGeneration)
+			delete(ext.requests, reqId)
+		}
+	}
 }
