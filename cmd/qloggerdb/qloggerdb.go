@@ -59,6 +59,7 @@ func newQfsExtPair(common string,
 
 func createExtractors() []qlogstats.StatExtractor {
 	return []qlogstats.StatExtractor{
+		qlogstats.NewExtPointStatsPartialFormat("ERROR: ", "SystemErrors"),
 		qlogstats.NewExtPointStats(daemon.CacheHitLog, "readcache_hit"),
 		qlogstats.NewExtPointStats(daemon.CacheMissLog, "readcache_miss"),
 

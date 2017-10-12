@@ -212,15 +212,13 @@ func TestPointCount(t *testing.T) {
 	})
 }
 
-func TestErrorCounting(t *testing.T) {
+func TestPartialFormatMatch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.ShouldFailLogscan = true
 		qlogHandle := test.Logger
 
-		// Artificially insert some error logs
 		for i := int64(0); i < 123; i++ {
 			qlogHandle.Log_(time.Unix(i, 20000+i), qlog.LogTest,
-				uint64(i), 2, "ERROR: TestMatch")
+				uint64(i), 2, "ER_OR: TestMatch")
 		}
 
 		checked := false
@@ -234,7 +232,9 @@ func TestErrorCounting(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, nil, checker)
+		test.runExtractorTest(qlogHandle,
+			NewExtPointStatsPartialFormat("ER_OR: ", "SystemErrors"),
+			checker)
 		test.Assert(checked, "test not checking count")
 	})
 }
