@@ -19,11 +19,15 @@ type extPointStats struct {
 }
 
 func NewExtPointStats(format_ string, nametag string) *extPointStats {
-	return &extPointStats{
+	ext := &extPointStats{
 		format:   format_ + "\n",
 		name:     nametag,
 		messages: make(chan *qlog.LogOutput, 10000),
 	}
+
+	go ext.process()
+
+	return ext
 }
 
 func (ext *extPointStats) TriggerStrings() []string {
@@ -41,9 +45,10 @@ func (ext *extPointStats) Type() TriggerType {
 	return OnFormat
 }
 
-func (ext *extPointStats) ProcessRequest(request []indentedLog) {
-	for _, v := range request {
-		ext.stats.NewPoint(int64(v.log.T))
+func (ext *extPointStats) process() {
+	for {
+		log := <-ext.messages
+		ext.stats.NewPoint(int64(log.T))
 	}
 }
 
