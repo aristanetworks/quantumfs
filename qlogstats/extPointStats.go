@@ -8,6 +8,7 @@ package qlogstats
 import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type extPointStats struct {
@@ -16,6 +17,7 @@ type extPointStats struct {
 	messages      chan *qlog.LogOutput
 	partialFormat bool
 
+	lock  utils.DeferableMutex
 	stats basicStats
 }
 
@@ -68,12 +70,17 @@ func (ext *extPointStats) Type() TriggerType {
 func (ext *extPointStats) process() {
 	for {
 		log := <-ext.messages
-		ext.stats.NewPoint(int64(log.T))
+		func() {
+			defer ext.lock.Lock().Unlock()
+			ext.stats.NewPoint(int64(log.T))
+		}()
 	}
 }
 
 func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
 	fields []quantumfs.Field) {
+
+	defer ext.lock.Lock().Unlock()
 
 	tags = make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))

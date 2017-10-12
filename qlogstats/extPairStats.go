@@ -25,7 +25,7 @@ type extPairStats struct {
 	name     string
 	messages chan *qlog.LogOutput
 
-	reqLock           utils.DeferableMutex
+	lock              utils.DeferableMutex
 	requests          map[uint64]request
 	currentGeneration uint64
 
@@ -75,7 +75,7 @@ func (ext *extPairStats) process() {
 }
 
 func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
-	defer ext.reqLock.Lock().Unlock()
+	defer ext.lock.Lock().Unlock()
 
 	if previous, exists := ext.requests[log.ReqId]; exists {
 		fmt.Printf("%s: nested start %d at %d and %d\n",
@@ -89,7 +89,7 @@ func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 }
 
 func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
-	defer ext.reqLock.Lock().Unlock()
+	defer ext.lock.Lock().Unlock()
 
 	start, exists := ext.requests[log.ReqId]
 	if !exists {
@@ -111,6 +111,8 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 	fields []quantumfs.Field) {
 
+	defer ext.lock.Lock().Unlock()
+
 	tags = make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
@@ -130,7 +132,7 @@ func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 }
 
 func (ext *extPairStats) GC() {
-	defer ext.reqLock.Lock().Unlock()
+	defer ext.lock.Lock().Unlock()
 
 	ext.currentGeneration++
 
