@@ -224,7 +224,7 @@ func TestPartialFormatMatch(t *testing.T) {
 		checked := false
 		checker := func(memdb *processlocal.Memdb) {
 			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "SystemErrors" {
+				if v.Name == "samples" {
 					test.Assert(v.Data == 123,
 						"incorrect count %d", v.Data)
 					checked = true
@@ -235,6 +235,6 @@ func TestPartialFormatMatch(t *testing.T) {
 		test.runExtractorTest(qlogHandle,
 			NewExtPointStatsPartialFormat("ER_OR: ", "SystemErrors"),
 			checker)
-		test.Assert(checked, "test not checking count")
+		test.Assert(checked, "test not checking count, %d")
 	})
 }
