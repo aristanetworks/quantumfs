@@ -12,23 +12,22 @@ import (
 )
 
 func runReader(qlogFile string,
-	extractors []StatExtractorConfig) *processlocal.Memdb {
+	extractors []StatExtractor) *processlocal.Memdb {
 
 	db := processlocal.NewMemdb("").(*processlocal.Memdb)
-	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors)
-
-	agg.requestEndAfter = time.Millisecond * 100
+	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors,
+		100*time.Millisecond)
 
 	return db
 }
 
 func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
-	cfg *StatExtractorConfig, check func(*processlocal.Memdb)) {
+	cfg StatExtractor, check func(*processlocal.Memdb)) {
 
 	// Setup an extractor
-	extractors := []StatExtractorConfig{}
+	extractors := []StatExtractor{}
 	if cfg != nil {
-		extractors = append(extractors, *cfg)
+		extractors = append(extractors, cfg)
 	}
 
 	// Run the reader
@@ -90,7 +89,7 @@ func TestMatches(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average_ns" {
-					test.Assert(v.Data == uint64(duration1+
+					test.Assert(v.Data == int64(duration1+
 						duration2)/2, "incorrect delta %d",
 						v.Data)
 					checkedAvg = true
@@ -102,10 +101,9 @@ func TestMatches(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+		test.runExtractorTest(qlogHandle,
 			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(300*time.Millisecond)), checker)
+				qlog.FnExitStr+"TestMatch", "TestMatch"), checker)
 
 		test.Assert(checkedAvg, "test not checking average")
 		test.Assert(checkedSamples, "test not checking samples")
@@ -174,10 +172,9 @@ func TestPercentiles(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+		test.runExtractorTest(qlogHandle,
 			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(300*time.Millisecond)), checker)
+				qlog.FnExitStr+"TestMatch", "TestMatch"), checker)
 
 		for i := 0; i < 7; i++ {
 			test.Assert(checked[i], "test not checking field %d", i)
@@ -209,9 +206,9 @@ func TestPointCount(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPointStats("TestLog", "TestLog Name Tag"),
-			(300*time.Millisecond)), checker)
+		test.runExtractorTest(qlogHandle,
+			&NewExtPointStats("TestLog", "TestLog Name Tag"),
+			checker)
 
 		test.Assert(checked, "test not checking anything")
 	})
@@ -248,7 +245,7 @@ func TestIndentation(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average_ns" {
-					test.Assert(v.Data == uint64(durationReal),
+					test.Assert(v.Data == int64(durationReal),
 						"incorrect delta %d", v.Data)
 					checkedAvg = true
 				} else if v.Name == "samples" {
@@ -259,10 +256,9 @@ func TestIndentation(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+		test.runExtractorTest(qlogHandle,
 			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(300*time.Millisecond)), checker)
+				qlog.FnExitStr+"TestMatch", "TestMatch"), checker)
 
 		test.Assert(checkedAvg, "test not checking average")
 		test.Assert(checkedSamples, "test not checking samples")

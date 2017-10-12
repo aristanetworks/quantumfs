@@ -20,11 +20,10 @@ type request struct {
 }
 
 type extPairStats struct {
-	fmtStart  string
-	fmtStop   string
-	sameScope bool
-	name      string
-	messages  chan *qlog.LogOutput
+	fmtStart string
+	fmtStop  string
+	name     string
+	messages chan *qlog.LogOutput
 
 	reqLock           utils.DeferableMutex
 	requests          map[uint64]request
@@ -33,18 +32,13 @@ type extPairStats struct {
 	stats basicStats
 }
 
-// Set matchingIndent to true if start and stop should only be recognized when they
-// are seen at the same function scope
-func NewExtPairStats(start string, stop string, matchingIndent bool,
-	nametag string) *extPairStats {
-
+func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 	ext := &extPairStats{
-		fmtStart:  start + "\n",
-		fmtStop:   stop + "\n",
-		sameScope: matchingIndent,
-		name:      nametag,
-		messages:  make(chan *qlog.LogOutput, 10000),
-		requests:  make(map[uint64]request),
+		fmtStart: start + "\n",
+		fmtStop:  stop + "\n",
+		name:     nametag,
+		messages: make(chan *qlog.LogOutput, 10000),
+		requests: make(map[uint64]request),
 	}
 
 	go ext.process()
