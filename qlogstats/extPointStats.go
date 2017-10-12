@@ -18,7 +18,7 @@ type extPointStats struct {
 	stats basicStats
 }
 
-func NewExtPointStats(format_ string, nametag string) *extPointStats {
+func NewExtPointStats(format_ string, nametag string) StatExtractor {
 	ext := &extPointStats{
 		format:   format_ + "\n",
 		name:     nametag,
