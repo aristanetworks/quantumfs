@@ -92,7 +92,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 
 	start, exists := ext.requests[log.ReqId]
 	if !exists {
-		fmt.Printf("%s: end with start %s at %d\n", ext.name,
+		fmt.Printf("%s: end without start '%s' at %d\n", ext.name,
 			log.Format, log.T)
 		return
 	}
