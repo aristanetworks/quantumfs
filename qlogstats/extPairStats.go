@@ -16,7 +16,7 @@ import (
 
 type request struct {
 	lastUpdateGeneration uint64
-	log                  *qlog.LogOutput
+	time                 int64
 }
 
 type extPairStats struct {
@@ -79,12 +79,12 @@ func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 
 	if previous, exists := ext.requests[log.ReqId]; exists {
 		fmt.Printf("%s: nested start %d at %d and %d\n",
-			ext.name, log.ReqId, previous.log.T, log.T)
+			ext.name, log.ReqId, previous.time, log.T)
 	}
 
 	ext.requests[log.ReqId] = request{
 		lastUpdateGeneration: ext.currentGeneration,
-		log:                  log,
+		time:                 log.T,
 	}
 }
 
@@ -98,7 +98,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 		return
 	}
 
-	delta := log.T - start.log.T
+	delta := log.T - start.time
 	if delta < 0 {
 		fmt.Printf("Negative delta (%d): |%s| to |%s|\n",
 			delta, ext.fmtStart, ext.fmtStop)
