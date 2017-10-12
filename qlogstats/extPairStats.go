@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 type extPairStats struct {
@@ -17,6 +18,7 @@ type extPairStats struct {
 	fmtStop   string
 	sameScope bool
 	name      string
+	messages  chan *qlog.LogOutput
 
 	stats basicStats
 }
@@ -31,6 +33,7 @@ func NewExtPairStats(start string, stop string, matchingIndent bool,
 		fmtStop:   stop + "\n",
 		sameScope: matchingIndent,
 		name:      nametag,
+		messages:  make(chan *qlog.LogOutput, 10000),
 	}
 }
 
@@ -64,6 +67,14 @@ func (ext *extPairStats) TriggerStrings() []string {
 	return rtn
 }
 
+func (ext *extPairStats) Chan() chan *qlog.LogOutput {
+	return ext.messages
+}
+
+func (ext *extPairStats) Type() TriggerType {
+	return OnFormat
+}
+
 func (ext *extPairStats) ProcessRequest(request []indentedLog) {
 	for i, v := range request {
 		if v.log.Format == ext.fmtStart {
@@ -91,4 +102,7 @@ func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 
 	ext.stats = basicStats{}
 	return "quantumFsLatency", tags, fields
+}
+
+func (ext *extPairStats) GC() {
 }

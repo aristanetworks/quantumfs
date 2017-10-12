@@ -48,35 +48,24 @@ func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
 const statPeriod = 30 * time.Second
 
 func newQfsExtPair(common string,
-	startPostfix string) qlogstats.StatExtractorConfig {
+	startPostfix string) qlogstats.StatExtractor {
 
-	return *qlogstats.NewStatExtractorConfig(
-		qlogstats.NewExtPairStats(
-			qlog.FnEnterStr+common+" "+startPostfix,
-			qlog.FnExitStr+common, true, common), statPeriod)
+	return qlogstats.NewExtPairStats(
+		qlog.FnEnterStr+common+" "+startPostfix,
+		qlog.FnExitStr+common, true, common)
 }
 
-func createExtractors() []qlogstats.StatExtractorConfig {
-	return []qlogstats.StatExtractorConfig{
-		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(daemon.CacheHitLog,
-				"readcache_hit"), statPeriod),
-		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(daemon.CacheMissLog,
-				"readcache_miss"), statPeriod),
+func createExtractors() []qlogstats.StatExtractor {
+	return []qlogstats.StatExtractor{
+		qlogstats.NewExtPointStats(daemon.CacheHitLog, "readcache_hit"),
+		qlogstats.NewExtPointStats(daemon.CacheMissLog, "readcache_miss"),
 
-		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(
-				thirdparty_backends.EtherTtlCacheHit,
-				"ether_setcache_hit"), statPeriod),
-		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(
-				thirdparty_backends.EtherTtlCacheMiss,
-				"ether_setcache_miss"), statPeriod),
-		*qlogstats.NewStatExtractorConfig(
-			qlogstats.NewExtPointStats(
-				thirdparty_backends.EtherTtlCacheEvict,
-				"ether_setcache_evict"), statPeriod),
+		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheHit,
+			"ether_setcache_hit"),
+		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheMiss,
+			"ether_setcache_miss"),
+		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheEvict,
+			"ether_setcache_evict"),
 
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
 			thirdparty_backends.KeyLog),
@@ -156,5 +145,6 @@ func main() {
 
 	extractors := createExtractors()
 
-	qlogstats.AggregateLogs(qlog.ReadThenTail, lastParam, db, extractors)
+	qlogstats.AggregateLogs(qlog.ReadThenTail, lastParam, db, extractors,
+		30*time.Second)
 }

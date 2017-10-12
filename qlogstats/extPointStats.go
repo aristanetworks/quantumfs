@@ -7,19 +7,22 @@ package qlogstats
 
 import (
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 type extPointStats struct {
-	format string
-	name   string
+	format   string
+	name     string
+	messages chan *qlog.LogOutput
 
 	stats basicStats
 }
 
 func NewExtPointStats(format_ string, nametag string) *extPointStats {
 	return &extPointStats{
-		format: format_ + "\n",
-		name:   nametag,
+		format:   format_ + "\n",
+		name:     nametag,
+		messages: make(chan *qlog.LogOutput, 10000),
 	}
 }
 
@@ -28,6 +31,14 @@ func (ext *extPointStats) TriggerStrings() []string {
 
 	rtn = append(rtn, ext.format)
 	return rtn
+}
+
+func (ext *extPointStats) Chan() chan *qlog.LogOutput {
+	return ext.messages
+}
+
+func (ext *extPointStats) Type() TriggerType {
+	return OnFormat
 }
 
 func (ext *extPointStats) ProcessRequest(request []indentedLog) {
@@ -48,4 +59,8 @@ func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
 
 	ext.stats = basicStats{}
 	return "quantumFsPointCount", tags, fields
+}
+
+func (ext *extPointStats) GC() {
+	// We keep no state, so there is nothing to do
 }
