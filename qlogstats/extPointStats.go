@@ -11,18 +11,34 @@ import (
 )
 
 type extPointStats struct {
-	format   string
-	name     string
-	messages chan *qlog.LogOutput
+	format        string
+	name          string
+	messages      chan *qlog.LogOutput
+	partialFormat bool
 
 	stats basicStats
 }
 
-func NewExtPointStats(format_ string, nametag string) StatExtractor {
+func NewExtPointStats(format string, nametag string) StatExtractor {
+	return newExtPointStats(format, nametag, false)
+}
+
+func NewExtPointStatsPartialFormat(format string, nametag string) StatExtractor {
+	return newExtPointStats(format, nametag, true)
+}
+
+func newExtPointStats(format string, nametag string,
+	partialFormat bool) StatExtractor {
+
+	if !partialFormat {
+		format = format + "\n"
+	}
+
 	ext := &extPointStats{
-		format:   format_ + "\n",
-		name:     nametag,
-		messages: make(chan *qlog.LogOutput, 10000),
+		format:        format,
+		name:          nametag,
+		messages:      make(chan *qlog.LogOutput, 10000),
+		partialFormat: partialFormat,
 	}
 
 	go ext.process()
@@ -42,7 +58,11 @@ func (ext *extPointStats) Chan() chan *qlog.LogOutput {
 }
 
 func (ext *extPointStats) Type() TriggerType {
-	return OnFormat
+	if ext.partialFormat {
+		return OnPartialFormat
+	} else {
+		return OnFormat
+	}
 }
 
 func (ext *extPointStats) process() {

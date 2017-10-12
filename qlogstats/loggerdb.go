@@ -6,6 +6,7 @@ package qlogstats
 import (
 	"container/list"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -38,7 +39,7 @@ type trackerKey struct {
 
 type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
-	// receive. Strings must match format exactly, with a trailing "\n"
+	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
 	Chan() chan *qlog.LogOutput
 	Type() TriggerType
@@ -77,9 +78,6 @@ type Aggregator struct {
 	// more logs coming for each request)
 	requestSequence list.List
 
-	// Uses a prefix (slower) system to extract data
-	//errorCount *extPointStats
-
 	extractors             []StatExtractor
 	triggerByFormat        map[string][]chan *qlog.LogOutput
 	triggerByPartialFormat map[string][]chan *qlog.LogOutput
@@ -93,17 +91,14 @@ type Aggregator struct {
 	notification chan struct{}
 }
 
-const errorStr = "ERROR: "
-
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	extractors []StatExtractor, daemonVersion_ string,
 	publishInterval time.Duration) *Aggregator {
 
 	agg := Aggregator{
-		db:            db_,
-		logsByRequest: make(map[uint64]logTrack),
-		daemonVersion: daemonVersion_,
-		//errorCount:             NewExtPointStats(errorStr, "SystemErrors"),
+		db:                     db_,
+		logsByRequest:          make(map[uint64]logTrack),
+		daemonVersion:          daemonVersion_,
 		extractors:             extractors,
 		triggerByFormat:        make(map[string][]chan *qlog.LogOutput),
 		triggerByPartialFormat: make(map[string][]chan *qlog.LogOutput),
@@ -196,10 +191,19 @@ func (agg *Aggregator) filterAndDistribute(log qlog.LogOutput) {
 		extractor <- &log
 	}
 
-	// These match the format string
+	// These match the format string fully
 	matching := agg.triggerByFormat[log.Format]
 	for _, extractor := range matching {
 		extractor <- &log
+	}
+
+	// These partially match the format string
+	for trigger, extractors := range agg.triggerByPartialFormat {
+		if strings.Contains(log.Format, trigger) {
+			for _, extractor := range extractors {
+				extractor <- &log
+			}
+		}
 	}
 }
 
