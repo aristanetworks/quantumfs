@@ -238,3 +238,56 @@ func TestPartialFormatMatch(t *testing.T) {
 		test.Assert(checked, "test not checking count, %d")
 	})
 }
+
+func TestPairStatsGC(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		statExtractor := NewExtPairStats("Start match", "Stop match",
+			"Testlatency")
+		ext := statExtractor.(*extPairStats)
+
+		c := ext.Chan()
+
+		c <- &qlog.LogOutput{
+			Subsystem: qlog.LogTest,
+			ReqId:     1,
+			T:         1,
+			Format:    "Start match\n",
+			Args:      []interface{}{},
+		}
+		test.WaitFor("Request 1 to be started", func() bool {
+			return len(ext.requests) == 1
+		})
+
+		ext.GC()
+		test.Assert(len(ext.requests) == 1, "Request 1 deleted early")
+		c <- &qlog.LogOutput{
+			Subsystem: qlog.LogTest,
+			ReqId:     2,
+			T:         2,
+			Format:    "Start match\n",
+			Args:      []interface{}{},
+		}
+		test.WaitFor("Request 2 to be started", func() bool {
+			return len(ext.requests) == 2
+		})
+
+		ext.GC()
+		test.Assert(len(ext.requests) == 2, "Request 2 deleted early")
+
+		c <- &qlog.LogOutput{
+			Subsystem: qlog.LogTest,
+			ReqId:     2,
+			T:         3,
+			Format:    "Stop match\n",
+			Args:      []interface{}{},
+		}
+		test.WaitFor("Request 2 to be deleted", func() bool {
+			return len(ext.requests) == 1
+		})
+		_, exists := ext.requests[1]
+		test.Assert(exists, "Request 1 deleted early")
+
+		ext.GC()
+		test.Assert(len(ext.requests) == 0, "Request 1 didn't age out")
+	})
+}
