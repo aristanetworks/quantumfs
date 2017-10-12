@@ -1039,7 +1039,9 @@ func TestDirectoryMvChildOntoOpenFileSameDir(t *testing.T) {
 		f, err := os.Open(file2)
 		test.AssertNoErr(err)
 		defer f.Close()
+		syncErr := test.SyncWorkspaceAsync(test.RelPath(workspace))
 		test.AssertNoErr(syscall.Rename(file1, file2))
+		test.AssertNoErr(<-syncErr)
 	})
 }
 
@@ -1057,7 +1059,9 @@ func TestDirectoryMvChildOntoOpenFileInParentDir(t *testing.T) {
 		f, err := os.Open(file2)
 		test.AssertNoErr(err)
 		defer f.Close()
+		syncErr := test.SyncWorkspaceAsync(test.RelPath(workspace))
 		test.AssertNoErr(syscall.Rename(file1, file2))
+		test.AssertNoErr(<-syncErr)
 	})
 }
 
@@ -1077,7 +1081,9 @@ func TestDirectoryMvChildOntoOpenFileInSibling(t *testing.T) {
 		f, err := os.Open(file2)
 		test.AssertNoErr(err)
 		defer f.Close()
+		syncErr := test.SyncWorkspaceAsync(test.RelPath(workspace))
 		test.AssertNoErr(syscall.Rename(file1, file2))
+		test.AssertNoErr(<-syncErr)
 	})
 }
 
