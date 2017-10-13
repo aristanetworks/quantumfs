@@ -525,7 +525,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
-	workspaceName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
+	workspaceName := wsr.fullname()
 	if nonce != wsr.nonce {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
 			"nonces %d vs %d", workspaceName, wsr.nonce, nonce)
@@ -854,8 +854,12 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {
-	workspaceName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
-	defer c.FuncIn("WorkspaceRoot::cleanup", "workspace %s", workspaceName).Out()
+	defer c.FuncIn("WorkspaceRoot::cleanup", "workspace %s",
+		wsr.fullname()).Out()
 
-	c.workspaceDB.UnsubscribeFrom(workspaceName)
+	c.workspaceDB.UnsubscribeFrom(wsr.fullname())
+}
+
+func (wsr *WorkspaceRoot) fullname() string {
+	return wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
 }

@@ -33,7 +33,7 @@ func (test *testHelper) markMutable(ctx *ctx, workspace string) {
 }
 
 func (th *testHelper) waitForNRefresh(workspace string, n int) {
-	th.WaitForNLogStrings(fmt.Sprintf("Refreshing %s", workspace), n,
+	th.WaitForNLogStrings(fmt.Sprintf("Workspace Refreshing %s", workspace), n,
 		"Workspace not refreshed")
 	th.WaitForNLogStrings("Out-- WorkspaceRoot::refresh", n,
 		"Workspace refresh not finished")
