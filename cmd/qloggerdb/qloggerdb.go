@@ -98,7 +98,7 @@ func createExtractors() []qlogstats.StatExtractorConfig {
 		newQfsExtPair(daemon.LookupLog, daemon.InodeNameLog),
 		newQfsExtPair(daemon.ForgetLog, ""),
 		newQfsExtPair(daemon.GetAttrLog, daemon.InodeOnlyLog),
-		newQfsExtPair(daemon.SetAttrLog, daemon.InodeOnlyLog),
+		newQfsExtPair(daemon.SetAttrLog, daemon.SetAttrArgLog),
 		newQfsExtPair(daemon.MknodLog, daemon.InodeNameLog),
 		newQfsExtPair(daemon.MkdirLog, daemon.InodeNameLog),
 		newQfsExtPair(daemon.UnlinkLog, daemon.InodeNameLog),

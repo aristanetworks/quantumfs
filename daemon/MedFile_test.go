@@ -213,3 +213,32 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 		file.Close()
 	})
 }
+
+func TestMultiBlockFileSequentialSet(t *testing.T) {
+	t.Skip()
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+		const (
+			size     = 30 * 1024 * 1024
+			pagesize = 4096
+			numpages = size / pagesize
+		)
+
+		f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
+			0777)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(os.Truncate(filename, size))
+
+		mmap, err := syscall.Mmap(int(f.Fd()), 0, size,
+			syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+
+		for i := 0; i < numpages; i++ {
+			for j := 0; j < pagesize; j++ {
+				mmap[i*pagesize+j] = byte((i + j) % 256)
+			}
+		}
+		test.AssertNoErr(syscall.Munmap(mmap))
+	})
+}

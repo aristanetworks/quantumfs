@@ -1844,8 +1844,12 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		ds.children = ds.src.getChildSnapshot(c)
 	}
 
+	if offset > uint64(len(ds.children)) {
+		return fuse.EINVAL
+	}
+
 	processed := 0
-	for _, child := range ds.children {
+	for _, child := range ds.children[offset:] {
 		entry := fuse.DirEntry{
 			Mode: child.fuseType,
 			Name: child.filename,
@@ -1862,8 +1866,6 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 		processed++
 	}
-
-	ds.children = ds.children[processed:]
 
 	return fuse.OK
 }
