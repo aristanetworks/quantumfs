@@ -5,11 +5,11 @@ FROM fedora:20
 LABEL maintainer="clr@arista.com"
 
 ENV USER root
-ARG QFS_RPM_NAME=latest
+ARG QFS_RPM_VERSION=latest
 
 RUN yum install -y fuse wget && \
-    wget -q http://dist/storage/QuantumFS/QuantumFS-$QFS_RPM_NAME.x86_64.rpm && \
-    yum --nogpgcheck -y localinstall QuantumFS-$QFS_RPM_NAME.x86_64.rpm && \
+    wget -q http://dist/storage/QuantumFS/QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
+    yum --nogpgcheck -y localinstall QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
     mkdir /qfs
 
 COPY run_qfs.sh /run_qfs.sh
