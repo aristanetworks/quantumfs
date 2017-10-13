@@ -394,6 +394,8 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		if wsdbErr, isWsdbErr := err.(quantumfs.WorkspaceDbErr); isWsdbErr &&
 			wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
 
+			c.wlog("Workspace advanced during merge of %s, retrying.",
+				wsr.fullname())
 			// Try again
 			continue
 		}
