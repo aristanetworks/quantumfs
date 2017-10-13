@@ -64,6 +64,7 @@ func (fi *MultiBlockFile) expandTo(length int) {
 		newLength[i] = quantumfs.EmptyBlockKey
 	}
 	fi.metadata.Blocks = append(fi.metadata.Blocks, newLength...)
+	fi.metadata.LastBlockBytes = 0
 }
 
 func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buffer {
@@ -152,7 +153,9 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	copied := block.Write(&c.Ctx, buf, uint32(offset))
 	if copied > 0 {
 		if blockIdx == len(fi.metadata.Blocks)-1 {
-			fi.metadata.LastBlockBytes = uint32(block.Size())
+			if fi.metadata.LastBlockBytes < uint32(block.Size()) {
+				fi.metadata.LastBlockBytes = uint32(block.Size())
+			}
 		}
 
 		// Ensure we note the block for syncing
