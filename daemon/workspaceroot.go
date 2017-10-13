@@ -519,12 +519,9 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 	}
 }
 
-func (wsr *WorkspaceRoot) refresh(c *ctx) {
+func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
-	// Lock the tree while acquiring the publishedRootId to prevent
-	// working with a stale publishedRootId
-	defer wsr.LockTree().Unlock()
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
@@ -541,10 +538,6 @@ func (wsr *WorkspaceRoot) refresh(c *ctx) {
 		return
 	}
 
-	if c.qfs.workspaceIsMutable(c, wsr) {
-		c.vlog("Workspace %s mutable", workspaceName)
-		return
-	}
 	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
@@ -586,16 +579,8 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 			c.vlog("Workspace is deleted. Will not retry flushing.")
 			return true
 		} else if err.Code == quantumfs.WSDB_OUT_OF_DATE {
-			// Attempt to merge
-			mergedRootId, err := mergeWorkspaceRoot(c,
-				wsr.publishedRootId, rootId, newRootId)
-			if err != nil {
-				c.elog("Unable to merge workspaces: %s", err)
-				return false
-			}
-
-			wsr.publishedRootId = mergedRootId
-			return true
+			c.vlog("Workspace out of date. Will attempt merge.")
+			return false
 		} else {
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 		}

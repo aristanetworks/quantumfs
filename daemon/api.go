@@ -596,17 +596,7 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 	}
 	c.vlog("Refreshing workspace %s", cmd.Workspace)
 
-	workspace := strings.Split(cmd.Workspace, "/")
-	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
-		workspace[1], workspace[2])
-	defer cleanup()
-	if !ok {
-		c.vlog("Workspace not found: %s", cmd.Workspace)
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"Workspace %s does not exist or is not active",
-			cmd.Workspace)
-	}
-	wsr.refresh(c)
+	c.qfs.refreshWorkspace(c, cmd.Workspace)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
 }
