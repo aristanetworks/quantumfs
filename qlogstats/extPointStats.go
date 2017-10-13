@@ -17,6 +17,13 @@ type extPointStats struct {
 	messages      chan *qlog.LogOutput
 	partialFormat bool
 
+	// These channels are used instead of a mutex to pause the processing thread
+	// so publishing or GC can occur. This eliminates the mutex overhead from the
+	// common mutex processing path.
+	pause   chan struct{}
+	paused  chan struct{}
+	unpause chan struct{}
+
 	lock  utils.DeferableMutex
 	stats basicStats
 }
@@ -41,6 +48,9 @@ func newExtPointStats(format string, nametag string,
 		name:          nametag,
 		messages:      make(chan *qlog.LogOutput, 10000),
 		partialFormat: partialFormat,
+		pause:         make(chan struct{}),
+		paused:        make(chan struct{}),
+		unpause:       make(chan struct{}),
 	}
 
 	go ext.process()
@@ -69,11 +79,18 @@ func (ext *extPointStats) Type() TriggerType {
 
 func (ext *extPointStats) process() {
 	for {
-		log := <-ext.messages
-		func() {
-			defer ext.lock.Lock().Unlock()
-			ext.stats.NewPoint(int64(log.T))
-		}()
+		select {
+		case log := <-ext.messages:
+			func() {
+				defer ext.lock.Lock().Unlock()
+				ext.stats.NewPoint(int64(log.T))
+			}()
+		case <-ext.pause:
+			// Notify the other goroutine that we are paused
+			ext.paused <- struct{}{}
+			// Wait until they are complete
+			<-ext.unpause
+		}
 	}
 }
 
@@ -81,6 +98,11 @@ func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
 	fields []quantumfs.Field) {
 
 	defer ext.lock.Lock().Unlock()
+	ext.pause <- struct{}{}
+	<-ext.paused
+	defer func() {
+		ext.unpause <- struct{}{}
+	}()
 
 	tags = make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))

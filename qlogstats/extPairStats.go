@@ -25,6 +25,13 @@ type extPairStats struct {
 	name     string
 	messages chan *qlog.LogOutput
 
+	// These channels are used instead of a mutex to pause the processing thread
+	// so publishing or GC can occur. This eliminates the mutex overhead from the
+	// common mutex processing path.
+	pause   chan struct{}
+	paused  chan struct{}
+	unpause chan struct{}
+
 	lock              utils.DeferableMutex
 	requests          map[uint64]request
 	currentGeneration uint64
@@ -39,6 +46,9 @@ func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 		name:     nametag,
 		messages: make(chan *qlog.LogOutput, 10000),
 		requests: make(map[uint64]request),
+		pause:    make(chan struct{}),
+		paused:   make(chan struct{}),
+		unpause:  make(chan struct{}),
 	}
 
 	go ext.process()
@@ -64,19 +74,23 @@ func (ext *extPairStats) Type() TriggerType {
 
 func (ext *extPairStats) process() {
 	for {
-		log := <-ext.messages
-
-		if log.Format == ext.fmtStart {
-			ext.startRequest(log)
-		} else if log.Format == ext.fmtStop {
-			ext.stopRequest(log)
+		select {
+		case log := <-ext.messages:
+			if log.Format == ext.fmtStart {
+				ext.startRequest(log)
+			} else if log.Format == ext.fmtStop {
+				ext.stopRequest(log)
+			}
+		case <-ext.pause:
+			// Notify the other goroutine that we are paused
+			ext.paused <- struct{}{}
+			// Wait until they are complete
+			<-ext.unpause
 		}
 	}
 }
 
 func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
-	defer ext.lock.Lock().Unlock()
-
 	if previous, exists := ext.requests[log.ReqId]; exists {
 		fmt.Printf("%s: nested start %d at %d and %d\n",
 			ext.name, log.ReqId, previous.time, log.T)
@@ -89,8 +103,6 @@ func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 }
 
 func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
-	defer ext.lock.Lock().Unlock()
-
 	start, exists := ext.requests[log.ReqId]
 	if !exists {
 		fmt.Printf("%s: end without start '%s' at %d\n", ext.name,
@@ -112,6 +124,11 @@ func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 	fields []quantumfs.Field) {
 
 	defer ext.lock.Lock().Unlock()
+	ext.pause <- struct{}{}
+	<-ext.paused
+	defer func() {
+		ext.unpause <- struct{}{}
+	}()
 
 	tags = make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))
@@ -133,6 +150,11 @@ func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 
 func (ext *extPairStats) GC() {
 	defer ext.lock.Lock().Unlock()
+	ext.pause <- struct{}{}
+	<-ext.paused
+	defer func() {
+		ext.unpause <- struct{}{}
+	}()
 
 	ext.currentGeneration++
 
