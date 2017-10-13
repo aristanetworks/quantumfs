@@ -181,6 +181,9 @@ func exitNoRestart(c *Ctx, exitMsg string, trueCond bool) {
 }
 
 // walkFullWSDB will iterate through all the TS/NS/WS once.
+// It is possible for NamespaceList and WorkspaceList to be empty
+// due to concurrent deletes from pruner. The TypespaceList will
+// never be empty due to null typespace.
 func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 
 	tsl, err := c.wsdb.TypespaceList(c.qctx)
@@ -197,7 +200,6 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 			c.elog("NamespaceList(%s) failed: %v", ts, err)
 			continue
 		}
-		exitNoRestart(c, "Namespace list should not be empty", len(nsl) != 0)
 		for _, ns := range nsl {
 			wsMap, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
@@ -205,8 +207,6 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 					ts, ns, err)
 				continue
 			}
-			exitNoRestart(c, "Workspace map should not be empty",
-				len(wsMap) != 0)
 			for ws := range wsMap {
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
 					c.elog("Error from queueWorkspace (%s/%s/%s): %v",
