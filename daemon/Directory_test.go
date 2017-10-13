@@ -1025,6 +1025,62 @@ func TestDirectoryMvChildFileOntoDir(t *testing.T) {
 	})
 }
 
+func TestDirectoryMvChildOntoOpenFileSameDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+		file1 := dir + "/file1"
+		file2 := dir + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(syscall.Rename(file1, file2))
+	})
+}
+
+func TestDirectoryMvChildOntoOpenFileInParentDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+		file1 := dir + "/file1"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(syscall.Rename(file1, file2))
+	})
+}
+
+func TestDirectoryMvChildOntoOpenFileInSibling(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := workspace + "/dir2"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir1, 0124))
+		test.AssertNoErr(utils.MkdirAll(dir2, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		test.AssertNoErr(syscall.Rename(file1, file2))
+	})
+}
+
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -1621,5 +1677,51 @@ func TestDeleteOpenDirWithChild(t *testing.T) {
 
 		err = syscall.Close(f2)
 		test.AssertNoErr(err)
+	})
+}
+
+func TestDirectorySeekMiddle(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fullname := workspace + "/" + "testdir"
+		test.AssertNoErr(syscall.Mkdir(fullname, 0777))
+		test.AssertNoErr(CreateSmallFile(fullname+"/f0", ""))
+		test.AssertNoErr(CreateSmallFile(fullname+"/f1", ""))
+
+		f, err := os.Open(fullname)
+		test.AssertNoErr(err)
+		defer f.Close()
+
+		_, err = f.Seek(0, os.SEEK_SET)
+		buf := make([]byte, 1000)
+		n, err := syscall.Getdents(int(f.Fd()), buf)
+		test.AssertNoErr(err)
+		_, count, offs := utils.ParseDirentOffsets(buf, n, nil)
+		// There should be an entry for each file
+		test.Assert(count == 2, "Bad number of directory entries %d", count)
+		_, _, names := syscall.ParseDirent(buf, n, nil)
+		for i, off := range offs {
+			test.Log("Offset of entry %s is %d", names[i], off)
+		}
+
+		getNDirents := func(offset int64) int {
+			test.Log("Seeking to offset %d", offset)
+			_, err = syscall.Seek(int(f.Fd()), offset, os.SEEK_SET)
+			test.AssertNoErr(err)
+			buf := make([]byte, 1000)
+			n, err = syscall.Getdents(int(f.Fd()), buf)
+			test.AssertNoErr(err)
+			_, count, names = syscall.ParseDirent(buf, n, nil)
+			for i, name := range names {
+				test.Log("Name %d is %s", i, name)
+			}
+			return count
+		}
+
+		res0 := getNDirents(offs[0])
+		res1 := getNDirents(offs[1])
+		test.Assert(res0+res1 == 1,
+			"The offsets should result in 0 or 1. Got %d and %d.",
+			res0, res1)
 	})
 }
