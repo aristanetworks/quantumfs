@@ -27,7 +27,6 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-const MaxMergeTries = 5
 const InodeNameLog = "Inode %d Name %s"
 const InodeOnlyLog = "Inode %d"
 const FileHandleLog = "Fh: %d"
@@ -258,7 +257,7 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 		if state.Deleted {
 			go qfs.handleDeletedWorkspace(c, name)
 		} else {
-			go qfs.refreshWorkspace(c, name, state)
+			go qfs.refreshWorkspace(c, name)
 		}
 	}
 }
@@ -336,11 +335,8 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	c.qfs.metaInodeDeletionRecords = nil
 }
 
-func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
-	state quantumfs.WorkspaceState) {
-
-	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
-		state.Nonce).Out()
+func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
+	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s", name).Out()
 
 	defer logRequestPanic(c)
 
@@ -354,55 +350,61 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	}
 
 	defer wsr.LockTree().Unlock()
-	oldRootId := wsr.publishedRootId
 
-	dirtyQueueLen := qfs.flusher.dirtyQueueLength(wsr)
-
-	// If there are no local changes, then we can just refresh
-	if dirtyQueueLen == 0 {
-		c.vlog("No local changes - just refreshing")
-		publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
-			wsr.typespace, wsr.namespace, wsr.workspace)
-		utils.Assert(err == nil, "Failed to get rootId of the workspace.")
-
-		if nonce != wsr.nonce {
-			c.dlog("Not refreshing workspace %s due to mismatching "+
-				"nonces %d vs %d", name, wsr.nonce, nonce)
-			return
-		}
-
-		if wsr.publishedRootId.IsEqualTo(publishedRootId) {
-			c.dlog("Not refreshing workspace %s - there are no updates",
-				name)
-			return
-		}
-
-		wsr.publishedRootId = publishedRootId
-	} else {
-		c.vlog("Merging local changes")
-
-		// ensure our local wsr is synced
-		err := qfs.flusher.syncWorkspace_(c, name)
-		if err != nil {
-			c.elog("Unable to syncWorkspace - ignoring update")
-			return
-		}
-
-		dirtyQueueLen = qfs.flusher.dirtyQueueLength(wsr)
-		if dirtyQueueLen == 0 {
-			// Fail gracefully in this error case
-			c.elog("Flusher has inodes for workspace that will be lost")
-		}
+	err := qfs.flusher.syncWorkspace_(c, name)
+	if err != nil {
+		c.elog("Unable to syncWorkspace: %s", err.Error())
+		return
 	}
 
-	c.vlog("Refreshing %s rootid: %s -> %s", name,
-		oldRootId.String(), wsr.publishedRootId.String())
+	wsr.refresh_(c)
+}
 
-	wsr.refreshTo_(c, wsr.publishedRootId)
+func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
+	newRootId := publishWorkspaceRoot(c,
+		wsr.baseLayerId, wsr.hardlinks)
+
+	// We should eventually be able to Advance after merging
+	for {
+		rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+			wsr.typespace, wsr.namespace, wsr.workspace)
+
+		if err != nil {
+			c.elog("Unable to get workspace rootId")
+			return err
+		}
+		
+		if nonce != wsr.nonce {
+			c.wlog("Nothing to merge, new workspace")
+			return nil
+		}
+
+		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
+			newRootId)
+
+		if err != nil {
+			c.elog("Unable to merge: %s", err.Error())
+			return err
+		}
+
+		// now try to advance the workspace from the fresh id
+		_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace, wsr.nonce, rootId, mergedId)
+
+		if wsdbErr, isWsdbErr := err.(quantumfs.WorkspaceDbErr); isWsdbErr &&
+			wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
+
+			// Try again
+			continue
+		}
+
+		return err
+	}
 }
 
 // Should be called with the tree locked for read or write
-func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool {
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
+	lastInode bool) bool {
 
 	inodeNum := inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
@@ -412,6 +414,15 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool 
 	if !inode.isOrphaned() {
 		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
 			_, flushSuccess = wsr.flushCanFail(c)
+
+			// Flush of wsr failed, so try merging
+			if !flushSuccess && lastInode {
+				err := forceMerge(c, wsr)
+				if err == nil {
+					// We fixed the wsr flush failure via merge
+					flushSuccess = true
+				}
+			}
 		} else {
 			inode.flush(c)
 		}
@@ -893,7 +904,13 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	wsr.realTreeLock.Lock()
 	defer wsr.realTreeLock.Unlock()
 
-	return qfs.flusher.syncWorkspace_(c, workspace)
+	err = qfs.flusher.syncWorkspace_(c, workspace)
+	if err != nil {
+		return err
+	}
+
+	wsr.refresh_(c)
+	return nil
 }
 
 func logRequestPanic(c *ctx) {
