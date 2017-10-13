@@ -22,21 +22,6 @@ const (
 	OnAll                               // Match every message
 )
 
-type indentedLog struct {
-	log    qlog.LogOutput
-	indent int
-}
-
-type logTrack struct {
-	logs        qlog.LogStack
-	listElement *list.Element
-}
-
-type trackerKey struct {
-	reqId       uint64
-	lastLogTime time.Time
-}
-
 type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
@@ -66,11 +51,8 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	return agg
 }
 
-type extractorIdx int
-
 type Aggregator struct {
 	db            quantumfs.TimeSeriesDB
-	logsByRequest map[uint64]logTrack
 	daemonVersion string
 
 	// track the oldest untouched requests so we can push them to the stat
@@ -97,7 +79,6 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 	agg := Aggregator{
 		db:                     db_,
-		logsByRequest:          make(map[uint64]logTrack),
 		daemonVersion:          daemonVersion_,
 		extractors:             extractors,
 		triggerByFormat:        make(map[string][]chan *qlog.LogOutput),
