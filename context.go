@@ -55,7 +55,7 @@ type ExitFuncLog struct {
 }
 
 func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
-	format := qlog.FnEnterStr+funcName
+	format := qlog.FnEnterStr + funcName
 	if len(c.Prefix) > 0 {
 		format = c.Prefix + format
 	}
@@ -71,7 +71,7 @@ func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLo
 func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	extraFmtStr string, args ...interface{}) ExitFuncLog {
 
-	format := qlog.FnEnterStr+funcName+" "+extraFmtStr
+	format := qlog.FnEnterStr + funcName + " " + extraFmtStr
 	if len(c.Prefix) > 0 {
 		format = c.Prefix + format
 	}
@@ -85,7 +85,7 @@ func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 }
 
 func (e ExitFuncLog) Out() {
-	format := qlog.FnExitStr+e.funcName
+	format := qlog.FnExitStr + e.funcName
 	if len(e.c.Prefix) > 0 {
 		format = e.c.Prefix + format
 	}
