@@ -12,23 +12,21 @@ import (
 )
 
 func runReader(qlogFile string,
-	extractors []StatExtractorConfig) *processlocal.Memdb {
+	extractors []StatExtractor) *processlocal.Memdb {
 
 	db := processlocal.NewMemdb("").(*processlocal.Memdb)
-	agg := AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors)
-
-	agg.requestEndAfter = time.Millisecond * 100
+	AggregateLogs(qlog.ReadOnly, qlogFile, db, extractors, 100*time.Millisecond)
 
 	return db
 }
 
 func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
-	cfg *StatExtractorConfig, check func(*processlocal.Memdb)) {
+	cfg StatExtractor, check func(*processlocal.Memdb)) {
 
 	// Setup an extractor
-	extractors := []StatExtractorConfig{}
+	extractors := []StatExtractor{}
 	if cfg != nil {
-		extractors = append(extractors, *cfg)
+		extractors = append(extractors, cfg)
 	}
 
 	// Run the reader
@@ -90,7 +88,7 @@ func TestMatches(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average_ns" {
-					test.Assert(v.Data == uint64(duration1+
+					test.Assert(v.Data == int64(duration1+
 						duration2)/2, "incorrect delta %d",
 						v.Data)
 					checkedAvg = true
@@ -102,10 +100,9 @@ func TestMatches(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+		test.runExtractorTest(qlogHandle,
 			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(300*time.Millisecond)), checker)
+				qlog.FnExitStr+"TestMatch", "TestMatch"), checker)
 
 		test.Assert(checkedAvg, "test not checking average")
 		test.Assert(checkedSamples, "test not checking samples")
@@ -174,10 +171,9 @@ func TestPercentiles(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
+		test.runExtractorTest(qlogHandle,
 			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(300*time.Millisecond)), checker)
+				qlog.FnExitStr+"TestMatch", "TestMatch"), checker)
 
 		for i := 0; i < 7; i++ {
 			test.Assert(checked[i], "test not checking field %d", i)
@@ -209,81 +205,26 @@ func TestPointCount(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPointStats("TestLog", "TestLog Name Tag"),
-			(300*time.Millisecond)), checker)
+		test.runExtractorTest(qlogHandle,
+			NewExtPointStats("TestLog", "TestLog Name Tag"), checker)
 
 		test.Assert(checked, "test not checking anything")
 	})
 }
 
-func TestIndentation(t *testing.T) {
+func TestPartialFormatMatch(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		qlogHandle := test.Logger
 
-		// Artificially insert matching logs at different scopes
-		durationReal := int64(10000)
-		qlogHandle.Log_(time.Unix(0, 20000), qlog.LogTest, 12345, 2,
-			qlog.FnEnterStr+"TestMatch")
-
-		// Go up in scope and place a matching string there
-		qlogHandle.Log_(time.Unix(0, 20100), qlog.LogTest, 12345, 2,
-			qlog.FnEnterStr+"Other Function")
-		qlogHandle.Log_(time.Unix(0, 20200), qlog.LogTest,
-			12345, 3, qlog.FnEnterStr+"Mismatching funcIn")
-		qlogHandle.Log_(time.Unix(0, 20300), qlog.LogTest,
-			12345, 3, qlog.FnExitStr+"TestMatch")
-		qlogHandle.Log_(time.Unix(0, 20400), qlog.LogTest, 12345, 2,
-			qlog.FnExitStr+"Other Function")
-
-		qlogHandle.Log_(time.Unix(0, 20000+durationReal), qlog.LogTest,
-			12345, 3, qlog.FnExitStr+"TestMatch")
-
-		checkedAvg := false
-		checkedSamples := false
-		checker := func(memdb *processlocal.Memdb) {
-			test.Assert(len(memdb.Data[0].Fields) == 7,
-				"%d fields produced from one matching log",
-				len(memdb.Data[0].Fields))
-
-			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "average_ns" {
-					test.Assert(v.Data == uint64(durationReal),
-						"incorrect delta %d", v.Data)
-					checkedAvg = true
-				} else if v.Name == "samples" {
-					test.Assert(v.Data == 1,
-						"incorrect samples %d", v.Data)
-					checkedSamples = true
-				}
-			}
-		}
-
-		test.runExtractorTest(qlogHandle, NewStatExtractorConfig(
-			NewExtPairStats(qlog.FnEnterStr+"TestMatch",
-				qlog.FnExitStr+"TestMatch", true, "TestMatch"),
-			(300*time.Millisecond)), checker)
-
-		test.Assert(checkedAvg, "test not checking average")
-		test.Assert(checkedSamples, "test not checking samples")
-	})
-}
-
-func TestErrorCounting(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		test.ShouldFailLogscan = true
-		qlogHandle := test.Logger
-
-		// Artificially insert some error logs
 		for i := int64(0); i < 123; i++ {
 			qlogHandle.Log_(time.Unix(i, 20000+i), qlog.LogTest,
-				uint64(i), 2, "ERROR: TestMatch")
+				uint64(i), 2, "ER_OR: TestMatch")
 		}
 
 		checked := false
 		checker := func(memdb *processlocal.Memdb) {
 			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "SystemErrors" {
+				if v.Name == "samples" {
 					test.Assert(v.Data == 123,
 						"incorrect count %d", v.Data)
 					checked = true
@@ -291,8 +232,62 @@ func TestErrorCounting(t *testing.T) {
 			}
 		}
 
-		test.runExtractorTest(qlogHandle, nil, checker)
-		test.Assert(checked, "test not checking count")
+		test.runExtractorTest(qlogHandle,
+			NewExtPointStatsPartialFormat("ER_OR: ", "SystemErrors"),
+			checker)
+		test.Assert(checked, "test not checking count, %d")
+	})
+}
 
+func TestPairStatsGC(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		statExtractor := NewExtPairStats("Start match", "Stop match",
+			"Testlatency")
+		ext := statExtractor.(*extPairStats)
+
+		c := ext.Chan()
+
+		c <- &qlog.LogOutput{
+			Subsystem: qlog.LogTest,
+			ReqId:     1,
+			T:         1,
+			Format:    "Start match\n",
+			Args:      []interface{}{},
+		}
+		test.WaitFor("Request 1 to be started", func() bool {
+			return len(ext.requests) == 1
+		})
+
+		ext.GC()
+		test.Assert(len(ext.requests) == 1, "Request 1 deleted early")
+		c <- &qlog.LogOutput{
+			Subsystem: qlog.LogTest,
+			ReqId:     2,
+			T:         2,
+			Format:    "Start match\n",
+			Args:      []interface{}{},
+		}
+		test.WaitFor("Request 2 to be started", func() bool {
+			return len(ext.requests) == 2
+		})
+
+		ext.GC()
+		test.Assert(len(ext.requests) == 2, "Request 2 deleted early")
+
+		c <- &qlog.LogOutput{
+			Subsystem: qlog.LogTest,
+			ReqId:     2,
+			T:         3,
+			Format:    "Stop match\n",
+			Args:      []interface{}{},
+		}
+		test.WaitFor("Request 2 to be deleted", func() bool {
+			return len(ext.requests) == 1
+		})
+		_, exists := ext.requests[1]
+		test.Assert(exists, "Request 1 deleted early")
+
+		ext.GC()
+		test.Assert(len(ext.requests) == 0, "Request 1 didn't age out")
 	})
 }
