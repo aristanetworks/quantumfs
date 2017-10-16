@@ -189,7 +189,7 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 	abort := false
 
 	for dq.Len_() > 0 && !done {
-		func () {
+		func() {
 			sleepTime := getSleepTime(c, nextExpiringInode)
 			cmd := KICK
 			flushAll := false
