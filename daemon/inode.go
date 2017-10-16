@@ -139,6 +139,7 @@ type Inode interface {
 		quantumfs.ObjectType))
 	parentSetChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
 		out *fuse.AttrOut, updateMtime bool) fuse.Status
+	parentUpdateSize(c *ctx, getSize_ func() uint64) fuse.Status
 	parentGetChildXAttrSize(c *ctx, inodeNum InodeId, attr string) (size int,
 		result fuse.Status)
 	parentGetChildXAttrData(c *ctx, inodeNum InodeId, attr string) (data []byte,
@@ -273,6 +274,7 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+	defer inode.Lock().Unlock()
 
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
@@ -285,6 +287,20 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	baseLayerId, objectType := publishFn()
 
 	inode.parent_(c).syncChild(c, inode.id, baseLayerId, objectType)
+}
+
+func (inode *InodeCommon) parentUpdateSize(c *ctx,
+	getSize_ func() uint64) fuse.Status {
+
+	defer c.funcIn("InodeCommon::parentUpdateSize").Out()
+
+	defer inode.parentLock.RLock().RUnlock()
+	defer inode.lock.Lock().Unlock()
+
+	var attr fuse.SetAttrIn
+	attr.Valid = fuse.FATTR_SIZE
+	attr.Size = getSize_()
+	return inode.parent_(c).setChildAttr(c, inode.inodeNum(), &attr, nil, true)
 }
 
 func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
