@@ -1427,7 +1427,11 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	}
 
 	if input.NodeId == input.Newdir {
-		return srcInode.RenameChild(c, oldName, newName)
+		result := srcInode.RenameChild(c, oldName, newName)
+		if result == fuse.OK {
+			asDirectory(srcInode).updateSize(c)
+		}
+		return result
 	} else {
 		dstInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.Newdir))
 		defer unlock.RUnlock()
@@ -1441,7 +1445,12 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 			return fuse.EROFS
 		}
 
-		return srcInode.MvChild(c, dstInode, oldName, newName)
+		result := srcInode.MvChild(c, dstInode, oldName, newName)
+		if result == fuse.OK {
+			asDirectory(srcInode).updateSize(c)
+			asDirectory(dstInode).updateSize(c)
+		}
+		return result
 	}
 }
 
