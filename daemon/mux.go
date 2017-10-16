@@ -853,8 +853,9 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	}
 
 	wsr := inode.(*WorkspaceRoot)
+	if false {
 	wsr.realTreeLock.Lock()
-	defer wsr.realTreeLock.Unlock()
+	defer wsr.realTreeLock.Unlock() }
 
 	return qfs.flusher.syncWorkspace_(c, workspace)
 }
