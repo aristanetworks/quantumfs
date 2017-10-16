@@ -645,6 +645,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 		err fuse.Status)) fuse.Status {
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
+	defer inode.parentLock.Lock().Unlock()
 	defer inode.lock.Lock().Unlock()
 
 	// One of this inode's names is going away, reset the accessed cache to
@@ -652,7 +653,6 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	inode.clearAccessedCache()
 
 	// We must perform the deletion with the lockedParent lock
-	defer inode.parentLock.Lock().Unlock()
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
 
