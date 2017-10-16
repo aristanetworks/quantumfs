@@ -652,7 +652,6 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 	// ensure any remaining names are marked correctly.
 	inode.clearAccessedCache()
 
-	// We must perform the deletion with the lockedParent lock
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
 
