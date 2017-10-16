@@ -684,13 +684,13 @@ func (wsdb *workspaceDB) _fetchWorkspace(c *quantumfs.Ctx, workspaceName string)
 	response, err := wsdb.server.FetchWorkspace(context.TODO(), &request)
 	if err != nil {
 		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
-		return key, nonce, false, wsdb.handleGrpcError(err)
+		return quantumfs.ZeroKey, 0, false, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
 		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
-		return key, nonce, false, wsdb.convertErr(*response.Header)
+		return quantumfs.ZeroKey, 0, false, wsdb.convertErr(*response.Header)
 	}
 
 	key = quantumfs.NewObjectKeyFromBytes(response.Key.GetData())
@@ -735,7 +735,7 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, err
+		return quantumfs.ZeroKey, 0, err
 	}
 
 	return wsdb.Workspace(c, typespace, namespace, workspace)
@@ -782,17 +782,16 @@ func (wsdb *workspaceDB) advanceWorkspace(c *quantumfs.Ctx, typespace string,
 	response, err := wsdb.server.AdvanceWorkspace(context.TODO(), &request)
 	if err != nil {
 		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
-		return quantumfs.ObjectKey{}, wsdb.handleGrpcError(err)
+		return quantumfs.ZeroKey, wsdb.handleGrpcError(err)
 	}
-
-	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
 
 	if response.Header.Err != 0 {
 		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
-		return newKey, wsdb.convertErr(*response.Header)
+		return quantumfs.ZeroKey, wsdb.convertErr(*response.Header)
 	}
 
+	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
 	return newKey, nil
 }
 
