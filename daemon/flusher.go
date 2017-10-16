@@ -186,6 +186,8 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	done := false
+	abort := false
+
 	for dq.Len_() > 0 && !done {
 		func () {
 			sleepTime := getSleepTime(c, nextExpiringInode)
@@ -193,7 +195,7 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 			flushAll := false
 			var unlockFn func()
 
-			abort := func() bool {
+			func() {
 				c.qfs.flusher.lock.Unlock()
 				defer c.qfs.flusher.lock.Lock()
 
@@ -217,12 +219,11 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 				case QUIT:
 					flushAll = true
 				case ABORT:
-					return true
+					abort = true
+					return
 				default:
 					panic("Unhandled flushing type")
 				}
-
-				return false
 			}()
 
 			if unlockFn != nil {
@@ -235,6 +236,10 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 
 			nextExpiringInode, done = dq.flushQueue_(c, flushAll)
 		}()
+
+		if abort {
+			return
+		}
 	}
 }
 
