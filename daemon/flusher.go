@@ -187,52 +187,54 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	done := false
 	for dq.Len_() > 0 && !done {
-		sleepTime := getSleepTime(c, nextExpiringInode)
-		cmd := KICK
-		flushAll := false
-		var unlockFn func()
+		func () {
+			sleepTime := getSleepTime(c, nextExpiringInode)
+			cmd := KICK
+			flushAll := false
+			var unlockFn func()
 
-		abort := func() bool {
-			c.qfs.flusher.lock.Unlock()
-			defer c.qfs.flusher.lock.Lock()
+			abort := func() bool {
+				c.qfs.flusher.lock.Unlock()
+				defer c.qfs.flusher.lock.Lock()
 
-			select {
-			case cmd = <-dq.cmd:
-				c.vlog("dirtyqueue received cmd %d", cmd)
-			case <-time.After(sleepTime):
-				c.vlog("flusher woken up due to timer")
+				select {
+				case cmd = <-dq.cmd:
+					c.vlog("dirtyqueue received cmd %d", cmd)
+				case <-time.After(sleepTime):
+					c.vlog("flusher woken up due to timer")
+				}
+
+				// ensure that treelock is locked *before* the
+				// flusher lock is acquired, or else we'll deadlock
+				switch cmd {
+				case KICK:
+					dq.treelock.lock.RLock()
+					unlockFn = dq.treelock.lock.RUnlock
+				case LOCKANDQUIT:
+					dq.treelock.lock.RLock()
+					unlockFn = dq.treelock.lock.RUnlock
+					flushAll = true
+				case QUIT:
+					flushAll = true
+				case ABORT:
+					return true
+				default:
+					panic("Unhandled flushing type")
+				}
+
+				return false
+			}()
+
+			if unlockFn != nil {
+				defer unlockFn()
 			}
 
-			// ensure that treelock is locked *before* the flusher lock
-			// is acquired, or else we'll deadlock
-			switch cmd {
-			case KICK:
-				dq.treelock.lock.RLock()
-				unlockFn = dq.treelock.RUnlock
-			case LOCKANDQUIT:
-				dq.treelock.lock.RLock()
-				unlockFn = dq.treelock.RUnlock
-				fallthrough
-			case QUIT:
-				flushAll = true
-			case ABORT:
-				return true
-			default:
-				panic("Unhandled flushing type")
+			if abort {
+				return
 			}
 
-			return false
+			nextExpiringInode, done = dq.flushQueue_(c, flushAll)
 		}()
-
-		if abort {
-			return
-		}
-
-		if unlockFn != nil {
-			defer unlockFn()
-		}
-
-		nextExpiringInode, done = dq.flushQueue_(c, flushAll)
 	}
 }
 
@@ -273,7 +275,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 			// If you specify a workspace, we assume the tree is already
 			// locked before calling this function
 			if workspace == "" {
-			//	cmd = LOCKANDQUIT
+				cmd = LOCKANDQUIT
 			}
 
 			err = dq.TryCommand_(c, cmd)
