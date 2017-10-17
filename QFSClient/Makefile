@@ -31,6 +31,8 @@ all: $(TARGET) test
 
 qfsclient: $(TARGET)
 
+qfsclienttest: $(TEST_TARGET)
+
 clean: qfsc-clean
 
 qfsc-clean:
