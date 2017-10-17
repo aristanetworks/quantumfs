@@ -153,6 +153,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 			// all expiring inodes have been flushed
 			return candidate.expiryTime, false
 		}
+
 		if !dq.flushCandidate_(c, candidate) {
 			candidate.expiryTime = time.Now().Add(
 				c.qfs.config.DirtyFlushDelay)
@@ -187,33 +188,60 @@ func (dq *DirtyQueue) flush_(c *ctx) {
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 	done := false
+	abort := false
+
 	for dq.Len_() > 0 && !done {
-		sleepTime := getSleepTime(c, nextExpiringInode)
-		cmd := KICK
 		func() {
-			c.qfs.flusher.lock.Unlock()
-			defer c.qfs.flusher.lock.Lock()
-			select {
-			case cmd = <-dq.cmd:
-				c.vlog("dirtyqueue received cmd %d", cmd)
-			case <-time.After(sleepTime):
-				c.vlog("flusher woken up due to timer")
+			sleepTime := getSleepTime(c, nextExpiringInode)
+			cmd := KICK
+			flushAll := false
+			var unlockFn func()
+
+			func() {
+				c.qfs.flusher.lock.Unlock()
+				defer c.qfs.flusher.lock.Lock()
+
+				select {
+				case cmd = <-dq.cmd:
+					c.vlog("dirtyqueue received cmd %d", cmd)
+				case <-time.After(sleepTime):
+					c.vlog("flusher woken up due to timer")
+				}
+
+				// ensure that treelock is locked *before* the
+				// flusher lock is acquired, or else we'll deadlock
+				switch cmd {
+				case KICK:
+					dq.treelock.lock.RLock()
+					unlockFn = dq.treelock.lock.RUnlock
+				case LOCKANDQUIT:
+					dq.treelock.lock.RLock()
+					unlockFn = dq.treelock.lock.RUnlock
+					flushAll = true
+				case QUIT:
+					flushAll = true
+				case ABORT:
+					abort = true
+					return
+				default:
+					panic("Unhandled flushing type")
+				}
+			}()
+
+			if unlockFn != nil {
+				defer unlockFn()
 			}
+
+			if abort {
+				return
+			}
+
+			nextExpiringInode, done = dq.flushQueue_(c, flushAll)
 		}()
 
-		flushAll := false
-		switch cmd {
-		case KICK:
-		case LOCKANDQUIT:
-			dq.treelock.lock.Lock()
-			defer dq.treelock.lock.Unlock()
-			fallthrough
-		case QUIT:
-			flushAll = true
-		case ABORT:
+		if abort {
 			return
 		}
-		nextExpiringInode, done = dq.flushQueue_(c, flushAll)
 	}
 }
 
@@ -347,15 +375,4 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	// ABORT is not currently used anywhere, therefore dq must not be nil
 	dq.TryCommand_(c, KICK)
 	return dirtyElement
-}
-
-func (flusher *Flusher) dirtyQueueLength(wsr *WorkspaceRoot) int {
-	defer flusher.lock.Lock().Unlock()
-
-	dq := flusher.dqs[wsr.treeLock()]
-	if dq == nil {
-		return 0
-	}
-
-	return dq.Len_()
 }
