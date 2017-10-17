@@ -506,14 +506,6 @@ func (th *TestHelper) SyncWorkspace(workspace string) {
 	th.AssertNoErr(th.getApi().SyncWorkspace(workspace))
 }
 
-func (th *TestHelper) SyncWorkspaceAsync(workspace string) chan error {
-	chanErr := make(chan error)
-	go func() {
-		chanErr <- th.getApi().SyncWorkspace(workspace)
-	}()
-	return chanErr
-}
-
 func (th *TestHelper) GetWorkspaceDB() quantumfs.WorkspaceDB {
 	return th.qfs.config.WorkspaceDB
 }
