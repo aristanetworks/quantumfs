@@ -16,6 +16,7 @@ import (
 	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
@@ -89,6 +90,20 @@ func createExtractors() []qlogstats.StatExtractor {
 			thirdparty_backends.EtherBranchDebugLog),
 		newQfsExtPair(thirdparty_backends.EtherAdvanceLog,
 			thirdparty_backends.EtherAdvanceDebugLog),
+
+		newQfsExtPair(grpc.NumTypespaceLog, ""),
+		newQfsExtPair(grpc.TypespaceListLog, ""),
+		newQfsExtPair(grpc.NumNamespacesLog, ""),
+		newQfsExtPair(grpc.NamespaceListLog, ""),
+		newQfsExtPair(grpc.NumWorkspacesLog, ""),
+		newQfsExtPair(grpc.WorkspaceListLog, ""),
+		newQfsExtPair(grpc.BranchWorkspaceLog, ""),
+		newQfsExtPair(grpc.DeleteWorkspaceLog, ""),
+		newQfsExtPair(grpc.FetchWorkspaceLog, grpc.FetchWorkspaceDebug),
+		newQfsExtPair(grpc.AdvanceWorkspaceLog, grpc.AdvanceWorkspaceDebug),
+		newQfsExtPair(grpc.WorkspaceIsImmutableLog, ""),
+		newQfsExtPair(grpc.SetWorkspaceImmutableLog,
+			grpc.SetWorkspaceImmutableDebug),
 
 		// FUSE Requests
 		newQfsExtPair(daemon.LookupLog, daemon.InodeNameLog),
