@@ -1786,8 +1786,9 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
+	defer dir.Lock().Unlock()
+
 	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
-		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
 		return dir.baseLayerId, quantumfs.ObjectTypeDirectory
