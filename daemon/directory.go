@@ -1008,61 +1008,87 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
 	defer c.FuncIn("Directory::RenameChild", "%s -> %s", oldName, newName).Out()
-	defer dir.Lock().Unlock()
 
-	oldInodeId, err := func() (InodeId, fuse.Status) {
-		defer dir.childRecordLock.Lock().Unlock()
+	result := func() fuse.Status {
+		defer dir.Lock().Unlock()
 
-		dstRecord := dir.children.recordByName(c, newName)
-		if dstRecord != nil &&
-			dstRecord.Type() == quantumfs.ObjectTypeDirectory &&
-			dstRecord.Size() != 0 {
+		oldInodeId, oldRemoved, err := func() (InodeId, InodeId,
+			fuse.Status) {
 
-			// We can not overwrite a non-empty directory
-			return quantumfs.InodeIdInvalid,
-				fuse.Status(syscall.ENOTEMPTY)
+			defer dir.childRecordLock.Lock().Unlock()
+
+			dstRecord := dir.children.recordByName(c, newName)
+			if dstRecord != nil &&
+				dstRecord.Type() == quantumfs.ObjectTypeDirectory &&
+				dstRecord.Size() != 0 {
+
+				// We can not overwrite a non-empty directory
+				return quantumfs.InodeIdInvalid,
+					quantumfs.InodeIdInvalid,
+					fuse.Status(syscall.ENOTEMPTY)
+			}
+
+			record := dir.children.recordByName(c, oldName)
+			if record == nil {
+				return quantumfs.InodeIdInvalid,
+					quantumfs.InodeIdInvalid, fuse.ENOENT
+			}
+
+			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			if err != fuse.OK {
+				return quantumfs.InodeIdInvalid,
+					quantumfs.InodeIdInvalid, err
+			}
+
+			if oldName == newName {
+				return quantumfs.InodeIdInvalid,
+					quantumfs.InodeIdInvalid, fuse.OK
+			}
+			oldInodeId_ := dir.children.inodeNum(oldName)
+			oldRemovedId_, oldRemovedRecord_ :=
+				dir.children.renameChild(c, oldName, newName)
+
+			// If this rename replaces a previously existing path, then
+			// we need to mark it deleted. Since we've put something into
+			// place the delete then create will tend to balance out into
+			// "updated" for files and "nothing" for directories.
+			if oldRemovedRecord_ != nil {
+				dir.self.markAccessed(c, newName,
+					markType(oldRemovedRecord_.Type(),
+						quantumfs.PathDeleted))
+			}
+
+			// Conceptually we remove any entry in the way before we move
+			// the source file in its place, so update the accessed list
+			// mark in that order to ensure mark logic produces the
+			// correct result.
+			dir.self.markAccessed(c, oldName,
+				markType(record.Type(), quantumfs.PathDeleted))
+			dir.self.markAccessed(c, newName,
+				markType(record.Type(), quantumfs.PathCreated))
+
+			return oldInodeId_, oldRemovedId_, fuse.OK
+		}()
+		if oldName == newName || err != fuse.OK {
+			return err
 		}
 
-		record := dir.children.recordByName(c, oldName)
-		if record == nil {
-			return quantumfs.InodeIdInvalid, fuse.ENOENT
+		// update the inode name
+		if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
+			child.setName(newName)
+			child.clearAccessedCache()
 		}
 
-		err := hasDirectoryWritePermSticky(c, dir, record.Owner())
-		if err != fuse.OK {
-			return quantumfs.InodeIdInvalid, err
+		if oldRemoved != quantumfs.InodeIdInvalid {
+			c.qfs.removeUninstantiated(c, []InodeId{oldRemoved})
 		}
 
-		if oldName == newName {
-			return quantumfs.InodeIdInvalid, fuse.OK
-		}
-		oldInodeId_ := dir.children.inodeNum(oldName)
-		dir.orphanChild_(c, newName)
-		dir.children.renameChild(c, oldName, newName)
+		dir.updateSize_(c)
 
-		// Conceptually we remove any entry in the way before we move
-		// the source file in its place, so update the accessed list
-		// mark in that order to ensure mark logic produces the
-		// correct result.
-		dir.self.markAccessed(c, oldName,
-			markType(record.Type(), quantumfs.PathDeleted))
-		dir.self.markAccessed(c, newName,
-			markType(record.Type(), quantumfs.PathCreated))
-
-		return oldInodeId_, fuse.OK
+		return fuse.OK
 	}()
-	if oldName == newName || err != fuse.OK {
-		return err
-	}
 
-	// update the inode name
-	if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
-		child.setName(newName)
-		child.clearAccessedCache()
-	}
-	dir.updateSize_(c)
-
-	return fuse.OK
+	return result
 }
 
 func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
@@ -1079,39 +1105,11 @@ func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
 	return a, b
 }
 
-// Must hold dir and dir.childRecordLock
-func (dir *Directory) orphanChild_(c *ctx, name string) {
-	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
-	removedRecord := dir.children.recordByName(c, name)
-	if removedRecord == nil {
-		return
-	}
-	dir.self.markAccessed(c, name,
-		markType(removedRecord.Type(),
-			quantumfs.PathDeleted))
-	removedId := dir.children.inodeNum(name)
-	dir.children.deleteChild(c, name, true)
-	if removedId == quantumfs.InodeIdInvalid {
-		return
-	}
-	if removedRecord.Type() == quantumfs.ObjectTypeHardlink {
-		c.vlog("nothing to do for the detached leg of hardlink")
-		// XXX handle the case where the Record is the last leg of
-		// a not-yet-normalized hardlink with nlink of 1
-		return
-	}
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, removedId)
-	if overwrittenInode == nil {
-		c.qfs.removeUninstantiated(c, []InodeId{removedId})
-	} else {
-		overwrittenInode.orphan(c, removedRecord)
-	}
-}
-
 func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
-	defer c.FuncIn("Directory::MvChild", "%s -> %s", oldName, newName).Out()
+	defer c.FuncIn("Directory::MvChild", "%s -> %s", oldName,
+		newName).Out()
 
 	// check write permission for both directories
 	err := hasDirectoryWritePerm(c, dstInode)
@@ -1228,14 +1226,32 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			}
 
 			func() {
-				defer dst.childRecordLock.Lock().Unlock()
-				dst.orphanChild_(c, newName)
-				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
-			}()
-
-			func() {
 				defer dir.childRecordLock.Lock().Unlock()
-				dir.children.deleteChild(c, oldName, true)
+
+				deletedRecord := dst.children.recordByName(c,
+					newName)
+				if deletedRecord != nil {
+					dst.self.markAccessed(c, newName,
+						markType(deletedRecord.Type(),
+							quantumfs.PathDeleted))
+				}
+
+				// Delete the target InodeId, before (possibly)
+				// overwriting it.
+				dst.deleteEntry_(c, newName)
+
+				overwrittenRecord := dst.children.recordByName(c,
+					newName)
+				overwrittenId := dst.children.inodeNum(newName)
+				if overwrittenRecord != nil {
+					c.qfs.removeUninstantiated(c,
+						[]InodeId{overwrittenId})
+				}
+
+				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
+
+				// Remove entry in old directory
+				dir.deleteEntry_(c, oldName)
 			}()
 
 			// This is the same entry just moved, so we can use the same
@@ -1264,6 +1280,18 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	}()
 
 	return result
+}
+
+// Must hold childrecord lock for writing
+func (dir *Directory) deleteEntry_(c *ctx, name string) {
+	defer c.FuncIn("Directory::deleteEntry_", "name %s", name).Out()
+
+	if record := dir.children.recordByName(c, name); record == nil {
+		// Nothing to do
+		return
+	}
+
+	dir.children.deleteChild(c, name, true)
 }
 
 // Needs to hold childRecordLock
@@ -1324,7 +1352,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 
 	entry := dir.getRecordChildCall_(c, inodeNum)
 	if entry == nil {
-		c.elog("Directory::syncChild inode %d not a valid child",
+		c.wlog("Directory::syncChild inode %d not a valid child",
 			inodeNum)
 		return
 	}

@@ -88,3 +88,17 @@ func TestSubscriptionsAcrossDisconnection(t *testing.T) {
 		test.Assert(!exists, "Invalid workspace notification received")
 	})
 }
+
+func TestAdvanceNonExistentWorkspace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		client := test.newClient()
+
+		_, err := client.AdvanceWorkspace(test.ctx, "test", "test",
+			"test", 1, quantumfs.EmptyWorkspaceKey, quantumfs.ZeroKey)
+		wsdbErr, ok := err.(quantumfs.WorkspaceDbErr)
+		test.Assert(ok, "Error isn't WorkspaceDbErr: %s", err.Error())
+
+		test.Assert(wsdbErr.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND,
+			"Non-existent workspace was found: %s", err.Error())
+	})
+}
