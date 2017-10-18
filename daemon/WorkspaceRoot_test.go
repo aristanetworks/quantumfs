@@ -354,3 +354,24 @@ func TestWorkspaceDeleteThenSyncAll(t *testing.T) {
 		test.SyncAllWorkspaces()
 	})
 }
+
+func TestWorkspaceAccessAfterDeletion(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirpaths := workspace + "/dir1/dir2/dir3"
+		filename := dirpaths + "/file"
+
+		test.AssertNoErr(utils.MkdirAll(dirpaths, 0777))
+
+		test.AssertNoErr(testutils.PrintToFile(filename, "Test data"))
+
+		api := test.getApi()
+		api.DeleteWorkspace(test.RelPath(workspace))
+
+		test.WaitFor("File to no longer exist", func() bool {
+			var stat syscall.Stat_t
+			err := syscall.Stat(filename, &stat)
+			return err == nil
+		})
+	})
+}
