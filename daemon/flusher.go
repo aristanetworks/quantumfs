@@ -37,7 +37,8 @@ type FlushCmd int
 
 const (
 	KICK = FlushCmd(iota)
-	QUIT
+	FLUSHALL
+	RETURN
 )
 
 type DirtyQueue struct {
@@ -90,6 +91,8 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 }
 
 func (dq *DirtyQueue) kicker(c *ctx) {
+	defer logRequestPanic(c)
+
 	// When we think we have no inodes try periodically anyways to ensure sanity
 	nextExpiringInode := time.Now().Add(flushSanityTimeout)
 
@@ -108,11 +111,15 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			dq.treelock.lock.RLock()
 			defer dq.treelock.lock.RUnlock()
 
+			// We must wait until the flusher is done so that we can
+			// only then release the treelock
+			var doneLock sync.Mutex
+			doneCond := sync.NewCond(&doneLock)
+			doneLock.Lock()
+			defer doneLock.Unlock()
+
 			switch cmd {
 			case KICK:
-				var doneLock sync.Mutex
-				doneCond := sync.NewCond(&doneLock)
-
 				dq.trigger <- triggerCmd {
 					flushAll: false,
 					finished: doneCond,
@@ -129,10 +136,14 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 					nextExpiringInode = time.Now().Add(0+
 						flushSanityTimeout)
 				}
-			case QUIT:
+			case FLUSHALL:
 				dq.trigger <- triggerCmd {
 					flushAll: true,
+					finished: doneCond,
 				}
+				doneCond.Wait()
+
+			case RETURN:
 				return
 			default:
 				panic("Unhandled flushing type")
@@ -239,6 +250,7 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 // flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flush(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
+	defer logRequestPanic(c)
 	done := false
 
 	for !done {
@@ -300,7 +312,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 					flushAll: true,
 				}
 			} else {
-				err = dq.TryCommand_(c, QUIT)
+				err = dq.TryCommand_(c, FLUSHALL)
 				if err != nil {
 					c.vlog("failed to send cmd to dirtyqueue")
 					return
@@ -387,7 +399,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 			delete(flusher.dqs, treelock)
 
 			// end the kicker thread
-			dq.TryCommand_(c, QUIT)
+			dq.TryCommand_(c, RETURN)
 		}()
 
 		go dq.kicker(nc)
