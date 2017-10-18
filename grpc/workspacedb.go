@@ -354,8 +354,10 @@ func retry(c *quantumfs.Ctx, opName string, op func(c *quantumfs.Ctx) error) err
 	return err
 }
 
+const NumTypespaceLog = "grpc::NumTypespaces"
+
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumTypespaces").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, NumTypespaceLog).Out()
 
 	var result int
 
@@ -386,8 +388,10 @@ func (wsdb *workspaceDB) numTypespaces(c *quantumfs.Ctx) (int, error) {
 	return int(response.NumTypespaces), nil
 }
 
+const TypespaceListLog = "grpc::TypespaceList"
+
 func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::TypespaceList").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, TypespaceListLog).Out()
 
 	var result []string
 
@@ -418,10 +422,12 @@ func (wsdb *workspaceDB) typespaceList(c *quantumfs.Ctx) ([]string, error) {
 	return response.Typespaces, nil
 }
 
+const NumNamespacesLog = "grpc::NumNamespaces"
+
 func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumNamespaces").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, NumNamespacesLog).Out()
 
 	var result int
 
@@ -457,10 +463,12 @@ func (wsdb *workspaceDB) numNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	return int(response.NumNamespaces), nil
 }
 
+const NamespaceListLog = "grpc::NamespaceList"
+
 func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NamespaceList").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, NamespaceListLog).Out()
 
 	var result []string
 
@@ -496,10 +504,12 @@ func (wsdb *workspaceDB) namespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	return response.Namespaces, nil
 }
 
+const NumWorkspacesLog = "grpc::NumWorkspaces"
+
 func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::NumWorkspaces").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, NumWorkspacesLog).Out()
 
 	var result int
 
@@ -536,10 +546,12 @@ func (wsdb *workspaceDB) numWorkspaces(c *quantumfs.Ctx, typespace string,
 	return int(response.NumWorkspaces), nil
 }
 
+const WorkspaceListLog = "grpc::WorkspaceList"
+
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::WorkspaceList").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceListLog).Out()
 
 	var result map[string]quantumfs.WorkspaceNonce
 
@@ -582,11 +594,13 @@ func (wsdb *workspaceDB) workspaceList(c *quantumfs.Ctx, typespace string,
 	return workspaces, nil
 }
 
+const BranchWorkspaceLog = "grpc::BranchWorkspace"
+
 func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::BranchWorkspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, BranchWorkspaceLog).Out()
 
 	err := retry(c, "BranchWorkspace", func(c *quantumfs.Ctx) error {
 		return wsdb.branchWorkspace(c, srcTypespace, srcNamespace,
@@ -621,10 +635,12 @@ func (wsdb *workspaceDB) branchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	return nil
 }
 
+const DeleteWorkspaceLog = "grpc::DeleteWorkspace"
+
 func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::DeleteWorkspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, DeleteWorkspaceLog).Out()
 
 	err := retry(c, "DeleteWorkspace", func(c *quantumfs.Ctx) error {
 		return wsdb.deleteWorkspace(c, typespace, namespace, workspace)
@@ -656,11 +672,14 @@ func (wsdb *workspaceDB) deleteWorkspace(c *quantumfs.Ctx, typespace string,
 	return nil
 }
 
+const FetchWorkspaceLog = "grpc::fetchWorkspace"
+const FetchWorkspaceDebug = "%s"
+
 func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) (
 	key quantumfs.ObjectKey, nonce quantumfs.WorkspaceNonce, immutable bool,
 	err error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::fetchWorkspace", "%s",
+	defer c.FuncIn(qlog.LogWorkspaceDb, FetchWorkspaceLog, FetchWorkspaceDebug,
 		workspaceName).Out()
 
 	err = retry(c, "fetchWorkspace", func(c *quantumfs.Ctx) error {
@@ -684,13 +703,13 @@ func (wsdb *workspaceDB) _fetchWorkspace(c *quantumfs.Ctx, workspaceName string)
 	response, err := wsdb.server.FetchWorkspace(context.TODO(), &request)
 	if err != nil {
 		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
-		return key, nonce, false, wsdb.handleGrpcError(err)
+		return quantumfs.ZeroKey, 0, false, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
 		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
-		return key, nonce, false, wsdb.convertErr(*response.Header)
+		return quantumfs.ZeroKey, 0, false, wsdb.convertErr(*response.Header)
 	}
 
 	key = quantumfs.NewObjectKeyFromBytes(response.Key.GetData())
@@ -700,11 +719,13 @@ func (wsdb *workspaceDB) _fetchWorkspace(c *quantumfs.Ctx, workspaceName string)
 	return key, nonce, immutable, nil
 }
 
+const WorkspaceLog = "grpc::Workspace"
+
 func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey,
 	quantumfs.WorkspaceNonce, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::Workspace").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceLog).Out()
 
 	var resKey quantumfs.ObjectKey
 	var resNonce quantumfs.WorkspaceNonce
@@ -735,11 +756,14 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, err
+		return quantumfs.ZeroKey, 0, err
 	}
 
 	return wsdb.Workspace(c, typespace, namespace, workspace)
 }
+
+const AdvanceWorkspaceLog = "grpc::AdvanceWorkspace"
+const AdvanceWorkspaceDebug = "%s from %s to %s"
 
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
@@ -748,8 +772,8 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, "grpc::AdvanceWorkspace",
-		"%s from %s to %s", workspaceName, currentRootId.String(),
+	defer c.FuncIn(qlog.LogWorkspaceDb, AdvanceWorkspaceLog,
+		AdvanceWorkspaceDebug, workspaceName, currentRootId.String(),
 		newRootId.String()).Out()
 
 	var result quantumfs.ObjectKey
@@ -782,24 +806,25 @@ func (wsdb *workspaceDB) advanceWorkspace(c *quantumfs.Ctx, typespace string,
 	response, err := wsdb.server.AdvanceWorkspace(context.TODO(), &request)
 	if err != nil {
 		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
-		return quantumfs.ObjectKey{}, wsdb.handleGrpcError(err)
+		return quantumfs.ZeroKey, wsdb.handleGrpcError(err)
 	}
-
-	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
 
 	if response.Header.Err != 0 {
 		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
-		return newKey, wsdb.convertErr(*response.Header)
+		return quantumfs.ZeroKey, wsdb.convertErr(*response.Header)
 	}
 
+	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
 	return newKey, nil
 }
+
+const WorkspaceIsImmutableLog = "grpc::WorkspaceIsImmutable"
 
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "grpc::WorkspaceIsImmutable").Out()
+	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceIsImmutableLog).Out()
 
 	var result bool
 
@@ -822,11 +847,14 @@ func (wsdb *workspaceDB) workspaceIsImmutable(c *quantumfs.Ctx, typespace string
 	return immutable, err
 }
 
+const SetWorkspaceImmutableLog = "grpc::SetWorkspaceImmutable"
+const SetWorkspaceImmutableDebug = "%s/%s/%s"
+
 func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, "grps::SetWorkspaceImmutable",
-		"%s/%s/%s", typespace, namespace, workspace).Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, SetWorkspaceImmutableLog,
+		SetWorkspaceImmutableDebug, typespace, namespace, workspace).Out()
 
 	err := retry(c, "SetWorkspaceImmutable", func(c *quantumfs.Ctx) error {
 		return wsdb.setWorkspaceImmutable(c, typespace, namespace, workspace)
