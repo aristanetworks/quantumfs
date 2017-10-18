@@ -226,10 +226,10 @@ func TestMultiBlockFileWriteLastBlockBeforeEnd(t *testing.T) {
 		test.AssertNoErr(os.Truncate(filename,
 			int64(3*quantumfs.MaxBlockSize-1)))
 
-		// Now write well past the point where the end of the file is. This
-		// will make the file sparse between the write above and the write
-		// below.
-		test.Log("Writing byte halfway into block")
+		// Write at the beginning of the last block. The Truncate() above has
+		// made the file longer than the last block and longer than where we
+		// are writing to. The file length must be unchanged after this
+		// write.
 		_, err = file.Seek(int64(2*quantumfs.MaxBlockSize+1), os.SEEK_SET)
 		test.AssertNoErr(err)
 		_, err = file.Write([]byte{1})
@@ -237,7 +237,6 @@ func TestMultiBlockFileWriteLastBlockBeforeEnd(t *testing.T) {
 
 		// Now the byte we just wrote should be 1 while the byte after the
 		// first write is sparse and must be zero.
-		test.Log("Verifying")
 		buf := make([]byte, 1)
 		_, err = file.ReadAt(buf, int64(2*quantumfs.MaxBlockSize+1))
 		test.AssertNoErr(err)
