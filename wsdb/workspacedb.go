@@ -15,6 +15,7 @@ import (
 // ObjectKey is key used to access object in the cluster-wide
 // object store using Ether's BlobStore API
 type ObjectKey []byte
+type WorkspaceNonce int64
 
 func (key ObjectKey) String() string {
 	return hex.EncodeToString(key)
@@ -107,7 +108,7 @@ type WorkspaceDB interface {
 
 	// These methods need to be up to date
 	Workspace(c ether.Ctx, typespace string, namespace string,
-		workspace string) (ObjectKey, error)
+		workspace string) (ObjectKey, WorkspaceNonce, error)
 
 	// These methods need to be atomic, but may retry internally
 
@@ -119,7 +120,7 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	CreateWorkspace(c ether.Ctx, typespace string, namespace string,
-		workspace string, wsKey ObjectKey) error
+		workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error
 
 	// BranchWorkspace branches srcNamespace/srcWorkspace to create
 	// dstNamespace/dstWorkspace
@@ -153,5 +154,5 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
 	//  	remotely so the local instance is out of date
 	AdvanceWorkspace(c ether.Ctx, typespace string, namespace string, workspace string,
-		currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
+		nonce WorkspaceNonce, currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
 }
