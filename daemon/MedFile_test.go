@@ -236,7 +236,8 @@ func TestMultiBlockFileWriteLastBlockBeforeEnd(t *testing.T) {
 		test.AssertNoErr(err)
 
 		// Now the byte we just wrote should be 1 while the byte after the
-		// first write is sparse and must be zero.
+		// first write is sparse and must be zero and must not be beyond the
+		// end of the file.
 		buf := make([]byte, 1)
 		_, err = file.ReadAt(buf, int64(2*quantumfs.MaxBlockSize+1))
 		test.AssertNoErr(err)
