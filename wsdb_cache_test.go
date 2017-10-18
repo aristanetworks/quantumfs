@@ -240,8 +240,12 @@ func (suite *wsdbCacheTestSuite) TestCacheAdvanceOk() {
 	suite.common.TestAdvanceOk()
 }
 
-func (suite *wsdbCacheTestSuite) TestCacheAdvanceOutOfDate() {
-	suite.common.TestAdvanceOutOfDate()
+func (suite *wsdbCacheTestSuite) TestCacheAdvanceOutOfDateKey() {
+	suite.common.TestAdvanceOutOfDateKey()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheAdvanceOutOfDateNonce() {
+	suite.common.TestAdvanceOutOfDateNonce()
 }
 
 func (suite *wsdbCacheTestSuite) TestCacheAdvanceNotExist() {
@@ -432,14 +436,14 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 	// newly branched workspace must be in cache
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1",
-		[]byte(nil), gocql.ErrNotFound)
+		[]byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws2",
-		[]byte(nil), gocql.ErrNotFound)
+		[]byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 	err = suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws2")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
@@ -510,7 +514,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	// namespace
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1",
-		[]byte(nil), gocql.ErrNotFound)
+		[]byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 
 	// causes a local insert of ws1 workspace for the null namespace
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
@@ -645,11 +649,11 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "a",
-		[]byte(nil), gocql.ErrNotFound)
+		[]byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "b",
-		[]byte(nil), gocql.ErrNotFound)
+		[]byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "a")
@@ -704,7 +708,7 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
-		"childWS", []byte(nil), gocql.ErrNotFound)
+		"childWS", []byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
@@ -754,7 +758,7 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
-		"childWS", []byte(nil), gocql.ErrNotFound)
+		"childWS", []byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
@@ -805,7 +809,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 func (suite *wsdbCacheTestSuite) TestCacheChildDeleteDuringRefresh() {
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
-		"childWS", []byte(nil), gocql.ErrNotFound)
+		"childWS", []byte(nil), GetUniqueNonce(), gocql.ErrNotFound)
 
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
@@ -924,7 +928,7 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
 	mockBranchWorkspace(suite.common.mockSess,
 		wsdb.NullSpaceName, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, "ts1", "ns1", "ws1", []byte(nil),
-		gocql.ErrNotFound)
+		GetUniqueNonce(), gocql.ErrNotFound)
 	err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err,
@@ -977,7 +981,7 @@ VALUES (?,?,?,?,?)`
 	query := suite.common.mockSess.Query(`
 INSERT INTO ether.workspacedb
 (typespace, namespace, workspace, key, ignore)
-VALUES (?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), time.Now().UnixNano())
+VALUES (?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), GetUniqueNonce())
 
 	err := query.Exec()
 	suite.Require().NoError(err, "Insert failed with %s", err)

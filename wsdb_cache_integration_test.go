@@ -25,7 +25,7 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 
 	wsdb := NewWorkspaceDB(confFile)
 
-	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName, []byte(nil))
+	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName, 0, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{

@@ -385,30 +385,30 @@ WHERE typespace=? AND namespace=? AND workspace=?`,
 }
 
 func mockWsdbKeyGet(sess *MockSession, typespace string,
-	namespace string, workspace string, key []byte, err error) {
+	namespace string, workspace string, key []byte, nonce int64, err error) {
 
 	query := new(MockQuery)
 	qScanFunc := newMockQueryScanByteSlice(err, key)
-	query.On("Scan", mock.AnythingOfType("*[]uint8")).Return(qScanFunc)
+	query.On("Scan", mock.AnythingOfType("*[]uint8"), mock.AnythingOfType("*int64")).Return(qScanFunc)
 
 	sess.On("Query", `
-SELECT key
+SELECT key, nonce
 FROM ether.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 		typespace, namespace, workspace).Return(query)
 }
 
 func mockWsdbKeyPut(sess *MockSession, typespace string,
-	namespace string, workspace string, key []byte, err error) {
+	namespace string, workspace string, key []byte, nonce int64, err error) {
 
 	query := new(MockQuery)
 	stmt := `
 INSERT INTO ether.workspacedb
-(typespace, namespace, workspace, key)
-VALUES (?,?,?,?)`
+(typespace, namespace, workspace, key, nonce)
+VALUES (?,?,?,?,?)`
 
 	sess.On("Query", stmt,
-		typespace, namespace, workspace, key).Return(query)
+		typespace, namespace, workspace, key, mock.AnythingOfType("int64")).Return(query)
 	if err == nil {
 		query.On("Exec").Return(nil)
 	} else {
@@ -563,12 +563,12 @@ func mockWsdbCacheWorkspaceFetchErr(sess *MockSession, err error) {
 func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 	srcNamespace string, srcWorkspace string,
 	dstTypespace string, dstNamespace string, dstWorkspace string,
-	srcKey []byte, dstErr error) {
+	srcKey []byte, nonce int64, dstErr error) {
 
 	mockWsdbKeyGet(sess, srcTypespace, srcNamespace, srcWorkspace,
-		srcKey, nil)
+		srcKey, nonce, nil)
 	mockWsdbKeyGet(sess, dstTypespace, dstNamespace, dstWorkspace,
-		nil, dstErr)
+		nil, nonce, dstErr)
 	mockWsdbKeyPut(sess, dstTypespace, dstNamespace, dstWorkspace,
-		srcKey, nil)
+		srcKey, 0, nil)
 }

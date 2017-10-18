@@ -106,13 +106,13 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 }
 
 func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
-	workspace string, wsKey wsdb.ObjectKey) error {
+	workspace string, nonce wsdb.WorkspaceNonce, wsKey wsdb.ObjectKey) error {
 
 	keyHex := hex.EncodeToString(wsKey)
-	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)", typespace, namespace,
-		workspace, keyHex).Out()
+	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)(%d)", typespace, namespace,
+		workspace, keyHex, nonce).Out()
 
-	err := cw.base.CreateWorkspace(c, typespace, namespace, workspace, wsKey)
+	err := cw.base.CreateWorkspace(c, typespace, namespace, workspace, nonce, wsKey)
 	if err != nil {
 		return err
 	}
@@ -171,34 +171,35 @@ func (cw *cacheWsdb) WorkspaceLastWriteTime(c ether.Ctx, typespace string, names
 }
 
 func (cw *cacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
-	workspace string) (wsdb.ObjectKey, error) {
+	workspace string) (wsdb.ObjectKey, wsdb.WorkspaceNonce, error) {
 
 	defer c.FuncIn("cacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
 		workspace).Out()
 
-	key, err := cw.base.Workspace(c, typespace, namespace, workspace)
+	key, nonce, err := cw.base.Workspace(c, typespace, namespace, workspace)
 	if err != nil {
-		return wsdb.ObjectKey{}, err
+		return wsdb.ObjectKey{}, 0, err
 	}
 	cw.cache.InsertEntities(c, typespace, namespace, workspace)
-	return key, nil
+	return key, nonce, nil
 }
 
 func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
-	namespace string, workspace string, currentRootID wsdb.ObjectKey,
+	namespace string, workspace string, nonce wsdb.WorkspaceNonce,
+	currentRootID wsdb.ObjectKey,
 	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
 	currentKeyHex := hex.EncodeToString(currentRootID)
 	newKeyHex := hex.EncodeToString(newRootID)
 
-	defer c.FuncIn("cacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s)", typespace, namespace,
-		workspace, currentKeyHex, newKeyHex).Out()
+	defer c.FuncIn("cacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s) old-nonce:%d", typespace, namespace,
+		workspace, currentKeyHex, newKeyHex, nonce).Out()
 
 	start := time.Now()
 	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()
 
 	key, err := cw.base.AdvanceWorkspace(c, typespace, namespace,
-		workspace, currentRootID, newRootID)
+		workspace, nonce, currentRootID, newRootID)
 	if err != nil {
 		return key, err
 	}

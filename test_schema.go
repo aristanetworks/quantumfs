@@ -36,8 +36,8 @@ func execWithRetry(q *gocql.Query) error {
 
 // SetupTestSchema does the setup of schema for docker/k8s
 //   CREATE KEYSPACE IF NOT EXISTS ether WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
-//   CREATE TABLE IF NOT EXISTS ether.blobstore ( key text PRIMARY KEY, value blob );
-//   CREATE TABLE IF NOT EXISTS ether.workspacedb ( namespace text, workspace text, key text, PRIMARY KEY ( namespace, workspace )) ;
+//   CREATE TABLE IF NOT EXISTS ether.blobstore ( key blob PRIMARY KEY, value blob );
+//   CREATE TABLE IF NOT EXISTS ether.workspacedb ( namespace text, workspace text, key blob, PRIMARY KEY ( namespace, workspace )) ;
 func SetupTestSchema(confFile string) error {
 
 	cfg, err := readCqlConfig(confFile)
@@ -69,7 +69,7 @@ func SetupTestSchema(confFile string) error {
 	}
 
 	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.workspacedb "+
-		"( typespace text, namespace text, workspace text, key blob, "+
+		"( typespace text, namespace text, workspace text, key blob, nonce bigint, "+
 		"PRIMARY KEY ( typespace, namespace, workspace ))",
 		cfg.Cluster.KeySpace)
 	query = session.Query(queryStr)

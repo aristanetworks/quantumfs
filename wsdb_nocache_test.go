@@ -53,8 +53,12 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceOk() {
 	suite.common.TestAdvanceOk()
 }
 
-func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceOutOfDate() {
-	suite.common.TestAdvanceOutOfDate()
+func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceOutOfDateKey() {
+	suite.common.TestAdvanceOutOfDateKey()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceOutOfDateNonce() {
+	suite.common.TestAdvanceOutOfDateNonce()
 }
 
 func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceNotExist() {

@@ -31,7 +31,9 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
 
-	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName, []byte(nil))
+	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
+		qwsdb.NullSpaceName, qwsdb.NullSpaceName,
+		qwsdb.WorkspaceNonce(GetUniqueNonce()), []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{

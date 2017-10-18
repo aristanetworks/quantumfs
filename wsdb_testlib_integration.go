@@ -98,16 +98,16 @@ func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
 		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(e, "Error branching null workspace: %v", e)
 
-	key, err1 := s.db.Workspace(integTestEtherCtx, "ts1", "ns1", "ws1")
+	key, nonce, err1 := s.db.Workspace(integTestEtherCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err1, "Workspace failed %s", err1)
 	s.req.True(bytes.Equal(key, emptyKey), "Current RootID isn't empty")
 
-	newRootID, err := s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1", emptyKey,
+	newRootID, err := s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1", nonce, emptyKey,
 		newKey)
 	s.req.NoError(err, "Error in advancing workspace EmptyDirKey: %v", err)
 	s.req.True(bytes.Equal(newRootID, newKey), "New RootID isn't EmptyDirKey")
 
-	newRootID, err = s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1", newKey, emptyKey)
+	newRootID, err = s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1", nonce, newKey, emptyKey)
 	s.req.NoError(err, "Error in advancing workspace to EmptyWorkspaceKey: %v",
 		err)
 	s.req.True(bytes.Equal(newRootID, emptyKey),

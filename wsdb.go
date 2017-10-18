@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aristanetworks/ether/qubit/wsdb"
 )
@@ -30,4 +31,10 @@ func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
 	}
 
 	return newCacheWsdb(wsdb, cfg.WsDB)
+}
+
+var GetUniqueNonce func() int64 = GetTimeBasedNonce
+
+func GetTimeBasedNonce() int64 {
+	return time.Now().UnixNano()
 }
