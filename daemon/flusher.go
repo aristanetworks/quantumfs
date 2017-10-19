@@ -27,18 +27,23 @@ type dirtyInode struct {
 	expiryTime          time.Time
 }
 
+type triggerCmd struct {
+	flushAll bool
+	finished chan bool
+}
+
 type FlushCmd int
 
 const (
 	KICK = FlushCmd(iota)
-	QUIT
-	LOCKANDQUIT
-	ABORT // N.B. ABORT is unused at the moment
+	FLUSHALL
+	RETURN
 )
 
 type DirtyQueue struct {
 	// The Front of the list are the Inodes next in line to flush.
 	l        *list.List
+	trigger  chan triggerCmd
 	cmd      chan FlushCmd
 	done     chan error
 	treelock *TreeLock
@@ -46,7 +51,8 @@ type DirtyQueue struct {
 
 func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 	dq := DirtyQueue{
-		l: list.New(),
+		l:       list.New(),
+		trigger: make(chan triggerCmd, 1000),
 		// We would like to allow a large number of
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
@@ -83,10 +89,86 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 	return dq.l.PushFront(v)
 }
 
+func (dq *DirtyQueue) kicker(c *ctx) {
+	defer logRequestPanic(c)
+
+	// When we think we have no inodes try periodically anyways to ensure sanity
+	nextExpiringInode := time.Now().Add(flushSanityTimeout)
+
+	for {
+		sleepTime := getSleepTime(c, nextExpiringInode)
+		cmd := KICK
+		done := false
+
+		select {
+		case cmd = <-dq.cmd:
+			c.vlog("dq kicker cmd %d", cmd)
+		case <-time.After(sleepTime):
+			c.vlog("dq kicker woken up due to timer")
+		}
+
+		func() {
+			dq.treelock.lock.RLock()
+			defer dq.treelock.lock.RUnlock()
+
+			doneChan := make(chan bool)
+			func() {
+				defer c.qfs.flusher.lock.Lock().Unlock()
+
+				// By the time we get the flusher lock, the flush
+				// thread may be done and gone by now, so we have to
+				// check before we even think of waiting on it
+				if dq.Len_() == 0 {
+					done = true
+					return
+				}
+
+				switch cmd {
+				case KICK:
+					dq.trigger <- triggerCmd{
+						flushAll: false,
+						finished: doneChan,
+					}
+				case FLUSHALL:
+					dq.trigger <- triggerCmd{
+						flushAll: true,
+						finished: doneChan,
+					}
+				case RETURN:
+					c.elog("RETURN with non-empty dirty queue")
+				default:
+					c.elog("Unhandled flushing type")
+				}
+			}()
+
+			if done {
+				return
+			}
+
+			// With the flusher lock released, we've allowed the flush
+			// thread to do its job and inform us when we can release
+			// the treelock
+			<-doneChan
+
+			defer c.qfs.flusher.lock.Lock().Unlock()
+			if dq.Len_() > 0 {
+				element := dq.Front_()
+				candidate := element.Value.(*dirtyInode)
+				nextExpiringInode = candidate.expiryTime
+			} else {
+				done = true
+			}
+		}()
+
+		if done {
+			return
+		}
+	}
+}
+
 // Try sending a command to the dirtyqueue, failing immediately
 // if it would have blocked
-// flusher lock must be locked when calling this function
-func (dq *DirtyQueue) TryCommand_(c *ctx, cmd FlushCmd) error {
+func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd) error {
 	c.vlog("Sending cmd %d to dirtyqueue %s", cmd, dq.treelock.name)
 	select {
 	case dq.cmd <- cmd:
@@ -97,7 +179,7 @@ func (dq *DirtyQueue) TryCommand_(c *ctx, cmd FlushCmd) error {
 	}
 }
 
-// treeLock and flusher lock must be exclusively locked when calling this function
+// treeLock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
@@ -135,13 +217,11 @@ func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
 	dq.done <- fmt.Errorf("Flushing inode %d failed", inodeId)
 }
 
-// treeLock and flusher lock must be exclusively locked when calling this function
-func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
-	done bool) {
+// treeLock and flusher lock must be locked R/W when calling this function
+func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
 
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
 	defer logRequestPanic(c)
-	next, done = time.Now(), false
 
 	for dq.Len_() > 0 {
 		// Should we clean this inode?
@@ -151,7 +231,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 		now := time.Now()
 		if !flushAll && candidate.expiryTime.After(now) {
 			// all expiring inodes have been flushed
-			return candidate.expiryTime, false
+			return false
 		}
 
 		if !dq.flushCandidate_(c, candidate) {
@@ -160,11 +240,11 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (next time.Time,
 			if flushAll {
 				dq.handleFlushError_(c, candidate.inode.inodeNum())
 			}
-			return candidate.expiryTime, false
+			return false
 		}
 		dq.Remove_(element)
 	}
-	return time.Now(), true
+	return true
 }
 
 func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
@@ -183,64 +263,50 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 }
 
 // flusher lock must be locked when calling this function
-func (dq *DirtyQueue) flush_(c *ctx) {
-	defer c.FuncIn("DirtyQueue::flush_", "%s", dq.treelock.name).Out()
-	// When we think we have no inodes try periodically anyways to ensure sanity
-	nextExpiringInode := time.Now().Add(flushSanityTimeout)
+func (dq *DirtyQueue) flush(c *ctx) {
+	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
+	defer logRequestPanic(c)
 	done := false
-	abort := false
 
-	for dq.Len_() > 0 && !done {
+	for !done {
+		trigger := <-dq.trigger
+		c.vlog("dirtyqueue received cmd %d", trigger.flushAll)
+
+		// NOTE: When we are triggered, the treelock *must* already
+		// be locked by the caller, exclusively or not
+
 		func() {
-			sleepTime := getSleepTime(c, nextExpiringInode)
-			cmd := KICK
-			flushAll := false
-			var unlockFn func()
+			defer c.qfs.flusher.lock.Lock().Unlock()
+			done = dq.flushQueue_(c, trigger.flushAll)
 
-			func() {
-				c.qfs.flusher.lock.Unlock()
-				defer c.qfs.flusher.lock.Lock()
-
-				select {
-				case cmd = <-dq.cmd:
-					c.vlog("dirtyqueue received cmd %d", cmd)
-				case <-time.After(sleepTime):
-					c.vlog("flusher woken up due to timer")
-				}
-
-				// ensure that treelock is locked *before* the
-				// flusher lock is acquired, or else we'll deadlock
-				switch cmd {
-				case KICK:
-					dq.treelock.lock.RLock()
-					unlockFn = dq.treelock.lock.RUnlock
-				case LOCKANDQUIT:
-					dq.treelock.lock.RLock()
-					unlockFn = dq.treelock.lock.RUnlock
-					flushAll = true
-				case QUIT:
-					flushAll = true
-				case ABORT:
-					abort = true
-					return
-				default:
-					panic("Unhandled flushing type")
-				}
-			}()
-
-			if unlockFn != nil {
-				defer unlockFn()
+			if dq.Len_() == 0 {
+				done = true
+			} else if done {
+				c.elog("Done without empty dirty queue")
 			}
 
-			if abort {
-				return
-			}
+			if done {
+				// Cleanup
+				close(dq.done)
+				delete(c.qfs.flusher.dqs, dq.treelock)
 
-			nextExpiringInode, done = dq.flushQueue_(c, flushAll)
+				// end the kicker thread and cleanup any triggers
+				dq.TryCommand(c, RETURN)
+				close(dq.trigger)
+			}
 		}()
 
-		if abort {
-			return
+		if trigger.finished != nil {
+			trigger.finished <- true
+		}
+	}
+
+	// cleanup any leftover triggers
+	for range dq.trigger {
+		trigger := <-dq.trigger
+
+		if trigger.finished != nil {
+			trigger.finished <- true
 		}
 	}
 }
@@ -268,28 +334,30 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 	var err error
 	func() {
 		defer flusher.lock.Lock().Unlock()
-		// We cannot close the channel, as we have to distinguish between
-		// ABORT and QUIT commands.
+
 		c.vlog("Flusher: %d dirty queues should finish off",
 			len(flusher.dqs))
 		for _, dq := range flusher.dqs {
-			if workspace != "" &&
-				!strings.HasPrefix(workspace, dq.treelock.name) {
-				continue
+			if workspace != "" {
+				if !strings.HasPrefix(workspace, dq.treelock.name) {
+					continue
+				}
+
+				// For a single specific workspace, we assume to
+				// already have the treelock acquired, so trigger
+				// flusher thread manually
+				dq.trigger <- triggerCmd{
+					flushAll: true,
+					finished: nil,
+				}
+			} else {
+				err = dq.TryCommand(c, FLUSHALL)
+				if err != nil {
+					c.vlog("failed to send cmd to dirtyqueue")
+					return
+				}
 			}
 
-			cmd := QUIT
-			// If you specify a workspace, we assume the tree is already
-			// locked before calling this function
-			if workspace == "" {
-				cmd = LOCKANDQUIT
-			}
-
-			err = dq.TryCommand_(c, cmd)
-			if err != nil {
-				c.vlog("failed to send cmd to dirtyqueue")
-				return
-			}
 			doneChannels = append(doneChannels, dq.done)
 		}
 	}()
@@ -363,16 +431,13 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	treelock := inode.treeLock()
 	dq := flusher.dqs[treelock]
 	if launch {
-		go func() {
-			nc := c.flusherCtx()
-			defer flusher.lock.Lock().Unlock()
-			dq.flush_(nc)
-			close(dq.done)
-			delete(flusher.dqs, treelock)
-		}()
+		nc := c.flusherCtx()
+
+		// flush will acquire the flusher lock when it needs to
+		go dq.flush(nc)
+		go dq.kicker(nc)
 	}
-	// N.B. dq might be nil if the flusher goroutines are ABORTed,
-	// ABORT is not currently used anywhere, therefore dq must not be nil
-	dq.TryCommand_(c, KICK)
+
+	dq.TryCommand(c, KICK)
 	return dirtyElement
 }
