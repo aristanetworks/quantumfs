@@ -726,7 +726,7 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 
 		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
 
-		test.WaitFor("File type to update", func () bool {
+		test.WaitFor("File type to update", func() bool {
 			// Confirm the directory is consistent with a medium file
 			inode = test.getInode(dirName)
 			dir = inode.(*Directory)
