@@ -177,7 +177,7 @@ func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd) error {
 	}
 }
 
-// treeLock and flusher lock must be exclusively locked when calling this function
+// treeLock and flusher lock must be locked R/W when calling this function
 func flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
@@ -213,7 +213,7 @@ func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
 	dq.done <- fmt.Errorf("Flushing inode %d failed", inodeId)
 }
 
-// treeLock and flusher lock must be exclusively locked when calling this function
+// treeLock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
 
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
@@ -427,8 +427,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	treelock := inode.treeLock()
 	dq := flusher.dqs[treelock]
 	if launch {
-		//nc := c.flusherCtx()
-		nc := c
+		nc := c.flusherCtx()
 
 		// flush will acquire the flusher lock when it needs to
 		go dq.flush(nc)
