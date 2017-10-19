@@ -51,8 +51,8 @@ type DirtyQueue struct {
 
 func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 	dq := DirtyQueue{
-		l: list.New(),
-		trigger:  make(chan triggerCmd, 1000),
+		l:       list.New(),
+		trigger: make(chan triggerCmd, 1000),
 		// We would like to allow a large number of
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
@@ -112,7 +112,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			defer dq.treelock.lock.RUnlock()
 
 			doneChan := make(chan bool)
-			func () {
+			func() {
 				defer c.qfs.flusher.lock.Lock().Unlock()
 
 				// By the time we get the flusher lock, the flush
@@ -132,12 +132,12 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 
 				switch cmd {
 				case KICK:
-					dq.trigger <- triggerCmd {
+					dq.trigger <- triggerCmd{
 						flushAll: false,
 						finished: doneChan,
 					}
 				case FLUSHALL:
-					dq.trigger <- triggerCmd {
+					dq.trigger <- triggerCmd{
 						flushAll: true,
 						finished: doneChan,
 					}
@@ -146,7 +146,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 				default:
 					c.elog("Unhandled flushing type")
 				}
-			} ()
+			}()
 
 			if done {
 				return
@@ -271,7 +271,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 		// NOTE: When we are triggered, the treelock *must* already
 		// be locked by the caller, exclusively or not
 
-		func () {
+		func() {
 			defer c.qfs.flusher.lock.Lock().Unlock()
 			done = dq.flushQueue_(c, trigger.flushAll)
 
@@ -342,7 +342,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 				// For a single specific workspace, we assume to
 				// already have the treelock acquired, so trigger
 				// flusher thread manually
-				dq.trigger <- triggerCmd {
+				dq.trigger <- triggerCmd{
 					flushAll: true,
 					finished: nil,
 				}
