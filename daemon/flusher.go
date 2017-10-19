@@ -293,6 +293,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 				// end the kicker thread and cleanup any triggers
 				dq.TryCommand(c, RETURN)
 				close(dq.trigger)
+				close(dq.cmd)
 			}
 		}()
 
