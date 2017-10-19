@@ -366,7 +366,7 @@ func TestWorkspaceAccessAfterDeletion(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(filename, "Test data"))
 
 		api := test.getApi()
-		api.DeleteWorkspace(test.RelPath(workspace))
+		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(workspace)))
 
 		test.WaitFor("File to no longer exist", func() bool {
 			var stat syscall.Stat_t
