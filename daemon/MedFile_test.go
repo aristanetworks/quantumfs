@@ -214,31 +214,43 @@ func TestMultiBlockFileReadPastEnd(t *testing.T) {
 	})
 }
 
-func TestMultiBlockFileSequentialSet(t *testing.T) {
-	t.Skip()
+func TestMultiBlockFileWriteLastBlockBeforeEnd(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		filename := workspace + "/file"
-		const (
-			size     = 30 * 1024 * 1024
-			pagesize = 4096
-			numpages = size / pagesize
-		)
 
-		f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
+		fileSize := int64(3*quantumfs.MaxBlockSize - 1)
+
+		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
 			0777)
 		test.AssertNoErr(err)
-		defer f.Close()
-		test.AssertNoErr(os.Truncate(filename, size))
+		defer file.Close()
+		test.AssertNoErr(os.Truncate(filename, fileSize))
 
-		mmap, err := syscall.Mmap(int(f.Fd()), 0, size,
-			syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+		// Write at the beginning of the last block. The Truncate() above has
+		// made the file longer than the last block and longer than where we
+		// are writing to. The file length must be unchanged after this
+		// write.
+		_, err = file.Seek(int64(2*quantumfs.MaxBlockSize+1), os.SEEK_SET)
+		test.AssertNoErr(err)
+		_, err = file.Write([]byte{1})
+		test.AssertNoErr(err)
 
-		for i := 0; i < numpages; i++ {
-			for j := 0; j < pagesize; j++ {
-				mmap[i*pagesize+j] = byte((i + j) % 256)
-			}
-		}
-		test.AssertNoErr(syscall.Munmap(mmap))
+		// Now the byte we just wrote should be 1 while the byte after the
+		// first write is sparse and must be zero and must not be beyond the
+		// end of the file.
+		buf := make([]byte, 1)
+		_, err = file.ReadAt(buf, int64(2*quantumfs.MaxBlockSize+1))
+		test.AssertNoErr(err)
+		test.Assert(buf[0] == 1, "Written byte not one: %d", buf[0])
+
+		_, err = file.ReadAt(buf, int64(2*quantumfs.MaxBlockSize+
+			quantumfs.MaxBlockSize/2))
+		test.AssertNoErr(err)
+		test.Assert(buf[0] == 0, "Sparse byte not zero: %d", buf[0])
+
+		// Confirm the file still has the expected length
+		_, err = file.ReadAt(buf, fileSize+1)
+		test.AssertErr(err)
 	})
 }
