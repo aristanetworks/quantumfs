@@ -231,9 +231,16 @@ func (qfs *QuantumFs) Serve() {
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
+	retries := 5
 	for qfs.flusher.syncAll(&qfs.c) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
+
+		if retries == 0 {
+			qfs.c.elog("Unable to syncAll after Serve")
+			break
+		}
+		retries--
 	}
 	qfs.c.dataStore.shutdown()
 }
@@ -418,10 +425,19 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
 			_, flushSuccess = wsr.flushCanFail(c)
 
 			// Flush of wsr failed, so try merging
-			if !flushSuccess && lastInode {
-				err := forceMerge(c, wsr)
-				if err == nil {
-					// We fixed the wsr flush failure via merge
+			if !flushSuccess {
+				if lastInode {
+					err := forceMerge(c, wsr)
+					if err == nil {
+						// We fixed the wsr flush failure
+						// via merge
+						flushSuccess = true
+					}
+				} else {
+					// the workspaceroot should be dropped for
+					// now - there are children in queue to be
+					// flushed first. They will push the wsr
+					// back into the dirty queue later
 					flushSuccess = true
 				}
 			}
