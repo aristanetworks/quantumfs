@@ -219,12 +219,13 @@ func TestMultiBlockFileWriteLastBlockBeforeEnd(t *testing.T) {
 		workspace := test.NewWorkspace()
 		filename := workspace + "/file"
 
+		fileSize := int64(3*quantumfs.MaxBlockSize - 1)
+
 		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
 			0777)
 		test.AssertNoErr(err)
 		defer file.Close()
-		test.AssertNoErr(os.Truncate(filename,
-			int64(3*quantumfs.MaxBlockSize-1)))
+		test.AssertNoErr(os.Truncate(filename, fileSize))
 
 		// Write at the beginning of the last block. The Truncate() above has
 		// made the file longer than the last block and longer than where we
@@ -247,5 +248,9 @@ func TestMultiBlockFileWriteLastBlockBeforeEnd(t *testing.T) {
 			quantumfs.MaxBlockSize/2))
 		test.AssertNoErr(err)
 		test.Assert(buf[0] == 0, "Sparse byte not zero: %d", buf[0])
+
+		// Confirm the file still has the expected length
+		_, err = file.ReadAt(buf, fileSize+1)
+		test.AssertErr(err)
 	})
 }
