@@ -380,7 +380,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 			c.elog("Unable to get workspace rootId")
 			return err
 		}
-		
+
 		if nonce != wsr.nonce {
 			c.wlog("Nothing to merge, new workspace")
 			return nil
