@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -33,11 +34,13 @@ func (test *testHelper) setupDual() (workspace0 string, workspace1 string) {
 // Specify data of length zero to wait for file to not exist
 func (test *testHelper) waitForPropagate(file string, data []byte) {
 	test.WaitFor(file+" to propagate", func() bool {
-		readData, err := ioutil.ReadFile(file)
+		fd, err := os.Open(file)
+		defer fd.Close()
 		if len(data) == 0 {
-			return err == os.ErrNotExist
+			return err != os.ErrNotExist
 		}
 
+		readData, err := ioutil.ReadFile(file)
 		if err != nil {
 			return false
 		}
@@ -107,8 +110,8 @@ func TestConcurrentWriteDeletion(t *testing.T) {
 		// Check that we can still read everything from the orphan
 		buf := make([]byte, 10)
 		n, err = fd.ReadAt(buf, 0)
-		test.AssertNoErr(err)
-		test.Assert(bytes.Equal(buf, append(dataA, dataB...)),
-			"Mismatched data in orphan")
+		test.Assert(err == io.EOF, "Didn't read all file contents")
+		test.Assert(bytes.Equal(buf[:n], append(dataA, dataB...)),
+			"Mismatched data in orphan: %s", buf[:n])
 	})
 }
