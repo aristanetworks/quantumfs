@@ -849,8 +849,9 @@ func TestRemoveHardlinkBeforeSync(t *testing.T) {
 
 		// Create and remove the hardlink. Though the file is gone the
 		// hardink entry must remain until after all the directories in which
-		// it was a child have flushed, otherwise a directory metadata may
-		// point to an entry which does not exist in the hardlink table.
+		// it was a child have flushed, otherwise an uploaded directory
+		// metadata may point to an entry which does not exist in the
+		// hardlink table.
 		test.createFile(workspace, "dir/leg1", 1)
 		test.linkFile(workspace, "dir/leg1", "leg2")
 		test.removeFile(workspace, "leg2")
