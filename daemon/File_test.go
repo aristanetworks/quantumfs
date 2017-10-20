@@ -696,6 +696,11 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		file.Close()
 		fileInode := test.getInodeNum(fileName)
 
+		// Increase the file size to be a medium file. After this write we
+		// should have the state where, according to the directory, the file
+		// is still a small file with the EmptyBlockKey. Only after the file
+		// has flushed should its parent directory see it as a medium file
+		// with the appropiate ID.
 		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
 
 		// Confirm the directory is consistent with a small file
@@ -710,6 +715,7 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
 			"File isn't small file: %s", record.Type())
 
+		// Cause the file to be flushed
 		test.SyncAllWorkspaces()
 
 		// Confirm the directory is consistent with a medium file
