@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -57,6 +58,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 		dataB := []byte("def")
 		fileA := "/fileA"
 		fileB := "/fileB"
+
 		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
 			string(dataA)))
 
@@ -113,5 +115,28 @@ func TestConcurrentWriteDeletion(t *testing.T) {
 		test.Assert(err == io.EOF, "Didn't read all file contents")
 		test.Assert(bytes.Equal(buf[:n], append(dataA, dataB...)),
 			"Mismatched data in orphan: %s", buf[:n])
+	})
+}
+
+func TestConcurrentHardlinks(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0, workspace1 := test.setupDual()
+
+		dataA := []byte("abc")
+		fileA := "/fileA"
+		fileB := "/fileB"
+
+		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
+			string(dataA)))
+
+		test.waitForPropagate(workspace1 + fileA, dataA)
+
+		test.AssertNoErr(syscall.Link(workspace1+fileA, workspace1+fileB))
+
+		test.waitForPropagate(workspace0 + fileB, dataA)
+
+		test.AssertNoErr(os.Remove(workspace0 + fileA))
+
+		test.waitForPropagate(workspace1 + fileA, []byte{})
 	})
 }
