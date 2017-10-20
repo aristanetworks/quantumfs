@@ -131,7 +131,7 @@ func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
 // If you need to run two concurrent instances of QuantumFS in the same test, use
 // runTestDualQuantumFS().
 func runDualQuantumFsTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 2, nil)
+	runTestCommon(t, test, 2, dirtyDelay100Ms)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
