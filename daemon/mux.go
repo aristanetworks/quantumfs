@@ -345,6 +345,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s", name).Out()
 
+	c = c.refreshCtx()
 	defer logRequestPanic(c)
 
 	parts := strings.Split(name, "/")
