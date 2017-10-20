@@ -709,7 +709,9 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		file.Close()
 		fileInode := test.getInodeNum(fileName)
 
-		msg := fmt.Sprintf("Mux::flushInode_ inode %d", dirInode)
+		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
+
+		msg := fmt.Sprintf("Mux::flushInode inode %d", dirInode)
 		test.WaitForLogString(msg, "Directory to flush")
 
 		// Confirm the directory is consistent with a small file
@@ -724,23 +726,19 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
 			"File isn't small file: %s", record.Type())
 
-		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
+		msg = fmt.Sprintf("Mux::flushInode inode %d", fileInode)
+		test.WaitForLogString(msg, "File to flush")
 
-		test.WaitFor("File type to update", func() bool {
-			// Confirm the directory is consistent with a medium file
-			inode = test.getInode(dirName)
-			dir = inode.(*Directory)
-			record, err = dir.getChildRecordCopy(test.TestCtx(),
-				fileInode)
-			test.AssertNoErr(err)
+		// Confirm the directory is consistent with a medium file
+		inode = test.getInode(dirName)
+		dir = inode.(*Directory)
+		record, err = dir.getChildRecordCopy(test.TestCtx(),
+			fileInode)
+		test.AssertNoErr(err)
 
-			if record.ID().IsEqualTo(quantumfs.EmptyBlockKey) ||
-				record.Type() != quantumfs.ObjectTypeMediumFile {
-
-				return false
-			}
-
-			return true
-		})
+		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+			"ID is empty block: %s", record.ID().String())
+		test.Assert(record.Type() == quantumfs.ObjectTypeMediumFile,
+			"File isn't medium file: %s", record.Type())
 	})
 }
