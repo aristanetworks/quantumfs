@@ -83,6 +83,7 @@ const (
 )
 
 const (
+	FlusherRequestIdMin = uint64(0xb) << 48
 	RefreshRequestIdMin = uint64(0xc) << 48
 	ForgetRequstIdMin   = uint64(0xd) << 48
 )
