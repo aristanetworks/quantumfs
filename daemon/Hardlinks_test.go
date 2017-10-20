@@ -845,7 +845,7 @@ func TestRemoveHardlinkBeforeSync(t *testing.T) {
 		defer cleanup()
 
 		test.Assert(len(wsr.hardlinks) == 0,
-			"Hardlink table not intially empty")
+			"Hardlink table not initially empty")
 
 		// Create and remove the hardlink. Though the file is gone the
 		// hardink entry must remain until after all the directories in which
