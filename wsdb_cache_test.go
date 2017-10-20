@@ -33,9 +33,6 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockWsdbKeyPut(mockSession, wsdb.NullSpaceName, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, []byte(nil), nil)
-
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
 			KeySpace: "ether",
