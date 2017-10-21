@@ -46,7 +46,12 @@ func (test *testHelper) waitForPropagate(file string, data []byte) {
 			return false
 		}
 
-		return bytes.Equal(readData, data)
+		if !bytes.Equal(readData, data) {
+			test.qfs.c.vlog("Propagation %s vs %s", readData, data)
+			return false
+		}
+
+		return true
 	})
 }
 
@@ -138,5 +143,33 @@ func TestConcurrentHardlinks(t *testing.T) {
 		test.AssertNoErr(os.Remove(workspace0 + fileA))
 
 		test.waitForPropagate(workspace1 + fileA, []byte{})
+	})
+}
+
+func TestConcurrentIntraFileMerges(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0, workspace1 := test.setupDual()
+
+		dataA :=  []byte("0000\n00\n0000")
+		dataB :=  []byte("0000\n22\n0444")
+		dataC :=  []byte("1110\n33\n0000")
+		expect := []byte("1110\n33\n0444")
+		file := "/file"
+
+		test.AssertNoErr(testutils.PrintToFile(workspace0+file,
+			string(dataA)))
+
+		test.waitForPropagate(workspace1+file, dataA)
+
+		test.AssertNoErr(testutils.OverWriteFile(workspace1+file,
+			string(dataB)))
+
+		test.AssertNoErr(testutils.OverWriteFile(workspace0+file,
+			string(dataC)))
+
+		// There should be a merge conflict, resolved by an intra-file
+		// merge, that eventually is reflected in both workspaces
+		test.waitForPropagate(workspace0+file, expect)
+		test.waitForPropagate(workspace1+file, expect)
 	})
 }
