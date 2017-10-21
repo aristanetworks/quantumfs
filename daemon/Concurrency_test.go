@@ -67,14 +67,14 @@ func TestConcurrentReadWrite(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
 			string(dataA)))
 
-		test.waitForPropagate(workspace1 + fileA, dataA)
+		test.waitForPropagate(workspace1+fileA, dataA)
 
 		test.AssertNoErr(testutils.PrintToFile(workspace0+fileB,
 			string(dataA)))
 		test.AssertNoErr(testutils.PrintToFile(workspace1+fileB,
 			string(dataB)))
 
-		test.waitForPropagate(workspace0 + fileB, dataB)
+		test.waitForPropagate(workspace0+fileB, dataB)
 	})
 }
 
@@ -97,7 +97,7 @@ func TestConcurrentWriteDeletion(t *testing.T) {
 		test.waitForPropagate(workspace1+file, dataA)
 
 		// Orphan the file from the other workspace
-		os.Remove(workspace1+file)
+		os.Remove(workspace1 + file)
 
 		// Wait for file to be deleted
 		test.waitForPropagate(workspace0+file, []byte{})
@@ -134,15 +134,15 @@ func TestConcurrentHardlinks(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
 			string(dataA)))
 
-		test.waitForPropagate(workspace1 + fileA, dataA)
+		test.waitForPropagate(workspace1+fileA, dataA)
 
 		test.AssertNoErr(syscall.Link(workspace1+fileA, workspace1+fileB))
 
-		test.waitForPropagate(workspace0 + fileB, dataA)
+		test.waitForPropagate(workspace0+fileB, dataA)
 
 		test.AssertNoErr(os.Remove(workspace0 + fileA))
 
-		test.waitForPropagate(workspace1 + fileA, []byte{})
+		test.waitForPropagate(workspace1+fileA, []byte{})
 	})
 }
 
@@ -150,9 +150,9 @@ func TestConcurrentIntraFileMerges(t *testing.T) {
 	runDualQuantumFsTest(t, func(test *testHelper) {
 		workspace0, workspace1 := test.setupDual()
 
-		dataA :=  []byte("0000\n00\n0000")
-		dataB :=  []byte("0000\n22\n0444")
-		dataC :=  []byte("1110\n33\n0000")
+		dataA := []byte("0000\n00\n0000")
+		dataB := []byte("0000\n22\n0444")
+		dataC := []byte("1110\n33\n0000")
 		expect := []byte("1110\n33\n0444")
 		file := "/file"
 
