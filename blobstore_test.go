@@ -70,8 +70,9 @@ func (s *storeTests) TestInsert() {
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
 USING TTL %s`, s.bls.keyspace, "0")
-	keyVal := []interface{}{[]byte(testKey), []byte(testValue)}
-	mocksession.On("Query", qstr, keyVal).Return(mockquery)
+	mocksession.On("Query", qstr,
+		[]byte(testKey),
+		[]byte(testValue)).Return(mockquery)
 
 	mockquery.On("Exec").Return(nil)
 	mocksession.On("Close").Return()
@@ -87,10 +88,11 @@ func (s *storeTests) TestInsertFailure() {
 INTO %s.blobStore (key, value)
 VALUES (?, ?)
 USING TTL %s`, s.bls.keyspace, "0")
-	keyVal := []interface{}{[]byte(testKey), []byte(testValue)}
 
 	mockquery := &MockQuery{}
-	mocksession.On("Query", qstr, keyVal).Return(mockquery)
+	mocksession.On("Query", qstr,
+		[]byte(testKey),
+		[]byte(testValue)).Return(mockquery)
 	mocksession.On("Close").Return()
 	errVal := errors.New("Some random error")
 	mockquery.On("Exec").Return(errVal)
@@ -108,7 +110,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 func (s *storeTests) TestGetNoErr() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
-	key := []interface{}{[]byte(testKey)}
+	key := []byte(testKey)
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
@@ -130,7 +132,7 @@ func (s *storeTests) TestGetFailureNoKey() {
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{[]byte(unknownKey)}
+	key := []byte(unknownKey)
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
@@ -152,7 +154,7 @@ func (s *storeTests) TestGetFailureGeneric() {
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{[]byte(unknownKey)}
+	key := []byte(unknownKey)
 	mocksession.On("Query", qstr, key).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
@@ -172,11 +174,10 @@ WHERE key = ?`, s.bls.keyspace)
 func (s *storeTests) TestGetNonZeroTTL() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
-	key := []interface{}{[]byte(testKey)}
 	qstr := fmt.Sprintf(`SELECT value, ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	mocksession.On("Query", qstr, key).Return(mockquery)
+	mocksession.On("Query", qstr, []byte(testKey)).Return(mockquery)
 	mocksession.On("Close").Return()
 
 	readMockTTL := func(dest ...interface{}) error {
@@ -199,11 +200,10 @@ WHERE key = ?`, s.bls.keyspace)
 func (s *storeTests) TestMetadataOK() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
-	key := []interface{}{[]byte(testKey)}
 	qstr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	mocksession.On("Query", qstr, key).Return(mockquery)
+	mocksession.On("Query", qstr, []byte(testKey)).Return(mockquery)
 	mocksession.On("Close").Return()
 
 	readMockTTL := func(dest ...interface{}) error {
@@ -228,8 +228,7 @@ func (s *storeTests) TestMetadataFailNoKey() {
 	qstr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{[]byte(unknownKey)}
-	mocksession.On("Query", qstr, key).Return(mockquery)
+	mocksession.On("Query", qstr, []byte(unknownKey)).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
@@ -249,8 +248,7 @@ func (s *storeTests) TestMetadataFailGeneric() {
 	qstr := fmt.Sprintf(`SELECT ttl(value)
 FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
-	key := []interface{}{[]byte(unknownKey)}
-	mocksession.On("Query", qstr, key).Return(mockquery)
+	mocksession.On("Query", qstr, []byte(unknownKey)).Return(mockquery)
 	mocksession.On("Close").Return()
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/gocql/gocql"
+	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -963,6 +964,35 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
 	// locally branched workspace should get deleted from cache
 	suite.Require().Equal(1, tsCount,
 		"Incorrect number of Typespaces. Exp: 1, Actual: %d", tsCount)
+}
+
+// a dummy test to verify that mock.Anything works
+// fine for session.Query mocking
+func (suite *wsdbCacheTestSuite) TestCacheIgnoreField() {
+
+	// setup mock
+	func() {
+		mq := new(MockQuery)
+		stmt := `
+INSERT INTO ether.workspacedb
+(typespace, namespace, workspace, key, ignore)
+VALUES (?,?,?,?,?)`
+
+		suite.common.mockSess.On("Query", stmt,
+			"ts", "ns", "ws", []byte(nil),
+			mock.AnythingOfType("int64")).Return(mq)
+		mq.On("Exec").Return(nil)
+	}()
+
+
+	// trigger mock
+	query := suite.common.mockSess.Query(`
+INSERT INTO ether.workspacedb
+(typespace, namespace, workspace, key, ignore)
+VALUES (?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), time.Now().UnixNano())
+
+	err := query.Exec()
+	suite.Require().NoError(err, "Insert failed with %s", err)
 }
 
 // TODO: once the APIs return errors, add appropriate test cases

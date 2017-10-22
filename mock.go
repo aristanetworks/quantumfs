@@ -70,7 +70,10 @@ func (_m *MockSession) Closed() bool {
 // Query provides a mock function with given fields: stmt, values
 func (_m *MockSession) Query(stmt string, values ...interface{}) Query {
 
-	ret := _m.Called(stmt, values)
+	l := []interface{}{}
+	l = append(l, stmt)
+	l = append(l, values...)
+	ret := _m.Called(l...)
 
 	var r0 Query
 	if rf, ok := ret.Get(0).(func(string, ...interface{}) Query); ok {
@@ -331,11 +334,10 @@ func mockDbTypespaceGet(sess *MockSession, typespace string, err error) {
 	qScanFunc := newMockQueryScanStrings(err, []interface{}(nil))
 	query.On("Scan", mock.AnythingOfType("*string")).Return(qScanFunc)
 
-	args := []interface{}{typespace}
 	sess.On("Query", `
 SELECT typespace
 FROM ether.workspacedb
-WHERE typespace = ? LIMIT 1`, args).Return(query)
+WHERE typespace = ? LIMIT 1`, typespace).Return(query)
 }
 
 func mockDbNamespaceGet(sess *MockSession, typespace string,
@@ -345,11 +347,10 @@ func mockDbNamespaceGet(sess *MockSession, typespace string,
 	qScanFunc := newMockQueryScanStrings(err, []interface{}(nil))
 	query.On("Scan", mock.AnythingOfType("*string")).Return(qScanFunc)
 
-	args := []interface{}{typespace, namespace}
 	sess.On("Query", `
 SELECT namespace
 FROM ether.workspacedb
-WHERE typespace = ? AND namespace = ? LIMIT 1`, args).Return(query)
+WHERE typespace = ? AND namespace = ? LIMIT 1`, typespace, namespace).Return(query)
 }
 
 func mockWsdbKeyDel(sess *MockSession, typespace string,
@@ -361,7 +362,7 @@ DELETE
 FROM ether.workspacedb
 WHERE typespace=? AND namespace=? AND workspace=?`
 	sess.On("Query", stmt,
-		[]interface{}{typespace, namespace, workspace}).Return(query)
+		typespace, namespace, workspace).Return(query)
 	if err == nil {
 		query.On("Exec").Return(nil)
 	} else {
@@ -376,12 +377,11 @@ func mockWsdbWorkspaceLastWriteTime(sess *MockSession, typespace string,
 	qScanFunc := newMockQueryScanStrings(err, []interface{}{microSecs})
 	query.On("Scan", mock.AnythingOfType("*int64")).Return(qScanFunc)
 
-	args := []interface{}{typespace, namespace, workspace}
-
 	sess.On("Query", `
 SELECT WRITETIME(key)
 FROM ether.workspacedb
-WHERE typespace=? AND namespace=? AND workspace=?`, args).Return(query)
+WHERE typespace=? AND namespace=? AND workspace=?`,
+	typespace, namespace, workspace).Return(query)
 }
 
 func mockWsdbKeyGet(sess *MockSession, typespace string,
@@ -391,12 +391,11 @@ func mockWsdbKeyGet(sess *MockSession, typespace string,
 	qScanFunc := newMockQueryScanByteSlice(err, key)
 	query.On("Scan", mock.AnythingOfType("*[]uint8")).Return(qScanFunc)
 
-	args := []interface{}{typespace, namespace, workspace}
-
 	sess.On("Query", `
 SELECT key
 FROM ether.workspacedb
-WHERE typespace = ? AND namespace = ? AND workspace = ?`, args).Return(query)
+WHERE typespace = ? AND namespace = ? AND workspace = ?`,
+	typespace, namespace, workspace).Return(query)
 }
 
 func mockWsdbKeyPut(sess *MockSession, typespace string,
@@ -409,7 +408,7 @@ INSERT INTO ether.workspacedb
 VALUES (?,?,?,?)`
 
 	sess.On("Query", stmt,
-		[]interface{}{typespace, namespace, workspace, key}).Return(query)
+		typespace, namespace, workspace, key).Return(query)
 	if err == nil {
 		query.On("Exec").Return(nil)
 	} else {
@@ -484,7 +483,11 @@ func setupMockWsdbCacheCqlFetch(sess *MockSession, iter *MockIter,
 	fetchQuery := new(MockQuery)
 	fetchQuery.On("Iter").Return(iter)
 
-	sess.On("Query", stmt, vals).Return(fetchQuery)
+	l := []interface{}{}
+	l = append(l, stmt)
+	l = append(l, vals...)
+
+	sess.On("Query", l...).Return(fetchQuery)
 }
 
 func mockWsdbCacheTypespaceFetchPanic(sess *MockSession) {
@@ -497,7 +500,7 @@ func mockWsdbCacheTypespaceFetchPanic(sess *MockSession) {
 
 	sess.On("Query", `
 SELECT distinct typespace
-FROM ether.workspacedb`, []interface{}(nil)).Return(fetchQuery)
+FROM ether.workspacedb`).Return(fetchQuery)
 
 }
 
