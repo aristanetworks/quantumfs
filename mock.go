@@ -183,6 +183,9 @@ func (_m *MockIter) Close() error {
 		r0 = ret.Error(0)
 	}
 
+	// By resetting currentRow, we enable the reuse of the
+	// the same iter object again.
+	_m.currentRow = 0
 	return r0
 }
 
@@ -388,7 +391,7 @@ func mockWsdbKeyGet(sess *MockSession, typespace string,
 	namespace string, workspace string, key []byte, nonce int64, err error) {
 
 	query := new(MockQuery)
-	qScanFunc := newMockQueryScanByteSlice(err, key)
+	qScanFunc := newMockQueryScanByteSlice(err, key, nonce)
 	query.On("Scan", mock.AnythingOfType("*[]uint8"), mock.AnythingOfType("*int64")).Return(qScanFunc)
 
 	sess.On("Query", `
@@ -417,7 +420,7 @@ VALUES (?,?,?,?,?)`
 }
 
 func newMockQueryScanByteSlice(err error,
-	val []byte) func(dest ...interface{}) error {
+	val []byte, nonce int64) func(dest ...interface{}) error {
 
 	return func(dest ...interface{}) error {
 
@@ -425,6 +428,7 @@ func newMockQueryScanByteSlice(err error,
 			// byte slice pointed by val is copied
 			// into dest[0]
 			assignValToDest(val, dest[0])
+			assignValToDest(nonce, dest[1])
 		}
 		return err
 	}
@@ -471,6 +475,25 @@ func newMockIterScan(fetchPause chan bool,
 	}
 }
 
+func setupMockWsdbCacheCqlFetch2Args(sess *MockSession, iter *MockIter,
+	stmt string, rows mockDbRows, vals []interface{},
+	fetchPause chan bool, err error) {
+
+	iter.On("Close").Return(err)
+	iter.SetRows(rows)
+	iterateRows := newMockIterScan(fetchPause, iter)
+	iter.On("Scan", mock.AnythingOfType("*string"), mock.AnythingOfType("*int64")).Return(iterateRows)
+
+	fetchQuery := new(MockQuery)
+	fetchQuery.On("Iter").Return(iter)
+
+	l := []interface{}{}
+	l = append(l, stmt)
+	l = append(l, vals...)
+
+	sess.On("Query", l...).Return(fetchQuery)
+}
+
 func setupMockWsdbCacheCqlFetch(sess *MockSession, iter *MockIter,
 	stmt string, rows mockDbRows, vals []interface{},
 	fetchPause chan bool, err error) {
@@ -514,7 +537,7 @@ FROM ether.workspacedb
 WHERE typespace = ?`
 
 const cacheWorkspaceFetchQuery = `
-SELECT workspace
+SELECT workspace, nonce
 FROM ether.workspacedb
 WHERE typespace = ? AND namespace = ?`
 
@@ -538,7 +561,7 @@ func mockWsdbCacheWorkspaceFetch(sess *MockSession,
 	rows mockDbRows, vals []interface{},
 	iter *MockIter, fetchPause chan bool) {
 
-	setupMockWsdbCacheCqlFetch(sess, iter, cacheWorkspaceFetchQuery,
+	setupMockWsdbCacheCqlFetch2Args(sess, iter, cacheWorkspaceFetchQuery,
 		rows, vals, fetchPause, nil)
 }
 
@@ -556,7 +579,7 @@ func mockWsdbCacheNamespaceFetchErr(sess *MockSession, err error) {
 
 func mockWsdbCacheWorkspaceFetchErr(sess *MockSession, err error) {
 	iter := new(MockIter)
-	setupMockWsdbCacheCqlFetch(sess, iter, cacheWorkspaceFetchQuery,
+	setupMockWsdbCacheCqlFetch2Args(sess, iter, cacheWorkspaceFetchQuery,
 		nil, nil, nil, err)
 }
 

@@ -49,16 +49,11 @@ func newCacheWsdb(base wsdb.WorkspaceDB, cfg WsDBConfig) wsdb.WorkspaceDB {
 			cacheTimeout))
 	}
 
-	ce := newEntityCache(3, cacheTimeout, cwsdb, wsdbFetcherImpl)
-
-	// QFS requires an empty workspaceDB to contain null namespace
-	// and null workspace
-	// Had to pass ether.DefaultCtx for the lack of a better option.
+	ce := newEntityCache(4, cacheTimeout, cwsdb, wsdbFetcherImpl)
+	nonce := wsdb.WorkspaceNonceInvalid
 	ce.InsertEntities(ether.DefaultCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
-		wsdb.NullSpaceName)
-
+		wsdb.NullSpaceName, nonce.String())
 	cwsdb.cache = ce
-
 	return cwsdb
 }
 
@@ -98,11 +93,35 @@ func (cw *cacheWsdb) NumWorkspaces(c ether.Ctx, typespace,
 }
 
 func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
-	namespace string) ([]string, error) {
+	namespace string) (map[string]wsdb.WorkspaceNonce, error) {
 
 	defer c.FuncIn("cacheWsdb::WorkspaceList", "%s/%s", typespace, namespace).Out()
 
-	return cw.cache.ListEntities(c, typespace, namespace)
+	wsMap := make(map[string]wsdb.WorkspaceNonce)
+	wsList, err := cw.cache.ListEntities(c, typespace, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ws := range wsList {
+		nonceStr, err := cw.cache.ListEntities(c, typespace, namespace, ws)
+		if err != nil {
+			return nil, err
+		}
+
+		// If nonceStr is longer than 1, then panic
+		if len(nonceStr) > 1 {
+			panic(fmt.Sprintf("%d nonces for %s/%s/%s", len(nonceStr),
+				typespace, namespace, ws))
+		}
+		nonce, err := wsdb.StringToNonce(nonceStr[0])
+		if err != nil {
+			panic(fmt.Sprintf("Nonce is not a valid int64: %s", err.Error()))
+		}
+		wsMap[ws] = wsdb.WorkspaceNonce(nonce)
+	}
+
+	return wsMap, err
 }
 
 func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
@@ -121,7 +140,7 @@ func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace st
 
 func (cw *cacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamespace string,
 	srcWorkspace string, dstTypespace string,
-	dstNamespace string, dstWorkspace string) error {
+	dstNamespace string, dstWorkspace string) (wsdb.WorkspaceNonce, wsdb.WorkspaceNonce, error) {
 
 	start := time.Now()
 	defer func() { cw.branchStats.RecordOp(time.Since(start)) }()
@@ -129,15 +148,16 @@ func (cw *cacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamesp
 	defer c.FuncIn("cacheWsdb::BranchWorkspace", "%s/%s/%s -> %s/%s/%s)", srcTypespace,
 		srcNamespace, srcWorkspace, dstTypespace, dstNamespace, dstWorkspace).Out()
 
-	if err := cw.base.BranchWorkspace(c, srcTypespace, srcNamespace, srcWorkspace,
-		dstTypespace, dstNamespace, dstWorkspace); err != nil {
-		return err
+	srcNonce, dstNonce, err := cw.base.BranchWorkspace(c, srcTypespace, srcNamespace, srcWorkspace,
+		dstTypespace, dstNamespace, dstWorkspace)
+	if err != nil {
+		return 0, 0, err
 	}
 
-	cw.cache.InsertEntities(c, srcTypespace, srcNamespace, srcWorkspace)
-	cw.cache.InsertEntities(c, dstTypespace, dstNamespace, dstWorkspace)
+	cw.cache.InsertEntities(c, srcTypespace, srcNamespace, srcWorkspace, srcNonce.String())
+	cw.cache.InsertEntities(c, dstTypespace, dstNamespace, dstWorkspace, dstNonce.String())
 
-	return nil
+	return srcNonce, dstNonce, nil
 }
 
 func (cw *cacheWsdb) DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
@@ -180,7 +200,7 @@ func (cw *cacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
 	if err != nil {
 		return wsdb.ObjectKey{}, 0, err
 	}
-	cw.cache.InsertEntities(c, typespace, namespace, workspace)
+	cw.cache.InsertEntities(c, typespace, namespace, workspace, nonce.String())
 	return key, nonce, nil
 }
 
@@ -204,7 +224,7 @@ func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 		return key, err
 	}
 
-	cw.cache.InsertEntities(c, typespace, namespace, workspace)
+	cw.cache.InsertEntities(c, typespace, namespace, workspace, nonce.String())
 
 	return key, nil
 }
@@ -222,13 +242,30 @@ func wsdbFetcherImpl(c ether.Ctx, arg interface{},
 
 	var list []string
 	var err error
-	switch len(entityPath) {
+	numEntityParts := len(entityPath)
+	switch numEntityParts {
 	case 0:
 		list, err = cw.base.TypespaceList(c)
 	case 1:
 		list, err = cw.base.NamespaceList(c, entityPath[0])
 	case 2:
-		list, err = cw.base.WorkspaceList(c, entityPath[0], entityPath[1])
+		wsMap, err := cw.base.WorkspaceList(c, entityPath[0], entityPath[1])
+		if err != nil {
+			return nil, err
+		}
+		// All the keys together make up the list of workspaces need for the given
+		// ts/ns/...
+		for wsname := range wsMap {
+			list = append(list, wsname)
+		}
+	case 3:
+		// Get the WorkspaceNonce for the given ts/ns/ws
+		_, nonce, err := cw.base.Workspace(c, entityPath[0], entityPath[1],
+			entityPath[2])
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, nonce.String())
 	default:
 		panic("unsupported entityPath depth")
 	}

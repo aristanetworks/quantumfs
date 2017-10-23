@@ -103,7 +103,7 @@ func (nc *noCacheWsdb) NumWorkspaces(c ether.Ctx, typespace string,
 }
 
 func (nc *noCacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
-	namespace string) ([]string, error) {
+	namespace string) (map[string]wsdb.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::WorkspaceList", "%s/%s", typespace, namespace).Out()
 
@@ -147,7 +147,7 @@ func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace 
 	}
 
 	err := nc.wsdbKeyPut(ether.DefaultCtx, typespace, namespace, workspace,
-		wsKey, int64(nonce))
+		wsKey, nonce.Value())
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Put in CreateWorkspace %s/%s/%s(%s) : %s",
@@ -160,26 +160,26 @@ func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace 
 // Add new Nonce here.
 func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string,
-	dstTypespace string, dstNamespace string, dstWorkspace string) error {
+	dstTypespace string, dstNamespace string, dstWorkspace string) (wsdb.WorkspaceNonce, wsdb.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::BranchWorkspace", "%s/%s/%s -> %s/%s/%s)", srcTypespace,
 		srcNamespace, srcWorkspace, dstTypespace, dstNamespace, dstWorkspace).Out()
 
 	if isTypespaceLocked(dstTypespace) {
-		return wsdb.NewError(wsdb.ErrLocked,
+		return 0, 0, wsdb.NewError(wsdb.ErrLocked,
 			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
-	key, _, present, err := nc.wsdbKeyGet(c, srcTypespace, srcNamespace,
+	key, srcNonce, present, err := nc.wsdbKeyGet(c, srcTypespace, srcNamespace,
 		srcWorkspace)
 	if err != nil {
-		return wsdb.NewError(wsdb.ErrFatal,
+		return 0, 0, wsdb.NewError(wsdb.ErrFatal,
 			"during Get in BranchWorkspace %s/%s/%s : %s ",
 			srcTypespace, srcNamespace, srcWorkspace,
 			err.Error())
 	}
 
 	if !present {
-		return wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+		return 0, 0, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
 			"cannot branch workspace: %s/%s/%s",
 			srcTypespace, srcNamespace, srcWorkspace)
 	}
@@ -187,30 +187,30 @@ func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 	// branching to an existing workspace shouldn't be allowed
 	_, _, present, err = nc.wsdbKeyGet(c, dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
-		return wsdb.NewError(wsdb.ErrFatal,
+		return 0, 0, wsdb.NewError(wsdb.ErrFatal,
 			"during Get in BranchWorkspace %s/%s/%s : %s",
 			dstTypespace, dstNamespace, dstWorkspace,
 			err.Error())
 	}
 
 	if present {
-		return wsdb.NewError(wsdb.ErrWorkspaceExists,
+		return 0, 0, wsdb.NewError(wsdb.ErrWorkspaceExists,
 			"cannot branch workspace: %s/%s/%s",
 			dstTypespace, dstNamespace, dstWorkspace)
 	}
 
-	nonce := GetUniqueNonce()
-	c.Vlog("Create Workspace %s/%s/%s nonce:%d",
-		dstTypespace, dstNamespace, dstWorkspace, nonce)
+	dstNonce := GetUniqueNonce()
+	c.Vlog("Create Workspace %s/%s/%s dstNonce:%d",
+		dstTypespace, dstNamespace, dstWorkspace, dstNonce)
 	if err = nc.wsdbKeyPut(c, dstTypespace, dstNamespace,
-		dstWorkspace, key, nonce); err != nil {
-		return wsdb.NewError(wsdb.ErrFatal,
-			"during Put in BranchWorkspace %s/%s/%s nonce:(%d): %s",
-			dstTypespace, dstNamespace, dstWorkspace, nonce,
+		dstWorkspace, key, dstNonce.Value()); err != nil {
+		return 0, 0, wsdb.NewError(wsdb.ErrFatal,
+			"during Put in BranchWorkspace %s/%s/%s dstNonce:(%d): %s",
+			dstTypespace, dstNamespace, dstWorkspace, dstNonce,
 			err.Error())
 	}
 
-	return nil
+	return wsdb.WorkspaceNonce(srcNonce), wsdb.WorkspaceNonce(dstNonce), nil
 }
 
 func (nc *noCacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
@@ -278,7 +278,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 			typespace, namespace, workspace, err.Error())
 	}
 
-	if nonce != int64(currentNonce) {
+	if nonce != currentNonce.Value() {
 		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
 			"nonce mispatch Expected:%d Received:%d",
 			currentNonce, nonce)
@@ -296,7 +296,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	}
 
 	if err := nc.wsdbKeyPut(c, typespace, namespace, workspace,
-		newRootID, int64(currentNonce)); err != nil {
+		newRootID, currentNonce.Value()); err != nil {
 
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
 			"during Put in AdvanceWorkspace %s/%s/%s : %s",
@@ -434,13 +434,13 @@ WHERE typespace = ?`, nc.keyspace)
 }
 
 func (nc *noCacheWsdb) fetchDBWorkspaces(c ether.Ctx, typespace string,
-	namespace string) (int, []string, error) {
+	namespace string) (int, map[string]wsdb.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::fetchDBWorkspaces", "%s/%s", typespace,
 		namespace).Out()
 
 	qryStr := fmt.Sprintf(`
-SELECT workspace
+SELECT workspace, nonce
 FROM %s.workspacedb
 WHERE typespace = ? AND namespace = ?`, nc.keyspace)
 
@@ -450,9 +450,10 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace)
 	iter := query.Iter()
 	count := 0
 	var tempWorkspace string
-	var workspaceList []string
-	for iter.Scan(&tempWorkspace) {
-		workspaceList = append(workspaceList, tempWorkspace)
+	var tempNonce int64
+	workspaceList := make(map[string]wsdb.WorkspaceNonce)
+	for iter.Scan(&tempWorkspace, &tempNonce) {
+		workspaceList[tempWorkspace] = wsdb.WorkspaceNonce(tempNonce)
 		count++
 	}
 	if err := iter.Close(); err != nil {

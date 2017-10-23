@@ -58,8 +58,12 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceLastWriteTime() {
 	suite.common.TestIntegWorkspaceLastWriteTime()
 }
 
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceNonce() {
+	suite.common.TestIntegWorkspaceNonce()
+}
+
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
-	err := suite.common.db.BranchWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
+	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
 		qwsdb.NullSpaceName, qwsdb.NullSpaceName,
 		"ts1", "ns1", "ws1")
 	suite.Require().NoError(err,

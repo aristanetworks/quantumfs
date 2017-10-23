@@ -33,8 +33,9 @@ func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
 	return newCacheWsdb(wsdb, cfg.WsDB)
 }
 
-var GetUniqueNonce func() int64 = GetTimeBasedNonce
+// GetUniqueNonce provides a unique nonce
+var GetUniqueNonce = getTimeBasedNonce
 
-func GetTimeBasedNonce() int64 {
-	return time.Now().UnixNano()
+func getTimeBasedNonce() wsdb.WorkspaceNonce {
+	return wsdb.WorkspaceNonce(time.Now().UnixNano())
 }

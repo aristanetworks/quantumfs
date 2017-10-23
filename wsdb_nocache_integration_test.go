@@ -33,7 +33,7 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 
 	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
 		qwsdb.NullSpaceName, qwsdb.NullSpaceName,
-		qwsdb.WorkspaceNonce(GetUniqueNonce()), []byte(nil))
+		qwsdb.WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
@@ -64,6 +64,10 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegWorkspaceLastWriteTime()
 
 func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteWorkspaceOK() {
 	suite.common.TestIntegDeleteWorkspaceOK()
+}
+
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegWorkspaceNonce() {
+	suite.common.TestIntegWorkspaceNonce()
 }
 
 func (suite *wsdbNoCacheIntegTestSuite) TearDownTest() {
