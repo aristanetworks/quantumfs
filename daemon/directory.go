@@ -934,15 +934,18 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		buf := newBuffer(c, []byte(pointedTo), quantumfs.KeyTypeMetadata)
-		key, err := buf.Key(&c.Ctx)
-		if err != nil {
-			c.elog("Failed to upload block: %v", err)
-			return fuse.EIO
-		}
+		inode := dir.create_(c, name, 0777, 0777, 0, newSymlink,
+			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
-		dir.create_(c, name, 0777, 0777, 0, newSymlink,
-			quantumfs.ObjectTypeSymlink, key, out)
+		link := inode.(*Symlink)
+
+		link.setLink(c, pointedTo)
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.children.getRecord(c, inode.inodeNum(), name)
+			record.SetSize(uint64(len(pointedTo)))
+		}()
+
 		return fuse.OK
 	}()
 
