@@ -381,7 +381,7 @@ func mockWsdbWorkspaceLastWriteTime(sess *MockSession, typespace string,
 SELECT WRITETIME(key)
 FROM ether.workspacedb
 WHERE typespace=? AND namespace=? AND workspace=?`,
-	typespace, namespace, workspace).Return(query)
+		typespace, namespace, workspace).Return(query)
 }
 
 func mockWsdbKeyGet(sess *MockSession, typespace string,
@@ -395,7 +395,7 @@ func mockWsdbKeyGet(sess *MockSession, typespace string,
 SELECT key
 FROM ether.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
-	typespace, namespace, workspace).Return(query)
+		typespace, namespace, workspace).Return(query)
 }
 
 func mockWsdbKeyPut(sess *MockSession, typespace string,

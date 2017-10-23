@@ -40,6 +40,7 @@ type BlobStoreConfig struct {
 }
 
 const DontExpireWsdbCache = -1
+
 // WsDBConfig holds config values specfic to WorkspaceDB API
 type WsDBConfig struct {
 	// CacheTimeoutSecs if set to DontExpireWsdbCache disables cache timeouts

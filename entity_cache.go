@@ -110,7 +110,7 @@ func newEntityCache(levels int, cacheTimeout int,
 	ec.fetcher = fetcher
 	ec.fetcherArg = fetcherArg
 	ec.neverExpires = false
-	ec.expiryDuration = time.Duration(cacheTimeout)*time.Second
+	ec.expiryDuration = time.Duration(cacheTimeout) * time.Second
 	if cacheTimeout == DontExpireWsdbCache {
 		ec.neverExpires = true
 	}
