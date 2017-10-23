@@ -106,10 +106,6 @@ type WorkspaceDB interface {
 	WorkspaceList(c ether.Ctx, typespace string, namespace string) ([]string, error)
 
 	// These methods need to be up to date
-	TypespaceExists(c ether.Ctx, typespace string) (bool, error)
-	NamespaceExists(c ether.Ctx, typespace string, namespace string) (bool, error)
-	WorkspaceExists(c ether.Ctx, typespace string, namespace string,
-		workspace string) (bool, error)
 	Workspace(c ether.Ctx, typespace string, namespace string,
 		workspace string) (ObjectKey, error)
 
