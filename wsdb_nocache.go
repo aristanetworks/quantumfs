@@ -116,49 +116,6 @@ func (nc *noCacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 	return list, nil
 }
 
-func (nc *noCacheWsdb) TypespaceExists(c ether.Ctx, typespace string) (bool, error) {
-	defer c.FuncIn("noCacheWsdb::TypespaceExists", "%s", typespace).Out()
-
-	exists, err := nc.wsdbTypespaceExists(c, typespace)
-	if err != nil {
-		return exists, wsdb.NewError(wsdb.ErrFatal,
-			"during TypespaceExists %s : %s", typespace, err.Error())
-	}
-
-	return exists, nil
-}
-
-func (nc *noCacheWsdb) NamespaceExists(c ether.Ctx, typespace string,
-	namespace string) (bool, error) {
-
-	defer c.FuncIn("noCacheWsdb::NamespaceExists", "%s/%s", typespace, namespace).Out()
-
-	exists, err := nc.wsdbNamespaceExists(c, typespace, namespace)
-	if err != nil {
-		return exists, wsdb.NewError(wsdb.ErrFatal,
-			"during NamespaceExists %s/%s : %s", typespace,
-			namespace, err.Error())
-	}
-
-	return exists, nil
-}
-
-func (nc *noCacheWsdb) WorkspaceExists(c ether.Ctx, typespace string, namespace string,
-	workspace string) (bool, error) {
-
-	defer c.FuncIn("noCacheWsdb::WorkspaceExists", "%s/%s/%s", typespace, namespace,
-		workspace).Out()
-
-	_, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
-	if err != nil {
-		return present, wsdb.NewError(wsdb.ErrFatal,
-			"during WorkspaceExists %s/%s/%s : %s",
-			typespace, namespace, workspace, err.Error())
-	}
-
-	return present, nil
-}
-
 // All workspaces under the wsdb.NullSpaceName
 // typespace are locked. They cannot be deleted,
 // cannot be advanced or cannot be destination

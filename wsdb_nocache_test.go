@@ -61,14 +61,6 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheAdvanceNotExist() {
 	suite.common.TestAdvanceNotExist()
 }
 
-func (suite *wsdbNoCacheTestSuite) TestNoCacheNamespaceNotExist() {
-	suite.common.TestNamespaceNotExist()
-}
-
-func (suite *wsdbNoCacheTestSuite) TestNoCacheTypespaceNotExist() {
-	suite.common.TestTypespaceNotExist()
-}
-
 func (suite *wsdbNoCacheTestSuite) TestNoCacheLockedBranching() {
 	suite.common.TestLockedBranchWorkspace()
 }

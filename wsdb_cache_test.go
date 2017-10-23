@@ -99,7 +99,6 @@ func (suite *wsdbCacheTestSuite) TestCacheBadConfig() {
 		WsDB: WsDBConfig{
 			CacheTimeoutSecs: timeout,
 		},
-
 	}
 
 	mockCluster := new(MockCluster)
@@ -124,7 +123,6 @@ func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
 		WsDB: WsDBConfig{
 			CacheTimeoutSecs: timeout,
 		},
-
 	}
 
 	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
@@ -192,7 +190,6 @@ func (suite *wsdbCacheTestSuite) TestCacheTimeout() {
 		WsDB: WsDBConfig{
 			CacheTimeoutSecs: timeout,
 		},
-
 	}
 
 	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
@@ -249,14 +246,6 @@ func (suite *wsdbCacheTestSuite) TestCacheAdvanceOutOfDate() {
 
 func (suite *wsdbCacheTestSuite) TestCacheAdvanceNotExist() {
 	suite.common.TestAdvanceNotExist()
-}
-
-func (suite *wsdbCacheTestSuite) TestCacheNamespaceNotExist() {
-	suite.common.TestNamespaceNotExist()
-}
-
-func (suite *wsdbCacheTestSuite) TestCacheTypespaceNotExist() {
-	suite.common.TestTypespaceNotExist()
 }
 
 func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
@@ -983,7 +972,6 @@ VALUES (?,?,?,?,?)`
 			mock.AnythingOfType("int64")).Return(mq)
 		mq.On("Exec").Return(nil)
 	}()
-
 
 	// trigger mock
 	query := suite.common.mockSess.Query(`

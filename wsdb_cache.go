@@ -105,64 +105,6 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 	return cw.cache.ListEntities(c, typespace, namespace)
 }
 
-func (cw *cacheWsdb) TypespaceExists(c ether.Ctx,
-	typespace string) (bool, error) {
-
-	defer c.FuncIn("cacheWsdb::TypespaceExists", "%s", typespace).Out()
-
-	exist, err := cw.base.TypespaceExists(c, typespace)
-	if err != nil {
-		return exist, err
-	}
-
-	if !exist {
-		cw.cache.DeleteEntities(c, typespace)
-	} else {
-		cw.cache.InsertEntities(c, typespace)
-	}
-
-	return exist, nil
-}
-
-func (cw *cacheWsdb) NamespaceExists(c ether.Ctx, typespace string,
-	namespace string) (bool, error) {
-
-	defer c.FuncIn("cacheWsdb::NamespaceExists", "%s/%s", typespace, namespace).Out()
-
-	exist, err := cw.base.NamespaceExists(c, typespace, namespace)
-	if err != nil {
-		return exist, err
-	}
-
-	if !exist {
-		cw.cache.DeleteEntities(c, typespace, namespace)
-	} else {
-		cw.cache.InsertEntities(c, typespace, namespace)
-	}
-
-	return exist, nil
-}
-
-func (cw *cacheWsdb) WorkspaceExists(c ether.Ctx, typespace string,
-	namespace string, workspace string) (bool, error) {
-
-	defer c.FuncIn("cacheWsdb::WorkspaceExists", "%s/%s/%s", typespace, namespace,
-		workspace).Out()
-
-	exist, err := cw.base.WorkspaceExists(c, typespace, namespace, workspace)
-	if err != nil {
-		return exist, err
-	}
-
-	if !exist {
-		cw.cache.DeleteEntities(c, typespace, namespace, workspace)
-	} else {
-		cw.cache.InsertEntities(c, typespace, namespace, workspace)
-	}
-
-	return exist, nil
-}
-
 func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace string,
 	workspace string, wsKey wsdb.ObjectKey) error {
 

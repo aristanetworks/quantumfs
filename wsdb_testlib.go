@@ -94,26 +94,8 @@ func (s *wsdbCommonUnitTest) TestEmptyDB() {
 		"Empty DB has incorrect list of workspaces")
 
 	// basic uncached APIs
-	mockDbTypespaceGet(s.mockSess, wsdb.NullSpaceName, nil)
-
-	exists, err5 := s.wsdb.TypespaceExists(unitTestEtherCtx, wsdb.NullSpaceName)
-	s.req.NoError(err5, "TypespaceExists failed: %s", err5)
-	s.req.True(exists, "Expected typespace doesn't exist in empty DB")
-
-	mockDbNamespaceGet(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName, nil)
-
-	exists, err6 := s.wsdb.NamespaceExists(unitTestEtherCtx, wsdb.NullSpaceName,
-		wsdb.NullSpaceName)
-	s.req.NoError(err6, "NamespaceExists failed: %s", err6)
-	s.req.True(exists, "Expected namespace doesn't exist in empty DB")
-
 	mockWsdbKeyGet(s.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, []byte(nil), nil)
-
-	exists, err7 := s.wsdb.WorkspaceExists(unitTestEtherCtx, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, wsdb.NullSpaceName)
-	s.req.NoError(err7, "WorkspaceExists failed: %s", err7)
-	s.req.True(exists, "Failed to find expected workspace in empty DB")
 
 	key, err8 := s.wsdb.Workspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName)
@@ -208,24 +190,6 @@ func (s *wsdbCommonUnitTest) TestAdvanceNotExist() {
 	s.req.Error(err, "Succeeded advancing non-existant workspace")
 	s.req.IsType(&wsdb.Error{},
 		err, "Invalid error type %T", err)
-}
-
-func (s *wsdbCommonUnitTest) TestNamespaceNotExist() {
-
-	mockDbNamespaceGet(s.mockSess, "some", "doesntexist", gocql.ErrNotFound)
-
-	exists, err := s.wsdb.NamespaceExists(unitTestEtherCtx, "some", "doesntexist")
-	s.req.NoError(err, "NamespaceExists failed: %s", err)
-	s.req.False(exists, "Unexpected namespace exists in empty DB")
-}
-
-func (s *wsdbCommonUnitTest) TestTypespaceNotExist() {
-
-	mockDbTypespaceGet(s.mockSess, "doesntexist", gocql.ErrNotFound)
-
-	exists, err := s.wsdb.TypespaceExists(unitTestEtherCtx, "doesntexist")
-	s.req.NoError(err, "TypespaceExists failed: %s", err)
-	s.req.False(exists, "Unexpected typespace exists in empty DB")
 }
 
 func (s *wsdbCommonUnitTest) TestLockedBranchWorkspace() {
