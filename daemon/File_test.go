@@ -13,7 +13,6 @@ import (
 	"os"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
@@ -682,7 +681,7 @@ func TestFileOwnership(t *testing.T) {
 }
 
 func TestChangeFileTypeBeforeSync(t *testing.T) {
-	runTestCustomConfig(t, dirtyDelay400Ms, func(test *testHelper) {
+	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/dir"
@@ -691,28 +690,18 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 			quantumfs.MaxBlockSize)
 
 		test.AssertNoErr(utils.MkdirAll(dirName, 0777))
-		dirInode := test.getInodeNum(dirName)
-
-		// The dirty timeout is 400ms and we need to create a dirty queue
-		// with some space between the directory syncing and the file syncing
-		// so we can confirm the file ObjectType between those two events.
-		// Therefore we sleep 100ms before writing data to the file so the
-		// dirty queue will be:
-		//
-		// dirName
-		// <100ms gap>
-		// fileName
-		time.Sleep(100 * time.Millisecond)
 
 		file, err := os.Create(fileName)
 		test.AssertNoErr(err)
 		file.Close()
 		fileInode := test.getInodeNum(fileName)
 
+		// Increase the file size to be a medium file. After this write we
+		// should have the state where, according to the directory, the file
+		// is still a small file with the EmptyBlockKey. Only after the file
+		// has flushed should its parent directory see it as a medium file
+		// with the appropiate ID.
 		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
-
-		msg := fmt.Sprintf("Mux::flushInode inode %d", dirInode)
-		test.WaitForLogString(msg, "Directory to flush")
 
 		// Confirm the directory is consistent with a small file
 		inode := test.getInode(dirName)
@@ -726,8 +715,8 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
 			"File isn't small file: %s", record.Type())
 
-		msg = fmt.Sprintf("Mux::flushInode inode %d", fileInode)
-		test.WaitForLogString(msg, "File to flush")
+		// Cause the file to be flushed
+		test.SyncAllWorkspaces()
 
 		// Confirm the directory is consistent with a medium file
 		inode = test.getInode(dirName)
