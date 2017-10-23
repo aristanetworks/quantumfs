@@ -818,7 +818,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
 	}()
 
-	parent.updateSize(c)
+	parent.updateSize(c, fuse.OK)
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }
 
