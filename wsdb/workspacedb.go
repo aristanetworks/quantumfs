@@ -7,6 +7,7 @@ package wsdb
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -15,6 +16,11 @@ import (
 // ObjectKey is key used to access object in the cluster-wide
 // object store using Ether's BlobStore API
 type ObjectKey []byte
+
+// WorkspaceNonce is a number used to distinguish between workspaces of the same
+// path, but different lifetimes. For example, if a workspace path were deleted and
+// then recreated, the old workspace and new workspace would have different
+// WorkspaceNonces and therefore be distinguishable.
 type WorkspaceNonce int64
 
 func (key ObjectKey) String() string {
@@ -50,6 +56,9 @@ const (
 	ErrLocked = iota
 )
 
+// WorkspaceNonceInvalid is an invalid nonce
+const WorkspaceNonceInvalid = WorkspaceNonce(0)
+
 // Error represents the error returned from workspace DB APIs
 type Error struct {
 	Code ErrCode // This can be used as sentinal value
@@ -83,6 +92,25 @@ func (err *Error) Error() string {
 	return fmt.Sprintf("Error: %s: %s", err.ErrorCode(), err.Msg)
 }
 
+// String returns the string representation for WorkspaceNonce
+func (nonce *WorkspaceNonce) String() string {
+	return strconv.FormatInt(int64(*nonce), 10)
+}
+
+// Value returns the int64 representation for WorkspaceNonce
+func (nonce *WorkspaceNonce) Value() int64 {
+	return int64(*nonce)
+}
+
+// StringToNonce returns WorkspaceNonce for a given string
+func StringToNonce(nonceStr string) (WorkspaceNonce, error) {
+	num, err := strconv.ParseInt(nonceStr, 10, 64)
+	if err != nil {
+		return WorkspaceNonce(0), err
+	}
+	return WorkspaceNonce(num), nil
+}
+
 // WorkspaceDB provides a cluster-wide and consistent mapping between names
 // and ObjectKeys. Workspace names have three components and are represented
 // as strings with the format "<typespace>/<namespace>/<workspace>".
@@ -104,7 +132,8 @@ type WorkspaceDB interface {
 	NumNamespaces(c ether.Ctx, typespace string) (int, error)
 	NamespaceList(c ether.Ctx, typespace string) ([]string, error)
 	NumWorkspaces(c ether.Ctx, typespace string, namespace string) (int, error)
-	WorkspaceList(c ether.Ctx, typespace string, namespace string) ([]string, error)
+	WorkspaceList(c ether.Ctx, typespace string,
+		namespace string) (map[string]WorkspaceNonce, error)
 
 	// These methods need to be up to date
 	Workspace(c ether.Ctx, typespace string, namespace string,
@@ -122,15 +151,16 @@ type WorkspaceDB interface {
 	CreateWorkspace(c ether.Ctx, typespace string, namespace string,
 		workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error
 
-	// BranchWorkspace branches srcNamespace/srcWorkspace to create
-	// dstNamespace/dstWorkspace
+	// BranchWorkspace branches srcTypespace/srcNamespace/srcWorkspace to create
+	// dstTypespace/dstNamespace/dstWorkspace.
+	// srcNonce and dstNonce is returned so it can inserted in the cache.
 	//
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	//  ErrWorkspaceNotFound
 	BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamespace string,
 		srcWorkspace string, dstTypespace string,
-		dstNamespace string, dstWorkspace string) error
+		dstNamespace string, dstWorkspace string) (WorkspaceNonce, WorkspaceNonce, error)
 
 	// DeleteWorkspace deletes the workspace
 	DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
