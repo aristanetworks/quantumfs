@@ -213,6 +213,11 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	link.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
 		defer link.Lock().Unlock()
 
+		if link.dirtyPointsTo == "" {
+			// use existing key
+			return link.key, quantumfs.ObjectTypeSymlink
+		}
+
 		buf := newBuffer(c, []byte(link.dirtyPointsTo),
 			quantumfs.KeyTypeMetadata)
 
@@ -221,6 +226,7 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 			panic(fmt.Sprintf("Failed to upload block: %v", err))
 		}
 		link.key = key
+
 		link.dirtyPointsTo = ""
 
 		return link.key, quantumfs.ObjectTypeSymlink
@@ -230,7 +236,7 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (link *Symlink) setLink(c *ctx, pointTo string) {
-	defer c.funcIn("Symlink::setLink").Out()
+	defer c.FuncIn("Symlink::setLink", "%s", pointTo).Out()
 
 	defer link.Lock().Unlock()
 
