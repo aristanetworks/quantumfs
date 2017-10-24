@@ -939,12 +939,18 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 		link := inode.(*Symlink)
 
+		// Set the symlink link data
 		link.setLink(c, pointedTo)
 		func() {
 			defer dir.childRecordLock.Lock().Unlock()
-			record := dir.children.getRecord(c, inode.inodeNum(), name)
+
+			// Update the record's size
+			record := dir.children.record(inode.inodeNum())
 			record.SetSize(uint64(len(pointedTo)))
 		}()
+
+		// Update the outgoing entry size
+		out.Attr.Size = uint64(len(pointedTo))
 
 		return fuse.OK
 	}()
