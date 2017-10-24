@@ -195,28 +195,25 @@ func (qfs *QuantumFs) fileHandleReleaser() {
 	i := 0
 	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
 	for shutdown := false; !shutdown; {
-		func() {
+		shutdown = func() bool {
 			ids = ids[:0]
 			fh, ok := <-qfs.toBeReleased
-			if ok {
-				ids = append(ids, fh)
-			} else {
-				shutdown = true
-				return
+			if !ok {
+				return true
 			}
+			ids = append(ids, fh)
 			for i = 1; i < maxReleasesPerCycle; i++ {
 				select {
 				case fh, ok := <-qfs.toBeReleased:
-					if ok {
-						ids = append(ids, fh)
-					} else {
-						shutdown = true
-						return
+					if !ok {
+						return true
 					}
+					ids = append(ids, fh)
 				default:
-					return
+					return false
 				}
 			}
+			return false
 		}()
 		func() {
 			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
