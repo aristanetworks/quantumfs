@@ -349,6 +349,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
 		state.Nonce).Out()
 
+	c = c.refreshCtx()
 	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
