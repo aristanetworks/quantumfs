@@ -44,8 +44,11 @@ func AggregateLogs(mode qlog.LogProcessMode, filename string,
 	reader := qlog.NewReader(filename)
 	agg := NewAggregator(db, extractors, reader.DaemonVersion(), publishInterval)
 
-	reader.ProcessLogs(mode, func(v qlog.LogOutput) {
-		agg.ProcessLog(v)
+	reader.ProcessLogs(mode, func(log *qlog.LogOutput) {
+		if log == nil {
+			panic("nil log")
+		}
+		agg.ProcessLog(log)
 	})
 
 	return agg
@@ -69,7 +72,7 @@ type Aggregator struct {
 	publishInterval time.Duration
 
 	queueMutex   utils.DeferableMutex
-	queueLogs    []qlog.LogOutput
+	queueLogs    []*qlog.LogOutput
 	notification chan struct{}
 }
 
@@ -86,7 +89,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		triggerAll:             make([]chan *qlog.LogOutput, 0),
 		gcInternval:            time.Minute * 2,
 		publishInterval:        publishInterval,
-		queueLogs:              make([]qlog.LogOutput, 0),
+		queueLogs:              make([]*qlog.LogOutput, 0, 1000),
 		notification:           make(chan struct{}, 1),
 	}
 
@@ -130,7 +133,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
-func (agg *Aggregator) ProcessLog(log qlog.LogOutput) {
+func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
@@ -143,20 +146,20 @@ func (agg *Aggregator) ProcessLog(log qlog.LogOutput) {
 
 func (agg *Aggregator) processThread() {
 	for {
-		logs := func() []qlog.LogOutput {
+		logs := func() []*qlog.LogOutput {
 			<-agg.notification
 
 			defer agg.queueMutex.Lock().Unlock()
 
 			// nothing to do
 			if len(agg.queueLogs) == 0 {
-				return []qlog.LogOutput{}
+				return []*qlog.LogOutput{}
 			}
 
 			// Take a small performance hit in creating a new array,
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
-			agg.queueLogs = make([]qlog.LogOutput, 0)
+			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
 			return rtn
 		}()
 
@@ -166,23 +169,23 @@ func (agg *Aggregator) processThread() {
 	}
 }
 
-func (agg *Aggregator) filterAndDistribute(log qlog.LogOutput) {
+func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 	// These always match
 	for _, extractor := range agg.triggerAll {
-		extractor <- &log
+		extractor <- log
 	}
 
 	// These match the format string fully
 	matching := agg.triggerByFormat[log.Format]
 	for _, extractor := range matching {
-		extractor <- &log
+		extractor <- log
 	}
 
 	// These partially match the format string
 	for trigger, extractors := range agg.triggerByPartialFormat {
 		if strings.Contains(log.Format, trigger) {
 			for _, extractor := range extractors {
-				extractor <- &log
+				extractor <- log
 			}
 		}
 	}
