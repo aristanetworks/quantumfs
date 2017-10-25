@@ -1046,20 +1046,6 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	return
 }
 
-func sortParentChild(c *ctx, a *Directory, b *Directory) (parentDir *Directory,
-	childDir *Directory) {
-
-	defer c.funcIn("sortParentChild").Out()
-
-	if a.parentHasAncestor(c, b) {
-		return b, a
-	}
-
-	// If b isn't an ancestor of a, then either a is an ancestor of b or there's
-	// no relationship in which case we can return the same result
-	return a, b
-}
-
 // Must hold dir and dir.childRecordLock
 func (dir *Directory) orphanChild_(c *ctx, name string) {
 	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
@@ -1126,29 +1112,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	// We prevent this by locking dir and dst in a consistent ordering
 	// based upon their inode number. All multi-inode locking must call
 	// getLockOrder() to facilitate this.
-	//
-	// However, there is another wrinkle. It is possible to rename a file
-	// from a directory into its parent. If we keep the parent locked
-	// while we run dir.updateSize_(), then we'll deadlock as we try to
-	// lock the parent again down the call stack.
-	//
-	// So we have two phases of locking. In the first phase we lock dir
-	// and dst according to their inode number. Then, with both those
-	// locks held we perform the bulk of the logic. Just before we start
-	// releasing locks we update the parent metadata. Then we drop the
-	// locks of the parent, which is fine since it is up to date. Finally
-	// we update the metadata of the child before dropping its lock.
-	//
-	// We need to update and release the parent first so we can
-	// successfully update the child. If the two directories are not
-	// related in that way then we choose arbitrarily because it doesn't
-	// matter.
-	parent, child := sortParentChild(c, dst, dir)
 	firstLock, lastLock := getLockOrder(dst, dir)
-	firstLock.Lock()
-	lastLock.Lock()
-
-	defer child.lock.Unlock()
+	defer firstLock.Lock().Unlock()
+	defer lastLock.Lock().Unlock()
 
 	result = func() fuse.Status {
 		defer dst.childRecordLock.Lock().Unlock()
@@ -1164,12 +1130,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		return fuse.OK
 	}()
 	if result != fuse.OK {
-		parent.lock.Unlock()
 		return
 	}
-
-	// we need to unlock the parent early
-	defer parent.lock.Unlock()
 
 	newEntry, oldInodeId,
 		result := func() (quantumfs.DirectoryRecord, InodeId,
