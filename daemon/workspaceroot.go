@@ -405,10 +405,6 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 	wsr.removeHardlink_(fileId, link.inodeId)
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
-
-	// Do not reparent here. It must be done safety with either the treeLock or
-	// the child, parent, and lockedParent locks locked in an UP order
-
 	wsr.dirty(c)
 
 	return link.record, inodeId
