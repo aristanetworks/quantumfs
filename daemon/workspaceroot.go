@@ -37,6 +37,7 @@ type WorkspaceRoot struct {
 	linkLock    utils.DeferableRwMutex
 	hardlinks   map[quantumfs.FileId]linkEntry
 	inodeToLink map[InodeId]quantumfs.FileId
+	linkPaths   map[quantumfs.FileId][]string
 }
 
 type linkEntry struct {
@@ -106,6 +107,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		wsr.hardlinks = loadHardlinks(c,
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]quantumfs.FileId)
+		wsr.linkPaths = make(map[quantumfs.FileId][]string)
 	}()
 	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
@@ -822,7 +824,6 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 			// (updated). This simplifies the case where some program
 			// unlinked and then created/moved a file into place.
 			c.vlog("Removing deleted from recreated file")
-			pathFlags = pathFlags &^ quantumfs.PathDeleted
 			pathFlags = quantumfs.PathUpdated
 		}
 	} else {
