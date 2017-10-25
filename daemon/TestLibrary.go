@@ -142,6 +142,12 @@ func (th *TestHelper) EndTest() {
 	exception := recover()
 
 	defer th.ShutdownLogger()
+	defer func() {
+		if th.qfs != nil {
+			close(th.qfs.toBeReleased)
+		}
+	}()
+
 	th.finishApi()
 	th.putApi()
 
