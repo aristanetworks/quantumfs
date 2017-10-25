@@ -1018,7 +1018,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			return quantumfs.InodeIdInvalid, fuse.OK
 		}
 		oldInodeId_ := dir.children.inodeNum(oldName)
-		dir.orphanChild_(c, newName)
+		dir.orphanChild_(c, newName, overwrittenInode)
 		dir.children.renameChild(c, oldName, newName)
 
 		// Conceptually we remove any entry in the way before we move
@@ -1046,8 +1046,8 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 }
 
 // Must hold dir and dir.childRecordLock
-// Must hold the child's parentLock if child is instantiated
-func (dir *Directory) orphanChild_(c *ctx, name string) {
+// Must hold the child's parentLock if inode is not nil
+func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
 	removedRecord := dir.children.recordByName(c, name)
 	if removedRecord == nil {
@@ -1067,11 +1067,10 @@ func (dir *Directory) orphanChild_(c *ctx, name string) {
 		// a not-yet-normalized hardlink with nlink of 1
 		return
 	}
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, removedId)
-	if overwrittenInode == nil {
+	if inode == nil {
 		c.qfs.removeUninstantiated(c, []InodeId{removedId})
 	} else {
-		overwrittenInode.orphan_(c, removedRecord)
+		inode.orphan_(c, removedRecord)
 	}
 }
 
@@ -1189,7 +1188,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
-		dst.orphanChild_(c, newName)
+		dst.orphanChild_(c, newName, overwrittenInode)
 		dst.insertEntry_(c, newEntry, childInodeId, childInode)
 	}()
 
