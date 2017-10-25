@@ -538,7 +538,6 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := quantumfs.EmptyBlockKey
 	fi.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
-		defer fi.Lock().Unlock()
 		key = fi.accessor.sync(c)
 		return key, fi.accessorType
 	})
