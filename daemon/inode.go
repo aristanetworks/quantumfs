@@ -482,11 +482,6 @@ func (inode *InodeCommon) inodeNum() InodeId {
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
 	defer c.funcIn("InodeCommon::dirty").Out()
-	if inode.isOrphaned() {
-		c.vlog("Not dirtying inode %d because it is orphaned", inode.id)
-		return
-	}
-
 	defer c.qfs.flusher.lock.Lock().Unlock()
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)

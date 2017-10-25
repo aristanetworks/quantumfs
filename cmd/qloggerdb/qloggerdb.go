@@ -16,6 +16,7 @@ import (
 	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
@@ -57,7 +58,10 @@ func newQfsExtPair(common string,
 
 func createExtractors() []qlogstats.StatExtractor {
 	return []qlogstats.StatExtractor{
+		// Critical system errors
 		qlogstats.NewExtPointStatsPartialFormat("ERROR: ", "SystemErrors"),
+
+		// Cache hits and misses
 		qlogstats.NewExtPointStats(daemon.CacheHitLog, "readcache_hit"),
 		qlogstats.NewExtPointStats(daemon.CacheMissLog, "readcache_miss"),
 
@@ -68,10 +72,13 @@ func createExtractors() []qlogstats.StatExtractor {
 		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheEvict,
 			"ether_setcache_evict"),
 
+		// Data store latency
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
 			thirdparty_backends.KeyLog),
 		newQfsExtPair(thirdparty_backends.EtherSetLog,
 			thirdparty_backends.KeyLog),
+
+		// Workspace DB latency
 		newQfsExtPair(thirdparty_backends.EtherTypespaceLog, ""),
 		newQfsExtPair(thirdparty_backends.EtherNamespaceLog,
 			thirdparty_backends.EtherNamespaceDebugLog),
@@ -83,8 +90,22 @@ func createExtractors() []qlogstats.StatExtractor {
 			thirdparty_backends.EtherBranchDebugLog),
 		newQfsExtPair(thirdparty_backends.EtherAdvanceLog,
 			thirdparty_backends.EtherAdvanceDebugLog),
-		newQfsExtPair(daemon.SyncAllLog, ""),
-		newQfsExtPair(daemon.SyncWorkspaceLog, ""),
+
+		newQfsExtPair(grpc.NumTypespaceLog, ""),
+		newQfsExtPair(grpc.TypespaceListLog, ""),
+		newQfsExtPair(grpc.NumNamespacesLog, ""),
+		newQfsExtPair(grpc.NamespaceListLog, ""),
+		newQfsExtPair(grpc.NumWorkspacesLog, ""),
+		newQfsExtPair(grpc.WorkspaceListLog, ""),
+		newQfsExtPair(grpc.BranchWorkspaceLog, ""),
+		newQfsExtPair(grpc.DeleteWorkspaceLog, ""),
+		newQfsExtPair(grpc.FetchWorkspaceLog, grpc.FetchWorkspaceDebug),
+		newQfsExtPair(grpc.AdvanceWorkspaceLog, grpc.AdvanceWorkspaceDebug),
+		newQfsExtPair(grpc.WorkspaceIsImmutableLog, ""),
+		newQfsExtPair(grpc.SetWorkspaceImmutableLog,
+			grpc.SetWorkspaceImmutableDebug),
+
+		// FUSE Requests
 		newQfsExtPair(daemon.LookupLog, daemon.InodeNameLog),
 		newQfsExtPair(daemon.ForgetLog, ""),
 		newQfsExtPair(daemon.GetAttrLog, daemon.InodeOnlyLog),
@@ -115,9 +136,15 @@ func createExtractors() []qlogstats.StatExtractor {
 		newQfsExtPair(daemon.ReadDirLog, daemon.FileOffsetLog),
 		newQfsExtPair(daemon.ReadDirPlusLog, daemon.FileOffsetLog),
 		newQfsExtPair(daemon.ReleaseDirLog, daemon.FileHandleLog),
-		newQfsExtPair(daemon.ReleaseFileHandleLog, ""),
 		newQfsExtPair(daemon.FsyncDirLog, daemon.FileHandleLog),
 		newQfsExtPair(daemon.StatFsLog, ""),
+
+		// Top-level QuantumFS filesystem operations
+		newQfsExtPair(daemon.ReleaseFileHandleLog, ""),
+		newQfsExtPair(daemon.SyncWorkspaceLog, ""),
+		newQfsExtPair(daemon.SyncAllLog, ""),
+
+		// Ether.CQL internal statistics
 		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
 		newQfsExtPair(cql.GetLog, cql.KeyLog),
 		newQfsExtPair(cql.InsertLog, cql.KeyTTLLog),
