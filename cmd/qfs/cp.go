@@ -84,7 +84,7 @@ func insertPaths(paths chan copyItem, wg *sync.WaitGroup) {
 		src := job.srcPath
 		dst := job.dstPath
 
-		stat := job.fileinfo.Sys().(syscall.Stat_t)
+		stat := job.fileinfo.Sys().(*syscall.Stat_t)
 
 		mode := uint(stat.Mode)
 
