@@ -18,9 +18,11 @@ import (
 )
 
 type copyItem struct {
-	srcPath  string
-	dstPath  string
-	fileinfo os.FileInfo
+	srcPath            string
+	dstPath            string
+	dstRootPrefix      string
+	dstWorkspacePrefix string
+	fileinfo           os.FileInfo
 }
 
 // Use InsertInode to copy a directory tree from one workspace to another, possibly
@@ -31,8 +33,38 @@ func cp() {
 		os.Exit(exitBadArgs)
 	}
 
-	srcRoot := flag.Arg(1)
-	dstRoot := flag.Arg(2)
+	srcRoot, err := filepath.Abs(flag.Arg(1))
+	if err != nil {
+		panic(fmt.Sprintf("Error making src absolute: %s/%v\n", flag.Arg(1),
+			err))
+	}
+	dstRoot, err := filepath.Abs(flag.Arg(2))
+	if err != nil {
+		panic(fmt.Sprintf("Error making dst absolute: %s/%v\n", flag.Arg(2),
+			err))
+	}
+
+	// Find the workspace name of the destination
+	dstParts := strings.Split(dstRoot, "/")
+
+	qfsRoot := ""
+	i := 0
+	for ; i < len(dstParts); i++ {
+		qfsRoot += "/" + dstParts[i]
+		var stat syscall.Stat_t
+		err := syscall.Stat(qfsRoot+"/"+quantumfs.ApiPath, &stat)
+		if err != nil {
+			continue // no "api" file
+		}
+
+		if stat.Ino == quantumfs.InodeIdApi {
+			break
+		}
+	}
+
+	dstWorkspacePrefix := strings.Join(dstParts[i+1:i+4], "/") + "/"
+	dstRootPrefix := strings.Join(dstParts[0:i+4], "/") + "/"
+	sharedDestinationPrefix := strings.Join(dstParts[i+3:], "/")
 
 	toProcess := make(chan copyItem, 10000)
 	wg := sync.WaitGroup{}
@@ -42,7 +74,7 @@ func cp() {
 		go insertPaths(toProcess, &wg)
 	}
 
-	err := filepath.Walk(srcRoot, func(srcPath string, fileinfo os.FileInfo,
+	err = filepath.Walk(srcRoot, func(srcPath string, fileinfo os.FileInfo,
 		inErr error) error {
 
 		if inErr != nil {
@@ -50,12 +82,14 @@ func cp() {
 				inErr))
 		}
 
-		dstPath := strings.Replace(srcPath, srcRoot, dstRoot, 1)
+		dstPath := sharedDestinationPrefix + strings.TrimPrefix(srcPath, srcRoot)
 
 		toProcess <- copyItem{
-			srcPath:  srcPath,
-			dstPath:  dstPath,
-			fileinfo: fileinfo,
+			srcPath:            srcPath,
+			dstPath:            dstPath,
+			dstRootPrefix:      dstRootPrefix,
+			dstWorkspacePrefix: dstWorkspacePrefix,
+			fileinfo:           fileinfo,
 		}
 
 		return nil
@@ -83,14 +117,26 @@ func insertPaths(paths chan copyItem, wg *sync.WaitGroup) {
 
 		src := job.srcPath
 		dst := job.dstPath
+		rootPrefix := job.dstRootPrefix
+		workspacePrefix := job.dstWorkspacePrefix
 
 		stat := job.fileinfo.Sys().(*syscall.Stat_t)
 
 		mode := uint(stat.Mode)
 
+		// We may run before out parent directory has been created, create it
+		// anyways and the permissions will be fixed up when that directory
+		// is eventually processed.
+		err = utils.MkdirAll(filepath.Dir(rootPrefix+dst), 0777)
+		if err != nil && !os.IsExist(err) {
+			// This may not end up being fatal
+			fmt.Println("MkdirAll error making parents for %s: %v",
+				dst, err)
+		}
+
 		if utils.BitFlagsSet(mode, syscall.S_IFDIR) {
 			// Create directories
-			err = os.Mkdir(dst, os.FileMode(mode)&os.ModePerm)
+			err = os.Mkdir(rootPrefix+dst, os.FileMode(mode)&os.ModePerm)
 
 			// The directory may have been created by a child in a
 			// concurrent goroutine.
@@ -98,12 +144,12 @@ func insertPaths(paths chan copyItem, wg *sync.WaitGroup) {
 				panic(fmt.Sprintf("Mkdir error on %s: %v\n", dst,
 					err))
 			}
-			err = os.Chmod(dst, os.FileMode(mode)&os.ModePerm)
+			err = os.Chmod(rootPrefix+dst, os.FileMode(mode)&os.ModePerm)
 			if err != nil {
 				panic(fmt.Sprintf("Chmod error on %s: %v\n", dst,
 					err))
 			}
-			err = os.Chown(dst, int(stat.Uid), int(stat.Gid))
+			err = os.Chown(rootPrefix+dst, int(stat.Uid), int(stat.Gid))
 			if err != nil {
 				panic(fmt.Sprintf("Chown error on %s: %v\n", dst,
 					err))
@@ -119,7 +165,7 @@ func insertPaths(paths chan copyItem, wg *sync.WaitGroup) {
 			panic(fmt.Sprintf("LGetXattr error on %s: %v\n", src, err))
 		}
 
-		err = api.InsertInode(dst, string(key), stat.Mode, stat.Uid, stat.Gid)
+		err = api.InsertInode(workspacePrefix+dst, string(key), stat.Mode, stat.Uid, stat.Gid)
 		if err != nil {
 			panic(fmt.Sprintf("InsertInode error on %s: %v\n", dst,
 				err))
