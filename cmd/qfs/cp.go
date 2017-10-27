@@ -61,9 +61,7 @@ func cp() {
 		}
 	}
 
-	dstWorkspacePrefix := strings.Join(dstParts[i+1:i+4], "/") + "/"
-	dstRootPrefix := strings.Join(dstParts[0:i+4], "/") + "/"
-	sharedDestinationPrefix := strings.Join(dstParts[i+3:], "/")
+	dstWorkspacePrefix := strings.Join(dstParts[i+1:], "/")
 
 	toProcess := make(chan copyItem, 10000)
 	wg := sync.WaitGroup{}
@@ -81,12 +79,12 @@ func cp() {
 				inErr))
 		}
 
-		dstPath := sharedDestinationPrefix + strings.TrimPrefix(srcPath, srcRoot)
+		dstPath := strings.TrimPrefix(srcPath, srcRoot)
 
 		toProcess <- copyItem{
 			srcPath:            srcPath,
 			dstPath:            dstPath,
-			dstRootPrefix:      dstRootPrefix,
+			dstRootPrefix:      dstRoot,
 			dstWorkspacePrefix: dstWorkspacePrefix,
 			fileinfo:           fileinfo,
 		}
