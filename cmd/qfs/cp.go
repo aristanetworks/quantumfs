@@ -123,7 +123,7 @@ func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 		err = utils.MkdirAll(filepath.Dir(rootPrefix+dst), 0777)
 		if err != nil && !os.IsExist(err) {
 			// This may not end up being fatal
-			fmt.Println("MkdirAll error making parents for %s: %v",
+			fmt.Printf("MkdirAll error making parents for %s: %v\n",
 				dst, err)
 		}
 
