@@ -1731,3 +1731,35 @@ func TestDirectorySeekMiddle(t *testing.T) {
 			res0, res1)
 	})
 }
+
+func TestDirectoryReadStaleDir(t *testing.T) {
+	t.Skip() // bug227468
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/" + "testdir"
+		filename := dir + "/foo"
+		test.AssertNoErr(syscall.Mkdir(dir, 0777))
+		for i := 0; i < 100; i++ {
+			test.AssertNoErr(CreateSmallFile(
+				fmt.Sprintf("%s/f%d", dir, i), ""))
+		}
+		test.AssertNoErr(CreateSmallFile(filename, ""))
+
+		f, err := os.Open(dir)
+		test.AssertNoErr(err)
+		defer f.Close()
+
+		_, err = f.Readdirnames(1)
+		test.AssertNoErr(err)
+
+		test.AssertNoErr(syscall.Unlink(filename))
+		test.AssertNoErr(syscall.Symlink(dir+"/f0", filename))
+
+		_, err = f.Readdirnames(100)
+		test.AssertNoErr(err)
+
+		_, err = os.Readlink(filename)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Unlink(filename))
+	})
+}
