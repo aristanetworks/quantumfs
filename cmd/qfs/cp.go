@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -69,7 +68,7 @@ func cp() {
 	toProcess := make(chan copyItem, 10000)
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go insertPaths(toProcess, &wg)
 	}
