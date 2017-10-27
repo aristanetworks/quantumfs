@@ -159,7 +159,8 @@ func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 			panic(fmt.Sprintf("LGetXattr error on %s: %v\n", src, err))
 		}
 
-		err = api.InsertInode(workspacePrefix+dst, string(key), stat.Mode, stat.Uid, stat.Gid)
+		err = api.InsertInode(workspacePrefix+dst, string(key), stat.Mode,
+			stat.Uid, stat.Gid)
 		if err != nil {
 			panic(fmt.Sprintf("InsertInode error on %s: %v\n", dst,
 				err))
