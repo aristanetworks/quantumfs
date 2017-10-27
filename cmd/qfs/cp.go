@@ -94,6 +94,8 @@ func cp() {
 		return nil
 	})
 
+	close(toProcess)
+
 	wg.Wait()
 
 	if err != nil {
@@ -101,19 +103,13 @@ func cp() {
 	}
 }
 
-func insertPaths(paths chan copyItem, wg *sync.WaitGroup) {
+func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 	api, err := quantumfs.NewApi()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to initialize API: %v\n", err))
 	}
 
-	for {
-		job, stillWorking := <-paths
-		if !stillWorking {
-			wg.Done()
-			return
-		}
-
+	for job := range jobs {
 		src := job.srcPath
 		dst := job.dstPath
 		rootPrefix := job.dstRootPrefix
@@ -170,4 +166,5 @@ func insertPaths(paths chan copyItem, wg *sync.WaitGroup) {
 				err))
 		}
 	}
+	wg.Done()
 }
