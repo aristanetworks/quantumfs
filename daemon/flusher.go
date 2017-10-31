@@ -29,7 +29,7 @@ type dirtyInode struct {
 
 type triggerCmd struct {
 	flushAll bool
-	finished chan bool
+	finished chan struct{}
 }
 
 type FlushCmd int
@@ -111,7 +111,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			dq.treelock.lock.RLock()
 			defer dq.treelock.lock.RUnlock()
 
-			doneChan := make(chan bool)
+			doneChan := make(chan struct{})
 			func() {
 				defer c.qfs.flusher.lock.Lock().Unlock()
 
@@ -264,6 +264,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 	done := false
+	var empty struct{}
 
 	for !done {
 		trigger := <-dq.trigger
@@ -294,7 +295,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 		}()
 
 		if trigger.finished != nil {
-			trigger.finished <- true
+			trigger.finished <- empty
 		}
 	}
 
@@ -303,7 +304,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 		trigger := <-dq.trigger
 
 		if trigger.finished != nil {
-			trigger.finished <- true
+			trigger.finished <- empty
 		}
 	}
 }
