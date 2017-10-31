@@ -271,7 +271,8 @@ func (dq *DirtyQueue) flush(c *ctx) {
 		c.vlog("trigger, flushAll: %v", trigger.flushAll)
 
 		// NOTE: When we are triggered, the treelock *must* already
-		// be locked by the caller, exclusively or not
+		// be locked by the caller (the thread that pushed into dq.trigger),
+		// exclusively or not
 
 		func() {
 			defer c.qfs.flusher.lock.Lock().Unlock()
@@ -299,7 +300,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 		}
 	}
 
-	// cleanup any leftover triggers
+	// consume any leftover triggers
 	for range dq.trigger {
 		trigger := <-dq.trigger
 
