@@ -750,6 +750,44 @@ func (test *testHelper) verifyContentStartsWith(file *os.File, expected string) 
 		"content mismatch %s vs. %s", content, expected)
 }
 
+func (test *testHelper) setupDual() (workspace0 string, workspace1 string) {
+	workspace0 = test.NewWorkspace()
+	mnt1 := test.qfsInstances[1].config.MountPath
+	workspaceName := test.RelPath(workspace0)
+	workspace1 = mnt1 + "/" + workspaceName
+
+	api1, err := quantumfs.NewApiWithPath(mnt1 + "/api")
+	test.AssertNoErr(err)
+	defer api1.Close()
+
+	test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+	return workspace0, workspace1
+}
+
+// Specify data of length zero to wait for file to not exist
+func (test *testHelper) waitForPropagate(file string, data []byte) {
+	test.WaitFor(file+" to propagate", func() bool {
+		fd, err := os.Open(file)
+		defer fd.Close()
+		if len(data) == 0 {
+			return err != os.ErrNotExist
+		}
+
+		readData, err := ioutil.ReadFile(file)
+		if err != nil {
+			return false
+		}
+
+		if !bytes.Equal(readData, data) {
+			test.qfs.c.vlog("Propagation %s vs %s", readData, data)
+			return false
+		}
+
+		return true
+	})
+}
+
 func createSparseFile(name string, size int64) error {
 	fd, err := syscall.Creat(name, 0124)
 	if err != nil {
