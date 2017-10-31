@@ -48,6 +48,7 @@ type TestHelper struct {
 	ShouldFail        bool
 	ShouldFailLogscan bool
 	Timeout           time.Duration
+	Done              chan bool
 }
 
 // TestName returns name of the test by looking
@@ -90,6 +91,7 @@ func NewTestHelper(testName string, testRunDir string,
 		Logger:     logger,
 		TempDir:    TestRunDir + "/" + testName,
 		Timeout:    1500 * time.Millisecond,
+		Done:       make(chan bool),
 	}
 }
 
@@ -223,7 +225,17 @@ func (th *TestHelper) WaitForResult(startChan <-chan struct{}) (testResult strin
 	}
 	select {
 	case <-time.After(th.Timeout):
-		testResult = "ERROR: Timed out running the test"
+		// Send a signal to any WaitFors
+		close(th.Done)
+
+		// WaitFors have a little extra time to affect the result
+		select {
+		case <-time.After(100 * time.Millisecond):
+			// This will only happen on a real hard timeout
+			testResult = "ERROR: Timed out running the test"
+		case testResult = <-th.TestResult:
+		}
+
 	case testResult = <-th.TestResult:
 	}
 	return
@@ -382,16 +394,23 @@ func (th *TestHelper) ReadTo(file *os.File, offset int, num int) []byte {
 // Repeatedly check the condition by calling the function until that function returns
 // true.
 //
-// No timeout is provided beyond the normal test timeout.
+// Wait for most of the test timeout before asserting - so that we can actually tell
+// which WaitFor is triggering in more complicated tests
 func (th *TestHelper) WaitFor(description string, condition func() bool) {
 	th.Log("Started waiting for %s", description)
+
 	for {
+		select {
+		case <-th.Done:
+			th.Assert(false, "WaitFor '%s' failed.", description)
+		case <-time.After(20 * time.Millisecond):
+		}
+
 		if condition() {
 			th.Log("Finished waiting for %s", description)
 			return
 		}
 		th.Log("Condition not satisfied")
-		time.Sleep(20 * time.Millisecond)
 	}
 }
 
