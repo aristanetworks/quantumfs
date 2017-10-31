@@ -46,6 +46,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan FileHandleId, 1000000),
+		syncAllRetries:		-1,
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -103,6 +104,8 @@ type QuantumFs struct {
 	inodeNum      uint64
 	fileHandleNum uint64
 	c             ctx
+
+	syncAllRetries int
 
 	// We present the sum of the size of all responses waiting on the api file as
 	// the size of that file because the kernel will clear any reads beyond what
@@ -239,16 +242,18 @@ func (qfs *QuantumFs) Serve() {
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	retries := 5
 	for qfs.flusher.syncAll(&qfs.c) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 
-		if retries == 0 {
+		if qfs.syncAllRetries < 0 {
+			continue
+		} else if qfs.syncAllRetries == 0 {
 			qfs.c.elog("Unable to syncAll after Serve")
 			break
 		}
-		retries--
+
+		qfs.syncAllRetries--
 	}
 	qfs.c.dataStore.shutdown()
 }
@@ -378,6 +383,8 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 }
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
+	defer c.funcIn("Mux::forceMerge").Out()
+
 	newRootId := publishWorkspaceRoot(c,
 		wsr.baseLayerId, wsr.hardlinks)
 

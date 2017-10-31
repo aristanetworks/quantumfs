@@ -515,6 +515,8 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 	}
 }
 
+// Workspace must be synced first, with the tree locked exclusively across both the
+// sync and this refresh
 func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
