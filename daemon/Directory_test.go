@@ -1733,7 +1733,6 @@ func TestDirectorySeekMiddle(t *testing.T) {
 }
 
 func TestDirectoryReadStaleDir(t *testing.T) {
-	t.Skip() // bug227468
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir := workspace + "/" + "testdir"

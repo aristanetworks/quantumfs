@@ -172,6 +172,14 @@ func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
 	out.AttrValidNsec = c.config.CacheTimeNsecs
 }
 
+func clearEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
+	out.Generation = 0
+	out.EntryValid = 0
+	out.EntryValidNsec = 0
+	out.AttrValid = 0
+	out.AttrValidNsec = 0
+}
+
 func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
