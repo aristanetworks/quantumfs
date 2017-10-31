@@ -260,7 +260,6 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 	return sleepTime
 }
 
-// flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flush(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
@@ -268,7 +267,7 @@ func (dq *DirtyQueue) flush(c *ctx) {
 
 	for !done {
 		trigger := <-dq.trigger
-		c.vlog("dirtyqueue received cmd %d", trigger.flushAll)
+		c.vlog("trigger, flushAll: %v", trigger.flushAll)
 
 		// NOTE: When we are triggered, the treelock *must* already
 		// be locked by the caller, exclusively or not
@@ -431,7 +430,6 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	if launch {
 		nc := c.flusherCtx()
 
-		// flush will acquire the flusher lock when it needs to
 		go dq.flush(nc)
 		go dq.kicker(nc)
 	}
