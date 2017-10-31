@@ -1088,7 +1088,6 @@ func TestDirectoryMvChildOntoOpenFileInSibling(t *testing.T) {
 }
 
 func TestDirectoryRenameNonNormalizedHardlink(t *testing.T) {
-	t.Skip() // BUG226245
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir1 := workspace + "/dir1"
