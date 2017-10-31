@@ -308,6 +308,7 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
 		if logPrefix {
 			qfs.c.Ctx.Prefix = fmt.Sprintf("[%d]: ", instanceNum)
 		}
+		qfs.syncAllRetries = 5
 		th.qfsInstances = append(th.qfsInstances, qfs)
 	}()
 
