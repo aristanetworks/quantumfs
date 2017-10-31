@@ -142,6 +142,12 @@ func (th *TestHelper) EndTest() {
 	exception := recover()
 
 	defer th.ShutdownLogger()
+	defer func() {
+		if th.qfs != nil {
+			close(th.qfs.toBeReleased)
+		}
+	}()
+
 	th.finishApi()
 	th.putApi()
 
@@ -507,6 +513,14 @@ func (th *TestHelper) SyncAllWorkspaces() {
 
 func (th *TestHelper) SyncWorkspace(workspace string) {
 	th.AssertNoErr(th.getApi().SyncWorkspace(workspace))
+}
+
+func (th *TestHelper) SyncWorkspaceAsync(workspace string) chan error {
+	chanErr := make(chan error)
+	go func() {
+		chanErr <- th.getApi().SyncWorkspace(workspace)
+	}()
+	return chanErr
 }
 
 func (th *TestHelper) GetWorkspaceDB() quantumfs.WorkspaceDB {
