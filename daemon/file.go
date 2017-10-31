@@ -536,8 +536,6 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush", "%s", fi.name_).Out()
 
-	defer fi.Lock().Unlock()
-
 	key := quantumfs.EmptyBlockKey
 	fi.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
 		key = fi.accessor.sync(c)
