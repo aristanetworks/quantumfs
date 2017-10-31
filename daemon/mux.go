@@ -189,34 +189,42 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	return nil
 }
 
-const ReleaseFileHandleLog = "Mux::fileHandlerReleaser"
+const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser() {
 	const maxReleasesPerCycle = 1000
 	i := 0
 	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
-	for {
-		func() {
+	for shutdown := false; !shutdown; {
+		shutdown = func() bool {
 			ids = ids[:0]
-			fh := <-qfs.toBeReleased
-			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
-
+			fh, ok := <-qfs.toBeReleased
+			if !ok {
+				return true
+			}
 			ids = append(ids, fh)
-
 			for i = 1; i < maxReleasesPerCycle; i++ {
 				select {
-				case fh := <-qfs.toBeReleased:
+				case fh, ok := <-qfs.toBeReleased:
+					if !ok {
+						return true
+					}
 					ids = append(ids, fh)
 				default:
-					defer qfs.mapMutex.Lock().Unlock()
-					for _, fh := range ids {
-						qfs.setFileHandle_(&qfs.c, fh, nil)
-					}
-					return
+					return false
 				}
 			}
+			return false
 		}()
-		if i < maxReleasesPerCycle {
+		func() {
+			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
+			defer qfs.mapMutex.Lock().Unlock()
+			for _, fh := range ids {
+				qfs.setFileHandle_(&qfs.c, fh, nil)
+			}
+		}()
+
+		if !shutdown && i < maxReleasesPerCycle {
 			// If we didn't need our full allocation, sleep to accumulate
 			// more work with minimal mapMutex contention.
 			time.Sleep(100 * time.Millisecond)
@@ -242,6 +250,7 @@ func (qfs *QuantumFs) Shutdown() error {
 	if err := qfs.c.Qlog.Sync(); err != 0 {
 		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
 	}
+	close(qfs.toBeReleased)
 	return qfs.c.Qlog.Close()
 }
 
