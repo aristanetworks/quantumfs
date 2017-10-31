@@ -63,7 +63,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	store.mutex.RUnlock()
 	if exists {
 		if !bytes.Equal(buffer.Get(), data) {
-			c.Elog(qlog.LogDatastore, "ERROR: Key Collision! %s",
+			c.Elog(qlog.LogDatastore, "Key Collision! %s",
 				key.String())
 			digest := md5.Sum(data)
 			qhash := hash.Hash(data)
