@@ -931,7 +931,6 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 		// Update the outgoing entry size
 		out.Attr.Size = uint64(len(pointedTo))
-		c.vlog("Created new symlink with key: %s", key.String())
 
 		return fuse.OK
 	}()
