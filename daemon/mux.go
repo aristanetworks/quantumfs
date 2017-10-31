@@ -46,7 +46,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan FileHandleId, 1000000),
-		syncAllRetries:		-1,
+		syncAllRetries:         -1,
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
