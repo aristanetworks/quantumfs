@@ -127,7 +127,7 @@ func (read *Reader) DaemonVersion() string {
 	return read.daemonVersion
 }
 
-func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
+func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
 	if mode == ReadThenTail || mode == ReadOnly {
 		freshHeader := read.ReadHeader()
 		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.EndIndex())
@@ -160,10 +160,10 @@ func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(LogOutput)) {
 	}
 }
 
-func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
+func (read *Reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 	haveReadTo uint64) {
 
-	logs = make([]LogOutput, 0, 1000000)
+	logs = make([]*LogOutput, 0, 1000000)
 
 	distanceToEnd := read.circBufSize - 1
 	lastReadyIdx := pastEndIdx
@@ -210,9 +210,9 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 		distanceToEnd = newDistanceToEnd
 
 		if ready {
-			logs = append(logs, logOutput)
+			logs = append(logs, &logOutput)
 		} else {
-			logs = make([]LogOutput, 0, 1000000)
+			logs = make([]*LogOutput, 0, 1000000)
 			lastReadyIdx = readTo
 			wrapMinusEquals(&lastReadyIdx, uint64(packetLen),
 				read.circBufSize)
@@ -225,10 +225,10 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []LogOutput,
 	return logs, lastReadyIdx
 }
 
-func reverseLogSlice(in []LogOutput) []LogOutput {
+func reverseLogSlice(in []*LogOutput) []*LogOutput {
 	numEntries := len(in)
 	backwardsLogs := in
-	logs := make([]LogOutput, numEntries)
+	logs := make([]*LogOutput, numEntries)
 	for i, val := range backwardsLogs {
 		logs[numEntries-1-i] = val
 	}
@@ -236,10 +236,10 @@ func reverseLogSlice(in []LogOutput) []LogOutput {
 	return logs
 }
 
-func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
+func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []*LogOutput,
 	haveReadTo uint64) {
 
-	logs = make([]LogOutput, 1000)
+	logs = make([]*LogOutput, 0, 1000)
 
 	pastEndIdx := readTo
 	readLen := wrapMinus(readTo, readFrom, read.circBufSize)
@@ -257,20 +257,20 @@ func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []LogOutput,
 
 		if !ready {
 			// throw away the logs we've seen so far because of this hole
-			logs = make([]LogOutput, 1000)
+			logs = make([]*LogOutput, 0, 1000)
 		}
 
 		if int64(readLen) > pastDataIdx {
 			errorLog := newLog(LogQlog, QlogReqId, 0,
 				"ERROR: Packet over-read error", nil)
-			logs = append(logs, errorLog)
+			logs = append(logs, &errorLog)
 			break
 		}
 
 		pastDataIdx -= int64(readLen)
 
 		if ready {
-			logs = append(logs, logOutput)
+			logs = append(logs, &logOutput)
 		} else {
 			pastEndIdx = readFrom
 			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),

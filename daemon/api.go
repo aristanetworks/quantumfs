@@ -794,8 +794,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	parent := p.(*Directory)
 	target := dst[len(dst)-1]
 
-	defer parent.Lock().Unlock()
-	if record := parent.children.recordByName(c, target); record != nil {
+	if parent.childExists(c, target) == fuse.Status(syscall.EEXIST) {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist", target)
 	}
@@ -803,9 +802,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	parent.duplicateInode_(c, target, permissions, 0, 0, size,
-		quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
+	func() {
+		defer parent.Lock().Unlock()
+		parent.duplicateInode_(c, target, permissions, 0, 0, size,
+			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
+	}()
 
+	parent.updateSize(c, fuse.OK)
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }
 
