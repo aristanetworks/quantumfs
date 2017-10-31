@@ -46,6 +46,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan FileHandleId, 1000000),
+		syncAllRetries:         -1,
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -103,6 +104,8 @@ type QuantumFs struct {
 	inodeNum      uint64
 	fileHandleNum uint64
 	c             ctx
+
+	syncAllRetries int
 
 	// We present the sum of the size of all responses waiting on the api file as
 	// the size of that file because the kernel will clear any reads beyond what
@@ -189,34 +192,42 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	return nil
 }
 
-const ReleaseFileHandleLog = "Mux::fileHandlerReleaser"
+const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser() {
 	const maxReleasesPerCycle = 1000
 	i := 0
 	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
-	for {
-		func() {
+	for shutdown := false; !shutdown; {
+		shutdown = func() bool {
 			ids = ids[:0]
-			fh := <-qfs.toBeReleased
-			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
-
+			fh, ok := <-qfs.toBeReleased
+			if !ok {
+				return true
+			}
 			ids = append(ids, fh)
-
 			for i = 1; i < maxReleasesPerCycle; i++ {
 				select {
-				case fh := <-qfs.toBeReleased:
+				case fh, ok := <-qfs.toBeReleased:
+					if !ok {
+						return true
+					}
 					ids = append(ids, fh)
 				default:
-					defer qfs.mapMutex.Lock().Unlock()
-					for _, fh := range ids {
-						qfs.setFileHandle_(&qfs.c, fh, nil)
-					}
-					return
+					return false
 				}
 			}
+			return false
 		}()
-		if i < maxReleasesPerCycle {
+		func() {
+			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
+			defer qfs.mapMutex.Lock().Unlock()
+			for _, fh := range ids {
+				qfs.setFileHandle_(&qfs.c, fh, nil)
+			}
+		}()
+
+		if !shutdown && i < maxReleasesPerCycle {
 			// If we didn't need our full allocation, sleep to accumulate
 			// more work with minimal mapMutex contention.
 			time.Sleep(100 * time.Millisecond)
@@ -231,16 +242,18 @@ func (qfs *QuantumFs) Serve() {
 
 	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	retries := 5
 	for qfs.flusher.syncAll(&qfs.c) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 
-		if retries == 0 {
+		if qfs.syncAllRetries < 0 {
+			continue
+		} else if qfs.syncAllRetries == 0 {
 			qfs.c.elog("Unable to syncAll after Serve")
 			break
 		}
-		retries--
+
+		qfs.syncAllRetries--
 	}
 	qfs.c.dataStore.shutdown()
 }
@@ -249,6 +262,7 @@ func (qfs *QuantumFs) Shutdown() error {
 	if err := qfs.c.Qlog.Sync(); err != 0 {
 		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
 	}
+	close(qfs.toBeReleased)
 	return qfs.c.Qlog.Close()
 }
 
@@ -369,6 +383,8 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 }
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
+	defer c.funcIn("Mux::forceMerge").Out()
+
 	newRootId := publishWorkspaceRoot(c,
 		wsr.baseLayerId, wsr.hardlinks)
 

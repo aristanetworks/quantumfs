@@ -405,10 +405,6 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 	wsr.removeHardlink_(fileId, link.inodeId)
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
-
-	// Do not reparent here. It must be done safety with either the treeLock or
-	// the child, parent, and lockedParent locks locked in an UP order
-
 	wsr.dirty(c)
 
 	return link.record, inodeId
@@ -519,6 +515,8 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 	}
 }
 
+// Workspace must be synced first, with the tree locked exclusively across both the
+// sync and this refresh
 func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
