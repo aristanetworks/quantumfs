@@ -29,7 +29,7 @@ type dirtyInode struct {
 
 type triggerCmd struct {
 	flushAll bool
-	finished chan bool
+	finished chan struct{}
 }
 
 type FlushCmd int
@@ -111,7 +111,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			dq.treelock.lock.RLock()
 			defer dq.treelock.lock.RUnlock()
 
-			doneChan := make(chan bool)
+			doneChan := make(chan struct{})
 			func() {
 				defer c.qfs.flusher.lock.Lock().Unlock()
 
@@ -262,18 +262,19 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 	return sleepTime
 }
 
-// flusher lock must be locked when calling this function
 func (dq *DirtyQueue) flush(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 	done := false
+	var empty struct{}
 
 	for !done {
 		trigger := <-dq.trigger
-		c.vlog("dirtyqueue received cmd %d", trigger.flushAll)
+		c.vlog("trigger, flushAll: %v", trigger.flushAll)
 
 		// NOTE: When we are triggered, the treelock *must* already
-		// be locked by the caller, exclusively or not
+		// be locked by the caller (the thread that pushed into dq.trigger),
+		// exclusively or not
 
 		func() {
 			defer c.qfs.flusher.lock.Lock().Unlock()
@@ -298,16 +299,16 @@ func (dq *DirtyQueue) flush(c *ctx) {
 		}()
 
 		if trigger.finished != nil {
-			trigger.finished <- true
+			trigger.finished <- empty
 		}
 	}
 
-	// cleanup any leftover triggers
+	// consume any leftover triggers
 	for range dq.trigger {
 		trigger := <-dq.trigger
 
 		if trigger.finished != nil {
-			trigger.finished <- true
+			trigger.finished <- empty
 		}
 	}
 }
@@ -434,7 +435,6 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	if launch {
 		nc := c.flusherCtx()
 
-		// flush will acquire the flusher lock when it needs to
 		go dq.flush(nc)
 		go dq.kicker(nc)
 	}
