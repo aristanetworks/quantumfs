@@ -20,18 +20,14 @@ elif [ $(df -k --output=avail /dev/shm | tail -n 1) -lt 8388608 ]; then
   exit 4
 fi
 
-# Start the QuantumFS daemon in the background.
-quantumfsd \
-  -datastore ether.cql -datastoreconf $QFSCONFIG \
-  -workspaceDB ether.cql -workspaceDBconf $QFSCONFIG &
-
 function cleanup() {
   # Unmount QFS and stop the daemon.
   fusermount -u /qfs
 }
 trap cleanup EXIT
 
-# Execute whatever is passed as an argument.
-# Note this must remain at the end if the command's error code is to become the
-# script's error code.
-eval $@
+# Start the QuantumFS daemon.
+quantumfsd \
+  -datastore ether.cql -datastoreconf $QFSCONFIG \
+  -workspaceDB ether.cql -workspaceDBconf $QFSCONFIG
+
