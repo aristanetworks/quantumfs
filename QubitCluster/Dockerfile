@@ -7,12 +7,12 @@ LABEL maintainer="clr@arista.com"
 ENV USER root
 ARG QFS_RPM_VERSION=latest
 
-RUN yum install -y fuse wget && \
+RUN yum install -y supervisor fuse wget && \
     wget -q http://dist/storage/QuantumFS/QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
     yum --nogpgcheck -y localinstall QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
     mkdir /qfs
 
 COPY run_qfs.sh /run_qfs.sh
+COPY quantumfs_supervisord.conf /etc/quantumfs_supervisord.conf
 
-ENTRYPOINT ["/run_qfs.sh"]
-CMD ["bash"]
+CMD ["supervisord", "-n", "-c", "/etc/quantumfs_supervisord.conf"]
