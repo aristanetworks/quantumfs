@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/excludespec"
 	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
