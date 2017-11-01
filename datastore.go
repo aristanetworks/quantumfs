@@ -624,6 +624,7 @@ func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
 // concurrency safe. Multiple threads calling at the same time may get the same
 // number in the pseudorandom sequence. Use an atomic offset to get around this.
 var atomicOffset uint64
+
 func GenerateUniqueFileId() FileId {
 	for {
 		newId := FileId(utils.RandomNumberGenerator.Uint64())
