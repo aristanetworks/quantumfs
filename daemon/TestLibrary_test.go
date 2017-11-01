@@ -312,6 +312,14 @@ func (th *testHelper) MakeFile(filepath string) (data []byte) {
 
 }
 
+func (th *testHelper) SameLink(fileA string, fileB string) {
+	var statA, statB syscall.Stat_t
+	th.AssertNoErr(syscall.Stat(fileA, &statA))
+	th.AssertNoErr(syscall.Stat(fileB, &statB))
+
+	th.Assert(statA.Ino == statB.Ino, "Files are not hardlinked together")
+}
+
 func (th *testHelper) CheckLink(filepath string, data []byte, nlink uint64) {
 	th.CheckData(filepath, data)
 
