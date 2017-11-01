@@ -1,7 +1,7 @@
 /quantumfsd
 /quantumfsd-static
 /qfs
-/qfs-386
+/*-386
 /qloggerdb
 /qparse
 /qupload
