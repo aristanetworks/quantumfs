@@ -1725,7 +1725,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
-	c.qfs.noteChildCreated(dir.inodeNum(), name)
+	go c.qfs.noteChildCreated(dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
