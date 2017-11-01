@@ -118,7 +118,7 @@ func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 
 		mode := uint(stat.Mode)
 
-		// We may run before out parent directory has been created, create it
+		// We may run before our parent directory has been created, create it
 		// anyways and the permissions will be fixed up when that directory
 		// is eventually processed.
 		err = utils.MkdirAll(filepath.Dir(rootPrefix+dst), 0777)
