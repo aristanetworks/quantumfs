@@ -130,6 +130,34 @@ func TestConcurrentHardlinkWrites(t *testing.T) {
 	})
 }
 
+func TestConcurrentHardlinkNormalization(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0, workspace1 := test.setupDual()
+
+		dataA := []byte("abc")
+		fileA := "/fileA"
+		fileB := "/fileB"
+		fileC := "/fileC"
+
+		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
+			string(dataA)))
+
+		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileB))
+		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileC))
+
+		test.waitForPropagate(workspace1+fileB, dataA)
+
+		test.AssertNoErr(os.Remove(workspace1+fileB))
+		test.AssertNoErr(os.Remove(workspace0+fileA))
+
+		test.waitForPropagate(workspace0+fileB, []byte{})
+
+		test.assertNoFile(workspace0+fileA)
+		test.assertNoFile(workspace0+fileB)
+		test.CheckLink(workspace0+fileC, dataA, 1)
+	})
+}
+
 func TestConcurrentIntraFileMerges(t *testing.T) {
 	runDualQuantumFsTest(t, func(test *testHelper) {
 		workspace0, workspace1 := test.setupDual()
