@@ -262,7 +262,7 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 	return sleepTime
 }
 
-func (dq *DirtyQueue) flush(c *ctx) {
+func (dq *DirtyQueue) flusher(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 	done := false
@@ -435,7 +435,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	if launch {
 		nc := c.flusherCtx()
 
-		go dq.flush(nc)
+		go dq.flusher(nc)
 		go dq.kicker(nc)
 	}
 
