@@ -69,15 +69,15 @@ type Inode interface {
 	RemoveXAttr(c *ctx, attr string) fuse.Status
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-		attr *fuse.SetAttrIn, out *fuse.AttrOut,
-		updateMtime bool) fuse.Status
+	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+		out *fuse.AttrOut, updateMtime bool) fuse.Status
 
 	getChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
-	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
+	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
+		newType quantumfs.ObjectType)
 
 	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
 
@@ -135,10 +135,11 @@ type Inode interface {
 			err fuse.Status)) fuse.Status
 
 	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
-	parentSyncChild(c *ctx, publishFn func() quantumfs.ObjectKey)
-	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
-		attr *fuse.SetAttrIn, out *fuse.AttrOut,
-		updateMtime bool) fuse.Status
+	parentSyncChild(c *ctx, publishFn func() (quantumfs.ObjectKey,
+		quantumfs.ObjectType))
+	parentSetChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+		out *fuse.AttrOut, updateMtime bool) fuse.Status
+	parentUpdateSize(c *ctx, getSize_ func() uint64) fuse.Status
 	parentGetChildXAttrSize(c *ctx, inodeNum InodeId, attr string) (size int,
 		result fuse.Status)
 	parentGetChildXAttrData(c *ctx, inodeNum InodeId, attr string) (data []byte,
@@ -268,11 +269,12 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 }
 
 func (inode *InodeCommon) parentSyncChild(c *ctx,
-	publishFn func() quantumfs.ObjectKey) {
+	publishFn func() (quantumfs.ObjectKey, quantumfs.ObjectType)) {
 
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+	defer inode.Lock().Unlock()
 
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
@@ -282,20 +284,32 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	}
 
 	// publish before we sync, once we know it's safe
-	baseLayerId := publishFn()
+	baseLayerId, objectType := publishFn()
 
-	inode.parent_(c).syncChild(c, inode.id, baseLayerId)
+	inode.parent_(c).syncChild(c, inode.id, baseLayerId, objectType)
+}
+
+func (inode *InodeCommon) parentUpdateSize(c *ctx,
+	getSize_ func() uint64) fuse.Status {
+
+	defer c.funcIn("InodeCommon::parentUpdateSize").Out()
+
+	defer inode.parentLock.RLock().RUnlock()
+	defer inode.lock.Lock().Unlock()
+
+	var attr fuse.SetAttrIn
+	attr.Valid = fuse.FATTR_SIZE
+	attr.Size = getSize_()
+	return inode.parent_(c).setChildAttr(c, inode.inodeNum(), &attr, nil, true)
 }
 
 func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
-		updateMtime)
+	return inode.parent_(c).setChildAttr(c, inodeNum, attr, out, updateMtime)
 }
 
 func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
@@ -468,11 +482,6 @@ func (inode *InodeCommon) inodeNum() InodeId {
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
 	defer c.funcIn("InodeCommon::dirty").Out()
-	if inode.isOrphaned() {
-		c.vlog("Not dirtying inode %d because it is orphaned", inode.id)
-		return
-	}
-
 	defer c.qfs.flusher.lock.Lock().Unlock()
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
@@ -631,14 +640,13 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 		err fuse.Status)) fuse.Status {
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
+	defer inode.parentLock.Lock().Unlock()
 	defer inode.lock.Lock().Unlock()
 
 	// One of this inode's names is going away, reset the accessed cache to
 	// ensure any remaining names are marked correctly.
 	inode.clearAccessedCache()
 
-	// We must perform the deletion with the lockedParent lock
-	defer inode.parentLock.Lock().Unlock()
 	// After we've locked the child, we can safely go UP and lock our parent
 	toOrphan, err := deleteFromParent()
 
