@@ -219,7 +219,8 @@ func TestSymlinkBeforeSync(t *testing.T) {
 		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
 			"ID isn't empty block: %s", record.ID().String())
 		test.Assert(record.Type() == quantumfs.ObjectTypeSymlink,
-			"File isn't symlink: %s", record.Type())
+			"File isn't symlink: %s",
+			quantumfs.ObjectType2String(record.Type()))
 
 		test.SyncAllWorkspaces()
 
