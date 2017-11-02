@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func TestDirectoryRecordSort(t *testing.T) {
