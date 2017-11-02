@@ -48,15 +48,18 @@ func TestConcurrentWriteDeletion(t *testing.T) {
 
 		// Open a file handle to be orphaned and write some data
 		fd, err := os.OpenFile(workspace0+file, os.O_RDWR|os.O_CREATE, 0777)
+		_, err = fd.Write(dataA[:1])
+		test.AssertNoErr(err)
+
+		test.waitForPropagate(workspace1+file, dataA[:1])
+
 		defer fd.Close()
 		test.AssertNoErr(err)
-		n, err := fd.Write(dataA)
-		test.Assert(n == len(dataA), "Not all data written")
+		n, err := fd.Write(dataA[1:])
+		test.Assert(n == len(dataA)-1, "Not all data written")
 		test.AssertNoErr(err)
 
-		test.waitForPropagate(workspace1+file, dataA)
-
-		// Orphan the file from the other workspace
+		// Orphan the file from the other workspace at the same time as write
 		os.Remove(workspace1 + file)
 
 		// Wait for file to be deleted
@@ -127,34 +130,6 @@ func TestConcurrentHardlinkWrites(t *testing.T) {
 	
 		test.SameLink(workspace0+fileA, workspace0+fileC)
 		test.SameLink(workspace0+fileA, workspace0+fileB)
-	})
-}
-
-func TestConcurrentHardlinkNormalization(t *testing.T) {
-	runDualQuantumFsTest(t, func(test *testHelper) {
-		workspace0, workspace1 := test.setupDual()
-
-		dataA := []byte("abc")
-		fileA := "/fileA"
-		fileB := "/fileB"
-		fileC := "/fileC"
-
-		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
-			string(dataA)))
-
-		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileB))
-		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileC))
-
-		test.waitForPropagate(workspace1+fileB, dataA)
-
-		test.AssertNoErr(os.Remove(workspace1+fileB))
-		test.AssertNoErr(os.Remove(workspace0+fileA))
-
-		test.waitForPropagate(workspace0+fileB, []byte{})
-
-		test.assertNoFile(workspace0+fileA)
-		test.assertNoFile(workspace0+fileB)
-		test.CheckLink(workspace0+fileC, dataA, 1)
 	})
 }
 
