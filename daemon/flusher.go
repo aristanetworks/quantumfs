@@ -180,7 +180,7 @@ func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd) error {
 }
 
 // treeLock and flusher lock must be locked R/W when calling this function
-func flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
+func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
 	// parent onto the dirty queue. If we still hold that lock
@@ -189,10 +189,12 @@ func flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// the case of a panic.
 	uninstantiate := dirtyInode.shouldUninstantiate
 	inode := dirtyInode.inode
+
+	dqlen := dq.Len_()
 	ret := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode, uninstantiate)
+		return c.qfs.flushInode_(c, inode, uninstantiate, dqlen <= 1)
 	}()
 	if !uninstantiate && dirtyInode.shouldUninstantiate {
 		// we have released and re-acquired the flusher lock, and the
@@ -232,7 +234,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
 			return false
 		}
 
-		if !flushCandidate_(c, candidate) {
+		if !dq.flushCandidate_(c, candidate) {
 			candidate.expiryTime = time.Now().Add(
 				c.qfs.config.DirtyFlushDelay)
 			if flushAll {
@@ -292,6 +294,7 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 				// end the kicker thread and cleanup any triggers
 				dq.TryCommand(c, RETURN)
 				close(dq.trigger)
+				close(dq.cmd)
 			}
 		}()
 
