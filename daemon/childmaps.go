@@ -133,6 +133,7 @@ func (cmap *ChildMap) getRecord(c *ctx, inodeId InodeId,
 
 	for _, v := range list {
 		if v.Filename() == name {
+			c.vlog("Found %s", name)
 			return v
 		}
 	}

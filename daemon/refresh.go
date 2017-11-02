@@ -146,7 +146,10 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 	dir := asDirectory(inode)
 	defer dir.childRecordLock.Lock().Unlock()
 	staleRecord.toOrphan = dir.children.deleteChild(c, staleRecord.name, false)
-	c.qfs.noteDeletedInode(dir.id, staleRecord.inodeId, staleRecord.name)
+	status := c.qfs.noteDeletedInode(c, dir.id, staleRecord.inodeId,
+		staleRecord.name)
+	utils.Assert(status == fuse.OK, "noting %d deleted failed with %d",
+		staleRecord.inodeId, status)
 }
 
 // The reason we cannot unlink the stale dentries at this point is that
@@ -195,7 +198,7 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 			}
 		}
 
-		status := c.qfs.invalidateInode(entry.inodeId)
+		status := c.qfs.invalidateInode(c, entry.inodeId)
 		utils.Assert(status == fuse.OK,
 			"invalidating %d failed with %d", entry.inodeId, status)
 	}
@@ -233,7 +236,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	} else {
 		srcInode.MvChild(c, newParent, oldName, remoteRecord.Filename())
 	}
-	c.qfs.noteDeletedInode(srcInode.inodeNum(), inodeId, oldName)
+	c.qfs.noteDeletedInode(c, srcInode.inodeNum(), inodeId, oldName)
 	c.qfs.noteChildCreated(newParent.inodeNum(), remoteRecord.Filename())
 }
 
@@ -249,7 +252,7 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
 			if inode != nil {
 				reload(c, wsr, rc, inode, loadRecord.remoteRecord)
-				status := c.qfs.invalidateInode(loadRecord.inodeId)
+				status := c.qfs.invalidateInode(c, loadRecord.inodeId)
 				utils.Assert(status == fuse.OK,
 					"invalidating %d failed with %d",
 					loadRecord.inodeId, status)
