@@ -266,22 +266,3 @@ func TestSymlinks(t *testing.T) {
 		})
 	})
 }
-
-func TestFileIdUniqueness(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		checkMap := make(map[quantumfs.FileId]struct{})
-		var mutex utils.DeferableMutex
-		var empty struct{}
-
-		for i := 0; i < 1000; i++ {
-			go func() {
-				fileId := quantumfs.GenerateUniqueFileId()
-
-				defer mutex.Lock().Unlock()
-				_, exists := checkMap[fileId]
-				test.Assert(!exists, "Duplicate FileId generated")
-				checkMap[fileId] = empty
-			}()
-		}
-	})
-}
