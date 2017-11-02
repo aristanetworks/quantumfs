@@ -131,6 +131,8 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	defer c.funcIn("Symlink::Readlink").Out()
 
+	defer link.Lock().Unlock()
+
 	link.self.markSelfAccessed(c, quantumfs.PathRead)
 
 	// If we have an unflushed pointsTo, then use it
@@ -211,8 +213,6 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Symlink::flush").Out()
 
 	link.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
-		defer link.Lock().Unlock()
-
 		if link.dirtyPointsTo == "" {
 			// use existing key
 			return link.key, quantumfs.ObjectTypeSymlink
@@ -242,5 +242,9 @@ func (link *Symlink) setLink(c *ctx, pointTo string) {
 
 	link.dirtyPointsTo = pointTo
 
-	link.self.dirty(c)
+	// queue the symlink in the dirty queue at the front, regardless of
+	// whether it's already in the queue to ensure it's flushed NOW
+	defer c.qfs.flusher.lock.Lock().Unlock()
+	c.vlog("Queueing symlink %d on dirty list at the front", link.id)
+	link.dirtyElement__ = c.qfs.queueDirtyInodeNow_(c, link.self)
 }
