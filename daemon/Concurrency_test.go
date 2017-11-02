@@ -127,7 +127,7 @@ func TestConcurrentHardlinkWrites(t *testing.T) {
 		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileC))
 
 		test.waitForPropagate(workspace0+fileB, dataA)
-	
+
 		test.SameLink(workspace0+fileA, workspace0+fileC)
 		test.SameLink(workspace0+fileA, workspace0+fileB)
 	})
