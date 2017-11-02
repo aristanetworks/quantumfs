@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func TestDirectoryRecordSort(t *testing.T) {
@@ -94,5 +96,24 @@ func TestKeyToString(t *testing.T) {
 		test.Assert(err == nil, "error in FromString() err: %v", err)
 		test.Assert(key1.IsEqualTo(key2),
 			"The key before and after are not the same")
+	})
+}
+
+func TestFileIdUniqueness(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		checkMap := make(map[FileId]struct{})
+		var mutex utils.DeferableMutex
+		var empty struct{}
+
+		for i := 0; i < 1000; i++ {
+			go func() {
+				fileId := GenerateUniqueFileId()
+
+				defer mutex.Lock().Unlock()
+				_, exists := checkMap[fileId]
+				test.Assert(!exists, "Duplicate FileId generated")
+				checkMap[fileId] = empty
+			}()
+		}
 	})
 }
