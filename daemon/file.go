@@ -473,8 +473,8 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 		err := operateOnBlocks(c, fi.accessor, offset, size,
 			func(c *ctx, blockIdx int, offset uint64) error {
-				read, err := fi.accessor.readBlock(c, blockIdx, offset,
-					buf[readCount:])
+				read, err := fi.accessor.readBlock(c, blockIdx,
+					offset, buf[readCount:])
 
 				readCount += read
 				return err
