@@ -46,6 +46,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan FileHandleId, 1000000),
+		syncAllRetries:         -1,
 		c: ctx{
 			Ctx: quantumfs.Ctx{
 				Qlog:      qlogIn,
@@ -103,6 +104,8 @@ type QuantumFs struct {
 	inodeNum      uint64
 	fileHandleNum uint64
 	c             ctx
+
+	syncAllRetries int
 
 	// We present the sum of the size of all responses waiting on the api file as
 	// the size of that file because the kernel will clear any reads beyond what
@@ -242,6 +245,15 @@ func (qfs *QuantumFs) Serve() {
 	for qfs.flusher.syncAll(&qfs.c) != nil {
 		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
+
+		if qfs.syncAllRetries < 0 {
+			continue
+		} else if qfs.syncAllRetries == 0 {
+			qfs.c.elog("Unable to syncAll after Serve")
+			break
+		}
+
+		qfs.syncAllRetries--
 	}
 	qfs.c.dataStore.shutdown()
 }
@@ -266,7 +278,7 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 		if state.Deleted {
 			go qfs.handleDeletedWorkspace(c, name)
 		} else {
-			go qfs.refreshWorkspace(c, name, state)
+			go qfs.refreshWorkspace(c, name)
 		}
 	}
 }
@@ -344,14 +356,12 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	c.qfs.metaInodeDeletionRecords = nil
 }
 
-func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
-	state quantumfs.WorkspaceState) {
-
-	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
-		state.Nonce).Out()
+func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
+	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s", name).Out()
 
 	c = c.refreshCtx()
 	defer logRequestPanic(c)
+
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	defer cleanup()
@@ -361,21 +371,66 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		return
 	}
 
-	if qfs.workspaceIsMutable(c, wsr) {
-		// TODO At this point the workpace should be locked, flushed/synced
-		// and finally have the newly produced local RootID merged with the
-		// remote incoming RootID.
-		c.vlog("Refreshing mutable workspaces is not supported")
+	defer wsr.LockTree().Unlock()
+
+	err := qfs.flusher.syncWorkspace_(c, name)
+	if err != nil {
+		c.elog("Unable to syncWorkspace: %s", err.Error())
 		return
 	}
 
-	// TODO This should probably call wsr.refreshTo() and provide the new rootId
-	// instead of refetching from the workspaceDB.
-	wsr.refresh(c)
+	wsr.refresh_(c)
+}
+
+func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
+	defer c.funcIn("Mux::forceMerge").Out()
+
+	newRootId := publishWorkspaceRoot(c,
+		wsr.baseLayerId, wsr.hardlinks)
+
+	// We should eventually be able to Advance after merging
+	for {
+		rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+			wsr.typespace, wsr.namespace, wsr.workspace)
+
+		if err != nil {
+			c.elog("Unable to get workspace rootId")
+			return err
+		}
+
+		if nonce != wsr.nonce {
+			c.wlog("Nothing to merge, new workspace")
+			return nil
+		}
+
+		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
+			newRootId)
+
+		if err != nil {
+			c.elog("Unable to merge: %s", err.Error())
+			return err
+		}
+
+		// now try to advance the workspace from the fresh id
+		_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+			wsr.namespace, wsr.workspace, wsr.nonce, rootId, mergedId)
+
+		if wsdbErr, isWsdbErr := err.(quantumfs.WorkspaceDbErr); isWsdbErr &&
+			wsdbErr.Code == quantumfs.WSDB_OUT_OF_DATE {
+
+			c.wlog("Workspace advanced during merge of %s, retrying.",
+				wsr.fullname())
+			// Try again
+			continue
+		}
+
+		return err
+	}
 }
 
 // Should be called with the tree locked for read or write
-func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool {
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
+	lastInode bool) bool {
 
 	inodeNum := inode.inodeNum()
 	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
@@ -385,6 +440,24 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool 
 	if !inode.isOrphaned() {
 		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
 			_, flushSuccess = wsr.flushCanFail(c)
+
+			// Flush of wsr failed, so try merging
+			if !flushSuccess {
+				if lastInode {
+					err := forceMerge(c, wsr)
+					if err == nil {
+						// We fixed the wsr flush failure
+						// via merge
+						flushSuccess = true
+					}
+				} else {
+					// the workspaceroot should be dropped for
+					// now - there are children in queue to be
+					// flushed first. They will push the wsr
+					// back into the dirty queue later
+					flushSuccess = true
+				}
+			}
 		} else {
 			inode.flush(c)
 		}
@@ -736,7 +809,7 @@ func (qfs *QuantumFs) increaseLookupCountWithNum(c *ctx, inodeId InodeId,
 	num uint64) {
 
 	defer c.FuncIn("Mux::increaseLookupCountWithNum",
-		"inode %d with value %d", inodeId, num).Out()
+		"inode %d, val %d", inodeId, num).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
@@ -866,7 +939,13 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	wsr.realTreeLock.Lock()
 	defer wsr.realTreeLock.Unlock()
 
-	return qfs.flusher.syncWorkspace_(c, workspace)
+	err = qfs.flusher.syncWorkspace_(c, workspace)
+	if err != nil {
+		return err
+	}
+
+	wsr.refresh_(c)
+	return nil
 }
 
 func logRequestPanic(c *ctx) {
@@ -1090,7 +1169,7 @@ func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
 func (qfs *QuantumFs) getWorkspaceRootLineage(c *ctx,
 	typespace, namespace, workspace string) (ids []InodeId, cleanup func()) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "Workspace %s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
 
 	// In order to run getWorkspaceRootLineage, we must set a proper value for
