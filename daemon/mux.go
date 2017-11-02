@@ -10,6 +10,7 @@ package daemon
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -373,13 +374,12 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	wsr.refresh(c)
 }
 
-func (qfs *QuantumFs) flushInode(c *ctx, inode Inode, uninstantiate bool) bool {
+// Should be called with the tree locked for read or write
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool) bool {
 
 	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode", "inode %d, uninstantiate %t",
+	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
 		inodeNum, uninstantiate).Out()
-
-	defer inode.RLockTree().RUnlock()
 
 	flushSuccess := true
 	if !inode.isOrphaned() {
@@ -844,7 +844,29 @@ const SyncWorkspaceLog = "Mux::syncWorkspace"
 
 func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	defer c.funcIn(SyncWorkspaceLog).Out()
-	return qfs.flusher.syncWorkspace(c, workspace)
+
+	parts := strings.Split(workspace, "/")
+	ids, err := qfs.getWorkspaceRootLineageNoInstantiate(c, parts[0], parts[1],
+		parts[2])
+	if err != nil {
+		return errors.New("Unable to get WorkspaceRoot for Sync")
+	}
+
+	if len(ids) < 4 {
+		// not instantiated yet, so nothing to sync
+		return nil
+	}
+
+	inode := qfs.inodeNoInstantiate(c, ids[3])
+	if inode == nil {
+		return nil
+	}
+
+	wsr := inode.(*WorkspaceRoot)
+	wsr.realTreeLock.Lock()
+	defer wsr.realTreeLock.Unlock()
+
+	return qfs.flusher.syncWorkspace_(c, workspace)
 }
 
 func logRequestPanic(c *ctx) {
