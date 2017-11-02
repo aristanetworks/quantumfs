@@ -188,12 +188,12 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	var updateMtime bool
 
-	result := func() fuse.Status {
-		defer fi.Lock().Unlock()
+	if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		result := func() fuse.Status {
+			defer fi.Lock().Unlock()
 
-		c.vlog("Got file lock")
+			c.vlog("Got file lock")
 
-		if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			if attr.Size != fi.accessor.fileLength(c) {
 				updateMtime = true
 			}
@@ -217,16 +217,17 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			}
 
 			fi.self.dirty(c)
+
+			return fuse.OK
+		}()
+
+		if result != fuse.OK {
+			return result
 		}
 
-		return fuse.OK
-	}()
-
-	if result != fuse.OK {
-		return result
+		fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 	}
 
-	fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 	return fi.parentSetChildAttr(c, fi.InodeCommon.id, attr, out, updateMtime)
 }
 
