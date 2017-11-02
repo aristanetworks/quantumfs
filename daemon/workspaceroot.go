@@ -405,10 +405,6 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 	wsr.removeHardlink_(fileId, link.inodeId)
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
-
-	// Do not reparent here. It must be done safety with either the treeLock or
-	// the child, parent, and lockedParent locks locked in an UP order
-
 	wsr.dirty(c)
 
 	return link.record, inodeId
@@ -709,7 +705,7 @@ func (wsr *WorkspaceRoot) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
 
 	defer c.funcIn("WorkspaceRoot::syncChild").Out()
 
@@ -727,9 +723,13 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			}
 
 			entry.SetID(newKey)
+
+			if newType != quantumfs.ObjectTypeInvalid {
+				entry.SetType(newType)
+			}
 		}()
 	} else {
-		wsr.Directory.syncChild(c, inodeNum, newKey)
+		wsr.Directory.syncChild(c, inodeNum, newKey, newType)
 	}
 }
 

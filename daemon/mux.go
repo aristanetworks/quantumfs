@@ -188,34 +188,42 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	return nil
 }
 
-const ReleaseFileHandleLog = "Mux::fileHandlerReleaser"
+const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser() {
 	const maxReleasesPerCycle = 1000
 	i := 0
 	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
-	for {
-		func() {
+	for shutdown := false; !shutdown; {
+		shutdown = func() bool {
 			ids = ids[:0]
-			fh := <-qfs.toBeReleased
-			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
-
+			fh, ok := <-qfs.toBeReleased
+			if !ok {
+				return true
+			}
 			ids = append(ids, fh)
-
 			for i = 1; i < maxReleasesPerCycle; i++ {
 				select {
-				case fh := <-qfs.toBeReleased:
+				case fh, ok := <-qfs.toBeReleased:
+					if !ok {
+						return true
+					}
 					ids = append(ids, fh)
 				default:
-					defer qfs.mapMutex.Lock().Unlock()
-					for _, fh := range ids {
-						qfs.setFileHandle_(&qfs.c, fh, nil)
-					}
-					return
+					return false
 				}
 			}
+			return false
 		}()
-		if i < maxReleasesPerCycle {
+		func() {
+			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
+			defer qfs.mapMutex.Lock().Unlock()
+			for _, fh := range ids {
+				qfs.setFileHandle_(&qfs.c, fh, nil)
+			}
+		}()
+
+		if !shutdown && i < maxReleasesPerCycle {
 			// If we didn't need our full allocation, sleep to accumulate
 			// more work with minimal mapMutex contention.
 			time.Sleep(100 * time.Millisecond)
@@ -235,6 +243,14 @@ func (qfs *QuantumFs) Serve() {
 		time.Sleep(100 * time.Millisecond)
 	}
 	qfs.c.dataStore.shutdown()
+}
+
+func (qfs *QuantumFs) Shutdown() error {
+	if err := qfs.c.Qlog.Sync(); err != 0 {
+		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
+	}
+	close(qfs.toBeReleased)
+	return qfs.c.Qlog.Close()
 }
 
 func (qfs *QuantumFs) handleWorkspaceChanges(
@@ -333,6 +349,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s (%d)", name,
 		state.Nonce).Out()
 
+	c = c.refreshCtx()
 	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
@@ -838,7 +855,7 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("ERROR: PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
+	c.elog("PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
 		fmt.Sprintf("%v", exception), utils.BytesToString(stackTrace))
 }
 
@@ -982,7 +999,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						inode.parentId_(), inodeNum))
 				}
 
-				parent.syncChild(c, inodeNum, key)
+				parent.syncChild(c, inodeNum, key,
+					quantumfs.ObjectTypeInvalid)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
 					inode.parentId_())
@@ -1998,7 +2016,7 @@ func (qfs *QuantumFs) decreaseApiFileSize(c *ctx, offset int) {
 	result := atomic.AddInt64(&qfs.apiFileSize, -1*int64(offset))
 	c.vlog("QuantumFs::APIFileSize subtract %d downto %d", offset, result)
 	if result < 0 {
-		c.elog("ERROR: PANIC Global variable %d should"+
+		c.elog("PANIC Global variable %d should"+
 			" be greater than zero", result)
 		atomic.StoreInt64(&qfs.apiFileSize, 0)
 	}
