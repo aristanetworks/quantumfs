@@ -1195,6 +1195,7 @@ func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
+	c.vlog("WorkspaceList::setChildAttr doing nothing")
 	return fuse.OK
 }
 
