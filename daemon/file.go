@@ -200,7 +200,6 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 			if attr.Size == 0 {
 				fi.accessor.truncate(c, 0)
-				fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 				return fuse.OK
 			}
 			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
@@ -218,7 +217,6 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			}
 
 			fi.self.dirty(c)
-			fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 		}
 
 		return fuse.OK
@@ -228,6 +226,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		return result
 	}
 
+	fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 	return fi.parentSetChildAttr(c, fi.InodeCommon.id, attr, out, updateMtime)
 }
 
