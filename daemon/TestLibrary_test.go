@@ -131,7 +131,7 @@ func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
 // If you need to run two concurrent instances of QuantumFS in the same test, use
 // runTestDualQuantumFS().
 func runDualQuantumFsTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 2, dirtyDelay20Ms)
+	runTestCommon(t, test, 2, dirtyDelay100Ms)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -415,11 +415,6 @@ func cacheTimeout100Ms(test *testHelper, config *QuantumFsConfig) {
 // Modify the QuantumFS flush delay to 100 milliseconds
 func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
 	config.DirtyFlushDelay = 100 * time.Millisecond
-}
-
-// Modify the QuantumFS flush delay to 20 milliseconds
-func dirtyDelay20Ms(test *testHelper, config *QuantumFsConfig) {
-	config.DirtyFlushDelay = 20 * time.Millisecond
 }
 
 // Extract namespace and workspace path from the absolute path of
