@@ -523,6 +523,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
+	c.dlog("Opened Inode %d as Fh: %d", dir.inodeNum(), ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 
 	return fuse.OK
@@ -1724,7 +1725,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
-	c.qfs.noteChildCreated(dir.inodeNum(), name)
+	go c.qfs.noteChildCreated(dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
