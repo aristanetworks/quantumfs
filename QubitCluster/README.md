@@ -17,7 +17,7 @@ http://dist/storage/QuantumFS/.
 To run a container use the following steps:
  - Grab a config file from the [Scylla Keyspace Reservations sheet](https://docs.google.com/spreadsheets/d/1ZAd-_rF0eqSqsllDF9rT7YWIDCbVwU4u_AgRJbeRvUM/edit#gid=0) and save it as `quantumfsd.conf`
  - Create and run an instance of the QFS container with `docker run --rm -it --privileged --shm-size=8g -v $PWD/quantumfsd.conf:/etc/quantumfsd.conf --name my_qfs_container qfs`
- - In a seperate term open a shell in the container with `docker exec -it my_qfs_container bash`
+ - In a seperate terminal open a shell in the container with `docker exec -it my_qfs_container bash`
 
 This will start a container with a QuantumFS filesystem mounted on `/qfs`.
 The container will be removed once you send Ctrl-C to the `docker run` terminal.
