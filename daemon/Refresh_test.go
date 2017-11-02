@@ -263,6 +263,7 @@ func TestRefreshHardlinkRemoval(t *testing.T) {
 		linkname := workspace + "/" + linkfile
 		err := os.Remove(linkname)
 		test.Assert(err != nil, "The linkfile must not exist after refresh")
+		test.Assert(false, "dddd")
 	})
 }
 
