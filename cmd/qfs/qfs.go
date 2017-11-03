@@ -46,6 +46,7 @@ func printUsage() {
 	fmt.Println("         - get the access list of workspace")
 	fmt.Println("  clearAccessedFiles <workspace>")
 	fmt.Println("         - clear the access list of workspace")
+	fmt.Println("  cp <srcPath> <dstPath> - Copy a directory using insertInode")
 	fmt.Println("  insertInode <dstPath> <key> <uid> <gid> <permission>")
 	fmt.Println("         - copy an inode corresponding to an extended" +
 		" key under the location of dstPath with specifications of" +
@@ -86,10 +87,12 @@ func main() {
 		getAccessed()
 	case "clearAccessedFiles":
 		clearAccessed()
+	case "cp":
+		cp()
 	case "insertInode":
 		insertInode()
 	case "sync":
-		sync()
+		syncAll()
 	case "deleteWorkspace":
 		deleteWorkspace()
 	case "enableRootWrite":
@@ -295,7 +298,7 @@ func insertInode() {
 	}
 }
 
-func sync() {
+func syncAll() {
 	api, err := quantumfs.NewApi()
 	if err != nil {
 		fmt.Println("Failed to find API:", err)
