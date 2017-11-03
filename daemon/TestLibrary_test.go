@@ -188,7 +188,7 @@ func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFun
 		}
 
 		startChan = make(chan struct{}, 0)
-		th.startQuantumFs(config, startChan)
+		th.startQuantumFs(config, startChan, (numDefaultQfs > 1))
 	}
 	if numDefaultQfs >= 2 {
 		config := th.defaultConfig()
@@ -204,7 +204,7 @@ func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFun
 
 		startChan1 := startChan
 		startChan2 := make(chan struct{}, 0)
-		th.startQuantumFs(config, startChan2)
+		th.startQuantumFs(config, startChan2, true)
 
 		startChan = make(chan struct{}, 0)
 		go func() {

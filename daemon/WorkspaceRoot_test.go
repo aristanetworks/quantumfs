@@ -369,9 +369,8 @@ func TestWorkspaceAccessAfterDeletion(t *testing.T) {
 		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(workspace)))
 
 		test.WaitFor("File to no longer exist", func() bool {
-			var stat syscall.Stat_t
-			err := syscall.Stat(filename, &stat)
-			return err == nil
+			_, err := os.Stat(filename)
+			return os.IsNotExist(err)
 		})
 	})
 }
