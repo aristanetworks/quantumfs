@@ -386,7 +386,7 @@ func TestWorkspaceAttributeChange(t *testing.T) {
 		var stat2 syscall.Stat_t
 		test.AssertNoErr(syscall.Stat(workspace, &stat2))
 
-		test.Assert(stat1.Mode != stat2.Mode,
+		test.Assert(stat1.Mode == stat2.Mode,
 			"WSR Permissions shouldn't have changed")
 	})
 }
