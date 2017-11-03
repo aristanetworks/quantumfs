@@ -53,7 +53,7 @@ func printList(args []string) error {
 					"for TS:%s NS:%s failed: %s\n", ts, ns, err)
 				continue
 			}
-			for ws := range wsMap {
+			for ws, nonce := range wsMap {
 				var rootID quantumfs.ObjectKey
 				wsname := ts + "/" + ns + "/" + ws
 				if rootID, _, err = qubitutils.GetWorkspaceRootID(&cs.ctx.Ctx, cs.qfsdb, wsname); err != nil {
@@ -65,7 +65,7 @@ func printList(args []string) error {
 					return cmdproc.NewBadCmdExitErr("Cannot find lastWriteTime for %s: %v", wsname, err)
 				}
 				fmt.Println()
-				fmt.Printf("[%s] %v : %s\n", lastWrite.Local().Format(time.UnixDate), rootID.String(), wsname)
+				fmt.Printf("[%s] %v : %s : %d\n", lastWrite.Local().Format(time.UnixDate), rootID.String(), wsname, nonce)
 			}
 		}
 	}
