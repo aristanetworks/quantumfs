@@ -243,24 +243,12 @@ func NewApiWithPath(path string) (Api, error) {
 // read.
 type PathsAccessed struct {
 	Paths map[string]PathFlags
-	Links map[string]LinkPaths
 }
 
 func NewPathsAccessed() PathsAccessed {
 	return PathsAccessed{
 		Paths: map[string]PathFlags{},
-		Links: NewLinkPaths(),
 	}
-}
-
-func NewLinkPaths() LinkPaths {
-	return LinkPaths {
-		LegPaths: make(map[string]struct{}),
-	}
-}
-
-type LinkPaths struct {
-	LegPaths map[string]struct{}
 }
 
 const (
