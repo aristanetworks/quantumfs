@@ -243,7 +243,8 @@ func (link *Symlink) setLink(c *ctx, pointTo string) {
 	link.dirtyPointsTo = pointTo
 
 	// queue the symlink in the dirty queue at the front, regardless of
-	// whether it's already in the queue to ensure it's flushed NOW
+	// whether it's already in the queue to ensure it's flushed before its
+	// parent, thus ensuring a consistent uploaded metadata tree
 	defer c.qfs.flusher.lock.Lock().Unlock()
 	c.vlog("Queueing symlink %d on dirty list at the front", link.id)
 	link.dirtyElement__ = c.qfs.queueDirtyInodeNow_(c, link.self)
