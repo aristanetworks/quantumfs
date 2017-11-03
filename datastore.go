@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/aristanetworks/quantumfs/encoding"
@@ -619,9 +620,17 @@ func overlayHardlinkRecord(r encoding.HardlinkRecord) *HardlinkRecord {
 	return &record
 }
 
+// Because utils.RandomNumberGenerator uses an unlocked source, it is not
+// concurrency safe. Multiple threads calling at the same time may get the same
+// number in the pseudorandom sequence. Use an atomic offset to get around this.
+var atomicOffset uint64
+
 func GenerateUniqueFileId() FileId {
 	for {
 		newId := FileId(utils.RandomNumberGenerator.Uint64())
+		offset := atomic.AddUint64(&atomicOffset, 1)
+		newId += FileId(offset)
+
 		if newId == InvalidFileId {
 			continue
 		}
