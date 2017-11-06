@@ -8,9 +8,11 @@ package daemon
 
 import (
 	"bytes"
+	"os"
 	"syscall"
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -193,5 +195,44 @@ func TestSymlinkOrphanedPermission(t *testing.T) {
 
 		err = syscall.Close(fd)
 		test.AssertNoErr(err)
+	})
+}
+
+func TestSymlinkBeforeSync(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		symlink := createSymlink(workspace, test)
+
+		// Confirm the directory record's key isn't uploaded yet
+		var linkStats syscall.Stat_t
+		err := syscall.Lstat(symlink, &linkStats)
+		test.AssertNoErr(err)
+		linkInode := InodeId(linkStats.Ino)
+
+		inode := test.getInode(workspace)
+		dir := inode.(*WorkspaceRoot)
+		record, err := dir.getChildRecordCopy(test.TestCtx(),
+			linkInode)
+		test.AssertNoErr(err)
+
+		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+			"ID isn't empty block: %s", record.ID().String())
+		test.Assert(record.Type() == quantumfs.ObjectTypeSymlink,
+			"File isn't symlink: %s",
+			quantumfs.ObjectType2String(record.Type()))
+
+		test.SyncAllWorkspaces()
+
+		record, err = dir.getChildRecordCopy(test.TestCtx(),
+			linkInode)
+		test.AssertNoErr(err)
+
+		data := test.qfs.c.dataStore.Get(&test.qfs.c.Ctx, record.ID())
+		test.Assert(data != nil, "No data for symlink")
+		linkPath, err := os.Readlink(symlink)
+		test.AssertNoErr(err)
+		test.Assert(bytes.Equal(data.Get(), []byte(linkPath)),
+			"Symlink corrupt: %s", data.Get())
 	})
 }
