@@ -809,6 +809,29 @@ func (wsr *WorkspaceRoot) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 	}
 }
 
+func (wsr *WorkspaceRoot) markHardlinkPath(c *ctx, path string,
+	fileId quantumfs.FileId) {
+
+	defer c.funcIn("WorkspaceRoot::markHardlinkPath").out()
+	defer wsr.linkLock.Lock().Unlock()
+
+	list, exists := wsr.linkPaths[fileId]
+	if !exists {
+		list = make([]string, 0)
+	}
+
+	// ensure there are no duplicates (like from renames, etc)
+	for _, curPath := range list {
+		if curPath == path {
+			// done early
+			return
+		}
+	}
+
+	list = append(list, path)
+	wsr.linkPaths[fileId] = list
+}
+
 func (wsr *WorkspaceRoot) markAccessed_(c *ctx, path string,
 	op quantumfs.PathFlags) {
 
