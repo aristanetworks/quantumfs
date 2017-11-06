@@ -530,6 +530,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
+	c.dlog("Opened Inode %d as Fh: %d", dir.inodeNum(), ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 
 	return fuse.OK
@@ -921,16 +922,24 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		buf := newBuffer(c, []byte(pointedTo), quantumfs.KeyTypeMetadata)
-		key, err := buf.Key(&c.Ctx)
-		if err != nil {
-			c.elog("Failed to upload block: %v", err)
-			return fuse.EIO
-		}
+		inode := dir.create_(c, name, 0777, 0777, 0, newSymlink,
+			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
-		dir.create_(c, name, 0777, 0777, 0, newSymlink,
-			quantumfs.ObjectTypeSymlink, key, out)
-		c.vlog("Created new symlink with key: %s", key.String())
+		link := inode.(*Symlink)
+
+		// Set the symlink link data
+		link.setLink(c, pointedTo)
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+
+			// Update the record's size
+			record := dir.children.record(inode.inodeNum())
+			record.SetSize(uint64(len(pointedTo)))
+		}()
+
+		// Update the outgoing entry size
+		out.Attr.Size = uint64(len(pointedTo))
+
 		return fuse.OK
 	}()
 
@@ -1731,7 +1740,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
-	c.qfs.noteChildCreated(dir.inodeNum(), name)
+	go c.qfs.noteChildCreated(dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
