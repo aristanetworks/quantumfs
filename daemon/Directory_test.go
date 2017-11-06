@@ -1737,13 +1737,19 @@ func TestDirectoryReadStaleDir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir := workspace + "/" + "testdir"
-		filename := dir + "/foo"
 		test.AssertNoErr(syscall.Mkdir(dir, 0777))
-		for i := 0; i < 100; i++ {
+
+		// The kernel uses the batch size of 25 when reading dentries of
+		// a directory, therefore, we should use a larger number to make
+		// sure not every file is read in the first readdirnames
+		const nFiles = 26
+
+		for i := 0; i < nFiles; i++ {
 			test.AssertNoErr(CreateSmallFile(
 				fmt.Sprintf("%s/f%d", dir, i), ""))
+			test.AssertNoErr(CreateSmallFile(
+				fmt.Sprintf("%s/g%d", dir, i), ""))
 		}
-		test.AssertNoErr(CreateSmallFile(filename, ""))
 
 		f, err := os.Open(dir)
 		test.AssertNoErr(err)
@@ -1752,14 +1758,21 @@ func TestDirectoryReadStaleDir(t *testing.T) {
 		_, err = f.Readdirnames(1)
 		test.AssertNoErr(err)
 
-		test.AssertNoErr(syscall.Unlink(filename))
-		test.AssertNoErr(syscall.Symlink(dir+"/f0", filename))
-
+		for i := 0; i < nFiles; i++ {
+			test.AssertNoErr(
+				syscall.Unlink(fmt.Sprintf("%s/f%d", dir, i)))
+			test.AssertNoErr(syscall.Symlink(
+				fmt.Sprintf("%s/g%d", dir, i),
+				fmt.Sprintf("%s/f%d", dir, i)))
+		}
 		_, err = f.Readdirnames(100)
 		test.AssertNoErr(err)
 
-		_, err = os.Readlink(filename)
-		test.AssertNoErr(err)
-		test.AssertNoErr(syscall.Unlink(filename))
+		for i := 0; i < nFiles; i++ {
+			_, err = os.Readlink(fmt.Sprintf("%s/f%d", dir, i))
+			test.AssertNoErr(err)
+			test.AssertNoErr(syscall.Unlink(
+				fmt.Sprintf("%s/f%d", dir, i)))
+		}
 	})
 }
