@@ -84,7 +84,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
-	cmap, uninstantiated := newChildMap(c, wsr, dir.baseLayerId)
+	cmap, uninstantiated := newChildMap(c, dir, dir.baseLayerId)
 	dir.children = cmap
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
@@ -616,7 +616,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.loadChild_(c, entry, inodeNum)
+		dir.children.loadChild(c, entry, inodeNum)
 	}()
 	dir.updateSize_(c)
 
@@ -1241,7 +1241,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 						[]InodeId{overwrittenId})
 				}
 
-				dst.loadChild_(c, newEntry, oldInodeId)
+				dst.children.loadChild(c, newEntry, oldInodeId)
 				// child inode was inserted, which counts as dirty
 				if childInode != nil {
 					childInode.dirty(c)
@@ -1781,7 +1781,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.loadChild_(c, entry, quantumfs.InodeIdInvalid)
+		return dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
 	}()
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
@@ -1796,7 +1796,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 func (dir *Directory) markHardlinkPath(c *ctx, path string,
 	fileId quantumfs.FileId) {
 
-	defer c.funcIn("markHardlinkPath").out()
+	defer c.funcIn("Directory::markHardlinkPath").Out()
 
 	if dir.InodeCommon.isWorkspaceRoot() {
 		dir.wsr.markHardlinkPath(c, path, fileId)
@@ -1807,20 +1807,8 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 
 	defer dir.InodeCommon.parentLock.RLock().RUnlock()
 	parent := dir.InodeCommon.parent_(c)
-	parentDir := parent.(*Directory)
+	parentDir := asDirectory(parent)
 	parentDir.markHardlinkPath(c, path, fileId)
-}
-
-// Must be called with the childRecordLock exclusively locked
-func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord,
-	inodeNum InodeId) InodeId {
-
-	// We need to track any hardlinks as they're loaded for the accesslist
-	if entry.Type() == quantumfs.ObjectTypeHardlink {
-		dir.markHardlinkPath(c, entry.Filename(), entry.FileId())
-	}
-
-	return dir.children.loadChild(c, entry, inodeNum)
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
