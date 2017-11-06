@@ -26,7 +26,7 @@ type WorkspaceRoot struct {
 	publishedRootId quantumfs.ObjectKey
 	nonce           quantumfs.WorkspaceNonce
 
-	listLock   sync.Mutex
+	listLock   utils.DeferableMutex
 	accessList quantumfs.PathsAccessed
 
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
@@ -779,8 +779,39 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 		quantumfs.PathCreated|quantumfs.PathDeleted),
 		"Cannot create and delete simultaneously")
 
-	wsr.listLock.Lock()
-	defer wsr.listLock.Unlock()
+	defer wsr.listLock.Lock().Unlock()
+	wsr.markAccessed_(c, path, op)
+}
+
+func (wsr *WorkspaceRoot) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
+	op quantumfs.PathFlags) {
+
+	defer c.FuncIn("WorkspaceRoot::markHardlinkAccessed",
+		"fileId %d CRUD %x", fileId, op).Out()
+
+	utils.Assert(!utils.BitFlagsSet(uint(op),
+		quantumfs.PathCreated|quantumfs.PathDeleted),
+		"Cannot create and delete simultaneously")
+
+	paths := func () []string {
+		defer wsr.linkLock.Lock().Unlock()
+		rtn, exists := wsr.linkPaths[fileId]
+		
+		utils.Assert(exists, "markHardlinkAccessed link has no paths, %d",
+			fileId)
+
+		return rtn
+	} ()
+
+	defer wsr.listLock.Lock().Unlock()
+	for _, path := range paths {
+		wsr.markAccessed_(c, path, op)
+	}
+}
+
+func (wsr *WorkspaceRoot) markAccessed_(c *ctx, path string,
+	op quantumfs.PathFlags) {
+
 	path = "/" + path
 	pathFlags, exists := wsr.accessList.Paths[path]
 	if !exists {
@@ -838,14 +869,12 @@ func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 }
 
 func (wsr *WorkspaceRoot) getList() quantumfs.PathsAccessed {
-	wsr.listLock.Lock()
-	defer wsr.listLock.Unlock()
+	defer wsr.listLock.Lock().Unlock()
 	return wsr.accessList
 }
 
 func (wsr *WorkspaceRoot) clearList() {
-	wsr.listLock.Lock()
-	defer wsr.listLock.Unlock()
+	defer wsr.listLock.Lock().Unlock()
 	wsr.accessList = quantumfs.NewPathsAccessed()
 }
 

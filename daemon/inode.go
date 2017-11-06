@@ -262,9 +262,19 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 
 	defer c.FuncIn("InodeCommon::parentMarkAccessed", "path %s CRUD %x", path,
 		op).Out()
+
 	defer inode.parentLock.RLock().RUnlock()
 
-	inode.parent_(c).markAccessed(c, path, op)
+	parent := inode.parent_(c)
+	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
+		isHardlink, fileId := wsr.checkHardlink(inode.id)
+		if isHardlink {
+			wsr.markHardlinkAccessed(c, fileId, op)
+			return
+		}
+	}
+
+	parent.markAccessed(c, path, op)
 }
 
 func (inode *InodeCommon) parentSyncChild(c *ctx,
