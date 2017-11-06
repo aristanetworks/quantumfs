@@ -139,19 +139,6 @@ func (dir *Directory) updateSize_(c *ctx) {
 	}
 }
 
-// Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, inode InodeId,
-	child quantumfs.DirectoryRecord) {
-
-	defer c.funcIn("Directory::addChild_").Out()
-
-	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.loadChild(c, child, inode)
-	}()
-	dir.updateSize_(c)
-}
-
 // Needs inode lock and parentLock for write
 func (dir *Directory) delChild_(c *ctx,
 	name string) (toOrphan quantumfs.DirectoryRecord) {
@@ -626,7 +613,13 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	inodeNum := c.qfs.newInodeId()
 	newEntity, uninstantiated := constructor(c, name, key, 0, inodeNum, dir.self,
 		mode, rdev, entry)
-	dir.addChild_(c, inodeNum, entry)
+
+	func() {
+		defer dir.childRecordLock.Lock().Unlock()
+		dir.loadChild_(c, entry, inodeNum)
+	}()
+	dir.updateSize_(c)
+
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
 	c.qfs.increaseLookupCount(c, inodeNum)
@@ -1248,7 +1241,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 						[]InodeId{overwrittenId})
 				}
 
-				dst.insertEntry_(c, newEntry, oldInodeId, childInode)
+				dst.loadChild_(c, newEntry, oldInodeId)
+				// child inode was inserted, which counts as dirty
+				if childInode != nil {
+					childInode.dirty(c)
+				}
+				dst.self.dirty(c)
 
 				// Remove entry in old directory
 				dir.deleteEntry_(c, oldName)
@@ -1292,21 +1290,6 @@ func (dir *Directory) deleteEntry_(c *ctx, name string) {
 	}
 
 	dir.children.deleteChild(c, name, true)
-}
-
-// Needs to hold childRecordLock
-func (dir *Directory) insertEntry_(c *ctx, entry quantumfs.DirectoryRecord,
-	inodeNum InodeId, childInode Inode) {
-
-	defer c.FuncIn("DirectoryRecord::insertEntry_", "inode %d", inodeNum).Out()
-
-	dir.children.loadChild(c, entry, inodeNum)
-
-	// being inserted means you're dirty and need to be synced
-	if childInode != nil {
-		childInode.dirty(c)
-	}
-	dir.self.dirty(c)
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
@@ -1798,7 +1781,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
+		return dir.loadChild_(c, entry, quantumfs.InodeIdInvalid)
 	}()
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
@@ -1808,6 +1791,36 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	c.qfs.noteChildCreated(dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
+}
+
+func (dir *Directory) markHardlinkPath(c *ctx, path string,
+	fileId quantumfs.FileId) {
+
+	defer c.funcIn("markHardlinkPath").out()
+
+	if dir.InodeCommon.isWorkspaceRoot() {
+		dir.wsr.markHardlinkPath(c, path, fileId)
+		return
+	}
+
+	path = dir.name() + "/" + path
+
+	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	parent := dir.InodeCommon.parent_(c)
+	parentDir := parent.(*Directory)
+	parentDir.markHardlinkPath(c, path, fileId)
+}
+
+// Must be called with the childRecordLock exclusively locked
+func (dir *Directory) loadChild_(c *ctx, entry quantumfs.DirectoryRecord,
+	inodeNum InodeId) InodeId {
+
+	// We need to track any hardlinks as they're loaded for the accesslist
+	if entry.Type() == quantumfs.ObjectTypeHardlink {
+		dir.markHardlinkPath(c, entry.Filename(), entry.FileId())
+	}
+
+	return dir.children.loadChild(c, entry, inodeNum)
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
