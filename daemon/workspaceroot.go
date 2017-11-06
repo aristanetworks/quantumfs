@@ -405,10 +405,6 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 	wsr.removeHardlink_(fileId, link.inodeId)
 	// we're throwing link away, but be safe and clear its inodeId
 	link.inodeId = quantumfs.InodeIdInvalid
-
-	// Do not reparent here. It must be done safety with either the treeLock or
-	// the child, parent, and lockedParent locks locked in an UP order
-
 	wsr.dirty(c)
 
 	return link.record, inodeId
@@ -519,16 +515,15 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 	}
 }
 
-func (wsr *WorkspaceRoot) refresh(c *ctx) {
+// Workspace must be synced first, with the tree locked exclusively across both the
+// sync and this refresh
+func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh").Out()
 
-	// Lock the tree while acquiring the publishedRootId to prevent
-	// working with a stale publishedRootId
-	defer wsr.LockTree().Unlock()
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
-	workspaceName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
+	workspaceName := wsr.fullname()
 	if nonce != wsr.nonce {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
 			"nonces %d vs %d", workspaceName, wsr.nonce, nonce)
@@ -541,10 +536,6 @@ func (wsr *WorkspaceRoot) refresh(c *ctx) {
 		return
 	}
 
-	if c.qfs.workspaceIsMutable(c, wsr) {
-		c.vlog("Workspace %s mutable", workspaceName)
-		return
-	}
 	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
@@ -569,6 +560,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 		panic("Failed to upload new workspace root")
 	}
 
+	c.vlog("Publish: %s", newRootId.String())
 	return newRootId
 }
 
@@ -585,22 +577,8 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 			c.vlog("Workspace is deleted. Will not retry flushing.")
 			return true
 		} else if err.Code == quantumfs.WSDB_OUT_OF_DATE {
-			workspacePath := wsr.typespace + "/" + wsr.namespace + "/" +
-				wsr.workspace
-
-			c.wlog("rootID update failure, wsdb %s, new %s, wsr %s: %s",
-				rootId.String(), newRootId.String(),
-				wsr.publishedRootId.String(), err.Error())
-			c.wlog("Another quantumfs instance is writing to %s, %s",
-				workspacePath,
-				"your changes will be lost. "+
-					"Unable to sync to datastore - save your"+
-					" work somewhere else.")
-
-			// Lock the user out of the workspace
-			defer c.qfs.mutabilityLock.Lock().Unlock()
-			c.qfs.workspaceMutability[workspacePath] = 0 +
-				workspaceImmutableUntilRestart
+			c.vlog("Workspace out of date. Will attempt merge.")
+			return false
 		} else {
 			c.wlog("Unable to AdvanceWorkspace: %s", err.Error())
 		}
@@ -874,8 +852,12 @@ func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {
-	workspaceName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
-	defer c.FuncIn("WorkspaceRoot::cleanup", "workspace %s", workspaceName).Out()
+	defer c.FuncIn("WorkspaceRoot::cleanup", "workspace %s",
+		wsr.fullname()).Out()
 
-	c.workspaceDB.UnsubscribeFrom(workspaceName)
+	c.workspaceDB.UnsubscribeFrom(wsr.fullname())
+}
+
+func (wsr *WorkspaceRoot) fullname() string {
+	return wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
 }

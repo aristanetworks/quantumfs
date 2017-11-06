@@ -1195,8 +1195,11 @@ func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
 func (wsl *WorkspaceList) setChildAttr(c *ctx, inodeNum InodeId,
 	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	c.elog("Invalid setChildAttr on WorkspaceList")
-	return fuse.ENOSYS
+	c.vlog("WorkspaceList::setChildAttr doing nothing")
+	out.AttrValid = 0
+	out.AttrValidNsec = 0
+	fillWorkspaceAttrFake(c, &out.Attr, inodeNum, "", "")
+	return fuse.OK
 }
 
 func (wsl *WorkspaceList) getChildXAttrSize(c *ctx, inodeNum InodeId,
